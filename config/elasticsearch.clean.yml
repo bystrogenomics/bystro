@@ -1,0 +1,7 @@
+connection:
+  # 200MB max content size
+  max_content_length: 209715200
+  request_timeout: 300
+  gzip: 1
+  nodes:
+    - ~
