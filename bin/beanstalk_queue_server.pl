@@ -191,7 +191,7 @@ while(my $job = $beanstalk->reserve) {
     say "job ". $job->id . " failed";
 
     if(defined $verbose || defined $debug) {
-      p $err->{vars}{body};
+      p $err;
     }
 
     if(ref $err eq 'Search::Elasticsearch::Error::Request') {

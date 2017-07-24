@@ -16,11 +16,7 @@ use namespace::autoclean;
 
 use DDP;
 
-# IO::FDPass recommended for MCE::Shared
-# https://github.com/marioroy/mce-perl/issues/5
-use IO::FDPass;
 use MCE::Loop;
-use MCE::Shared;
 
 use Seq::InputFile;
 use Seq::Output;
@@ -298,7 +294,11 @@ sub annotateFile {
       $dataFromDbAref = $self->{_db}->dbReadOne($fields[0], $fields[1] - 1, 1);
 
       if(!defined $dataFromDbAref) {
-        return ($self->_errorWithCleanup("Wrong assembly? $fields[0]\: $fields[1] not found."), 0, undef);
+        $self->_errorWithCleanup("Wrong assembly? $fields[0]\: $fields[1] not found.");
+        # Store a reference to the error, allowing us to exit with a useful fail message
+        MCE->gather(0, 0, "Wrong assembly? $fields[0]\: $fields[1] not found.");
+        $_[0]->abort();
+        return;
       }
 
       if(length($fields[4]) > 1) {
@@ -381,11 +381,6 @@ sub annotateFile {
 
   MCE::Loop::finish();
 
-  # This removes the content of $abortErr
-  # https://metacpan.org/pod/MCE::Shared
-  # Needed to exit, and close piped file handles
-  MCE::Shared::stop();
-
   # Unfortunately, MCE::Shared::stop() removes the value of $abortErr
   # according to documentation, and I did not see mention of a way
   # to copy the data from a scalar, and don't want to use a hash for this alone
@@ -437,8 +432,8 @@ sub makeLogProgressAndPrint {
     $throttleThreshold = 1e4;
   }
   return sub {
-    #<Int>$annotatedCount, <Int>$skipCount, <Str>$err, <Str>$outputLines = @_;
-    ##    $_[0],          $_[1],     $_[2], $_[3].   , $_[4]
+    #<Int>$annotatedCount, <Int>$skipCount, <Str>$err, <Str>$outputLines, <Bool> $forcePublish = @_;
+    ##    $_[0],          $_[1]           , $_[2],     $_[3].           , $_[4]
     if($_[2]) {
       $$abortErrRef = $_[2];
       return;
