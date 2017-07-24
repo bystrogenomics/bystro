@@ -9,7 +9,6 @@ cpan install MCE::Shared
 cpan install List::MoreUtils
 cpan install Log::Fast
 cpan install Parallel::ForkManager
-cpan install Redis::hiredis
 cpan install Cpanel::JSON::XS
 cpan install Mouse::Meta::Attribute::Custom::Trait::Array
 cpan install Net::HTTP

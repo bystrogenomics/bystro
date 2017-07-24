@@ -420,7 +420,6 @@ sub dbPut {
   return 0;
 }
 
-#TODO: check if this works
 sub dbGetNumberOfEntries {
   my ( $self, $chr ) = @_;
 
