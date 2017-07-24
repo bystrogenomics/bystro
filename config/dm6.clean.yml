@@ -1,0 +1,55 @@
+---
+assembly: dm6
+chromosomes:
+- chr2L
+- chr2R
+- chr3L
+- chr3R
+- chr4
+- chrM
+- chrX
+- chrY
+database_dir: '~'
+files: '~'
+files_dir: ~
+statistics:
+  dbSNPnameField: ~
+  exonicAlleleFunctionField: refSeq.exonicAlleleFunction
+  outputExtensions:
+    json: .statistics.json
+    qc: .statistics.qc.tab
+    tab: .statistics.tab
+  refTrackField: ref
+  siteTypeField: refSeq.siteType
+  programPath: bystro-stats
+temp_dir: '~'
+snpProcessor: bystro-snp
+vcfProcessor: bystro-vcf
+tracks:
+- local_files:
+  - dm6.fa.gz
+  name: ref
+  remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/dm6/bigZips/
+  remote_files:
+  - dm6.fa.gz
+  type: reference
+- features:
+  - name
+  - name2
+  name: refSeq
+  nearest:
+  - name
+  - name2
+  sql_statement: SELECT * FROM dm6.refGene
+  type: gene
+- name: phastCons
+  remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/dm6/phastCons27way/
+  remote_files:
+  - dm6.27way.phastCons.wigFix.gz
+  type: score
+- name: phyloP
+  remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/dm6/phyloP27way/
+  remote_files:
+  - dm6.phyloP27way.wigFix.gz
+  type: score
+

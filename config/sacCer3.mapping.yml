@@ -1,0 +1,371 @@
+#Our own, special field, tells an interface which fields to run prefix queries on
+numericalFields:
+    - phastCons
+    - phyloP
+    - pos
+    - sgd.codonNumber
+    - sgd.codonPosition
+sort:
+    cadd: avg
+    dbSNP.alleleNs: avg
+    dbSNP.alleleFreqs: min
+    sgd.codonNumber: avg
+    sgd.codonPosition: avg
+booleanFields:
+   - discordant
+# These only refer to searchable exact fields
+# These should be case sensitive, they are, by definition, exact
+hasExactFields:
+    - type
+    - sgd.name
+    - sgd.nearest.name
+
+post_index_settings:
+    index:
+        refresh_interval: 15s
+        number_of_replicas: 1
+index_settings:
+    index:
+        refresh_interval: -1
+        number_of_replicas: 0
+        number_of_shards: 9
+        codec: best_compression
+    analysis:
+        normalizer:
+            lowercase_normalizer:
+                type: custom
+                filter:
+                    - lowercase
+                    - asciifolding
+            uppercase_normalizer:
+                type: custom
+                filter:
+                    - uppercase
+                    - asciifolding
+        filter:
+            catenate_filter:
+                type: word_delimiter
+                catenate_words: true
+                catenate_numbers: true
+                catenate_all: true
+                preserve_original: false
+                generate_word_parts: false
+                stem_english_possessive: true
+                generate_number_parts: false
+                split_on_numerics: false
+                split_on_case_change: false
+            catenate_filter_split:
+                type: word_delimiter
+                catenate_words: true
+                catenate_numbers: true
+                catenate_all: true
+                preserve_original: false
+                generate_word_parts: true
+                stem_english_possessive: true
+                generate_number_parts: false
+                split_on_numerics: false
+                split_on_case_change: true
+
+            english_stemmer:
+                type: stemmer
+                language: light_english
+            english_possessive_stemmer:
+                type: stemmer
+                language: possessive_english
+            english_minimal_stemmer:
+                type: stemmer
+                language: minimal_english
+            search_synonym_filter:
+                type: synonym
+                synonyms_path : "analysis/search-synonyms.txt"
+            amino_synonym_filter:
+                type: synonym
+                synonyms_path : "analysis/amino-synonyms.txt"
+            type_synonym_filter:
+                type: synonym
+                synonyms_path : "analysis/type-synonyms.txt"
+            dbSNP_func_synonyms:
+                type: synonym
+                synonyms_path : "analysis/dbsnp-func-synonyms.txt"
+            dbSNP_class_synonyms:
+                type: synonym
+                synonyms_path : "analysis/dbsnp-class-synonyms.txt"
+            exonic_allele_function_search_synonyms:
+                type: synonym
+                synonyms_path : "analysis/exonic-allele-function-search-synonyms.txt"
+            site_type_synonym_filter:
+                type: synonym
+                synonyms_path : "analysis/site-type-synonyms.txt"
+            codon_map_synonym_filter:
+                type: synonym
+                synonyms_path : "analysis/codon-map-synonyms.txt"
+            description_synonyms:
+                type: synonym
+                synonyms_path : "analysis/refseq-description-synonyms.txt"
+            disease_synonyms:
+                type: synonym
+                synonyms_path : "analysis/disease-synonyms.txt"
+            autocomplete_filter:
+                type: edge_ngram
+                min_gram: 1
+                max_gram: 30
+                token_chars:
+                    - letter
+                    - digit
+            english_stop:
+                type: stop
+                stopwords:
+                    - a
+                    - an
+                    - and
+                    - are
+                    - as
+                    - at
+                    - be
+                    - but
+                    - by
+                    - for
+                    - if
+                    - in
+                    - into
+                    - is
+                    - it
+                    - of
+                    - on
+                    - or
+                    - has
+                    - such
+                    - that
+                    - the
+                    - their
+                    - then
+                    - there
+                    - these
+                    - they
+                    - this
+                    - to
+                    - was
+                    - will
+                    - with
+        analyzer:
+            autocomplete_english:
+                type: custom
+                tokenizer: whitespace
+                filter:
+                    - lowercase
+                    - asciifolding
+                    #- english_stop
+                    - catenate_filter
+                    - english_stemmer
+                    - autocomplete_filter
+            autocomplete_english_split:
+                type: custom
+                tokenizer: whitespace
+                filter:
+                    - lowercase
+                    - asciifolding
+                    #- english_stop
+                    - catenate_filter_split
+                    - english_stemmer
+                    - autocomplete_filter
+            search_english:
+                type: custom
+                tokenizer: whitespace
+                filter:
+                    - lowercase
+                    - asciifolding
+                    #- english_stop
+                    - catenate_filter
+                    - english_stemmer
+                    - search_synonym_filter
+            search_english_split:
+                type: custom
+                tokenizer: whitespace
+                filter:
+                    - lowercase
+                    - asciifolding
+                    #- english_stop
+                    - catenate_filter_split
+                    - english_stemmer
+                    - search_synonym_filter
+            search_english_type:
+                type: custom
+                tokenizer: whitespace
+                filter:
+                    - lowercase
+                    - asciifolding
+                    #- english_stop
+                    - catenate_filter
+                    - english_stemmer
+                    - type_synonym_filter
+                    - dbSNP_class_synonyms
+            search_english_description_synonyms:
+                type: custom
+                tokenizer: whitespace
+                filter:
+                    - lowercase
+                    - asciifolding
+                    #- english_stop
+                    - catenate_filter_split
+                    - english_stemmer
+                    - description_synonyms
+                    - disease_synonyms
+            search_english_class:
+                type: custom
+                tokenizer: whitespace
+                filter:
+                    - lowercase
+                    - asciifolding
+                    #- english_stop
+                    - catenate_filter
+                    - english_stemmer
+                    - dbSNP_class_synonyms
+            search_english_func:
+                type: custom
+                tokenizer: whitespace
+                filter:
+                    - lowercase
+                    - asciifolding
+                    #- english_stop
+                    - catenate_filter
+                    - english_stemmer
+                    - dbSNP_func_synonyms
+            lowercase_keyword:
+                type: custom
+                tokenizer: keyword
+                filter:
+                    - lowercase
+                    - asciifolding
+                    #- english_stop
+                    - catenate_filter
+                    - english_stemmer
+            lowercase_keyword_codon:
+                type: custom
+                tokenizer: keyword
+                filter:
+                    - lowercase
+                    - asciifolding
+                    #- english_stop
+                    - catenate_filter
+                    - english_stemmer
+                    - codon_map_synonym_filter
+                    - amino_synonym_filter
+                    - search_synonym_filter
+            lowercase_keyword_amino:
+                type: custom
+                tokenizer: keyword
+                filter:
+                    - lowercase
+                    - asciifolding
+                    #- english_stop
+                    - catenate_filter
+                    - english_stemmer
+                    - amino_synonym_filter
+                    - search_synonym_filter
+mappings:
+    _all:
+        enabled: false
+    properties:
+        chrom:
+            type: keyword
+            normalizer: lowercase_normalizer
+            # chr's are very short, and the "prefix" is a completely valid value
+            # so, don't include in all, because many false positivies with ngrams
+        pos:
+            type: integer
+        type:
+            type: text
+            analyzer:  autocomplete_english
+            search_analyzer: search_english_type
+            fields:
+                exact:
+                    type: keyword
+                    normalizer: lowercase_normalizer
+        discordant:
+            type: boolean
+        heterozygotes:
+            type: keyword
+        homozygotes:
+            type: keyword
+        missingGenos:
+            type: keyword
+        alt:
+            type: keyword
+            normalizer: uppercase_normalizer
+        ref:
+            type: keyword
+            normalizer: uppercase_normalizer
+        sgd:
+            properties:
+                siteType:
+                    type: text
+                    analyzer:  autocomplete_english
+                    #dbSNP func fields are similar to out siteType and exonicAlleleFunction fields
+                    search_analyzer: search_english_func
+                    fields:
+                        exact:
+                            type: keyword
+                            normalizer: lowercase_normalizer
+                exonicAlleleFunction:
+                    type: text
+                    analyzer:  autocomplete_english
+                    search_analyzer: search_english_func
+                    fields:
+                        exact:
+                            type: keyword
+                            normalizer: lowercase_normalizer
+                refCodon:
+                    type: keyword
+                    normalizer:  uppercase_normalizer
+                altCodon:
+                    type: keyword
+                    normalizer: uppercase_normalizer
+                refAminoAcid:
+                    type: text
+                    analyzer: lowercase_keyword
+                    search_analyzer: lowercase_keyword_amino
+                altAminoAcid:
+                    type: text
+                    analyzer:  lowercase_keyword
+                    search_analyzer: lowercase_keyword_amino
+                codonPosition:
+                    type: byte
+                codonNumber:
+                    type: integer
+                strand:
+                    type: keyword
+                # kgID is in the form uc001uub.1 , seems to always be lowercase
+                type:
+                    type: keyword
+                    normalizer:  lowercase_normalizer
+                proteinID:
+                    type: keyword
+                    normalizer: uppercase_normalizer
+                name:
+                    type: text
+                    analyzer:  autocomplete_english
+                    search_analyzer: search_english
+                    fields:
+                        exact:
+                            type: keyword
+                            normalizer: uppercase_normalizer
+                description:
+                    type: text
+                    analyzer:  autocomplete_english_split
+                    search_analyzer: search_english_description_synonyms
+                nearest:
+                    properties:
+                        proteinID:
+                            type: keyword
+                            normalizer:  uppercase_normalizer
+                        name:
+                            type: text
+                            analyzer:  autocomplete_english
+                            search_analyzer: search_english
+                            fields:
+                                exact:
+                                    type: keyword
+                                    normalizer: uppercase_normalizer
+        phastCons:
+            type: scaled_float
+            scaling_factor: 1000
