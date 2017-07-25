@@ -44,6 +44,8 @@ go install github.com/akotlar/bystro-vcf
 go get github.com/akotlar/bystro-snp
 go install github.com/akotlar/bystro-snp
 
+rm go1.8*
+
 # Eases package installation, gives us ability to quickly upgrade perl versions
 wget -O - https://install.perlbrew.pl | bash
 (echo "" ; echo "source ~/perl5/perlbrew/etc/bashrc") >> ~/.bash_profile && source ~/.bash_profile
