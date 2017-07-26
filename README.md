@@ -39,7 +39,7 @@ Please read [FIELDS.md](FIELDS.md)
     - chr3
     ```
     
-    Only chr1, chr2, and chr3 will be accepted. However, Bystro tries to make your life simple
+    Only chr1, chr2, and chr3 will be accepted. However, Bystro tries to make your life easy
       1. We currently follow UCSC coneventions for ```chromosomes```, meaning they should be prepended by **chr**
       2. Bystro will automatically append **chr** to chromosomes read from an input file during annotation. 
       3. Bystro allows the transformation of any field during building, configurable in the YAML config file for that assembly, making it easy to prepend **chr** to the source file chromosome field
@@ -54,7 +54,7 @@ Please read [FIELDS.md](FIELDS.md)
             Chromosome: chrom
       ```
       
-      Here ```fieldMap``` allows us to rename header fields, and ```build_field_transformations```
+      Here ```fieldMap``` allows us to rename header fields, and ```build_field_transformations``` allows us to defined a prepend operation (```chr .``` can be interpreted as the perl command ``` "chr" . $chrom```)
       
       
     So: input files do **not** need to have their chromosomes prepended by **chr**. Bystro will normalize the name.
