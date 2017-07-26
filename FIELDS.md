@@ -1,5 +1,5 @@
 # Bystro Annotation Field Description
-<h4> *Italicized fields* are custom Bystro fields. All others are sourced as described.</h4>
+<h4> <em>Italicized fields</em> are custom Bystro fields. All others are sourced as described.</h4>
 
 <br/>
 
