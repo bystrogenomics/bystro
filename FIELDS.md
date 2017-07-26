@@ -27,15 +27,15 @@ Reserved characters:
 **pos**  - genomic position
 
 **type** - the type of variant
-  * <md-icon class='material-icons small list-center'>help</md-icon> VCF format types: **SNP**, **INS**, **DEL**, **MULTIALLELIC**
-  * <md-icon class='material-icons small list-center'>help</md-icon> SNP format types: **SNP**, **INS**, **DEL**, **MULTIALLELIC**, **DENOVO_***
+  * VCF format types: **SNP**, **INS**, **DEL**, **MULTIALLELIC**
+  * SNP format types: **SNP**, **INS**, **DEL**, **MULTIALLELIC**, **DENOVO_***
   
 <em>**discordant**</em> - does the input file's reference allele differ from Bystro's genome assembly? (1 if yes, 0 otherwise)
 
 <em>**trTv**</em> - is the site a transition (1), transversion (2), or neither (0)?
 
 **alt** - the alternate/nonreference allele
-  * <md-icon class='material-icons small list-center'>help</md-icon> VCF multiallelics are split, one line each
+  * VCF multiallelics are split, one line each
 
 <em>**heterozygotes**</em> - all samples that are heterozygotes for the alternate allele 
 
@@ -43,7 +43,7 @@ Reserved characters:
 
 <em>**missingGenos**</em> - all samples that have at least one '.' (VCF) or 'N' (SNP) genotype call.
 
-  * <md-icon class='material-icons small list-center'>help</md-icon> **Note**: No samples are dropped
+  * **Note**: No samples are dropped
 
 Multiallelic variants are always decomposed into bi-allelic variants on separate lines, and given the type **MULTIALLELIC**
   * Heterozygotes/Homozygotes are called based on the number of alleles for a given decomposed variants
@@ -54,7 +54,7 @@ Multiallelic variants are always decomposed into bi-allelic variants on separate
 <h4>Sourced from UCSC</h4>
 
 **ref** - the reference allele
-  * <md-icon class='material-icons small list-center'>help</md-icon> e.g Human (hg38, hg19), Mouse (mm10, mm9), Fly (dm6), C.elegans (ce11), etc.
+  * e.g Human (hg38, hg19), Mouse (mm10, mm9), Fly (dm6), C.elegans (ce11), etc.
 
 <br/>
 
@@ -64,11 +64,11 @@ Multiallelic variants are always decomposed into bi-allelic variants on separate
 All overlapping RefSeq transcripts are annotated (no prioritization, all possible values are reported)
 
 <em>**refSeq.siteType**</em> - the effect the ```alt``` allele has on this transcript.
-  * <md-icon class='material-icons small list-center'>help</md-icon> Possible types: **intronic**, **exonic**, **UTR3**, **UTR5**, **spliceAcceptor**, **spliceDonor**, **ncRNA**, **intergenic**
-  * <md-icon class='material-icons small list-center'>help</md-icon> This is the only field that will have a value when a site is intergenic
+  * Possible types: **intronic**, **exonic**, **UTR3**, **UTR5**, **spliceAcceptor**, **spliceDonor**, **ncRNA**, **intergenic**
+  * This is the only field that will have a value when a site is intergenic
 
 <em>**refSeq.exonicAlleleFunction**</em> - The coding effect of the variant
-  * <md-icon class='material-icons small list-center'>help</md-icon> Possible values: **synonymous**, **nonSynonymous**, **indel-nonFrameshift**, **indel-frameshift**, **stopGain**, **stopLoss**, **startLoss**
+  * Possible values: **synonymous**, **nonSynonymous**, **indel-nonFrameshift**, **indel-frameshift**, **stopGain**, **stopLoss**, **startLoss**
 
 <em>**refSeq.refCodon**</em> - the codon based on *in silico* transcription of the reference assembly
 
@@ -133,7 +133,7 @@ Clinvar variants are reported based on position and **do not necessarily corresp
 <em>**refSeq.clinvar.numberSubmitters**</em> - total number of submissions of the Clinvar variant
 
 <em>**refSeq.clinvar.reviewStatus**</em> - level of intepretation of the variant provided
-  * <md-icon class='material-icons small list-center'>help</md-icon> Such as "reviewed by expert panel"
+  * Such as "reviewed by expert panel"
 
 <em>**refSeq.clinvar.chromStart**</em> - chromosome start site for the clinvar record
 
