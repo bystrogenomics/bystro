@@ -80,10 +80,10 @@ These describe where the Bystro database and any source files are located.
 
 2. `database_dir` : Each database is held within ```database_dir```, in a folder of the name ```assembly```
   
-  **Ex:** For the config file containing
-  ```yaml
-  assembly: hg19
-  database_dir: /path/to/databases/
-  ```
+    **Ex:** For the config file containing
+    ```yaml
+    assembly: hg19
+    database_dir: /path/to/databases/
+    ```
  
-   Bystro will look for the database ```/path/to/databases/hg19```
+     Bystro will look for the database ```/path/to/databases/hg19```
