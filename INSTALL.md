@@ -16,7 +16,7 @@ Users of AWS can skip installation altogether, and use the latest public Bystro 
 
 
 ## Configuring Bystro for annotation
-Once Bystro is installed, it needs to be configured. The easiest step is choosing the species/assemblies to annotate from.
+Once Bystro is installed, it needs to be configured. The easiest step is choosing the species/assemblies to annotate.
 
 1. Download the Bystro database for your species/assembly
  * **Example:**  hg38 (human reference GRCh38): ```wget https://s3.amazonaws.com/bystro-db/hg38.tar.gz```</strong> 
