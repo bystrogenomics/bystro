@@ -14,45 +14,76 @@ Please read [FIELDS.md](FIELDS.md)
 
 - The config file describes the state of both the database and the annotation. It's required for annotating or building
 - It has several keys:
-- *tracks*: What your database contains, and what you annotate against. Tracks have a name, which must be unique, and a type, which doesn't need to be unique, but must be one of:
-  - *type*:
-    + *sparse*: Any bed file, or any file that can be mapped to chrom, chromStart, and chromEnd columns.
-      + We can transform almost any file to fit this format. 
-    + *score*: Accepts any wigFix file. 
-      + Used for phastCons, phyloP
-    + *cadd*: Accepts any CADD file, or Bystro's custom "bed-like" CADD file, which has 2 header lines, and chrom, chromStart, chromEnd columns, followed by standard CADD fields
-      * CADD format: http://cadd.gs.washington.edu
-    + *gene*: A UCSC gene track field (ex: knownGene, refGene, sgdGene).
-    + The "source files" for this are created by an `sql_statement`:
-      + Ex: SELECT * FROM hg38.refGene LEFT JOIN hg38.kgXref ON hg38.kgXref.refseq
-    = hg38.refGene.name
+  - ```tracks```: The highest level organization for database values. Tracks have a ```name``` property, which must be unique, and a ```type```, which must be one of:
+      + *sparse*: Any bed file, or any file that can be mapped to chrom, chromStart, and chromEnd columns.
+        + This is used for dbSNP, and Clinvar records, but many files can be fit this format.
+        + Mapping fields can be managed by the ```fieldMap``` key
+      + *score*: Accepts any wigFix file. 
+        + Used for phastCons, phyloP
+      + *cadd*:
+        + Accepts any CADD file, or Bystro's custom "bed-like" CADD file, which has 2 header lines, and chrom, chromStart, chromEnd columns, followed by standard CADD fields
+        * CADD format: http://cadd.gs.washington.edu
+      + *gene*: A UCSC gene track field (ex: knownGene, refGene, sgdGene).
+        + The ```local_files``` for this are created using an ```sql_statement```
+        + Ex: ```SELECT * FROM hg38.refGene LEFT JOIN hg38.kgXref ON hg38.kgXref.refseq = hg38.refGene.name```
+  - ```chromosomes```: The allowable chromosomes.
+    - Each row of every track must be identified by these chromosomes (during building)
+    - Each row of any input file submitted for annotation must also be "" "" (during annotation)
+    - However, Bystro is flexible about the **chr** prefix
+ 
+    **Ex:** For the following config
+    ```yaml
+    chromosomes:
+    - chr1
+    - chr2
+    - chr3
+    ```
+    
+    Only chr1, chr2, and chr3 will be accepted. However, Bystro tries to make your life simple
+      1. We currently follow UCSC coneventions for ```chromosomes```, meaning they should be prepended by **chr**
+      2. Bystro will automatically append **chr** to chromosomes read from an input file during annotation. 
+      3. Bystro allows the transformation of any field during building, configurable in the YAML config file for that assembly, making it easy to prepend **chr** to the source file chromosome field
+      
+      Ex: Clinvar doesn't have a **chr** prefix, so during building we specify:
+      ```yaml
+      tracks:
+        - name: clinvar
+          build_field_transformations:
+            chrom: chr .
+          fieldMap:
+            Chromosome: chrom
+      ```
+      
+      Here ```fieldMap``` allows us to rename header fields, and ```build_field_transformations```
+      
+      
+    So: input files do **not** need to have their chromosomes prepended by **chr**. Bystro will normalize the name.
+    
+    In this example chromosomes ```1``` and ```chr1``` will be built/annotated, but ```1_rand``` will not.
 
 ### Directories and Files
 These describe where the Bystro database and any source files are located.
 
-1. `files_dir` : The parent folder in which our database source directories (which are used in creating the databsae) are located. This is only necessary when building a database
-  * This directory must contain one folder, with the same name as each track being built
+1. `files_dir` : The parent folder within which each track's ```local_files``` are located
+  * Bystro automatically checks for ```local_files``` at ```parent/trackName/file```
+    
+    **Ex:** For the config file containing
+    ```yaml
+    files_dir: /path/to/files/
+    track:
+      - name: refSeq
+        local_files:
+          - hg19.refGene.chr1.gz
+          # and more files
+     ```
+       Bystro will expect files in ```/path/to/files/refSeq/hg19.refGene.chr1.gz```
 
-Ex:
-```yml
-files_dir: /path/to/
-# ...
-tracks:
-  - name: refSeq
-    type: gene
-    local_files:
-      - chr1.fa.gz
-      - chr2.fa.gz
-      - chr3.fa.gz
-    # more refSeq track configuration
-    # We then expect that all refSeq source file will be in /path/to/refSeq,
-    # in which we find chr1.fa.gz, chr2.fa.gz, and chr3.fa.gz
-```
-  * It is also possible
-2. `database_dir` : Where the database is located. Required
-```
-database_dir: /path/to/database/
-```
-
-# Statistics configuration
-The "statistics" key describes the bystro-stats module configuration.
+2. `database_dir` : Each database is held within ```database_dir```, in a folder of the name ```assembly```
+  
+  **Ex:** For the config file containing
+  ```yaml
+  assembly: hg19
+  database_dir: /path/to/databases/
+  ```
+ 
+   Bystro will look for the database ```/path/to/databases/hg19```
