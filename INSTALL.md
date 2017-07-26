@@ -9,7 +9,9 @@ Users of AWS can skip installation altogether, and use the latest public Bystro 
  1. Following [Amazon's instructions](http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/usingsharedamis-finding.html), search for the "Bystro" Public AMI
 
 
-## Installation on RPM-based distros (Fedora, Redhat, Centos, openSUSE, Mandriva)
+## Installation on RPM-based distros
+<h4>(Fedora, Redhat, Centos, openSUSE, Mandriva)</h4>
+
  1. ```wget https://github.com/akotlar/bystro/archive/master.zip -O bystro.zip && unzip bystro.zip && mv bystro-master bystro && cd $_ && ./install-rpm.sh```
 
 
