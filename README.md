@@ -54,7 +54,7 @@ Please read [FIELDS.md](FIELDS.md)
             Chromosome: chrom
       ```
       
-      Here ```fieldMap``` allows us to rename header fields, and ```build_field_transformations``` allows us to defined a prepend operation (```chr .``` can be interpreted as the perl command ``` "chr" . $chrom```)
+      Here ```fieldMap``` allows us to rename header fields, and ```build_field_transformations``` allows us to define a prepend operation (```chr .``` can be interpreted as the perl command ``` "chr" . $chrom```)
       
       
     So: input files do **not** need to have their chromosomes prepended by **chr**. Bystro will normalize the name.
