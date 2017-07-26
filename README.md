@@ -1,6 +1,8 @@
 # Bystro
 ## Using Bystro
-For most users, we recommend https://bystro.io . The web app gives full access to all of Bystro's capabilities, and provides a convenient search/filtering interface.
+For most users, we recommend https://bystro.io .
+
+The web app gives full access to all of Bystro's capabilities, provides a convenient search/filtering interface, supports large data sets (tested up to 890GB uncompressed/129GB compressed), and has excellent performance.
 
 ## Installing Bystro
 Follow the instructions in [INSTALL.md](INSTALL.md)
