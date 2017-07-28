@@ -29,6 +29,10 @@ wget https://storage.googleapis.com/golang/go1.8.linux-amd64.tar.gz
 tar -xvf go1.8.linux-amd64.tar.gz
 sudo mv go /usr/local
 
+# LiftOver is used for the LiftOverCadd.pm package, to liftOver cadd to hg38
+# and cadd's GRCh37.p13 MT to hg19
+wget http://hgdownload.cse.ucsc.edu/admin/exe/linux.x86_64/liftOver && chmod +x liftOver && sudo mv $_ /usr/local/bin/
+
 (echo "" ; echo 'export PATH=$PATH:/usr/local/go/bin') >> ~/.bash_profile 
 (echo ""; echo 'export GOPATH=$HOME/go') >> ~/.bash_profile
 echo 'export PATH=$PATH:$HOME/go/bin/' >> ~/.bash_profile && source ~/.bash_profile
