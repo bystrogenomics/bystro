@@ -39,4 +39,19 @@ Once Bystro is installed, it needs to be configured. The easiest step is choosin
 6. Rat (rn6): https://s3.amazonaws.com/bystro-db/rn6.tar.gz
 7. Rhesus (rheMac8): https://s3.amazonaws.com/bystro-db/rheMac8.tar.gz
 8. S.cerevisae (sacCer3): https://s3.amazonaws.com/bystro-db/sacCer3.tar.gz
-9. C.elegans (ce11): 	https://s3.amazonaws.com/bystro-db/ce11.tar.gz
+9. C.elegans (ce11): https://s3.amazonaws.com/bystro-db/ce11.tar.gz
+
+
+## Running your first annotation
+Ex: Runing hg38 annotation
+
+```sh
+bin/annotate.pl --config config/hg38.yml --in /path/in.vcf.gz --out /path/outPrefix --run_statistics [0,1] --compress
+```
+
+The outputs will be:
+  - Annotation (compressed, due to --compress flag): ```outPrefix.annotation.tsv.gz```
+  - Annotation log: ```outPrefix.log.txt```
+  - Statistics JSON file ```outPrefix.statistics.json```
+  - Statistics tab-separated file: ```outPrefix.statistics.tsv```
+    - Removing the ```--run_statistics``` flag will skip the generation of ```outPrefix.statistics.*``` files
