@@ -1,4 +1,4 @@
-# Bystro
+# Bystro [![DOI](https://zenodo.org/badge/98203430.svg)](https://zenodo.org/badge/latestdoi/98203430)
 ## Using Bystro
 For most users, we recommend https://bystro.io .
 
