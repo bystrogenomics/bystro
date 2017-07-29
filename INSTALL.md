@@ -23,12 +23,28 @@ Once Bystro is installed, it needs to be configured. The easiest step is choosin
    * You need ~270GB of free space for human and mouse databases (less for all other species by at least half)
    * Databases are ~4.5x their compressed size when unpacked
   
+  The downloaded databases are tar balls, in which the database files that Bystro needs to access are located in ```<assembly>/index```
+  
 2. Expand within some folder:
-  * **Example:** ```pigz -d -c hg38.tar.gz | (cd /where/to/ && tar xvf -)```
-3. Create a copy of the assembly config YAML file, and update its ```database_dir``` property to point to folder in which the database was expanded
-  * **Example:**
-    1. ```cp config/hg38.clean.yml config/hg38.yml && vim $_```
-    2. Replace ```database_dir: '~'``` with ```database_dir:/where/to/```
+  
+   **Example:**
+  
+   ```shell
+   pigz -d -c hg38.tar.gz | (cd /where/to/ && tar xvf -)```
+   ```
+  
+   In this example the hg38 database would located in `/where/to/hg38/index`
+
+3. Create a copy of the assembly config YAML file, and update its `database_dir` property to point to `index` folder
+   - Since in our downloaded tarballs, the database is within a folder called `index`
+  
+   **Example:**
+  
+   ```shell
+   cp config/hg38.clean.yml config/hg38.yml && yaml w -i $_ database_dir /where/to/hg38/index
+   ```
+
+   The config file editing could of course be also done using vim/nano/vi/emacs
  
 ## Databases:
 1. Human (hg38): https://s3.amazonaws.com/bystro-db/hg38.tar.gz

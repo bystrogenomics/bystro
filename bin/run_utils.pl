@@ -20,7 +20,7 @@ use Seq::Build;
 
 my (
   $yaml_config, $wantedName, $sortCadd, $renameTrack,
-  $help,        $liftOverCadd, $liftOverCadd_path, $liftOverChainPath,
+  $help,        $liftOverCadd, $liftOverPath, $liftOverChainPath,
   $debug,       $overwrite, $fetch, $caddToBed, $compress, $toBed,
   $renameTrackTo, $verbose, $dryRunInsertions,
 );
@@ -38,7 +38,7 @@ GetOptions(
   'renameTrack'  => \$renameTrack,
   'liftOverCadd' => \$liftOverCadd,
   'compress' => \$compress,
-  'liftOverPath=s' => \$liftOverCadd_path,
+  'liftOverPath=s' => \$liftOverPath,
   'liftOverChainPath=s' => \$liftOverChainPath,
   'renameTo=s' => \$renameTrackTo,
   'verbose=i' => \$verbose,
@@ -56,16 +56,24 @@ unless ($yaml_config) {
 
 my %options = (
   config       => $yaml_config,
-  name         => $wantedName || undef,
+  name         => $wantedName,
   debug        => $debug,
   overwrite    => $overwrite || 0,
-  overwrite    => $overwrite || 0,
-  liftOverPath => $liftOverCadd_path || '',
-  liftOverChainPath => $liftOverChainPath || '',
-  renameTo => $renameTrackTo,
   verbose => $verbose,
   dryRun => $dryRunInsertions,
 );
+
+if($renameTrackTo) {
+  $options{renameTo} = $renameTrackTo;
+}
+
+if($liftOverPath) {
+  $options{liftOverPath} = $liftOverPath;
+}
+
+if($liftOverChainPath) {
+  $options{liftOverChainPath} = $liftOverChainPath;
+}
 
 if($compress) {
   $options{compress} = $compress;

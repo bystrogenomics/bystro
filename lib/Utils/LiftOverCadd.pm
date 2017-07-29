@@ -42,6 +42,8 @@ sub liftOver {
   my $localFilesPathsAref = $localFilesHandler->makeAbsolutePaths($self->_decodedConfig->{files_dir},
     $self->_wantedTrack->{name}, $self->_wantedTrack->{local_files});
 
+  my $outDir = path($self->_decodedConfig->{files_dir})->child($self->_wantedTrack->{name});
+
   my $pm = Parallel::ForkManager->new(scalar @$localFilesPathsAref);
 
   if(!@$localFilesPathsAref) {
@@ -55,15 +57,18 @@ sub liftOver {
 
     my (undef, $isCompressed, $inFh) = $self->get_read_fh($inPath);
 
-    my $inPathPart = $isCompressed ? substr( $inPath, 0, rindex($inPath, ".") )
-      : $inPath;
+    my $baseName = path($inPath)->basename;
+
+    my $outPath = $outDir->child($baseName)->stringify;
+
+    $outPath = $isCompressed ? substr( $outPath, 0, rindex($outPath, ".") ) : $outPath;
 
     my $compressOutput = $isCompressed || $self->compress;
 
     # It's a bit confusing how to compress stderr on the fly alongside stdout
     # So just compress it (always) as a 2nd step
-    my $unmappedPath = $inPathPart . ".unmapped.txt";
-    my $liftedPath = $inPathPart . ".mapped" . ($compressOutput ? '.gz' : '');
+    my $unmappedPath = $outPath . ".unmapped.txt";
+    my $liftedPath = $outPath . ".mapped" . ($compressOutput ? '.gz' : '');
 
     if(-e $liftedPath && -e $unmappedPath && !$self->overwrite) {
       $self->log('info', "$liftedPath and $unmappedPath exist, and overwrite not set. Skipping.");

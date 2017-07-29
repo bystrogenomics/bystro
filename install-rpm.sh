@@ -48,6 +48,10 @@ go install github.com/akotlar/bystro-vcf
 go get github.com/akotlar/bystro-snp
 go install github.com/akotlar/bystro-snp
 
+# allows us to modify our config files in place
+go get github.com/mikefarah/yaml
+go install github.com/mikefarah/yaml
+
 rm go1.8*
 
 # Eases package installation, gives us ability to quickly upgrade perl versions

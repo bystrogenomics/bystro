@@ -162,7 +162,8 @@ tracks:
   type: score
 - local_files:
   # Note that chrM for hg19 is not equal to GRCh37.p13 MT
-  - whole_genome_SNVs.tsv.chr*.bed.gz
+  - whole_genome_SNVs.tsv.bed.chr*.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.bed.chrM.organized-by-chr.txt.sorted.txt.mapped.gz
   name: cadd
   sorted_guaranteed: 1
   type: cadd
