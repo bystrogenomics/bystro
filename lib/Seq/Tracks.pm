@@ -38,6 +38,7 @@ use Seq::Tracks::Sparse;
 use Seq::Tracks::Region;
 use Seq::Tracks::Gene;
 use Seq::Tracks::Cadd;
+use Seq::Tracks::Vcf;
 
 use Seq::Tracks::Reference::Build;
 use Seq::Tracks::Score::Build;
@@ -45,6 +46,8 @@ use Seq::Tracks::Sparse::Build;
 use Seq::Tracks::Region::Build;
 use Seq::Tracks::Gene::Build;
 use Seq::Tracks::Cadd::Build;
+use Seq::Tracks::Vcf::Build;
+
 
 use Seq::Tracks::Base::Types;
 ########################### Configuration ##################################

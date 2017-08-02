@@ -14,6 +14,7 @@ use Seq::Tracks;
 use Seq::Statistics;
 
 with 'Seq::Role::IO';
+with 'Seq::Output::Fields';
 # Note: All init_arg undef methods must be lazy if they rely on arguments that are
 # not init_arg => undef, and do not have defaults (aka are required)
 ######################## Required ##############################
@@ -47,16 +48,6 @@ has statistics => (is => 'ro', isa => 'HashRef');
 has run_statistics => (is => 'ro', isa => 'Bool', default => sub {!!$_[0]->statistics});
 
 has max_threads => (is => 'ro', isa => 'Int', lazy => 1, default => 8);
-
-has chromField => (is => 'ro', default => 'chrom', lazy => 1);
-has posField => (is => 'ro', default => 'pos', lazy => 1);
-has typeField => (is => 'ro', default => 'type', lazy => 1);
-has discordantField => (is => 'ro', default => 'discordant', lazy => 1);
-has altField => (is => 'ro', default => 'alt', lazy => 1);
-has trTvField => (is => 'ro', default => 'trTv', lazy => 1);
-has heterozygotesField => (is => 'ro', default => 'heterozygotes', lazy => 1);
-has homozygotesField => (is => 'ro', default => 'homozygotes', lazy => 1);
-has missingField => (is => 'ro', default => 'missingGenos', lazy => 1);
 
 # has badSamplesField => (is => 'ro', default => 'badSamples', lazy => 1);
 

@@ -37,11 +37,14 @@ has geneType => (is => 'ro', init_arg => undef, lazy => 1, default => sub{$geneT
 state $caddType = 'cadd';
 has caddType => (is => 'ro', init_arg => undef, lazy => 1, default => sub{$caddType});
 
+state $vcfType = 'vcf';
+has vcfType => (is => 'ro', init_arg => undef, lazy => 1, default => sub{$vcfType});
+
 has trackTypes => (is => 'ro', init_arg => undef, lazy => 1, default => sub{
-  return [$refType, $scoreType, $sparseType, $regionType, $geneType, $caddType]
+  return [$refType, $scoreType, $sparseType, $regionType, $geneType, $caddType, $vcfType]
 });
 
-enum TrackType => [$refType, $scoreType, $sparseType, $regionType, $geneType, $caddType];
+enum TrackType => [$refType, $scoreType, $sparseType, $regionType, $geneType, $caddType, $vcfType];
 
 #Convert types; Could move the conversion code elsewehre,
 #but I wanted types definition close to implementation

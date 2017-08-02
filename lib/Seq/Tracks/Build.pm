@@ -316,6 +316,66 @@ sub transformField {
   return &{$codeRef}($featureValue);
 }
 
+# Merge sparse data. We intentionally push undefined (or nil if in Go)
+# values, because we want to keep order consistent, so that all records pertaining
+# to one position for this track are kept together
+# Merge functions are only called if there is an $oldTrackVal
+# WARNING: This will not work if you try to build twice, without first deleting
+# that track from the database. It will result in nested arrays.
+sub makeMergeFunc {
+  my $self = shift;
+
+  my $name = $self->name;
+  my $madeIntoArray = {};
+
+  return sub {
+    my ($chr, $pos, $oldTrackVal, $newTrackVal) = @_;
+    my @updated = @$oldTrackVal;
+
+    # oldTrackVal and $newTrackVal should both be arrays, with at least one index
+    for (my $i = 0; $i < @$newTrackVal; $i++) {
+      if($i > $#$oldTrackVal) {
+        push @updated, $newTrackVal->[$i];
+        next;
+      }
+
+      if(ref $newTrackVal->[$i]) {
+        if(ref $newTrackVal->[$i] ne 'ARRAY') {
+          # TODO: move away from fatal, allow graceful exit w/ error message
+          $self->log('fatal', $self->name. ": $name track received new record in mergeFunc that was a non-Array reference");
+          # We should never get here; fatal should exit; however, for consistent return and clarity
+          # and in case API changes
+          return ($self->name. ": $name track received new record in mergeFunc that was a non-Array reference", undef);
+        }
+
+        if(!ref $updated[$i]) {
+          $updated[$i] = [$updated[$i], @{$newTrackVal->[$i]}];
+        } else {
+          push @{$updated[$i]}, @{$newTrackVal->[$i]};
+        }
+
+      } else {
+        if(!ref $updated[$i]) {
+
+          $updated[$i] = [$updated[$i], $newTrackVal->[$i]];
+        } else {
+          push @{$updated[$i]}, $newTrackVal->[$i];
+        }
+      }
+    }
+
+    # if($self->name eq 'snp146') {
+    #   say "oldVal is";
+    #   p $oldTrackVal;
+    #   say "newTrackVal is";
+    #   p $newTrackVal;
+    #   say "updated is";
+    #   p @updated;
+    # }
+    return (undef, \@updated);
+  }
+}
+
 sub _coerceUndefinedValues {
   #my $dataStr = shift;
   #    $_[0]   = shift;
