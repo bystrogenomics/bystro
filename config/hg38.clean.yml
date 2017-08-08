@@ -28,7 +28,9 @@ chromosomes:
 - chrY
 database_dir: '~'
 files: '~'
-files_dir: ~
+files_dir: '~'
+snpProcessor: bystro-snp
+vcfProcessor: bystro-vcf
 statistics:
   dbSNPnameField: dbSNP.name
   exonicAlleleFunctionField: refSeq.exonicAlleleFunction
@@ -36,12 +38,10 @@ statistics:
     json: .statistics.json
     qc: .statistics.qc.tab
     tab: .statistics.tab
+  programPath: bystro-stats
   refTrackField: ref
   siteTypeField: refSeq.siteType
-  programPath: bystro-stats
 temp_dir: '~'
-snpProcessor: bystro-snp
-vcfProcessor: bystro-vcf
 tracks:
 - name: ref
   remote_dir: http://hgdownload.soe.ucsc.edu/goldenPath/hg38/chromosomes/
@@ -160,7 +160,6 @@ tracks:
   - chrM.phyloP100way.wigFix.gz
   type: score
 - local_files:
-  # Leaving this in clean copy, to make note of hg38/hg19 chrM issue
   - whole_genome_SNVs.tsv.bed.mapped.chr*.organized-by-chr.txt.sorted.txt.gz
   - whole_genome_SNVs.tsv.bed.chrM.organized-by-chr.txt.gz
   name: cadd
@@ -220,4 +219,48 @@ tracks:
   remote_files:
   - ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz
   type: sparse
+- features:
+  - alt
+  - ID
+  - AC: number
+  - AF: number
+  - AN: number
+  - AC_AFR: number
+  - AC_AMR: number
+  - AC_ASJ: number
+  - AC_EAS: number
+  - AC_FIN: number
+  - AC_NFE: number
+  - AC_OTH: number
+  - AC_Male: number
+  - AC_Female: number
+  - AN_AFR: number
+  - AN_AMR: number
+  - AN_ASJ: number
+  - AN_EAS: number
+  - AN_FIN: number
+  - AN_NFE: number
+  - AN_OTH: number
+  - AN_Male: number
+  - AN_Female: number
+  - AF_AFR: number
+  - AF_AMR: number
+  - AF_ASJ: number
+  - AF_EAS: number
+  - AF_FIN: number
+  - AF_NFE: number
+  - AF_OTH: number
+  - AF_Male: number
+  - AF_Female: number
+  fieldMap:
+    AC: ac
+    AC_AFR: ac_afr
+    AC_AMR: ac_amr
+    AC_ASJ: ac_asj
+    AF: af
+    ALT: alt
+    AN: an
+    ID: id
+  name: gnomad.genomes
+  type: vcf
 

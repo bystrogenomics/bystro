@@ -19,10 +19,12 @@ use Seq::DBManager;
 use Seq::Tracks::Build::CompletionMeta;
 use Seq::Tracks::Base::Types;
 use Seq::Tracks::Build::LocalFilesPaths;
+use Seq::Output;
 
 extends 'Seq::Tracks::Base';
 # All builders need get_read_fh
 with 'Seq::Role::IO';
+
 #################### Instance Variables #######################################
 ############################# Public Exports ##################################
 has delete => (is => 'ro', lazy => 1, default => 0);
@@ -99,6 +101,17 @@ has build_field_transformations => (
   default => sub { {} },
 );
 
+# TODO: config output;
+has _emptyFieldRegex => (is => 'ro', isa => 'RegexpRef', init_arg => undef, default => sub { 
+  my $output = Seq::Output->new();
+
+  my $emptyField = $output->delimiters->emptyFieldChar;
+
+  my $regex = qr/^\s*$emptyField\s*$/;
+
+  return $regex;
+});
+
 ################################ Constructor ################################
 sub BUILD {
   my $self = shift;
@@ -165,7 +178,7 @@ sub coerceFeatureType {
   # http://stackoverflow.com/questions/2059817/why-is-perl-foreach-variable-assignment-modifying-the-values-in-the-array
   # https://ideone.com/gjWQeS
   for my $val (ref $_[2] ? @{ $_[2] } : $_[2]) {
-    $val = _coerceUndefinedValues($val);
+    $val = $_[0]->coerceUndefinedValues($val);
 
     if( defined $type && defined $val ) {
       $val = $converter->convert($val, $type);
@@ -376,18 +389,17 @@ sub makeMergeFunc {
   }
 }
 
-sub _coerceUndefinedValues {
-  #my $dataStr = shift;
-  #    $_[0]   = shift;
+sub coerceUndefinedValues {
+  #my ($self, $dataStr) = @_;
 
   # Don't waste storage space on NA. In Bystro undef values equal NA (or whatever
   # Output.pm chooses to represent missing data as.
 
-  if($_[0] =~ /^\s*NA\s*$/i || $_[0] =~/^\s*$/) {
+  if($_[1] =~ /^\s*NA\s*$/i || $_[1] =~/^\s*$/ || $_[1] =~/^\s*\.\s*$/ || $_[1] =~ $_[0]->_emptyFieldRegex) {
     return undef;
   }
 
-  return $_[0];
+  return $_[1];
 }
 
 sub _isTransformOperator {

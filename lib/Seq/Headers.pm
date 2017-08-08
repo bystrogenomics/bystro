@@ -23,7 +23,7 @@ state $parentChildHashRef = {};
 state $orderMap = {};
 
 # All singleton tracks have an initialize method, which clears 
-sub initialize() {
+sub initialize {
   $orderedHeaderFeaturesAref = [];
   $orderedHeaderFeaturesArefNoMap = [];
   $parentChild = {};
@@ -31,7 +31,7 @@ sub initialize() {
   $orderMap = {};
 }
 
-sub get() {
+sub get {
   return $orderedHeaderFeaturesAref;
 }
 

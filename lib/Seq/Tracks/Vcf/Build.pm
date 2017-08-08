@@ -16,6 +16,10 @@ our $VERSION = '0.001';
 # TODO: better error handling in the vcf pre-processor
 # TODO: Support fields delimited by something other than just , for Number=A
 # TODO: Move opening of vcf to Seq::Input::Vcf
+# TODO: Be more explicit with naming of indices from the intermediate annotation output
+# (such as vcfAltIdx = 4, rather than using 4 itself)
+
+# Note ALT field is required, if not found will be appended
 use Mouse 2;
 
 use namespace::autoclean;
@@ -24,12 +28,14 @@ use Parallel::ForkManager;
 use Scalar::Util qw/looks_like_number/;
 use Seq::Output::Delimiters;
 use Seq::Tracks::Base::Types;
+use Scalar::Util qw/looks_like_number/;
 
 use DDP;
 
 extends 'Seq::Tracks::Build';
 
 with 'Seq::Output::Fields';
+with 'Seq::Tracks::Vcf::Definition';
 # We assume sparse tracks have at least one feature; can remove this requirement
 # But will need to update makeMergeFunc to not assume an array of values (at least one key => value)
 has '+features' => (required => 1);
@@ -38,16 +44,55 @@ has vcfProcessor => (is => 'ro', isa => 'Str', required => 1);
 
 # We skip entries that span more than this number of bases
 has maxVariantSize => (is => 'ro', isa => 'Int', lazy => 1, default => 32);
-has keepId => (is => 'ro', isa => 'Bool', lazy => 1, default => !!1);
 
 state $converter = Seq::Tracks::Base::Types->new();
+
+# name followed by index in the intermediate snp file
+# QUAL and FILTER not yet implemented
+state $vcfFeatureIdx = {CHROM => 0, POS => 1, ALT => 2, REF => 3, ID => -3,
+  QUAL => -9, FILTER => -9};
+
 sub BUILD {
   my $self = shift;
 
-  # The length of each feature + 1 character , since 
-  # VCF will have these as featureName=
-  $self->{_featureLengths} = [ map { length($_) + 1 } @{$self->features} ];
-  $self->{_featuresVcfForm} = [ map { "$_\=" } @{$self->features} ];
+  # We mostly expect features to be in INFO field.
+  # However, chrom, pos, ref, alt, qual, filter are fair game too
+  # These are built not from INFO field, so must be removed from features
+  # and placed in separate pool
+  my %reverseFieldMap;
+  if(keys %{$self->fieldMap}) {
+    %reverseFieldMap = map { $self->fieldMap->{$_} => $_ } keys %{$self->fieldMap};
+  }
+
+  my %infoFeatureNames;
+  for my $feature (@{$self->features}) {
+    my $originalName = $reverseFieldMap{$feature} || $feature;
+
+    # skip the first few columns, don't allow ALT in INFO
+    if(defined $self->headerFeatures->{$originalName}) {
+      next;
+    }
+
+    $infoFeatureNames{$feature} = $originalName;
+  }
+
+  # TODO: prevent header features from overriding
+  $self->{_infoFeatureNames} = \%infoFeatureNames;
+
+  # Precalculate the field db names, for faster accesss
+  # TODO: think about moving away from storing the "db name" in the database
+  # We may just want to enforce no changs to the order of fields once
+  # The db is created
+  # It fails in too many ways; for instance if you remove a feature,
+  # Then try to build again, it will crash, because expected array length
+  # shorter than some of the remaining field indices stored in db, potentially
+  my %fieldDbNames;
+
+  for my $feature (@{$self->features}) {
+    $fieldDbNames{$feature} = $self->getFieldDbName($feature);
+  }
+
+  $self->{_fieldDbNames} = \%fieldDbNames;
 }
 
 # has altName => (is => '')
@@ -60,6 +105,11 @@ sub buildTrack {
 
   my $delim = $outputter->emptyFieldChar;
 
+  # my $altIdx = $self->headerFeatures->{ALT};
+  # my $idIdx = $self->headerFeatures->{ID};
+
+  my $lastIdx = $#{$self->features};
+
   for my $file (@{$self->local_files}) {
     $self->log('info', $self->name . ": beginning building from $file");
 
@@ -67,34 +117,60 @@ sub buildTrack {
       my $echoProg = $self->isCompressedSingle($file) ? $self->gzip . ' -d -c' : 'cat';
 
       my $wantedChr;
-      # Get an instance of the merge function that closes over $self
-      # Note that tracking which positinos have been over-written will only work
-      # if there is one chromosome per file, or if all chromosomes are in one file
-      my $mergeFunc = $self->makeMergeFunc();
-      # Record which chromosomes were recorded for completionMeta
-      my %visitedChrs;
-
-      my %fieldDbNames;
-
       my $errPath = $file . ".build." . localtime() . ".log";
 
-      my ($err, @fieldDescriptions) = $self->_extractHeader($file);
-      
+      my ($err, $vcfNameMap) = $self->_extractHeader($file);
+
       if($err) {
         # DB not open yet, no need to commit
         $pm->finish(255, \$err);
       }
 
+      # Get an instance of the merge function that closes over $self
+      # Note that tracking which positinos have been over-written will only work
+      # if there is one chromosome per file, or if all chromosomes are in one file
+      # At least until we share $madeIntoArray (in makeMergeFunc) between threads
+      # Won't be an issue in Go
+      my $mergeFunc = $self->makeMergeFunc();
+
+       # Record which chromosomes were recorded for completionMeta
+      my %visitedChrs;
+
       open(my $fh, '-|', "$echoProg $file | " . $self->vcfProcessor . " --emptyField $delim"
         . " --keepId --keepInfo");
 
-      my $count = 0;
+      # p $self->headerFeatures;
+      # my $keepId = $self->headerFeatures->{ID};
+      # my $keepAlt = $self->headerFeatures->{ALT};
+
+      # p $keepId;
+      # p $keepAlt;
       # my ($chr, @fields, @sparseData, $start, $end);
       while ( my $line = $fh->getline() ) {
+        # This is the annotation input first 7 lines, plus id, info
         my @fields = split '\t', $line;
 
-        #                      (alleleIdx  , info
-        my ($err, $valuesAref) = $self->_extractFeatures($fields[-2], $fields[-1], \@fieldDescriptions);
+        # TODO: check for wanted chr, insert into db
+         # Transforms $chr if it's not prepended with a 'chr' or is 'chrMT' or 'MT'
+          # # and checks against our list of wanted chromosomes
+          # $chr = $self->normalizedWantedChr( $fields[ $reqIdxHref->{$self->chromField} ] );
+
+          # if(!$chr || $chr ne $wantedChr) {
+          #   if($self->chrPerFile) {
+          #     # Because this is not an unusual occurance; there is only 1 chr wanted
+          #     # and the function is called once for each chromoosome, we use debug
+          #     # to reduce log clutter
+          #     $self->log('debug', $self->name . "join track: chrs in file $file not wanted . Skipping");
+
+          #     last FH_LOOP;
+          #   }
+
+          #   next FH_LOOP;
+          # }
+
+        my $data;
+
+        my ($err, $data) = $self->_extractFeatures(\@fields, $vcfNameMap);
 
         if($err) {
           #Commit, sync everything, including completion status, and release mmap
@@ -102,10 +178,9 @@ sub buildTrack {
           $pm->finish(255, \$err);
         }
 
-        $count++;
+        # $self->db->dbPatch($wantedChr, $self->dbName, $pos, \@sparseData, $mergeFunc);
       }
 
-      say "Read $count lines";
     $pm->finish();
   }
 
@@ -130,8 +205,6 @@ sub _extractHeader {
   my $file = shift;
   my $dieIfNotFound = shift;
 
-  my @types;
-
   my $echoProg = $self->isCompressedSingle($file) ? $self->gzip . ' -d -c' : 'cat';
 
   open(my $fh, '-|', "$echoProg $file");
@@ -150,74 +223,128 @@ sub _extractHeader {
 
   close $fh;
 
-  FEATURE_LOOP: for my $feature (@{$self->features}) {
-    for my $h (@header) {
-      if(index($h, "INFO\=\<ID\=$feature,") > 0) {
-        $h =~ /Number=(\w+)/;
+  my $idxOfInfo = -9;
+  my $idx = -1;
 
-        my $number = $1;
+  my %nameMap;
 
-        # In case Number and Type aren't adjacent to each other
-        $h =~ /Type=(\w+)/;
+  # Flags may or may not be in the info field
+  # To speed search, store these, and walk back to find our value
+  my $flagCount = 0;
+  for my $h (@header) {
+    $idx++;
 
-        my $type = $1;
-
-        push @types, [$number, $type];
-
-        next FEATURE_LOOP;
-      }
+    if($h !~ /\#\#INFO=/) {
+      next;
     }
 
-    if($dieIfNotFound) {
-      return ("Couldn't find $feature, exiting", undef);
+    if($idxOfInfo == -9) {
+      $idxOfInfo = $idx;
+    }
+
+    $h =~ /Number=([\w.]+)/;
+
+    my $number = $1;
+
+    $h =~ /Type=(\w+)/;
+
+    my $type = $1;
+
+    # Keep track of things that look like they could mess up INFO string order
+    # Flag in particular seems often missing, so we'll do a linear search
+    # From $idx - $idxOfInfo to +$flagCount
+    if(looks_like_number($number)) {
+      if($number == 0) {
+         $flagCount++;
+      }
+    } elsif($number eq '.') {
+      $flagCount++;
+    }
+
+    my $featIdx = -1;
+
+    # TODO: if the flag item is the feature we're searching for do something
+    # Not critial, but will have less efficient search
+    FEATURE_LOOP: for my $feature (@{$self->features}) {
+      if(!defined $self->{_infoFeatureNames}{$feature}) {
+        next;
+      }
+
+      my $infoName = $self->{_infoFeatureNames}{$feature};
+
+      if(index($h, "INFO\=\<ID\=$infoName,") > 0) {
+        # my $vcfName = "$feature=";
+        # In case Number and Type aren't adjacent to each other
+        # $return[$featIdx] = [$number, $type];
+        $nameMap{$infoName} = [$feature, $number, $type, $idx];
+        last FEATURE_LOOP;
+      }
     }
   }
 
-  return (undef, @types);
+  return (undef, \%nameMap);
 }
 
 sub _extractFeatures {
-  my $self = shift;
-  # vcfProcessor will split multiallelics
-  my $alleleIdx = shift;
-  my $info = shift;
-  my $fieldDescriptionsAref = shift;
-
-  my @infoFields = split ';', $info;
+  my ($self, $fieldsAref, $vcfNameMap, $fieldDbNames) = @_;
+  
+  # vcfProcessor will split multiallelics, store the alleleIdx
+  # my @infoFields = ;
 
   my @returnData;
+  $#returnData = $#{$self->features};
 
-  my $idx = -1;
   my $firstChars;
-  FEATURE_LOOP: for my $feature (@{$self->{_featuresVcfForm}}) {
-    $idx++;
 
-    for my $field (@infoFields) {
-      if(index($field, $feature) > -1) {
-        my $val = (split '=', $field)[1];
+  my $warned;
 
-        if($fieldDescriptionsAref->[$idx][0] eq 'A') {
-          my @vals = split ',', $val;
+  my $entry;
+  my $found = 0;
+  my $name;
 
-          if(@vals - 1 < $alleleIdx) {
-            return ("Err: Number=A field has fewer values than alleles", undef);
-          }
+  my $info = $fieldsAref->[-1];
+  my $alleleIdx = $fieldsAref->[-2];
 
-          $val = $vals[$alleleIdx];
-        }
+  my $altIdx = $self->{_fieldDbNames}{$self->headerFeatures->{ALT}};
 
-        # TODO: support non-scalar values
-        # TODO: configure from either type specified in YAML, or from VCF Type=
-        $val = $self->coerceFeatureType($self->features->[$idx], $val);
-       
-        push @returnData, $val;
+  $returnData[$altIdx] = $fieldsAref->[4];
 
-        next FEATURE_LOOP;
-      }
+  my $idIdx = $self->{_fieldDbNames}{$self->headerFeatures->{ID}};
+  if(defined $idIdx) {
+    $returnData[$idIdx] = $self->coerceUndefinedValues($fieldsAref->[-3]);
+  }
+
+  for my $info (split ';', $info) {
+    # If # found == scalar @{$self->features}
+    if($found == @returnData) {
+      last;
     }
 
-    return ("Couldn't find $feature", undef);
-    push @returnData, undef;
+    $entry = $vcfNameMap->{substr($info, 0, index($info, '='))};
+    
+    # p $entry;
+    if(!$entry) {
+      next;
+    }
+
+    $found++;
+
+    my $val = substr($info, index($info, '=') + 1);
+
+    # If NUMBER=A
+    if($entry->[1] eq 'A') {
+      my @vals = split ',', $val;
+
+      if(@vals - 1 < $alleleIdx) {
+        return ("Err: Number=A field has fewer values than alleles", undef);
+      }
+
+      $val = $vals[$alleleIdx];
+    }
+
+    # TODO: support non-scalar values
+    # TODO: configure from either type specified in YAML, or from VCF Type=
+    $returnData[$self->{_fieldDbNames}{$entry->[0]}] = $self->coerceFeatureType($entry->[0], $val);
   }
 
   return (undef, \@returnData);

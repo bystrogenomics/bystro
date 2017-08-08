@@ -12,6 +12,8 @@ with 'Seq::Role::Message';
 
 use DDP;
 
+# TODO: Configure as singleton
+
 has delimiters => (is => 'ro', isa => 'Seq::Output::Delimiters', default => sub {
   return Seq::Output::Delimiters->new();
 });
@@ -20,6 +22,10 @@ sub BUILD {
   my $self = shift;
 
   $self->{_headers} = Seq::Headers->new();
+}
+
+# TODO: will be singleton, configured once for all consumers
+sub initialize {
 }
 
 # ABSTRACT: Knows how to make an output string
