@@ -221,46 +221,69 @@ tracks:
   type: sparse
 - features:
   - alt
-  - ID
-  - AC: number
-  - AF: number
-  - AN: number
-  - AC_AFR: number
-  - AC_AMR: number
-  - AC_ASJ: number
-  - AC_EAS: number
-  - AC_FIN: number
-  - AC_NFE: number
-  - AC_OTH: number
-  - AC_Male: number
-  - AC_Female: number
-  - AN_AFR: number
-  - AN_AMR: number
-  - AN_ASJ: number
-  - AN_EAS: number
-  - AN_FIN: number
-  - AN_NFE: number
-  - AN_OTH: number
-  - AN_Male: number
-  - AN_Female: number
-  - AF_AFR: number
-  - AF_AMR: number
-  - AF_ASJ: number
-  - AF_EAS: number
-  - AF_FIN: number
-  - AF_NFE: number
-  - AF_OTH: number
-  - AF_Male: number
-  - AF_Female: number
+  - id
+  - trTv
+  - ac: number
+  - af: number
+  - an: number
+  - ac_afr: number
+  - ac_amr: number
+  - ac_asj: number
+  - ac_eas: number
+  - ac_fin: number
+  - ac_nfe: number
+  - ac_oth: number
+  - ac_male: number
+  - ac_female: number
+  - an_afr: number
+  - an_amr: number
+  - an_asj: number
+  - an_eas: number
+  - an_fin: number
+  - an_nfe: number
+  - an_oth: number
+  - an_male: number
+  - an_female: number
+  - af_afr: number
+  - af_amr: number
+  - af_asj: number
+  - af_eas: number
+  - af_fin: number
+  - af_nfe: number
+  - af_oth: number
+  - af_male: number
+  - af_female: number
   fieldMap:
     AC: ac
+    AF: af
+    AN: an
     AC_AFR: ac_afr
     AC_AMR: ac_amr
     AC_ASJ: ac_asj
-    AF: af
-    ALT: alt
-    AN: an
-    ID: id
+    AC_EAS: ac_eas
+    AC_FIN: ac_fin
+    AC_NFE: ac_nfe
+    AC_OTH: ac_oth
+    AC_Male: ac_male
+    AC_Female: ac_female
+    AN_AFR: an_afr
+    AN_AMR: an_amr
+    AN_ASJ: an_asj
+    AN_EAS: an_eas
+    AN_FIN: an_fin
+    AN_NFE: an_nfe
+    AN_OTH: an_oth
+    AN_Male: an_male
+    AN_Female: an_female
+    AF_AFR: af_afr
+    AF_AMR: af_amr
+    AF_ASJ: af_asj
+    AF_EAS: af_eas
+    AF_FIN: af_fin
+    AF_NFE: af_nfe
+    AF_OTH: af_oth
+    AF_Male: af_male
+    AF_Female: af_female
   name: gnomad.genomes
   type: vcf
 

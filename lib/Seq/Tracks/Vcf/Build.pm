@@ -35,41 +35,105 @@ use DDP;
 extends 'Seq::Tracks::Build';
 
 with 'Seq::Output::Fields';
-with 'Seq::Tracks::Vcf::Definition';
+
 # We assume sparse tracks have at least one feature; can remove this requirement
 # But will need to update makeMergeFunc to not assume an array of values (at least one key => value)
 has '+features' => (required => 1);
 
-has vcfProcessor => (is => 'ro', isa => 'Str', required => 1);
-
-# We skip entries that span more than this number of bases
-has maxVariantSize => (is => 'ro', isa => 'Int', lazy => 1, default => 32);
+has vcfProcessor => (is => 'ro', isa => 'Str', required => 1, default => 'bystro-vcf');
 
 state $converter = Seq::Tracks::Base::Types->new();
 
 # name followed by index in the intermediate snp file
 # QUAL and FILTER not yet implemented
-state $vcfFeatureIdx = {CHROM => 0, POS => 1, ALT => 2, REF => 3, ID => -3,
-  QUAL => -9, FILTER => -9};
+# We also allow any fields output by the vcf professor (except info and the related alleleIdx)
+state $vcfFeatures = {
+  chrom => 0, pos => 1, type => 2, ref => 3, alt => 4, trTv => 5,
+  homozygotes => 6, heterozygotes => 7, missingGenos => 8, id => 9,
+  qual => undef, filter => undef};
+
+# We can use before BUILD to make any needed modifications to $self->features
+# before those features' indices are stored in the db in Seq::Base
+before 'BUILD' => sub {};
 
 sub BUILD {
   my $self = shift;
 
-  # We mostly expect features to be in INFO field.
-  # However, chrom, pos, ref, alt, qual, filter are fair game too
-  # These are built not from INFO field, so must be removed from features
-  # and placed in separate pool
-  my %reverseFieldMap;
-  if(keys %{$self->fieldMap}) {
-    %reverseFieldMap = map { $self->fieldMap->{$_} => $_ } keys %{$self->fieldMap};
+  my $features = $self->features;
+
+  if(!@{$features}) {
+    die "VCF build requires INFO features";
   }
+
+  my %featuresMap;
+  for(my $i = 0; $i < @{$features}; $i++) {
+    $featuresMap{lc($features->[$i])} = $i;
+  }
+
+  my %fieldMap = map{ lc($_) => $self->fieldMap->{$_} } keys %{$self->fieldMap};
+
+  my %visitedVcfFeatures;
+  my @headerFeatures;
+  for my $vcfFeature (keys %$vcfFeatures) {
+    my $idx;
+
+    if($visitedVcfFeatures{$vcfFeature}) {
+      die "Duplicate feature requested: $vcfFeature";
+    }
+
+    $visitedVcfFeatures{$vcfFeature} = 1;
+
+    # Because VCF files are so flexible with feature definitions, it will be
+    # difficult to tell if a certain feature just isn't present in a vcf file
+    # Easier to make feature definition flexible, especially since one 
+    # may correctly surmise that we read the VCF after transformation to intermediate
+    # annotated format
+    my $lcVcfFeature = lc($vcfFeature);
+
+    if(defined $featuresMap{$lcVcfFeature}) {
+      $idx = $featuresMap{$lcVcfFeature};
+    } elsif(defined $fieldMap{$lcVcfFeature} && defined $featuresMap{$fieldMap{$lcVcfFeature}}) {
+      $idx = $featuresMap{$fieldMap{$lcVcfFeature}};
+    }
+
+    # This $vcfFeature isn't requested by the user
+    if(!defined $idx) {
+      next;
+    }
+
+    # Some features are placeholders; catch these anyhow so we don't try to look
+    # for them in the INFO field
+    if(!defined $vcfFeatures->{$vcfFeature} && defined $idx) {
+      die "Currently $vcfFeature is not allowed";
+    }
+
+    #Stores:
+    #1) The feature naem (post-transformation)
+    #2) The index in the intermedaite annotation file
+    #3) The index in the database
+    push @headerFeatures, [
+      $self->features->[$idx], $vcfFeatures->{$vcfFeature},
+      $self->getFieldDbName($self->features->[$idx])
+    ];
+  }
+
+  # We could also force-add alt; would get properly inserted into db.
+  # However, we would reduce confidence users had in the representation stated
+  # in the YAML config
+  if(!defined $visitedVcfFeatures{alt}) {
+    die "alt (or ALT) field is required for vcf tracks, used to match input alleles";
+  }
+
+  $self->{_headerFeatures} = \@headerFeatures;
+
+  my %reverseFieldMap = map { $self->fieldMap->{$_} => $_ } keys %{$self->fieldMap};
 
   my %infoFeatureNames;
   for my $feature (@{$self->features}) {
     my $originalName = $reverseFieldMap{$feature} || $feature;
 
     # skip the first few columns, don't allow ALT in INFO
-    if(defined $self->headerFeatures->{$originalName}) {
+    if(defined $visitedVcfFeatures{lc($originalName)}) {
       next;
     }
 
@@ -168,9 +232,10 @@ sub buildTrack {
           #   next FH_LOOP;
           # }
 
-        my $data;
-
         my ($err, $data) = $self->_extractFeatures(\@fields, $vcfNameMap);
+
+        say "here is what we would be entering";
+        p $data;
 
         if($err) {
           #Commit, sync everything, including completion status, and release mmap
@@ -265,6 +330,8 @@ sub _extractHeader {
 
     # TODO: if the flag item is the feature we're searching for do something
     # Not critial, but will have less efficient search
+    # Requires precise spelling of the vcf feature
+    # TODO: Die if don't find header for any requested feature
     FEATURE_LOOP: for my $feature (@{$self->features}) {
       if(!defined $self->{_infoFeatureNames}{$feature}) {
         next;
@@ -302,19 +369,17 @@ sub _extractFeatures {
   my $found = 0;
   my $name;
 
-  my $info = $fieldsAref->[-1];
-  my $alleleIdx = $fieldsAref->[-2];
-
-  my $altIdx = $self->{_fieldDbNames}{$self->headerFeatures->{ALT}};
-
-  $returnData[$altIdx] = $fieldsAref->[4];
-
-  my $idIdx = $self->{_fieldDbNames}{$self->headerFeatures->{ID}};
-  if(defined $idIdx) {
-    $returnData[$idIdx] = $self->coerceUndefinedValues($fieldsAref->[-3]);
+  # $arr holds
+  # 1) field name
+  # 2) index in intermediate annotation
+  # 3) index in database
+  for my $arr (@{$self->{_headerFeatures}}) {
+    $returnData[$arr->[2]] = $self->coerceFeatureType($arr->[0], $fieldsAref->[$arr->[1]]);
   }
 
-  for my $info (split ';', $info) {
+  my $alleleIdx = $fieldsAref->[-2];
+
+  for my $info (split ';', $fieldsAref->[-1]) {
     # If # found == scalar @{$self->features}
     if($found == @returnData) {
       last;
