@@ -1,0 +1,5 @@
+#! /bin/bash
+echo "File chosen: $1"
+echo "Outputting test.vcf"
+
+gzip -d -c $1 | awk -F$"\t" 'BEGIN{count=0}{if($1 ~ /\#/){ print $0 } else if($7 == "PASS"){count++; if(count < 10){print $0; }}; if(count > 10) {exit 0;}}' > test.vcf

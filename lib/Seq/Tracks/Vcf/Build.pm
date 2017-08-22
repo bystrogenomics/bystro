@@ -10,7 +10,7 @@ our $VERSION = '0.001';
   @class Seq::Tracks::Vcf::Build
   Takes a VCF file, runs it through a vcf pre-processor to get it into 
   our internal annotation format, and then uses the info field to build a database
-
+  Will skip discordant sites, logging them
 =cut
 
 # TODO: better error handling in the vcf pre-processor
@@ -29,9 +29,9 @@ use Scalar::Util qw/looks_like_number/;
 use Seq::Output::Delimiters;
 use Seq::Tracks::Base::Types;
 use Scalar::Util qw/looks_like_number/;
-
 use DDP;
 
+use Seq::Tracks;
 extends 'Seq::Tracks::Build';
 
 with 'Seq::Output::Fields';
@@ -157,6 +157,9 @@ sub BUILD {
   }
 
   $self->{_fieldDbNames} = \%fieldDbNames;
+
+  my $tracks = Seq::Tracks->new();
+  $self->{_refTrack} = $tracks->getRefTrackGetter();
 }
 
 # has altName => (is => '')
@@ -174,13 +177,18 @@ sub buildTrack {
 
   my $lastIdx = $#{$self->features};
 
+  # location of these features in input file (intermediate annotation)
+  my $refIdx = $vcfFeatures->{ref};
+  my $posIdx = $vcfFeatures->{pos};
+  my $chrIdx = $vcfFeatures->{chrom};
+  my $altIdx = $vcfFeatures->{alt};
+
   for my $file (@{$self->local_files}) {
     $self->log('info', $self->name . ": beginning building from $file");
 
     $pm->start($file) and next;
       my $echoProg = $self->isCompressedSingle($file) ? $self->gzip . ' -d -c' : 'cat';
 
-      my $wantedChr;
       my $errPath = $file . ".build." . localtime() . ".log";
 
       my ($err, $vcfNameMap) = $self->_extractHeader($file);
@@ -199,7 +207,12 @@ sub buildTrack {
 
        # Record which chromosomes were recorded for completionMeta
       my %visitedChrs;
-
+      my $chr;
+      my @fields;
+      my $dbData;
+      my $wantedChr;
+      my $refExpected;
+      my $dbPos;
       open(my $fh, '-|', "$echoProg $file | " . $self->vcfProcessor . " --emptyField $delim"
         . " --keepId --keepInfo");
 
@@ -211,31 +224,41 @@ sub buildTrack {
       # p $keepAlt;
       # my ($chr, @fields, @sparseData, $start, $end);
       while ( my $line = $fh->getline() ) {
+        chomp;
         # This is the annotation input first 7 lines, plus id, info
-        my @fields = split '\t', $line;
+        @fields = split '\t', $line;
 
-        # TODO: check for wanted chr, insert into db
-         # Transforms $chr if it's not prepended with a 'chr' or is 'chrMT' or 'MT'
-          # # and checks against our list of wanted chromosomes
-          # $chr = $self->normalizedWantedChr( $fields[ $reqIdxHref->{$self->chromField} ] );
+        $chr = $fields[$chrIdx];
 
-          # if(!$chr || $chr ne $wantedChr) {
-          #   if($self->chrPerFile) {
-          #     # Because this is not an unusual occurance; there is only 1 chr wanted
-          #     # and the function is called once for each chromoosome, we use debug
-          #     # to reduce log clutter
-          #     $self->log('debug', $self->name . "join track: chrs in file $file not wanted . Skipping");
+        # falsy value is ''
+        if(($wantedChr && $wantedChr ne $chr) || !$wantedChr) {
+          $wantedChr = $self->chrIsWanted($chr) && $self->completionMeta->okToBuild($chr) ? $chr : '';
+        }
 
-          #     last FH_LOOP;
-          #   }
+        if(!$wantedChr) {
+          next;
+        }
 
-          #   next FH_LOOP;
-          # }
+        $visitedChrs{$wantedChr} //= 1;
+
+        # 0-based position: VCF is 1-based
+        $dbPos = $fields[$posIdx] - 1;
+
+        if(!looks_like_number($dbPos)) {
+          $self->db->cleanUp();
+          $pm->finish(255, \"Invalid position @ $chr\: $dbPos");
+        }
+
+        $dbData = $self->db->dbReadOne($wantedChr, $dbPos);
+
+        $refExpected = $self->{_refTrack}->get($dbData);
+        if($fields[$refIdx] ne $refExpected) {
+          $self->log('warn', "Skipping $chr\:$fields[$posIdx]: "
+            . " Discordant. Expected ref: $refExpected, found: ref: $fields[$refIdx], alt:$fields[$altIdx]");
+          next;
+        }
 
         my ($err, $data) = $self->_extractFeatures(\@fields, $vcfNameMap);
-
-        say "here is what we would be entering";
-        p $data;
 
         if($err) {
           #Commit, sync everything, including completion status, and release mmap
@@ -243,26 +266,47 @@ sub buildTrack {
           $pm->finish(255, \$err);
         }
 
-        # $self->db->dbPatch($wantedChr, $self->dbName, $pos, \@sparseData, $mergeFunc);
+        # Write every position to disk
+        # Commit for each position, fast if using MDB_NOSYNC
+        $self->db->dbPatch($wantedChr, $self->dbName, $dbPos, $data, $mergeFunc);
       }
 
-    $pm->finish();
+      #Commit, sync everything, including completion status, and release mmap
+      $self->db->cleanUp();
+
+    $pm->finish(0, \%visitedChrs);
   }
 
+  my %completedDetails;
   $pm->run_on_finish(sub {
-    my ($pid, $exitCode, $fileName, undef, undef, $errRef) = @_;
-
+    my ($pid, $exitCode, $fileName, undef, undef, $errOrChrs) = @_;
+    p @_;
     if($exitCode != 0) {
-      my $err = $errRef ? "due to: $$errRef" : "due to an untimely demise";
+      my $err = $errOrChrs ? "due to: $$errOrChrs" : "due to an untimely demise";
 
       $self->log('fatal', $self->name . ": Failed to build $fileName $err");
       die $self->name . ": Failed to build $fileName $err";
+    }
+
+    for my $chr (keys %$errOrChrs) {
+      if(!$completedDetails{$chr}) {
+        $completedDetails{$chr} = [$fileName];
+      } else {
+        push @{$completedDetails{$chr}}, $fileName;
+      }
     }
 
     $self->log('info', $self->name . ": completed building from $fileName");
   });
 
   $pm->wait_all_children;
+
+  for my $chr (keys %completedDetails) {
+    say "writing that we completed $chr";
+    $self->completionMeta->recordCompletion($chr);
+
+    $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedDetails{$chr}})));
+  }
 }
 
 sub _extractHeader {

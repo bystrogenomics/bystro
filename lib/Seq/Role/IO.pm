@@ -174,6 +174,16 @@ sub setLineEndings {
   return "";
 }
 
+sub checkDelimiter {
+  my ($self, $line) = @_;
+
+  if($line =~ /^\s*\S+\t\S+/) {
+    return 1;
+  }
+
+  return 0;
+}
+
 sub setDelimiter {
   my ($self, $line) = @_;
 

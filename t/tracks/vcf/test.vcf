@@ -1,0 +1,200 @@
+##fileformat=VCFv4.2
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Allelic depths for the ref and alt alleles in the order listed">
+##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read Depth">
+##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">
+##FORMAT=<ID=PL,Number=G,Type=Integer,Description="Normalized, Phred-scaled likelihoods for genotypes as defined in the VCF specification">
+##FILTER=<ID=RF,Description="Failed random forests filters (SNV cutoff 0.4, indels cutoff 0.4)">
+##FILTER=<ID=AC0,Description="Allele Count is zero (i.e. no high-confidence genotype (GQ >= 20, DP >= 10, AB => 0.2 for het calls))">
+##FILTER=<ID=InbreedingCoeff,Description="InbreedingCoeff < -0.3">
+##FILTER=<ID=LCR,Description="In a low complexity region">
+##FILTER=<ID=SEGDUP,Description="In a segmental duplication region">
+##FILTER=<ID=PASS,Description="All filters passed for at least one of the alleles at that site (see AS_FilterStatus for allele-specific filter status)">
+##INFO=<ID=AC,Number=A,Type=Integer,Description="Allele count in genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency among genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=AN,Number=1,Type=Integer,Description="Total number of alleles in called genotypes">
+##INFO=<ID=BaseQRankSum,Number=1,Type=Float,Description="Z-score from Wilcoxon rank sum test of Alt Vs. Ref base qualities">
+##INFO=<ID=ClippingRankSum,Number=1,Type=Float,Description="Z-score from Wilcoxon rank sum test of Alt vs. Ref number of hard clipped bases">
+##INFO=<ID=DB,Number=0,Type=Flag,Description="dbSNP Membership">
+##INFO=<ID=DP,Number=1,Type=Integer,Description="Approximate read depth; some reads may have been filtered">
+##INFO=<ID=FS,Number=1,Type=Float,Description="Phred-scaled p-value using Fisher's exact test to detect strand bias">
+##INFO=<ID=InbreedingCoeff,Number=1,Type=Float,Description="Inbreeding coefficient as estimated from the genotype likelihoods per-sample when compared against the Hardy-Weinberg expectation">
+##INFO=<ID=MQ,Number=1,Type=Float,Description="RMS Mapping Quality">
+##INFO=<ID=MQRankSum,Number=1,Type=Float,Description="Z-score from Wilcoxon rank sum test of Alt vs. Ref read mapping qualities">
+##INFO=<ID=QD,Number=1,Type=Float,Description="Variant Confidence/Quality by Depth">
+##INFO=<ID=ReadPosRankSum,Number=1,Type=Float,Description="Z-score from Wilcoxon rank sum test of Alt vs. Ref read position bias">
+##INFO=<ID=SOR,Number=1,Type=Float,Description="Symmetric Odds Ratio of 2x2 contingency table to detect strand bias">
+##INFO=<ID=VQSLOD,Number=1,Type=Float,Description="Log odds ratio of being a true variant versus being false under the trained VQSR gaussian mixture model (deprecated; see AS_RF)">
+##INFO=<ID=VQSR_culprit,Number=1,Type=String,Description="The annotation which was the worst performing in the VQSR Gaussian mixture model (deprecated; see AS_RF)">
+##INFO=<ID=VQSR_NEGATIVE_TRAIN_SITE,Number=0,Type=Flag,Description="This variant was used to build the negative training set of bad variants for VQSR (deprecated; see AS_RF_NEGATIVE_TRAIN)">
+##INFO=<ID=VQSR_POSITIVE_TRAIN_SITE,Number=0,Type=Flag,Description="This variant was used to build the positive training set of good variants for VQSR (deprecated; see AS_RF_POSITIVE_TRAIN)">
+##INFO=<ID=GQ_HIST_ALT,Number=A,Type=String,Description="Histogram for GQ for each allele; Midpoints of histogram bins: 2.5|7.5|12.5|17.5|22.5|27.5|32.5|37.5|42.5|47.5|52.5|57.5|62.5|67.5|72.5|77.5|82.5|87.5|92.5|97.5">
+##INFO=<ID=DP_HIST_ALT,Number=A,Type=String,Description="Histogram for DP for each allele; Midpoints of histogram bins: 2.5|7.5|12.5|17.5|22.5|27.5|32.5|37.5|42.5|47.5|52.5|57.5|62.5|67.5|72.5|77.5|82.5|87.5|92.5|97.5">
+##INFO=<ID=AB_HIST_ALT,Number=A,Type=String,Description="Histogram for Allele Balance in heterozygous individuals for each allele; 100*AD[i_alt]/sum(AD); Midpoints of histogram bins: 2.5|7.5|12.5|17.5|22.5|27.5|32.5|37.5|42.5|47.5|52.5|57.5|62.5|67.5|72.5|77.5|82.5|87.5|92.5|97.5">
+##INFO=<ID=GQ_HIST_ALL,Number=1,Type=String,Description="Histogram for GQ; Midpoints of histogram bins: 2.5|7.5|12.5|17.5|22.5|27.5|32.5|37.5|42.5|47.5|52.5|57.5|62.5|67.5|72.5|77.5|82.5|87.5|92.5|97.5">
+##INFO=<ID=DP_HIST_ALL,Number=1,Type=String,Description="Histogram for DP; Midpoints of histogram bins: 2.5|7.5|12.5|17.5|22.5|27.5|32.5|37.5|42.5|47.5|52.5|57.5|62.5|67.5|72.5|77.5|82.5|87.5|92.5|97.5">
+##INFO=<ID=AB_HIST_ALL,Number=1,Type=String,Description="Histogram for Allele Balance in heterozygous individuals; 100*AD[i_alt]/sum(AD); Midpoints of histogram bins: 2.5|7.5|12.5|17.5|22.5|27.5|32.5|37.5|42.5|47.5|52.5|57.5|62.5|67.5|72.5|77.5|82.5|87.5|92.5|97.5">
+##INFO=<ID=AC_AFR,Number=A,Type=Integer,Description="Allele count in African/African American genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=AC_AMR,Number=A,Type=Integer,Description="Allele count in Admixed American genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=AC_ASJ,Number=A,Type=Integer,Description="Allele count in Ashkenazi Jewish genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=AC_EAS,Number=A,Type=Integer,Description="Allele count in East Asian genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=AC_FIN,Number=A,Type=Integer,Description="Allele count in Finnish genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=AC_NFE,Number=A,Type=Integer,Description="Allele count in Non-Finnish European genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=AC_OTH,Number=A,Type=Integer,Description="Allele count in Other (population not assigned) genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=AC_Male,Number=A,Type=Integer,Description="Allele count in Male genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=AC_Female,Number=A,Type=Integer,Description="Allele count in Female genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=AN_AFR,Number=1,Type=Integer,Description="Total number of alleles in African/African American called genotypes">
+##INFO=<ID=AN_AMR,Number=1,Type=Integer,Description="Total number of alleles in Admixed American called genotypes">
+##INFO=<ID=AN_ASJ,Number=1,Type=Integer,Description="Total number of alleles in Ashkenazi Jewish called genotypes">
+##INFO=<ID=AN_EAS,Number=1,Type=Integer,Description="Total number of alleles in East Asian called genotypes">
+##INFO=<ID=AN_FIN,Number=1,Type=Integer,Description="Total number of alleles in Finnish called genotypes">
+##INFO=<ID=AN_NFE,Number=1,Type=Integer,Description="Total number of alleles in Non-Finnish European called genotypes">
+##INFO=<ID=AN_OTH,Number=1,Type=Integer,Description="Total number of alleles in Other (population not assigned) called genotypes">
+##INFO=<ID=AN_Male,Number=1,Type=Integer,Description="Total number of alleles in Male called genotypes">
+##INFO=<ID=AN_Female,Number=1,Type=Integer,Description="Total number of alleles in Female called genotypes">
+##INFO=<ID=AF_AFR,Number=A,Type=Float,Description="Allele Frequency among African/African American genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=AF_AMR,Number=A,Type=Float,Description="Allele Frequency among Admixed American genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=AF_ASJ,Number=A,Type=Float,Description="Allele Frequency among Ashkenazi Jewish genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=AF_EAS,Number=A,Type=Float,Description="Allele Frequency among East Asian genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=AF_FIN,Number=A,Type=Float,Description="Allele Frequency among Finnish genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=AF_NFE,Number=A,Type=Float,Description="Allele Frequency among Non-Finnish European genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=AF_OTH,Number=A,Type=Float,Description="Allele Frequency among Other (population not assigned) genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=AF_Male,Number=A,Type=Float,Description="Allele Frequency among Male genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=AF_Female,Number=A,Type=Float,Description="Allele Frequency among Female genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=GC_AFR,Number=G,Type=Integer,Description="Count of African/African American individuals for each genotype">
+##INFO=<ID=GC_AMR,Number=G,Type=Integer,Description="Count of Admixed American individuals for each genotype">
+##INFO=<ID=GC_ASJ,Number=G,Type=Integer,Description="Count of Ashkenazi Jewish individuals for each genotype">
+##INFO=<ID=GC_EAS,Number=G,Type=Integer,Description="Count of East Asian individuals for each genotype">
+##INFO=<ID=GC_FIN,Number=G,Type=Integer,Description="Count of Finnish individuals for each genotype">
+##INFO=<ID=GC_NFE,Number=G,Type=Integer,Description="Count of Non-Finnish European individuals for each genotype">
+##INFO=<ID=GC_OTH,Number=G,Type=Integer,Description="Count of Other (population not assigned) individuals for each genotype">
+##INFO=<ID=GC_Male,Number=G,Type=Integer,Description="Count of Male individuals for each genotype">
+##INFO=<ID=GC_Female,Number=G,Type=Integer,Description="Count of Female individuals for each genotype">
+##INFO=<ID=AC_raw,Number=A,Type=Integer,Description="Allele counts before filtering low-confidence genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=AN_raw,Number=1,Type=Integer,Description="Total number of alleles before filtering low-confidence genotypes">
+##INFO=<ID=AF_raw,Number=A,Type=Float,Description="Allele frequency before filtering low-confidence genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=GC_raw,Number=G,Type=Integer,Description="Raw count of individuals for each genotype before filtering low-confidence genotypes">
+##INFO=<ID=GC,Number=G,Type=Integer,Description="Count of individuals for each genotype">
+##INFO=<ID=Hom_AFR,Number=A,Type=Integer,Description="Count of homozygous African/African American individuals">
+##INFO=<ID=Hom_AMR,Number=A,Type=Integer,Description="Count of homozygous Admixed American individuals">
+##INFO=<ID=Hom_ASJ,Number=A,Type=Integer,Description="Count of homozygous Ashkenazi Jewish individuals">
+##INFO=<ID=Hom_EAS,Number=A,Type=Integer,Description="Count of homozygous East Asian individuals">
+##INFO=<ID=Hom_FIN,Number=A,Type=Integer,Description="Count of homozygous Finnish individuals">
+##INFO=<ID=Hom_NFE,Number=A,Type=Integer,Description="Count of homozygous Non-Finnish European individuals">
+##INFO=<ID=Hom_OTH,Number=A,Type=Integer,Description="Count of homozygous Other (population not assigned) individuals">
+##INFO=<ID=Hom_Male,Number=A,Type=Integer,Description="Count of homozygous Male individuals">
+##INFO=<ID=Hom_Female,Number=A,Type=Integer,Description="Count of homozygous Female individuals">
+##INFO=<ID=Hom_raw,Number=A,Type=Integer,Description="Count of homozygous individuals in raw genotypes before filtering low-confidence genotypes">
+##INFO=<ID=Hom,Number=A,Type=Integer,Description="Count of homozygous individuals">
+##INFO=<ID=STAR_AC,Number=1,Type=Integer,Description="AC of deletions spanning this position">
+##INFO=<ID=STAR_AC_raw,Number=1,Type=Integer,Description="Allele counts of deletions spanning this position before filtering low-confidence genotypes">
+##INFO=<ID=STAR_Hom,Number=1,Type=Integer,Description="Count of individuals homozygous for a deletion spanning this position">
+##INFO=<ID=POPMAX,Number=A,Type=String,Description="Population with max AF">
+##INFO=<ID=AC_POPMAX,Number=A,Type=Integer,Description="AC in the population with the max AF">
+##INFO=<ID=AN_POPMAX,Number=A,Type=Integer,Description="AN in the population with the max AF">
+##INFO=<ID=AF_POPMAX,Number=A,Type=Float,Description="Maximum Allele Frequency across populations (excluding OTH)">
+##INFO=<ID=DP_MEDIAN,Number=A,Type=Integer,Description="Median DP in carriers of each allele">
+##INFO=<ID=DREF_MEDIAN,Number=A,Type=Float,Description="Median dosage of homozygous reference in carriers of each allele">
+##INFO=<ID=GQ_MEDIAN,Number=A,Type=Integer,Description="Median GQ in carriers of each allele">
+##INFO=<ID=AB_MEDIAN,Number=A,Type=Float,Description="Median allele balance in heterozygote carriers of each allele">
+##INFO=<ID=AS_RF,Number=A,Type=Float,Description="Random Forests probability for each allele">
+##INFO=<ID=AS_FilterStatus,Number=A,Type=String,Description="Random Forests filter status for each allele">
+##INFO=<ID=AS_RF_POSITIVE_TRAIN,Number=.,Type=Integer,Description="Contains the indices of all alleles used as positive examples during training of random forests">
+##INFO=<ID=AS_RF_NEGATIVE_TRAIN,Number=.,Type=Integer,Description="Contains the indices of all alleles used as negative examples during training of random forests">
+##INFO=<ID=CSQ,Number=.,Type=String,Description="Consequence annotations from Ensembl VEP. Format: Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|Existing_variation|ALLELE_NUM|DISTANCE|STRAND|FLAGS|VARIANT_CLASS|MINIMISED|SYMBOL_SOURCE|HGNC_ID|CANONICAL|TSL|APPRIS|CCDS|ENSP|SWISSPROT|TREMBL|UNIPARC|GENE_PHENO|SIFT|PolyPhen|DOMAINS|HGVS_OFFSET|GMAF|AFR_MAF|AMR_MAF|EAS_MAF|EUR_MAF|SAS_MAF|AA_MAF|EA_MAF|ExAC_MAF|ExAC_Adj_MAF|ExAC_AFR_MAF|ExAC_AMR_MAF|ExAC_EAS_MAF|ExAC_FIN_MAF|ExAC_NFE_MAF|ExAC_OTH_MAF|ExAC_SAS_MAF|CLIN_SIG|SOMATIC|PHENO|PUBMED|MOTIF_NAME|MOTIF_POS|HIGH_INF_POS|MOTIF_SCORE_CHANGE|LoF|LoF_filter|LoF_flags|LoF_info">
+##contig=<ID=1,length=249250621>
+##contig=<ID=2,length=243199373>
+##contig=<ID=3,length=198022430>
+##contig=<ID=4,length=191154276>
+##contig=<ID=5,length=180915260>
+##contig=<ID=6,length=171115067>
+##contig=<ID=7,length=159138663>
+##contig=<ID=8,length=146364022>
+##contig=<ID=9,length=141213431>
+##contig=<ID=10,length=135534747>
+##contig=<ID=11,length=135006516>
+##contig=<ID=12,length=133851895>
+##contig=<ID=13,length=115169878>
+##contig=<ID=14,length=107349540>
+##contig=<ID=15,length=102531392>
+##contig=<ID=16,length=90354753>
+##contig=<ID=17,length=81195210>
+##contig=<ID=18,length=78077248>
+##contig=<ID=19,length=59128983>
+##contig=<ID=20,length=63025520>
+##contig=<ID=21,length=48129895>
+##contig=<ID=22,length=51304566>
+##contig=<ID=X,length=155270560>
+##contig=<ID=Y,length=59373566>
+##contig=<ID=MT,length=16569>
+##contig=<ID=GL000207.1,length=4262>
+##contig=<ID=GL000226.1,length=15008>
+##contig=<ID=GL000229.1,length=19913>
+##contig=<ID=GL000231.1,length=27386>
+##contig=<ID=GL000210.1,length=27682>
+##contig=<ID=GL000239.1,length=33824>
+##contig=<ID=GL000235.1,length=34474>
+##contig=<ID=GL000201.1,length=36148>
+##contig=<ID=GL000247.1,length=36422>
+##contig=<ID=GL000245.1,length=36651>
+##contig=<ID=GL000197.1,length=37175>
+##contig=<ID=GL000203.1,length=37498>
+##contig=<ID=GL000246.1,length=38154>
+##contig=<ID=GL000249.1,length=38502>
+##contig=<ID=GL000196.1,length=38914>
+##contig=<ID=GL000248.1,length=39786>
+##contig=<ID=GL000244.1,length=39929>
+##contig=<ID=GL000238.1,length=39939>
+##contig=<ID=GL000202.1,length=40103>
+##contig=<ID=GL000234.1,length=40531>
+##contig=<ID=GL000232.1,length=40652>
+##contig=<ID=GL000206.1,length=41001>
+##contig=<ID=GL000240.1,length=41933>
+##contig=<ID=GL000236.1,length=41934>
+##contig=<ID=GL000241.1,length=42152>
+##contig=<ID=GL000243.1,length=43341>
+##contig=<ID=GL000242.1,length=43523>
+##contig=<ID=GL000230.1,length=43691>
+##contig=<ID=GL000237.1,length=45867>
+##contig=<ID=GL000233.1,length=45941>
+##contig=<ID=GL000204.1,length=81310>
+##contig=<ID=GL000198.1,length=90085>
+##contig=<ID=GL000208.1,length=92689>
+##contig=<ID=GL000191.1,length=106433>
+##contig=<ID=GL000227.1,length=128374>
+##contig=<ID=GL000228.1,length=129120>
+##contig=<ID=GL000214.1,length=137718>
+##contig=<ID=GL000221.1,length=155397>
+##contig=<ID=GL000209.1,length=159169>
+##contig=<ID=GL000218.1,length=161147>
+##contig=<ID=GL000220.1,length=161802>
+##contig=<ID=GL000213.1,length=164239>
+##contig=<ID=GL000211.1,length=166566>
+##contig=<ID=GL000199.1,length=169874>
+##contig=<ID=GL000217.1,length=172149>
+##contig=<ID=GL000216.1,length=172294>
+##contig=<ID=GL000215.1,length=172545>
+##contig=<ID=GL000205.1,length=174588>
+##contig=<ID=GL000219.1,length=179198>
+##contig=<ID=GL000224.1,length=179693>
+##contig=<ID=GL000223.1,length=180455>
+##contig=<ID=GL000195.1,length=182896>
+##contig=<ID=GL000212.1,length=186858>
+##contig=<ID=GL000222.1,length=186861>
+##contig=<ID=GL000200.1,length=187035>
+##contig=<ID=GL000193.1,length=189789>
+##contig=<ID=GL000194.1,length=191469>
+##contig=<ID=GL000225.1,length=211173>
+##contig=<ID=GL000192.1,length=547496>
+##contig=<ID=NC_007605,length=171823>
+##reference=file:///seq/references/Homo_sapiens_assembly19/v1/Homo_sapiens_assembly19.fasta
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+chr22	15927888	.	C	CACA,G	1164.92	PASS	AC=3,0;AF=1.81378e-04,0.00000e+00;AN=16540;BaseQRankSum=-2.24000e-01;ClippingRankSum=-2.63000e-01;DP=230703;FS=8.86700e+00;InbreedingCoeff=5.80000e-03;MQ=3.46800e+01;MQRankSum=1.43000e-01;QD=1.01300e+01;ReadPosRankSum=-2.13000e-01;SOR=3.30000e-02;VQSLOD=-1.37800e+00;VQSR_culprit=SOR;VQSR_NEGATIVE_TRAIN_SITE;GQ_HIST_ALT=0|0|0|0|0|0|0|0|0|0|0|0|0|0|1|0|1|0|0|4,0|0|0|0|0|0|0|0|0|0|0|0|0|0|1|0|0|0|0|0;DP_HIST_ALT=0|3|2|1|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0,0|1|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0;AB_HIST_ALT=0|0|0|0|0|0|2|0|1|1|1|0|0|0|0|1|0|0|0|0,0|0|0|0|0|0|0|0|0|0|0|0|1|0|0|0|0|0|0|0;GQ_HIST_ALL=104|464|608|1985|2741|1441|2526|1859|721|1069|690|260|538|62|159|47|92|8|46|68;DP_HIST_ALL=1018|6123|5177|2097|791|161|97|24|0|0|0|0|0|0|0|0|0|0|0|0;AB_HIST_ALL=0|0|0|0|0|0|2|0|1|1|1|0|1|0|0|1|0|0|0|0;AC_AFR=0,0;AC_AMR=0,0;AC_ASJ=0,0;AC_EAS=0,0;AC_FIN=0,0;AC_NFE=3,0;AC_OTH=0,0;AC_Male=3,0;AC_Female=0,0;AN_AFR=3614;AN_AMR=528;AN_ASJ=180;AN_EAS=892;AN_FIN=2256;AN_NFE=8466;AN_OTH=604;AN_Male=9308;AN_Female=7232;AF_AFR=0.00000e+00,0.00000e+00;AF_AMR=0.00000e+00,0.00000e+00;AF_ASJ=0.00000e+00,0.00000e+00;AF_EAS=0.00000e+00,0.00000e+00;AF_FIN=0.00000e+00,0.00000e+00;AF_NFE=3.54359e-04,0.00000e+00;AF_OTH=0.00000e+00,0.00000e+00;AF_Male=3.22303e-04,0.00000e+00;AF_Female=0.00000e+00,0.00000e+00;GC_AFR=1807,0,0,0,0,0;GC_AMR=264,0,0,0,0,0;GC_ASJ=90,0,0,0,0,0;GC_EAS=446,0,0,0,0,0;GC_FIN=1128,0,0,0,0,0;GC_NFE=4230,3,0,0,0,0;GC_OTH=302,0,0,0,0,0;GC_Male=4651,3,0,0,0,0;GC_Female=3616,0,0,0,0,0;AC_raw=6,1;AN_raw=30976;AF_raw=1.93698e-04,3.22831e-05;GC_raw=15481,6,0,1,0,0;GC=8267,3,0,0,0,0;Hom_AFR=0,0;Hom_AMR=0,0;Hom_ASJ=0,0;Hom_EAS=0,0;Hom_FIN=0,0;Hom_NFE=0,0;Hom_OTH=0,0;Hom_Male=0,0;Hom_Female=0,0;Hom_raw=0,0;Hom=0,0;POPMAX=NFE,.;AC_POPMAX=3,.;AN_POPMAX=8466,.;AF_POPMAX=3.54359e-04,.;DP_MEDIAN=10,8;DREF_MEDIAN=3.15558e-20,2.51189e-13;GQ_MEDIAN=99,72;AB_MEDIAN=4.41558e-01,6.25000e-01;AS_RF=5.16800e-01,3.29197e-01;AS_FilterStatus=PASS,RF|AC0;CSQ=C|intergenic_variant|MODIFIER||||||||||||||||2||||insertion|1||||||||||||||||||||||||||||||||||||||||||||
+chr22	15927876	.	G	A	108.57	PASS	AC=1;AF=5.09632e-05;AN=19622;BaseQRankSum=-7.51000e-01;ClippingRankSum=-1.43000e-01;DP=255559;FS=0.00000e+00;InbreedingCoeff=-4.70000e-03;MQ=3.40100e+01;MQRankSum=-3.32000e-01;QD=9.87000e+00;ReadPosRankSum=6.60000e-02;SOR=9.90000e-02;VQSLOD=-3.45100e+01;VQSR_culprit=MQ;GQ_HIST_ALT=0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|1;DP_HIST_ALT=0|0|1|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0;AB_HIST_ALT=0|0|0|0|0|0|0|0|0|0|1|0|0|0|0|0|0|0|0|0;GQ_HIST_ALL=90|295|443|1443|2398|1347|2546|2110|845|1318|842|356|727|79|237|59|159|7|90|99;DP_HIST_ALL=626|4935|5582|2741|1103|289|169|45|0|0|0|0|0|0|0|0|0|0|0|0;AB_HIST_ALL=0|0|0|0|0|0|0|0|0|0|1|0|0|0|0|0|0|0|0|0;AC_AFR=0;AC_AMR=0;AC_ASJ=0;AC_EAS=0;AC_FIN=0;AC_NFE=1;AC_OTH=0;AC_Male=1;AC_Female=0;AN_AFR=4696;AN_AMR=588;AN_ASJ=206;AN_EAS=1092;AN_FIN=2392;AN_NFE=9986;AN_OTH=662;AN_Male=10956;AN_Female=8666;AF_AFR=0.00000e+00;AF_AMR=0.00000e+00;AF_ASJ=0.00000e+00;AF_EAS=0.00000e+00;AF_FIN=0.00000e+00;AF_NFE=1.00140e-04;AF_OTH=0.00000e+00;AF_Male=9.12742e-05;AF_Female=0.00000e+00;GC_AFR=2348,0,0;GC_AMR=294,0,0;GC_ASJ=103,0,0;GC_EAS=546,0,0;GC_FIN=1196,0,0;GC_NFE=4992,1,0;GC_OTH=331,0,0;GC_Male=5477,1,0;GC_Female=4333,0,0;AC_raw=1;AN_raw=30980;AF_raw=3.22789e-05;GC_raw=15489,1,0;GC=9810,1,0;Hom_AFR=0;Hom_AMR=0;Hom_ASJ=0;Hom_EAS=0;Hom_FIN=0;Hom_NFE=0;Hom_OTH=0;Hom_Male=0;Hom_Female=0;Hom_raw=0;Hom=0;POPMAX=NFE;AC_POPMAX=1;AN_POPMAX=9986;AF_POPMAX=1.00140e-04;DP_MEDIAN=11;DREF_MEDIAN=7.94328e-18;GQ_MEDIAN=99;AB_MEDIAN=5.45455e-01;AS_RF=4.14273e-01;AS_FilterStatus=PASS;CSQ=A|intergenic_variant|MODIFIER||||||||||||||||1||||SNV|1||||||||||||||||||||||||||||||||||||||||||||
+chr22	15927837	.	A	C	215.56	PASS	AC=1;AF=4.23837e-05;AN=23594;BaseQRankSum=1.45000e+00;ClippingRankSum=9.70000e-02;DP=287254;FS=0.00000e+00;InbreedingCoeff=-3.60000e-03;MQ=3.28600e+01;MQRankSum=2.26000e-01;QD=9.37000e+00;ReadPosRankSum=-4.20000e-01;SOR=2.75000e-01;VQSLOD=-3.70600e+01;VQSR_culprit=MQ;GQ_HIST_ALT=0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|1;DP_HIST_ALT=0|0|0|0|1|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0;AB_HIST_ALT=0|0|0|0|0|0|1|0|0|0|0|0|0|0|0|0|0|0|0|0;GQ_HIST_ALL=74|217|284|953|1552|1124|2262|2199|980|1697|1212|502|1089|163|422|118|256|20|147|222;DP_HIST_ALL=374|3170|5440|3653|1801|617|309|107|16|5|1|0|0|0|0|0|0|0|0|0;AB_HIST_ALL=0|0|0|0|0|0|1|0|0|0|0|0|0|0|0|0|0|0|0|0;AC_AFR=0;AC_AMR=0;AC_ASJ=0;AC_EAS=0;AC_FIN=0;AC_NFE=0;AC_OTH=1;AC_Male=1;AC_Female=0;AN_AFR=6398;AN_AMR=642;AN_ASJ=220;AN_EAS=1378;AN_FIN=2270;AN_NFE=11958;AN_OTH=728;AN_Male=13148;AN_Female=10446;AF_AFR=0.00000e+00;AF_AMR=0.00000e+00;AF_ASJ=0.00000e+00;AF_EAS=0.00000e+00;AF_FIN=0.00000e+00;AF_NFE=0.00000e+00;AF_OTH=1.37363e-03;AF_Male=7.60572e-05;AF_Female=0.00000e+00;GC_AFR=3199,0,0;GC_AMR=321,0,0;GC_ASJ=110,0,0;GC_EAS=689,0,0;GC_FIN=1135,0,0;GC_NFE=5979,0,0;GC_OTH=363,1,0;GC_Male=6573,1,0;GC_Female=5223,0,0;AC_raw=1;AN_raw=30986;AF_raw=3.22726e-05;GC_raw=15492,1,0;GC=11796,1,0;Hom_AFR=0;Hom_AMR=0;Hom_ASJ=0;Hom_EAS=0;Hom_FIN=0;Hom_NFE=0;Hom_OTH=0;Hom_Male=0;Hom_Female=0;Hom_raw=0;Hom=0;POPMAX=.;AC_POPMAX=.;AN_POPMAX=.;AF_POPMAX=.;DP_MEDIAN=23;DREF_MEDIAN=1.58489e-28;GQ_MEDIAN=99;AB_MEDIAN=3.47826e-01;AS_RF=7.79080e-01;AS_FilterStatus=PASS;CSQ=C|intergenic_variant|MODIFIER||||||||||||||||1||||SNV|1||||||||||||||||||||||||||||||||||||||||||||
+chr22	15927835	.	C	T	149.65	PASS	AC=1;AF=4.22297e-05;AN=23680;BaseQRankSum=1.22000e+00;ClippingRankSum=-1.07000e-01;DP=287265;FS=0.00000e+00;InbreedingCoeff=-3.20000e-03;MQ=3.78300e+01;MQRankSum=-1.07000e-01;QD=1.06900e+01;ReadPosRankSum=9.67000e-01;SOR=3.50000e-01;VQSLOD=-2.44000e+01;VQSR_culprit=MQ;GQ_HIST_ALT=0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|1;DP_HIST_ALT=0|0|1|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0;AB_HIST_ALT=0|0|0|0|0|0|0|0|0|0|0|1|0|0|0|0|0|0|0|0;GQ_HIST_ALL=64|220|294|926|1565|1084|2265|2217|996|1671|1225|488|1101|152|440|148|259|14|143|221;DP_HIST_ALL=374|3167|5435|3621|1823|620|325|106|16|5|1|0|0|0|0|0|0|0|0|0;AB_HIST_ALL=0|0|0|0|0|0|0|0|0|0|0|1|0|0|0|0|0|0|0|0;AC_AFR=0;AC_AMR=0;AC_ASJ=0;AC_EAS=0;AC_FIN=0;AC_NFE=1;AC_OTH=0;AC_Male=1;AC_Female=0;AN_AFR=6446;AN_AMR=636;AN_ASJ=220;AN_EAS=1394;AN_FIN=2274;AN_NFE=11990;AN_OTH=720;AN_Male=13182;AN_Female=10498;AF_AFR=0.00000e+00;AF_AMR=0.00000e+00;AF_ASJ=0.00000e+00;AF_EAS=0.00000e+00;AF_FIN=0.00000e+00;AF_NFE=8.34028e-05;AF_OTH=0.00000e+00;AF_Male=7.58610e-05;AF_Female=0.00000e+00;GC_AFR=3223,0,0;GC_AMR=318,0,0;GC_ASJ=110,0,0;GC_EAS=697,0,0;GC_FIN=1137,0,0;GC_NFE=5994,1,0;GC_OTH=360,0,0;GC_Male=6590,1,0;GC_Female=5249,0,0;AC_raw=1;AN_raw=30986;AF_raw=3.22726e-05;GC_raw=15492,1,0;GC=11839,1,0;Hom_AFR=0;Hom_AMR=0;Hom_ASJ=0;Hom_EAS=0;Hom_FIN=0;Hom_NFE=0;Hom_OTH=0;Hom_Male=0;Hom_Female=0;Hom_raw=0;Hom=0;POPMAX=NFE;AC_POPMAX=1;AN_POPMAX=11990;AF_POPMAX=8.34028e-05;DP_MEDIAN=14;DREF_MEDIAN=6.30957e-22;GQ_MEDIAN=99;AB_MEDIAN=5.71429e-01;AS_RF=6.44340e-01;AS_FilterStatus=PASS;CSQ=T|intergenic_variant|MODIFIER||||||||||||||||1||||SNV|1||||||||||||||||||||||||||||||||||||||||||||
+chr22	15927834	.	G	T	183.64	PASS	AC=1;AF=4.21905e-05;AN=23702;BaseQRankSum=2.20000e+00;ClippingRankSum=-6.08000e-01;DP=287202;FS=0.00000e+00;InbreedingCoeff=-3.00000e-03;MQ=3.51700e+01;MQRankSum=2.36000e+00;QD=9.18000e+00;ReadPosRankSum=1.14000e+00;SOR=8.60000e-02;VQSLOD=-3.66200e+01;VQSR_culprit=MQ;GQ_HIST_ALT=0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|1;DP_HIST_ALT=0|0|0|0|1|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0;AB_HIST_ALT=0|0|0|0|0|0|0|0|0|1|0|0|0|0|0|0|0|0|0|0;GQ_HIST_ALL=54|216|270|931|1532|1084|2270|2199|971|1682|1284|459|1155|157|434|133|260|21|158|223;DP_HIST_ALL=380|3164|5416|3618|1841|618|328|106|16|5|1|0|0|0|0|0|0|0|0|0;AB_HIST_ALL=0|0|0|0|0|0|0|0|0|1|0|0|0|0|0|0|0|0|0|0;AC_AFR=1;AC_AMR=0;AC_ASJ=0;AC_EAS=0;AC_FIN=0;AC_NFE=0;AC_OTH=0;AC_Male=1;AC_Female=0;AN_AFR=6452;AN_AMR=638;AN_ASJ=222;AN_EAS=1398;AN_FIN=2270;AN_NFE=12010;AN_OTH=712;AN_Male=13204;AN_Female=10498;AF_AFR=1.54991e-04;AF_AMR=0.00000e+00;AF_ASJ=0.00000e+00;AF_EAS=0.00000e+00;AF_FIN=0.00000e+00;AF_NFE=0.00000e+00;AF_OTH=0.00000e+00;AF_Male=7.57346e-05;AF_Female=0.00000e+00;GC_AFR=3225,1,0;GC_AMR=319,0,0;GC_ASJ=111,0,0;GC_EAS=699,0,0;GC_FIN=1135,0,0;GC_NFE=6005,0,0;GC_OTH=356,0,0;GC_Male=6601,1,0;GC_Female=5249,0,0;AC_raw=1;AN_raw=30986;AF_raw=3.22726e-05;GC_raw=15492,1,0;GC=11850,1,0;Hom_AFR=0;Hom_AMR=0;Hom_ASJ=0;Hom_EAS=0;Hom_FIN=0;Hom_NFE=0;Hom_OTH=0;Hom_Male=0;Hom_Female=0;Hom_raw=0;Hom=0;POPMAX=AFR;AC_POPMAX=1;AN_POPMAX=6452;AF_POPMAX=1.54991e-04;DP_MEDIAN=20;DREF_MEDIAN=2.51189e-25;GQ_MEDIAN=99;AB_MEDIAN=4.50000e-01;AS_RF=8.93688e-01;AS_FilterStatus=PASS;CSQ=T|intergenic_variant|MODIFIER||||||||||||||||1||||SNV|1||||||||||||||||||||||||||||||||||||||||||||
+chr22	15927834	rs199856444	G	C	1458410.68	PASS	AC=5232;AF=2.00721e-01;AN=26066;BaseQRankSum=9.10000e-02;ClippingRankSum=0.00000e+00;DB;DP=379518;FS=1.42950e+01;InbreedingCoeff=-1.97800e-01;MQ=3.43800e+01;MQRankSum=5.53000e-01;QD=9.27000e+00;ReadPosRankSum=5.81000e-01;SOR=1.93600e+00;VQSLOD=-3.58400e+01;VQSR_culprit=MQ;GQ_HIST_ALT=35|58|54|77|62|73|105|121|121|134|123|107|124|140|135|130|112|141|175|4217;DP_HIST_ALT=75|462|1286|1606|1270|749|409|209|87|54|23|10|4|0|0|0|0|0|0|0;AB_HIST_ALT=0|0|96|323|534|762|776|697|765|409|526|278|241|166|133|147|151|77|13|0;GQ_HIST_ALL=449|206|192|333|415|337|693|898|568|1088|1019|567|1363|338|675|319|555|199|455|4792;DP_HIST_ALL=342|1228|2964|3911|3340|1799|1048|584|146|60|23|10|4|1|0|1|0|0|0|0;AB_HIST_ALL=0|0|96|323|534|762|776|697|765|409|526|278|241|166|133|147|151|77|13|0;AC_AFR=1195;AC_AMR=199;AC_ASJ=48;AC_EAS=462;AC_FIN=539;AC_NFE=2634;AC_OTH=155;AC_Male=2860;AC_Female=2372;AN_AFR=7838;AN_AMR=630;AN_ASJ=216;AN_EAS=1372;AN_FIN=2596;AN_NFE=12638;AN_OTH=776;AN_Male=14358;AN_Female=11708;AF_AFR=1.52462e-01;AF_AMR=3.15873e-01;AF_ASJ=2.22222e-01;AF_EAS=3.36735e-01;AF_FIN=2.07627e-01;AF_NFE=2.08419e-01;AF_OTH=1.99742e-01;AF_Male=1.99192e-01;AF_Female=2.02597e-01;GC_AFR=2733,1177,9;GC_AMR=120,191,4;GC_ASJ=60,48,0;GC_EAS=228,454,4;GC_FIN=767,523,8;GC_NFE=3709,2586,24;GC_OTH=235,151,2;GC_Male=4350,2798,31;GC_Female=3502,2332,20;AC_raw=6394;AN_raw=30922;AF_raw=2.06778e-01;GC_raw=9217,6094,150;GC=7852,5130,51;Hom_AFR=9;Hom_AMR=4;Hom_ASJ=0;Hom_EAS=4;Hom_FIN=8;Hom_NFE=24;Hom_OTH=2;Hom_Male=31;Hom_Female=20;Hom_raw=150;Hom=51;POPMAX=EAS;AC_POPMAX=462;AN_POPMAX=1372;AF_POPMAX=3.36735e-01;DP_MEDIAN=18;DREF_MEDIAN=6.30957e-17;GQ_MEDIAN=99;AB_MEDIAN=3.84615e-01;AS_RF=5.10467e-01;AS_FilterStatus=PASS;CSQ=T|intergenic_variant|MODIFIER|||||||||||||||rs199856444|1||||SNV|1||||||||||||||||||||||||||||||||||||||||||||
+chr22	15927759	.	T	A,C	692.49	PASS	AC=1,7;AF=3.55290e-05,2.48703e-04;AN=28146;BaseQRankSum=-1.66300e+00;ClippingRankSum=-6.10000e-02;DP=405801;FS=2.74010e+01;InbreedingCoeff=2.60000e-03;MQ=3.41700e+01;MQRankSum=-1.61300e+00;QD=1.10000e+00;ReadPosRankSum=-3.22000e-01;SOR=6.70000e-02;VQSLOD=-6.27400e+01;VQSR_culprit=MQ;GQ_HIST_ALT=0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|1,1|1|1|3|1|0|0|0|2|3|1|1|0|1|1|1|0|0|0|2;DP_HIST_ALT=0|0|0|1|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0,0|0|4|5|2|5|1|2|0|0|0|0|0|0|0|0|0|0|0|0;AB_HIST_ALT=0|0|0|0|0|0|0|0|1|0|0|0|0|0|0|0|0|0|0|0,0|0|5|7|2|3|2|0|0|0|0|0|0|0|0|0|0|0|0|0;GQ_HIST_ALL=75|210|161|374|461|353|797|1090|677|1437|1528|731|2217|413|1197|417|966|122|653|1602;DP_HIST_ALL=347|986|2229|3523|3708|2138|1370|889|199|50|27|9|4|1|0|1|0|0|0|0;AB_HIST_ALL=0|0|5|7|2|3|2|0|1|0|0|0|0|0|0|0|0|0|0|0;AC_AFR=0,1;AC_AMR=1,0;AC_ASJ=0,1;AC_EAS=0,0;AC_FIN=0,3;AC_NFE=0,1;AC_OTH=0,1;AC_Male=0,3;AC_Female=1,4;AN_AFR=8282;AN_AMR=744;AN_ASJ=226;AN_EAS=1590;AN_FIN=2918;AN_NFE=13538;AN_OTH=848;AN_Male=15510;AN_Female=12636;AF_AFR=0.00000e+00,1.20744e-04;AF_AMR=1.34409e-03,0.00000e+00;AF_ASJ=0.00000e+00,4.42478e-03;AF_EAS=0.00000e+00,0.00000e+00;AF_FIN=0.00000e+00,1.02810e-03;AF_NFE=0.00000e+00,7.38662e-05;AF_OTH=0.00000e+00,1.17925e-03;AF_Male=0.00000e+00,1.93424e-04;AF_Female=7.91390e-05,3.16556e-04;GC_AFR=4140,0,0,1,0,0;GC_AMR=371,1,0,0,0,0;GC_ASJ=112,0,0,1,0,0;GC_EAS=795,0,0,0,0,0;GC_FIN=1456,0,0,3,0,0;GC_NFE=6768,0,0,1,0,0;GC_OTH=423,0,0,1,0,0;GC_Male=7752,0,0,3,0,0;GC_Female=6313,1,0,4,0,0;AC_raw=1,19;AN_raw=30962;AF_raw=3.22977e-05,6.13655e-04;GC_raw=15461,1,0,19,0,0;GC=14065,1,0,7,0,0;Hom_AFR=0,0;Hom_AMR=0,0;Hom_ASJ=0,0;Hom_EAS=0,0;Hom_FIN=0,0;Hom_NFE=0,0;Hom_OTH=0,0;Hom_Male=0,0;Hom_Female=0,0;Hom_raw=0,0;Hom=0,0;POPMAX=AMR,ASJ;AC_POPMAX=1,1;AN_POPMAX=744,226;AF_POPMAX=1.34409e-03,4.42478e-03;DP_MEDIAN=19,22;DREF_MEDIAN=3.16228e-18,1.99522e-05;GQ_MEDIAN=99,47;AB_MEDIAN=4.21053e-01,1.73913e-01;AS_RF=7.14240e-01,1.47824e-02;AS_FilterStatus=PASS,RF;AS_RF_NEGATIVE_TRAIN=1;CSQ=A|intergenic_variant|MODIFIER||||||||||||||||1||||SNV|||||||||||||||||||||||||||||||||||||||||||||,C|intergenic_variant|MODIFIER||||||||||||||||2||||SNV|||||||||||||||||||||||||||||||||||||||||||||
+chr22	15927755	.	T	G	296.53	NON_PASS	AC=2;AF=7.06764e-05;AN=28298;BaseQRankSum=-4.54000e-01;ClippingRankSum=-7.13000e-01;DP=415781;FS=1.91800e+00;InbreedingCoeff=-2.80000e-03;MQ=3.76000e+01;MQRankSum=9.30000e-02;QD=6.18000e+00;ReadPosRankSum=6.51000e-01;SOR=1.19500e+00;VQSLOD=-2.46100e+01;VQSR_culprit=MQ;GQ_HIST_ALT=0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|0|2;DP_HIST_ALT=0|0|0|0|1|1|0|0|0|0|0|0|0|0|0|0|0|0|0|0;AB_HIST_ALT=0|0|0|0|0|1|0|0|1|0|0|0|0|0|0|0|0|0|0|0;GQ_HIST_ALL=77|197|151|386|424|329|796|995|663|1392|1445|753|2211|438|1213|415|1061|122|696|1718;DP_HIST_ALL=325|927|2029|3382|3793|2212|1494|1006|220|51|28|9|4|1|0|1|0|0|0|0;AB_HIST_ALL=0|0|0|0|0|1|0|0|1|0|0|0|0|0|0|0|0|0|0|0;AC_AFR=2;AC_AMR=0;AC_ASJ=0;AC_EAS=0;AC_FIN=0;AC_NFE=0;AC_OTH=0;AC_Male=1;AC_Female=1;AN_AFR=8322;AN_AMR=748;AN_ASJ=226;AN_EAS=1598;AN_FIN=2966;AN_NFE=13580;AN_OTH=858;AN_Male=15596;AN_Female=12702;AF_AFR=2.40327e-04;AF_AMR=0.00000e+00;AF_ASJ=0.00000e+00;AF_EAS=0.00000e+00;AF_FIN=0.00000e+00;AF_NFE=0.00000e+00;AF_OTH=0.00000e+00;AF_Male=6.41190e-05;AF_Female=7.87278e-05;GC_AFR=4159,2,0;GC_AMR=374,0,0;GC_ASJ=113,0,0;GC_EAS=799,0,0;GC_FIN=1483,0,0;GC_NFE=6790,0,0;GC_OTH=429,0,0;GC_Male=7797,1,0;GC_Female=6350,1,0;AC_raw=2;AN_raw=30964;AF_raw=6.45911e-05;GC_raw=15480,2,0;GC=14147,2,0;Hom_AFR=0;Hom_AMR=0;Hom_ASJ=0;Hom_EAS=0;Hom_FIN=0;Hom_NFE=0;Hom_OTH=0;Hom_Male=0;Hom_Female=0;Hom_raw=0;Hom=0;POPMAX=AFR;AC_POPMAX=2;AN_POPMAX=8322;AF_POPMAX=2.40327e-04;DP_MEDIAN=24;DREF_MEDIAN=1.25594e-15;GQ_MEDIAN=99;AB_MEDIAN=3.57391e-01;AS_RF=5.53853e-01;AS_FilterStatus=PASS;CSQ=G|intergenic_variant|MODIFIER||||||||||||||||1||||SNV|1||||||||||||||||||||||||||||||||||||||||||||
+chr22	15927745	.	A	C	718.20	PASS	AC=2;AF=6.93049e-05;AN=28858;BaseQRankSum=-1.40100e+00;ClippingRankSum=3.61000e-01;DP=440172;FS=3.22100e+00;InbreedingCoeff=-1.50000e-03;MQ=3.87000e+01;MQRankSum=-7.30000e-02;QD=7.48000e+00;ReadPosRankSum=0.00000e+00;SOR=1.09300e+00;VQSLOD=-2.17400e+01;VQSR_culprit=MQ;GQ_HIST_ALT=0|0|0|0|0|0|0|0|0|0|0|0|1|0|0|0|0|0|1|2;DP_HIST_ALT=0|1|0|0|0|2|1|0|0|0|0|0|0|0|0|0|0|0|0|0;AB_HIST_ALT=0|0|0|1|0|0|0|0|1|0|1|1|0|0|0|0|0|0|0|0;GQ_HIST_ALL=30|139|117|300|352|256|578|857|572|1259|1323|742|2332|396|1303|408|1234|111|867|2309;DP_HIST_ALL=235|803|1714|3101|3801|2363|1856|1262|252|55|28|9|4|1|0|1|0|0|0|0;AB_HIST_ALL=0|0|0|1|0|0|0|0|1|0|1|1|0|0|0|0|0|0|0|0;AC_AFR=0;AC_AMR=0;AC_ASJ=0;AC_EAS=0;AC_FIN=0;AC_NFE=2;AC_OTH=0;AC_Male=1;AC_Female=1;AN_AFR=8454;AN_AMR=782;AN_ASJ=232;AN_EAS=1606;AN_FIN=3132;AN_NFE=13774;AN_OTH=878;AN_Male=15900;AN_Female=12958;AF_AFR=0.00000e+00;AF_AMR=0.00000e+00;AF_ASJ=0.00000e+00;AF_EAS=0.00000e+00;AF_FIN=0.00000e+00;AF_NFE=1.45201e-04;AF_OTH=0.00000e+00;AF_Male=6.28931e-05;AF_Female=7.71724e-05;GC_AFR=4227,0,0;GC_AMR=391,0,0;GC_ASJ=116,0,0;GC_EAS=803,0,0;GC_FIN=1566,0,0;GC_NFE=6885,2,0;GC_OTH=439,0,0;GC_Male=7949,1,0;GC_Female=6478,1,0;AC_raw=4;AN_raw=30970;AF_raw=1.29157e-04;GC_raw=15481,4,0;GC=14427,2,0;Hom_AFR=0;Hom_AMR=0;Hom_ASJ=0;Hom_EAS=0;Hom_FIN=0;Hom_NFE=0;Hom_OTH=0;Hom_Male=0;Hom_Female=0;Hom_raw=0;Hom=0;POPMAX=NFE;AC_POPMAX=2;AN_POPMAX=13774;AF_POPMAX=1.45201e-04;DP_MEDIAN=27;DREF_MEDIAN=2.50594e-10;GQ_MEDIAN=96;AB_MEDIAN=4.72222e-01;AS_RF=5.74840e-01;AS_FilterStatus=PASS;CSQ=C|intergenic_variant|MODIFIER||||||||||||||||1||||SNV|1||||||||||||||||||||||||||||||||||||||||||||
