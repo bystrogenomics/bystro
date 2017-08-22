@@ -11,7 +11,7 @@ our $VERSION = '0.001';
 
 use Mouse 2;
 use namespace::autoclean;
-
+use DDP;
 extends 'Seq::Tracks::Get';
 
 __PACKAGE__->meta->make_immutable;
@@ -27,59 +27,73 @@ sub BUILD {
 
 sub get {
   # Avoid assignments, save overhead
-  #my ($self, $href, $chr, $refBase, $allele, $alleleIdx, $positionIdx, $outAccum) = @_;
-  #$href is the data that the user previously grabbed from the database
+  #my ($self, $href, $chr, $refBase, $allele, $outAccum, $alleleNumber) = @_
   # $_[0] == $self
-  # $_[1] == $href : the array fetched for this position from the database
-  # $_[2] == $chr
-  # $_[3] == $refBase
-  # $_[4] == $allele
-  # $_[5] == $alleleIdx
-  # $_[6] == $positionIdx
-  # $_[7] == $outAccum
+  # $_[1] == <ArrayRef> $href : the database data, with each top-level index corresponding to a track
+  # $_[2] == <String> $chr  : the chromosome
+  # $_[3] == <String> $refBase : ACTG
+  # $_[4] == <String> $allele  : the allele (ACTG or -N / +ACTG)
+  # $_[5] == <Int> $alleleIdx  : if this is a single-line multiallelic, the allele index
+  # $_[6] == <Int> $positionIdx : the position in the indel, if any
+  # $_[7] == <ArrayRef> $outAccum : a reference to the output, which we mutate
 
-  my $data = $_[1]->[$_[0]->{_dbName}];
-  my $alt = $data->[$_[0]->{_altIdx}];
-
-  # If $alt is a reference (if not to array will die an ugly death, means horribly corrrupted db)
-  # then find the matching alt, record the index, and look up all field values
-  # at this index
-  # All fields are required to have the same depth, during building
-  # We attempt to only enter a for loop when necessary, because perl is slow
-  # Most sites will not have overlapping records
-  if (ref $alt) {
-    my $dataIdx = 0;
-
-    for my $alt (@$alt) {
-      if($alt eq $_[4]) {
-        for my $fieldIdx (@{$_[0]->{_fieldIdxRange}}) {
-          #$outAccum->[$fieldIdx][$alleleIdx][$positionIdx] = $data->[$self->{_fieldDbNames}[$dataIdx]] }
-          $_[7]->[$fieldIdx][$_[5]][$_[6]] = $data->[$_[0]->{_fieldDbNames}[$fieldIdx]][$dataIdx];
-        }
-
-        #return $outAccum;
-        return $_[7];
-      }
-
-      $dataIdx++;
-    }
-
-    # If we got to this point, we found nothing.
-    # Return nothing. That is a perfectly valid value
-    # The output module will correctly write undefined values for all encessary
-    # fields
-    #return $outAccum;
+  # Unlike other tracks, for Vcf, we only return exact matches
+  # So tiling across the entire deleted region isn't appropriate
+  # Could result in false positives during search
+  if($_[6] > 0) {
     return $_[7];
   }
 
-  # Alt is a scalar, which means there were no overlapping database values
-  # at this pposiiton, and all fields represent a single value 
-  for my $idx (@{$_[0]->{_fieldIdxRange}}) {
-    #$outAccum->[$idx][$alleleIdx][$positionIdx] = $href->[$self->{_dbName}][$self->{_fieldDbNames}[$idx]] }
-    $_[7]->[$idx][$_[5]][$_[6]] = $data->[$_[0]->{_fieldDbNames}[$idx]];
+  my $data = $_[1]->[$_[0]->{_dbName}];
+
+  if(!defined $data) {
+    return $_[7];
   }
 
-  #return $outAccum
+  my $alt = $data->[$_[0]->{_altIdx}];
+
+  # To save CPU time, only enter for loop when necessary
+  # Almost all VCF sites (~99%) will not be multiallelic, and so the alt stored
+  # in db will be a scalar
+  # Handle this as a special, fast path
+  if(!ref $alt) {
+    if($alt eq $_[4]) {
+      # Alt is a scalar, which means there were no overlapping database values
+      # at this pposiiton, and all fields represent a single value
+      for my $idx (@{$_[0]->{_fieldIdxRange}}) {
+        #$outAccum->[$idx][$alleleIdx][$positionIdx] = $href->[$self->{_dbName}][$self->{_fieldDbNames}[$idx]] }
+        $_[7]->[$idx][$_[5]][$_[6]] = $data->[$_[0]->{_fieldDbNames}[$idx]];
+      }
+    }
+
+    return $_[7];
+  }
+
+ 
+  # If $alt is a reference (expect array: if not, this is a programmatic error 
+  # which we allow to crash the program)
+  # then find the matching alt if any, record its index in the database array,
+  # and look up all YAML-defined fields at this index in the same db data arrayref
+  # All fields are required to have the same depth, during building
+  my $dataIdx = 0;
+
+  for my $alt (@$alt) {
+    if($alt eq $_[4]) {
+      for my $fieldIdx (@{$_[0]->{_fieldIdxRange}}) {
+        #$outAccum->[$fieldIdx][$alleleIdx][$positionIdx] = $data->[$self->{_fieldDbNames}[$dataIdx]] }
+        $_[7]->[$fieldIdx][$_[5]][$_[6]] = $data->[$_[0]->{_fieldDbNames}[$fieldIdx]][$dataIdx];
+      }
+
+      #return $outAccum;
+      return $_[7];
+    }
+
+    $dataIdx++;
+  }
+
+  # If we got to this point, we found nothing.
+  # Note that unlike other tracks that tile across indels, we return a single
+  # undef, rather than per-alt or per-position in indel
   return $_[7];
 }
 

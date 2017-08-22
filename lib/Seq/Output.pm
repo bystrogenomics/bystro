@@ -68,7 +68,7 @@ sub makeOutputString {
 
     TRACK_LOOP: for my $trackName ( @{$self->{_orderedHeader}} ) {
       if(ref $trackName) {
-        if(!defined $row->[$trackIdx] || ! @{$row->[$trackIdx]}) {
+        if(!defined $row->[$trackIdx] || !@{$row->[$trackIdx]}) {
           $row->[$trackIdx] = join($fieldSeparator, ($emptyFieldChar) x @$trackName);
 
           $trackIdx++;
@@ -77,6 +77,8 @@ sub makeOutputString {
 
         for my $featureIdx (0 .. $#$trackName) {
           for my $alleleData (@{$row->[$trackIdx][$featureIdx]}) {
+            $alleleData //= $emptyFieldChar;
+
             for my $positionData (@$alleleData) {
               $positionData //= $emptyFieldChar;
 
