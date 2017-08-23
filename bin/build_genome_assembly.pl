@@ -48,8 +48,31 @@ if ($help) {
   exit;
 }
 
+my %options = (
+  'c|config=s'   => \$yaml_config,
+  't|type|wantedType=s'     => \$wantedType,
+  'n|name|wantedName=s'     => \$wantedName,
+  'v|verbose=i'    => \$verbose,
+  'h|help'       => \$help,
+  'd|debug=i'      => \$debug,
+  'o|overwrite=i'  => \$overwrite,
+  'chr|wantedChr=s' => \$wantedChr,
+  'delete' => \$delete,
+  'build_region_track_only' => \$regionTrackOnly,
+  'skipCompletionCheck|skip_completion_check' => \$skipCompletionCheck,
+  'dry_run_insertions|dry|dryRun' => \$dryRunInsertions,
+  'log_dir=s' => \$logDir,
+  'max_threads=i' => \$maxThreads,
+  'meta_only' => \$metaOnly,
+);
+
 unless ($yaml_config) {
   Pod::Usage::pod2usage();
+}
+
+if($debug) {
+  say STDERR "Running with the following parameters:" ;
+  p %options;
 }
 
 

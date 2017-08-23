@@ -281,6 +281,7 @@ sub annotateFile {
     # Each line is expected to be
     # chrom \t pos \t type \t inputRef \t alt \t hets \t homozygotes \n
     # the chrom is always in ucsc form, chr (the golang program guarantees it)
+
     while (my $line = $MEM_FH->getline()) {
       chomp $line;
 
