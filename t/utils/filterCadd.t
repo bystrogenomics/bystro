@@ -23,7 +23,7 @@ Seq::DBManager::setGlobalDatabaseDir($config->{database_dir});
 
 my $db = Seq::DBManager->new();
 
-$config->{tracks}[1]{local_files} = ['test.filterCadd.cadd.chr22.txt', 'test.filterCadd.cadd.chr1.txt', 'test.filterCadd.cadd.chr2.txt'];
+$config->{tracks}[1]{local_files} = ['test.filterCadd.cadd.chr22.txt', 'test.filterCadd.cadd.chr1.txt.gz', 'test.filterCadd.cadd.chr2.txt'];
 
 open(my $fh, '>', './t/utils/filterCadd.yml');
 
@@ -213,6 +213,6 @@ for my $path (@{$caddTrack->{local_files}}) {
 }
 
 ok($found == 3, "Found $found output files");
-ok($caddTrack->{filteredCadd_date}, "has non-null filteredCadd_date property");
+ok($caddTrack->{filterCadd_date}, "has non-null filterCadd_date property");
 
 done_testing();

@@ -111,7 +111,15 @@ sub go {
 
   for my $inPath (@$localFilesPathsAref) {
     my $outPath;
-    my $outPathBase = substr($inPath, 0, rindex($inPath, '.') );
+
+    my $outPathBase;
+    # If this is a compressed file, strip the preceeding extension
+    if($inPath =~ /.gz$/) {
+      $outPathBase = substr($inPath, 0, rindex($inPath, '.'));
+      $outPathBase = substr($outPathBase, 0, rindex($outPathBase, '.'));
+    } else {
+      $outPathBase = substr($inPath, 0, rindex($inPath, '.'));
+    }
 
     $pm->start($inPath) and next;
       my $readFh = $self->get_read_fh($inPath);
@@ -309,7 +317,7 @@ sub go {
   $pm->wait_all_children();
 
   $self->_wantedTrack->{local_files} = \@outPaths;
-  $self->_wantedTrack->{filteredCadd_date} = $self->_dateOfRun;
+  $self->_wantedTrack->{filterCadd_date} = $self->_dateOfRun;
 
   $self->_backupAndWriteConfig();
 
