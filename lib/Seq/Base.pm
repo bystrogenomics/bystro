@@ -46,6 +46,12 @@ has debug => (is => 'ro', default => 0);
 sub BUILDARGS {
   my ($self, $data) = @_;
 
+  # Since we never have more than one database_dir, it's a global property we can set
+  # in this package, which Seq.pm and Seq::Build extend from
+  if(!$data->{database_dir}) {
+    die "Please provide a database_dir";
+  }
+
   # DBManager acts as a singleton. It is configured once, and then consumed repeatedly
   # However, in long running processes, this can lead to misconfiguration issues
   # and worse, environments created in one process, then copied during forking, to others

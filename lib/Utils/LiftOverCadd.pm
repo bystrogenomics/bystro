@@ -44,13 +44,27 @@ sub liftOver {
 
   my $outDir = path($self->_decodedConfig->{files_dir})->child($self->_wantedTrack->{name});
 
-  my $pm = Parallel::ForkManager->new(scalar @$localFilesPathsAref);
+  my $pm = Parallel::ForkManager->new($self->maxThreads);
 
   if(!@$localFilesPathsAref) {
     $self->log('fatal', "No local files found");
   }
 
   my @finalOutPaths;
+
+  # If we don't call the run_on_finish here
+  # only 1 outPath will be stored for each fork, regardless of how many
+  # files that fork read, since this will only be run once per termination
+  # of a fork (rather than for each finish() call)
+  $pm->run_on_finish(sub{
+    my ($pid, $exitCode, $liftedPath) = @_;
+    if($exitCode != 0) {
+      $self->log('fatal', "$liftedPath failed liftOver");
+      return;
+    }
+
+    push @finalOutPaths, path($liftedPath)->basename;
+  });
 
   for my $inPath (@$localFilesPathsAref) {
     $self->log('info', "Beginning to lift over $inPath");
@@ -124,16 +138,6 @@ sub liftOver {
       }
     $pm->finish($exitStatus);
   }
-
-  $pm->run_on_finish(sub{
-    my ($pid, $exitCode, $liftedPath) = @_;
-    if($exitCode != 0) {
-      $self->log('fatal', "$liftedPath failed liftOver");
-      return;
-    }
-
-    push @finalOutPaths, path($liftedPath)->basename;
-  });
 
   $pm->wait_all_children;
 

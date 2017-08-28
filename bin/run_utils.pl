@@ -15,14 +15,17 @@ use Utils::Fetch;
 use Utils::LiftOverCadd;
 use Utils::SortCadd;
 use Utils::RenameTrack;
+use Utils::FilterCadd;
 
 use Seq::Build;
 
+# TODO: refactor to automatically call util by string value
+# i.e: --util filterCadd launches Utils::FilterCadd
 my (
-  $yaml_config, $wantedName, $sortCadd, $renameTrack,
+  $yaml_config, $wantedName, $sortCadd, $filterCadd, $renameTrack,
   $help,        $liftOverCadd, $liftOverPath, $liftOverChainPath,
   $debug,       $overwrite, $fetch, $caddToBed, $compress, $toBed,
-  $renameTrackTo, $verbose, $dryRunInsertions,
+  $renameTrackTo, $verbose, $dryRunInsertions, $maxThreads,
 );
 
 # usage
@@ -35,6 +38,7 @@ GetOptions(
   'fetch' => \$fetch,
   'caddToBed' => \$caddToBed,
   'sortCadd'  => \$sortCadd,
+  'filterCadd' => \$filterCadd,
   'renameTrack'  => \$renameTrack,
   'liftOverCadd' => \$liftOverCadd,
   'compress' => \$compress,
@@ -43,9 +47,10 @@ GetOptions(
   'renameTo=s' => \$renameTrackTo,
   'verbose=i' => \$verbose,
   'dryRun' => \$dryRunInsertions,
+  'maxThreads' => \$maxThreads,
 );
 
-if ( (!$fetch && !$caddToBed && !$liftOverCadd && !$sortCadd && !$renameTrack) || $help) {
+if ( (!$fetch && !$caddToBed && !$liftOverCadd && !$sortCadd && !$renameTrack && !$filterCadd) || $help) {
   Pod::Usage::pod2usage(1);
   exit;
 }
@@ -79,6 +84,10 @@ if($compress) {
   $options{compress} = $compress;
 }
 
+if($maxThreads) {
+  $options{maxThreads} = $maxThreads;
+}
+
 # If user wants to split their local files, needs to happen before we build
 # So that the YAML config file has a chance to update
 if($caddToBed) {
@@ -102,9 +111,13 @@ if($sortCadd) {
 }
 
 if($renameTrack) {
-  say "renaming";
   my $renamer = Utils::RenameTrack->new(\%options);
   $renamer->go();
+}
+
+if($filterCadd) {
+  my $filterCadd = Utils::FilterCadd->new(\%options);
+  $filterCadd->go();
 }
 
 #say "done: " . $wantedType || $wantedName . $wantedChr ? ' for $wantedChr' : '';

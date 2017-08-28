@@ -48,6 +48,10 @@ has publisher => (is => 'ro');
 
 has verbose => (is => 'ro');
 
+has dryRun => (is => 'ro', isa => 'Bool', default => 0);
+
+has maxThreads => (is => 'ro', isa => 'Int', default => 8);
+
 #########'Protected' vars (Meant to be used by child class only) ############ 
 has _wantedTrack => ( is => 'ro', init_arg => undef, writer => '_setWantedTrack' );
 

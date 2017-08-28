@@ -128,9 +128,22 @@ sub sort {
   $self->log('info', "Finished organizing cadd files by chr, beginning sort (multi threaded)");
 
   # TODO: use max processors based on # of cores
-  my $pm = Parallel::ForkManager->new(8);
+  my $pm = Parallel::ForkManager->new($self->maxThreads);
 
   my @finalOutPaths;
+
+  # If we don't call the run_on_finish here
+  # only 1 outPath will be stored for each fork, regardless of how many
+  # files that fork read, since this will only be run once per termination
+  # of a fork (rather than for each finish() call)
+  $pm->run_on_finish(sub {
+    my ($pid, $exitCode, $finalOutPath) = @_;
+
+    if($exitCode != 0) {
+      return $self->log('fatal', "$finalOutPath failed to sort, with exit code $exitCode");
+    }
+    push @finalOutPaths, path($finalOutPath)->basename;
+  });
 
   for my $outPath (@outPaths) {
     my $gzipPath = $self->gzip;
@@ -168,15 +181,6 @@ sub sort {
     # returns the exit status for run_on_finish to die
     $pm->finish($exitStatus);
   }
-
-  $pm->run_on_finish(sub {
-    my ($pid, $exitCode, $finalOutPath) = @_;
-
-    if($exitCode != 0) {
-      return $self->log('fatal', "$finalOutPath failed to sort, with exit code $exitCode");
-    }
-    push @finalOutPaths, path($finalOutPath)->basename;
-  });
 
   $pm->wait_all_children();
 

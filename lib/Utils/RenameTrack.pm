@@ -25,7 +25,6 @@ extends 'Utils::Base';
 ########## Arguments accepted ##############
 # Take the CADD file and make it a bed file
 has renameTo => (is => 'ro', isa => 'Str', required => 1);
-has dryRun => (is => 'ro', default => 0);
 
 ############# Private ############
 
