@@ -57,6 +57,8 @@ tracks:
   - af_oth: number
   - af_male: number
   - af_female: number
+  build_row_filters:
+    AS_FilterStatus: == PASS
   fieldMap:
     AC: ac
     AF: af
@@ -92,5 +94,5 @@ tracks:
   - test.vcf
   name: gnomad.genomes
   type: vcf
-vcfProcessor: "go run ~/go/src/github.com/akotlar/bystro-vcf/main.go"
+vcfProcessor: bystro-vcf
 

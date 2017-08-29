@@ -16,6 +16,7 @@ use Seq::Tracks::Vcf::Build;
 use Test::More;
 use Path::Tiny;
 use Scalar::Util qw/looks_like_number/;
+use DDP;
 
 my $baseMapper = Seq::Tracks::Reference::MapBases->new();
 
@@ -73,45 +74,6 @@ my $vcf = $tracks->getTrackGetterByName('gnomad.genomes');
 
 my $db = Seq::DBManager->new();
 
-my $href = $db->dbReadOne('chr22', 15927888 - 1);
-
-#my ($vcf, $href, $chr, $refBase, $allele, $alleleIdx, $positionIdx, $outAccum) = @_;
-# At this position we have CACA,G alleles
-my $out = [];
-
-# Vcf tracks are going to be treated differently from transcripts and sparse tracks
-# They should return nothing for the nth position in a deletion
-# Or if the allele doesn't match exactly.
-$vcf->get($href, 'chr22', 'C', 'G', 0, 0, $out);
-
-my $numFeatures = scalar @{$vcf->features};
-ok(@{$out} == $numFeatures, "vcf array contians an entry for each requested feature");
-
-for my $feature (@{$vcf->features}) {
-  my $idx = $vcf->getFieldDbName($feature);
-
-  ok(@{$out->[$idx]} == 1, "Every feature is considered bi-allelelic (because alleles are decomposed into bi-allelic sites, with 1 entry");
-  ok(@{$out->[$idx][0]} == 1 && !ref $out->[$idx][0][0], "Every feature contains a single position's worth of data, and that value is scalar");
-}
-
-$vcf->get($href, 'chr22', 'C', 'G', 0, 1, $out);
-
-for my $feature (@{$vcf->features}) {
-  my $idx = $vcf->getFieldDbName($feature);
-
-  ok(@{$out->[$idx][0]} == 1 && !ref $out->[$idx][0][0], "Vcf getter does not tile annotations by the position of the allele (occurs for deletions and insertions only)");
-}
-
-$vcf->get($href, 'chr22', 'C', 'G', 1, 0, $out);
-
-# Although we've deprecated single-line multiallelics, we must continue to support them
-# Until we've decided to drop support
-for my $feature (@{$vcf->features}) {
-  my $idx = $vcf->getFieldDbName($feature);
-
-  ok(@{$out->[$idx]} == 2, "For multiallelic sites, where both alleles on a single input row, each feature is given an array of length == \# of alleles");
-}
-
 ############### Feature tests ################
 # The vcf file contains the following items:
 # Comma separated values are treated as belonging to diff alleles
@@ -148,9 +110,37 @@ for my $feature (@{$vcf->features}) {
 # AF_OTH=0.00000e+00, 0.00000e+00;
 # AF_Male=3.22303e-04, 0.00000e+00;
 # AF_Female=0.00000e+00, 0.00000e+00;
+# AS_FilterStatus=PASS,RF|AC0
+
+# Notice that this site has an RF|AC0 value for AS_FilterStatus
+# Therefore it doesn't pass
+
+my $href = $db->dbReadOne('chr22', 15927888 - 1);
+
+#my ($vcf, $href, $chr, $refBase, $allele, $alleleIdx, $positionIdx, $outAccum) = @_;
+# At this position we have CACA,G alleles
+my $out = [];
+
+# Vcf tracks are going to be treated differently from transcripts and sparse tracks
+# They should return nothing for the nth position in a deletion
+# Or if the allele doesn't match exactly.
+$vcf->get($href, 'chr22', 'C', 'G', 0, 0, $out);
+
+ok(@{$out} == 0, "Non PASS AS_FilterStatus causes alleles to be skipped in multiallelic (testing build_row_filters on INFO values)");
+
+# my $numFeatures = scalar @{$vcf->features};
+# ok(@{$out} == $numFeatures, "vcf array contians an entry for each requested feature");
+
+# for my $feature (@{$vcf->features}) {
+#   my $idx = $vcf->getFieldDbName($feature);
+
+#   ok(@{$out->[$idx]} == 1, "Every feature is considered bi-allelelic (because alleles are decomposed into bi-allelic sites, with 1 entry");
+#   ok(@{$out->[$idx][0]} == 1 && !ref $out->[$idx][0][0], "Every feature contains a single position's worth of data, and that value is scalar");
+# }
 
 # We define these as lower case in our test yaml, so that is how we will look them up
 # No decision is made on behalf of the user how to name these; will be taken as defined
+
 my $trTvIdx = $vcf->getFieldDbName('trTv');
 my $idIdx = $vcf->getFieldDbName('id');
 my $acIdx = $vcf->getFieldDbName('ac');
@@ -189,41 +179,41 @@ my $afOthIdx = $vcf->getFieldDbName('af_oth');
 my $afMaleIdx = $vcf->getFieldDbName('af_male');
 my $afFemaleIdx = $vcf->getFieldDbName('af_female');
 
-ok($out->[$trTvIdx][0][0] == 0, "indels and multiallelics have 0 trTv value");
-ok(!defined $out->[$idIdx][0][0], "correctly finds that this site has no rsID");
-ok($out->[$acIdx][0][0] == 0, "correctly finds first the G alleles ac value");
-ok($out->[$afIdx][0][0] == 0, "correctly finds first the G alleles af value");
-ok($out->[$anIdx][0][0] == 16540, "correctly finds first the G alleles an value, which has only one value across all alleles");
+# ok($out->[$trTvIdx][0][0] == 0, "indels and multiallelics have 0 trTv value");
+# ok(!defined $out->[$idIdx][0][0], "correctly finds that this site has no rsID");
+# ok($out->[$acIdx][0][0] == 0, "correctly finds first the G alleles ac value");
+# ok($out->[$afIdx][0][0] == 0, "correctly finds first the G alleles af value");
+# ok($out->[$anIdx][0][0] == 16540, "correctly finds first the G alleles an value, which has only one value across all alleles");
 
-ok($out->[$acAfrIdx][0][0] == 0, "correctly finds first the G alleles ac_afr value");
-ok($out->[$acAmrIdx][0][0] == 0, "correctly finds first the G alleles ac_amr value");
-ok($out->[$acAsjIdx][0][0] == 0, "correctly finds first the G alleles ac_asj value");
-ok($out->[$acEasIdx][0][0] == 0, "correctly finds first the G alleles ac_eas value");
-ok($out->[$acFinIdx][0][0] == 0, "correctly finds first the G alleles ac_fin value");
-ok($out->[$acNfeIdx][0][0] == 0, "correctly finds first the G alleles ac_nfe value");
-ok($out->[$acOthIdx][0][0] == 0, "correctly finds first the G alleles ac_oth value");
-ok($out->[$acMaleIdx][0][0] == 0, "correctly finds first the G alleles ac_male value");
-ok($out->[$acFemaleIdx][0][0] == 0, "correctly finds first the G alleles ac_female value");
+# ok($out->[$acAfrIdx][0][0] == 0, "correctly finds first the G alleles ac_afr value");
+# ok($out->[$acAmrIdx][0][0] == 0, "correctly finds first the G alleles ac_amr value");
+# ok($out->[$acAsjIdx][0][0] == 0, "correctly finds first the G alleles ac_asj value");
+# ok($out->[$acEasIdx][0][0] == 0, "correctly finds first the G alleles ac_eas value");
+# ok($out->[$acFinIdx][0][0] == 0, "correctly finds first the G alleles ac_fin value");
+# ok($out->[$acNfeIdx][0][0] == 0, "correctly finds first the G alleles ac_nfe value");
+# ok($out->[$acOthIdx][0][0] == 0, "correctly finds first the G alleles ac_oth value");
+# ok($out->[$acMaleIdx][0][0] == 0, "correctly finds first the G alleles ac_male value");
+# ok($out->[$acFemaleIdx][0][0] == 0, "correctly finds first the G alleles ac_female value");
 
-ok($out->[$anAfrIdx][0][0] == 3614, "correctly finds first the G alleles an_afr value, which has only one value across all alleles");
-ok($out->[$anAmrIdx][0][0] == 528, "correctly finds first the G alleles an_amr value, which has only one value across all alleles");
-ok($out->[$anAsjIdx][0][0] == 180, "correctly finds first the G alleles an_asj value, which has only one value across all alleles");
-ok($out->[$anEasIdx][0][0] == 892, "correctly finds first the G alleles an_eas value, which has only one value across all alleles");
-ok($out->[$anFinIdx][0][0] == 2256, "correctly finds first the G alleles an_fin value, which has only one value across all alleles");
-ok($out->[$anNfeIdx][0][0] == 8466, "correctly finds first the G alleles an_nfe value, which has only one value across all alleles");
-ok($out->[$anOthIdx][0][0] == 604, "correctly finds first the G alleles an_oth value, which has only one value across all alleles");
-ok($out->[$anMaleIdx][0][0] == 9308, "correctly finds first the G alleles an_male value, which has only one value across all alleles");
-ok($out->[$anFemaleIdx][0][0] == 7232, "correctly finds first the G alleles an_female value, which has only one value across all alleles");
+# ok($out->[$anAfrIdx][0][0] == 3614, "correctly finds first the G alleles an_afr value, which has only one value across all alleles");
+# ok($out->[$anAmrIdx][0][0] == 528, "correctly finds first the G alleles an_amr value, which has only one value across all alleles");
+# ok($out->[$anAsjIdx][0][0] == 180, "correctly finds first the G alleles an_asj value, which has only one value across all alleles");
+# ok($out->[$anEasIdx][0][0] == 892, "correctly finds first the G alleles an_eas value, which has only one value across all alleles");
+# ok($out->[$anFinIdx][0][0] == 2256, "correctly finds first the G alleles an_fin value, which has only one value across all alleles");
+# ok($out->[$anNfeIdx][0][0] == 8466, "correctly finds first the G alleles an_nfe value, which has only one value across all alleles");
+# ok($out->[$anOthIdx][0][0] == 604, "correctly finds first the G alleles an_oth value, which has only one value across all alleles");
+# ok($out->[$anMaleIdx][0][0] == 9308, "correctly finds first the G alleles an_male value, which has only one value across all alleles");
+# ok($out->[$anFemaleIdx][0][0] == 7232, "correctly finds first the G alleles an_female value, which has only one value across all alleles");
 
-ok($out->[$afAfrIdx][0][0] == 0, "correctly finds first the G alleles af_afr value");
-ok($out->[$afAmrIdx][0][0] == 0, "correctly finds first the G alleles af_amr value");
-ok($out->[$afAsjIdx][0][0] == 0, "correctly finds first the G alleles af_asj value");
-ok($out->[$afEasIdx][0][0] == 0, "correctly finds first the G alleles af_eas value");
-ok($out->[$afFinIdx][0][0] == 0, "correctly finds first the G alleles af_fin value");
-ok($out->[$afNfeIdx][0][0] == 0, "correctly finds first the G alleles af_nfe value");
-ok($out->[$afOthIdx][0][0] == 0, "correctly finds first the G alleles af_oth value");
-ok($out->[$afMaleIdx][0][0] == 0, "correctly finds first the G alleles af_male value");
-ok($out->[$afFemaleIdx][0][0] == 0, "correctly finds first the G alleles af_female value");
+# ok($out->[$afAfrIdx][0][0] == 0, "correctly finds first the G alleles af_afr value");
+# ok($out->[$afAmrIdx][0][0] == 0, "correctly finds first the G alleles af_amr value");
+# ok($out->[$afAsjIdx][0][0] == 0, "correctly finds first the G alleles af_asj value");
+# ok($out->[$afEasIdx][0][0] == 0, "correctly finds first the G alleles af_eas value");
+# ok($out->[$afFinIdx][0][0] == 0, "correctly finds first the G alleles af_fin value");
+# ok($out->[$afNfeIdx][0][0] == 0, "correctly finds first the G alleles af_nfe value");
+# ok($out->[$afOthIdx][0][0] == 0, "correctly finds first the G alleles af_oth value");
+# ok($out->[$afMaleIdx][0][0] == 0, "correctly finds first the G alleles af_male value");
+# ok($out->[$afFemaleIdx][0][0] == 0, "correctly finds first the G alleles af_female value");
 
 
 ############### Feature tests ################
@@ -269,6 +259,36 @@ ok($out->[$afFemaleIdx][0][0] == 0, "correctly finds first the G alleles af_fema
 $out = [];
 $vcf->get($href, 'chr22', 'C', '+ACA', 0, 0, $out);
 
+my $numFeatures = scalar @{$vcf->features};
+ok(@{$out} == $numFeatures, "vcf array contains an entry for each requested feature");
+
+for my $feature (@{$vcf->features}) {
+  my $idx = $vcf->getFieldDbName($feature);
+
+  ok(@{$out->[$idx]} == 1, "Every feature is considered bi-allelelic (because alleles are decomposed into bi-allelic sites, with 1 entry");
+  ok(@{$out->[$idx][0]} == 1 && !ref $out->[$idx][0][0], "Every feature contains a single position's worth of data, and that value is scalar");
+}
+
+$vcf->get($href, 'chr22', 'C', '+ACA', 0, 1, $out);
+
+for my $feature (@{$vcf->features}) {
+  my $idx = $vcf->getFieldDbName($feature);
+
+  ok(@{$out->[$idx][0]} == 1 && !ref $out->[$idx][0][0], "Vcf getter does not tile annotations by the position of the allele (occurs for deletions and insertions only)");
+}
+
+$vcf->get($href, 'chr22', 'C', '+ACA', 1, 0, $out);
+
+# Although we've deprecated single-line multiallelics, we must continue to support them
+# Until we've decided to drop support
+# Note, taht is for some reason a person wanted to fetch only one of the two alleles
+# the site would appear as a [feature1, featuer2] rather than [[feature1_allele1...], [feature1_allele2...]]
+for my $feature (@{$vcf->features}) {
+  my $idx = $vcf->getFieldDbName($feature);
+
+  ok(@{$out->[$idx]} == 2, "For multiallelic sites, where both alleles on a single input row, each feature is given an array of length == \# of alleles");
+}
+
 ok($out->[$trTvIdx][0][0] == 0, "indels and multiallelics have 0 trTv value");
 ok(!defined $out->[$idIdx][0][0], "correctly finds that this site has no rsID");
 ok($out->[$acIdx][0][0] == 3, "correctly finds first the +ACA allele ac value");
@@ -312,7 +332,7 @@ $out = [];
 $href = $db->dbReadOne('chr22', 15927755 - 1);
 $vcf->get($href, 'chr22', 'T', 'G', 0, 0, $out);
 
-ok(@$out == 0, 'NON-PASS (or .) variants are skipped');
+ok(@$out == 0, 'NON PASS/. variants are skipped');
 
 # Next let's check variants that are bi-allelic
 # chr22 15927745  . A C 718.20  PASS

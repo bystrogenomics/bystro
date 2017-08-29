@@ -142,6 +142,7 @@ sub BUILD {
 
   # TODO: prevent header features from overriding
   $self->{_infoFeatureNames} = \%infoFeatureNames;
+  $self->{_numFilters} = scalar keys %{$self->build_row_filters} || 0;
 
   # Precalculate the field db names, for faster accesss
   # TODO: think about moving away from storing the "db name" in the database
@@ -183,6 +184,28 @@ sub buildTrack {
   my $chrIdx = $vcfFeatures->{chrom};
   my $altIdx = $vcfFeatures->{alt};
 
+  my %completedDetails;
+  $pm->run_on_finish(sub {
+    my ($pid, $exitCode, $fileName, undef, undef, $errOrChrs) = @_;
+
+    if($exitCode != 0) {
+      my $err = $errOrChrs ? "due to: $$errOrChrs" : "due to an untimely demise";
+
+      $self->log('fatal', $self->name . ": Failed to build $fileName $err");
+      die $self->name . ": Failed to build $fileName $err";
+    }
+
+    for my $chr (keys %$errOrChrs) {
+      if(!$completedDetails{$chr}) {
+        $completedDetails{$chr} = [$fileName];
+      } else {
+        push @{$completedDetails{$chr}}, $fileName;
+      }
+    }
+
+    $self->log('info', $self->name . ": completed building from $fileName");
+  });
+
   for my $file (@{$self->local_files}) {
     $self->log('info', $self->name . ": beginning building from $file");
 
@@ -191,7 +214,7 @@ sub buildTrack {
 
       my $errPath = $file . ".build." . localtime() . ".log";
 
-      my ($err, $vcfNameMap) = $self->_extractHeader($file);
+      my ($err, $vcfNameMap, $vcfFilterMap) = $self->_extractHeader($file);
 
       if($err) {
         # DB not open yet, no need to commit
@@ -258,12 +281,18 @@ sub buildTrack {
           next;
         }
 
-        my ($err, $data) = $self->_extractFeatures(\@fields, $vcfNameMap);
+        my ($err, $data) = $self->_extractFeatures(\@fields, $vcfNameMap, $vcfFilterMap);
 
         if($err) {
           #Commit, sync everything, including completion status, and release mmap
           $self->db->cleanUp();
           $pm->finish(255, \$err);
+        }
+
+        # If the row didn't pass filters, $data will be undefined
+        # In all other cases it will be an array
+        if(!defined $data) {
+          next;
         }
 
         # Write every position to disk
@@ -277,29 +306,7 @@ sub buildTrack {
     $pm->finish(0, \%visitedChrs);
   }
 
-  my %completedDetails;
-  $pm->run_on_finish(sub {
-    my ($pid, $exitCode, $fileName, undef, undef, $errOrChrs) = @_;
-    p @_;
-    if($exitCode != 0) {
-      my $err = $errOrChrs ? "due to: $$errOrChrs" : "due to an untimely demise";
-
-      $self->log('fatal', $self->name . ": Failed to build $fileName $err");
-      die $self->name . ": Failed to build $fileName $err";
-    }
-
-    for my $chr (keys %$errOrChrs) {
-      if(!$completedDetails{$chr}) {
-        $completedDetails{$chr} = [$fileName];
-      } else {
-        push @{$completedDetails{$chr}}, $fileName;
-      }
-    }
-
-    $self->log('info', $self->name . ": completed building from $fileName");
-  });
-
-  $pm->wait_all_children;
+  $pm->wait_all_children();
 
   for my $chr (keys %completedDetails) {
     say "writing that we completed $chr";
@@ -336,6 +343,7 @@ sub _extractHeader {
   my $idx = -1;
 
   my %nameMap;
+  my %filterMap;
 
   # Flags may or may not be in the info field
   # To speed search, store these, and walk back to find our value
@@ -387,17 +395,30 @@ sub _extractHeader {
         # my $vcfName = "$feature=";
         # In case Number and Type aren't adjacent to each other
         # $return[$featIdx] = [$number, $type];
-        $nameMap{$infoName} = [$feature, $number, $type, $idx];
+        $nameMap{$infoName} = [$feature, $number, $type, $idx, ];
+        last FEATURE_LOOP;
+      }
+    }
+
+    # Filters on INFO fields
+    FEATURE_LOOP: for my $feature (keys %{$self->build_row_filters}) {
+      my $infoName = $self->{_infoFeatureNames}{$feature} || $feature;
+
+      if(index($h, "INFO\=\<ID\=$infoName,") > 0) {
+        # my $vcfName = "$feature=";
+        # In case Number and Type aren't adjacent to each other
+        # $return[$featIdx] = [$number, $type];
+        $filterMap{$infoName} = [$feature, $number, $type, $idx, ];
         last FEATURE_LOOP;
       }
     }
   }
 
-  return (undef, \%nameMap);
+  return (undef, \%nameMap, \%filterMap);
 }
 
 sub _extractFeatures {
-  my ($self, $fieldsAref, $vcfNameMap, $fieldDbNames) = @_;
+  my ($self, $fieldsAref, $vcfNameMap, $vcfFilterMap, $fieldDbNames) = @_;
   
   # vcfProcessor will split multiallelics, store the alleleIdx
   # my @infoFields = ;
@@ -412,7 +433,9 @@ sub _extractFeatures {
   my $entry;
   my $found = 0;
   my $name;
+  my $val;
 
+  my $totalNeeded = @returnData + $self->{_numFilters};
   # $arr holds
   # 1) field name
   # 2) index in intermediate annotation
@@ -425,11 +448,13 @@ sub _extractFeatures {
 
   for my $info (split ';', $fieldsAref->[-1]) {
     # If # found == scalar @{$self->features}
-    if($found == @returnData) {
+    if($found == $totalNeeded) {
       last;
     }
 
-    $entry = $vcfNameMap->{substr($info, 0, index($info, '='))};
+    $name = substr($info, 0, index($info, '='));
+
+    $entry = $vcfNameMap->{$name} || $vcfFilterMap->{$name};
     
     # p $entry;
     if(!$entry) {
@@ -438,17 +463,26 @@ sub _extractFeatures {
 
     $found++;
 
-    my $val = substr($info, index($info, '=') + 1);
+    $val = substr($info, index($info, '=') + 1);
 
-    # If NUMBER=A
+    # A types have a value per allele
     if($entry->[1] eq 'A') {
       my @vals = split ',', $val;
 
       if(@vals - 1 < $alleleIdx) {
-        return ("Err: Number=A field has fewer values than alleles", undef);
+        return ("Err: Type=A field has fewer values than alleles", undef);
       }
 
       $val = $vals[$alleleIdx];
+    }
+
+    # Using $entry->[0] allows us to map the name of the property to be filtered
+    if($self->hasFilter($entry->[0])) {
+      if(!$self->passesFilter($entry->[0], $val)) {
+        return (undef, undef);
+      }
+
+      next;
     }
 
     # TODO: support non-scalar values

@@ -47,7 +47,7 @@ GetOptions(
   'renameTo=s' => \$renameTrackTo,
   'verbose=i' => \$verbose,
   'dryRun' => \$dryRunInsertions,
-  'maxThreads' => \$maxThreads,
+  'maxThreads=i' => \$maxThreads,
 );
 
 if ( (!$fetch && !$caddToBed && !$liftOverCadd && !$sortCadd && !$renameTrack && !$filterCadd) || $help) {
