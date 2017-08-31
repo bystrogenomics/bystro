@@ -516,30 +516,100 @@ mappings:
                             normalizer: lowercase_normalizer
                         trTv:
                             type: byte
-                        ac:
-                            type: integer
+                        # ac:
+                        #     type: integer
                         af:
                             type: half_float
                         an:
                             type: integer
-                        ac_afr:
+                        # ac_afr:
+                        #     type: integer
+                        # ac_amr:
+                        #     type: integer
+                        # ac_asj:
+                        #     type: integer
+                        # ac_eas:
+                        #     type: integer
+                        # ac_fin:
+                        #     type: integer
+                        # ac_nfe:
+                        #     type: integer
+                        # ac_oth:
+                        #     type: integer
+                        # ac_male:
+                        #     type: integer
+                        # ac_female:
+                        #     type: integer
+                        an_afr:
                             type: integer
-                        ac_amr:
+                        an_amr:
                             type: integer
-                        ac_asj:
+                        an_asj:
                             type: integer
-                        ac_eas:
+                        an_eas:
                             type: integer
-                        ac_fin:
+                        an_fin:
                             type: integer
-                        ac_nfe:
+                        an_nfe:
                             type: integer
-                        ac_oth:
+                        an_oth:
                             type: integer
-                        ac_male:
+                        an_male:
                             type: integer
-                        ac_female:
+                        an_female:
                             type: integer
+                        af_afr:
+                            type: half_float
+                        af_amr:
+                            type: half_float
+                        af_asj:
+                            type: half_float
+                        af_eas:
+                            type: half_float
+                        af_fin:
+                            type: half_float
+                        af_nfe:
+                            type: half_float
+                        af_oth:
+                            type: half_float
+                        af_male:
+                            type: half_float
+                        af_female:
+                            type: half_float
+                exomes:
+                    properties:
+                        alt:
+                            type: keyword
+                            normalizer: uppercase_normalizer
+                        id:
+                            type: keyword
+                            normalizer: lowercase_normalizer
+                        trTv:
+                            type: byte
+                        # ac:
+                        #     type: integer
+                        af:
+                            type: half_float
+                        an:
+                            type: integer
+                        # ac_afr:
+                        #     type: integer
+                        # ac_amr:
+                        #     type: integer
+                        # ac_asj:
+                        #     type: integer
+                        # ac_eas:
+                        #     type: integer
+                        # ac_fin:
+                        #     type: integer
+                        # ac_nfe:
+                        #     type: integer
+                        # ac_oth:
+                        #     type: integer
+                        # ac_male:
+                        #     type: integer
+                        # ac_female:
+                        #     type: integer
                         an_afr:
                             type: integer
                         an_amr:
