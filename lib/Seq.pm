@@ -110,9 +110,17 @@ sub BUILD {
     #index 6
     $self->heterozygotesField,
     #index 7
-    $self->homozygotesField,
+    $self->heterozygosityField,
     #index 8
+    $self->homozygotesField,
+    #index 9
+    $self->homozygosityField,
+    #index 10
     $self->missingField,
+    #index 11
+    $self->missingnessField,
+    #index 12
+    $self->sampleMafField,
   ], undef, 1);
 
   $self->{_lastHeaderIdx} = $#{$headers->get()};
@@ -262,6 +270,8 @@ sub annotateFile {
     $self->_errorWithCleanup($err);
     return ($err, undef);
   }
+
+  my $header = <$fh>;
 
   mce_loop_f {
     #my ($mce, $slurp_ref, $chunk_id) = @_;

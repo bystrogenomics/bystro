@@ -12,8 +12,12 @@ has discordantField => (is => 'ro', default => 'discordant', lazy => 1);
 has altField => (is => 'ro', default => 'alt', lazy => 1);
 has trTvField => (is => 'ro', default => 'trTv', lazy => 1);
 has heterozygotesField => (is => 'ro', default => 'heterozygotes', lazy => 1);
+has heterozygosityField => (is => 'ro', default => 'heterozygosity', lazy => 1);
 has homozygotesField => (is => 'ro', default => 'homozygotes', lazy => 1);
+has homozygosityField => (is => 'ro', default => 'homozygosity', lazy => 1);
 has missingField => (is => 'ro', default => 'missingGenos', lazy => 1);
+has missingnessField => (is => 'ro', default => 'missingness', lazy => 1);
+has sampleMafField => (is => 'ro', default => 'sampleMaf', lazy => 1);
 
 no Mouse::Role;
 1;

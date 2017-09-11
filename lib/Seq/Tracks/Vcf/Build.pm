@@ -49,7 +49,7 @@ state $converter = Seq::Tracks::Base::Types->new();
 # We also allow any fields output by the vcf professor (except info and the related alleleIdx)
 state $vcfFeatures = {
   chrom => 0, pos => 1, type => 2, ref => 3, alt => 4, trTv => 5,
-  homozygotes => 6, heterozygotes => 7, missingGenos => 8, id => 9,
+  heterozygotes => 6, homozygotes => 8, missingGenos => 10, id => 13,
   qual => undef, filter => undef};
 
 # We can use before BUILD to make any needed modifications to $self->features
@@ -161,6 +161,11 @@ sub BUILD {
 
   my $tracks = Seq::Tracks->new();
   $self->{_refTrack} = $tracks->getRefTrackGetter();
+
+
+  # TODO: Read bystro-vcf header, and configure $vcfFeatures based on that
+  # will require either reading the first file in the list, or giving
+  # bystro-vcf a "output only the header" feature (but scope creep)
 }
 
 # has altName => (is => '')
@@ -239,13 +244,9 @@ sub buildTrack {
       open(my $fh, '-|', "$echoProg $file | " . $self->vcfProcessor . " --emptyField $delim"
         . " --keepId --keepInfo");
 
-      # p $self->headerFeatures;
-      # my $keepId = $self->headerFeatures->{ID};
-      # my $keepAlt = $self->headerFeatures->{ALT};
+      # TODO: Read header, and configure vcf header feature indices based on that
+      my $header = <$fh>;
 
-      # p $keepId;
-      # p $keepAlt;
-      # my ($chr, @fields, @sparseData, $start, $end);
       while ( my $line = $fh->getline() ) {
         chomp;
         # This is the annotation input first 7 lines, plus id, info
