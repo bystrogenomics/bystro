@@ -3,6 +3,7 @@ cdir=$(pwd)
 line=$(lsblk | grep nvme | wc -l);
 
 cd ~/seq-lmdb
+git pull origin master
 
 # Update go packages;
 # TODO: combine go packages
@@ -12,6 +13,8 @@ cd ../bystro-snp
 git pull origin master
 cd ../bystro-utils
 git pull origin master
+
+cd $cdir
 
 sudo mkdir -p /mnt/annotator;
 sudo chown ec2-user -R /mnt/annotator;
