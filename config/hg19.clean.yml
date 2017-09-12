@@ -28,9 +28,8 @@ chromosomes:
 - chrM
 - chrX
 - chrY
-database_dir: '~'
-files: '~'
-files_dir: '~'
+database_dir: ~
+files_dir: ~
 snpProcessor: bystro-snp
 statistics:
   dbSNPnameField: dbSNP.name
@@ -42,7 +41,6 @@ statistics:
   programPath: bystro-stats
   refTrackField: ref
   siteTypeField: refSeq.siteType
-temp_dir: '~'
 tracks:
 - build_author: ec2-user
   build_date: 2017-04-21T05:08:00
