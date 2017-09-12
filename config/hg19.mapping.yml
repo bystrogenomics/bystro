@@ -293,10 +293,18 @@ mappings:
             type: boolean
         heterozygotes:
             type: keyword
+        heterozygosity:
+            type: half_float
         homozygotes:
             type: keyword
+        homozygosity:
+            type: half_float
         missingGenos:
             type: keyword
+        missingness:
+            type: half_float
+        sampleMaf:
+            type: half_float
         alt:
             type: keyword
             normalizer: uppercase_normalizer
