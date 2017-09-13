@@ -1,3 +1,18 @@
+### Beta 9 (9/13/17):
+1. Added heterozygosity, homozygosity, missingness, sampleMaf fields
+2. Added gnomad.genomes and gnomad.exomes for hg38 (lifted over) and hg19
+
+Breaking Changes:
+1. bystro-vcf and bystro-snp output a header, to simplify using these programs' outputs
+2. The additiona fields (heterozygosity, homozygosity, missingness, sampleMaf) affect bystro-vcf and bystro-snp output order
+3. bystro-vcf now has a maximum limit of 10 alleles (9 non-reference) for any multiallelic
+  - This allows for substantial speedup of the slowest function (the makeHetHomozygotes function, which calculates heterozygosity, homozygosity)
+  
+Note: As a result of the use of floats, and the current limitation on Perl's best msgpack implementation (no float32 serialization), db size has grown ~20GB due to gnomad. Unfortunately, since floats don't compress well, and I wanted to avoid modifying the source data by rounding, the compressed size .tar.gz has grown by a similar order (~10-20GB).
+
+Performance Improvements:
+~ 15% reduction in CPU usage for bystro-vcf for vcf files with many samples (15% on 1000 Genomes, 2504 samples), and a slight improvement in throughput.
+
 ### Beta 8 (7/12/17):
 Breaking Changes:
 1. Switchecd .snp annotation path to bystro-snp package. Multiallelics are decomposed into bi-allic sites (where one of the alleles is the reference)
