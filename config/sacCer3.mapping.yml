@@ -1,14 +1,10 @@
 #Our own, special field, tells an interface which fields to run prefix queries on
 numericalFields:
     - phastCons
-    - phyloP
     - pos
     - sgd.codonNumber
     - sgd.codonPosition
 sort:
-    cadd: avg
-    dbSNP.alleleNs: avg
-    dbSNP.alleleFreqs: min
     sgd.codonNumber: avg
     sgd.codonPosition: avg
 booleanFields:
@@ -273,6 +269,8 @@ mappings:
             # so, don't include in all, because many false positivies with ngrams
         pos:
             type: integer
+        trTv:
+            type: byte
         type:
             type: text
             analyzer:  autocomplete_english
@@ -285,10 +283,18 @@ mappings:
             type: boolean
         heterozygotes:
             type: keyword
+        heterozygosity:
+            type: half_float
         homozygotes:
             type: keyword
+        homozygosity:
+            type: half_float
         missingGenos:
             type: keyword
+        missingness:
+            type: half_float
+        sampleMaf:
+            type: half_float
         alt:
             type: keyword
             normalizer: uppercase_normalizer
