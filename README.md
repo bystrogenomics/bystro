@@ -7,6 +7,11 @@ The web app gives full access to all of Bystro's capabilities, provides a conven
 ## Installing Bystro
 Follow the instructions in [INSTALL.md](INSTALL.md)
 
+Bystro relies on pluggable (via Bystro's YAML config) pre-processors to normalize variant inputs (**dealing with VCF issues such as padding**), calculate whether a site is a transition or transversion, calculate sample maf, identify hets/homozygotes/missing samples, calculate heterozygosity, homozygosity, missingness, and more.
+1. VCF format: [Bystro-Vcf](https://github.com/akotlar/bystro-vcf)
+2. SNP format: [Bystro-SNP](https://github.com/akotlar/bystro-snp)
+3. Create your own to support other formats!
+
 ## Annotation (Output) Field Descriptions
 Please read [FIELDS.md](FIELDS.md)
 
