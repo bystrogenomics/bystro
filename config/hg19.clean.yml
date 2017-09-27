@@ -375,6 +375,7 @@ tracks:
     Start: chromStart
     Stop: chromEnd
     Type: type
+    Origin: origin
   local_files:
   - variant_summary.txt.gz
   name: clinvar
