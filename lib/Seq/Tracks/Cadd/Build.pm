@@ -45,7 +45,7 @@ sub buildTrack {
   my $pm = Parallel::ForkManager->new($self->max_threads);
 
   #Perl is dramatically faster when splitting on a constant, so we assume '\t'
-  if($self->delimiter ne "\t") {
+  if($self->delimiter ne '\t' && $self->delimiter ne "\t") {
     $self->log("fatal", $self->name . ": requires delimiter to be \\t");
     die $self->name . ": requires delimiter to be \\t";
   }
