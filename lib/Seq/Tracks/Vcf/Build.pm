@@ -247,7 +247,7 @@ sub buildTrack {
       # TODO: Read header, and configure vcf header feature indices based on that
       my $header = <$fh>;
 
-      while ( my $line = $fh->getline() ) {
+      FH_LOOP: while ( my $line = $fh->getline() ) {
         chomp;
         # This is the annotation input first 7 lines, plus id, info
         @fields = split '\t', $line;
@@ -260,7 +260,13 @@ sub buildTrack {
         }
 
         if(!$wantedChr) {
-          next;
+          if($self->chrPerFile) {
+            $self->log('info', $self->name . ": skipping $file because found unwanted chr, and expect 1 chr per file");
+
+            last FH_LOOP;
+          }
+
+          next FH_LOOP;
         }
 
         $visitedChrs{$wantedChr} //= 1;
