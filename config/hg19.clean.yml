@@ -1,7 +1,7 @@
 ---
 assembly: hg19
 build_author: ec2-user
-build_date: 2017-08-31T06:00:00
+build_date: 2017-09-27T16:35:00
 chromosomes:
 - chr1
 - chr2
@@ -28,8 +28,9 @@ chromosomes:
 - chrM
 - chrX
 - chrY
-database_dir: ~
-files_dir: ~
+database_dir: '~'
+files: '~'
+files_dir: /mnt/annotator/hg19/raw/
 snpProcessor: bystro-snp
 statistics:
   dbSNPnameField: dbSNP.name
@@ -41,6 +42,7 @@ statistics:
   programPath: bystro-stats
   refTrackField: ref
   siteTypeField: refSeq.siteType
+temp_dir: '~'
 tracks:
 - build_author: ec2-user
   build_date: 2017-04-21T05:08:00
@@ -383,13 +385,12 @@ tracks:
   type: sparse
   version: 3
 - build_author: ec2-user
-  build_date: 2017-08-31T06:00:00
+  build_date: 2017-09-27T16:35:00
   build_row_filters:
     AS_FilterStatus: == PASS
   features:
   - alt
   - id
-  - trTv: number
   - af: number
   - an: number
   - an_afr: number
@@ -435,15 +436,14 @@ tracks:
   - gnomad.genomes.r2.0.1.sites.*.vcf.gz
   name: gnomad.genomes
   type: vcf
-  version: 1
+  version: 2
 - build_author: ec2-user
-  build_date: 2017-08-31T06:00:00
+  build_date: 2017-09-27T16:35:00
   build_row_filters:
     AS_FilterStatus: == PASS
   features:
   - alt
   - id
-  - trTv: number
   - af: number
   - an: number
   - an_afr: number
@@ -489,7 +489,7 @@ tracks:
   - gnomad.exomes.r2.0.1.sites.vcf.gz
   name: gnomad.exomes
   type: vcf
-  version: 1
+  version: 2
 vcfProcessor: bystro-vcf
-version: 4
+version: 5
 
