@@ -1,7 +1,7 @@
 ---
 assembly: hg19
 build_author: ec2-user
-build_date: 2017-09-27T18:27:00
+build_date: 2017-10-07T17:00:00
 chromosomes:
 - chr1
 - chr2
@@ -28,8 +28,9 @@ chromosomes:
 - chrM
 - chrX
 - chrY
-database_dir: ~
-files_dir: ~
+database_dir: '~'
+files: '~'
+files_dir: /mnt/annotator/hg19_ensembl/raw/
 snpProcessor: bystro-snp
 statistics:
   dbSNPnameField: dbSNP.name
@@ -41,7 +42,7 @@ statistics:
   programPath: bystro-stats
   refTrackField: ref
   siteTypeField: refSeq.siteType
-temp_dir: ~
+temp_dir: '~'
 tracks:
 - build_author: ec2-user
   build_date: 2017-09-27T18:27:00
@@ -103,14 +104,14 @@ tracks:
   type: reference
   version: 1
 - build_author: ec2-user
-  build_date: 2017-09-27T18:27:00
+  build_date: 2017-10-07T17:00:00
   features:
   - name
   - name2
   - gene
   - strand
   - txStart
-  fetch_date: 2017-09-27T01:56:00
+  fetch_date: 2017-10-07T16:57:00
   join:
     features:
     - alleleID
@@ -156,7 +157,7 @@ tracks:
   sql_statement: SELECT ensGene.name,chrom,strand,txStart,txEnd,cdsStart,cdsEnd,exonCount,exonStarts,exonEnds,name2,value
     AS gene FROM hg19.ensGene LEFT JOIN hg19.ensemblToGeneName ON (hg19.ensGene.name=hg19.ensemblToGeneName.name)
   type: gene
-  version: 1
+  version: 2
 - build_author: ec2-user
   build_date: 2017-09-27T18:27:00
   local_files:
@@ -308,7 +309,7 @@ tracks:
   - reviewStatus
   - referenceAllele
   - alternateAllele
-  fetch_date: 2017-09-27T02:08:00
+  fetch_date: 2017-10-07T16:57:00
   fieldMap:
     '#AlleleID': alleleID
     AlternateAllele: alternateAllele
@@ -437,5 +438,5 @@ tracks:
   type: vcf
   version: 1
 vcfProcessor: bystro-vcf
-version: 1
+version: 2
 
