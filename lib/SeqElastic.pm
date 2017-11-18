@@ -164,13 +164,12 @@ sub go {
 
   my $emptyFieldChar = $delimiters->emptyFieldChar;
 
-  # Todo implement tain check; default taint check doesn't work for annotated files
-  # $taint_check_regex = qr/./;
-  # With a too-low value, too many messages sent to the receiver
-  # slows down apparent indexing
+  # We need to flush at the end of each chunk read; so chunk size directly
+  # controls bulk request size, as long as bulk request doesnt hit
+  # max_count and max_size thresholds
   my $chunkSize = $self->getChunkSize($filePath, $self->max_threads);
-  if($chunkSize < 2000) {
-    $chunkSize = 2000;
+  if($chunkSize < 5000) {
+    $chunkSize = 5000;
   }
 
   if($chunkSize > 10000) {
@@ -181,7 +180,7 @@ sub go {
   my $progressFunc = $self->makeLogProgress(1e4);
 
   MCE::Loop::init {
-    max_workers => 8, use_slurpio => 1, #Disable on shared storage: parallel_io => 1,
+    max_workers => $self->max_threads, use_slurpio => 1, #Disable on shared storage: parallel_io => 1,
     chunk_size => $chunkSize . 'K',
     gather => $progressFunc,
   };
@@ -216,6 +215,8 @@ sub go {
   my $bulk = $es->bulk_helper(
     index       => $self->indexName,
     type        => $self->indexType,
+    max_count   => 5000,
+    max_size    => 10000000,
     on_error    => sub {
       my ($action, $response, $i) = @_;
       $self->log('warn', "Index error: $action ; $response ; $i");

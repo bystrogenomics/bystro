@@ -1,7 +1,7 @@
 ---
 assembly: hg38
 build_author: ec2-user
-build_date: 2017-08-29T17:10:00
+build_date: 2017-09-27T02:24:00
 chromosomes:
 - chr1
 - chr2
@@ -28,8 +28,9 @@ chromosomes:
 - chrM
 - chrX
 - chrY
-database_dir: ~
-files_dir: ~
+database_dir: '~'
+files: '~'
+files_dir: /mnt/annotator/hg38/raw/
 snpProcessor: bystro-snp
 statistics:
   dbSNPnameField: dbSNP.name
@@ -41,7 +42,7 @@ statistics:
   programPath: bystro-stats
   refTrackField: ref
   siteTypeField: refSeq.siteType
-temp_dir: ~
+temp_dir: '~'
 tracks:
 - name: ref
   remote_dir: http://hgdownload.soe.ucsc.edu/goldenPath/hg38/chromosomes/
@@ -73,6 +74,7 @@ tracks:
   - chrY.fa.gz
   type: reference
 - features:
+  - txStart
   - kgID
   - mRNA
   - spID
@@ -248,13 +250,12 @@ tracks:
   - ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz
   type: sparse
 - build_author: ec2-user
-  build_date: 2017-08-29T17:10:00
+  build_date: 2017-09-27T02:24:00
   build_row_filters:
     AS_FilterStatus: == PASS
   features:
   - alt
   - id
-  - trTv: number
   - af: number
   - an: number
   - an_afr: number
@@ -300,15 +301,14 @@ tracks:
   - gnomad.genomes.r2.0.1.sites.*.liftedOver.hg38.vcf.liftedOver.gz
   name: gnomad.genomes
   type: vcf
-  version: 1
+  version: 2
 - build_author: ec2-user
-  build_date: 2017-08-29T17:10:00
+  build_date: 2017-09-27T02:24:00
   build_row_filters:
     AS_FilterStatus: == PASS
   features:
   - alt
   - id
-  - trTv: number
   - af: number
   - an: number
   - an_afr: number
@@ -354,6 +354,7 @@ tracks:
   - gnomad.exomes.r2.0.1.sites.liftedOver.hg38.vcf.liftedOver.gz
   name: gnomad.exomes
   type: vcf
-  version: 1
+  version: 2
 vcfProcessor: bystro-vcf
-version: 74
+version: 75
+

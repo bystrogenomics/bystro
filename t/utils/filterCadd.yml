@@ -21,10 +21,11 @@ tracks:
   - chr22
   - chr1
   - chr2
+  filterCadd_date: 2017-09-12T19:18:00
   local_files:
-  - ''
-  - ''
-  - ''
+  - test.filterCadd.cadd.chr22.chr22.filtered.txt
+  - test.filterCadd.cadd.chr1.chr1.filtered.txt
+  - test.filterCadd.cadd.chr2.chr2.filtered.txt
   name: cadd
   sortCadd_date: 2017-01-20T23:53:00
   sorted_guaranteed: 1

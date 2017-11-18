@@ -126,16 +126,16 @@ sub getStatsArguments {
   my $dbSNPpart = "";
 
   if($snpNameColumnName) {
-    $dbSNPpart = "-dbSNPnameColumnName $snpNameColumnName ";
+    $dbSNPpart = "-dbSnpNameColumn $snpNameColumnName ";
   }
 
-  return (undef, "$statsProg -outputJSONPath $jsonOutPath -outputTabPath $tabOutPath "
-    . "-outputQcTabPath $qcOutPath -referenceColumnName $refColumnName "
-    . "-alleleColumnName $alleleColumnName -homozygotesColumnName $homozygotesColumnName "
-    . "-heterozygotesColumnName $heterozygotesColumnName -siteTypeColumnName $siteTypeColumnName "
+  return (undef, "$statsProg -outJsonPath $jsonOutPath -outTabPath $tabOutPath "
+    . "-outQcTabPath $qcOutPath -refColumn $refColumnName "
+    . "-altColumn $alleleColumnName -homozygotesColumn $homozygotesColumnName "
+    . "-heterozygotesColumn $heterozygotesColumnName -siteTypeColumn $siteTypeColumnName "
     . $dbSNPpart
-    . "-emptyFieldString \$\"$emptyFieldString\" "
-    . "-exonicAlleleFunctionColumnName $exonicAlleleFuncColumnName "
+    . "-emptyField \$\"$emptyFieldString\" "
+    . "-exonicAlleleFunctionColumn $exonicAlleleFuncColumnName "
     . "-primaryDelimiter \$\"$valueDelimiter\" -fieldSeparator \$\"$fieldSeparator\" ");
 }
 
