@@ -607,9 +607,9 @@ sub _getDbi {
 
   my $flags;
   if($dbReadOnly) {
-    $flags = MDB_NOLOCK | MDB_NOSYNC | MDB_RDONLY;
+    $flags = MDB_NOLOCK | MDB_NOSYNC | MDB_RDONLY | MDB_NORDAHEAD;
   } else {
-    $flags = MDB_NOSYNC;
+    $flags = MDB_NOSYNC | MDB_NORDAHEAD;
   }
 
   my $env = LMDB::Env->new($dbPath, {

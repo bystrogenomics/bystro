@@ -28,8 +28,10 @@ GetOptions(
     'large'                              => \( my $large_data         = 0 ),
     'very_large|very-large|verylarge'    => \( my $very_large_data    = 0 ),
     'array'    => \( my $array_data    = 0 ),
+    'small_array'    => \( my $small_array    = 0 ),
     'large_array' => \(my $large_array = 0),
     'large_array_sigfig' => \(my $large_array_sigfig = 0),
+    'small_hash' => \(my $small_hash = 0),
     'no_bless|no-bless|nobless'          => \( my $nobless            = 0 ),
     'sereal_only|sereal-only|serealonly' => \( my $sereal_only        = 0 ),
     'diagrams'                           => \( my $diagrams           = 0 ),
@@ -401,6 +403,8 @@ sub make_data {
             [ map { [ reverse 1 .. 100 ] } ( 0 .. 1000 ) ],
             [ map { +{ foo => "bar", baz => "buz" } } 1 .. 2000 ]
         ];
+    } elsif ($small_array) {
+      return [1, 2, 3, 'string', 5.018];
     } elsif ($array_data) {
         $data_set_name = "Bystro-like data composed of multiple values in an array";
         # my $data = [
@@ -1012,8 +1016,9 @@ sub make_data {
       ];
 
       return $data;
-    }
-    else {    # "large data"
+    } elsif($small_hash) {
+      return { a => 1, b => 2, c => 3, d => 'string', e => 5.018 };
+    } else {    # "large data"
         $data_set_name = "large data structure";
         return [
             [ map { my $y= "$_"; $_ } 1 .. 10000 ], {@str}, {@str}, [ map { my $y= "$_"; $_ } 1 .. 10000 ],
