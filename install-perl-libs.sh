@@ -13,6 +13,7 @@ cpan install Cpanel::JSON::XS
 cpan install Mouse::Meta::Attribute::Custom::Trait::Array
 cpan install Net::HTTP
 cpan install Search::Elasticsearch
+cpan install Math::SigFigs
 # cpan install Data::MessagePack
 cpan install LMDB_File
 cpan install Sort::XS

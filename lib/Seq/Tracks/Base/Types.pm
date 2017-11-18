@@ -14,7 +14,8 @@ use Mouse 2;
 use Mouse::Util::TypeConstraints; 
 use namespace::autoclean;
 use Scalar::Util qw/looks_like_number/;
-
+use Math::SigFigs qw(:all);
+use DDP;
 #What the types must be called in the config file
 # TODO: build these track maps automatically
 # by title casing the "type" field
@@ -49,57 +50,62 @@ enum TrackType => [$refType, $scoreType, $sparseType, $regionType, $geneType, $c
 #Convert types; Could move the conversion code elsewehre,
 #but I wanted types definition close to implementation
 
-enum DataType => ['float', 'int', 'number'];
+subtype DataType => as 'Str' => where { $_ =~ /number|number\(\d+\)/ };#['float', 'int', 'number', 'number(2)'];
 
+# float / number / int can give a precision in the form number(2)
+state $precision = {};
+state $typeFunc = {};
 #idiomatic way to re-use a stack, gain some efficiency
 #expects ->convert('string or number', 'type')
 sub convert {
-  goto &{$_[2]}; #2nd argument, with $self == $_[0]
-}
+  #my ($self, $value, $type)
+  #    $_[0], $_[1],  $_[2]
+  if(!$typeFunc->{$_[2]}) {
+    my $idx = index($_[2], '(');
 
-#For numeric types we need to check if we were given a weird string
-#not certain if we should return, warn, or what
-#in bioinformatics it seems very common to use "NA" or a "." or "-" to
-#depict missing data
+    # We're given number(N) where N is sig figs
+    if($idx > -1) {
+      my $type = substr($_[2], 0, $idx);
 
-#@param {Str | Num} $_[1] : the data
-#Note that if "-1.000000" is passed, it is NOT guaranteed to be returned as a float
-#Strangely enough, it seems to be handled internally as an int potentially
-#Or this could be dependent on msgpack-perl
-sub float {
-  if (!looks_like_number($_[1] ) ) {
-    return $_[1];
+      $typeFunc->{$_[2]} = \&{$type};
+      # if number(2) take "2" + 0 == 2
+      $precision->{$_[2]} = substr($_[2], $idx + 1, index($_[2], ')') - $idx - 1) + 0;
+    } else {
+      # We're given just "number", no precision, so use the type itself ($_[2])
+      $typeFunc->{$_[2]} = \&{$_[2]};
+      $precision->{$_[2]} = -1;
+    }
   }
 
-  return $_[1] + 0;
-}
-
-#@param {Str | Num} $_[1] : the data
-sub int {
-  if (!looks_like_number($_[1] ) ) {
-    return $_[1];
-  }
-
-  #Truncates, doesn't round
-  return CORE::int($_[1]);
+  return $typeFunc->{$_[2]}->($_[1], $precision->{$_[2]}); #2nd argument, with $self == $_[0]
 }
 
 # This is useful, because will convert a string like "1.000000" to an int
 # And this will be interpreted in msgpack as an int, rather than a long string
 # Similarly, all numbers *should* be storable within 9 bytes (float64),
 # whereas if we sprintf, they will be stored as strings
+# Will always take the smallest possible value, so will only be stored as float
+# if needed
 sub number {
-  if (!looks_like_number($_[1] ) ) {
-    return $_[1];
+  #my ($value, $precision) = @_;
+  #    $_[0], $_[1],
+  if (!looks_like_number($_[0] ) ) {
+    return $_[0];
   }
 
   #Saves us up to 8 bytes, because otherwise msgpack will store everything
   #as a 9 byte double
-  if(CORE::int($_[1]) == $_[1]) {
-    return CORE::int($_[1]);
+  if(CORE::int($_[0]) == $_[0]) {
+    return CORE::int($_[0]);
   }
 
-  return 0 + $_[1];
+  # Add 0 to prevent from being treated as string by serializers
+  if($_[1] > 0) {
+    return 0 + FormatSigFigs($_[0], $_[1]);
+  }
+
+  # No precision given, just ducktype into a number
+  return 0 + $_[0];
 }
 
 #moved away from this; the base build class shouldn't need to know 
