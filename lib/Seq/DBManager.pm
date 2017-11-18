@@ -94,8 +94,9 @@ sub BUILD {
 };
 
 # Our packing function
-my $mp = Data::MessagePack->new();
-$mp->prefer_integer(); #treat "1" as an integer, save more space
+#treat "1" as an integer, save more space
+#treat .00012 as a single precision float, saving 4 bytes.
+my $mp = Data::MessagePack->new()->prefer_integer()->prefer_float32();
 
 ################### DB Read, Write methods ############################
 # Unsafe for $_[2] ; will be modified if an array is passed
