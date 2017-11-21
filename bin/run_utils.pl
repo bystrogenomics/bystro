@@ -87,23 +87,23 @@ if($maxThreads) {
 }
 
 my $config = LoadFile($yaml_config);
-my $utilConfig;
+my $utilConfigs;
 my $trackIdx = 0;
 
 for my $track (@{$config->{tracks}}) {
   if($track->{name} eq $wantedName) {
-    $utilConfig = $track->{utils};
+    $utilConfigs = $track->{utils};
     last;
   }
 
   $trackIdx++;
 }
 
-if($utilConfig) {
-  for(my $utilIdx = 0; $utilIdx < @$utilConfig; $utilIdx++) {
+if($utilConfigs) {
+  for(my $utilIdx = 0; $utilIdx < @$utilConfigs; $utilIdx++) {
     # config may be mutated, by the last utility
     $config = LoadFile($yaml_config);
-    $utilConfig = $config->{tracks}[$trackIdx]{utils}[$utilIdx];
+    my $utilConfig = $config->{tracks}[$trackIdx]{utils}[$utilIdx];
 
     my $utilName = $utilConfig->{name};
     my $className = 'Utils::' . uc( substr($utilName, 0, 1) ) . substr($utilName, 1, length($utilName) - 1); 
@@ -115,7 +115,7 @@ if($utilConfig) {
     $instance->go();
   }
 
-  return;
+  exit;
 }
 
 # Legacy

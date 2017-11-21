@@ -139,7 +139,7 @@ sub go {
     my $header = <$fh>;
     chomp $header;
 
-    $header = join("\t", $header, @dbNSFPheaderFields);
+    say $outFh join("\t", $header, @dbNSFPheaderFields);
 
     while(<$fh>) {
       chomp;
@@ -162,13 +162,10 @@ sub go {
 
   $pm->wait_all_children();
 
-  p $self->_wantedTrack->{local_files};
-  
-  # $self->_wantedTrack->{local_files} = [$outPath];
+  # TODO: store completion under the util object
+  $self->_wantedTrack->{refGeneXdbnsfp_date} = $self->_dateOfRun;
 
-  # $self->_wantedTrack->{caddToBed_date} = $self->_dateOfRun;
-
-  # $self->_backupAndWriteConfig();
+  $self->_backupAndWriteConfig();
 }
 
 __PACKAGE__->meta->make_immutable;
