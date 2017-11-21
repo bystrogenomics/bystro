@@ -7,7 +7,7 @@ package SeqFromQuery;
 
 use Mouse 2;
 our $VERSION = '0.001';
-
+use MCE::Loop;
 use Search::Elasticsearch;
 
 use namespace::autoclean;
@@ -60,6 +60,8 @@ sub annotate {
 
   $self->log( 'info', 'Input query is: ' . $prettyCoder->encode($self->inputQueryBody) );
 
+  my $hasSort = $self->inputQueryBody->{sort};
+
   my $outputter = Seq::Output->new();
 
   my $alleleDelimiter = $outputter->delimiters->alleleDelimiter;
@@ -108,20 +110,6 @@ sub annotate {
     return ($err, undef);
   }
 
-  # TODO: can use connection pool sniffing as well, not doing so atm
-  # because not sure if connection sniffing issue exists here as in
-  # elasticjs library
-  my $es = Search::Elasticsearch->new($self->connection);
-
-  my $batchSize = 4000;
-
-  my $scroll = $es->scroll_helper(
-    size        => $batchSize,
-    body        => $self->inputQueryBody,
-    index => $self->indexName,
-    type => $self->indexType,
-  );
-
   # Stats may or may not be provided
   my $statsFh;
   my $outputHeader = join($fieldSeparator, @fieldNames);
@@ -140,14 +128,21 @@ sub annotate {
 
   $self->log('info', "Beginning to create annotation from the query");
 
-  my $progressHandler = $self->makeLogProgress();
+  my $batchSize = 4000;
 
-  while(my @docs = $scroll->next($batchSize)) {
+  MCE::Loop::init {
+    max_workers => $self->max_threads || 1, chunk_size => $batchSize,
+    gather => $self->_makeLogProgress($hasSort, $statsFh, $outFh)
+  };
+
+  mce_loop {
+    my ($mce, $chunkRef, $chunkId) = @_;
+
     my @sourceData;
-    $#sourceData = $#docs;
-
+    $#sourceData = $#$_;
     my $i = 0;
-    for my $doc (@docs) {
+
+    for my $doc (@$_) {
       my @rowData;
       # Initialize all values to undef
       # Output.pm requires a sparse array for any missing values
@@ -166,11 +161,8 @@ sub annotate {
     my $outputString = _makeOutputString(\@sourceData, 
       $emptyFieldChar, $valueDelimiter, $positionDelimiter, $alleleDelimiter, $fieldSeparator);
 
-    print $outFh $outputString . "\n";
-    print $statsFh $outputString . "\n";
-
-    &{$progressHandler}(scalar @docs);
-  }
+    $mce->gather(scalar @$_, $outputString, $chunkId);
+  } $self->_esIterator($batchSize);
 
   ################ Finished writing file. If statistics, print those ##########
   # Sync to ensure all files written
@@ -191,6 +183,32 @@ sub annotate {
   }
 
   return ($err || undef, $self->outputFilesInfo);
+}
+
+sub _esIterator {
+  my ($self, $batchSize) = @_;
+  # TODO: can use connection pool sniffing as well, not doing so atm
+  # because not sure if connection sniffing issue exists here as in
+  # elasticjs library
+  my $es = Search::Elasticsearch->new($self->connection);
+
+  my $scroll = $es->scroll_helper(
+    size        => $batchSize,
+    body        => $self->inputQueryBody,
+    index => $self->indexName,
+    type => $self->indexType,
+  );
+
+  return sub {
+     my ($chunkSize) = @_;
+
+     my @docs = $scroll->next($chunkSize);
+     if (@docs) {
+        return @docs;
+     }
+
+     return;
+  };
 }
 
 sub _populateArrayPathFromHash {
@@ -244,29 +262,49 @@ sub _makeOutputString {
   return join("\n", @$arrayRef);
 }
 
-sub makeLogProgress {
-  my $self = shift;
+sub _makeLogProgress {
+  my ($self, $hasSort, $outFh, $statsFh) = @_;
 
   my $total = 0;
 
   my $hasPublisher = $self->hasPublisher;
 
-  if(!$hasPublisher) {
-    # noop
-    return sub{};
+  my %result;
+  my $orderId = 1;
+
+  if($hasSort) {
+    return sub {
+      my ($progress, $outputStringRef, $chunkId) = @_;
+
+      if($hasPublisher) {
+        $total += $progress;
+        $self->publishProgress($total);
+      }
+
+      $result{ $chunkId } = $outputStringRef;
+
+      say $statsFh $outputStringRef;
+
+      while (1) {
+        last unless exists $result{$orderId};
+
+        say $outFh $outputStringRef;
+
+        $orderId++;
+      }
+    }
   }
 
   return sub {
-    #my $progress = shift;
-    ##    $_[0] 
+    my ($progress, $outputStringRef) = @_;
 
-    if(defined $_[0]) {
-
-      $total += $_[0];
-
+    if($hasPublisher) {
+      $total += $progress;
       $self->publishProgress($total);
-      return;
     }
+
+    say $statsFh $outputStringRef;
+    say $outFh $outputStringRef;
   }
 }
 
