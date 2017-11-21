@@ -29,7 +29,7 @@ has liftOverPath => (is => 'ro', isa => Path, coerce => 1, default => 'liftOver'
 has liftOverChainPath => (is => 'ro', isa => AbsFile, coerce => 1, required => 1);
 
 my $localFilesHandler = Seq::Tracks::Build::LocalFilesPaths->new();
-sub liftOver {
+sub go {
   my $self = shift;
 
   my $liftOverExe = $self->liftOverPath;

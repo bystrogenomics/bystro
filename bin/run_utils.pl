@@ -9,6 +9,8 @@ use lib './lib';
 use Getopt::Long;
 use Path::Tiny qw/path/;
 use Pod::Usage;
+use YAML::XS qw/LoadFile/;
+use DDP;
 
 use Utils::CaddToBed;
 use Utils::Fetch;
@@ -16,6 +18,7 @@ use Utils::LiftOverCadd;
 use Utils::SortCadd;
 use Utils::RenameTrack;
 use Utils::FilterCadd;
+use Utils::RefGeneXdbnsfp;
 
 use Seq::Build;
 
@@ -50,12 +53,7 @@ GetOptions(
   'maxThreads=i' => \$maxThreads,
 );
 
-if ( (!$fetch && !$caddToBed && !$liftOverCadd && !$sortCadd && !$renameTrack && !$filterCadd) || $help) {
-  Pod::Usage::pod2usage(1);
-  exit;
-}
-
-unless ($yaml_config) {
+if (!$yaml_config && !$wantedName) {
   Pod::Usage::pod2usage();
 }
 
@@ -88,6 +86,44 @@ if($maxThreads) {
   $options{maxThreads} = $maxThreads;
 }
 
+my $config = LoadFile($yaml_config);
+my $utilConfig;
+my $trackIdx = 0;
+
+for my $track (@{$config->{tracks}}) {
+  if($track->{name} eq $wantedName) {
+    $utilConfig = $track->{utils};
+    last;
+  }
+
+  $trackIdx++;
+}
+
+if($utilConfig) {
+  for(my $utilIdx = 0; $utilIdx < @$utilConfig; $utilIdx++) {
+    # config may be mutated, by the last utility
+    $config = LoadFile($yaml_config);
+    $utilConfig = $config->{tracks}[$trackIdx]{utils}[$utilIdx];
+
+    my $utilName = $utilConfig->{name};
+    my $className = 'Utils::' . uc( substr($utilName, 0, 1) ) . substr($utilName, 1, length($utilName) - 1); 
+    my $args = $utilConfig->{args};
+
+    my %finalOpts = (%options, %$args);
+   
+    my $instance = $className->new(\%finalOpts);
+    $instance->go();
+  }
+
+  return;
+}
+
+# Legacy
+if ( (!$fetch && !$caddToBed && !$liftOverCadd && !$sortCadd && !$renameTrack && !$filterCadd) || $help) {
+  Pod::Usage::pod2usage(1);
+  exit;
+}
+
 # If user wants to split their local files, needs to happen before we build
 # So that the YAML config file has a chance to update
 if($caddToBed) {
@@ -97,17 +133,17 @@ if($caddToBed) {
 
 if($fetch) {
   my $fetcher = Utils::Fetch->new(\%options);
-  $fetcher->fetch();
+  $fetcher->go();
 }
 
 if($liftOverCadd) {
   my $liftOverCadd = Utils::LiftOverCadd->new(\%options);
-  $liftOverCadd->liftOver();
+  $liftOverCadd->go();
 }
 
 if($sortCadd) {
   my $sortCadder = Utils::SortCadd->new(\%options);
-  $sortCadder->sort();
+  $sortCadder->go();
 }
 
 if($renameTrack) {

@@ -45,7 +45,7 @@ sub BUILD {
 }
 
 ########################## The only public export  ######################
-sub fetch {
+sub go {
   my $self = shift;
 
   if(defined $self->_wantedTrack->{remote_files} || defined $self->_wantedTrack->{remote_dir}) {

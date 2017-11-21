@@ -37,7 +37,7 @@ sub BUILD {
     $self->_wantedTrack->{name}, $self->_wantedTrack->{local_files});
 }
 
-sub sort {
+sub go {
   my $self = shift;
 
   my %wantedChrs = map { $_ => 1 } @{ $self->_decodedConfig->{chromosomes} };
