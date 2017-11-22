@@ -26,6 +26,9 @@ has chromosomes => (is => 'ro', isa => 'ArrayRef', required => 1);
 # Where any downloaded or created files should be saved
 has outputDir => ( is => 'ro', isa => 'Str', required => 1);
 
+# Genome assembly
+has assembly => (is => 'ro', required => 1);
+
 # Compress the output?
 has compress => ( is => 'ro', isa => 'Bool', lazy => 1, default => 0);
 
@@ -80,11 +83,13 @@ sub fetchAndWriteSQLData {
 
     $query.= sprintf(" WHERE %s.chrom = '%s'", $fullyQualifiedTableName, $chr);
 
-    my ($databaseName, $tableName) = ( split (/\./, $fullyQualifiedTableName) );
-
-    if(!($databaseName && $tableName)) {
-      $self->log('fatal', "FROM statement must use fully qualified table name" .
-        "Ex: hg38.refGene instead of refGene");
+    my ($databaseName, $tableName);
+    if($fullyQualifiedTableName =~ /\S+\.\S+/) {
+      ($databaseName, $tableName) = ( split (/\./, $fullyQualifiedTableName) );
+    } else {
+      $databaseName = $self->assembly;
+      $tableName = $fullyQualifiedTableName;
+      $self->log('info', "Set database name to $databaseName");
     }
 
     $self->log('info', "Updated sql_statement to $query");
