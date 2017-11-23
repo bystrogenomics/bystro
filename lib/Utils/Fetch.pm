@@ -98,6 +98,7 @@ sub _fetchFromUCSCsql {
   
   my $sqlWriter = Utils::SqlWriter->new({
     sql_statement => $sqlStatement,
+    assembly => $self->_decodedConfig->{assembly},
     chromosomes => $self->_decodedConfig->{chromosomes},
     outputDir => $self->_localFilesDir,
     compress => 1,

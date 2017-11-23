@@ -147,12 +147,18 @@ sub go {
 
       my @fields = split '\t', $_;
 
+      my $foundDbNFSP;
       for my $field (@fields) {
         # Empirically determine
         if($dbNSFP{$field}) {
           push @fields, @{$dbNSFP{$field}};
+          $foundDbNFSP = 1;
           last;
         }
+      }
+
+      if(!$foundDbNFSP) {
+        push @fields, map { '.' } @dbNSFPheaderFields;
       }
 
       say $outFh join("\t", @fields);
