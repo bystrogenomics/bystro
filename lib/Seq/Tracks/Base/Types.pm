@@ -80,6 +80,17 @@ sub convert {
   return $typeFunc->{$_[2]}->($_[1], $precision->{$_[2]}); #2nd argument, with $self == $_[0]
 }
 
+# Truncate a number
+sub int {
+  #my ($value, $precision) = @_;
+  #    $_[0], $_[1],
+  if (!looks_like_number($_[0] ) ) {
+    return $_[0];
+  }
+
+  return CORE::int($_[0])
+}
+
 # This is useful, because will convert a string like "1.000000" to an int
 # And this will be interpreted in msgpack as an int, rather than a long string
 # Similarly, all numbers *should* be storable within 9 bytes (float64),

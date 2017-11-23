@@ -167,6 +167,7 @@ sub coerceFeatureType {
 
   my $type = $_[0]->getFeatureType( $_[1] );
 
+  # say "$type";
   # Don't mutate the input if no type is stated for the feature
   # if( !defined $type ) {
   #   return $_[2];
@@ -178,9 +179,13 @@ sub coerceFeatureType {
   # http://stackoverflow.com/questions/2059817/why-is-perl-foreach-variable-assignment-modifying-the-values-in-the-array
   # https://ideone.com/gjWQeS
   for my $val (ref $_[2] ? @{ $_[2] } : $_[2]) {
+    if(!defined $val) {
+      next;
+    }
+
     $val = $_[0]->coerceUndefinedValues($val);
 
-    if( defined $type && defined $val ) {
+    if( defined $type ) {
       $val = $converter->convert($val, $type);
     }
   }

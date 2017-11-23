@@ -35,6 +35,20 @@ has logPath => ( is => 'ro', lazy => 1, default => sub {
   return $path->stringify();
 });
 
+# In the new API, the producer passed the index of the utility configuration
+# aka
+# utils:
+#  - name: liftOverCadd
+#    args:
+#     something: 1
+# So that here liftOverCadd is index 0
+# This allows this class to write a "completed" property aka:
+# # utils:
+#  - name: liftOverCadd
+#    args:
+#     something: 1
+#    completed: Date()
+has utilIdx => (is => 'ro', isa => 'Int');
 # Debug log level?
 has debug => (is => 'ro');
 
@@ -127,8 +141,23 @@ sub BUILD {
   }
 }
 
+sub _writeCompletedDate {
+  my ($self, $prop) = @_;
+
+  if(defined $self->utilIdx) {
+    $self->_wantedTrack->{utils}[$self->utilIdx]{completed} = $self->_dateOfRun;
+  } else {
+    $self->_wantedTrack->{$prop . '_completed'} = $self->_dateOfRun;
+  }
+
+  return;
+}
+
 sub _backupAndWriteConfig {
   my $self = shift;
+  my $utilName = shift;
+
+  $self->_writeCompletedDate($utilName);
 
   my $backPath =  $self->configPath . ".utils-bak." . $self->_dateOfRun;
 

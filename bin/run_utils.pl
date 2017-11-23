@@ -107,9 +107,9 @@ if($utilConfigs) {
 
     my $utilName = $utilConfig->{name};
     my $className = 'Utils::' . uc( substr($utilName, 0, 1) ) . substr($utilName, 1, length($utilName) - 1); 
-    my $args = $utilConfig->{args};
+    my $args = $utilConfig->{args} || {};
 
-    my %finalOpts = (%options, %$args);
+    my %finalOpts = (%options, %$args, (utilIdx => $utilIdx));
    
     my $instance = $className->new(\%finalOpts);
     $instance->go();

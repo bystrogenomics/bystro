@@ -43,6 +43,7 @@ sub BUILD {
 sub go {
   my $self = shift;
 
+  $self->log('info', 'Beginning RefGeneXdbnsfp');
   # Store output handles by chromosome, so we can write even if input file
   # out of order
   my %outFhs;
@@ -162,10 +163,7 @@ sub go {
 
   $pm->wait_all_children();
 
-  # TODO: store completion under the util object
-  $self->_wantedTrack->{refGeneXdbnsfp_date} = $self->_dateOfRun;
-
-  $self->_backupAndWriteConfig();
+  $self->_backupAndWriteConfig('refGeneXdbnsfp');
 }
 
 __PACKAGE__->meta->make_immutable;

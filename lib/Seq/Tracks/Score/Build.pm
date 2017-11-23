@@ -19,13 +19,20 @@ extends 'Seq::Tracks::Build';
 
 use Seq::Tracks::Score::Build::Round;
 
-my $rounder = Seq::Tracks::Score::Build::Round->new();
 # score track could potentially be 0 based
 # http://www1.bioinf.uni-leipzig.de/UCSC/goldenPath/help/wiggle.html
 # if it is the BED format version of the WIG format.
 has '+based' => (
   default => 1,
 );
+
+has scalingFactor => (is => 'ro', isa => 'Int', default => 10);
+
+sub BUILD {
+  my $self = shift;
+
+  $self->{_rounder} = Seq::Tracks::Score::Build::Round->new({scalingFactor => $self->scalingFactor});
+}
 
 sub buildTrack{
   my $self = shift;
@@ -122,7 +129,7 @@ sub buildTrack{
         }
 
         #Args:             $chr,       $trackIndex,   $pos,         $trackValue,        $mergeFunc, $skipCommit
-        $self->db->dbPatch($wantedChr, $self->dbName, $chrPosition, $rounder->round($_), undef, $count < $self->commitEvery);
+        $self->db->dbPatch($wantedChr, $self->dbName, $chrPosition, $self->{_rounder}->round($_), undef, $count < $self->commitEvery);
         $count = $count < $self->commitEvery ? $count + 1 : 0;
 
         #this must come AFTER we store the position's data in db, since we have a starting pos

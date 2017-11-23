@@ -133,9 +133,7 @@ sub go {
 
   $self->_wantedTrack->{local_files} = [$outPath];
 
-  $self->_wantedTrack->{caddToBed_date} = $self->_dateOfRun;
-
-  $self->_backupAndWriteConfig();
+  $self->_backupAndWriteConfig('caddToBed');
 }
 
 __PACKAGE__->meta->make_immutable;

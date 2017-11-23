@@ -31,12 +31,6 @@ with 'Seq::Role::Message';
 # Not worth complexity of Maybe[Type], default => undef,
 has dbName => ( is => 'ro', init_arg => undef, writer => '_setDbName');
 
-# Some tracks may have a nearest property; these are stored as their own track, but
-# conceptually are a sub-track, 
-has nearestTrackName => ( is => 'ro', isa => 'Str', init_arg => undef, default => 'nearest');
-
-has nearestDbName => ( is => 'ro', isa => 'Str', init_arg => undef, writer => '_setNearestDbName');
-
 has joinTrackFeatures => (is => 'ro', isa => 'ArrayRef', init_arg => undef, writer => '_setJoinTrackFeatures');
 
 has joinTrackName => (is => 'ro', isa => 'Str', init_arg => undef, writer => '_setJoinTrackName');
@@ -121,24 +115,6 @@ has featureDataTypes => (
 );
 
 has fieldMap => (is => 'ro', isa => 'HashRef', lazy => 1, default => sub{ {} });
-# We allow a "nearest" property to be defined for any tracks
-# Although it won't make sense for some (like reference)
-# It's up to the consuming class to decide if they need it
-# It is a property that, when set, may have 0 or more features
-# Cannot use predicate with this, because it ALWAYS has a default non-empty value
-# As required by the 'Array' trait
-has nearest => (
-  is => 'ro',
-  isa => 'ArrayRef',
-  # Cannot use traits with Maybe
-  traits => ['Array'],
-  handles => {
-    noNearestFeatures => 'is_empty',
-    allNearestFeatureNames => 'elements',
-  },
-  lazy => 1,
-  default => sub{ [] },
-);
 
 has join => (is => 'ro', isa => 'Maybe[HashRef]', predicate => 'hasJoin', lazy => 1, default => undef);
 
@@ -160,17 +136,6 @@ sub BUILD {
   }
 
   my $trackNameMapper = Seq::Tracks::Base::MapTrackNames->new();
-  #Set the nearest track names first, because they may be applied genome wide
-  #And if we use array format to store data (to save space) good to have
-  #Genome-wide tracks have lower indexes, so that higher indexes can be used for 
-  #sparser items, because we cannot store a sparse array, must store 1 byte per field
-  if(!$self->noNearestFeatures) {
-    my $nearestFullQualifiedTrackName = $self->name . '.' . $self->nearestTrackName;
-
-    $self->_setNearestDbName( $trackNameMapper->getOrMakeDbName($nearestFullQualifiedTrackName) );
-
-    $self->log('debug', "Track " . $self->name . ' nearest dbName is ' . $self->nearestDbName);
-  }
 
   $self->_setDbName( $trackNameMapper->getOrMakeDbName($self->name) );
 
@@ -266,23 +231,6 @@ sub BUILDARGS {
   }
 
   $data->{features} = \@featureLabels;
-
-  # Currently requires features. Could allow for tracks w/o features in future
-  if( defined $data->{nearest} ) {
-    if( ref $data->{nearest} ne 'ARRAY' || !@{ $data->{nearest} } ) {
-      $class->log('fatal', 'Cannot set "nearest" property without providing 
-       an array of feature names');
-    }
-
-    for my $nearestFeatureName ( @{$data->{nearest}} ) {
-      #~ takes a -1 and makes it a 0
-      if(!defined( first{$_ eq $nearestFeatureName} @{$data->{features}} )) {
-        $class->log('fatal', "$nearestFeatureName, which you've defined under 
-          the nearest property, doesn't exist in the list of $data->{name} 'feature' 
-          properties");
-      }
-    }
-  }
 
   return $data;
 };

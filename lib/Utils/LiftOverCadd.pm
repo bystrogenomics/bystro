@@ -143,9 +143,7 @@ sub go {
 
   $self->_wantedTrack->{local_files} = \@finalOutPaths;
 
-  $self->_wantedTrack->{liftOverCadd_date} = $self->_dateOfRun;
-
-  $self->_backupAndWriteConfig();
+  $self->_backupAndWriteConfig('liftOverCadd');
 }
 
 __PACKAGE__->meta->make_immutable;

@@ -186,13 +186,11 @@ sub go {
 
   $self->_wantedTrack->{local_files} = \@finalOutPaths;
 
-  $self->_wantedTrack->{sortCadd_date} = $self->_dateOfRun;
-
   # Make sure that we indicate to the user that cadd is guaranteed to be sorted
   # This speeds up cadd building
   $self->_wantedTrack->{sorted_guaranteed} = 1;
 
-  $self->_backupAndWriteConfig();
+  $self->_backupAndWriteConfig('sortCadd');
 }
 
 __PACKAGE__->meta->make_immutable;

@@ -201,7 +201,7 @@ sub get {
 
   ################# Cache track's region data ##############
   $self->{_geneTrackRegionHref}{$chr} //= $self->{_db}->dbReadAll( $self->regionTrackPath($chr) );
-  
+  p  $self->{_geneTrackRegionHref}{$chr} ;
   my $geneDb = $self->{_geneTrackRegionHref}{$chr};
 
   ####### Get all transcript numbers, and site data for this position #########

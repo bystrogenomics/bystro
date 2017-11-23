@@ -1,7 +1,7 @@
 ---
 assembly: hg38
 build_author: ec2-user
-build_date: 2017-09-27T02:24:00
+build_date: 2017-11-22T00:11:00
 chromosomes:
 - chr1
 - chr2
@@ -30,7 +30,7 @@ chromosomes:
 - chrY
 database_dir: '~'
 files: '~'
-files_dir: /mnt/annotator/hg38/raw/
+files_dir: /mnt/db_backup/hg38/
 snpProcessor: bystro-snp
 statistics:
   dbSNPnameField: dbSNP.name
@@ -73,8 +73,9 @@ tracks:
   - chrX.fa.gz
   - chrY.fa.gz
   type: reference
-- features:
-  - txStart
+- build_author: ec2-user
+  build_date: 2017-11-22T00:11:00
+  features:
   - kgID
   - mRNA
   - spID
@@ -84,6 +85,17 @@ tracks:
   - rfamAcc
   - name
   - name2
+  - dbnsfp.ExAC_pLI: number(3)
+  - dbnsfp.ExAC_pRec: number(3)
+  - dbnsfp.ExAC_pNull: number(3)
+  - dbnsfp.LoFtool_score: number(3)
+  - dbnsfp.ExAC_nonTCGA_pRec: number(3)
+  - dbnsfp.ExAC_nonTCGA_pNull: number(3)
+  - dbnsfp.ExAC_nonTCGA_pLI: number(3)
+  - dbnsfp.ExAC_nonpsych_pRec: number(3)
+  - dbnsfp.ExAC_nonpsych_pNull: number(3)
+  - dbnsfp.ExAC_nonpsych_pLI: number(3)
+  fetch_date: 2017-11-21T18:26:00
   join:
     features:
     - alleleID
@@ -96,13 +108,52 @@ tracks:
     - chromStart
     - chromEnd
     track: clinvar
+  local_files:
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr5.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr6.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr8.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr2.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr7.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr4.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr3.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr1.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr15.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr13.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr14.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr11.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr16.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr9.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr10.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr12.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr22.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr20.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr17.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr18.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chrX.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr21.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr19.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chrM.with_dbnsfp.gz
+  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chrY.with_dbnsfp.gz
   name: refSeq
   nearest:
   - name
   - name2
-  sql_statement: SELECT * FROM hg38.refGene LEFT JOIN hg38.kgXref ON hg38.kgXref.refseq
-    = hg38.refGene.name
+  nearestTss:
+  - name
+  - name2
+  refGeneXdbnsfp_date: 2017-11-21T18:28:00
+  sql_statement: SELECT refGene.name, chrom, strand, txStart, txEnd, cdsStart, cdsEnd,
+    exonCount, exonStarts, exonEnds, score, name2, kgID, mRNA, spID, spDisplayID,
+    refseq, protAcc, description, rfamAcc, tRnaName, value AS 'ensemblID', geneSymbol
+    FROM refGene LEFT JOIN hg38.kgXref k ON refGene.name = k.refseq LEFT JOIN hg38.knownToEnsembl
+    e ON k.kgID = e.name
   type: gene
+  utils:
+  - name: fetch
+  - args:
+      geneFile: /mnt/db_backup/dbnsfp/dbNSFP3.5_gene.complete
+    name: refGeneXdbnsfp
+  version: 11
 - name: phastCons
   remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/hg38/phastCons100way/hg38.100way.phastCons/
   remote_files:
@@ -208,7 +259,7 @@ tracks:
   - func
   - alleles
   - alleleNs: number
-  - alleleFreqs: number
+  - alleleFreqs: number(2)
   name: dbSNP
   sql_statement: SELECT * FROM hg38.snp147
   type: sparse
@@ -228,7 +279,7 @@ tracks:
   - clinicalSignificance
   - type
   - origin
-  - numberSubmitters: number
+  - numberSubmitters: number(2)
   - reviewStatus
   - referenceAllele
   - alternateAllele
@@ -245,37 +296,40 @@ tracks:
     Start: chromStart
     Stop: chromEnd
     Type: type
+  local_files:
+  - variant_summary.txt.gz
   name: clinvar
   remote_files:
   - ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz
   type: sparse
 - build_author: ec2-user
-  build_date: 2017-09-27T02:24:00
+  build_date: 2017-08-29T17:10:00
   build_row_filters:
     AS_FilterStatus: == PASS
   features:
   - alt
   - id
-  - af: number
-  - an: number
-  - an_afr: number
-  - an_amr: number
-  - an_asj: number
-  - an_eas: number
-  - an_fin: number
-  - an_nfe: number
-  - an_oth: number
-  - an_male: number
-  - an_female: number
-  - af_afr: number
-  - af_amr: number
-  - af_asj: number
-  - af_eas: number
-  - af_fin: number
-  - af_nfe: number
-  - af_oth: number
-  - af_male: number
-  - af_female: number
+  - trTv: number(2)
+  - af: number(2)
+  - an: number(2)
+  - an_afr: number(2)
+  - an_amr: number(2)
+  - an_asj: number(2)
+  - an_eas: number(2)
+  - an_fin: number(2)
+  - an_nfe: number(2)
+  - an_oth: number(2)
+  - an_male: number(2)
+  - an_female: number(2)
+  - af_afr: number(2)
+  - af_amr: number(2)
+  - af_asj: number(2)
+  - af_eas: number(2)
+  - af_fin: number(2)
+  - af_nfe: number(2)
+  - af_oth: number(2)
+  - af_male: number(2)
+  - af_female: number(2)
   fieldMap:
     AF: af
     AF_AFR: af_afr
@@ -301,34 +355,35 @@ tracks:
   - gnomad.genomes.r2.0.1.sites.*.liftedOver.hg38.vcf.liftedOver.gz
   name: gnomad.genomes
   type: vcf
-  version: 2
+  version: 1
 - build_author: ec2-user
-  build_date: 2017-09-27T02:24:00
+  build_date: 2017-08-29T17:10:00
   build_row_filters:
     AS_FilterStatus: == PASS
   features:
   - alt
   - id
-  - af: number
-  - an: number
-  - an_afr: number
-  - an_amr: number
-  - an_asj: number
-  - an_eas: number
-  - an_fin: number
-  - an_nfe: number
-  - an_oth: number
-  - an_male: number
-  - an_female: number
-  - af_afr: number
-  - af_amr: number
-  - af_asj: number
-  - af_eas: number
-  - af_fin: number
-  - af_nfe: number
-  - af_oth: number
-  - af_male: number
-  - af_female: number
+  - trTv: number(2)
+  - af: number(2)
+  - an: number(2)
+  - an_afr: number(2)
+  - an_amr: number(2)
+  - an_asj: number(2)
+  - an_eas: number(2)
+  - an_fin: number(2)
+  - an_nfe: number(2)
+  - an_oth: number(2)
+  - an_male: number(2)
+  - an_female: number(2)
+  - af_afr: number(2)
+  - af_amr: number(2)
+  - af_asj: number(2)
+  - af_eas: number(2)
+  - af_fin: number(2)
+  - af_nfe: number(2)
+  - af_oth: number(2)
+  - af_male: number(2)
+  - af_female: number(2)
   fieldMap:
     AF: af
     AF_AFR: af_afr
@@ -354,7 +409,7 @@ tracks:
   - gnomad.exomes.r2.0.1.sites.liftedOver.hg38.vcf.liftedOver.gz
   name: gnomad.exomes
   type: vcf
-  version: 2
+  version: 1
 vcfProcessor: bystro-vcf
-version: 75
+version: 85
 

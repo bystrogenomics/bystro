@@ -39,15 +39,16 @@ use Seq::Tracks::Region;
 use Seq::Tracks::Gene;
 use Seq::Tracks::Cadd;
 use Seq::Tracks::Vcf;
+use Seq::Tracks::Gene::Nearest;
 
 use Seq::Tracks::Reference::Build;
 use Seq::Tracks::Score::Build;
 use Seq::Tracks::Sparse::Build;
 use Seq::Tracks::Region::Build;
 use Seq::Tracks::Gene::Build;
+use Seq::Tracks::Gene::Nearest::Build;
 use Seq::Tracks::Cadd::Build;
 use Seq::Tracks::Vcf::Build;
-
 
 use Seq::Tracks::Base::Types;
 ########################### Configuration ##################################
@@ -228,8 +229,6 @@ sub _buildTrackGetters {
   _clearStaticGetters();
 
   for my $trackHref (@$trackConfigurationAref ) {
-    #get the trackClass
-    my $trackFileName = $self->_toTrackGetterClass($trackHref->{type} );
     #class 
     my $className = $self->_toTrackGetterClass( $trackHref->{type} );
 
@@ -282,7 +281,6 @@ sub _buildTrackBuilders {
   _clearStaticBuilders();
 
   for my $trackHref (@$trackConfigurationAref) {
-    my $trackFileName = $self->_toTrackBuilderClass($trackHref->{type} );
     #class 
     my $className = $self->_toTrackBuilderClass( $trackHref->{type} );
 
@@ -335,18 +333,32 @@ sub _toTrackGetterClass {
   my $self = shift,
   my $type = shift;
 
-  my $classNamePart = $self->_toTitleCase($type);
+  if($type =~ /\w+\:+\w+/) {
+    my @types = split /\:+/, $type;
+    p @types;
+    my $part1 = $self->_toTitleCase($types[0]);
+    my $part2 = $self->_toTitleCase($types[1]);
 
-  return "Seq::Tracks::" . $classNamePart;
+    return "Seq::Tracks::" . $part1 . "::" . $part2;
+  }
+
+  return "Seq::Tracks::" . $self->_toTitleCase($type);
 }
 
 sub _toTrackBuilderClass{
   my $self = shift,
   my $type = shift;
 
-  my $classNamePart = $self->_toTitleCase($type);
+  if($type =~ /\w+\:+\w+/) {
+    my @types = split /\:+/, $type;
+    p @types;
+    my $part1 = $self->_toTitleCase($types[0]);
+    my $part2 = $self->_toTitleCase($types[1]);
 
-  return "Seq::Tracks::" . $classNamePart ."::Build";
+    return "Seq::Tracks::" . $part1 . "::" . $part2 . "::Build";
+  }
+
+  return "Seq::Tracks::" . $self->_toTitleCase($type) . "::Build";
 }
 
 __PACKAGE__->meta->make_immutable;

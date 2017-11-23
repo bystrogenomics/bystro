@@ -31,8 +31,6 @@ extends 'Utils::Base';
 
 my $localFilesHandler = Seq::Tracks::Build::LocalFilesPaths->new();
 
-my $rounder = Seq::Tracks::Score::Build::Round->new();
-
 sub BUILD {
   my $self = shift;
 
@@ -81,6 +79,8 @@ sub go {
   # p %trackConfig;
   # exit;
   my $caddGetter = Seq::Tracks::Cadd->new(\%trackConfig);
+
+  my $rounder = Seq::Tracks::Score::Build::Round->new({scalingFactor => $caddGetter->scalingFactor});
 
   my $db = Seq::DBManager->new();
 
@@ -317,9 +317,8 @@ sub go {
   $pm->wait_all_children();
 
   $self->_wantedTrack->{local_files} = \@outPaths;
-  $self->_wantedTrack->{filterCadd_date} = $self->_dateOfRun;
 
-  $self->_backupAndWriteConfig();
+  $self->_backupAndWriteConfig('filterCadd');
 
   return 1;
 }

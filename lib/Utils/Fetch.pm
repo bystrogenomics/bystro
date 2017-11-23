@@ -108,9 +108,7 @@ sub _fetchFromUCSCsql {
 
   $self->_wantedTrack->{local_files} = \@writtenFileNames;
 
-  $self->_wantedTrack->{fetch_date} = $self->_dateOfRun;
-
-  $self->_backupAndWriteConfig();
+  $self->_backupAndWriteConfig('fetch');
 
   $self->log('info', "Finished fetching data from sql");
 }
@@ -198,9 +196,7 @@ sub _fetchFiles {
     sleep 3;
   }
 
-  $self->_wantedTrack->{fetch_date} = $self->_dateOfRun;
-
-  $self->_backupAndWriteConfig();
+  $self->_backupAndWriteConfig('fetch');
 
   $self->log('info', "Finished fetching all remote files");
 }

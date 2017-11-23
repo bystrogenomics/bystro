@@ -16,15 +16,13 @@ use Seq::Tracks;
 
 use Scalar::Util qw/looks_like_number/;
 
-my $rounder = Seq::Tracks::Score::Build::Round->new();
-
 # Cadd tracks seem to be 1 based (not well documented)
-has '+based' => (
-  default => 1,
-);
+has '+based' => (default => 1);
 
 # CADD files may not be sorted,
 has sorted_guaranteed => (is => 'ro', isa => 'Bool', lazy => 1, default => 0);
+
+has scalingFactor => (is => 'ro', isa => 'Int', default => 10);
 
 my $order = Seq::Tracks::Cadd::Order->new();
 $order = $order->order;
@@ -35,6 +33,8 @@ sub BUILD {
 
   my $tracks = Seq::Tracks->new();
   $refTrack = $tracks->getRefTrackGetter();
+
+  $self->{_rounder} = Seq::Tracks::Score::Build::Round->new({scalingFactor => $self->scalingFactor});
 }
 ############## Version that does not assume positions in order ################
 ############## Will optimize for cases when sorted_guranteed truthy ###########
@@ -376,7 +376,7 @@ sub buildTrack {
           next;
         }
 
-        push @caddData, [ $altAllele, $rounder->round( $fields[$phastIdx] ) ];
+        push @caddData, [ $altAllele, $self->{_rounder}->round( $fields[$phastIdx] ) ];
       }
 
       ######################### Finished reading file ##########################
