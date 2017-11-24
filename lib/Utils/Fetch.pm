@@ -6,8 +6,8 @@ package Utils::Fetch;
 
 our $VERSION = '0.001';
 
-# ABSTRACT: Fetch anything specified by remote_dir + remote_files 
-# or sql_statement
+# ABSTRACT: Fetch anything specified by remoteDir . / . remoteFiles
+# or an sql statement
 
 use Mouse 2;
 
@@ -22,22 +22,26 @@ use Utils::SqlWriter;
 
 use DDP;
 
-# wget, ftp, whatever
-# has fetch_program => (is => 'ro', writer => '_setFetchProgram');
-# has fetch_program_arguments => (is => 'ro', writer => '_setFetchProgramArguments');
-# has fetch_command => (is => 'ro');
+# The sql connection config
+has sql => (is => 'ro', isa => 'Maybe[Str]');
+has remoteFiles => (is => 'ro', isa => 'Maybe[ArrayRef]');
+has remoteDir => (is => 'ro', isa => 'Maybe[Str]');
+
+has connection => (is => 'ro', isa => 'Maybe[HashRef]');
+
+# Choose whether to use wget or rsync program to fetch
 has wget => (is => 'ro', init_arg => undef, writer => '_setWget');
 has rsync => (is => 'ro', init_arg => undef, writer => '_setRsync');
 
 sub BUILD {
   my $self = shift;
 
-  if($self->_wantedTrack->{sql_statement}) {
+  if(defined $self->sql) {
     return;
   }
 
   if(!which('rsync') || !which('wget')) {
-    $self->log('fatal', 'Fetch.pm requires rsync and wget when fetching remote_files');
+    $self->log('fatal', 'Fetch.pm requires rsync and wget when fetching remoteFiles');
   }
 
   $self->_setRsync(which('rsync'));
@@ -48,32 +52,32 @@ sub BUILD {
 sub go {
   my $self = shift;
 
-  if(defined $self->_wantedTrack->{remote_files} || defined $self->_wantedTrack->{remote_dir}) {
+  if(defined $self->remoteFiles || defined $self->remoteDir) {
     return $self->_fetchFiles();
   }
 
-  if(defined $self->_wantedTrack->{sql_statement}) {
+  if(defined $self->sql) {
     return $self->_fetchFromUCSCsql();
   }
 
-  $self->log('fatal', "Couldn't find either remote_files + remote_dir,"
-    . " or an sql_statement for this track");
+  $self->log('fatal', "Couldn't find either remoteFiles + remoteDir,"
+    . " or an sql statement for this track");
 }
 
 ########################## Main methods, which do the work  ######################
-# These are called depending on whether sql_statement or remote_files + remote_dir given
+# These are called depending on whether sql_statement or remoteFiles + remoteDir given
 sub _fetchFromUCSCsql {
   my $self = shift;
   
-  my $sqlStatement = $self->_wantedTrack->{sql_statement};
+  my $sqlStatement = $self->sql;
 
   # What features are called according to our YAML config spec
-  my $featuresKey = 'features';
+  my $featuresKey = '%features%';
   my $featuresIdx = index($sqlStatement, $featuresKey);
 
   if( $featuresIdx > -1 ) {
     if(! @{$self->_wantedTrack->{features}} ) {
-      $self->log('fatal', "Requires features if sql_statement speciesi SELECT features")
+      $self->log('fatal', "Requires features if sql_statement speciesi SELECT %features%")
     }
 
     my $trackFeatures;
@@ -96,13 +100,19 @@ sub _fetchFromUCSCsql {
     substr($sqlStatement, $featuresIdx, length($featuresKey) ) = $trackFeatures;
   }
   
-  my $sqlWriter = Utils::SqlWriter->new({
-    sql_statement => $sqlStatement,
+  my $config = {
+    sql => $sqlStatement,
     assembly => $self->_decodedConfig->{assembly},
     chromosomes => $self->_decodedConfig->{chromosomes},
     outputDir => $self->_localFilesDir,
     compress => 1,
-  });
+  };
+
+  if(defined $self->connection) {
+    $config->{connection} = $self->connection;
+  }
+
+  my $sqlWriter = Utils::SqlWriter->new($config);
 
   # Returns the relative file names
   my @writtenFileNames = $sqlWriter->fetchAndWriteSQLData();
@@ -125,9 +135,9 @@ sub _fetchFiles {
 
   my $isRsync;
 
-  if($self->_wantedTrack->{remote_dir}) {
+  if($self->remoteDir) {
     # remove http:// (or whatever protocol)
-    $self->_wantedTrack->{remote_dir} =~ m/$pathRe/;
+    $self->remoteDir =~ m/$pathRe/;
 
     if($1) {
       $isRsync = 0;
@@ -144,7 +154,7 @@ sub _fetchFiles {
 
   $self->_wantedTrack->{local_files} = [];
 
-  for my $file ( @{$self->_wantedTrack->{remote_files}} ) {
+  for my $file ( @{$self->remoteFiles} ) {
     my $remoteUrl;
 
     if($remoteDir) {

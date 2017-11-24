@@ -38,22 +38,12 @@ GetOptions(
   'h|help'       => \$help,
   'd|debug=i'      => \$debug,
   'o|overwrite'  => \$overwrite,
-  'fetch' => \$fetch,
-  'caddToBed' => \$caddToBed,
-  'sortCadd'  => \$sortCadd,
-  'filterCadd' => \$filterCadd,
-  'renameTrack'  => \$renameTrack,
-  'liftOverCadd' => \$liftOverCadd,
-  'compress' => \$compress,
-  'liftOverPath=s' => \$liftOverPath,
-  'liftOverChainPath=s' => \$liftOverChainPath,
-  'renameTo=s' => \$renameTrackTo,
-  'verbose=i' => \$verbose,
-  'dryRun' => \$dryRunInsertions,
-  'maxThreads=i' => \$maxThreads,
+  'v|verbose=i' => \$verbose,
+  'r|dryRun' => \$dryRunInsertions,
+  'm|maxThreads=i' => \$maxThreads,
 );
 
-if (!$yaml_config && !$wantedName) {
+if ($help || !$yaml_config || !$wantedName) {
   Pod::Usage::pod2usage();
 }
 
@@ -65,22 +55,6 @@ my %options = (
   verbose => $verbose,
   dryRun => $dryRunInsertions,
 );
-
-if($renameTrackTo) {
-  $options{renameTo} = $renameTrackTo;
-}
-
-if($liftOverPath) {
-  $options{liftOverPath} = $liftOverPath;
-}
-
-if($liftOverChainPath) {
-  $options{liftOverChainPath} = $liftOverChainPath;
-}
-
-if($compress) {
-  $options{compress} = $compress;
-}
 
 if($maxThreads) {
   $options{maxThreads} = $maxThreads;
@@ -99,65 +73,27 @@ for my $track (@{$config->{tracks}}) {
   $trackIdx++;
 }
 
-if($utilConfigs) {
-  for(my $utilIdx = 0; $utilIdx < @$utilConfigs; $utilIdx++) {
-    # config may be mutated, by the last utility
-    $config = LoadFile($yaml_config);
-    my $utilConfig = $config->{tracks}[$trackIdx]{utils}[$utilIdx];
-
-    my $utilName = $utilConfig->{name};
-    my $className = 'Utils::' . uc( substr($utilName, 0, 1) ) . substr($utilName, 1, length($utilName) - 1); 
-    my $args = $utilConfig->{args} || {};
-
-    my %finalOpts = (%options, %$args, (utilIdx => $utilIdx));
-   
-    my $instance = $className->new(\%finalOpts);
-    $instance->go();
-  }
-
-  exit;
+if (!$utilConfigs) {
+  die "The specified track must have 'utils' property";
 }
 
-# Legacy
-if ( (!$fetch && !$caddToBed && !$liftOverCadd && !$sortCadd && !$renameTrack && !$filterCadd) || $help) {
-  Pod::Usage::pod2usage(1);
-  exit;
+for(my $utilIdx = 0; $utilIdx < @$utilConfigs; $utilIdx++) {
+  # config may be mutated, by the last utility
+  $config = LoadFile($yaml_config);
+  my $utilConfig = $config->{tracks}[$trackIdx]{utils}[$utilIdx];
+
+  my $utilName = $utilConfig->{name};
+
+  # Uppercase the first letter of the utility class name
+  # aka user may specify "fetch" and we grab Utils::Fetch
+  my $className = 'Utils::' . uc( substr($utilName, 0, 1) ) . substr($utilName, 1, length($utilName) - 1); 
+  my $args = $utilConfig->{args} || {};
+
+  my %finalOpts = (%options, %$args, (utilIdx => $utilIdx));
+ 
+  my $instance = $className->new(\%finalOpts);
+  $instance->go();
 }
-
-# If user wants to split their local files, needs to happen before we build
-# So that the YAML config file has a chance to update
-if($caddToBed) {
-  my $caddToBedRunner = Utils::CaddToBed->new(\%options);
-  $caddToBedRunner->go();
-}
-
-if($fetch) {
-  my $fetcher = Utils::Fetch->new(\%options);
-  $fetcher->go();
-}
-
-if($liftOverCadd) {
-  my $liftOverCadd = Utils::LiftOverCadd->new(\%options);
-  $liftOverCadd->go();
-}
-
-if($sortCadd) {
-  my $sortCadder = Utils::SortCadd->new(\%options);
-  $sortCadder->go();
-}
-
-if($renameTrack) {
-  my $renamer = Utils::RenameTrack->new(\%options);
-  $renamer->go();
-}
-
-if($filterCadd) {
-  my $filterCadd = Utils::FilterCadd->new(\%options);
-  $filterCadd->go();
-}
-
-#say "done: " . $wantedType || $wantedName . $wantedChr ? ' for $wantedChr' : '';
-
 
 __END__
 
@@ -168,10 +104,14 @@ run_utils - Runs items in lib/Utils
 =head1 SYNOPSIS
 
 run_utils
-  --config <file>
-  --compress
-  --name
+  --config <yaml>
+  --name <track>
   [--debug]
+  [--verbose]
+  [--maxThreads]
+  [--dryRun]
+  [--overwrite]
+  [--help]
 
 =head1 DESCRIPTION
 

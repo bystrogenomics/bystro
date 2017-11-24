@@ -18,7 +18,7 @@ use Utils::SqlWriter::Connection;
 with 'Seq::Role::IO', 'Seq::Role::Message';
 
 # @param <Str> sql_statement : Valid SQL with fully qualified field names
-has sql_statement => (is => 'ro', isa => 'Str', required => 1);
+has sql => (is => 'ro', isa => 'Str', required => 1);
 
 # @param <ArrayRef> chromosomes : All wanted chromosomes
 has chromosomes => (is => 'ro', isa => 'ArrayRef', required => 1);
@@ -32,7 +32,7 @@ has assembly => (is => 'ro', required => 1);
 # Compress the output?
 has compress => ( is => 'ro', isa => 'Bool', lazy => 1, default => 0);
 
-has connection_config => (is => 'ro', isa => 'HashRef');
+has connection => (is => 'ro', isa => 'Maybe[HashRef]');
 
 has sqlClient => (is => 'ro', init_arg => undef, writer => '_setSqlClient');
 ######################### DB Configuartion Vars #########################
@@ -44,15 +44,9 @@ my $nowTimestamp = sprintf( "%d-%02d-%02d", $year, $mos, $day );
 sub BUILD {
   my $self = shift;
 
-  if($self->connection_config) {
-    $self->_setSqlClient( Utils::SqlWriter::Connection->new({
-      connection_config => $self->connection_config
-    }) );
-  } else {
-    $self->_setSqlClient( Utils::SqlWriter::Connection->new({
-      connectino_config => $self->connection_config
-    }) );
-  }
+  my $config = defined $self->connection ? {connection => $self->connection} : {};
+
+  $self->_setSqlClient( Utils::SqlWriter::Connection->new($config) );
 }
 =method @public sub fetchAndWriteSQLData
 
@@ -67,32 +61,48 @@ sub fetchAndWriteSQLData {
 
   my $extension = $self->compress ? 'gz' : 'txt';
 
+  my $query = $self->sql;
+
+  my $perChromosome;
+
+  if($query =~ /%chromosomes%/) {
+    $perChromosome = 1;
+  }
+
   # We'll return the relative path to the files we wrote
   my @outRelativePaths;
-  for my $chr ( @{$self->chromosomes} ) {
+  for my $chr ( $perChromosome ? @{$self->chromosomes} : 'fetch' ) {
     # for return data
     my @sql_data = ();
     
-    my $query = $self->sql_statement;
+    my $query = $self->sql;
 
     ########### Restrict SQL fetching to just this chromosome ##############
 
     # Get the FQ table name (i.e hg19.refSeq instead of refSeq), to avoid
+    if($perChromosome) {
+      $query =~ s/%chromosomes%/'$chr'/;
+    }
+
     $query =~ m/FROM\s(\S+)/i;
+
+    ##### use database ######
+    # If given database in connection object, use that, else try to infer
+    my ($databaseName, $tableName);
     my $fullyQualifiedTableName = $1;
 
-    $query.= sprintf(" WHERE %s.chrom = '%s'", $fullyQualifiedTableName, $chr);
-
-    my ($databaseName, $tableName);
     if($fullyQualifiedTableName =~ /\S+\.\S+/) {
       ($databaseName, $tableName) = ( split (/\./, $fullyQualifiedTableName) );
     } else {
       $databaseName = $self->assembly;
       $tableName = $fullyQualifiedTableName;
-      $self->log('info', "Set database name to $databaseName");
     }
 
-    $self->log('info', "Updated sql_statement to $query");
+    if(defined $self->sqlClient->database) {
+      $databaseName = $self->sqlClient->database;
+    } else {
+      $self->log('info', "Set database name to $databaseName");
+    }
 
     my $fileName = join '.', $databaseName, $tableName, $chr, $extension;
     my $timestampName = join '.', $nowTimestamp, $fileName;
@@ -105,11 +115,12 @@ sub fetchAndWriteSQLData {
     # prepare file handle
     my $outFh = $self->get_write_fh($targetFile);
 
+    $self->log('info', "Fetching from $databaseName: $query");
     ########### Connect to database ##################
     my $dbh = $self->sqlClient->connect($databaseName);
     ########### Prepare and execute SQL ##############
     my $sth = $dbh->prepare($query) or $self->log('fatal', $dbh->errstr);
-    
+
     $sth->execute or $self->log('fatal', $dbh->errstr);
 
     ########### Retrieve data ##############

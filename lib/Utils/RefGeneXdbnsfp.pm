@@ -170,6 +170,8 @@ sub go {
   $pm->wait_all_children();
 
   $self->_backupAndWriteConfig('refGeneXdbnsfp');
+
+  $self->log('info', 'Finished RefGeneXdbnsfp');
 }
 
 __PACKAGE__->meta->make_immutable;
