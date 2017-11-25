@@ -36,10 +36,9 @@ sub BUILD {
     return;
   }
 
-  $self->headers->addFeaturesToHeader([$self->allFeatureNames], $self->name);
+  $self->headers->addFeaturesToHeader($self->features, $self->name);
 
-  $self->{_fieldDbNames} = [map { $self->getFieldDbName($_) } $self->allFeatureNames];
-  $self->{_fieldIdxRange} = [ 0 .. $#{$self->{_fieldDbNames}} ];
+  $self->{_fieldDbNames} = [map { $self->getFieldDbName($_) } @{$self->features}];
 }
 
 # Take an array reference containing  (that is passed to this function), and get back all features
@@ -69,7 +68,7 @@ sub get {
     #$outAccum->[$alleleIdx][$positionIdx] = $href->[ $self->{_dbName} ]
     $_[7]->[$_[5]][$_[6]] = $_[1]->[ $_[0]->{_dbName} ];
 
-    #      $outAccum;
+    #return #$outAccum;
     return $_[7];
   }
 
@@ -79,11 +78,14 @@ sub get {
   # and these dbNames will be found as a value of $href->{$self->dbName}
   # #http://ideone.com/WD3Ele
   # return [ map { $_[1]->[$_[0]->{_dbName}][$_] } @{$_[0]->{_fieldDbNames}} ];
-  for my $idx (@{$_[0]->{_fieldIdxRange}}) {
+  my $idx = 0;
+  for my $fieldDbName (@{$_[0]->{_fieldDbNames}}) {
     #$outAccum->[$idx][$alleleIdx][$positionIdx] = $href->[$self->{_dbName}][$self->{_fieldDbNames}[$idx]] }
-    $_[7]->[$idx][$_[5]][$_[6]] = $_[1]->[$_[0]->{_dbName}][$_[0]->{_fieldDbNames}[$idx]];
+    $_[7]->[$idx][$_[5]][$_[6]] = $_[1]->[$_[0]->{_dbName}][$fieldDbName];
+    $idx++;
   }
-        #$outAccum;
+
+  #return #$outAccum;
   return $_[7];
 }
 __PACKAGE__->meta->make_immutable;

@@ -123,7 +123,7 @@ sub go {
       $self->log('fatal', "Failed to add dbnsfp, with exit code $exitCode for file $$outFileRef");
     }
 
-    push @{$self->_wantedTrack->{local_files}}, $$outFileRef;
+    push @{$self->_wantedTrack->{local_files}}, path($$outFileRef)->basename;
   });
 
   for my $file (@{$self->{_localFiles}}) {
