@@ -61,6 +61,13 @@ has ref => (is => 'ro', isa => 'Seq::Tracks::Build');
 # So that we know which db to store within (db is segregated on chromosome)
 has chromField => (is => 'ro', isa => 'Str', default => 'chrom');
 
+# Should we store not just the stuff that is intergenic (or between defined regions)
+# but also that within the regions themselves
+# This is Cutler/Wingo's preferred solution, so that we have data
+# for every position in genome
+# This I think is reasonable, and from my perspective provides a nice search advantage
+# We can search for nearest.dist < 5000 for instance, and include things that are 0 distance away
+has storeOverlap => (is => 'ro', isa => 'Bool', default => 1);
 my $txNumberKey = 'txNumber';
 
 around BUILDARGS => sub {
@@ -163,6 +170,8 @@ sub buildTrack {
   my $to;
   my $txNumber;
 
+  my @fieldDbNames = sort { $a <=> $b } map { $self->getFieldDbName($_) } @{$self->features};
+
   # Assume one file per loop, or all sites in one file. Tracks::Build warns if not
   for my $file (@allFiles) {
     $pm->start($file) and next;
@@ -244,7 +253,12 @@ sub buildTrack {
           next FH_LOOP;
         }
 
-        my %rowData;
+        my @rowData;
+
+        # Field db names are numerical, from 0 to N - 1
+        # Assign the last one as the last index, rather than by $#fieldDbNames
+        # so that if we have sparse feature names, rowData still can accomodate them
+        $#rowData = $fieldDbNames[-1];
         ACCUM_VALUES: for my $fieldName (keys %regionIdx) {
           my $data = $fields[ $regionIdx{$fieldName} ];
 
@@ -262,17 +276,17 @@ sub buildTrack {
           my $fieldDbName = $self->getFieldDbName($fieldName);
 
           #store under a shortened fieldName to save space in the db
-          $rowData{ $fieldDbName } = $data;
+          $rowData[$fieldDbName] = $data;
         }
 
-        my $from = $rowData{$fromDbName};
-        my $to = $rowData{$toDbName};
+        my $from = $rowData[$fromDbName];
+        my $to = $rowData[$toDbName];
 
         if( !(defined $from && defined $to && looks_like_number($from) && looks_like_number($to)) ) {
           $self->log('fatal', "Expected numeric 'from' and 'to' fields, found: $from and $to");
         }
 
-        $regionData{$wantedChr}{$rowIdx} = [$rowIdx, \%rowData];
+        $regionData{$wantedChr}{$rowIdx} = [$rowIdx, \@rowData];
 
         $rowIdx++;
       }
@@ -295,18 +309,7 @@ sub buildTrack {
       # So write it. LMDB will serialize writes, so this is fine, even 
       # if the file is not properly organized by chromosome
       for my $chr (keys %regionData) {
-        # say "called $chr";
-        my $compactRegionData = $self->_makeRegionData($regionData{$chr});
-        p $compactRegionData;
-        # $self->_writeRegionData($chr, $compactRegionData);
-
-        # $self->_writeNearest($chr, $txStartData{$chr});
-
-        #  # We've finished with 1 chromosome, so write that to meta to disk
-        #  # TODO: error check this
-        # $self->completionMeta->recordCompletion($chr);
-
-        # $self->log('info', $self->name . ": recorded $chr completed");
+        $self->_writeNearestData($chr, $regionData{$chr}, \@fieldDbNames);
       }
 
       #Commit, sync everything, including completion status, and release mmap
@@ -318,290 +321,320 @@ sub buildTrack {
   return;
 }
 
-sub _makeRegionData {
-  my ($self, $regionDataHref) = @_;
+sub _writeRegionData {
+  my ($self, $chr, $regionDataAref) = @_;
+
+  $self->log('info', $self->name . ": starting _writeRegionData for $chr");
+
+  my $regionDbName = $self->regionTrackPath($self->name);
+
+  for (my $i = 0; $i < @$regionDataAref; $i++) {
+    $self->db->dbPatch($regionDbName, $i, $regionDataAref->[$i]);
+  }
+
+  $self->log('info', $self->name . ": finished _writeRegionData for $chr");
+}
+
+# We tile in the following way
+#---previousLongestEnd##########midpoint#########currentStart-----currentLongestEnd
+#everything before midpoint is assigned to the previous region
+#everything midpoint on is assigned to the transcripts/regions overlapping currentStart
+#everything between currentStart and currentEnd (closed interval)
+#is assigned on a base by base basis
+
+# For all transcript/region records that overlap we take the smallest start
+# and the largest end, to come up with the largest contiguous region
+# And when (in getter) calculating distance, consider anything within
+# such an interval as having distance 0
+
+# Similarly, for any transcripts/regions sharing a start with multiple ends
+# take the largest end
+# And for any ends sharing a start, take the smallest start
+sub _writeNearestData {
+  my ($self, $chr, $regionDataHref, $fieldDbNames) = @_;
 
   my $fromDbName = $self->getFieldDbName($self->from);
   my $toDbName = $self->getFieldDbName($self->to);
 
-  my @sorted = sort { $a->[1]{$fromDbName} <=> $b->[1]{$fromDbName} } values %{$regionDataHref};
+  my $regionDbName = $self->regionTrackPath($self->name);
 
-  # my $minFrom = map {}
-  # p @sorted;
-  # exit;
-  my @featureKeys = sort { $a <=> $b } keys %{$sorted[0][1]};
+  my $uniqNumMaker = _getTxNumber();
+  my $uniqRegionEntryMaker = _makeUniqueRegionData($fromDbName, $toDbName, $fieldDbNames);
 
-  my %regionData;
-  my $txNumber = 0;
-  my $count = 0;
-  my %completed;
-  my %unique;
-  my %overlappingRegions;
-  my $from;
-  my $to;
-  while(@sorted > 0) {
-    # say "length of sorted was " . (scalar @sorted);
-    my $row = shift @sorted;
+  # First sort by to position, ascending (smallest to largest)
+  # then by from position (smallest to largest)
+  my @sorted = sort { $a->[1][$fromDbName] <=> $b->[1][$fromDbName] } sort { $a->[1][$toDbName] <=> $b->[1][$toDbName] } values %{$regionDataHref};
 
-    $from = $row->[1]{$fromDbName};
-    $to = $row->[1]{$toDbName};
+  # the tx starts ($self->from key)
+  my %startData;
 
-    say "processing id $row->[0] ($from - $to)";
-
-    for my $pos ($from .. $to) {
-      if($completed{$pos}) {
-        next;
-      }
-
-      my @ids = ($row->[0]);
-
-      I_LOOP: for my $iRow (@sorted) {
-        my $iFrom = $iRow->[1]{$fromDbName};
-        my $iTo = $iRow->[1]{$toDbName};
-
-        if($pos >= $iFrom && $pos <= $iTo) {
-          push @ids, $iRow->[0];
-        } elsif($iFrom > $pos) {
-          last I_LOOP;
-        }
-      }
-
-      # Sort should not be needed, but to be safe
-      my $id = join('_', sort { $a <=> $b } @ids);
-
-      if(!exists $unique{$id}) {
-        # p $ids;
-        $regionData{$txNumber} = \@ids;
-        $unique{$id} = $txNumber;
-        $txNumber++;
-      }
-
-      $completed{$pos} = 1;
-
-      # Assign the transcript number
-      $overlappingRegions{$pos} = $unique{$id};
-    }
+  for my $data (@sorted) {
+    my $start = $data->[1][$fromDbName];
+    push @{$startData{$start}}, $data;
   }
 
-  for my $regionIds (values %regionData) {
-    my @values;
-    $#values = $featureKeys[-1];
+  # the tx ends ($self->to key)
+  my %endData;
 
-    my %uniqueRows;
-    for my $id (@$regionIds) {
-      p $regionDataHref->{$id}[1];
-      # De-duplicate records, while retaining any unique relationships
-      # It often happens, say with UCSC refGene data, that even across all
-      # desired features, rows are not unique
-      # Check across all values other than from and to, these are updated
-      # to be the widest interval across all shared positions
-      # so at this time, there is no sense in checking uniqueness inclusive
-      # of from and to
+  for my $data (@sorted) {
+    my $end = $data->[1][$toDbName];
+    push @{$endData{$end}}, $data;
+  }
+
+  $self->log('info', $self->name . ": starting _writeNearestGenes for $chr");
+
+  # Get database length : assumes reference track already in the db
+  my $genomeNumberOfEntries = $self->db->dbGetNumberOfEntries($chr);
+
+  # Track the longest (further in db toward end of genome) txEnd, because
+  #  in  case of overlapping transcripts, want the points that ARENT 
+  #  covered by a gene (since those have apriori nearest records: themselves)
+  #  This also acts as our starting position
+  # my $longestPreviousTxEnd = 0;
+  # my $longestPreviousTxNumber;
+
+  my ($midPoint, $posTxNumber);
+
+  my $count = 0;
+
+  # We will combine overlapping transcripts here, and generate a unique txNumber
+  # for each combination
+  # This saves us having to walk transcript arrays to gather features at run time
+  # And also saves us having to write arrays to the main database, per genome position
+  # A big net win
+  my @globalTxData;
+
+  my $previousLongestEnd;
+  my $previousTxNumber;
+  # track what was previously made
+  my %completed;
+  TXSTART_LOOP: for (my $n = 0; $n < @sorted; $n++) {
+    p $sorted[$n];
+    my $start = $sorted[$n][1][$fromDbName];
+
+    # if(ref $startData{$start}) {
+    #   $longestEnd = max ( map { $_->[1][$toDbName]} ) @{$startData{$start}};
+    # }
+
+    # If > 1 transcript shares a start, txNumber will be an array of numbers
+    # <ArrayRef[Int]> of length 1 or more
+    # else will be a scalar, save some space in db, and reduce Perl memory growth
+
+    # Assign a unique txNumber based on the overlap of transcripts
+    # Idempotent
+    my $txNumber = $uniqNumMaker->([ map { $_->[0] } @{$startData{$start}} ]);
+
+    # If we're 1 short of the new txNumber (index), we have some unique data
+    # add the new item
+    if(@globalTxData == $txNumber) {
+      my $combinedValues = $uniqRegionEntryMaker->([ map { $_->[1] } @{$startData{$start}} ]);
+
+      # Since these values don't nec share an end, take the max one for the overlap
+      $combinedValues->[$toDbName] = ref $combinedValues->[$toDbName] ? max(@{$combinedValues->[$toDbName]}) : $combinedValues->[$toDbName];
+      
+      # write the region database, storing the region data at our sequential txNumber, allow us to release the data
+      $self->db->dbPatch($regionDbName, $txNumber, $combinedValues);
+
+      # we only need to store the longest end; only value that is needed below from combinedValues
+      push @globalTxData, $combinedValues->[$toDbName];
+    }
+
+    if(defined $previousLongestEnd) {
+      # Here we can assume that both $start and $longestPreviousEnd are both 0-based, closed
+      # and so the first intergenic base is + 1 of the longestPreviousTxEnd and - 1 of the current start
+      $midPoint = $previousLongestEnd + ( ( ($start - 1) - $previousLongestEnd + 1 ) / 2 );
+    }
+
+    #### Accumulate txNumber or longestPreviousTxNumber for positions between transcripts #### 
+
+    # If we have no previous end or midpoint, we're starting from 0 index in db
+    # and moving until the $start
+    $previousLongestEnd //= -1;
+    $midPoint //= -1;
+
+    # If previous end is longer than the start, we're not intergenic
+    if($previousLongestEnd < $start) {
+      # we force both the end and start to be 0-based closed, so start from +1 of previous end
+      # and - 1 of the start
+      POS_LOOP: for my $pos ( $previousLongestEnd + 1 .. $start - 1 ) {
+        if($pos >= $midPoint) {
+          #Args:             $chr,       $trackIndex,   $pos,  $trackValue, $mergeFunc, $skipCommit
+          $self->db->dbPatch($chr, $self->dbName, $pos, $txNumber);
+        } else {
+          #Args:             $chr,       $trackIndex,   $pos,  $trackValue,             $mergeFunc, $skipCommit
+          $self->db->dbPatch($chr, $self->dbName, $pos, $previousTxNumber);
+        }
+      }
+    }
+
+    my $longestEnd = $globalTxData[$txNumber];
+
+    # If we want to store the stuff in the regions themselves, do that
+    if($self->storeOverlap) {
+      # We investigate everything from the present tx down;
+      my @data = @sorted[$n .. $#sorted];
+
+      for my $pos ($start .. $longestEnd) {
+        # There may be overlaps between adjacent groups of transcripts
+        if($completed{$pos}) {
+          next;
+        }
+
+        my @overlap;
+        
+        I_LOOP: for my $iRow (@data) {
+          my $iFrom = $iRow->[1][$fromDbName];
+          my $iTo = $iRow->[1][$toDbName];
+
+          if($pos >= $iFrom && $pos <= $iTo) {
+            push @overlap, $iRow;
+          } elsif($iFrom > $pos) {
+            last I_LOOP;
+          }
+        }
+
+        if(!@overlap) {
+          say "no overlap from $start to $longestEnd";
+        }
+
+        # Make a unique overlap combination
+        my $txNumber = $uniqNumMaker->([map { $_->[0] } @overlap]);
+
+        # If we're 1 short of the new txNumber (index), we have some unique data
+        # add the new item
+        if(@globalTxData == $txNumber) {
+          my $combinedValues = $uniqRegionEntryMaker->([map { $_->[1] } @overlap]);
+
+          # Since these values don't nec share either start or end, take the max of each for the overlap
+          # Therefore, when checking dist, we'll be able to check scalars
+          $combinedValues->[$fromDbName] = ref $combinedValues->[$fromDbName] ? min(@{$combinedValues->[$fromDbName]}) : $combinedValues->[$fromDbName];
+          $combinedValues->[$toDbName] = ref $combinedValues->[$toDbName] ? max(@{$combinedValues->[$toDbName]}) : $combinedValues->[$toDbName];
+
+          # write the region database, storing the region data at our sequential txNumber, allow us to release the data
+          $self->db->dbPatch($regionDbName, $txNumber, $combinedValues);
+
+          # we only need to store the longest end; only value that is needed from combinedValues
+          push @globalTxData, $combinedValues->[$toDbName];
+        }
+
+        $completed{$pos} = 1;
+
+        # Assign the transcript number
+        $self->db->dbPatch($chr, $self->dbName, $pos, $txNumber);
+      }
+    }
+
+    ###### Store the previous values for the next loop's midpoint calc ######
+    my $longestEndTxNumber = $uniqNumMaker->([ map { $_->[0] } @{$endData{$longestEnd}} ]);
+
+    if(@globalTxData == $longestEndTxNumber) {
+      my $combinedValues = $uniqRegionEntryMaker->([ map { $_->[1] } @{$endData{$longestEnd}} ]);
+
+      # Since these don't nec. share a start, choose the min start for the overlap
+      $combinedValues->[$fromDbName] = ref $combinedValues->[$fromDbName] ? min(@{$combinedValues->[$fromDbName]}) : $combinedValues->[$fromDbName];
+
+      # write the region database, storing the region data at our sequential txNumber, allow us to release the data
+      $self->db->dbPatch($regionDbName, $longestEndTxNumber, $combinedValues);
+
+      # we only need to store the longest end; only value that is needed from combinedValues
+      push @globalTxData, $combinedValues->[$toDbName];
+    }
+
+    $previousTxNumber = $longestEndTxNumber;
+    $previousLongestEnd = $longestEnd;
+  }
+
+  # Once we've reached the last transcript, we still likely have some data remaining
+  END_LOOP: for my $pos ( $previousLongestEnd + 1 .. $genomeNumberOfEntries - 1 ) {
+    #Args:             $chr,       $trackIndex,   $pos,  $trackValue,   $mergeFunc, $skipCommit
+    $self->db->dbPatch($chr, $self->dbName, $pos, $previousTxNumber);
+  }
+
+  $self->log('info', $self->name . ": finished _writeNearest for $chr");
+}
+
+sub _getTxNumber {
+  my $txNumber = 0;
+  my %uniqCombos;
+
+  return sub {
+    my $numAref = shift;
+
+    my $hash = md5(@$numAref);
+
+    if(defined $uniqCombos{$hash}) {
+      return $uniqCombos{$hash};
+    }
+
+    $uniqCombos{$hash} = $txNumber;
+
+    $txNumber++;
+
+    return $uniqCombos{$hash};
+  }
+}
+
+sub _makeUniqueRegionData {
+  my ($fromDbName, $toDbName, $featureKeysAref) = @_;
+
+  my @featureKeys = @$featureKeysAref;
+  return sub {
+    my $aRef = shift;
+
+    my %dup;
+
+    my @out;
+
+    # Assumes arrays of equal length
+    #Expects val to have:
+    for my $val (@$aRef) {
+
+      my %uniqueRows;
+
       my @nonFromTo;
-
-      for my $key (@featureKeys) {
-        if($key != $fromDbName && $key != $toDbName) {
-          push @nonFromTo, $regionDataHref->{$id}[1]{$key};
+      
+      for my $i (@featureKeys) {
+        if($i != $fromDbName && $i != $toDbName) {
+          push @nonFromTo, $val->[$i];
         }
       }
 
       my $hash = md5(@nonFromTo);
-      
-      if($uniqueRows{$hash}) {
+
+      if($dup{$hash}) {
         next;
       }
 
-      for my $intKey (@featureKeys) {
-        push @{$values[$intKey]}, $regionDataHref->{$id}[1]{$intKey};
-      }
+      $dup{$hash} = 1;
 
-      $uniqueRows{$hash} = 1;
+      for my $intKey (@featureKeys) {
+        push @{$out[$intKey]}, $val->[$intKey];
+      }
     }
 
     for my $intKey (@featureKeys) {
-      if(@{$values[$intKey]} == 1) {
-        $values[$intKey] = $values[$intKey][0];
+      if(!defined $out[$intKey]) {
+        say "Something went weird";
+        p @out;
+        p @featureKeys;
+        p $aRef;
+      }
+      if(@{$out[$intKey]} == 1) {
+        $out[$intKey] = $out[$intKey][0];
+        next;
+      }
+
+      my @uniq = uniq(@{$out[$intKey]});
+
+      # Don't lose the relationships between data
+      # If there's a single unique value, use that however to remove redundancy
+      if(@uniq == 1) {
+        $out[$intKey] = $uniq[0];
       }
     }
 
-    if(ref $values[$fromDbName]) {
-      $values[$fromDbName] = uniq(@{$values[$fromDbName]});
-      $values[$toDbName] = uniq(@{$values[$toDbName]});
-    }
-
-    # Set the $regionData{$txNumber} value to \@values;
-    $regionIds = \@values;
+    return \@out;
   }
-
-  return \%regionData;
-  # p %overlappingRegions;
-  # Accumulate overlapping region data for each position from .. to
-  # each overlapping pair gets a number
-  # Store that number, write that number => [values] to region db
-  # and return the hash of number => [values]
-
-  # for my $
-  # if($self->from eq $self->to) {
-  #   return $self->_make1dRegionData($regionDataHref);
-  # }
-
-  # return $self->_make2dRegionData($regionDataHref);
-  # Find completely overlapping transcript sets
-  # These will most typically overlap
 }
-
-# sub _make1dRegionData {
-#   my ($self, $regionDataHref) = @_;
-# }
-
-sub _writeRegionData {
-  # my ($self, $chr, $regionDataHref) = @_;
-
-  # $self->log('info', $self->name . ": starting _writeRegionData for $chr");
-
-  # my $dbName = $self->regionTrackPath($chr);
-
-  # my @txNumbers = keys %$regionDataHref;
-
-  # for my $txNumber (@txNumbers) {
-  #   # Patch one at a time, because we assume performance isn't an issue
-  #   # And neither is size, so hash keys are fine
-  #   $self->db->dbPatchHash($dbName, $txNumber, $regionDataHref->{$txNumber});
-  # }
-
-  # $self->log('info', $self->name . ": finished _writeRegionData for $chr");
-}
-
-# TODO : combine _writeNearestFrom and _writeNearestFromTo
-sub _writeNearestFrom {
-  # my ($self, $chr, $txStartData) = @_;
-
-  # $self->log('info', $self->name . ": starting _writeNearestGenes for $chr");
-
-  # # Get database length : assumes reference track already in the db
-  # my $genomeNumberOfEntries = $self->db->dbGetNumberOfEntries($chr);
-
-  # my @allTranscriptStarts = sort { $a <=> $b } keys %$txStartData;
-
-  # # Track the longest (further in db toward end of genome) txEnd, because
-  # #  in  case of overlapping transcripts, want the points that ARENT 
-  # #  covered by a gene (since those have apriori nearest records: themselves)
-  # #  This also acts as our starting position
-  # my $longestPreviousTxEnd = 0;
-  # my $longestPreviousTxNumbers;
-
-  # my ($txStart, $txNumber, $midPoint, $posTxNumber, $previousTxStart);
-
-  # my $count = 0;
-  # TXSTART_LOOP: for (my $n = 0; $n < @allTranscriptStarts; $n++) {
-  #   $txStart = $allTranscriptStarts[$n];
-
-  #   # If > 1 transcript shares a start, txNumber will be an array of numbers
-  #   # <ArrayRef[Int]> of length 1 or more
-  #   # else will be a scalar, save some space in db, and reduce Perl memory growth
-  #   $txNumber =
-  #     @{$txStartData->{$txStart}} > 1
-  #     ? [ map { $_->[0] } @{ $txStartData->{$txStart} } ]
-  #     : $txStartData->{$txStart}[0][0];
-
-  #   if($n > 0) {
-  #     # Look over the upstream txStart, see if it overlaps
-  #     # We take into account the history of previousTxEnd's, for non-adjacent
-  #     # overlapping transcripts
-  #     $previousTxStart = $allTranscriptStarts[$n - 1];
-
-  #     for my $txItem ( @{ $txStartData->{$previousTxStart} } ) {
-  #       if($txItem->[1] > $longestPreviousTxEnd) {
-  #         $longestPreviousTxEnd =  $txItem->[1];
-
-  #         $longestPreviousTxNumbers = $txItem->[0];
-  #         next;
-  #       }
-
-  #       if($txItem->[1] == $longestPreviousTxEnd) {
-  #         if(!ref $longestPreviousTxNumbers) {
-  #           $longestPreviousTxNumbers = [$longestPreviousTxNumbers];
-  #         }
-
-  #         push @$longestPreviousTxNumbers, $txItem->[0];
-  #       }
-  #     }
-
-  #     # Take the midpoint of the longestPreviousTxEnd .. txStart - 1 region
-  #     $midPoint = $longestPreviousTxEnd + ( ( ($txStart - 1) - $longestPreviousTxEnd ) / 2 );
-  #   }
-
-  #   #### Accumulate txNumber or longestPreviousTxNumber for positions between transcripts #### 
-
-  #   # When true, we are not intergenic
-  #   if($longestPreviousTxEnd < $txStart) {
-  #     # txEnd is open, 1-based so include, txStart is closed, 0-based, so stop 1 base before it
-  #     POS_LOOP: for my $pos ( $longestPreviousTxEnd .. $txStart - 1 ) {
-  #       if($n == 0 || $pos >= $midPoint) {
-  #         #Args:             $chr,       $trackIndex,   $pos,  $trackValue, $mergeFunc, $skipCommit
-  #         $self->db->dbPatch($chr, $self->dbName, $pos, $txNumber, undef, $count < $self->commitEvery);
-  #       } else {
-  #         #Args:             $chr,       $trackIndex,   $pos,  $trackValue,             $mergeFunc, $skipCommit
-  #         $self->db->dbPatch($chr, $self->dbName, $pos, $longestPreviousTxNumbers, undef, $count < $self->commitEvery);
-  #       }
-
-  #       $count = $count < $self->commitEvery ? $count + 1 : 0;
-  #     }
-  #   }
-
-  #   #Just in case, force commit between these two sections
-  #   $self->db->dbForceCommit($chr);
-  #   $count = 0;
-
-  #   ###### Accumulate txNumber or longestPreviousTxNumber for positions after last transcript in the chr ######
-  #   if ($n == @allTranscriptStarts - 1) {
-  #     my $nearestNumber;
-  #     my $startPoint;
-
-  #     #maddingly perl reduce doesn't seem to work, despite this being an array
-  #     my $longestTxEnd = 0;
-  #     foreach (@{ $txStartData->{$txStart} }) {
-  #       $longestTxEnd = $longestTxEnd > $_->[1] ? $longestTxEnd : $_->[1];
-  #     }
-
-  #     if($longestTxEnd > $longestPreviousTxEnd) {
-  #       $nearestNumber = $txNumber;
-
-  #       $startPoint = $longestTxEnd;
-  #     } elsif ($longestTxEnd == $longestPreviousTxEnd) {
-  #       $nearestNumber = [
-  #         ref $longestPreviousTxNumbers ? @$longestPreviousTxNumbers : $longestPreviousTxNumbers,
-  #         ref $txNumber ? @$txNumber : $txNumber
-  #       ];
-
-  #       $startPoint = $longestTxEnd;
-  #     } else {
-  #       $nearestNumber = $longestPreviousTxNumbers;
-
-  #       $startPoint = $longestPreviousTxEnd;
-  #     }
-
-  #     if($self->hasDebugLevel) {
-  #       say "genome last position is @{[$genomeNumberOfEntries-1]}";
-  #       say "longestTxEnd is $longestTxEnd";
-  #       say "longestPreviousTxEnd is $longestPreviousTxEnd";
-  #       say "current end > previous? " . ($longestTxEnd > $longestPreviousTxEnd ? "YES" : "NO");
-  #       say "previous end equal current? " . ($longestTxEnd == $longestPreviousTxEnd ? "YES" : "NO");
-  #       say "nearestNumber is";
-  #       p $nearestNumber;
-  #       say "starting point in last is $startPoint";
-  #     }
-
-  #     END_LOOP: for my $pos ( $startPoint .. $genomeNumberOfEntries - 1 ) {
-  #       #Args:             $chr,       $trackIndex,   $pos,  $trackValue,   $mergeFunc, $skipCommit
-  #       $self->db->dbPatch($chr, $self->dbName, $pos, $nearestNumber, undef, $count < $self->commitEvery);
-  #       $count = $count < $self->commitEvery ? $count + 1 : 0;
-  #     }
-  #   }
-  # }
-
-  # $self->log('info', $self->name . ": finished _writeNearest for $chr");
-}
-
 __PACKAGE__->meta->make_immutable;
 1;
