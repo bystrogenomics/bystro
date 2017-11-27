@@ -171,6 +171,19 @@ sub buildTrack {
 
   my @fieldDbNames = sort { $a <=> $b } map { $self->getFieldDbName($_) } @{$self->features};
 
+  $pm->run_on_finish( sub {
+    my ($pid, $exitCode, $fileName, $exitSignal, $coreDump) = @_;
+
+    if($exitCode != 0) {
+      my $err = $self->name . ": got exitCode $exitCode for $fileName: $exitSignal . Dump: $coreDump";
+
+      $self->log('fatal', $err);
+    }
+
+    #Only message that is different, in that we don't pass the $fileName
+    $self->log('info', $self->name . ": completed building from $fileName");
+  });
+
   # Assume one file per loop, or all sites in one file. Tracks::Build warns if not
   for my $file (@allFiles) {
     $pm->start($file) and next;
@@ -309,6 +322,9 @@ sub buildTrack {
       # if the file is not properly organized by chromosome
       for my $chr (keys %regionData) {
         $self->_writeNearestData($chr, $regionData{$chr}, \@fieldDbNames);
+
+        # We've finished with 1 chromosome, so write that to meta to disk
+        $self->completionMeta->recordCompletion($chr);
       }
 
       #Commit, sync everything, including completion status, and release mmap
