@@ -73,7 +73,6 @@ my $txNumberKey = 'txNumber';
 around BUILDARGS => sub {
   my($orig, $self, $data) = @_;
 
-  p $data;
   if(!defined $data->{local_files}) {
     # Careful with the reference
     $data->{local_files} = $data->{ref}->local_files;
@@ -409,7 +408,6 @@ sub _writeNearestData {
   # track what was previously made
   my %completed;
   TXSTART_LOOP: for (my $n = 0; $n < @sorted; $n++) {
-    p $sorted[$n];
     my $start = $sorted[$n][1][$fromDbName];
 
     # if(ref $startData{$start}) {
@@ -613,12 +611,6 @@ sub _makeUniqueRegionData {
     }
 
     for my $intKey (@featureKeys) {
-      if(!defined $out[$intKey]) {
-        say "Something went weird";
-        p @out;
-        p @featureKeys;
-        p $aRef;
-      }
       if(@{$out[$intKey]} == 1) {
         $out[$intKey] = $out[$intKey][0];
         next;
