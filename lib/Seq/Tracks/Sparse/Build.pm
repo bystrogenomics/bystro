@@ -67,6 +67,13 @@ sub buildTrack {
       ############# Get Headers ##############
       my $firstLine = <$fh>;
 
+      # Support non-unix line endings
+      my $err = $self->setLineEndings($firstLine);
+
+      if($err) {
+        $self->log('fatal', $err);
+      }
+
       if(!$firstLine) {
         my $err;
         if(!close($fh) && $? != 13) {
@@ -76,7 +83,6 @@ sub buildTrack {
         }
 
         $self->log('fatal', $err);
-        die $err;
       }
 
       my ($featureIdxHref, $reqIdxHref, $fieldsToTransformIdx, $fieldsToFilterOnIdx, $numColumns) = 

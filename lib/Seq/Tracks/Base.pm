@@ -31,6 +31,8 @@ with 'Seq::Role::Message';
 # Not worth complexity of Maybe[Type], default => undef,
 has dbName => ( is => 'ro', init_arg => undef, writer => '_setDbName');
 
+# TODO: Evaluate removing joinTracks in favor of utilities
+# or otherwise make them more flexible (array of them)
 has joinTrackFeatures => (is => 'ro', isa => 'ArrayRef', init_arg => undef, writer => '_setJoinTrackFeatures');
 
 has joinTrackName => (is => 'ro', isa => 'Str', init_arg => undef, writer => '_setJoinTrackName');
@@ -112,8 +114,6 @@ has featureDataTypes => (
     getFeatureType => 'get',
   },
 );
-
-has fieldMap => (is => 'ro', isa => 'HashRef', lazy => 1, default => sub{ {} });
 
 has join => (is => 'ro', isa => 'Maybe[HashRef]', predicate => 'hasJoin', lazy => 1, default => undef);
 
@@ -205,17 +205,9 @@ around BUILDARGS => sub {
   # If features are passed to as hashes (to accomodate their data type) get back to array
   my @featureLabels;
 
-  # The user can rename any input field, this will be used for the feature name
-  # This makes it possible to store any name in the db, output file, in place
-  # of the field name in the source file used to make the db
-  my $fieldMap = $data->{fieldMap} || {};
-
   for my $origFeature (@{$data->{features} } ) {
     if (ref $origFeature eq 'HASH') {
       my ($name, $type) = %$origFeature; #Thomas Wingo method
-
-      # Transform the feature name if needed
-      $name = $fieldMap->{$name} || $name;
 
       push @featureLabels, $name;
       $data->{featureDataTypes}{$name} = $type;
@@ -223,9 +215,7 @@ around BUILDARGS => sub {
       next;
     }
 
-    my $name = $fieldMap->{$origFeature} || $origFeature;
-
-    push @featureLabels, $name;
+    push @featureLabels, $origFeature;
   }
 
   $data->{features} = \@featureLabels;

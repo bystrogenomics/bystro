@@ -101,6 +101,15 @@ has build_field_transformations => (
   default => sub { {} },
 );
 
+# The user can rename any input field, this will be used for the feature name
+# This makes it possible to store any name in the db, output file, in place
+# of the field name in the source file used to make the db
+# if fieldMap isn't specified, this property  will be filled with featureName => featureName
+has fieldMap => (is => 'ro', isa => 'HashRef', lazy => 1, default => sub {
+  my $self = shift;
+  my %data = map { $_ => $_ } @{$self->features};
+});
+
 # TODO: config output;
 has _emptyFieldRegex => (is => 'ro', isa => 'RegexpRef', init_arg => undef, default => sub { 
   my $output = Seq::Output->new();

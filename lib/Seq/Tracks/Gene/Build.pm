@@ -100,7 +100,6 @@ sub buildTrack {
       my $err = $self->name . ": got exitCode $exitCode for $fileName: $exitSignal . Dump: $coreDump";
 
       $self->log('fatal', $err);
-      die $err;
     }
 
     #Only message that is different, in that we don't pass the $fileName
@@ -125,15 +124,25 @@ sub buildTrack {
         }
 
         $self->log('fatal', $err);
-        die $err;
+      }
+
+      # support non-Unix line endings
+      my $err = $self->setLineEndings($firstLine);
+
+      if($err) {
+        $self->log('fatal', $err);
       }
 
       chomp $firstLine;
 
+      # If the user wanted to transform the input field names, do, so source field names match
+      # those expected by the track
+      my @fields = map{ $self->fieldMap->{$_} || $_ } split('\t', $firstLine);
+
       # Store all features we can find, for Seq::Build::Gene::TX. Avoid autocracy,
       # don't need to know what Gene::TX requires.
       my $fieldIdx = 0;
-      for my $field (split '\t', $firstLine) {
+      for my $field (@fields) {
         $allIdx{$field} = $fieldIdx;
         $fieldIdx++;
       }
@@ -143,8 +152,8 @@ sub buildTrack {
       || !defined $allIdx{$self->txEnd_field_name} ) {
         my $err = $self->name . ": must provide chrom, txStart, txEnd fields";
         $self->log('fatal', $err);
-        die $err;
       }
+
       # Region database features; as defined by user in the YAML config, or our default
       REGION_FEATS: for my $field (@{$self->features}) {
         if(exists $allIdx{$field} ) {
@@ -154,7 +163,6 @@ sub buildTrack {
 
         my $err = $self->name . ": required $field missing in $file header: $firstLine";
         $self->log('fatal', $err);
-        die $err;
       }
 
       my $skipped = 0;
@@ -223,7 +231,6 @@ sub buildTrack {
             $self->txStart_field_name . ')';
 
           $self->log('fatal', $statement);
-          die $statement;
         }
 
         $txEnd = $allDataHref->{$self->txEnd_field_name};
@@ -233,7 +240,6 @@ sub buildTrack {
             $self->txEnd_field_name . ')';
 
           $self->log('fatal', $statement);
-          die $statement;
         }
 
         #a field added by Bystro
@@ -257,7 +263,6 @@ sub buildTrack {
       if(!close($fh) && $? != 13) {
         my $err = $self->name . ": failed to close $file due to $! ($?)";
         $self->log('fatal', $err);
-        die $err;
       } else {
         $self->log('info', $self->name . ": closed $file with $?");
       }
@@ -271,7 +276,6 @@ sub buildTrack {
       if(!%allData) {
         my $err = $self->name . ": no transcript data accumulated";
         $self->log('fatal', $err);
-        die $err;
       }
 
       ############################### Make transcripts #########################
@@ -323,7 +327,6 @@ sub buildTrack {
             if(@{$txInfo->transcriptSites} %2 != 0) {
               my $err = $self->name . ": expected txSiteDataAndPos to contain (position1, value1, position2, value2) data";
               $self->log('fatal', $err);
-              die $err;
             }
 
             my $pos;
