@@ -15,7 +15,7 @@ package Seq::Tracks::Base::MapFieldNames;
 use Mouse 2;
 use List::Util qw/max/;
 use Seq::DBManager;
-
+use DDP;
 with 'Seq::Role::Message';
 
 ################### Required attributes at construction #######################
@@ -48,7 +48,6 @@ sub getFieldDbName {
   
   #$self = $_[0]
   #$fieldName = $_[1]
-
   if (! exists $_[0]->fieldNamesMap->{$_[0]->name} ) {
     $_[0]->_fetchMetaFields();
   }

@@ -101,7 +101,6 @@ sub BUILD {
 
   # Private variables, meant to cache often used data
   $self->{_allCachedDbNames} = {};
-  $self->{_allNearestFieldNames} = {};
   $self->{_allJoinFieldNames} = {};
   $self->{_geneTrackRegionHref} = {};
 
@@ -135,24 +134,6 @@ sub BUILD {
     $self->newAminoAcidKey, $self->codonPositionKey,
     $self->codonNumberKey, $self->strandKey,
   ], $self->name, 1);
-
-  if(!$self->noNearestFeatures) {
-    my $nTrackPrefix = $self->nearestTrackName;
-
-    $self->{_hasNearest} = 1;
-
-    $self->{_nearestDbName} = $self->nearestDbName;
-    
-    $self->{_flatNearestFeatures} = [ map { "$nTrackPrefix.$_" } $self->allNearestFeatureNames ];
-    $self->headers->addFeaturesToHeader($self->{_flatNearestFeatures}, $self->name);
-
-    #the features specified in the region database which we want for nearest gene records
-    my $i = 0;
-    for my $nfName ($self->allNearestFeatureNames) {
-      $self->{_allCachedDbNames}{$self->{_flatNearestFeatures}[$i]} = $self->getFieldDbName($nfName);
-      $i++;
-    }
-  }
 
   if($self->hasJoin) {
     my $joinTrackName = $self->joinTrackName;
@@ -200,8 +181,9 @@ sub get {
   my $idxMap = $self->{_featureIdxMap};
 
   ################# Cache track's region data ##############
+  # returns an array
   $self->{_geneTrackRegionHref}{$chr} //= $self->{_db}->dbReadAll( $self->regionTrackPath($chr) );
-  p  $self->{_geneTrackRegionHref}{$chr} ;
+
   my $geneDb = $self->{_geneTrackRegionHref}{$chr};
 
   ####### Get all transcript numbers, and site data for this position #########
@@ -214,30 +196,6 @@ sub get {
   if(defined $href->[$self->{_dbName}] ) {
     ($txNumbers, $siteData) = $siteUnpacker->unpack($href->[$self->{_dbName}]);
     $multiple = ref $txNumbers ? $#$txNumbers : 0;
-  }
-
-  # ################# Populate nearestGeneSubTrackName ##############
-  if($self->{_hasNearest}) {
-    # Nearest genes are sub tracks, stored under their own key, based on $self->name
-    # <Int|ArrayRef[Int]>
-    # If we're in a gene, we won't have a nearest gene reference, but will have a txNumber
-    my $nGeneNumber = defined $txNumbers ? $txNumbers : $href->[$self->{_nearestDbName}];
-
-    if(defined $nGeneNumber) {
-      if(ref $nGeneNumber) {
-        for my $nFeature (@{$self->{_flatNearestFeatures}}) {
-          $out[ $idxMap->{$nFeature} ] = [map { $geneDb->{$_}{$cachedDbNames->{$nFeature}} } @$nGeneNumber];
-        }
-      } else {
-        for my $nFeature (@{$self->{_flatNearestFeatures}}) {
-          $out[ $idxMap->{$nFeature} ] = $geneDb->{$nGeneNumber}{$cachedDbNames->{$nFeature}};
-        }
-      }
-    } else {
-      if($chr ne 'chrM') {
-        $self->log('error', "$chr missing nearest gene data. Wrong assembly?");
-      }
-    }
   }
   
   if( !defined $txNumbers ) {
@@ -252,7 +210,7 @@ sub get {
     my $num = $multiple ? $txNumbers->[0] : $txNumbers;
     # http://ideone.com/jlImGA
     for my $fName ( @{$self->{_flatJoinFeatures}} ) {
-      $out[ $idxMap->{$fName} ] = $geneDb->{$num}{$cachedDbNames->{$fName}};
+      $out[ $idxMap->{$fName} ] = $geneDb->[$num]{$cachedDbNames->{$fName}};
     }
   }
 
@@ -285,11 +243,11 @@ sub get {
   #Reads:            $self->{_features}
   if($multiple) {
     for my $feature (@{$self->{_features}}) {
-      $out[$idxMap->{$feature}] = [map { $geneDb->{$_}{$cachedDbNames->{$feature}} } @$txNumbers];
+      $out[$idxMap->{$feature}] = [map { $geneDb->[$_]{$cachedDbNames->{$feature}} } @$txNumbers];
     }
   } else {
     for my $feature (@{$self->{_features}}) {
-      $out[$idxMap->{$feature}] = $geneDb->{$txNumbers}{$cachedDbNames->{$feature}};
+      $out[$idxMap->{$feature}] = $geneDb->[$txNumbers]{$cachedDbNames->{$feature}};
     }
   }
 

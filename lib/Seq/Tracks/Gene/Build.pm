@@ -93,6 +93,20 @@ sub buildTrack {
   my $txEnd;
   my $txNumber;
 
+  $pm->run_on_finish( sub {
+    my ($pid, $exitCode, $fileName, $exitSignal, $coreDump) = @_;
+
+    if($exitCode != 0) {
+      my $err = $self->name . ": got exitCode $exitCode for $fileName: $exitSignal . Dump: $coreDump";
+
+      $self->log('fatal', $err);
+      die $err;
+    }
+
+    #Only message that is different, in that we don't pass the $fileName
+    $self->log('info', $self->name . ": completed building from $fileName");
+  });
+
   # Assume one file per loop, or all sites in one file. Tracks::Build warns if not
   for my $file (@allFiles) {
     $pm->start($file) and next;
@@ -132,7 +146,7 @@ sub buildTrack {
         die $err;
       }
       # Region database features; as defined by user in the YAML config, or our default
-      REGION_FEATS: for my $field ($self->allFeatureNames) {
+      REGION_FEATS: for my $field (@{$self->features}) {
         if(exists $allIdx{$field} ) {
           $regionIdx{$field} = $allIdx{$field};
           next REGION_FEATS;
@@ -377,20 +391,6 @@ sub buildTrack {
     $pm->finish(0);
   }
 
-  $pm->run_on_finish( sub {
-    my ($pid, $exitCode, $fileName, $exitSignal, $coreDump) = @_;
-
-    if($exitCode != 0) {
-      my $err = $self->name . ": got exitCode $exitCode for $fileName: $exitSignal . Dump: $coreDump";
-
-      $self->log('fatal', $err);
-      die $err;
-    }
-
-    #Only message that is different, in that we don't pass the $fileName
-    $self->log('info', $self->name . ": completed building from $fileName");
-  });
-
   $pm->wait_all_children;
   return;
 }
@@ -402,11 +402,12 @@ sub _writeRegionData {
 
   my $dbName = $self->regionTrackPath($chr);
 
-  my @txNumbers = keys %$regionDataHref;
+  my @txNumbers = sort { $a <=> $b } keys %$regionDataHref;
 
   for my $txNumber (@txNumbers) {
     # Patch one at a time, because we assume performance isn't an issue
     # And neither is size, so hash keys are fine
+    # TODO: move away from this; don't store any hashes, use arrays
     $self->db->dbPatchHash($dbName, $txNumber, $regionDataHref->{$txNumber});
   }
 

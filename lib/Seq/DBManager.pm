@@ -308,7 +308,9 @@ sub dbPatchHash {
 # Write transactions are by default committed
 sub dbPatch {
   my ($self, $chr, $trackIndex, $pos, $trackValue, $mergeFunc, $skipCommit, $overwrite, $stringKeys) = @_;
-
+  if($chr eq 'refSeq.nearest/chrM') {
+    p $trackValue;
+  }
   # 0 argument means "create if not found"
   my $db = $self->_getDbi($chr, 0, $stringKeys);
   my $dbi = $db->{dbi};
@@ -451,10 +453,12 @@ sub dbReadAll {
     $db->{db}->Txn->AutoCommit(1);
   }
 
+  # We store data in sequential, integer order
+  # in all but the meta tables, which don't use this function
   # LMDB::Cursor::open($txn, $db->{dbi}, my $cursor);
   my $cursor = $db->{db}->Cursor;
 
-  my ($key, $value, %out);
+  my ($key, $value, @out);
   while(1) {
     $cursor->_get($key, $value, MDB_NEXT);
 
@@ -471,7 +475,7 @@ sub dbReadAll {
       return 255;
     }
 
-    $out{$key} = $mp->unpack($value);
+    push @out, $mp->unpack($value);
   }
 
   #  !$skipCommit
@@ -487,7 +491,7 @@ sub dbReadAll {
   #reset the class error variable, to avoid crazy error reporting later
   $LMDB_File::last_err = 0;
 
-  return \%out;
+  return \@out;
 }
 
 sub dbDelete {
@@ -643,6 +647,8 @@ sub _getDbi {
 
   my $dbFlags;
 
+  # Much faster random, somewhat faster sequential performance
+  # Much smaller database size (4 byte keys, vs 6-10 byte keys)
   if(!$stringKeys) {
     $dbFlags = MDB_INTEGERKEY;
   }

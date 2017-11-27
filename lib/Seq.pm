@@ -288,6 +288,7 @@ sub annotateFile {
     my @lines;
     my $dataFromDbAref;
     my $dbReference;
+    my $zeroPos;
     # Each line is expected to be
     # chrom \t pos \t type \t inputRef \t alt \t hets \t homozygotes \n
     # the chrom is always in ucsc form, chr (the golang program guarantees it)
@@ -302,7 +303,9 @@ sub annotateFile {
         next;
       }
 
-      $dataFromDbAref = $self->{_db}->dbReadOne($fields[0], $fields[1] - 1, 1);
+      $zeroPos = $fields[1] - 1;
+
+      $dataFromDbAref = $self->{_db}->dbReadOne($fields[0], $zeroPos, 1);
 
       if(!defined $dataFromDbAref) {
         $self->_errorWithCleanup("Wrong assembly? $fields[0]\: $fields[1] not found.");
@@ -357,7 +360,7 @@ sub annotateFile {
           for my $track (@trackGettersExceptReference) {
             $fields[$trackIndices->{$track->name}] //= [];
 
-            $track->get($indelDbData[$posIdx], $fields[0], $indelRef[$posIdx], $fields[4], 0, $posIdx, $fields[$trackIndices->{$track->name}]);
+            $track->get($indelDbData[$posIdx], $fields[0], $indelRef[$posIdx], $fields[4], 0, $posIdx, $fields[$trackIndices->{$track->name}], $zeroPos + $posIdx);
           }
 
           $fields[$refTrackIdx][0][$posIdx] = $indelRef[$posIdx];
@@ -369,7 +372,7 @@ sub annotateFile {
       } else {
         for my $track (@trackGettersExceptReference) {
           $fields[$trackIndices->{$track->name}] //= [];
-          $track->get($dataFromDbAref, $fields[0], $fields[3], $fields[4], 0, 0, $fields[$trackIndices->{$track->name}])
+          $track->get($dataFromDbAref, $fields[0], $fields[3], $fields[4], 0, 0, $fields[$trackIndices->{$track->name}], $zeroPos);
         }
 
         $fields[$refTrackIdx][0][0] = $self->{_refTrackGetter}->get($dataFromDbAref);

@@ -33,25 +33,21 @@ has from => (is => 'ro', isa => 'Str', required => 1);
 
 # Coordinate we look to
 # Typically used for gene tracks, would 'txEnd' or nothing
-has to => (is => 'ro', isa => 'Str');
+has to => (is => 'ro', isa => 'Maybe[Str]');
 
 has dist => (is => 'ro', isa => 'Bool', default => 1);
 
 #### Add our other "features", everything we find for this site ####
 sub BUILD {
   my $self = shift;
-  # Not including the txNumberKey;  this is separate from the annotations, which is 
-  # what these keys represent
 
-  #  Prepend some custom features
-  #  Providing 1 as the last argument means "prepend" instead of append
-  #  So these features will come before any other refSeq.* features
-  $self->headers->addFeaturesToHeader('dist', $self->name, 1);
+  #  Append the 'dist' feature to the header
+  $self->headers->addFeaturesToHeader('dist', $self->name);
 
   # Avoid accessor penalties in Mouse/Moose;
   $self->{_eq} = !$self->to || $self->from eq $self->to;
-  $self->{_from} = $self->from;
-  $self->{_to} = $self->to;
+  $self->{_fromD} = $self->getFieldDbName($self->from);
+  $self->{_toD} = !$self->{_eq} ? $self->getFieldDbName($self->to) : undef;
   $self->{_db} = Seq::DBManager->new();
   $self->{_dist} = $self->dist;
 };
@@ -71,16 +67,18 @@ sub get {
   #$self->{_regionData}{$chr} //= $self->{_db}->dbReadAll( $self->regionTrackPath($_[2]) );
   $_[0]->{_regionData}{$_[2]} //= $_[0]->{_db}->dbReadAll( $_[0]->regionTrackPath($_[2]) );
 
-  #            $self->{_regionData}{$_[2]}{$href->$self->{_dbName}}]};
-  my $geneDb = $_[0]->{_regionData}{$_[2]}{$_[1]->[$_[0]->{_dbName}]};
-
+  #            $self->{_regionData}{$_[2]}[$href->[$self->{_dbName}}]];
+  my $geneDb = $_[0]->{_regionData}{$_[2]}[$_[1]->[$_[0]->{_dbName}]];
+  # p $geneDb
+  # exit;
   # We have features, so let's find those and return them
   # Since all features are stored in some shortened form in the db, we also
   # will first need to get their dbNames ($self->getFieldDbName)
   # and these dbNames will be found as a value of $href->{$self->dbName}
   # #http://ideone.com/WD3Ele
-  # return [ map { $_[1]->[$_[0]->{_dbName}][$_] } @{$_[0]->{_fieldDbNames}} ];
 
+  # All features from overlapping are already combined into arrays, unlike
+  # what gene tracks used to do
   my $idx = 0;
   for my $fieldDbName (@{$_[0]->{_fieldDbNames}}) {
     #$outAccum->[$idx][$alleleIdx][$positionIdx] = $href->[$self->{_dbName}][$self->{_fieldDbNames}[$idx]] }
@@ -88,9 +86,23 @@ sub get {
     $idx++;
   }
 
-  # if($_[0]->{_dist}) {
-
-  # }
+  # Calculate distance if requested
+  # We always expect from and to fields to be scalars
+  if($_[0]->{_dist}) {
+    if($_[0]->{_eq} || $_[8] < $geneDb->[$_[0]->{_fromD}]) {
+      # We're before the starting position of the nearest region
+      # Or we're only checking one boundary (the from boundary)
+      $_[7]->[$idx][$_[5]][$_[6]] = $geneDb->[$_[0]->{_fromD}] - $_[8];
+    } elsif($_[8] <= $geneDb->[$_[0]->{_toD}]) {
+      # We already know $_[8] >= $geneDb->[$_[0]->{_fromD}]
+      # so if we're here, we are within the range of the requested region at this position
+      # ie == 0 distance to the region
+      $_[7]->[$idx][$_[5]][$_[6]] = 0
+    } else {
+      # occurs after the 'to' position
+      $_[7]->[$idx][$_[5]][$_[6]] = $geneDb->[$_[0]->{_toD}] - $_[8];
+    }
+  }
 
   return $_[7];
 };

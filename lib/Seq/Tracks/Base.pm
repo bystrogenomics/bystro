@@ -96,7 +96,6 @@ has features => (
   traits   => ['Array'],
   default  => sub{ [] },
   handles  => { 
-    allFeatureNames => 'elements',
     noFeatures  => 'is_empty',
   },
 );
@@ -131,7 +130,7 @@ sub BUILD {
   # database the first time (ever) that it is run for a track
   # We could change this effect; for now, initialize here so that each thread
   # gets the same name
-  for my $featureName ($self->allFeatureNames) {
+  for my $featureName (@{$self->features}) {
     $self->getFieldDbName($featureName);
   }
 
@@ -169,12 +168,11 @@ sub BUILD {
 ############ Argument configuration to meet YAML config spec ###################
 
 # Expects a hash, will crash and burn if it doesn't
-sub BUILDARGS {
-  my ($class, $data) = @_;
+around BUILDARGS => sub {
+  my ($orig, $class, $data) = @_;
 
   # #don't mutate the input data
   # my %data = %$dataHref;
-
   if(defined $data->{chromosomes} &&  ref $data->{chromosomes} eq 'ARRAY') {
     my %chromosomes = map { $_ => $_ } @{$data->{chromosomes} };
     $data->{chromosomes} = \%chromosomes;
@@ -196,7 +194,7 @@ sub BUILDARGS {
   }
 
   if(! defined $data->{features} ) {
-    return $data;
+    return $class->$orig($data);
   }
 
   if( defined $data->{features} && ref $data->{features} ne 'ARRAY') {
@@ -232,7 +230,7 @@ sub BUILDARGS {
 
   $data->{features} = \@featureLabels;
 
-  return $data;
+  return $class->$orig($data);
 };
 
 __PACKAGE__->meta->make_immutable;

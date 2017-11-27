@@ -26,6 +26,7 @@ use 5.10.0;
 use strict;
 use warnings;
 use DDP;
+use Clone 'clone';
 
 use Mouse 2;
 with 'Seq::Role::Message';
@@ -39,14 +40,14 @@ use Seq::Tracks::Region;
 use Seq::Tracks::Gene;
 use Seq::Tracks::Cadd;
 use Seq::Tracks::Vcf;
-use Seq::Tracks::Gene::Nearest;
+use Seq::Tracks::Nearest;
 
 use Seq::Tracks::Reference::Build;
 use Seq::Tracks::Score::Build;
 use Seq::Tracks::Sparse::Build;
 use Seq::Tracks::Region::Build;
 use Seq::Tracks::Gene::Build;
-use Seq::Tracks::Gene::Nearest::Build;
+use Seq::Tracks::Nearest::Build;
 use Seq::Tracks::Cadd::Build;
 use Seq::Tracks::Vcf::Build;
 
@@ -184,13 +185,19 @@ sub BUILD {
     return;
   }
 
-  $self->_buildTrackGetters($self->tracks);
-
+  # If we're only requesting
   if($self->gettersOnly) {
+    $self->_buildTrackGetters($self->tracks);
     return;
   }
 
-  $self->_buildTrackBuilders($self->tracks);
+  # If both getters and builders requested, don't mutate the tracks object
+  # so that builders get their own distinct configuration
+  my $buildTracks = clone($self->tracks);
+
+  $self->_buildTrackGetters($self->tracks);
+
+  $self->_buildTrackBuilders($buildTracks);
 }
 
 ################### Private builders #####################
@@ -229,14 +236,18 @@ sub _buildTrackGetters {
   _clearStaticGetters();
 
   for my $trackHref (@$trackConfigurationAref ) {
+    if($trackHref->{ref}) {
+      $trackHref->{ref} = $trackBuildersByName->{ $trackHref->{ref} };
+    }
+
     #class 
     my $className = $self->_toTrackGetterClass( $trackHref->{type} );
 
     my $track = $className->new($trackHref);
 
     if(!$seenRef) {
-      $seenRef = $track->{type} eq $types->refType;
-    } elsif($track->{type} eq $types->refType) {
+      $seenRef = $trackHref->{type} eq $types->refType;
+    } elsif($trackHref->{type} eq $types->refType) {
       $self->log('fatal', "Only one reference track allowed, found at least 2");
       return;
     }
@@ -281,6 +292,9 @@ sub _buildTrackBuilders {
   _clearStaticBuilders();
 
   for my $trackHref (@$trackConfigurationAref) {
+    if($trackHref->{ref}) {
+      $trackHref->{ref} = $trackBuildersByName->{ $trackHref->{ref} };
+    }
     #class 
     my $className = $self->_toTrackBuilderClass( $trackHref->{type} );
 
@@ -333,9 +347,9 @@ sub _toTrackGetterClass {
   my $self = shift,
   my $type = shift;
 
+  # TODO: this right now won't pass $self->type TrackType constraints
   if($type =~ /\w+\:+\w+/) {
     my @types = split /\:+/, $type;
-    p @types;
     my $part1 = $self->_toTitleCase($types[0]);
     my $part2 = $self->_toTitleCase($types[1]);
 
@@ -349,9 +363,9 @@ sub _toTrackBuilderClass{
   my $self = shift,
   my $type = shift;
 
+  # TODO: this right now won't pass $self->type TrackType constraints
   if($type =~ /\w+\:+\w+/) {
     my @types = split /\:+/, $type;
-    p @types;
     my $part1 = $self->_toTitleCase($types[0]);
     my $part2 = $self->_toTitleCase($types[1]);
 

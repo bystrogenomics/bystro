@@ -112,7 +112,7 @@ around BUILDARGS => sub {
   # allows us to consider from .. to rather than from .. to - 1, from - 1 .. to, etc
   # TODO: don't assume UCSC-style genes, and require a build_field_transformation
   # For anything other than 'from' as 0-based closed and 'to' as 0-based open (+1 of true)
-  if($data->{build_field_transformations}{$data->{from}} && (!$hasTo || $data->{build_field_transformations}{$data->{to}})) {
+  if($data->{build_field_transformations}{$data->{from}} && (!$data->{to} || $data->{build_field_transformations}{$data->{to}})) {
     return $self->$orig($data);
   }
 
@@ -121,7 +121,7 @@ around BUILDARGS => sub {
     $data->{build_field_transformations}{$data->{from}} = '- 1';
   }
 
-  if($hasTo && ($data->{to} eq 'txEnd' || $data->{to} eq 'cdsEnd')) {
+  if($data->{to} && ($data->{to} eq 'txEnd' || $data->{to} eq 'cdsEnd')) {
     $data->{build_field_transformations}{$data->{to}} = '- 1';
   }
 
@@ -264,7 +264,7 @@ sub buildTrack {
           # say split, etc; comes first so that each individual value
           # in an array (if split) can be coerced
           if($self->hasTransform($fieldName) ) {
-            $data= $self->transformField($fieldName, $data);
+            $data = $self->transformField($fieldName, $data);
           }
 
           # convert the value into some type, typically number(N)
@@ -320,20 +320,6 @@ sub buildTrack {
   return;
 }
 
-sub _writeRegionData {
-  my ($self, $chr, $regionDataAref) = @_;
-
-  $self->log('info', $self->name . ": starting _writeRegionData for $chr");
-
-  my $regionDbName = $self->regionTrackPath($self->name);
-
-  for (my $i = 0; $i < @$regionDataAref; $i++) {
-    $self->db->dbPatch($regionDbName, $i, $regionDataAref->[$i]);
-  }
-
-  $self->log('info', $self->name . ": finished _writeRegionData for $chr");
-}
-
 # We tile in the following way
 #---previousLongestEnd##########midpoint#########currentStart-----currentLongestEnd
 #everything before midpoint is assigned to the previous region
@@ -355,7 +341,7 @@ sub _writeNearestData {
   my $fromDbName = $self->getFieldDbName($self->from);
   my $toDbName = $self->getFieldDbName($self->to);
 
-  my $regionDbName = $self->regionTrackPath($self->name);
+  my $regionDbName = $self->regionTrackPath($chr);
 
   my $uniqNumMaker = _getTxNumber();
   my $uniqRegionEntryMaker = _makeUniqueRegionData($fromDbName, $toDbName, $fieldDbNames);
@@ -385,6 +371,10 @@ sub _writeNearestData {
   # Get database length : assumes reference track already in the db
   my $genomeNumberOfEntries = $self->db->dbGetNumberOfEntries($chr);
 
+  if(!$genomeNumberOfEntries) {
+    $self->log('fatal', $self->name . " requires at least the reference track, to know how many bases in $chr");
+  }
+
   # Track the longest (further in db toward end of genome) txEnd, because
   #  in  case of overlapping transcripts, want the points that ARENT 
   #  covered by a gene (since those have apriori nearest records: themselves)
@@ -392,9 +382,7 @@ sub _writeNearestData {
   # my $longestPreviousTxEnd = 0;
   # my $longestPreviousTxNumber;
 
-  my ($midPoint, $posTxNumber);
-
-  my $count = 0;
+  my $midPoint;
 
   # We will combine overlapping transcripts here, and generate a unique txNumber
   # for each combination
@@ -420,18 +408,20 @@ sub _writeNearestData {
 
     # Assign a unique txNumber based on the overlap of transcripts
     # Idempotent
+    my @stuff = map { $_->[0] } @{$startData{$start}};
+
     my $txNumber = $uniqNumMaker->([ map { $_->[0] } @{$startData{$start}} ]);
 
     # If we're 1 short of the new txNumber (index), we have some unique data
     # add the new item
     if(@globalTxData == $txNumber) {
       my $combinedValues = $uniqRegionEntryMaker->([ map { $_->[1] } @{$startData{$start}} ]);
-
+      # p $combinedValues;
       # Since these values don't nec share an end, take the max one for the overlap
       $combinedValues->[$toDbName] = ref $combinedValues->[$toDbName] ? max(@{$combinedValues->[$toDbName]}) : $combinedValues->[$toDbName];
-      
+
       # write the region database, storing the region data at our sequential txNumber, allow us to release the data
-      $self->db->dbPatch($regionDbName, $txNumber, $combinedValues);
+      $self->db->dbPut($regionDbName, $txNumber, $combinedValues);
 
       # we only need to store the longest end; only value that is needed below from combinedValues
       push @globalTxData, $combinedValues->[$toDbName];
@@ -440,7 +430,12 @@ sub _writeNearestData {
     if(defined $previousLongestEnd) {
       # Here we can assume that both $start and $longestPreviousEnd are both 0-based, closed
       # and so the first intergenic base is + 1 of the longestPreviousTxEnd and - 1 of the current start
-      $midPoint = $previousLongestEnd + ( ( ($start - 1) - $previousLongestEnd + 1 ) / 2 );
+      #say previousLongestEnd == 1
+      #say $start == 11
+      #end..2..3..4..5..Midpoint..7..8..9..10..start
+      #(11 - 1 ) / 2 == 5; 5 + end = 5 + 1 == 6 == midpoint
+      # unnecessary extra precedence parenthesis, makes me feel safer :|
+      $midPoint = $previousLongestEnd + ( ($start - $previousLongestEnd) / 2 );
     }
 
     #### Accumulate txNumber or longestPreviousTxNumber for positions between transcripts #### 
@@ -450,7 +445,7 @@ sub _writeNearestData {
     $previousLongestEnd //= -1;
     $midPoint //= -1;
 
-    # If previous end is longer than the start, we're not intergenic
+    # Consider/store intergenic things (note: if previousLongestEnd > $start, last tx overlapped this one)
     if($previousLongestEnd < $start) {
       # we force both the end and start to be 0-based closed, so start from +1 of previous end
       # and - 1 of the start
@@ -509,7 +504,7 @@ sub _writeNearestData {
           $combinedValues->[$toDbName] = ref $combinedValues->[$toDbName] ? max(@{$combinedValues->[$toDbName]}) : $combinedValues->[$toDbName];
 
           # write the region database, storing the region data at our sequential txNumber, allow us to release the data
-          $self->db->dbPatch($regionDbName, $txNumber, $combinedValues);
+          $self->db->dbPut($regionDbName, $txNumber, $combinedValues);
 
           # we only need to store the longest end; only value that is needed from combinedValues
           push @globalTxData, $combinedValues->[$toDbName];
@@ -532,7 +527,7 @@ sub _writeNearestData {
       $combinedValues->[$fromDbName] = ref $combinedValues->[$fromDbName] ? min(@{$combinedValues->[$fromDbName]}) : $combinedValues->[$fromDbName];
 
       # write the region database, storing the region data at our sequential txNumber, allow us to release the data
-      $self->db->dbPatch($regionDbName, $longestEndTxNumber, $combinedValues);
+      $self->db->dbPut($regionDbName, $longestEndTxNumber, $combinedValues);
 
       # we only need to store the longest end; only value that is needed from combinedValues
       push @globalTxData, $combinedValues->[$toDbName];
@@ -586,7 +581,6 @@ sub _makeUniqueRegionData {
     # Assumes arrays of equal length
     #Expects val to have:
     for my $val (@$aRef) {
-
       my %uniqueRows;
 
       my @nonFromTo;

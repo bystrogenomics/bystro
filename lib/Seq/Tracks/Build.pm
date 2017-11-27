@@ -138,8 +138,8 @@ sub BUILD {
 # We pass on to classes that extend this: 
 #   chrom_field_name with value "Chromosome"
 my $localFilesHandler = Seq::Tracks::Build::LocalFilesPaths->new();
-sub BUILDARGS {
-  my ($class, $href) = @_;
+around BUILDARGS => sub {
+  my ($orig, $class, $href) = @_;
 
   my %data = %$href;
 
@@ -150,7 +150,7 @@ sub BUILDARGS {
   $data{local_files} = $localFilesHandler->makeAbsolutePaths($href->{files_dir},
     $href->{name}, $href->{local_files});
 
-  return \%data;
+  return $class->$orig(\%data);
 };
 
 #########################Type Conversion, Input Field Filtering #########################
@@ -270,8 +270,8 @@ sub passesFilter {
 }
 
 ######################### Field Transformations ###########################
-#for now I only need string concatenation
-state $transformOperators = ['.', 'split'];
+#TODO: taint check the modifying value
+state $transformOperators = ['.', 'split', '-', '+'];
 sub transformField {
   state $cachedTransform;
 
@@ -298,6 +298,24 @@ sub transformField {
       }
     }
 
+    if($leftHand eq '-') {
+      $codeRef = sub {
+        # my $fieldValue = shift;
+        # same as $_[0];
+
+        return $_[0] - $rightHand;
+      }
+    }
+
+    if($leftHand eq '+') {
+      $codeRef = sub {
+        # my $fieldValue = shift;
+        # same as $_[0];
+
+        return $_[0] + $rightHand;
+      }
+    }
+
     if($leftHand eq 'split') {
       $codeRef = sub {
         # my $fieldValue = shift;
@@ -315,6 +333,7 @@ sub transformField {
       }
     }
   } elsif($self->_isTransformOperator($rightHand) ) {
+    # Append text in the other direction
     if($rightHand eq '.') {
       $codeRef = sub {
        # my $fieldValue = shift;
@@ -322,6 +341,8 @@ sub transformField {
         return $leftHand . $_[0];
       }
     }
+
+    # Don't allow +/- as right hand operator, pointless and a little silly
   }
 
   if(!defined $codeRef) {
