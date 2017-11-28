@@ -25,7 +25,7 @@ use Seq::Build;
 # TODO: refactor to automatically call util by string value
 # i.e: --util filterCadd launches Utils::FilterCadd
 my (
-  $yaml_config, $wantedName, $sortCadd, $filterCadd, $renameTrack,
+  $yaml_config, $names, $sortCadd, $filterCadd, $renameTrack,
   $help,        $liftOverCadd, $liftOverPath, $liftOverChainPath,
   $debug,       $overwrite, $fetch, $caddToBed, $compress, $toBed,
   $renameTrackTo, $verbose, $dryRunInsertions, $maxThreads,
@@ -34,7 +34,7 @@ my (
 # usage
 GetOptions(
   'c|config=s'   => \$yaml_config,
-  'n|name=s'     => \$wantedName,
+  'n|name=s'     => \$names,
   'h|help'       => \$help,
   'd|debug=i'      => \$debug,
   'o|overwrite'  => \$overwrite,
@@ -43,56 +43,58 @@ GetOptions(
   'm|maxThreads=i' => \$maxThreads,
 );
 
-if ($help || !$yaml_config || !$wantedName) {
+if ($help || !$yaml_config || !$names) {
   Pod::Usage::pod2usage();
 }
 
-my %options = (
-  config       => $yaml_config,
-  name         => $wantedName,
-  debug        => $debug,
-  overwrite    => $overwrite || 0,
-  verbose => $verbose,
-  dryRun => $dryRunInsertions,
-);
+for my $wantedName (split ',', $names) {
+  my $config = LoadFile($yaml_config);
+  my $utilConfigs;
+  my $trackIdx = 0;
 
-if($maxThreads) {
-  $options{maxThreads} = $maxThreads;
-}
+  my %options = (
+    config       => $yaml_config,
+    name         => $wantedName,
+    debug        => $debug,
+    overwrite    => $overwrite || 0,
+    verbose      => $verbose,
+    dryRun       => $dryRunInsertions,
+  );
 
-my $config = LoadFile($yaml_config);
-my $utilConfigs;
-my $trackIdx = 0;
-
-for my $track (@{$config->{tracks}}) {
-  if($track->{name} eq $wantedName) {
-    $utilConfigs = $track->{utils};
-    last;
+  if($maxThreads) {
+    $options{maxThreads} = $maxThreads;
   }
 
-  $trackIdx++;
-}
+  for my $track (@{$config->{tracks}}) {
+    if($track->{name} eq $wantedName) {
+      $utilConfigs = $track->{utils};
+      last;
+    }
 
-if (!$utilConfigs) {
-  die "The specified track must have 'utils' property";
-}
+    $trackIdx++;
+  }
 
-for(my $utilIdx = 0; $utilIdx < @$utilConfigs; $utilIdx++) {
-  # config may be mutated, by the last utility
-  $config = LoadFile($yaml_config);
-  my $utilConfig = $config->{tracks}[$trackIdx]{utils}[$utilIdx];
+  if (!$utilConfigs) {
+    die "The $wantedName track must have 'utils' property";
+  }
 
-  my $utilName = $utilConfig->{name};
+  for(my $utilIdx = 0; $utilIdx < @$utilConfigs; $utilIdx++) {
+    # config may be mutated, by the last utility
+    $config = LoadFile($yaml_config);
+    my $utilConfig = $config->{tracks}[$trackIdx]{utils}[$utilIdx];
 
-  # Uppercase the first letter of the utility class name
-  # aka user may specify "fetch" and we grab Utils::Fetch
-  my $className = 'Utils::' . uc( substr($utilName, 0, 1) ) . substr($utilName, 1, length($utilName) - 1); 
-  my $args = $utilConfig->{args} || {};
+    my $utilName = $utilConfig->{name};
 
-  my %finalOpts = (%options, %$args, (utilIdx => $utilIdx));
- 
-  my $instance = $className->new(\%finalOpts);
-  $instance->go();
+    # Uppercase the first letter of the utility class name
+    # aka user may specify "fetch" and we grab Utils::Fetch
+    my $className = 'Utils::' . uc( substr($utilName, 0, 1) ) . substr($utilName, 1, length($utilName) - 1);
+    my $args = $utilConfig->{args} || {};
+
+    my %finalOpts = (%options, %$args, (utilIdx => $utilIdx));
+
+    my $instance = $className->new(\%finalOpts);
+    $instance->go();
+  }
 }
 
 __END__

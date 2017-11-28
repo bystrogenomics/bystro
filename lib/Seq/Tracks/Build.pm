@@ -108,6 +108,8 @@ has build_field_transformations => (
 has fieldMap => (is => 'ro', isa => 'HashRef', lazy => 1, default => sub {
   my $self = shift;
   my %data = map { $_ => $_ } @{$self->features};
+
+  return \%data;
 });
 
 # TODO: config output;

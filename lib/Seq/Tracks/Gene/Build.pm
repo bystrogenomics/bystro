@@ -7,11 +7,7 @@ package Seq::Tracks::Gene::Build;
 our $VERSION = '0.001';
 
 # ABSTRACT: Builds Gene Tracks 
-    # Stores refSeq data, nearest gene refSeq data, generates
-    # in-silico transcribed transcripts (and associated fields)
-
-    #Inserts a single value <ArrayRef> @ $self->name
-    #If $self->nearest defined, inserts a <Int> @ $self->nearestFeatureName
+# Stores refSeq data, and generates in-silico transcribed transcripts (and associated fields)
 
 use Mouse 2;
 use namespace::autoclean;
@@ -370,11 +366,6 @@ sub buildTrack {
 
         if($self->join) {
           $self->_joinTracksToGeneTrackRegionDb($chr, $txStartData{$chr} );
-        }
-
-        # For gene tracks we require features
-        if(!$self->noNearestFeatures) {
-          $self->_writeNearestGenes($chr, $txStartData{$chr});
         }
 
         delete $txStartData{$chr};

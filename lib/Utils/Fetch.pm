@@ -61,7 +61,7 @@ sub go {
   }
 
   $self->log('fatal', "Couldn't find either remoteFiles + remoteDir,"
-    . " or an sql statement for this track");
+    . " or an sql statement for this track " . $self->name);
 }
 
 ########################## Main methods, which do the work  ######################
