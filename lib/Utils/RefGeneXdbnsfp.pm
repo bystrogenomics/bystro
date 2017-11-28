@@ -81,6 +81,11 @@ sub go {
     #super chomp; also helps us avoid weird characters in the fasta data string
     #helps us find shitty lines
     $_ =~ s/\s+$//;
+
+    # Strip redundant words
+    $_ =~ s/TISSUE SPECIFICITY:\s//g;
+    $_ =~ s/FUNCTION:\s//g;
+
     my @fields = split '\t', $_;
     if(@fields != @dbNSFPheaderFields) {
       $self->log('fatal', "WTF: $_");

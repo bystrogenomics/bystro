@@ -25,7 +25,7 @@ use Seq::Build;
 # TODO: refactor to automatically call util by string value
 # i.e: --util filterCadd launches Utils::FilterCadd
 my (
-  $yaml_config, $names, $sortCadd, $filterCadd, $renameTrack,
+  $yaml_config, $names, $sortCadd, $filterCadd, $renameTrack, $utilName,
   $help,        $liftOverCadd, $liftOverPath, $liftOverChainPath,
   $debug,       $overwrite, $fetch, $caddToBed, $compress, $toBed,
   $renameTrackTo, $verbose, $dryRunInsertions, $maxThreads,
@@ -36,6 +36,7 @@ GetOptions(
   'c|config=s'   => \$yaml_config,
   'n|name=s'     => \$names,
   'h|help'       => \$help,
+  'u|util=s'     => \$utilName,
   'd|debug=i'      => \$debug,
   'o|overwrite'  => \$overwrite,
   'v|verbose=i' => \$verbose,
@@ -79,6 +80,10 @@ for my $wantedName (split ',', $names) {
   }
 
   for(my $utilIdx = 0; $utilIdx < @$utilConfigs; $utilIdx++) {
+    if($utilName && $utilConfigs->[$utilIdx]{name} ne $utilName) {
+      next;
+    }
+
     # config may be mutated, by the last utility
     $config = LoadFile($yaml_config);
     my $utilConfig = $config->{tracks}[$trackIdx]{utils}[$utilIdx];
