@@ -308,9 +308,7 @@ sub dbPatchHash {
 # Write transactions are by default committed
 sub dbPatch {
   my ($self, $chr, $trackIndex, $pos, $trackValue, $mergeFunc, $skipCommit, $overwrite, $stringKeys) = @_;
-  if($chr eq 'refSeq.nearest/chrM') {
-    p $trackValue;
-  }
+
   # 0 argument means "create if not found"
   my $db = $self->_getDbi($chr, 0, $stringKeys);
   my $dbi = $db->{dbi};

@@ -332,10 +332,22 @@ sub transformField {
         # my $fieldValue = shift;
         # same as $_[0];
         my @out;
+
+        # if trailing ,; or whichever specified delimiter
+        # remove so that no trailing undef value remains
+        $_[0] =~ s/\s*$rightHand\s*$//;
+
         # Some fields may contain no data after the delimiter,
         # which will lead to blank data, don't keep that
+        # TODO: skipping empty fields is dangerous; may lead to data that is
+        # ordered to fall out of order
+        # evalute the choice on line 349
         foreach(split(/$rightHand/, $_[0]) ) {
-          if($_ ne '') {
+          # Remove trailing/leading whitespace
+          $_ =~ s/^\s+//;
+          $_ =~ s/\s+$//;
+
+          if(defined $_ && $_ ne '') {
             push @out, $_;
           }
         }

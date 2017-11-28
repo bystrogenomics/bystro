@@ -1,4 +1,4 @@
-use 5.10.0;
+use 5.14.0;
 use strict;
 use warnings;
 
@@ -13,9 +13,10 @@ use Mouse 2;
 use namespace::autoclean;
 use Path::Tiny qw/path/;
 use Parallel::ForkManager;
-
+use Seq::Role::IO;
 use Seq::Tracks::Build::LocalFilesPaths;
 use DDP;
+use List::Util qw/uniq/;
 
 # # _localFilesDir, _decodedConfig, compress, _wantedTrack, _setConfig, and logPath
 extends 'Utils::Base';
@@ -52,7 +53,11 @@ sub go {
   my $dbnsfpFh = $self->get_read_fh($self->geneFile);
 
   my $header = <$dbnsfpFh>;
+
+  #appropriate chomp
+  $self->setLineEndings($header);
   chomp $header;
+
   my @dbNSFPheaderFields = split '\t', $header;
 
   # Unfortunately, dbnsfp has many errors, for instance, NM_207007 being associated
@@ -78,15 +83,35 @@ sub go {
 
   my %dbNSFP;
   while(<$dbnsfpFh>) {
-    #super chomp; also helps us avoid weird characters in the fasta data string
-    #helps us find shitty lines
-    $_ =~ s/\s+$//;
+    #appropriate chomp based on line endings
+    chomp;
 
     # Strip redundant words
-    $_ =~ s/TISSUE SPECIFICITY:\s//g;
-    $_ =~ s/FUNCTION:\s//g;
+    $_ =~ s/TISSUE SPECIFICITY:\s*|FUNCTION:\s*|DISEASE:\s*//g;
 
+    # $_ =~ s/\.\s*$//g;
+
+    # Weirdly many dbnsfp fields have trailing whitespace
     my @fields = split '\t', $_;
+    for my $field (@fields) {
+      # split on [;] more effective, will split in cases like ); which /;/ won't
+      my @unique = uniq(split /[;]/, $field);
+
+      my @out;
+      for my $f (@unique) {
+        $f =~ s/^\s+//;
+        $f =~ s/\s+$//;
+        $f =~ s/\.$//;
+        $f =~ s/\;$//;
+
+        if(defined $f && $f ne '') {
+          push @out, $f;
+        }
+      }
+
+      $field = @out ? join ";", @out : "NA";
+    }
+
     if(@fields != @dbNSFPheaderFields) {
       $self->log('fatal', "WTF: $_");
     }
@@ -134,6 +159,9 @@ sub go {
   for my $file (@{$self->{_localFiles}}) {
     $pm->start($file) and next;
 
+    # Need to reset line endings here, or get_read_fh may not operate correctly
+    $self->setLineEndings("\n");
+
     my $fh = $self->get_read_fh($file);
     my $outFh; 
 
@@ -143,6 +171,9 @@ sub go {
     $outFh = $self->get_write_fh($outFile);
 
     my $header = <$fh>;
+
+    $self->setLineEndings($header);
+
     chomp $header;
 
     say $outFh join("\t", $header, @dbNSFPheaderFields);
