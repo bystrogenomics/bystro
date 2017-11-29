@@ -51,8 +51,8 @@ sub get {
     return $_[7];
   }
   
-  #if ($order->{ $refBase }{ $altAlleles } ) {
-  if ( $order->{$_[3]}{$_[4]} ) {
+  #if (defined $order->{ $refBase }{ $altAlleles } ) {
+  if (defined $order->{$_[3]}{$_[4]} ) {
     $_[7][$_[5]][$_[6]] = $_[1]->[$_[0]->{_dbName}][ $order->{$_[3]}{$_[4]} ] / $_[0]->{_s};
 
     return $_[7];
