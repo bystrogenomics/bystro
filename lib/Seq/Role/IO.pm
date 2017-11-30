@@ -68,7 +68,7 @@ sub get_read_fh {
   my $compressed = 0;
   my $err;
   if($innerFile) {
-    $compressed = $innerFile =~ /\.gz$/ || $innerFile =~ /\.zip$/;
+    $compressed = $innerFile =~ /\.gz$/ || $innerFile =~ /\.bgz$/ || $innerFile =~ /\.zip$/;
 
     my $innerCommand = $compressed ? "\"$innerFile\" | $gzip -d -c -" : "\"$innerFile\"";
     # We do this because we have not built in error handling from opening streams
@@ -91,12 +91,7 @@ sub get_read_fh {
     # since the annotation dominate
     $compressed = $compressed || $outerCompressed;
     # If an innerFile is passed, we assume that $file is a path to a tarball
-  } elsif($filePath =~ /\.gz$/) {
-    $compressed = 1;
-    #PerlIO::gzip doesn't seem to play nicely with MCE, reads random number of lines
-    #and then exits, so use gunzip, standard on linux, and faster
-    open ($fh, '-|', "$gzip -d -c \"$filePath\"") or $self->log('fatal', "Failed to open $filePath due to $!");
-  } elsif($filePath =~ /\.zip$/) {
+  } elsif($filePath =~ /\.gz$/ || $filePath =~ /\.bgz$/ || $filePath =~ /\.zip$/) {
     $compressed = 1;
     #PerlIO::gzip doesn't seem to play nicely with MCE, reads random number of lines
     #and then exits, so use gunzip, standard on linux, and faster
@@ -119,7 +114,7 @@ sub isCompressedSingle {
     return 0;
   }
 
-  return $basename =~ /\.gz$/ || $basename =~ /\.zip$/;
+  return $basename =~ /\.gz$/ || $basename =~ /\.bgz$/ || $basename =~ /\.zip$/;
 }
 
 # TODO: return error if failed
@@ -129,12 +124,9 @@ sub get_write_fh {
   $self->log('fatal', "get_fh() expected a filename") unless $file;
 
   my $fh;
-  if ( $compress || $file =~ /\.gz$/ ) {
+  if ( $compress || $file =~ /\.gz$/ || $file =~ /\.bgz$/ || $file =~ /\.zip$/ ) {
     # open($fh, ">:gzip", $file) or die $self->log('fatal', "Couldn't open $file for writing: $!");
     open($fh, "|-", "$gzip -c > $file") or $self->log('fatal', "Couldn't open gzip $file for writing");
-  } elsif ( $file =~ /\.zip$/ ) {
-    open($fh, "|-", "$gzip -c > $file") or $self->log('fatal', "Couldn't open gzip $file for writing");
-    # open($fh, ">:gzip(none)", $file) or die $self->log('fatal', "Couldn't open $file for writing: $!");
   } else {
     open($fh, ">", $file) or return $self->log('fatal', "Couldn't open $file for writing: $!");
   }

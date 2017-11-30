@@ -400,7 +400,7 @@ sub annotateFile {
   # to copy the data from a scalar, and don't want to use a hash for this alone
   # So, using a scalar ref to abortErr in the gather function.
   if($abortErr) {
-    say "Aborted job";
+    say "Aborted job due to $abortErr";
 
     # Database & tx need to be closed
     $self->{_db}->cleanUp();

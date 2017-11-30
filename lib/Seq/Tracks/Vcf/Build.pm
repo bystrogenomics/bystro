@@ -328,9 +328,7 @@ sub _extractHeader {
   my $file = shift;
   my $dieIfNotFound = shift;
 
-  my $echoProg = $self->isCompressedSingle($file) ? $self->gzip . ' -d -c' : 'cat';
-
-  open(my $fh, '-|', "$echoProg $file");
+  my $fh = $self->get_read_fh($file);
 
   my @header;
   while(<$fh>) {
