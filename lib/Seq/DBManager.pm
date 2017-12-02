@@ -685,7 +685,8 @@ sub dbForceCommit {
     # Sync in case MDB_NOSYNC, MDB_MAPASYNC, or MDB_NOMETASYNC were enabled
     # I assume that if the user is forcing commit, they also want the state of the
     # db updated
-    $envs->{$envName}{env}->sync();
+    # sync(1) flag needed to ensure that disk buffer is flushed with MDB_NOSYNC, MAPASYNC
+    $envs->{$envName}{env}->sync(1);
   } else {
     $self->_errorWithCleanup('dbManager expects existing environment in dbForceCommit');
   }
@@ -710,7 +711,8 @@ sub cleanUp {
       }
 
       # Sync in case MDB_NOSYNC, MDB_MAPASYNC, or MDB_NOMETASYNC were enabled
-      $envs->{$_}{env}->sync();
+      # sync(1) flag needed to ensure that disk buffer is flushed with MDB_NOSYNC, MAPASYNC
+      $envs->{$_}{env}->sync(1);
       $envs->{$_}{env}->Clean();
 
       delete $envs->{$_};
