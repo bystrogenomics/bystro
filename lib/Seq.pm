@@ -120,11 +120,7 @@ sub BUILD {
     #index 11
     $self->missingnessField,
     #index 12
-    $self->sampleMafField,
-    #index 13
-    'alleleIdx',
-    #14
-    'pathogenic',
+    $self->sampleMafField,=
   ], undef, 1);
 
   $self->{_lastHeaderIdx} = $#{$headers->get()};
@@ -311,9 +307,6 @@ sub annotateFile {
 
       $dataFromDbAref = $self->{_db}->dbReadOne($fields[0], $zeroPos, 1);
 
-      if(!defined $dataFromDbAref->[2] || !defined $dataFromDbAref->[3]) {
-        say STDERR $fields[0];
-      }
       if(!defined $dataFromDbAref) {
         $self->_errorWithCleanup("Wrong assembly? $fields[0]\: $fields[1] not found.");
         # Store a reference to the error, allowing us to exit with a useful fail message
