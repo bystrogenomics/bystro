@@ -6,12 +6,22 @@ package Seq::Tracks::Nearest::Build;
 
 our $VERSION = '0.001';
 
-# ABSTRACT: Builds Gene Tracks 
-    # Stores refSeq data, nearest gene refSeq data, generates
-    # in-silico transcribed transcripts (and associated fields)
-
-    #Inserts a single value <ArrayRef> @ $self->name
-    #If $self->nearest defined, inserts a <Int> @ $self->nearestFeatureName
+# ABSTRACT: Builds region-based tracks , from some coordinate to some other coordinate
+# It then writes a reference to some index in a region database
+# And then creates that region database
+# The reference # to the region database actually is a unique combination
+# of overlapping data based on those coordinates
+# So if 3 transcripts overlap completely, there will be a single reference
+# that references the combined information of those 3 transcripts (whatever features requested by user)
+# Notably, this data is also unique; namely, if the transcript features are all
+# redundant, only 1 set of data will be written to the region database at that reference
+# If the combinations are not totally redundant, all N unique combinatins will be written
+# Finally, within any feature, if all values are completely redundant, only 1 such value
+# will be written
+# This is distinct from the gene track, which does no de-duplication
+# Therefore it makes more sense to store information that is say only available at the gene
+# rather than the transcript level, as this kind of track, rather than a type:gene
+# It will make that data far more human readable.
 
 use Mouse 2;
 use namespace::autoclean;
@@ -68,6 +78,7 @@ has chromField => (is => 'ro', isa => 'Str', default => 'chrom');
 # This I think is reasonable, and from my perspective provides a nice search advantage
 # We can search for nearest.dist < 5000 for instance, and include things that are 0 distance away
 has storeOverlap => (is => 'ro', isa => 'Bool', default => 1);
+has storeNearest => (is => 'ro', isa => 'Bool', default => 1);
 my $txNumberKey = 'txNumber';
 
 around BUILDARGS => sub {
@@ -206,10 +217,14 @@ sub buildTrack {
 
       chomp $firstLine;
 
+      # If the user wanted to transform the input field names, do, so source field names match
+      # those expected by the track
+      my @fields = map{ $self->fieldMap->{$_} || $_ } split('\t', $firstLine);
+
       # Store all features we can find, for Seq::Build::Gene::TX. Avoid autocracy,
       # don't need to know what Gene::TX requires.
       my $fieldIdx = 0;
-      for my $field (split '\t', $firstLine) {
+      for my $field (@fields) {
         $allIdx{$field} = $fieldIdx;
         $fieldIdx++;
       }
@@ -382,7 +397,7 @@ sub _writeNearestData {
     push @{$endData{$end}}, $data;
   }
 
-  $self->log('info', $self->name . ": starting _writeNearestGenes for $chr");
+  $self->log('info', $self->name . ": starting for $chr");
 
   # Get database length : assumes reference track already in the db
   my $genomeNumberOfEntries = $self->db->dbGetNumberOfEntries($chr);
@@ -462,7 +477,7 @@ sub _writeNearestData {
     $midPoint //= -1;
 
     # Consider/store intergenic things (note: if previousLongestEnd > $start, last tx overlapped this one)
-    if($previousLongestEnd < $start) {
+    if($self->storeNearest && $previousLongestEnd < $start) {
       # we force both the end and start to be 0-based closed, so start from +1 of previous end
       # and - 1 of the start
       POS_LOOP: for my $pos ( $previousLongestEnd + 1 .. $start - 1 ) {
@@ -483,8 +498,12 @@ sub _writeNearestData {
       # We investigate everything from the present tx down;
       my @data = @sorted[$n .. $#sorted];
 
+      # Remember, here longest end is 0-based, closed (last pos is the last 0-based
+      # position in the transcript)
       for my $pos ($start .. $longestEnd) {
         # There may be overlaps between adjacent groups of transcripts
+        # Since we search for all overlapping transcripts for every position
+        # once we've visited one position, we need never visit it again
         if($completed{$pos}) {
           next;
         }
@@ -526,10 +545,10 @@ sub _writeNearestData {
           push @globalTxData, $combinedValues->[$toDbName];
         }
 
-        $completed{$pos} = 1;
-
         # Assign the transcript number
         $self->db->dbPatch($chr, $self->dbName, $pos, $txNumber);
+
+        $completed{$pos} = 1;
       }
     }
 
@@ -546,6 +565,7 @@ sub _writeNearestData {
       $self->db->dbPut($regionDbName, $longestEndTxNumber, $combinedValues);
 
       # we only need to store the longest end; only value that is needed from combinedValues
+      # TODO: Should this be $longestEnd?
       push @globalTxData, $combinedValues->[$toDbName];
     }
 
@@ -553,13 +573,15 @@ sub _writeNearestData {
     $previousLongestEnd = $longestEnd;
   }
 
-  # Once we've reached the last transcript, we still likely have some data remaining
-  END_LOOP: for my $pos ( $previousLongestEnd + 1 .. $genomeNumberOfEntries - 1 ) {
-    #Args:             $chr,       $trackIndex,   $pos,  $trackValue,   $mergeFunc, $skipCommit
-    $self->db->dbPatch($chr, $self->dbName, $pos, $previousTxNumber);
+  if($self->storeNearest) {
+    # Once we've reached the last transcript, we still likely have some data remaining
+    END_LOOP: for my $pos ( $previousLongestEnd + 1 .. $genomeNumberOfEntries - 1 ) {
+      #Args:             $chr,       $trackIndex,   $pos,  $trackValue,   $mergeFunc, $skipCommit
+      $self->db->dbPatch($chr, $self->dbName, $pos, $previousTxNumber);
+    }
   }
 
-  $self->log('info', $self->name . ": finished _writeNearest for $chr");
+  $self->log('info', $self->name . ": finished for $chr");
 }
 
 sub _getTxNumber {

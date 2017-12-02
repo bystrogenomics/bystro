@@ -1,25 +1,22 @@
 # ABSTRACT: A base class for track classes
 
-# used to simplify process of detecting tracks
-# I think that Tracks.pm should know which features it has access to
-# and anything conforming to that interface should become an instance
-# of the appropriate class
-# and everythign else shouldn't, and should generate a warning
-# This is heavily inspired by Dr. Thomas Wingo's primer picking software design
-# expects structure to be {
-#  trackName : {typeStuff},
-#  typeName2 : {typeStuff2},
-#}
-
-#We don't instantiate a new object for each data source
-#Instead, we simply create a container for each name : type pair
-#We could use an array, but a hash is easier to reason about
-#We also expect that each record will be identified by its track name
-#so (in db) {
-#   trackName : {
-#     featureName: featureValue  
-#} 
-#}
+# Used to simplify process of detecting tracks
+# Tracks.pm knows very little about each track, just enough to instantiate them
+# This is a singleton class; it will not instantiate multiple of each track
+# Finally, it is worth noting that track order matters
+# By default, the tracks are stord in the database in the order specified in the
+# tracks object (from the YAML config)
+# Since the database stores each track's data at each position in the genome
+# in an array, and arrays can only be consequtively indexed, it is best
+# to place sparse tracks at the end of the array of tracks
+# such that undef values are not written for these sparse tracks for as many positions
+# Ex: If we place refSeq track before cadd track, at every position where cadd exists
+# and refSeq doesn't, an undef value will be written, such the cadd value can be written
+# to the appropriate place;
+# ie: [refSeq, cadd] yields [undef, caddData] at every position that cadd exists
+# but refSeq doesn't
+# However, placing refSeq after cadd maens that we can simply store [cadd] and notice
+# that there is no refSeq index
 
 package Seq::Tracks;
 use 5.10.0;

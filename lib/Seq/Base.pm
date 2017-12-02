@@ -43,8 +43,8 @@ has verbose => (is => 'ro');
 
 has debug => (is => 'ro', default => 0);
 
-sub BUILDARGS {
-  my ($self, $data) = @_;
+around BUILDARGS => sub {
+  my ($orig, $self, $data) = @_;
 
   # Since we never have more than one database_dir, it's a global property we can set
   # in this package, which Seq.pm and Seq::Build extend from
@@ -78,8 +78,8 @@ sub BUILDARGS {
   # Not really needed for Seq::Tracks, but for clarity
   Seq::Tracks::initialize();
 
-  return $data;
-}
+  return $self->$orig($data);
+};
 
 sub BUILD {
   my $self = shift;
