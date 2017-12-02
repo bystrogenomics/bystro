@@ -221,7 +221,7 @@ sub annotateFile {
     open($fh, '-|', "$echoProg $inPath | " . $self->snpProcessor . " --emptyField $delim --minGq $minGq 2> $errPath");
   } elsif($type eq 'vcf') {
     # Retruns chr, pos, homozygotes, heterozygotes, alt, ref in that order, tab delim
-    open($fh, '-|', "$echoProg $inPath | " . $self->vcfProcessor . " --emptyField $delim --keepInfo 2> $errPath");
+    open($fh, '-|', "$echoProg $inPath | " . $self->vcfProcessor . " --emptyField $delim 2> $errPath");
   } else {
     $self->_errorWithCleanup("annotateFiles only accepts snp and vcf types");
     return ("annotateFiles only accepts snp and vcf types", undef);
