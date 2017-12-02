@@ -621,11 +621,16 @@ sub _makeUniqueRegionData {
     for my $val (@$aRef) {
       my %uniqueRows;
 
+      # Figure out what is unique by building an array that does not include
+      # the to and from positoins
+      # Since the md5 functon will complain about sparse arrays
+      # fill missing values with "" during the md5 check
+      # However, in the final, unique output, undefined values will remain undefined
       my @nonFromTo;
       
       for my $i (@featureKeys) {
         if($i != $fromDbName && $i != $toDbName) {
-          push @nonFromTo, $val->[$i];
+          push @nonFromTo, $val->[$i] || "";
         }
       }
 
@@ -643,6 +648,10 @@ sub _makeUniqueRegionData {
     }
 
     for my $intKey (@featureKeys) {
+      if(!ref $out[$intKey]) {
+        next;
+      }
+
       if(@{$out[$intKey]} == 1) {
         $out[$intKey] = $out[$intKey][0];
         next;

@@ -121,6 +121,10 @@ sub BUILD {
     $self->missingnessField,
     #index 12
     $self->sampleMafField,
+    #index 13
+    'alleleIdx',
+    #14
+    'pathogenic',
   ], undef, 1);
 
   $self->{_lastHeaderIdx} = $#{$headers->get()};
@@ -221,7 +225,7 @@ sub annotateFile {
     open($fh, '-|', "$echoProg $inPath | " . $self->snpProcessor . " --emptyField $delim --minGq $minGq 2> $errPath");
   } elsif($type eq 'vcf') {
     # Retruns chr, pos, homozygotes, heterozygotes, alt, ref in that order, tab delim
-    open($fh, '-|', "$echoProg $inPath | " . $self->vcfProcessor . " --emptyField $delim 2> $errPath");
+    open($fh, '-|', "$echoProg $inPath | " . $self->vcfProcessor . " --emptyField $delim --keepInfo 2> $errPath");
   } else {
     $self->_errorWithCleanup("annotateFiles only accepts snp and vcf types");
     return ("annotateFiles only accepts snp and vcf types", undef);
@@ -307,6 +311,9 @@ sub annotateFile {
 
       $dataFromDbAref = $self->{_db}->dbReadOne($fields[0], $zeroPos, 1);
 
+      if(!defined $dataFromDbAref->[2] || !defined $dataFromDbAref->[3]) {
+        say STDERR $fields[0];
+      }
       if(!defined $dataFromDbAref) {
         $self->_errorWithCleanup("Wrong assembly? $fields[0]\: $fields[1] not found.");
         # Store a reference to the error, allowing us to exit with a useful fail message

@@ -33,6 +33,8 @@ has dryRun => (is => 'ro');
 
 has skipCompletionCheck => (is => 'ro');
 
+has overwrite => (is => 'ro', isa => 'Bool');
+
 # Every builder needs access to the database
 # Don't specify types because we do not allow consumers to set this attribute
 has db => (is => 'ro', init_arg => undef, default => sub { my $self = shift;

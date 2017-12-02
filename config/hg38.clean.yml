@@ -1,33 +1,9 @@
 ---
 assembly: hg38
 build_author: ec2-user
-build_date: 2017-11-22T00:11:00
+build_date: 2017-11-29T20:41:00
 chromosomes:
-- chr1
-- chr2
-- chr3
-- chr4
-- chr5
-- chr6
-- chr7
-- chr8
-- chr9
-- chr10
-- chr11
-- chr12
-- chr13
-- chr14
-- chr15
-- chr16
-- chr17
-- chr18
-- chr19
-- chr20
 - chr21
-- chr22
-- chrM
-- chrX
-- chrY
 database_dir: '~'
 files: '~'
 files_dir: /mnt/db_backup/hg38/
@@ -44,9 +20,9 @@ statistics:
   siteTypeField: refSeq.siteType
 temp_dir: '~'
 tracks:
-- name: ref
-  remote_dir: http://hgdownload.soe.ucsc.edu/goldenPath/hg38/chromosomes/
-  remote_files:
+- build_author: ec2-user
+  build_date: 2017-11-28T06:58:00
+  local_files:
   - chr1.fa.gz
   - chr2.fa.gz
   - chr3.fa.gz
@@ -72,10 +48,55 @@ tracks:
   - chrM.fa.gz
   - chrX.fa.gz
   - chrY.fa.gz
+  name: ref
   type: reference
+  utils:
+  - args:
+      remoteDir: http://hgdownload.soe.ucsc.edu/goldenPath/hg38/chromosomes/
+      remoteFiles:
+      - chr1.fa.gz
+      - chr2.fa.gz
+      - chr3.fa.gz
+      - chr4.fa.gz
+      - chr5.fa.gz
+      - chr6.fa.gz
+      - chr7.fa.gz
+      - chr8.fa.gz
+      - chr9.fa.gz
+      - chr10.fa.gz
+      - chr11.fa.gz
+      - chr12.fa.gz
+      - chr13.fa.gz
+      - chr14.fa.gz
+      - chr15.fa.gz
+      - chr16.fa.gz
+      - chr17.fa.gz
+      - chr18.fa.gz
+      - chr19.fa.gz
+      - chr20.fa.gz
+      - chr21.fa.gz
+      - chr22.fa.gz
+      - chrM.fa.gz
+      - chrX.fa.gz
+      - chrY.fa.gz
+    completed: 2017-11-28T01:25:00
+    name: fetch
+  version: 1
 - build_author: ec2-user
-  build_date: 2017-11-22T00:11:00
+  build_date: 2017-11-28T06:58:00
+  build_field_transformations:
+    egenetics.expression: split [;]
+    gnfAtlas.expression: split [;]
+    go.biologicalProcess: split [;]
+    go.cellularComponent: split [;]
+    go.molecularFunction: split [;]
+    uniprot.diseaseDescription: split [;]
+    uniprot.function: split [;]
+    uniprot.tissue: split [;]
   features:
+  - name
+  - name2
+  - geneSymbol
   - kgID
   - mRNA
   - spID
@@ -83,19 +104,59 @@ tracks:
   - protAcc
   - description
   - rfamAcc
-  - name
-  - name2
-  - dbnsfp.ExAC_pLI: number(3)
-  - dbnsfp.ExAC_pRec: number(3)
-  - dbnsfp.ExAC_pNull: number(3)
-  - dbnsfp.LoFtool_score: number(3)
-  - dbnsfp.ExAC_nonTCGA_pRec: number(3)
-  - dbnsfp.ExAC_nonTCGA_pNull: number(3)
-  - dbnsfp.ExAC_nonTCGA_pLI: number(3)
-  - dbnsfp.ExAC_nonpsych_pRec: number(3)
-  - dbnsfp.ExAC_nonpsych_pNull: number(3)
-  - dbnsfp.ExAC_nonpsych_pLI: number(3)
-  fetch_date: 2017-11-21T18:26:00
+  - tRnaName
+  - ensemblID
+  - exac.pLi: number
+  - exac.pRec: number
+  - exac.pNull: number
+  - exac.lofTool: number
+  - exac.lofFdr: number
+  - exac.pRec: number
+  - exac.pHi: number
+  - exac.nonTCGA.pRec: number
+  - exac.nonTCGA.pNull: number
+  - exac.nonTCGA.pLi: number
+  - exac.nonPsych.pRec: number
+  - exac.nonPsych.pNull: number
+  - exac.nonPsych.pLi: number
+  - gdi.phred: number
+  - exac.cnv.score: number
+  - exac.cnv.flag
+  - uniprot.tissue
+  - uniprot.diseaseDescription
+  - uniprot.function
+  - egenetics.expression
+  - gnfAtlas.expression
+  - go.biologicalProcess
+  - knownRecInfo
+  fieldMap:
+    dbnsfp.Disease_description: uniprot.diseaseDescription
+    dbnsfp.ExAC_cnv.score: exac.cnv.score
+    dbnsfp.ExAC_cnv_flag: exac.cnv.flag
+    dbnsfp.ExAC_nonTCGA_pLI: exac.nonTCGA.pLi
+    dbnsfp.ExAC_nonTCGA_pNull: exac.nonTCGA.pNull
+    dbnsfp.ExAC_nonTCGA_pRec: exac.nonTCGA.pRec
+    dbnsfp.ExAC_nonpsych_pLI: exac.nonPsych.pLi
+    dbnsfp.ExAC_nonpsych_pNull: exac.nonPsych.pNull
+    dbnsfp.ExAC_nonpsych_pRec: exac.nonPsych.pRec
+    dbnsfp.ExAC_pLI: exac.pLi
+    dbnsfp.ExAC_pNull: exac.pNull
+    dbnsfp.ExAC_pRec: exac.pRec
+    dbnsfp.Expression(GNF/Atlas): gnfAtlas.expression
+    dbnsfp.Expression(egenetics): egenetics.expression
+    dbnsfp.Function_description: uniprot.function
+    dbnsfp.GDI-Phred: gdi.phred
+    dbnsfp.GO_biological_process: go.biologicalProcess
+    dbnsfp.GO_cellular_component: go.cellularComponent
+    dbnsfp.GO_molecular_function: go.molecularFunction
+    dbnsfp.Known_rec_info: knownRecInfo
+    dbnsfp.LoF-FDR_ExAC: exac.lofFdr
+    dbnsfp.LoFtool_score: exac.lofTool
+    dbnsfp.P(HI): exac.pHi
+    dbnsfp.P(rec): exac.pRec
+    dbnsfp.RVIS_ExAC: exac.rvis
+    dbnsfp.RVIS_percentile_ExAC: exac.rvisPercentile
+    dbnsfp.Tissue_specificity(Uniprot): uniprot.tissue
   join:
     features:
     - alleleID
@@ -109,54 +170,75 @@ tracks:
     - chromEnd
     track: clinvar
   local_files:
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr5.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr6.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr8.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr2.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr7.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr4.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr3.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr1.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr15.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr13.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr14.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr11.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr16.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr9.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr10.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr12.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr22.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr20.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr17.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr18.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chrX.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr21.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chr19.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chrM.with_dbnsfp.gz
-  - /mnt/db_backup/hg38/refSeq/hg38.refGene.chrY.with_dbnsfp.gz
+  - hg38.refGene.chr2.with_dbnsfp.gz
+  - hg38.refGene.chr8.with_dbnsfp.gz
+  - hg38.refGene.chr6.with_dbnsfp.gz
+  - hg38.refGene.chr7.with_dbnsfp.gz
+  - hg38.refGene.chr3.with_dbnsfp.gz
+  - hg38.refGene.chr4.with_dbnsfp.gz
+  - hg38.refGene.chr5.with_dbnsfp.gz
+  - hg38.refGene.chr1.with_dbnsfp.gz
+  - hg38.refGene.chr15.with_dbnsfp.gz
+  - hg38.refGene.chr14.with_dbnsfp.gz
+  - hg38.refGene.chr9.with_dbnsfp.gz
+  - hg38.refGene.chr13.with_dbnsfp.gz
+  - hg38.refGene.chr11.with_dbnsfp.gz
+  - hg38.refGene.chr10.with_dbnsfp.gz
+  - hg38.refGene.chr16.with_dbnsfp.gz
+  - hg38.refGene.chr12.with_dbnsfp.gz
+  - hg38.refGene.chr19.with_dbnsfp.gz
+  - hg38.refGene.chrM.with_dbnsfp.gz
+  - hg38.refGene.chr18.with_dbnsfp.gz
+  - hg38.refGene.chr22.with_dbnsfp.gz
+  - hg38.refGene.chr17.with_dbnsfp.gz
+  - hg38.refGene.chr20.with_dbnsfp.gz
+  - hg38.refGene.chr21.with_dbnsfp.gz
+  - hg38.refGene.chrX.with_dbnsfp.gz
+  - hg38.refGene.chrY.with_dbnsfp.gz
   name: refSeq
-  nearest:
-  - name
-  - name2
-  nearestTss:
-  - name
-  - name2
-  refGeneXdbnsfp_date: 2017-11-21T18:28:00
-  sql_statement: SELECT refGene.name, chrom, strand, txStart, txEnd, cdsStart, cdsEnd,
-    exonCount, exonStarts, exonEnds, score, name2, kgID, mRNA, spID, spDisplayID,
-    refseq, protAcc, description, rfamAcc, tRnaName, value AS 'ensemblID', geneSymbol
-    FROM refGene LEFT JOIN hg38.kgXref k ON refGene.name = k.refseq LEFT JOIN hg38.knownToEnsembl
-    e ON k.kgID = e.name
   type: gene
   utils:
-  - name: fetch
+  - args:
+      connection:
+        database: hg38
+      sql: SELECT r.name, chrom, strand, txStart, txEnd, cdsStart, cdsEnd, exonCount,
+        exonStarts, exonEnds, score, name2, kgID, mRNA, spID, spDisplayID, refseq,
+        protAcc, description, rfamAcc, tRnaName, value AS 'ensemblID', geneSymbol
+        FROM refGene r LEFT JOIN kgXref k ON r.name = k.refseq LEFT JOIN knownToEnsembl
+        e ON k.kgID = e.name WHERE chrom = %chromosomes%;
+    completed: 2017-11-28T01:28:00
+    name: fetch
   - args:
       geneFile: /mnt/db_backup/dbnsfp/dbNSFP3.5_gene.complete
+    completed: 2017-11-28T06:56:00
     name: refGeneXdbnsfp
-  version: 11
-- name: phastCons
-  remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/hg38/phastCons100way/hg38.100way.phastCons/
-  remote_files:
+  version: 1
+- build_author: ec2-user
+  build_date: 2017-11-28T06:58:00
+  dist: true
+  features:
+  - name
+  - name2
+  from: txStart
+  name: refSeq.nearest
+  ref: refSeq
+  to: txEnd
+  type: nearest
+  version: 1
+- build_author: ec2-user
+  build_date: 2017-11-28T06:58:00
+  dist: true
+  features:
+  - name
+  - name2
+  from: txStart
+  name: refSeq.nearestTss
+  ref: refSeq
+  type: nearest
+  version: 1
+- build_author: ec2-user
+  build_date: 2017-11-29T20:41:00
+  local_files:
   - chr1.phastCons100way.wigFix.gz
   - chr2.phastCons100way.wigFix.gz
   - chr3.phastCons100way.wigFix.gz
@@ -182,10 +264,43 @@ tracks:
   - chrX.phastCons100way.wigFix.gz
   - chrY.phastCons100way.wigFix.gz
   - chrM.phastCons100way.wigFix.gz
+  name: phastCons
   type: score
-- name: phyloP
-  remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/hg38/phyloP100way/hg38.100way.phyloP100way/
-  remote_files:
+  utils:
+  - args:
+      remoteDir: http://hgdownload.cse.ucsc.edu/goldenPath/hg38/phastCons100way/hg38.100way.phastCons/
+      remoteFiles:
+      - chr1.phastCons100way.wigFix.gz
+      - chr2.phastCons100way.wigFix.gz
+      - chr3.phastCons100way.wigFix.gz
+      - chr4.phastCons100way.wigFix.gz
+      - chr5.phastCons100way.wigFix.gz
+      - chr6.phastCons100way.wigFix.gz
+      - chr7.phastCons100way.wigFix.gz
+      - chr8.phastCons100way.wigFix.gz
+      - chr9.phastCons100way.wigFix.gz
+      - chr10.phastCons100way.wigFix.gz
+      - chr11.phastCons100way.wigFix.gz
+      - chr12.phastCons100way.wigFix.gz
+      - chr13.phastCons100way.wigFix.gz
+      - chr14.phastCons100way.wigFix.gz
+      - chr15.phastCons100way.wigFix.gz
+      - chr16.phastCons100way.wigFix.gz
+      - chr17.phastCons100way.wigFix.gz
+      - chr18.phastCons100way.wigFix.gz
+      - chr19.phastCons100way.wigFix.gz
+      - chr20.phastCons100way.wigFix.gz
+      - chr21.phastCons100way.wigFix.gz
+      - chr22.phastCons100way.wigFix.gz
+      - chrX.phastCons100way.wigFix.gz
+      - chrY.phastCons100way.wigFix.gz
+      - chrM.phastCons100way.wigFix.gz
+    completed: 2017-11-28T01:38:00
+    name: fetch
+  version: 3
+- build_author: ec2-user
+  build_date: 2017-11-29T20:41:00
+  local_files:
   - chr1.phyloP100way.wigFix.gz
   - chr2.phyloP100way.wigFix.gz
   - chr3.phyloP100way.wigFix.gz
@@ -211,8 +326,42 @@ tracks:
   - chrX.phyloP100way.wigFix.gz
   - chrY.phyloP100way.wigFix.gz
   - chrM.phyloP100way.wigFix.gz
+  name: phyloP
   type: score
-- build_date: 2017-04-22T05:22:00
+  utils:
+  - args:
+      remoteDir: http://hgdownload.cse.ucsc.edu/goldenPath/hg38/phyloP100way/hg38.100way.phyloP100way/
+      remoteFiles:
+      - chr1.phyloP100way.wigFix.gz
+      - chr2.phyloP100way.wigFix.gz
+      - chr3.phyloP100way.wigFix.gz
+      - chr4.phyloP100way.wigFix.gz
+      - chr5.phyloP100way.wigFix.gz
+      - chr6.phyloP100way.wigFix.gz
+      - chr7.phyloP100way.wigFix.gz
+      - chr8.phyloP100way.wigFix.gz
+      - chr9.phyloP100way.wigFix.gz
+      - chr10.phyloP100way.wigFix.gz
+      - chr11.phyloP100way.wigFix.gz
+      - chr12.phyloP100way.wigFix.gz
+      - chr13.phyloP100way.wigFix.gz
+      - chr14.phyloP100way.wigFix.gz
+      - chr15.phyloP100way.wigFix.gz
+      - chr16.phyloP100way.wigFix.gz
+      - chr17.phyloP100way.wigFix.gz
+      - chr18.phyloP100way.wigFix.gz
+      - chr19.phyloP100way.wigFix.gz
+      - chr20.phyloP100way.wigFix.gz
+      - chr21.phyloP100way.wigFix.gz
+      - chr22.phyloP100way.wigFix.gz
+      - chrX.phyloP100way.wigFix.gz
+      - chrY.phyloP100way.wigFix.gz
+      - chrM.phyloP100way.wigFix.gz
+    completed: 2017-11-28T01:30:00
+    name: fetch
+  version: 3
+- build_author: ec2-user
+  build_date: 2017-11-28T06:58:00
   caddToBed_date: 2017-01-19T04:37:00
   filterCadd_date: 2017-08-28T18:28:00
   local_files:
@@ -245,7 +394,10 @@ tracks:
   sortCadd_date: 2017-01-20T23:53:00
   sorted_guaranteed: 1
   type: cadd
-- build_field_transformations:
+  version: 1
+- build_author: ec2-user
+  build_date: 2017-11-28T06:58:00
+  build_field_transformations:
     alleleFreqs: split [,]
     alleleNs: split [,]
     alleles: split [,]
@@ -260,10 +412,150 @@ tracks:
   - alleles
   - alleleNs: number
   - alleleFreqs: number(2)
+  local_files:
+  - hg38.snp150.chr1.gz
+  - hg38.snp150.chr2.gz
+  - hg38.snp150.chr3.gz
+  - hg38.snp150.chr4.gz
+  - hg38.snp150.chr5.gz
+  - hg38.snp150.chr6.gz
+  - hg38.snp150.chr7.gz
+  - hg38.snp150.chr8.gz
+  - hg38.snp150.chr9.gz
+  - hg38.snp150.chr10.gz
+  - hg38.snp150.chr11.gz
+  - hg38.snp150.chr12.gz
+  - hg38.snp150.chr13.gz
+  - hg38.snp150.chr14.gz
+  - hg38.snp150.chr15.gz
+  - hg38.snp150.chr16.gz
+  - hg38.snp150.chr17.gz
+  - hg38.snp150.chr18.gz
+  - hg38.snp150.chr19.gz
+  - hg38.snp150.chr20.gz
+  - hg38.snp150.chr21.gz
+  - hg38.snp150.chr22.gz
+  - hg38.snp150.chrM.gz
+  - hg38.snp150.chrX.gz
+  - hg38.snp150.chrY.gz
   name: dbSNP
-  sql_statement: SELECT * FROM hg38.snp147
   type: sparse
+  utils:
+  - args:
+      database: hg38
+      sql: SELECT * FROM snp150 WHERE chrom = %chromosomes%
+    completed: 2017-11-28T01:43:00
+    name: fetch
+  version: 1
+- build_author: ec2-user
+  build_date: 2017-11-28T06:58:00
+  build_row_filters:
+    AS_FilterStatus: == PASS
+  features:
+  - alt
+  - id
+  - af: number(2)
+  - an: number(2)
+  - an_afr: number(2)
+  - an_amr: number(2)
+  - an_asj: number(2)
+  - an_eas: number(2)
+  - an_fin: number(2)
+  - an_nfe: number(2)
+  - an_oth: number(2)
+  - an_male: number(2)
+  - an_female: number(2)
+  - af_afr: number(2)
+  - af_amr: number(2)
+  - af_asj: number(2)
+  - af_eas: number(2)
+  - af_fin: number(2)
+  - af_nfe: number(2)
+  - af_oth: number(2)
+  - af_male: number(2)
+  - af_female: number(2)
+  fieldMap:
+    AF: af
+    AF_AFR: af_afr
+    AF_AMR: af_amr
+    AF_ASJ: af_asj
+    AF_EAS: af_eas
+    AF_FIN: af_fin
+    AF_Female: af_female
+    AF_Male: af_male
+    AF_NFE: af_nfe
+    AF_OTH: af_oth
+    AN: an
+    AN_AFR: an_afr
+    AN_AMR: an_amr
+    AN_ASJ: an_asj
+    AN_EAS: an_eas
+    AN_FIN: an_fin
+    AN_Female: an_female
+    AN_Male: an_male
+    AN_NFE: an_nfe
+    AN_OTH: an_oth
+  local_files:
+  - gnomad.genomes.r2.0.2.sites.chr*.liftedOver.hg38.vcf.liftedOver.gz
+  name: gnomad.genomes
+  type: vcf
+  version: 2
+- build_author: ec2-user
+  build_date: 2017-11-28T06:58:00
+  build_row_filters:
+    AS_FilterStatus: == PASS
+  features:
+  - alt
+  - id
+  - af: number(2)
+  - an: number(2)
+  - an_afr: number(2)
+  - an_amr: number(2)
+  - an_asj: number(2)
+  - an_eas: number(2)
+  - an_fin: number(2)
+  - an_nfe: number(2)
+  - an_oth: number(2)
+  - an_male: number(2)
+  - an_female: number(2)
+  - af_afr: number(2)
+  - af_amr: number(2)
+  - af_asj: number(2)
+  - af_eas: number(2)
+  - af_fin: number(2)
+  - af_nfe: number(2)
+  - af_oth: number(2)
+  - af_male: number(2)
+  - af_female: number(2)
+  fieldMap:
+    AF: af
+    AF_AFR: af_afr
+    AF_AMR: af_amr
+    AF_ASJ: af_asj
+    AF_EAS: af_eas
+    AF_FIN: af_fin
+    AF_Female: af_female
+    AF_Male: af_male
+    AF_NFE: af_nfe
+    AF_OTH: af_oth
+    AN: an
+    AN_AFR: an_afr
+    AN_AMR: an_amr
+    AN_ASJ: an_asj
+    AN_EAS: an_eas
+    AN_FIN: an_fin
+    AN_Female: an_female
+    AN_Male: an_male
+    AN_NFE: an_nfe
+    AN_OTH: an_oth
+  local_files:
+  - gnomad.exomes.r2.0.2.sites.liftedOver.hg38.vcf.liftedOver.gz
+  name: gnomad.exomes
+  type: vcf
+  version: 2
 - based: 1
+  build_author: ec2-user
+  build_date: 2017-11-28T06:58:00
   build_field_transformations:
     chrom: chr .
     clinicalSignificance: split [;]
@@ -279,7 +571,7 @@ tracks:
   - clinicalSignificance
   - type
   - origin
-  - numberSubmitters: number(2)
+  - numberSubmitters: number
   - reviewStatus
   - referenceAllele
   - alternateAllele
@@ -299,117 +591,14 @@ tracks:
   local_files:
   - variant_summary.txt.gz
   name: clinvar
-  remote_files:
-  - ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz
   type: sparse
-- build_author: ec2-user
-  build_date: 2017-08-29T17:10:00
-  build_row_filters:
-    AS_FilterStatus: == PASS
-  features:
-  - alt
-  - id
-  - trTv: number(2)
-  - af: number(2)
-  - an: number(2)
-  - an_afr: number(2)
-  - an_amr: number(2)
-  - an_asj: number(2)
-  - an_eas: number(2)
-  - an_fin: number(2)
-  - an_nfe: number(2)
-  - an_oth: number(2)
-  - an_male: number(2)
-  - an_female: number(2)
-  - af_afr: number(2)
-  - af_amr: number(2)
-  - af_asj: number(2)
-  - af_eas: number(2)
-  - af_fin: number(2)
-  - af_nfe: number(2)
-  - af_oth: number(2)
-  - af_male: number(2)
-  - af_female: number(2)
-  fieldMap:
-    AF: af
-    AF_AFR: af_afr
-    AF_AMR: af_amr
-    AF_ASJ: af_asj
-    AF_EAS: af_eas
-    AF_FIN: af_fin
-    AF_Female: af_female
-    AF_Male: af_male
-    AF_NFE: af_nfe
-    AF_OTH: af_oth
-    AN: an
-    AN_AFR: an_afr
-    AN_AMR: an_amr
-    AN_ASJ: an_asj
-    AN_EAS: an_eas
-    AN_FIN: an_fin
-    AN_Female: an_female
-    AN_Male: an_male
-    AN_NFE: an_nfe
-    AN_OTH: an_oth
-  local_files:
-  - gnomad.genomes.r2.0.1.sites.*.liftedOver.hg38.vcf.liftedOver.gz
-  name: gnomad.genomes
-  type: vcf
-  version: 1
-- build_author: ec2-user
-  build_date: 2017-08-29T17:10:00
-  build_row_filters:
-    AS_FilterStatus: == PASS
-  features:
-  - alt
-  - id
-  - trTv: number(2)
-  - af: number(2)
-  - an: number(2)
-  - an_afr: number(2)
-  - an_amr: number(2)
-  - an_asj: number(2)
-  - an_eas: number(2)
-  - an_fin: number(2)
-  - an_nfe: number(2)
-  - an_oth: number(2)
-  - an_male: number(2)
-  - an_female: number(2)
-  - af_afr: number(2)
-  - af_amr: number(2)
-  - af_asj: number(2)
-  - af_eas: number(2)
-  - af_fin: number(2)
-  - af_nfe: number(2)
-  - af_oth: number(2)
-  - af_male: number(2)
-  - af_female: number(2)
-  fieldMap:
-    AF: af
-    AF_AFR: af_afr
-    AF_AMR: af_amr
-    AF_ASJ: af_asj
-    AF_EAS: af_eas
-    AF_FIN: af_fin
-    AF_Female: af_female
-    AF_Male: af_male
-    AF_NFE: af_nfe
-    AF_OTH: af_oth
-    AN: an
-    AN_AFR: an_afr
-    AN_AMR: an_amr
-    AN_ASJ: an_asj
-    AN_EAS: an_eas
-    AN_FIN: an_fin
-    AN_Female: an_female
-    AN_Male: an_male
-    AN_NFE: an_nfe
-    AN_OTH: an_oth
-  local_files:
-  - gnomad.exomes.r2.0.1.sites.liftedOver.hg38.vcf.liftedOver.gz
-  name: gnomad.exomes
-  type: vcf
+  utils:
+  - args:
+      remoteFiles:
+      - ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz
+    completed: 2017-11-28T03:21:00
+    name: fetch
   version: 1
 vcfProcessor: bystro-vcf
-version: 85
+version: 88
 

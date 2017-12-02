@@ -26,7 +26,7 @@ has '+based' => (
   default => 1,
 );
 
-has scalingFactor => (is => 'ro', isa => 'Int', default => 10);
+has scalingFactor => (is => 'ro', isa => 'Int', default => 100);
 
 sub BUILD {
   my $self = shift;
@@ -129,7 +129,7 @@ sub buildTrack{
         }
 
         #Args:             $chr,       $trackIndex,   $pos,         $trackValue,        $mergeFunc, $skipCommit
-        $self->db->dbPatch($wantedChr, $self->dbName, $chrPosition, $self->{_rounder}->round($_), undef, $count < $self->commitEvery);
+        $self->db->dbPatch($wantedChr, $self->dbName, $chrPosition, $self->{_rounder}->round($_), undef, $count < $self->commitEvery, $self->overwrite);
         $count = $count < $self->commitEvery ? $count + 1 : 0;
 
         #this must come AFTER we store the position's data in db, since we have a starting pos

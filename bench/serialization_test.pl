@@ -90,7 +90,7 @@ my %meta = (
         name => 'Data::MsgPack',
         use  => 'use Data::MessagePack;',
         init => sub {
-            $msgpack = Data::MessagePack->new()->prefer_float32();
+            $msgpack = Data::MessagePack->new()->prefer_integer()->prefer_float32();
         },
     },
     mp => {
