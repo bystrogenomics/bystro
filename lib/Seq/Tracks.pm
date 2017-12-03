@@ -238,7 +238,6 @@ sub _buildTrackGetters {
   my %trackOrder;
   if($self->outputOrder) {
     my %tracks = map { $_->{name} => $_ } @$trackConfigurationAref;
-
     my $i = 0;
     for my $name (@{$self->outputOrder}) {
       if(!defined $tracks{$name}) {
@@ -247,6 +246,11 @@ sub _buildTrackGetters {
 
       $trackOrder{$name} = $i;
       $i++;
+    }
+
+    if($i < @$trackConfigurationAref) {
+      my @notSeen = map { exists $trackOrder{$_->{name}} ? () : $_->{name} } @$trackConfigurationAref;
+      $self->log('fatal', "When using 'outputOrder', specify all tracks, missing: " . join(',', @notSeen));
     }
   }
 
@@ -287,7 +291,7 @@ sub _buildTrackGetters {
     $trackGettersByName->{$track->{name}} = $track;
 
     #allows us to preserve order when iterating over all track getters
-    if(%trackOrder) {
+    if(%trackOrder && $track->{name}) {
       $orderedTrackGettersAref->[$trackOrder{$track->{name}} ] = $track;
     } else {
       push @$orderedTrackGettersAref, $track;
