@@ -42,7 +42,9 @@ sub BUILD {
   my $self = shift;
 
   #  Append the 'dist' feature to the header
-  $self->headers->addFeaturesToHeader('dist', $self->name);
+  if($self->dist) {
+    $self->headers->addFeaturesToHeader('dist', $self->name);
+  }
 
   # Avoid accessor penalties in Mouse/Moose;
   $self->{_eq} = !$self->to || $self->from eq $self->to;
@@ -65,11 +67,19 @@ sub get {
   # $_[8] == <Int> $position : the genomic position
   ################# Cache track's region data ##############
   #$self->{_regionData}{$chr} //= $self->{_db}->dbReadAll( $self->regionTrackPath($_[2]) );
+
+  # WARNING: If $_[1]->[$_[0]->{_dbName} isn't defined, will be treated as the 0 index!!!
+  # therefore return here if that is the case
+  if(!defined $_[1]->[$_[0]->{_dbName}]) {
+    return $_[7];
+  }
+
   $_[0]->{_regionData}{$_[2]} //= $_[0]->{_db}->dbReadAll( $_[0]->regionTrackPath($_[2]) );
 
+  # WARNING: If $_[1]->[$_[0]->{_dbName} isn't defined, will be treated as the 0 index!!!
   #            $self->{_regionData}{$_[2]}[$href->[$self->{_dbName}}]];
   my $geneDb = $_[0]->{_regionData}{$_[2]}[$_[1]->[$_[0]->{_dbName}]];
-  # p $geneDb
+
   # exit;
   # We have features, so let's find those and return them
   # Since all features are stored in some shortened form in the db, we also

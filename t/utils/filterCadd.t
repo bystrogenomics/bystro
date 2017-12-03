@@ -23,14 +23,14 @@ Seq::DBManager::setGlobalDatabaseDir($config->{database_dir});
 
 my $db = Seq::DBManager->new();
 
-$config->{tracks}[1]{local_files} = ['test.filterCadd.cadd.chr22.txt', 'test.filterCadd.cadd.chr1.txt.gz', 'test.filterCadd.cadd.chr2.txt'];
+$config->{tracks}{tracks}[1]{local_files} = ['test.filterCadd.cadd.chr22.txt', 'test.filterCadd.cadd.chr1.txt.gz', 'test.filterCadd.cadd.chr2.txt'];
 
 open(my $fh, '>', './t/utils/filterCadd.yml');
 
 print $fh Dump($config);
 
-my $ref = Seq::Tracks::Reference->new($config->{tracks}[0]);
-my $cadd = Seq::Tracks::Cadd->new($config->{tracks}[1]);
+my $ref = Seq::Tracks::Reference->new($config->{tracks}{tracks}[0]);
+my $cadd = Seq::Tracks::Cadd->new($config->{tracks}{tracks}[1]);
 
 my $rounder = Seq::Tracks::Score::Build::Round->new();
 
@@ -115,7 +115,7 @@ ok($success == 1, "exited cleanly");
 
 $config = LoadFile('./t/utils/filterCadd.yml');
 
-my $caddTrack = $config->{tracks}[1];
+my $caddTrack = $config->{tracks}{tracks}[1];
 
 open($fh, '<', './t/utils/raw/cadd/test.filterCadd.cadd.chr1.chr1.filtered.txt');
 
@@ -155,7 +155,7 @@ ok($success == 1, "exited cleanly");
 
 $config = LoadFile('./t/utils/filterCadd.yml');
 
-$caddTrack = $config->{tracks}[1];
+$caddTrack = $config->{tracks}{tracks}[1];
 
 open($fh, '<', './t/utils/raw/cadd/test.filterCadd.cadd.chr2.chr2.filtered.txt');
 
@@ -195,7 +195,7 @@ ok($success == 1, "exited cleanly");
 
 $config = LoadFile('./t/utils/filterCadd.yml');
 
-$caddTrack = $config->{tracks}[1];
+$caddTrack = $config->{tracks}{tracks}[1];
 
 my @expectedPaths = (
   path('./t/utils/raw/cadd/test.filterCadd.cadd.chr1.chr1.filtered.txt')->absolute->stringify(),

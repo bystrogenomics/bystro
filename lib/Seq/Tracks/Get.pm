@@ -57,7 +57,13 @@ sub get {
   # $_[5] == <Int> $alleleIdx  : if this is a single-line multiallelic, the allele index
   # $_[6] == <Int> $positionIdx : the position in the indel, if any
   # $_[7] == <ArrayRef> $outAccum : a reference to the output, which we mutate
-  
+
+  # TODO: decide whether we want to revert to old system of returning a bunch of !
+  # one for each feature
+  if(!defined $_[1]->[$_[0]->{_dbName}]) {
+    return $_[7];
+  }
+
   #internally the data is store keyed on the dbName not name, to save space
   # 'some dbName' => someData
   #dbName is simply the track name as stored in the database

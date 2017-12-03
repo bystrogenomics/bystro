@@ -43,42 +43,53 @@ statistics:
   siteTypeField: refSeq.siteType
 temp_dir: /mnt/annotator/bystro-dev/tmp
 tracks:
-- build_author: ec2-user
-  build_date: 2017-11-27T05:44:00
-  local_files:
-  - chrM.fa.gz
-  name: ref
-  type: reference
-- features:
-  - kgID
-  - mRNA
-  - spID
-  - spDisplayID
-  - protAcc
-  - description
-  - rfamAcc
-  - name
-  - name2
-  local_files:
-  - hg19.refGene.chrM
-  name: refSeq
-  type: gene
-- dist: true
-  features:
-  - name
-  - name2
-  from: txStart
-  name: refSeq.nearest
-  ref: refSeq
-  to: txEnd
-  type: nearest
-- dist: true
-  features:
-  - name
-  - name2
-  from: txStart
-  name: refSeq.nearestTss
-  ref: refSeq
-  type: nearest
+  tracks:
+  - build_author: ec2-user
+    build_date: 2017-11-27T05:44:00
+    local_files:
+    - chrM.fa.gz
+    name: ref
+    type: reference
+  - features:
+    - kgID
+    - mRNA
+    - spID
+    - spDisplayID
+    - protAcc
+    - description
+    - rfamAcc
+    - name
+    - name2
+    local_files:
+    - hg19.refGene.chrM
+    name: refSeq
+    type: gene
+  - dist: true
+    features:
+    - name
+    - name2
+    from: txStart
+    name: refSeq.nearest
+    ref: refSeq
+    to: txEnd
+    type: nearest
+  - dist: true
+    features:
+    - name
+    - name2
+    from: txStart
+    name: refSeq.nearestTss
+    ref: refSeq
+    type: nearest
+  - dist: false
+    features:
+    - name
+    - name2
+    from: txStart
+    to: txEnd
+    name: refSeq.gene
+    ref: refSeq
+    storeNearest: false
+    type: nearest
 vcfProcessor: bystro-vcf
 
