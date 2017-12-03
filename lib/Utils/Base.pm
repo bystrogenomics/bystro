@@ -97,14 +97,14 @@ sub BUILD {
   # Must happen here, because we need to account for the case where track isn't found
   # And you cannot throw an error from within a default, and I think it is
   # More clear to throw a fatal error from the BUILD method than a builder=> method
-  my $trackIndex = first_index { $_->{name} eq $self->name } @{ $self->_decodedConfig->{tracks} };
+  my $trackIndex = first_index { $_->{name} eq $self->name } @{ $self->_decodedConfig->{tracks}{tracks} };
 
   if($trackIndex == -1) {
     $self->log('fatal', "Desired track " . $self->name . " wasn't found");
     return;
   }
 
-  $self->_setWantedTrack( $self->_decodedConfig->{tracks}[$trackIndex] );
+  $self->_setWantedTrack( $self->_decodedConfig->{tracks}{tracks}[$trackIndex] );
 
   my $dir = path($self->_localFilesDir);
 

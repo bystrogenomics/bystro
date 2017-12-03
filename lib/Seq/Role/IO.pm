@@ -149,6 +149,10 @@ sub getCleanFields {
   return undef;
 }
 
+sub getLineEndings {
+  return $/;
+}
+
 sub setLineEndings {
   my ($self, $firstLine) = @_;
 

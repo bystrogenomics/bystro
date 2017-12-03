@@ -48,12 +48,24 @@ sub validateInputFile {
   my $fh = $self->get_read_fh($inputFileAbsPath);
   my $firstLine = <$fh>;
 
+  my $orig = $self->getLineEndings();
+
+  my $err = $self->setLineEndings($firstLine);
+
+  if($err) {
+    return ($err, undef);
+  }
+
+  chomp $firstLine;
+
   my $headerFieldsAref = $self->getCleanFields($firstLine);
 
   my $inputHandler = Seq::InputFile->new();
 
   #last argument to not die, we want to be able to convert
   my $snpHeaderErr = $inputHandler->checkInputFileHeader($headerFieldsAref, 1);
+
+  $self->setLineEndings($orig);
 
   if(!defined $headerFieldsAref || defined $snpHeaderErr) {
     return (0, 'vcf');

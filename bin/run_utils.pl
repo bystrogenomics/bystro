@@ -66,7 +66,7 @@ for my $wantedName (split ',', $names) {
     $options{maxThreads} = $maxThreads;
   }
 
-  for my $track (@{$config->{tracks}}) {
+  for my $track (@{$config->{tracks}{tracks}}) {
     if($track->{name} eq $wantedName) {
       $utilConfigs = $track->{utils};
       last;
@@ -86,7 +86,7 @@ for my $wantedName (split ',', $names) {
 
     # config may be mutated, by the last utility
     $config = LoadFile($yaml_config);
-    my $utilConfig = $config->{tracks}[$trackIdx]{utils}[$utilIdx];
+    my $utilConfig = $config->{tracks}{tracks}[$trackIdx]{utils}[$utilIdx];
 
     my $utilName = $utilConfig->{name};
 

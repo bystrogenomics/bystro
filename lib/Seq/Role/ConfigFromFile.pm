@@ -61,11 +61,11 @@ sub new_with_config {
   #Since they are meant to operate as independent units
   my @nonTrackKeys = grep { $_ ne $tracksKey } keys %opts;
 
-  if( ref $opts{$tracksKey} ne 'ARRAY') {
+  if( ref $opts{$tracksKey}{$tracksKey} ne 'ARRAY') {
     croak "expect $tracksKey to contain an array of data";
   }
 
-  for my $trackHref ( @{ $opts{$tracksKey} } ) {
+  for my $trackHref ( @{ $opts{$tracksKey}{$tracksKey} } ) {
     for my $key (@nonTrackKeys) {
       $trackHref->{$key} = $opts{$key};
     }

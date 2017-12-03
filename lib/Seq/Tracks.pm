@@ -67,6 +67,9 @@ has tracks => (
   isa => 'ArrayRef[HashRef]'
 );
 
+has outputOrder => (
+  is => 'ro', isa => 'ArrayRef[Str]'
+);
 ########################### Public Methods #################################
 
 # @param <ArrayRef> trackBuilders : ordered track builders
@@ -232,7 +235,20 @@ sub _buildTrackGetters {
   # If so, remove the tracks, free the memory
   _clearStaticGetters();
 
-  for my $trackHref (@$trackConfigurationAref ) {
+  my @trackOrder;
+  if($self->outputOrder) {
+    my %tracks = map { $_->{name} => $_ } @$trackConfigurationAref;
+
+    for my $name (@{$self->outputOrder}) {
+      if(!defined $tracks{$name}) {
+        $self->log('fatal', "Uknown track $name specified in 'outputOrder'");
+      }
+
+      push @trackOrder, $tracks{$name};
+    }
+  }
+
+  for my $trackHref (@trackOrder ? @trackOrder : @$trackConfigurationAref) {
     if($trackHref->{ref}) {
       $trackHref->{ref} = $trackBuildersByName->{ $trackHref->{ref} };
     }

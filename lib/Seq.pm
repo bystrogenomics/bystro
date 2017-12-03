@@ -79,58 +79,6 @@ sub BUILD {
   $self->{_refTrackGetter} = $self->tracksObj->getRefTrackGetter();
   $self->{_trackGettersExceptReference} = $self->tracksObj->getTrackGettersExceptReference();
 
-  ######### Build the header, and write it as the first line #############
-  my $headers = Seq::Headers->new();
-
-  # Bystro has a single pseudo track, that is always present, regardless of whether
-  # any tracks exist
-  # Note: Field order is required to stay in the follwoing order, because
-  # current API allows use of constant as array index:
-  # these to be configured:
-  # idx 0:  $self->chromField,
-  # idx 1: $self->posField,
-  # idx 2: $self->typeField,
-  # idx 3: $self->discordantField,
-  # index 4: $self->altField,
-  # index 5: $self->heterozygotesField,
-  # index 6: $self->homozygotesField
-  $headers->addFeaturesToHeader([
-    #index 0
-    $self->chromField,
-    #index 1
-    $self->posField,
-    #index 2
-    $self->typeField,
-    #index 3
-    $self->discordantField,
-    #index 4
-    $self->altField,
-    #index 5
-    $self->trTvField,
-    #index 6
-    $self->heterozygotesField,
-    #index 7
-    $self->heterozygosityField,
-    #index 8
-    $self->homozygotesField,
-    #index 9
-    $self->homozygosityField,
-    #index 10
-    $self->missingField,
-    #index 11
-    $self->missingnessField,
-    #index 12
-    $self->sampleMafField,=
-  ], undef, 1);
-
-  $self->{_lastHeaderIdx} = $#{$headers->get()};
-
-  $self->{_trackIdx} = $headers->getParentFeaturesMap();
-
-  ################### Creates the output file handler #################
-  # Used in makeAnnotationString
-  $self->{_outputter} = Seq::Output->new();
-
   ################## Make the full output path ######################
   # The output path always respects the $self->output_file_base attribute path;
   $self->{_outPath} = $self->_workingDir->child($self->outputFilesInfo->{annotation});
@@ -141,16 +89,6 @@ sub annotate {
 
   $self->log( 'info', 'Checking input file format' );
 
-  my $err;
-  my $fh = $self->get_read_fh($self->input_file);
-  my $firstLine = <$fh>;
-
-  $err = $self->setLineEndings($firstLine);
-
-  if($err) {
-    $self->_errorWithCleanup($err);
-    return ($err, undef);
-  }
 
   # TODO: For now we only accept tab separated files
   # We could change this, although comma separation causes may cause with our fields
@@ -164,6 +102,7 @@ sub annotate {
   # }
 
   # Calling in annotate allows us to error early
+  my $err;
   ($err, $self->{_chunkSize}) = $self->getChunkSize($self->input_file, $self->max_threads);
 
   if($err) {
@@ -208,10 +147,14 @@ sub annotateFile {
   my $self = shift;
   my $type = shift;
 
+  ################### Creates the output file handler #################
+  # Used in makeAnnotationString
+  my $outputter = Seq::Output->new();
+
   my $errPath = $self->_workingDir->child($self->input_file->basename . '.vcf-log.log');
   my $inPath = $self->inputFilePath;
   my $echoProg = $self->isCompressedSingle($inPath) ? $self->gzip . ' -d -c' : 'cat';
-  my $delim = $self->{_outputter}->delimiters->emptyFieldChar;
+  my $delim = $outputter->delimiters->emptyFieldChar;
   my $minGq = $self->minGq;
 
   my $fh;
@@ -231,7 +174,39 @@ sub annotateFile {
   my $outFh = $self->get_write_fh( $self->{_outPath} );
 
   ########################## Write the header ##################################
+
+  ######### Build the header, and write it as the first line #############
   my $headers = Seq::Headers->new();
+
+  my $header = <$fh>;
+
+  $self->setLineEndings($header);
+
+  chomp $header;
+
+  my @header = split '\t', $header;
+
+  # Our header class checks the name of each feature
+  # It may be, more than likely, that the pre-processor names the 4th column 'ref'
+  # We replace this column with trTv
+  # This not only now reflects its actual function
+  # but prevents name collision issues resulting in the wrong header idx
+  # being generated for the ref track
+  $header[3] = $self->discordantField;
+
+  # Bystro takes data from a file pre-processor, which spits out a common
+  # intermediate format
+  # This format is very flexible, in fact Bystro doesn't care about the output
+  # of the pre-processor, provided that the following is found in the corresponding
+  # indices:
+  # idx 0: chromosome,
+  # idx 1: position
+  # idx 3: the reference (we rename this to discordant)
+  # idx 4: the alternate allele
+
+  # Prepend all of the headers created by the pre-processor
+  $headers->addFeaturesToHeader(\@header, undef, 1);
+
   my $outputHeader = $headers->getString();
 
   say $outFh $outputHeader;
@@ -258,20 +233,12 @@ sub annotateFile {
     gather => $progressFunc,
   };
 
-  my $trackIndices = $self->{_trackIdx};
-  my $refTrackIdx = $self->{_trackIdx}{$self->{_refTrackGetter}->name};
+  my $trackIndices = $headers->getParentFeaturesMap();
+
+  my $refTrackIdx = $trackIndices->{$self->{_refTrackGetter}->name};
   my @trackGettersExceptReference = @{$self->{_trackGettersExceptReference}};
   my %wantedChromosomes = %{ $self->{_refTrackGetter}->chromosomes };
   my $maxDel = $self->maxDel;
-
-  my $err = $self->setLineEndings("\n");
-
-  if($err) {
-    $self->_errorWithCleanup($err);
-    return ($err, undef);
-  }
-
-  my $header = <$fh>;
 
   mce_loop_f {
     #my ($mce, $slurp_ref, $chunk_id) = @_;
@@ -384,7 +351,7 @@ sub annotateFile {
     }
 
     if(@lines) {
-      MCE->gather(scalar @lines, $total - @lines, undef, $self->{_outputter}->makeOutputString(\@lines));
+      MCE->gather(scalar @lines, $total - @lines, undef, $outputter->makeOutputString(\@lines));
     } else {
       MCE->gather(0, $total);
     }
@@ -418,7 +385,7 @@ sub annotateFile {
 
   system('sync');
 
-  $err = $self->_moveFilesToOutputDir();
+  my $err = $self->_moveFilesToOutputDir();
 
   # If we have an error moving the output files, we should still return all data
   # that we can

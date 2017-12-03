@@ -110,7 +110,7 @@ sub BUILD {
     #Currently we expect buildTrack to die if it didn't properly complete
     $builder->buildTrack();
 
-    my $track = first{$_->{name} eq $builder->name} @{$decodedConfig->{tracks}};
+    my $track = first{$_->{name} eq $builder->name} @{$decodedConfig->{tracks}{tracks}};
 
     $track->{build_date} = $buildDate;
     $track->{build_author} = $buildAuthor;
