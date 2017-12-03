@@ -235,20 +235,29 @@ sub _buildTrackGetters {
   # If so, remove the tracks, free the memory
   _clearStaticGetters();
 
-  my @trackOrder;
+  my %trackOrder;
   if($self->outputOrder) {
     my %tracks = map { $_->{name} => $_ } @$trackConfigurationAref;
 
+    my $i = 0;
     for my $name (@{$self->outputOrder}) {
       if(!defined $tracks{$name}) {
         $self->log('fatal', "Uknown track $name specified in 'outputOrder'");
       }
 
-      push @trackOrder, $tracks{$name};
+      $trackOrder{$name} = $i;
+      $i++;
     }
   }
 
-  for my $trackHref (@trackOrder ? @trackOrder : @$trackConfigurationAref) {
+  # allow us to place tracks at specific indices
+  $#$orderedTrackGettersAref = $#$trackConfigurationAref;
+
+  # Iterate over the original order
+  # This is important, because otherwise we may accidentally set the
+  # tracks database order based on the output order
+  # if _buildTrackGetters is called before _buildTrackBuilders
+  for my $trackHref (@$trackConfigurationAref) {
     if($trackHref->{ref}) {
       $trackHref->{ref} = $trackBuildersByName->{ $trackHref->{ref} };
     }
@@ -275,12 +284,18 @@ sub _buildTrackGetters {
     #because at the moment, users are allowed to rename their tracks
     #by name : 
       #   something : someOtherName
-    $trackGettersByName->{$track->{name} } = $track;
+    $trackGettersByName->{$track->{name}} = $track;
 
     #allows us to preserve order when iterating over all track getters
-    push @$orderedTrackGettersAref, $track;
+    if(%trackOrder) {
+      $orderedTrackGettersAref->[$trackOrder{$track->{name}} ] = $track;
+    } else {
+      push @$orderedTrackGettersAref, $track;
+    }
+  }
 
-    push @{$trackGettersByType->{$trackHref->{type} } }, $track;
+  for my $track (@$orderedTrackGettersAref) {
+    push @{$trackGettersByType->{$track->{type}} }, $track;
   }
 
   if(!$seenRef) {
