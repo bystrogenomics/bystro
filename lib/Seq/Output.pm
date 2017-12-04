@@ -18,10 +18,12 @@ has delimiters => (is => 'ro', isa => 'Seq::Output::Delimiters', default => sub 
   return Seq::Output::Delimiters->new();
 });
 
+has header => (is => 'ro', isa => 'Seq::Headers', required => 1);
+
 sub BUILD {
   my $self = shift;
 
-  $self->{_headers} = Seq::Headers->new();
+  $self->{_orderedHeader} = $self->header->getOrderedHeaderNoMap();
 }
 
 # TODO: will be singleton, configured once for all consumers
@@ -37,49 +39,33 @@ sub initialize {
 #which we are going to re-use in our output (namely chr, position, type alleles)
 sub makeOutputString {
   my ($self, $outputDataAref) = @_;
-  # my $fieldSeparator = $self->{_fieldSeparator};
+
   my $emptyFieldChar = $self->delimiters->emptyFieldChar;
-
-  my $rowIdx;
-
   my $alleleDelimiter = $self->delimiters->alleleDelimiter;
   my $positionDelimiter = $self->delimiters->positionDelimiter;
   my $valueDelimiter = $self->delimiters->valueDelimiter;
   my $fieldSeparator = $self->delimiters->fieldSeparator;
 
-  if(!$self->{_multiDepth}) {
-    my @headers = @{ $self->{_headers}->getOrderedHeaderNoMap() };
-
-    $self->{_multiDepth} = { map {
-      $_ => ref $headers[$_] ? 3 : 2;
-    } 0 .. $#headers };
-
-    $self->{_orderedHeader} = \@headers;
-  }
-
-  my $trackIdx = -1;
-  my $multiallelic;
-  my $featureData;
+  my $trackIdx;
   for my $row (@$outputDataAref) {
     next if !$row;
 
-    $rowIdx = 0;
-    $trackIdx = 0;
+    $trackIdx = -1;
 
     TRACK_LOOP: for my $trackName ( @{$self->{_orderedHeader}} ) {
+      $trackIdx++;
+
       if(ref $trackName) {
         if(!defined $row->[$trackIdx] || !@{$row->[$trackIdx]}) {
           $row->[$trackIdx] = join($fieldSeparator, ($emptyFieldChar) x @$trackName);
 
-          $trackIdx++;
           next TRACK_LOOP;
         }
 
         for my $featureIdx (0 .. $#$trackName) {
-          for my $alleleData (@{$row->[$trackIdx][$featureIdx]}) {
-            $alleleData //= $emptyFieldChar;
-
-            for my $positionData (@$alleleData) {
+          # for my $alleleData (@{$row->[$trackIdx][$featureIdx]}) {
+          #   $alleleData //= $emptyFieldChar;
+            for my $positionData (@{$row->[$trackIdx][$featureIdx]}) {
               $positionData //= $emptyFieldChar;
 
               if(ref $positionData) {
@@ -91,42 +77,38 @@ sub makeOutputString {
                   : $emptyFieldChar
                 } @$positionData);
               }
-            }
-            $alleleData = @$alleleData > 1 ? join($positionDelimiter, @$alleleData) : $alleleData->[0];
+            # }
+            # $alleleData = @$alleleData > 1 ? join($positionDelimiter, @$alleleData) : $alleleData->[0];
           }
 
-          # p  $row->[$trackIdx][$featureIdx];
           $row->[$trackIdx][$featureIdx] =
             @{$row->[$trackIdx][$featureIdx]} > 1 
-            ? join($alleleDelimiter, @{$row->[$trackIdx][$featureIdx]})
+            ? join($positionDelimiter, @{$row->[$trackIdx][$featureIdx]})
             : $row->[$trackIdx][$featureIdx][0];
         }
 
         $row->[$trackIdx] = join($fieldSeparator, @{$row->[$trackIdx]});
-
       } else {
         # Nothing to be done, it's already a scalar
         if(!ref $row->[$trackIdx]) {
           $row->[$trackIdx] //= $emptyFieldChar;
 
-          $trackIdx++;
           next TRACK_LOOP
         }
 
         if(!defined $row->[$trackIdx] || ref $row->[$trackIdx] && !@{$row->[$trackIdx]}) {
           $row->[$trackIdx] = $emptyFieldChar;
 
-          $trackIdx++;
           next TRACK_LOOP;
         }
 
-        for my $alleleData (@{$row->[$trackIdx]}) {
-          if(!defined $alleleData) {
-            $alleleData = $emptyFieldChar;
-            next;
-          }
+        # for my $alleleData (@{$row->[$trackIdx]}) {
+        #   if(!defined $alleleData) {
+        #     $alleleData = $emptyFieldChar;
+        #     next;
+        #   }
 
-          for my $positionData (@$alleleData) {
+          for my $positionData (@{$row->[$trackIdx]}) {
             $positionData //= $emptyFieldChar;
 
             if(ref $positionData) {
@@ -134,13 +116,11 @@ sub makeOutputString {
             }
           }
 
-          $alleleData = @$alleleData > 1 ? join($positionDelimiter, @$alleleData) : $alleleData->[0];
-        }
+        #   $alleleData = @$alleleData > 1 ? join($positionDelimiter, @$alleleData) : $alleleData->[0];
+        # }
 
-        $row->[$trackIdx] = join($alleleDelimiter, @{$row->[$trackIdx]});
+        $row->[$trackIdx] = join($positionDelimiter, @{$row->[$trackIdx]});
       }
-
-      $trackIdx++;
     }
     
     $row = join("\t", @$row);

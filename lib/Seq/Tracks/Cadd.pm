@@ -37,7 +37,7 @@ sub get {
   if (!defined $order->{$_[3]} ) {
     $_[0]->log('warn', "reference base $_[3] doesn't look valid, in Cadd.pm");
     
-    $_[7][$_[5]][$_[6]] = undef;
+    $_[7][$_[6]] = undef;
 
     return $_[7];
   }
@@ -46,27 +46,27 @@ sub get {
   # the CADD scores read were not guaranteed to be sorted
   # Alternatively the CADD data for this position may be missing (not defined)
   if(!defined $_[1]->[$_[0]->{_dbName}] || !@{$_[1]->[$_[0]->{_dbName}]}) {
-    $_[7][$_[5]][$_[6]] = undef;
+    $_[7][$_[6]] = undef;
 
     return $_[7];
   }
   
   #if (defined $order->{ $refBase }{ $altAlleles } ) {
   if (defined $order->{$_[3]}{$_[4]} ) {
-    $_[7][$_[5]][$_[6]] = $_[1]->[$_[0]->{_dbName}][ $order->{$_[3]}{$_[4]} ] / $_[0]->{_s};
+    $_[7][$_[6]] = $_[1]->[$_[0]->{_dbName}][ $order->{$_[3]}{$_[4]} ] / $_[0]->{_s};
 
     return $_[7];
   }
 
   # For indels, which will be the least frequent, return it all
   if (length( $_[4] ) > 1) {
-    $_[7][$_[5]][$_[6]] = [ map { $_ / $_[0]->{_s} } @{$_[1]->[ $_[0]->{_dbName} ]} ];
+    $_[7][$_[6]] = [ map { $_ / $_[0]->{_s} } @{$_[1]->[ $_[0]->{_dbName} ]} ];
 
     return $_[7];
   }
 
   # Allele isn't an indel, but !defined $order->{ $refBase }{ $altAlleles }
-  $_[7][$_[5]][$_[6]] = undef;
+  $_[7][$_[6]] = undef;
 
   return $_[7];
 }

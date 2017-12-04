@@ -20,6 +20,7 @@ use MCE::Loop;
 
 use Seq::InputFile;
 use Seq::Output;
+use Seq::Output::Delimiters;
 use Seq::Headers;
 
 use Seq::DBManager;
@@ -149,12 +150,12 @@ sub annotateFile {
 
   ################### Creates the output file handler #################
   # Used in makeAnnotationString
-  my $outputter = Seq::Output->new();
+  my $delims = Seq::Output::Delimiters->new();
 
   my $errPath = $self->_workingDir->child($self->input_file->basename . '.vcf-log.log');
   my $inPath = $self->inputFilePath;
   my $echoProg = $self->isCompressedSingle($inPath) ? $self->gzip . ' -d -c' : 'cat';
-  my $delim = $outputter->delimiters->emptyFieldChar;
+  my $delim = $delims->emptyFieldChar;
   my $minGq = $self->minGq;
 
   my $fh;
@@ -210,6 +211,9 @@ sub annotateFile {
   my $outputHeader = $headers->getString();
 
   say $outFh $outputHeader;
+
+  # Now that header is prepared, make the outputter
+  my $outputter = Seq::Output->new({header => $headers});
 
   ########################## Tell stats program about our annotation ##############
   # TODO: error handling if fh fails to open
@@ -330,7 +334,7 @@ sub annotateFile {
             $track->get($indelDbData[$posIdx], $fields[0], $indelRef[$posIdx], $fields[4], 0, $posIdx, $fields[$trackIndices->{$track->name}], $zeroPos + $posIdx);
           }
 
-          $fields[$refTrackIdx][0][$posIdx] = $indelRef[$posIdx];
+          $fields[$refTrackIdx][$posIdx] = $indelRef[$posIdx];
         }
 
         # If we have multiple indel alleles at one position, need to clear stored values
@@ -342,11 +346,12 @@ sub annotateFile {
           $track->get($dataFromDbAref, $fields[0], $fields[3], $fields[4], 0, 0, $fields[$trackIndices->{$track->name}], $zeroPos);
         }
 
-        $fields[$refTrackIdx][0][0] = $self->{_refTrackGetter}->get($dataFromDbAref);
+        $fields[$refTrackIdx][0] = $self->{_refTrackGetter}->get($dataFromDbAref);
       }
 
        # 3 holds the input reference, we'll replace this with the discordant status
       $fields[3] = $self->{_refTrackGetter}->get($dataFromDbAref) ne $fields[3] ? 1 : 0;
+
       push @lines, \@fields;
     }
 

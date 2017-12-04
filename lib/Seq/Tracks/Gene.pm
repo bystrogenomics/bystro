@@ -176,7 +176,7 @@ sub get {
   # ~1/2 of sites will have no gene track entry (including all non-coding, 2% coding)
   if(!defined $_[1]->[$_[0]->{_dbName}]) {
     for my $i (@{$_[0]->{_featIdx}}) {
-      $_[7]->[$i][$_[5]][$_[6]] = undef;
+      $_[7]->[$i][$_[6]] = undef;
     }
 
     $_[7]->[$_[0]->{_siteFidx}][$_[5]][$_[6]] = $intergenic;
@@ -393,7 +393,7 @@ sub accumOut {
   my $i = 0;
   for my $feature (@{$_[3]}) {
     #$outAccum->[$featureIdx][$alleleIdx][$positionIdx] = $outAref->[$featureIdx];
-    $_[2]->[$i][$_[0]][$_[1]] = $feature;
+    $_[2]->[$i][$_[1]] = $feature;
     $i++;
   }
 

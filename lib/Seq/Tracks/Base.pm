@@ -204,7 +204,7 @@ around BUILDARGS => sub {
 
   # If features are passed to as hashes (to accomodate their data type) get back to array
   my @featureLabels;
-
+  my %seenFeatures;
   for my $origFeature (@{$data->{features} } ) {
     if (ref $origFeature eq 'HASH') {
       my ($name, $type) = %$origFeature; #Thomas Wingo method
@@ -216,6 +216,18 @@ around BUILDARGS => sub {
     }
 
     push @featureLabels, $origFeature;
+  }
+
+  my $idx = 0;
+  for my $feat (@featureLabels) {
+    if($seenFeatures{$feat}) {
+      $class->log('warn', "$feat is listed twice under " . $data->{name} . " features, removing");
+      splice(@featureLabels, $idx, 1);
+    }
+
+    $seenFeatures{$feat} = 1;
+
+    $idx++;
   }
 
   $data->{features} = \@featureLabels;

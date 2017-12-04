@@ -62,7 +62,7 @@ sub get {
       # at this pposiiton, and all fields represent a single value
       for my $idx (@{$_[0]->{_fieldIdxRange}}) {
         #$outAccum->[$idx][$alleleIdx][$positionIdx] = $href->[$self->{_dbName}][$self->{_fieldDbNames}[$idx]] }
-        $_[7]->[$idx][$_[5]][$_[6]] = $data->[$_[0]->{_fieldDbNames}[$idx]];
+        $_[7]->[$idx][$_[6]] = $data->[$_[0]->{_fieldDbNames}[$idx]];
       }
     }
 
@@ -81,7 +81,7 @@ sub get {
     if($alt eq $_[4]) {
       for my $fieldIdx (@{$_[0]->{_fieldIdxRange}}) {
         #$outAccum->[$fieldIdx][$alleleIdx][$positionIdx] = $data->[$self->{_fieldDbNames}[$dataIdx]] }
-        $_[7]->[$fieldIdx][$_[5]][$_[6]] = $data->[$_[0]->{_fieldDbNames}[$fieldIdx]][$dataIdx];
+        $_[7]->[$fieldIdx][$_[6]] = $data->[$_[0]->{_fieldDbNames}[$fieldIdx]][$dataIdx];
       }
 
       #return $outAccum;

@@ -41,11 +41,6 @@ has dist => (is => 'ro', isa => 'Bool', default => 1);
 sub BUILD {
   my $self = shift;
 
-  #  Append the 'dist' feature to the header
-  if($self->dist) {
-    $self->headers->addFeaturesToHeader('dist', $self->name);
-  }
-
   # Avoid accessor penalties in Mouse/Moose;
   $self->{_eq} = !$self->to || $self->from eq $self->to;
   $self->{_fromD} = $self->getFieldDbName($self->from);
@@ -54,8 +49,11 @@ sub BUILD {
 
   if($self->dist) {
     $self->{_dist} = 1;
+    $self->headers->addFeaturesToHeader('dist', $self->name);
     push @{$self->{_i}}, $#{$self->features} + 1;
   }
+
+  $self->{_fieldDbNames} = [ map { $self->getFieldDbName($_) } @{$self->features} ];
 
   $self->{_i} = [0 .. $#{$self->features}];
 };
@@ -112,7 +110,7 @@ sub get {
   my $idx = 0;
   for my $fieldDbName (@{$_[0]->{_fieldDbNames}}) {
     #$outAccum->[$idx][$alleleIdx][$positionIdx] = $href->[$self->{_dbName}][$self->{_fieldDbNames}[$idx]] }
-    $_[7]->[$idx][$_[5]][$_[6]] = $geneDb->[$fieldDbName];
+    $_[7]->[$idx][$_[6]] = $geneDb->[$fieldDbName];
     $idx++;
   }
 
@@ -122,15 +120,15 @@ sub get {
     if($_[0]->{_eq} || $_[8] < $geneDb->[$_[0]->{_fromD}]) {
       # We're before the starting position of the nearest region
       # Or we're only checking one boundary (the from boundary)
-      $_[7]->[$idx][$_[5]][$_[6]] = $geneDb->[$_[0]->{_fromD}] - $_[8];
+      $_[7]->[$idx][$_[6]] = $geneDb->[$_[0]->{_fromD}] - $_[8];
     } elsif($_[8] <= $geneDb->[$_[0]->{_toD}]) {
       # We already know $_[8] >= $geneDb->[$_[0]->{_fromD}]
       # so if we're here, we are within the range of the requested region at this position
       # ie == 0 distance to the region
-      $_[7]->[$idx][$_[5]][$_[6]] = 0
+      $_[7]->[$idx][$_[6]] = 0
     } else {
       # occurs after the 'to' position
-      $_[7]->[$idx][$_[5]][$_[6]] = $geneDb->[$_[0]->{_toD}] - $_[8];
+      $_[7]->[$idx][$_[6]] = $geneDb->[$_[0]->{_toD}] - $_[8];
     }
   }
 

@@ -67,7 +67,7 @@ sub get {
   #the value they stored
   if($_[0]->{_noFeatures}) {
     #$outAccum->[$alleleIdx][$positionIdx] = $href->[ $self->{_dbName} ]
-    $_[7]->[$_[5]][$_[6]] = $_[1]->[ $_[0]->{_dbName} ];
+    $_[7]->[$_[6]] = $_[1]->[ $_[0]->{_dbName} ];
 
     #return #$outAccum;
     return $_[7];
@@ -77,12 +77,8 @@ sub get {
   # one for each feature
   if(!defined $_[1]->[$_[0]->{_dbName}]) {
     for my $i (@{$_[0]->{_i}}) {
-      $_[7]->[$i][$_[5]][$_[6]] = undef;
+      $_[7]->[$i][$_[6]] = undef;
     }
-
-    if($_[0]->name eq 'clinvar') {
-      p $_[1];
-  }
 
     return $_[7];
   }
@@ -97,7 +93,7 @@ sub get {
   my $idx = 0;
   for my $fieldDbName (@{$_[0]->{_fieldDbNames}}) {
     #$outAccum->[$idx][$alleleIdx][$positionIdx] = $href->[$self->{_dbName}][$self->{_fieldDbNames}[$idx]] }
-    $_[7]->[$idx][$_[5]][$_[6]] = $_[1]->[$_[0]->{_dbName}][$fieldDbName];
+    $_[7]->[$idx][$_[6]] = $_[1]->[$_[0]->{_dbName}][$fieldDbName];
     $idx++;
   }
 

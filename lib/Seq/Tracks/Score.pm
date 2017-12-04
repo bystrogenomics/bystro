@@ -32,7 +32,7 @@ sub get {
   # $_[6] == <Int> $positionIdx : the position in the indel, if any
   # $_[7] == <ArrayRef> $outAccum : a reference to the output, which we mutate
 
-  $_[7][$_[5]][$_[6]] = defined $_[1]->[ $_[0]->{_dbName} ] ?  $_[1]->[ $_[0]->{_dbName} ] / $_[0]->{_s} : undef;
+  $_[7][$_[6]] = defined $_[1]->[ $_[0]->{_dbName} ] ?  $_[1]->[ $_[0]->{_dbName} ] / $_[0]->{_s} : undef;
 
   return $_[7];
 }
