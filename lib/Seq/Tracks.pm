@@ -28,8 +28,6 @@ use Clone 'clone';
 use Mouse 2;
 with 'Seq::Role::Message';
 
-use Seq::Headers;
-
 use Seq::Tracks::Reference;
 use Seq::Tracks::Score;
 use Seq::Tracks::Sparse;
@@ -68,7 +66,7 @@ has tracks => (
 );
 
 has outputOrder => (
-  is => 'ro', isa => 'ArrayRef[Str]'
+  is => 'ro', isa => 'Maybe[ArrayRef[Str]]'
 );
 ########################### Public Methods #################################
 
@@ -236,7 +234,7 @@ sub _buildTrackGetters {
   _clearStaticGetters();
 
   my %trackOrder;
-  if($self->outputOrder) {
+  if(defined $self->outputOrder) {
     my %tracks = map { $_->{name} => $_ } @$trackConfigurationAref;
     my $i = 0;
     for my $name (@{$self->outputOrder}) {
@@ -261,6 +259,7 @@ sub _buildTrackGetters {
   # This is important, because otherwise we may accidentally set the
   # tracks database order based on the output order
   # if _buildTrackGetters is called before _buildTrackBuilders
+  my $i = 0;
   for my $trackHref (@$trackConfigurationAref) {
     if($trackHref->{ref}) {
       $trackHref->{ref} = $trackBuildersByName->{ $trackHref->{ref} };
@@ -294,12 +293,14 @@ sub _buildTrackGetters {
     if(%trackOrder && $track->{name}) {
       $orderedTrackGettersAref->[$trackOrder{$track->{name}} ] = $track;
     } else {
-      push @$orderedTrackGettersAref, $track;
+      $orderedTrackGettersAref->[$i] = $track;
     }
+
+    $i++;
   }
 
   for my $track (@$orderedTrackGettersAref) {
-    push @{$trackGettersByType->{$track->{type}} }, $track;
+    push @{$trackGettersByType->{$track->type} }, $track;
   }
 
   if(!$seenRef) {

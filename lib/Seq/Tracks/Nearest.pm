@@ -51,7 +51,13 @@ sub BUILD {
   $self->{_fromD} = $self->getFieldDbName($self->from);
   $self->{_toD} = !$self->{_eq} ? $self->getFieldDbName($self->to) : undef;
   $self->{_db} = Seq::DBManager->new();
-  $self->{_dist} = $self->dist;
+
+  if($self->dist) {
+    $self->{_dist} = 1;
+    push @{$self->{_i}}, $#{$self->features} + 1;
+  }
+
+  $self->{_i} = [0 .. $#{$self->features}];
 };
 
 sub get {
@@ -68,9 +74,23 @@ sub get {
   ################# Cache track's region data ##############
   #$self->{_regionData}{$chr} //= $self->{_db}->dbReadAll( $self->regionTrackPath($_[2]) );
 
+  # If the position idx isn't 0 we're in an indel
+  # We should make a decision whether to tile across the genom
+  # My opinion atm is its substantially easier to just consider the indel
+  # from the starting position w.r.t nearest data
+  # However, this also removes useful information when an indel spans
+  # multiple regions (in our use case mostly genes)
+  # if($_[6] != 0) {
+  #   return $_[7];
+  # }
+
   # WARNING: If $_[1]->[$_[0]->{_dbName} isn't defined, will be treated as the 0 index!!!
   # therefore return here if that is the case
   if(!defined $_[1]->[$_[0]->{_dbName}]) {
+    # for my $i (@{$_[0]->{_i}}) {
+    #   $_[7]->[$i][$_[5]][$_[6]] = undef;
+    # }
+
     return $_[7];
   }
 

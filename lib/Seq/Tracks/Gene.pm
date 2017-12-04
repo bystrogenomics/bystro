@@ -101,22 +101,7 @@ sub BUILD {
 
   # Private variables, meant to cache often used data
   $self->{_allCachedDbNames} = {};
-  $self->{_allJoinFieldNames} = {};
-  $self->{_geneTrackRegionHref} = {};
-
-  # Avoid accessor penalties by aliasing to the $self hash
-  # These correspond to all of the sites held in Gene::Site
-  $self->{_strandKey} = $self->strandKey; 
-  $self->{_siteTypeKey} = $self->siteTypeKey;
-  $self->{_codonSequenceKey} = $self->codonSequenceKey;
-  $self->{_codonPositionKey} = $self->codonPositionKey;
-  $self->{_codonNumberKey} = $self->codonNumberKey;
-
-  # The values for these keys we calculate at get() time.
-  $self->{_refAminoAcidKey} = $self->refAminoAcidKey;
-  $self->{_newCodonKey} = $self->newCodonKey;
-  $self->{_newAminoAcidKey} = $self->newAminoAcidKey;
-  $self->{_exonicAlleleFunctionKey} = $self->exonicAlleleFunctionKey;
+  $self->{_regionDb} = {};
 
   $self->{_features} = $self->features;
   $self->{_dbName} = $self->dbName;
@@ -166,12 +151,40 @@ sub BUILD {
   }
 
   $self->{_lastFeatureIdx} = $#allGeneTrackFeatures;
-  # $self->{_featureIdxRange} = [ 0 .. $#allGeneTrackFeatures];
+  $self->{_featIdx} = [ 0 .. $#allGeneTrackFeatures ];
+
+  $self->{_strandFidx} = $self->{_featureIdxMap}{$self->strandKey};
+  $self->{_siteFidx} = $self->{_featureIdxMap}{$self->siteTypeKey};
+  # Avoid accessor penalties by aliasing to the $self hash
+  # These correspond to all of the sites held in Gene::Site
+  $self->{_codonFIdx} = $self->{_featureIdxMap}{$self->codonSequenceKey};
+  $self->{_codonPosFidx} = $self->{_featureIdxMap}{$self->codonPositionKey};
+  $self->{_codonNumFidx} = $self->{_featureIdxMap}{$self->codonNumberKey};
+
+  # The values for these keys we calculate at get() time.
+  $self->{_refAaFidx} = $self->{_featureIdxMap}{$self->refAminoAcidKey};
+  $self->{_altCodonFidx} = $self->{_featureIdxMap}{$self->newCodonKey};
+  $self->{_altAaFidx} = $self->{_featureIdxMap}{$self->newAminoAcidKey};
+  $self->{_alleleFuncFidx} = $self->{_featureIdxMap}{$self->exonicAlleleFunctionKey};
 };
 
 sub get {
+  #my ($self, $href, $chr, $refBase, $allele, $alleleIdx, $positionIdx, $outAccum) = @_;
+  #    $_[0], $_[1], $_[1], $_[3],   $_[4],   $_[5],      $_[6]         $_[7]
+  # WARNING: If $_[1]->[$_[0]->{_dbName} isn't defined, will be treated as the 0 index!!!
+  # therefore return here if that is the case
+  # ~1/2 of sites will have no gene track entry (including all non-coding, 2% coding)
+  if(!defined $_[1]->[$_[0]->{_dbName}]) {
+    for my $i (@{$_[0]->{_featIdx}}) {
+      $_[7]->[$i][$_[5]][$_[6]] = undef;
+    }
+
+    $_[7]->[$_[0]->{_siteFidx}][$_[5]][$_[6]] = $intergenic;
+    return $_[7];
+  }
+
   my ($self, $href, $chr, $refBase, $allele, $alleleIdx, $positionIdx, $outAccum) = @_;
-  
+
   my @out;
   # Set the out array to the size we need; undef for any indices we don't add here
   $#out = $self->{_lastFeatureIdx};
@@ -182,9 +195,9 @@ sub get {
 
   ################# Cache track's region data ##############
   # returns an array
-  $self->{_geneTrackRegionHref}{$chr} //= $self->{_db}->dbReadAll( $self->regionTrackPath($chr) );
+  $self->{_regionDb}{$chr} //= $self->{_db}->dbReadAll( $self->regionTrackPath($chr) );
 
-  my $geneDb = $self->{_geneTrackRegionHref}{$chr};
+  my $geneDb = $self->{_regionDb}{$chr};
 
   ####### Get all transcript numbers, and site data for this position #########
 
@@ -199,7 +212,7 @@ sub get {
   }
   
   if( !defined $txNumbers ) {
-    $out[ $idxMap->{$self->{_siteTypeKey}} ] = $intergenic;
+    $out[$_[0]->{_siteFidx}] = $intergenic;
     
     return accumOut($alleleIdx, $positionIdx, $outAccum, \@out);
   }
@@ -224,16 +237,16 @@ sub get {
   my $hasCodon;
   if($multiple) {
     for my $site (@$siteData) {
-      push @{ $out[ $idxMap->{$self->{_strandKey}} ] }, $site->[$strandIdx];
-      push @{ $out[ $idxMap->{$self->{_siteTypeKey}} ] }, $site->[$siteTypeIdx];
+      push @{ $out[$self->{_strandFidx}] }, $site->[$strandIdx];
+      push @{ $out[$self->{_siteFidx}] }, $site->[$siteTypeIdx];
 
       if(defined $site->[$codonSequenceIdx]) {
         $hasCodon //= 1;
       }
     }
   } else {
-    $out[ $idxMap->{$self->{_strandKey}} ] = $siteData->[$strandIdx];
-    $out[ $idxMap->{$self->{_siteTypeKey}} ] = $siteData->[$siteTypeIdx];
+    $out[$self->{_strandFidx}] = $siteData->[$strandIdx];
+    $out[$self->{_siteFidx}] = $siteData->[$siteTypeIdx];
 
     if(defined $siteData->[$codonSequenceIdx]) {
       $hasCodon = 1;
@@ -352,21 +365,21 @@ sub get {
   }
 
   if(!$multiple) {
-    $out[ $idxMap->{$self->{_codonPositionKey}} ] = $codonPos[0];
-    $out[ $idxMap->{$self->{_codonSequenceKey}} ] = $codonSeq[0];
-    $out[ $idxMap->{$self->{_codonNumberKey}} ] = $codonNum[0];
-    $out[ $idxMap->{$self->{_exonicAlleleFunctionKey}} ] = $funcAccum[0];
-    $out[ $idxMap->{$self->{_refAminoAcidKey}} ] = $refAA[0];
-    $out[ $idxMap->{$self->{_newAminoAcidKey}} ] = $newAA[0];
-    $out[ $idxMap->{$self->{_newCodonKey}} ] = $newCodon[0];
+    $out[$self->{_codonPosFidx}] = $codonPos[0];
+    $out[$self->{_codonFIdx}] = $codonSeq[0];
+    $out[$self->{_codonNumFidx}] = $codonNum[0];
+    $out[$self->{_alleleFuncFidx}] = $funcAccum[0];
+    $out[$self->{_refAaFidx}] = $refAA[0];
+    $out[$self->{_altAaFidx}] = $newAA[0];
+    $out[$self->{_altCodonFidx}] = $newCodon[0];
   } else {
-    $out[ $idxMap->{$self->{_codonPositionKey}} ] = \@codonPos;
-    $out[ $idxMap->{$self->{_codonSequenceKey}} ] = \@codonSeq;
-    $out[ $idxMap->{$self->{_codonNumberKey}} ] = \@codonNum;
-    $out[ $idxMap->{$self->{_exonicAlleleFunctionKey}} ] = \@funcAccum;
-    $out[ $idxMap->{$self->{_refAminoAcidKey}} ] = \@refAA;
-    $out[ $idxMap->{$self->{_newAminoAcidKey}} ] = \@newAA;
-    $out[ $idxMap->{$self->{_newCodonKey}} ] = \@newCodon;
+    $out[$self->{_codonPosFidx}] = \@codonPos;
+    $out[$self->{_codonFIdx}] = \@codonSeq;
+    $out[$self->{_codonNumFidx}] = \@codonNum;
+    $out[$self->{_alleleFuncFidx}] = \@funcAccum;
+    $out[$self->{_refAaFidx}] = \@refAA;
+    $out[$self->{_altAaFidx}] = \@newAA;
+    $out[$self->{_altCodonFidx}] = \@newCodon;
   }
 
   return accumOut($alleleIdx, $positionIdx, $outAccum, \@out);
