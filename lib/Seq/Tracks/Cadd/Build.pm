@@ -433,15 +433,17 @@ sub buildTrack {
       undef $wantedChr;
       undef $phredScoresAref;
 
-      #Commit any remaining transactions, sync all environments, free memory
-      $self->db->cleanUp();
-
        # Since any detected errors are fatal, and we expect 1 chr per file or all in 1 file
        # we have confidence that anything visited is complete
       foreach (keys %visitedChrs) {
         $self->completionMeta->recordCompletion($_);
-        # We don't record $chr completion status per file, but wait until all files read
-        # because CADD files may be tremendously out of order after liftover
+      }
+
+      #Commit any remaining transactions, sync all environments, free memory
+      $self->db->cleanUp();
+
+       # We've now synced, ok to write that we're done
+      foreach (keys %visitedChrs) {
         $self->log('info', $self->name . ": recorded $_ completed");
       }
 

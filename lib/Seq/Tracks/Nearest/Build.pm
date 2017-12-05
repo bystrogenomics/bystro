@@ -340,6 +340,8 @@ sub buildTrack {
 
         # We've finished with 1 chromosome, so write that to meta to disk
         $self->completionMeta->recordCompletion($chr);
+
+        $self->db->cleanUp($chr);
       }
 
       #Commit, sync everything, including completion status, and release mmap

@@ -370,12 +370,12 @@ sub buildTrack {
 
         delete $txStartData{$chr};
 
-        #Commit, sync everything, including completion status, and release mmap
-        $self->db->cleanUp($chr);
-
          # We've finished with 1 chromosome, so write that to meta to disk
          # TODO: error check this
         $self->completionMeta->recordCompletion($chr);
+
+        #Commit, sync everything, including completion status, and release mmap
+        $self->db->cleanUp();
 
         $self->log('info', $self->name . ": recorded $chr completed");
       }

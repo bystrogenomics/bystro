@@ -19,7 +19,7 @@ use Seq::DBManager;
 use Seq::Tracks::Build::CompletionMeta;
 use Seq::Tracks::Base::Types;
 use Seq::Tracks::Build::LocalFilesPaths;
-use Seq::Output;
+use Seq::Output::Delimiters;
 
 extends 'Seq::Tracks::Base';
 # All builders need get_read_fh
@@ -116,9 +116,9 @@ has fieldMap => (is => 'ro', isa => 'HashRef', lazy => 1, default => sub {
 
 # TODO: config output;
 has _emptyFieldRegex => (is => 'ro', isa => 'RegexpRef', init_arg => undef, default => sub { 
-  my $output = Seq::Output->new();
+  my $delim = Seq::Output::Delimiters->new();
 
-  my $emptyField = $output->delimiters->emptyFieldChar;
+  my $emptyField = $delim->emptyFieldChar;
 
   my $regex = qr/^\s*$emptyField\s*$/;
 
