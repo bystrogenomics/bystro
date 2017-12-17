@@ -151,7 +151,7 @@ while(my $job = $beanstalk->reserve) {
 
     $configData->{database_dir} = 'hidden';
 
-    for my $track (@{$configData->{tracks}}) {
+    for my $track (@{$configData->{tracks}{tracks}}) {
       # Strip local_files of their directory names, for security reasons
       $track->{local_files} = ['hidden'];
     }

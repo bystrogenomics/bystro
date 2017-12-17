@@ -1,7 +1,7 @@
 ---
 assembly: hg19
 build_author: ec2-user
-build_date: 2017-12-02T00:09:00
+build_date: 2017-12-09T21:56:00
 chromosomes:
 - chr1
 - chr2
@@ -28,8 +28,16 @@ chromosomes:
 - chrM
 - chrX
 - chrY
-database_dir: ~
-files_dir: ~
+database_dir: '~'
+fileProcessors:
+- args: --emptyField ! --minGq .95
+  handles: snp
+  name: bystro-snp
+- args: --emptyField !
+  handles: vcf
+  name: bystro-vcf
+files: '~'
+files_dir: /mnt/db_backup/hg19/
 snpProcessor: bystro-snp
 statistics:
   dbSNPnameField: dbSNP.name
@@ -41,7 +49,7 @@ statistics:
   programPath: bystro-stats
   refTrackField: ref
   siteTypeField: refSeq.siteType
-temp_dir: ~
+temp_dir: '~'
 tracks:
   outputOrder:
   - ref
@@ -98,12 +106,12 @@ tracks:
   - build_author: ec2-user
     build_date: 2017-12-02T00:09:00
     dist: true
-    local_files:
-      - hg19.refGene.chr*.with_dbnsfp.gz
     features:
     - name
     - name2
     from: txStart
+    local_files:
+    - hg19.refGene.chr*.with_dbnsfp.gz
     name: refSeq.nearest
     to: txEnd
     type: nearest
@@ -115,9 +123,9 @@ tracks:
     - name
     - name2
     from: txStart
-    name: refSeq.nearestTss
     local_files:
-      - hg19.refGene.chr*.with_dbnsfp.gz
+    - hg19.refGene.chr*.with_dbnsfp.gz
+    name: refSeq.nearestTss
     type: nearest
     version: 5
   - build_author: ec2-user
@@ -398,7 +406,9 @@ tracks:
       completed: 2017-11-28T06:41:00
       name: refGeneXdbnsfp
     version: 13
-  - build_field_transformations:
+  - build_author: ec2-user
+    build_date: 2017-12-09T21:56:00
+    build_field_transformations:
       egenetics.expression: split [;]
       gnfAtlas.expression: split [;]
       go.biologicalProcess: split [;]
@@ -407,6 +417,7 @@ tracks:
       uniprot.diseaseDescription: split [;]
       uniprot.function: split [;]
       uniprot.tissue: split [;]
+    dist: 0
     features:
     - name2
     - exac.pLi: number(2)
@@ -460,14 +471,14 @@ tracks:
       dbnsfp.RVIS_percentile_ExAC: exac.rvisPercentile
       dbnsfp.Tissue_specificity(Uniprot): uniprot.tissue
       dbnsfp.Trait_association(GWAS): gwasTraitAssoc
-    name: refSeq.gene
-    type: nearest
-    storeNearest: 0
-    dist: 0
     from: txStart
-    to: txEnd
     local_files:
-      - hg19.refGene.chr*.with_dbnsfp.gz
+    - hg19.refGene.chr*.with_dbnsfp.gz
+    name: refSeq.gene
+    storeNearest: 0
+    to: txEnd
+    type: nearest
+    version: 4
   - based: 1
     build_author: ec2-user
     build_date: 2017-11-30T15:06:00
@@ -516,4 +527,5 @@ tracks:
       name: fetch
     version: 5
 vcfProcessor: bystro-vcf
-version: 178
+version: 6
+

@@ -7,7 +7,7 @@ package Seq::Statistics;
 use Mouse 2;
 use namespace::autoclean;
 
-use Seq::Output;
+use Seq::Output::Delimiters;
 use Types::Path::Tiny qw/AbsPath AbsFile AbsDir/;
 use File::Which qw/which/;
 
@@ -75,7 +75,7 @@ sub BUILDARGS {
 sub BUILD {
   my $self = shift;
 
-  $self->{_outputter} = Seq::Output->new();
+  $self->{_delimiters} = Seq::Output::Delimiters->new();
   
   #TODO: Should we store the which path at $self->statistics_program
   if (!which($self->programPath)) {
@@ -93,10 +93,10 @@ sub getStatsArguments {
 
   # Accumulate the delimiters: Note that $alleleDelimiter isn't necessary
   # because the bystro_statistics script never operates on multiallelic sites
-  my $valueDelimiter = $self->{_outputter}->delimiters->valueDelimiter;
+  my $valueDelimiter = $self->{_delimiters}->valueDelimiter;
 
-  my $fieldSeparator = $self->{_outputter}->delimiters->fieldSeparator;
-  my $emptyFieldString = $self->{_outputter}->delimiters->emptyFieldChar;
+  my $fieldSeparator = $self->{_delimiters}->fieldSeparator;
+  my $emptyFieldString = $self->{_delimiters}->emptyFieldChar;
 
   my $refColumnName = $self->refTrackField;
   my $alleleColumnName = $self->altField;

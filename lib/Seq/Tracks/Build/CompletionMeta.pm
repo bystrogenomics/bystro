@@ -54,6 +54,7 @@ sub recordCompletion {
   }
 
   # overwrite any existing entry for $chr
+  # dbPatchMeta syncs the meta db automatically
   my $err = $self->db->dbPatchMeta($self->name, $metaKey, { $chr => 1 }, 1 );
 
   if($err) {
