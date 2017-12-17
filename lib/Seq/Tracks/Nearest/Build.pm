@@ -31,6 +31,7 @@ use Scalar::Util qw/looks_like_number/;
 use DDP;
 use List::Util qw/max min uniq/;
 use Digest::MD5 qw/md5/;
+use Devel::Size qw(total_size);
 
 use Seq::Tracks;
 
@@ -426,10 +427,12 @@ sub _writeNearestData {
 
   my $previousLongestEnd;
   my $previousTxNumber;
-  # track what was previously made
-  my %completed;
+
   TXSTART_LOOP: for (my $n = 0; $n < @sorted; $n++) {
     my $start = $sorted[$n][1][$fromDbName];
+
+    # We are no longer tracking; see line ~ 506
+    # my %completed;
 
     # if(ref $startData{$start}) {
     #   $longestEnd = max ( map { $_->[1][$toDbName]} ) @{$startData{$start}};
@@ -441,14 +444,12 @@ sub _writeNearestData {
 
     # Assign a unique txNumber based on the overlap of transcripts
     # Idempotent
-    my @stuff = map { $_->[0] } @{$startData{$start}};
-
-    my $txNumber = $uniqNumMaker->([ map { $_->[0] } @{$startData{$start}} ]);
+    my $txNumber = $uniqNumMaker->($startData{$start});
 
     # If we're 1 short of the new txNumber (index), we have some unique data
     # add the new item
     if(@globalTxData == $txNumber) {
-      my $combinedValues = $uniqRegionEntryMaker->([ map { $_->[1] } @{$startData{$start}} ]);
+      my $combinedValues = $uniqRegionEntryMaker->($startData{$start});
       # p $combinedValues;
       # Since these values don't nec share an end, take the max one for the overlap
       $combinedValues->[$toDbName] = ref $combinedValues->[$toDbName] ? max(@{$combinedValues->[$toDbName]}) : $combinedValues->[$toDbName];
@@ -497,43 +498,49 @@ sub _writeNearestData {
 
     # If we want to store the stuff in the regions themselves, do that
     if($self->storeOverlap) {
-      # We investigate everything from the present tx down;
-      my @data = @sorted[$n .. $#sorted];
-
       # Remember, here longest end is 0-based, closed (last pos is the last 0-based
       # position in the transcript)
       for my $pos ($start .. $longestEnd) {
         # There may be overlaps between adjacent groups of transcripts
         # Since we search for all overlapping transcripts for every position
         # once we've visited one position, we need never visit it again
-        if($completed{$pos}) {
-          next;
-        }
+        # However, let's say we got this wrong... it wouldn't actually matter
+        # except it would cost us a bit of performance
+        # Because the txNumber we get for the overlap simply wouldn't be unique.
+        # And we would overwrite it in the database, or more likely skip it
+        # if the overwrite flag isn't set.
+        # So don't check for $completed{$pos}, which requires setting global state
+        # and leaks/uses a tremendous amount of memory
+        # if($completed{$pos}) {
+        #   next;
+        # }
 
         my @overlap;
         
-        I_LOOP: for my $iRow (@data) {
-          my $iFrom = $iRow->[1][$fromDbName];
-          my $iTo = $iRow->[1][$toDbName];
+        # We investigate everything from the present tx down;
+        I_LOOP: for (my $i = $n; $i < @sorted; $i++) {
+          my $iFrom = $sorted[$i]->[1][$fromDbName];
+          my $iTo = $sorted[$i]->[1][$toDbName];
 
           if($pos >= $iFrom && $pos <= $iTo) {
-            push @overlap, $iRow;
+            push @overlap, $sorted[$i];
           } elsif($iFrom > $pos) {
             last I_LOOP;
           }
         }
 
         if(!@overlap) {
-          say "no overlap from $start to $longestEnd";
+          say STDERR "no overlap for the $chr\:$pos";
+          next;
         }
 
         # Make a unique overlap combination
-        my $txNumber = $uniqNumMaker->([map { $_->[0] } @overlap]);
+        my $txNumber = $uniqNumMaker->(\@overlap);
 
         # If we're 1 short of the new txNumber (index), we have some unique data
         # add the new item
         if(@globalTxData == $txNumber) {
-          my $combinedValues = $uniqRegionEntryMaker->([map { $_->[1] } @overlap]);
+          my $combinedValues = $uniqRegionEntryMaker->(\@overlap);
 
           # Since these values don't nec share either start or end, take the max of each for the overlap
           # Therefore, when checking dist, we'll be able to check scalars
@@ -550,15 +557,15 @@ sub _writeNearestData {
         # Assign the transcript number
         $self->db->dbPatch($chr, $self->dbName, $pos, $txNumber);
 
-        $completed{$pos} = 1;
+        # $completed{$pos} = 1;
       }
     }
 
     ###### Store the previous values for the next loop's midpoint calc ######
-    my $longestEndTxNumber = $uniqNumMaker->([ map { $_->[0] } @{$endData{$longestEnd}} ]);
+    my $longestEndTxNumber = $uniqNumMaker->($endData{$longestEnd});
 
     if(@globalTxData == $longestEndTxNumber) {
-      my $combinedValues = $uniqRegionEntryMaker->([ map { $_->[1] } @{$endData{$longestEnd}} ]);
+      my $combinedValues = $uniqRegionEntryMaker->($endData{$longestEnd});
 
       # Since these don't nec. share a start, choose the min start for the overlap
       $combinedValues->[$fromDbName] = ref $combinedValues->[$fromDbName] ? min(@{$combinedValues->[$fromDbName]}) : $combinedValues->[$fromDbName];
@@ -593,7 +600,9 @@ sub _getTxNumber {
   return sub {
     my $numAref = shift;
 
-    my $hash = md5(@$numAref);
+    # not as clean as passing the data we actually want, but maybe uses less mem
+    # Use pack to try to make smaller key
+    my $hash = join('_', map { $_->[0] } @$numAref);
 
     if(defined $uniqCombos{$hash}) {
       return $uniqCombos{$hash};
@@ -602,6 +611,10 @@ sub _getTxNumber {
     $uniqCombos{$hash} = $txNumber;
 
     $txNumber++;
+
+    # my $len = scalar keys %uniqCombos;
+    # my $size = total_size(\%uniqCombos);
+    # say "we now have $size bytes for $len unique numbers";
 
     return $uniqCombos{$hash};
   }
@@ -632,7 +645,8 @@ sub _makeUniqueRegionData {
       
       for my $i (@featureKeys) {
         if($i != $fromDbName && $i != $toDbName) {
-          push @nonFromTo, $val->[$i] || "";
+          #not as clean as having $aRef contain only the [1] values, but maybe less meme
+          push @nonFromTo, $val->[1][$i] || "";
         }
       }
 
@@ -645,7 +659,7 @@ sub _makeUniqueRegionData {
       $dup{$hash} = 1;
 
       for my $intKey (@featureKeys) {
-        push @{$out[$intKey]}, $val->[$intKey];
+        push @{$out[$intKey]}, $val->[1][$intKey];
       }
     }
 

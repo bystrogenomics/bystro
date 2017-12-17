@@ -80,17 +80,17 @@ for my $pos (0 .. $#$mainDbAref) {
 
   # config features order is name, name2, and then we add dist in the 3rd position
   # so 0 == name 1 == name2 2 == dist
-  my $name = $out[0][0][0];
-  my $name2 = $out[1][0][0];
-  my $dist = $out[2][0][0];
+  my $name = $out[0][0];
+  my $name2 = $out[1][0];
+  my $dist = $out[2][0];
 
-  my $nameTss = $outTss[0][0][0];
-  my $name2Tss = $outTss[1][0][0];
-  my $distTss = $outTss[2][0][0];
+  my $nameTss = $outTss[0][0];
+  my $name2Tss = $outTss[1][0];
+  my $distTss = $outTss[2][0];
 
-  my $nameGene = $outGene[0][0][0];
-  my $name2Gene = $outGene[1][0][0];
-  my $distGene = $outGene[2][0][0];
+  my $nameGene = $outGene[0][0];
+  my $name2Gene = $outGene[1][0];
+  my $distGene = $outGene[2][0];
 
   # intergenic
   if($pos < 1672) {
