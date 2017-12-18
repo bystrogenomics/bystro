@@ -29,9 +29,12 @@ use namespace::autoclean;
 use Parallel::ForkManager;
 use Scalar::Util qw/looks_like_number/;
 use DDP;
-use List::Util qw/max min uniq/;
+use List::Util qw/max min/;
+# http://fastcompression.blogspot.com/2014/07/xxhash-wider-64-bits.html
+# much faster than md5, no cryptographic guarantee should suffice for our use
+# Unfortunately, that turned out not to be true, failed tests
+# use Digest::xxHash qw/xxhash64/;
 use Digest::MD5 qw/md5/;
-use Devel::Size qw(total_size);
 
 use Seq::Tracks;
 
@@ -450,9 +453,6 @@ sub _writeNearestData {
     # add the new item
     if(@globalTxData == $txNumber) {
       my $combinedValues = $uniqRegionEntryMaker->($startData{$start});
-      # p $combinedValues;
-      # Since these values don't nec share an end, take the max one for the overlap
-      $combinedValues->[$toDbName] = ref $combinedValues->[$toDbName] ? max(@{$combinedValues->[$toDbName]}) : $combinedValues->[$toDbName];
 
       # write the region database, storing the region data at our sequential txNumber, allow us to release the data
       $self->db->dbPut($regionDbName, $txNumber, $combinedValues);
@@ -542,11 +542,6 @@ sub _writeNearestData {
         if(@globalTxData == $txNumber) {
           my $combinedValues = $uniqRegionEntryMaker->(\@overlap);
 
-          # Since these values don't nec share either start or end, take the max of each for the overlap
-          # Therefore, when checking dist, we'll be able to check scalars
-          $combinedValues->[$fromDbName] = ref $combinedValues->[$fromDbName] ? min(@{$combinedValues->[$fromDbName]}) : $combinedValues->[$fromDbName];
-          $combinedValues->[$toDbName] = ref $combinedValues->[$toDbName] ? max(@{$combinedValues->[$toDbName]}) : $combinedValues->[$toDbName];
-
           # write the region database, storing the region data at our sequential txNumber, allow us to release the data
           $self->db->dbPut($regionDbName, $txNumber, $combinedValues);
 
@@ -566,9 +561,6 @@ sub _writeNearestData {
 
     if(@globalTxData == $longestEndTxNumber) {
       my $combinedValues = $uniqRegionEntryMaker->($endData{$longestEnd});
-
-      # Since these don't nec. share a start, choose the min start for the overlap
-      $combinedValues->[$fromDbName] = ref $combinedValues->[$fromDbName] ? min(@{$combinedValues->[$fromDbName]}) : $combinedValues->[$fromDbName];
 
       # write the region database, storing the region data at our sequential txNumber, allow us to release the data
       $self->db->dbPut($regionDbName, $longestEndTxNumber, $combinedValues);
@@ -602,7 +594,10 @@ sub _getTxNumber {
 
     # not as clean as passing the data we actually want, but maybe uses less mem
     # Use pack to try to make smaller key
-    my $hash = join('_', map { $_->[0] } @$numAref);
+    # sort isn't necessary unless we don't trust the caller to give us
+    # pre-sorted data
+    # so...to reduce bug burden from future changes, sort here.
+    my $hash = join('_', sort {$a <=> $b} map { $_->[0] } @$numAref);
 
     if(defined $uniqCombos{$hash}) {
       return $uniqCombos{$hash};
@@ -624,6 +619,14 @@ sub _makeUniqueRegionData {
   my ($fromDbName, $toDbName, $featureKeysAref) = @_;
 
   my @featureKeys = @$featureKeysAref;
+  my @nonFromToFeatures;
+
+  for my $feat (@featureKeys) {
+    if($feat != $fromDbName && $feat != $toDbName) {
+      push @nonFromToFeatures, $feat;
+    }
+  }
+
   return sub {
     my $aRef = shift;
 
@@ -643,11 +646,9 @@ sub _makeUniqueRegionData {
       # However, in the final, unique output, undefined values will remain undefined
       my @nonFromTo;
       
-      for my $i (@featureKeys) {
-        if($i != $fromDbName && $i != $toDbName) {
-          #not as clean as having $aRef contain only the [1] values, but maybe less meme
-          push @nonFromTo, $val->[1][$i] || "";
-        }
+      for my $i (@nonFromToFeatures) {
+        #not as clean as having $aRef contain only the [1] values, but maybe less meme
+        push @nonFromTo, defined $val->[1][$i] ? $val->[1][$i] : "";
       }
 
       my $hash = md5(@nonFromTo);
@@ -663,24 +664,79 @@ sub _makeUniqueRegionData {
       }
     }
 
+    my @uniqInner;
+    my %seen;
     for my $intKey (@featureKeys) {
       if(!ref $out[$intKey]) {
         next;
       }
 
-      if(@{$out[$intKey]} == 1) {
-        $out[$intKey] = $out[$intKey][0];
+      my %seen;
+      my @uniqInner;
+
+      # If the first element is a reference, then we have an array of arrays
+      # Lets generate hashes of everything and see if they're unique
+      if(@{$out[$intKey]} > 1 && ref $out[$intKey][0]) {
+        for my $val (@{$out[$intKey]}) {
+          my $hash = md5(@$val);
+
+          if($seen{$hash}) {
+            next;
+          }
+
+          push @uniqInner, $val;
+          $seen{$hash} = 1;
+        }
+
+        # Only if all vals are duplicate can we compress and retain all information
+        # ie order with respect to element with the greatest amount of entropy
+        # ex: if we have 2 genes [gene1, gene2, gene3], we needed to make sure that
+        # we either have [val1, val2, vale] for the Nth feature, or [val1] in case
+        # val1, val2, and val3 are duplicates
+        # If only val1 and val2 are duplicates, then we must keep [val1, val2, val3]
+        if(@uniqInner == 1) {
+          $out[$intKey] = \@uniqInner;
+        }
+
         next;
       }
 
-      my @uniq = uniq(@{$out[$intKey]});
+      if(ref $out[$intKey]) {
+        for my $val (@{$out[$intKey]}) {
+          if($seen{$val || ''}) {
+            next;
+          }
 
-      # Don't lose the relationships between data
-      # If there's a single unique value, use that however to remove redundancy
-      if(@uniq == 1) {
-        $out[$intKey] = $uniq[0];
+          push @uniqInner, $val;
+          $seen{$val || ''} = 1;
+        }
+
+        if(@uniqInner == 1) {
+          $out[$intKey] = \@uniqInner;
+        }
       }
     }
+
+    # We keep everything all features in [[val1 ,.. valN]] form
+    # If all features have only 1 val, no need to keep the nested structure
+    my $maxKeys = 1;
+    for my $i (@nonFromToFeatures) {
+      if(@{$out[$i]} != 1) {
+        $maxKeys = 100;
+        last;
+      }
+    }
+
+    if($maxKeys == 1) {
+      for my $i (@nonFromToFeatures) {
+        $out[$i] = $out[$i][0];
+      }
+    }
+
+    # The from and to fields are reduce to min/max; i.e the widest interval they occupy
+    # Since these don't nec. share a start, choose the min start for the overlap
+    $out[$fromDbName] = ref $out[$fromDbName] ? min(@{$out[$fromDbName]}) : $out[$fromDbName];
+    $out[$toDbName] = ref $out[$toDbName] ? max(@{$out[$toDbName]}) : $out[$toDbName];
 
     return \@out;
   }
