@@ -189,6 +189,10 @@ sub buildTrack {
   my $chrIdx = $vcfFeatures->{chrom};
   my $altIdx = $vcfFeatures->{alt};
 
+  # Track over-written positions
+  # Hashes all values passed in, to make sure that duplicate values aren't written
+  my ($mergeFunc, $cleanUpMerge) = $self->makeMergeFunc();
+
   my %completedDetails;
   $pm->run_on_finish(sub {
     my ($pid, $exitCode, $fileName, undef, undef, $errOrChrs) = @_;
@@ -225,13 +229,6 @@ sub buildTrack {
         # DB not open yet, no need to commit
         $pm->finish(255, \$err);
       }
-
-      # Get an instance of the merge function that closes over $self
-      # Note that tracking which positinos have been over-written will only work
-      # if there is one chromosome per file, or if all chromosomes are in one file
-      # At least until we share $madeIntoArray (in makeMergeFunc) between threads
-      # Won't be an issue in Go
-      my $mergeFunc = $self->makeMergeFunc();
 
        # Record which chromosomes were recorded for completionMeta
       my %visitedChrs;
@@ -316,8 +313,8 @@ sub buildTrack {
   $pm->wait_all_children();
 
   for my $chr (keys %completedDetails) {
-    say "writing that we completed $chr";
     $self->completionMeta->recordCompletion($chr);
+    $cleanUpMerge->($chr);
 
     $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedDetails{$chr}})));
   }

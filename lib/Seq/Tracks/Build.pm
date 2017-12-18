@@ -392,52 +392,71 @@ sub makeMergeFunc {
   my $name = $self->name;
   my $madeIntoArray = {};
 
-  return sub {
-    my ($chr, $pos, $oldTrackVal, $newTrackVal) = @_;
-    my @updated = @$oldTrackVal;
+  my $tempDbName = "$name\_merge_temp";
+  return ( sub {
+      my ($chr, $pos, $oldTrackVal, $newTrackVal) = @_;
+      my @updated = @$oldTrackVal;
 
-    # oldTrackVal and $newTrackVal should both be arrays, with at least one index
-    for (my $i = 0; $i < @$newTrackVal; $i++) {
-      if($i > $#$oldTrackVal) {
-        push @updated, $newTrackVal->[$i];
-        next;
-      }
+      my $seen = $self->db->dbReadOne("$tempDbName/$chr", $pos);
 
-      if(ref $newTrackVal->[$i]) {
-        if(ref $newTrackVal->[$i] ne 'ARRAY') {
-          # TODO: move away from fatal, allow graceful exit w/ error message
-          $self->log('fatal', $self->name. ": $name track received new record in mergeFunc that was a non-Array reference");
-          # We should never get here; fatal should exit; however, for consistent return and clarity
-          # and in case API changes
-          return ($self->name. ": $name track received new record in mergeFunc that was a non-Array reference", undef);
+      # This doesn't seem to be working reliably
+      # TODO: handle this, to allow idempotent merging
+      # my $hash = md5(defined $newTrackVal ? (ref $newTrackVal ? map { $_ || '' } @{$newTrackVal} : $newTrackVal) : '');
+
+      # $seen //= {};
+
+      # if($seen->{$hash}) {
+      #   return;
+      # }
+
+      # oldTrackVal and $newTrackVal should both be arrays, with at least one index
+      for (my $i = 0; $i < @$newTrackVal; $i++) {
+        if($i > $#$oldTrackVal) {
+          # If we're given unequal length values; undef for the existing array at that position
+          $#$oldTrackVal = $i;
         }
 
-        if(!ref $updated[$i]) {
-          $updated[$i] = [$updated[$i], @{$newTrackVal->[$i]}];
-        } else {
-          push @{$updated[$i]}, @{$newTrackVal->[$i]};
+        if(ref $newTrackVal->[$i]) {
+          if(ref $newTrackVal->[$i] ne 'ARRAY') {
+            # TODO: move away from fatal, allow graceful exit w/ error message
+            $self->log('fatal', $self->name. ": $name track received new record in mergeFunc that was a non-Array reference");
+            # We should never get here; fatal should exit; however, for consistent return and clarity
+            # and in case API changes
+            return ($self->name. ": $name track received new record in mergeFunc that was a non-Array reference", undef);
+          }
+
         }
 
-      } else {
-        if(!ref $updated[$i]) {
-
-          $updated[$i] = [$updated[$i], $newTrackVal->[$i]];
-        } else {
+        if($seen) {
           push @{$updated[$i]}, $newTrackVal->[$i];
+        } else {
+          $updated[$i] = [$updated[$i], $newTrackVal->[$i]];
         }
       }
-    }
 
-    # if($self->name eq 'snp146') {
-    #   say "oldVal is";
-    #   p $oldTrackVal;
-    #   say "newTrackVal is";
-    #   p $newTrackVal;
-    #   say "updated is";
-    #   p @updated;
-    # }
-    return (undef, \@updated);
-  }
+     # if($self->name eq 'dbSNP') {
+     #    say "oldVal is";
+     #    p $oldTrackVal;
+     #    say "newTrackVal is";
+     #    p $newTrackVal;
+     #    say "updated is";
+     #    p @updated;
+     #  }
+
+      if(!$seen) {
+        $self->db->dbPut("$tempDbName/$chr", $pos, 1);
+      }
+
+      return (undef, \@updated);
+    },
+
+    sub {
+      my $chr = shift;
+      $self->db->dbDropDatabase("$tempDbName/$chr", 1);
+
+      say STDERR "Cleaned up $tempDbName/$chr";
+    }
+  );
 }
 
 sub coerceUndefinedValues {

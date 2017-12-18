@@ -58,6 +58,35 @@ sub buildTrack {
 
   my $pm = Parallel::ForkManager->new($self->max_threads);
 
+  # Get an instance of the merge function that closes over $self
+  # Note that tracking which positinos have been over-written will only work
+  # if there is one chromosome per file, or if all chromosomes are in one file
+  # At least until we share $madeIntoArray (in makeMergeFunc) between threads
+  # Won't be an issue in Go
+  my ($mergeFunc, $cleanUpMerge) = $self->makeMergeFunc();
+
+  my %completedDetails;
+  $pm->run_on_finish(sub {
+    my ($pid, $exitCode, $fileName, undef, undef, $errOrChrs) = @_;
+
+    if($exitCode != 0) {
+      my $err = $errOrChrs ? "due to: $$errOrChrs" : "due to an untimely demise";
+
+      $self->log('fatal', $self->name . ": Failed to build $fileName $err");
+      die $self->name . ": Failed to build $fileName $err";
+    }
+
+    for my $chr (keys %$errOrChrs) {
+      if(!$completedDetails{$chr}) {
+        $completedDetails{$chr} = [$fileName];
+      } else {
+        push @{$completedDetails{$chr}}, $fileName;
+      }
+    }
+
+    $self->log('info', $self->name . ": completed building from $fileName");
+  });
+
   for my $file (@{$self->local_files}) {
     $self->log('info', $self->name . ": beginning building from $file");
 
@@ -90,12 +119,6 @@ sub buildTrack {
       ############## Read file and insert data into main database #############
       my $wantedChr;
 
-      # Get an instance of the merge function that closes over $self
-      # Note that tracking which positinos have been over-written will only work
-      # if there is one chromosome per file, or if all chromosomes are in one file
-      # At least until we share $madeIntoArray (in makeMergeFunc) between threads
-      # Won't be an issue in Go
-      my $mergeFunc = $self->makeMergeFunc();
       # Record which chromosomes were recorded for completionMeta
       my %visitedChrs;
 
@@ -185,39 +208,31 @@ sub buildTrack {
         $visitedChrs{$wantedChr} //= 1;
       }
 
-      # Record completion. Safe because detected errors throw, kill process
-      foreach (keys %visitedChrs) {
-        $self->completionMeta->recordCompletion($_);
-        $self->log('info', $self->name . ": recorded $_ completed from $file");
-      }
-
       #Commit, sync everything, including completion status, and release mmap
       $self->db->cleanUp();
 
       if(!close($fh) && $? != 13) {
         $self->log('fatal', $self->name . ": couldn't close or read $file due to $! ($?)");
-        die $self->name . ": couldn't close or read $file due to $!";
       } else {
         $self->log('info', $self->name . ": $file closed with $?");
         $self->log('info', $self->name . ": invalid lines found in $file: $invalid");
         $self->log('info', $self->name . ": lines that didn't pass filters in $file: $failedFilters");
         $self->log('info', $self->name . ": lines that were longer than " . $self->maxVariantSize . " found in $file: $tooLong");
       }
-    $pm->finish(0);
+
+    $pm->finish(0, \%visitedChrs);
   }
 
-  $pm->run_on_finish(sub {
-    my ($pid, $exitCode, $fileName) = @_;
-
-    if($exitCode != 0) {
-      $self->log('fatal', $self->name . ": Failed to build $fileName");
-      die $self->name . ": Failed to build $fileName";
-    }
-
-    $self->log('info', $self->name . ": completed building from $fileName");
-  });
-
   $pm->wait_all_children;
+
+  # Defer recording completion state until all requested files visited, to ensure
+  # that if chromosomes are mis-sorted, we still build all that is needed
+  for my $chr (keys %completedDetails) {
+    $self->completionMeta->recordCompletion($chr);
+    $cleanUpMerge->($chr);
+
+    $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedDetails{$chr}})));
+  }
 
   return;
 }

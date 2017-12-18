@@ -587,6 +587,24 @@ sub dbDeleteMeta {
   return;
 }
 
+sub dbDropDatabase {
+  my ( $self, $chr, $remove ) = @_;
+
+  #dbDelete returns nothing
+  # last argument means non-integer keys
+  my $db = $self->_getDbi($chr);
+  if(!$db->{db}->Alive) {
+    $db->{db}->Txn = $db->{env}->BeginTxn();
+    # not strictly necessary, but I am concerned about hard to trace abort bugs related to scope
+    $db->{db}->Txn->AutoCommit(1);
+  }
+
+  # if $remove is not truthy, database is emptied rather than dropped
+  $db->{db}->drop($remove);
+
+  path($databaseDir)->child($chr)->remove_tree();
+}
+
 sub _getDbi {
   # Exists and not defined, because in read only database we may discover
   # that some chromosomes don't have any data (example: hg38 refSeq chrM)
