@@ -35,12 +35,18 @@ use List::Util qw/max min/;
 # Unfortunately, that turned out not to be true, failed tests
 # use Digest::xxHash qw/xxhash64/;
 use Digest::MD5 qw/md5/;
+use Data::MessagePack;
 
 use Seq::Tracks;
 
 extends 'Seq::Tracks::Build';
 #exports regionTrackPath
 with 'Seq::Tracks::Region::RegionTrackPath';
+
+# Use to evaluate whether we have duplicates, together with md5
+# canonical needed to prevent pseudo-random ordering of hash keys
+# although in our instance, shouldn't have any impact, as we use only arrays
+my $mp = Data::MessagePack->new()->canonical();
 
 # TODO: Currently we mutate the 'from' and 'to' properties
 # such that these may not keep 1:1 correspondance in case of overlapping transcripts
@@ -651,7 +657,7 @@ sub _makeUniqueRegionData {
         push @nonFromTo, defined $val->[1][$i] ? $val->[1][$i] : "";
       }
 
-      my $hash = md5(@nonFromTo);
+      my $hash = md5($mp->pack(\@nonFromTo));
 
       if($dup{$hash}) {
         next;

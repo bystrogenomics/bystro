@@ -73,7 +73,7 @@ sub makeOutputString {
                   defined $_
                   # Unfortunately, prior to 11/30/16 Bystro dbs would merge sparse tracks
                   # incorrectly, resulting in an extra array depth
-                  ? (ref $_ ? join($valueDelimiter, map { defined $_ ? $_ : $emptyFieldChar } @$_) : $_)
+                  ? (ref $_ ? join($alleleDelimiter, map { defined $_ ? $_ : $emptyFieldChar } @$_) : $_)
                   : $emptyFieldChar
                 } @$positionData);
               }
