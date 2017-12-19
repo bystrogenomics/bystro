@@ -603,7 +603,7 @@ sub _getTxNumber {
     # sort isn't necessary unless we don't trust the caller to give us
     # pre-sorted data
     # so...to reduce bug burden from future changes, sort here.
-    my $hash = join('_', sort {$a <=> $b} map { $_->[0] } @$numAref);
+    my $hash = join('_', sort { $a <=> $b } map { $_->[0] } @$numAref);
 
     if(defined $uniqCombos{$hash}) {
       return $uniqCombos{$hash};
@@ -640,10 +640,21 @@ sub _makeUniqueRegionData {
 
     my @out;
 
+    my $minFrom;
+    my $maxTo;
     # Assumes arrays of equal length
     #Expects val to have:
     for my $val (@$aRef) {
-      my %uniqueRows;
+      # Because we calculate uniqueness based all keys but from and to
+      # it is important to calculate the min and max bounds here
+      # as the consumer expects the maximum overlapping regions
+      if(!defined $minFrom || $minFrom > $val->[1][$fromDbName]) {
+        $minFrom = $val->[1][$fromDbName];
+      }
+
+      if(!defined $maxTo || $maxTo < $val->[1][$toDbName]) {
+        $maxTo = $val->[1][$toDbName];
+      }
 
       # Figure out what is unique by building an array that does not include
       # the to and from positoins
@@ -657,7 +668,12 @@ sub _makeUniqueRegionData {
         push @nonFromTo, defined $val->[1][$i] ? $val->[1][$i] : "";
       }
 
-      my $hash = md5($mp->pack(\@nonFromTo));
+      # not sure if using md5 would be of any benefit, except to shorten key length potentially
+      # however, this requires that the binary string, if stringified to its utf8 representation
+      # if done, doesn't lose information (for instance, printing such strings isn't guaranteed)
+      # to be handled well
+      # in tests, looks ok
+      my $hash = $mp->pack(\@nonFromTo);
 
       if($dup{$hash}) {
         next;
@@ -684,7 +700,7 @@ sub _makeUniqueRegionData {
       # Lets generate hashes of everything and see if they're unique
       if(@{$out[$intKey]} > 1) {
         for my $val (@{$out[$intKey]}) {
-          my $hash = ref $val ? md5($mp->pack($val)) : $val;
+          my $hash = ref $val ? $mp->pack($val) : ($val || '');
 
           if($seen{$hash}) {
             next;
@@ -724,8 +740,11 @@ sub _makeUniqueRegionData {
 
     # The from and to fields are reduce to min/max; i.e the widest interval they occupy
     # Since these don't nec. share a start, choose the min start for the overlap
-    $out[$fromDbName] = ref $out[$fromDbName] ? min(@{$out[$fromDbName]}) : $out[$fromDbName];
-    $out[$toDbName] = ref $out[$toDbName] ? max(@{$out[$toDbName]}) : $out[$toDbName];
+    # Because we hash/check uniqueness of all values but these values, important to
+    # calculate the minFrom and maxTo based on this input data, not on the
+    # non-redundant data
+    $out[$fromDbName] = $minFrom;
+    $out[$toDbName] = $maxTo;
 
     return \@out;
   }
