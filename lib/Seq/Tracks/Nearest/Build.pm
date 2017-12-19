@@ -682,9 +682,9 @@ sub _makeUniqueRegionData {
 
       # If the first element is a reference, then we have an array of arrays
       # Lets generate hashes of everything and see if they're unique
-      if(@{$out[$intKey]} > 1 && ref $out[$intKey][0]) {
+      if(@{$out[$intKey]} > 1) {
         for my $val (@{$out[$intKey]}) {
-          my $hash = md5(@$val);
+          my $hash = ref $val ? md5($mp->pack($val)) : $val;
 
           if($seen{$hash}) {
             next;
@@ -700,23 +700,6 @@ sub _makeUniqueRegionData {
         # we either have [val1, val2, vale] for the Nth feature, or [val1] in case
         # val1, val2, and val3 are duplicates
         # If only val1 and val2 are duplicates, then we must keep [val1, val2, val3]
-        if(@uniqInner == 1) {
-          $out[$intKey] = \@uniqInner;
-        }
-
-        next;
-      }
-
-      if(ref $out[$intKey]) {
-        for my $val (@{$out[$intKey]}) {
-          if($seen{$val || ''}) {
-            next;
-          }
-
-          push @uniqInner, $val;
-          $seen{$val || ''} = 1;
-        }
-
         if(@uniqInner == 1) {
           $out[$intKey] = \@uniqInner;
         }
