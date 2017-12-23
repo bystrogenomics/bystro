@@ -83,7 +83,6 @@ tracks:
     type: nearest
   - dist: false
     features:
-    - name
     - name2
     from: txStart
     to: txEnd

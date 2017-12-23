@@ -621,6 +621,36 @@ sub _getTxNumber {
   }
 }
 
+# Takes region data from multiple regions,
+# sets it so that each feature contains all regions' data for that feature
+# than compresses each feature to a single value if all regions' values are duplicates
+# then removes all duplicate regions
+# then, if only one region remains
+# represents that region in a single depth array, rather depth N
+# for N regions
+# Ex:
+# if we have features name and naem2
+# where name = [val1, val2], and name2 = [someName2, someName2]
+# name2 = [someName2], and not someName (scalar), and
+# name2 = [someName2, someOtherName2] when > 1 unique value
+# This is done because features aren't guaranteed to be scalar
+# Let's say we have a tissue expression feature
+# ie [[kidney, spleen, pons, medula], [kidney, spleen, pons, medula]]
+# we can, without
+# loss of information, compress to
+# expression = [[kidney, spleen, pons, medulla]]
+# but not expression = [kidney, spleen, pons, medulla],
+# as this would lose the order with respect to transcript
+# However, we can flatten the arrays in some cases
+# ex: name = [someName] , name2 = [someName2], expression = [[kidney, pons]]
+# then we can say: name = someName , name2 = someName2, expression = [kidney, pons]
+# again without loss of information
+# TODO: This does make parsing more difficult
+# So we may want to re-evaluate the flattening to scalars
+# Since our primary use of annotation data is to serialize it
+# and we currently do that using a simple tab-delimited schema
+# and ALWAYS expect no more than array depth 3, I don't think it presents much of a
+# parsing challenge
 sub _makeUniqueRegionData {
   my ($fromDbName, $toDbName, $featureKeysAref) = @_;
 
@@ -717,13 +747,16 @@ sub _makeUniqueRegionData {
         # val1, val2, and val3 are duplicates
         # If only val1 and val2 are duplicates, then we must keep [val1, val2, val3]
         if(@uniqInner == 1) {
+          # Cannot use $uniqInnr[0] because we may not always be able to distinguish
+          # multiple scalar values from N overlapping regions
+          # or a single region with N values
           $out[$intKey] = \@uniqInner;
         }
       }
     }
 
     # We keep everything all features in [[val1 ,.. valN]] form
-    # If all features have only 1 val, no need to keep the nested structure
+    # If all features have only 1 val, no need to store arrays, scalars will suffice
     my $maxKeys = 1;
     for my $i (@nonFromToFeatures) {
       if(@{$out[$i]} != 1) {
