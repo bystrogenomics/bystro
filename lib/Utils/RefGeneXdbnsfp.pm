@@ -14,6 +14,7 @@ use namespace::autoclean;
 use Path::Tiny qw/path/;
 use Parallel::ForkManager;
 use Seq::Role::IO;
+use Seq::Output::Delimiters;
 use Seq::Tracks::Build::LocalFilesPaths;
 use DDP;
 use List::Util qw/uniq/;
@@ -38,6 +39,8 @@ sub BUILD {
    if(!@{$self->{_localFiles}}) {
     $self->log('fatal', "Require some local files");
    }
+
+   p $self->{_localFiles};
 }
 
 # TODO: error check opening of file handles, write tests
@@ -78,8 +81,25 @@ sub go {
     }
   }
 
+  my $delims = Seq::Output::Delimiters->new();
+  my $posDelim = $delims->positionDelimiter;
+  my $altDelim = $delims->alleleDelimiter;
+  my $valDelim = $delims->valueDelimiter;
+
   # namespace
   @dbNSFPheaderFields = map { 'dbnsfp.' . $_ } @dbNSFPheaderFields;
+  push @dbNSFPheaderFields, 'dbnsfp.pubmedID';
+
+  # unfortunately uses a period as a multi-value delimiter...
+  my $funcIdx;
+
+  my $i = -1;
+  for my $field (@dbNSFPheaderFields) {
+    $i++;
+    if($field eq 'dbnsfp.Function_description') {
+      $funcIdx = $i;
+    }
+  }
 
   my %dbNSFP;
   while(<$dbnsfpFh>) {
@@ -87,29 +107,70 @@ sub go {
     chomp;
 
     # Strip redundant words
-    $_ =~ s/TISSUE SPECIFICITY:\s*|FUNCTION:\s*|DISEASE:\s*//g;
+    $_ =~ s/TISSUE SPECIFICITY:\s*|FUNCTION:\s*|DISEASE:\s*|PATHWAY:\s*//g;
 
-    # $_ =~ s/\.\s*$//g;
+    my @pmidMatch = $_ =~ m/PubMed:(\d+)/g;
+    if(@pmidMatch) {
+      @pmidMatch = uniq(@pmidMatch);
+    }
 
-    # Weirdly many dbnsfp fields have trailing whitespace
+    $_ =~ s/\{[^\}]+\}//g;
+
+    # say "length : " . (scalar @fields);
+
+    # Uniprot / dbnsfp annoyingly inserts a bunch of compound values
+    # that aren't really meant to be split on
+    # it would require negative lookbehind to correctly split them
+    # While that isn't difficult in perl, it wastes performance
+    # Replace such values with commas
+    my @innerStuff = $_ =~ m/(?<=[\(\[\{])([^\(\[\{\)\]\}]*[$posDelim$valDelim$altDelim]+[^\(\[\{\)\]\}]+)+(?=[\]\}\)])/g;
+
+    for my $match (@innerStuff) {
+      my $cp = $match;
+      $cp =~ s/[$posDelim$valDelim$altDelim]/,/g;
+      substr($_, index($_, $match), length($match)) = $cp;
+    }
+
+    $_ =~ s/[^\w\[\]\{\}\(\)\t\n\r]+(?=[^\w ])//g;
+
     my @fields = split '\t', $_;
+
+    my $index = -1;
     for my $field (@fields) {
-      # split on [;] more effective, will split in cases like ); which /;/ won't
-      my @unique = uniq(split /[;]/, $field);
+      $index++;
+
+      my @unique;
+      if($index == $funcIdx) {
+        @unique = uniq(split /[\.]/, $field);
+      } else {
+        # split on [;] more effective, will split in cases like ); which /;/ won't
+        @unique = uniq(split /[;]/, $field);
+      }
 
       my @out;
+
+      my $index = -1;
       for my $f (@unique) {
         $f =~ s/^\s+//;
         $f =~ s/\s+$//;
-        $f =~ s/\.$//;
-        $f =~ s/\;$//;
+
+        # shouldn't be necessary, just in case
+        $f =~ s/\s*[^\w\[\]\{\}\(\)]+\s*$//;
+
+        $f =~ s/[$posDelim$valDelim$altDelim]+/,/g;
 
         if(defined $f && $f ne '') {
           push @out, $f;
         }
       }
 
-      $field = @out ? join ";", @out : "NA";
+      $field = @out ? join ";", @out : ".";
+    }
+
+    if(@pmidMatch) {
+      push @fields, join(';', @pmidMatch);
+    } else {
+      push @fields, '.';
     }
 
     if(@fields != @dbNSFPheaderFields) {

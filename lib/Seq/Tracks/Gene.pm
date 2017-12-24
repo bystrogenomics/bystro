@@ -14,7 +14,7 @@ our $VERSION = '0.001';
   This is just like Annovar's
   We add "Intergenic" if not covered by any gene
 
-  This class also handles intergenic sites
+  This class not longer handles intergenic sites
 
 =cut
 
@@ -55,7 +55,8 @@ has exonicAlleleFunctionKey => (is => 'ro', default => 'exonicAlleleFunction');
 ########################## Private Attributes ##################################
 ########## The names of various features. These cannot be configured ##########
 ### Positions that aren't covered by a refSeq record are intergenic ###
-state $intergenic = 'intergenic';
+### TODO: We don't output anything for these sites ###
+### Because "intergenic" is just a label for missing , they are 100% equal ###
 
 ### txEffect possible values ###
 # TODO: export these, and make them configurable
@@ -179,7 +180,6 @@ sub get {
       $_[7]->[$i][$_[6]] = undef;
     }
 
-    $_[7]->[$_[0]->{_siteFidx}][$_[5]][$_[6]] = $intergenic;
     return $_[7];
   }
 
@@ -209,12 +209,6 @@ sub get {
   if(defined $href->[$self->{_dbName}] ) {
     ($txNumbers, $siteData) = $siteUnpacker->unpack($href->[$self->{_dbName}]);
     $multiple = ref $txNumbers ? $#$txNumbers : 0;
-  }
-  
-  if( !defined $txNumbers ) {
-    $out[$_[0]->{_siteFidx}] = $intergenic;
-    
-    return accumOut($alleleIdx, $positionIdx, $outAccum, \@out);
   }
 
   if($self->{_hasJoin}) {
@@ -364,23 +358,13 @@ sub get {
     }
   }
 
-  if(!$multiple) {
-    $out[$self->{_codonPosFidx}] = $codonPos[0];
-    $out[$self->{_codonFIdx}] = $codonSeq[0];
-    $out[$self->{_codonNumFidx}] = $codonNum[0];
-    $out[$self->{_alleleFuncFidx}] = $funcAccum[0];
-    $out[$self->{_refAaFidx}] = $refAA[0];
-    $out[$self->{_altAaFidx}] = $newAA[0];
-    $out[$self->{_altCodonFidx}] = $newCodon[0];
-  } else {
-    $out[$self->{_codonPosFidx}] = \@codonPos;
-    $out[$self->{_codonFIdx}] = \@codonSeq;
-    $out[$self->{_codonNumFidx}] = \@codonNum;
-    $out[$self->{_alleleFuncFidx}] = \@funcAccum;
-    $out[$self->{_refAaFidx}] = \@refAA;
-    $out[$self->{_altAaFidx}] = \@newAA;
-    $out[$self->{_altCodonFidx}] = \@newCodon;
-  }
+  $out[$self->{_codonPosFidx}] = \@codonPos;
+  $out[$self->{_codonFIdx}] = \@codonSeq;
+  $out[$self->{_codonNumFidx}] = \@codonNum;
+  $out[$self->{_alleleFuncFidx}] = \@funcAccum;
+  $out[$self->{_refAaFidx}] = \@refAA;
+  $out[$self->{_altAaFidx}] = \@newAA;
+  $out[$self->{_altCodonFidx}] = \@newCodon;
 
   return accumOut($alleleIdx, $positionIdx, $outAccum, \@out);
 };

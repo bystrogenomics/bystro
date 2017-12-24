@@ -1,7 +1,7 @@
 ---
 assembly: hg19
 build_author: ec2-user
-build_date: 2017-12-09T21:56:00
+build_date: 2017-12-24T18:18:00
 chromosomes:
 - chr1
 - chr2
@@ -66,7 +66,7 @@ tracks:
   - clinvar
   tracks:
   - build_author: ec2-user
-    build_date: 2017-11-28T03:33:00
+    build_date: 2017-12-19T16:46:00
     local_files:
     - chr*.fa.gz
     name: ref
@@ -102,9 +102,9 @@ tracks:
         - chrY.fa.gz
       completed: 2017-11-24T02:27:00
       name: fetch
-    version: 14
+    version: 16
   - build_author: ec2-user
-    build_date: 2017-12-02T00:09:00
+    build_date: 2017-12-19T16:46:00
     dist: true
     features:
     - name
@@ -115,9 +115,9 @@ tracks:
     name: refSeq.nearest
     to: txEnd
     type: nearest
-    version: 4
+    version: 7
   - build_author: ec2-user
-    build_date: 2017-11-28T01:00:00
+    build_date: 2017-12-19T16:46:00
     dist: true
     features:
     - name
@@ -127,9 +127,9 @@ tracks:
     - hg19.refGene.chr*.with_dbnsfp.gz
     name: refSeq.nearestTss
     type: nearest
-    version: 5
+    version: 7
   - build_author: ec2-user
-    build_date: 2017-11-29T23:41:00
+    build_date: 2017-12-19T16:46:00
     local_files:
     - chr*.phastCons100way.wigFix.gz
     name: phastCons
@@ -165,9 +165,9 @@ tracks:
         - chrM.phastCons100way.wigFix.gz
       completed: 2017-11-23T21:05:00
       name: fetch
-    version: 6
+    version: 8
   - build_author: ec2-user
-    build_date: 2017-11-28T01:00:00
+    build_date: 2017-12-19T16:46:00
     local_files:
     - chr*.phyloP100way.wigFix.gz
     name: phyloP
@@ -203,9 +203,9 @@ tracks:
         - chrM.phyloP100way.wigFix.gz
       completed: 2017-11-23T21:10:00
       name: fetch
-    version: 5
+    version: 7
   - build_author: ec2-user
-    build_date: 2017-11-28T01:00:00
+    build_date: 2017-12-19T16:46:00
     caddToBed_date: 2017-04-22T06:41:00
     liftOverCadd_date: 2017-07-28T17:35:00
     local_files:
@@ -216,9 +216,9 @@ tracks:
     sort_date: 2017-01-20T16:06:00
     sorted_guaranteed: 1
     type: cadd
-    version: 5
+    version: 7
   - build_author: ec2-user
-    build_date: 2017-11-28T01:00:00
+    build_date: 2017-12-19T16:46:00
     build_field_transformations:
       alleleFreqs: split [,]
       alleleNs: split [,]
@@ -233,7 +233,7 @@ tracks:
     - func
     - alleles
     - alleleNs: number
-    - alleleFreqs: number(2)
+    - alleleFreqs: number
     local_files:
     - hg19.snp150.chr*.gz
     name: dbSNP
@@ -243,15 +243,15 @@ tracks:
         sql: SELECT * FROM hg19.snp150 WHERE chrom = %chromosomes%
       completed: 2017-11-24T03:23:00
       name: fetch
-    version: 5
+    version: 16
   - build_author: ec2-user
-    build_date: 2017-11-30T15:30:00
+    build_date: 2017-12-19T16:46:00
     build_row_filters:
       AS_FilterStatus: == PASS
     features:
     - alt
     - id
-    - af: number(2)
+    - af: number
     - an: number
     - an_afr: number
     - an_amr: number
@@ -262,15 +262,15 @@ tracks:
     - an_oth: number
     - an_male: number
     - an_female: number
-    - af_afr: number(2)
-    - af_amr: number(2)
-    - af_asj: number(2)
-    - af_eas: number(2)
-    - af_fin: number(2)
-    - af_nfe: number(2)
-    - af_oth: number(2)
-    - af_male: number(2)
-    - af_female: number(2)
+    - af_afr: number
+    - af_amr: number
+    - af_asj: number
+    - af_eas: number
+    - af_fin: number
+    - af_nfe: number
+    - af_oth: number
+    - af_male: number
+    - af_female: number
     fieldMap:
       AF: af
       AF_AFR: af_afr
@@ -296,15 +296,15 @@ tracks:
     - gnomad.genomes.r2.0.2.sites.chr*.vcf.bgz
     name: gnomad.genomes
     type: vcf
-    version: 8
+    version: 10
   - build_author: ec2-user
-    build_date: 2017-11-30T15:30:00
+    build_date: 2017-12-19T16:46:00
     build_row_filters:
       AS_FilterStatus: == PASS
     features:
     - alt
     - id
-    - af: number(2)
+    - af: number
     - an: number
     - an_afr: number
     - an_amr: number
@@ -315,15 +315,15 @@ tracks:
     - an_oth: number
     - an_male: number
     - an_female: number
-    - af_afr: number(2)
-    - af_amr: number(2)
-    - af_asj: number(2)
-    - af_eas: number(2)
-    - af_fin: number(2)
-    - af_nfe: number(2)
-    - af_oth: number(2)
-    - af_male: number(2)
-    - af_female: number(2)
+    - af_afr: number
+    - af_amr: number
+    - af_asj: number
+    - af_eas: number
+    - af_fin: number
+    - af_nfe: number
+    - af_oth: number
+    - af_male: number
+    - af_female: number
     fieldMap:
       AF: af
       AF_AFR: af_afr
@@ -349,9 +349,9 @@ tracks:
     - gnomad.exomes.r2.0.2.sites.vcf.bgz
     name: gnomad.exomes
     type: vcf
-    version: 8
+    version: 10
   - build_author: ec2-user
-    build_date: 2017-11-28T06:52:00
+    build_date: 2017-12-19T16:46:00
     build_field_transformations:
       egenetics.expression: split [;]
       gnfAtlas.expression: split [;]
@@ -387,7 +387,31 @@ tracks:
       - chromEnd
       track: clinvar
     local_files:
-    - hg19.refGene.chr*.with_dbnsfp.gz
+    - hg19.refGene.chr12.with_dbnsfp.gz
+    - hg19.refGene.chr16.with_dbnsfp.gz
+    - hg19.refGene.chr11.with_dbnsfp.gz
+    - hg19.refGene.chr15.with_dbnsfp.gz
+    - hg19.refGene.chr1.with_dbnsfp.gz
+    - hg19.refGene.chr10.with_dbnsfp.gz
+    - hg19.refGene.chr14.with_dbnsfp.gz
+    - hg19.refGene.chr13.with_dbnsfp.gz
+    - hg19.refGene.chr3.with_dbnsfp.gz
+    - hg19.refGene.chr17.with_dbnsfp.gz
+    - hg19.refGene.chr22.with_dbnsfp.gz
+    - hg19.refGene.chr2.with_dbnsfp.gz
+    - hg19.refGene.chr20.with_dbnsfp.gz
+    - hg19.refGene.chr19.with_dbnsfp.gz
+    - hg19.refGene.chr18.with_dbnsfp.gz
+    - hg19.refGene.chr21.with_dbnsfp.gz
+    - hg19.refGene.chrX.with_dbnsfp.gz
+    - hg19.refGene.chr9.with_dbnsfp.gz
+    - hg19.refGene.chr4.with_dbnsfp.gz
+    - hg19.refGene.chr5.with_dbnsfp.gz
+    - hg19.refGene.chr6.with_dbnsfp.gz
+    - hg19.refGene.chr8.with_dbnsfp.gz
+    - hg19.refGene.chrM.with_dbnsfp.gz
+    - hg19.refGene.chr7.with_dbnsfp.gz
+    - hg19.refGene.chrY.with_dbnsfp.gz
     name: refSeq
     type: gene
     utils:
@@ -403,11 +427,11 @@ tracks:
       name: fetch
     - args:
         geneFile: /mnt/db_backup/dbnsfp/dbNSFP3.5_gene.complete
-      completed: 2017-11-28T06:41:00
+      completed: 2017-12-24T18:17:00
       name: refGeneXdbnsfp
-    version: 13
+    version: 15
   - build_author: ec2-user
-    build_date: 2017-12-09T21:56:00
+    build_date: 2017-12-24T18:18:00
     build_field_transformations:
       egenetics.expression: split [;]
       gnfAtlas.expression: split [;]
@@ -420,57 +444,53 @@ tracks:
     dist: 0
     features:
     - name2
-    - exac.pLi: number(2)
-    - exac.pRec: number(2)
-    - exac.pNull: number(2)
-    - exac.lofTool: number(2)
-    - exac.lofFdr: number(2)
-    - exac.pHi: number(2)
-    - exac.nonTCGA.pRec: number(2)
-    - exac.nonTCGA.pNull: number(2)
-    - exac.nonTCGA.pLi: number(2)
-    - exac.nonPsych.pRec: number(2)
-    - exac.nonPsych.pNull: number(2)
-    - exac.nonPsych.pLi: number(2)
-    - gdi.phred: number(2)
-    - exac.cnv.score: number(2)
-    - exac.cnv.flag
-    - uniprot.tissue
-    - uniprot.diseaseDescription
-    - uniprot.function
-    - egenetics.expression
-    - gnfAtlas.expression
-    - knownRecInfo
-    - gwasTraitAssoc
+    - pLi: number
+    - pRec: number
+    - pNull: number
+    - lofTool: number
+    - lofFdr: number
+    - pHi: number
+    - nonTCGA.pRec: number
+    - nonTCGA.pNull: number
+    - nonTCGA.pLi: number
+    - nonPsych.pRec: number
+    - nonPsych.pNull: number
+    - nonPsych.pLi: number
+    - gdi: number
+    - cnvScore: number
+    - cnvFlag
+    - uniprot.func
+    - pmid: number
+    - rvis: number
     fieldMap:
-      dbnsfp.Disease_description: uniprot.diseaseDescription
-      dbnsfp.ExAC_cnv.score: exac.cnv.score
-      dbnsfp.ExAC_cnv_flag: exac.cnv.flag
-      dbnsfp.ExAC_nonTCGA_pLI: exac.nonTCGA.pLi
-      dbnsfp.ExAC_nonTCGA_pNull: exac.nonTCGA.pNull
-      dbnsfp.ExAC_nonTCGA_pRec: exac.nonTCGA.pRec
-      dbnsfp.ExAC_nonpsych_pLI: exac.nonPsych.pLi
-      dbnsfp.ExAC_nonpsych_pNull: exac.nonPsych.pNull
-      dbnsfp.ExAC_nonpsych_pRec: exac.nonPsych.pRec
-      dbnsfp.ExAC_pLI: exac.pLi
-      dbnsfp.ExAC_pNull: exac.pNull
-      dbnsfp.ExAC_pRec: exac.pRec
+      dbnsfp.Disease_description: uniprot.disease
+      dbnsfp.ExAC_cnv.score: cnvScore
+      dbnsfp.ExAC_cnv_flag: cnvFlag
+      dbnsfp.ExAC_nonTCGA_pLI: nonTCGA.pLi
+      dbnsfp.ExAC_nonTCGA_pNull: nonTCGA.pNull
+      dbnsfp.ExAC_nonTCGA_pRec: nonTCGA.pRec
+      dbnsfp.ExAC_nonpsych_pLI: nonPsych.pLi
+      dbnsfp.ExAC_nonpsych_pNull: nonPsych.pNull
+      dbnsfp.ExAC_nonpsych_pRec: nonPsych.pRec
+      dbnsfp.ExAC_pLI: pLi
+      dbnsfp.ExAC_pNull: pNull
+      dbnsfp.ExAC_pRec: pRec
       dbnsfp.Expression(GNF/Atlas): gnfAtlas.expression
       dbnsfp.Expression(egenetics): egenetics.expression
-      dbnsfp.Function_description: uniprot.function
-      dbnsfp.GDI-Phred: gdi.phred
+      dbnsfp.Function_description: uniprot.func
+      dbnsfp.GDI-Phred: gdi
       dbnsfp.GO_biological_process: go.biologicalProcess
       dbnsfp.GO_cellular_component: go.cellularComponent
       dbnsfp.GO_molecular_function: go.molecularFunction
       dbnsfp.Known_rec_info: knownRecInfo
-      dbnsfp.LoF-FDR_ExAC: exac.lofFdr
-      dbnsfp.LoFtool_score: exac.lofTool
-      dbnsfp.P(HI): exac.pHi
-      dbnsfp.P(rec): exac.pRec
-      dbnsfp.RVIS_ExAC: exac.rvis
-      dbnsfp.RVIS_percentile_ExAC: exac.rvisPercentile
+      dbnsfp.LoF-FDR_ExAC: lofFdr
+      dbnsfp.LoFtool_score: lofTool
+      dbnsfp.P(HI): pHi
+      dbnsfp.P(rec): pRec
+      dbnsfp.RVIS_percentile_ExAC: rvis
       dbnsfp.Tissue_specificity(Uniprot): uniprot.tissue
       dbnsfp.Trait_association(GWAS): gwasTraitAssoc
+      dbnsfp.pubmedID: pmid
     from: txStart
     local_files:
     - hg19.refGene.chr*.with_dbnsfp.gz
@@ -478,10 +498,10 @@ tracks:
     storeNearest: 0
     to: txEnd
     type: nearest
-    version: 4
+    version: 12
   - based: 1
     build_author: ec2-user
-    build_date: 2017-11-30T15:06:00
+    build_date: 2017-12-19T16:46:00
     build_field_transformations:
       chrom: chr .
       clinicalSignificance: split [;]
@@ -525,7 +545,7 @@ tracks:
         - ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz
       completed: 2017-11-23T21:04:00
       name: fetch
-    version: 5
+    version: 7
 vcfProcessor: bystro-vcf
-version: 6
+version: 200
 

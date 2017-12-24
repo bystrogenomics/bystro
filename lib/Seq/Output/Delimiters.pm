@@ -4,16 +4,17 @@ use warnings;
 
 package Seq::Output::Delimiters;
 use Mouse 2;
+with 'Seq::Role::Message';
 
-has valueDelimiter => (is => 'ro', default => ';');
+has valueDelimiter => (is => 'ro', isa => 'Str', default => ';');
 
-has positionDelimiter => (is => 'ro', default => '|');
+has positionDelimiter => (is => 'ro', isa => 'Str', default => "\|");
 
-has alleleDelimiter => (is => 'ro', default => '/');
+has alleleDelimiter => (is => 'ro', isa => 'Str',  default => "\/");
 
-has fieldSeparator => (is => 'ro', default => "\t");
+has fieldSeparator => (is => 'ro', isa => 'Str', default => "\t");
 
-has emptyFieldChar => (is => 'ro', default => "!");
+has emptyFieldChar => (is => 'ro',  isa => 'Str', default => "!");
 
 __PACKAGE__->meta->make_immutable();
 return 1;
