@@ -85,9 +85,9 @@ sub get {
   # WARNING: If $_[1]->[$_[0]->{_dbName} isn't defined, will be treated as the 0 index!!!
   # therefore return here if that is the case
   if(!defined $_[1]->[$_[0]->{_dbName}]) {
-    # for my $i (@{$_[0]->{_i}}) {
-    #   $_[7]->[$i][$_[5]][$_[6]] = undef;
-    # }
+    for my $i (@{$_[0]->{_i}}) {
+      $_[7]->[$i][$_[6]] = undef;
+    }
 
     return $_[7];
   }
