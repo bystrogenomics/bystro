@@ -1,7 +1,7 @@
 ---
 assembly: hg19
 build_author: ec2-user
-build_date: 2017-12-24T18:18:00
+build_date: 2017-12-26T21:53:00
 chromosomes:
 - chr1
 - chr2
@@ -55,8 +55,8 @@ tracks:
   - ref
   - refSeq
   - refSeq.gene
-  - refSeq.nearest
-  - refSeq.nearestTss
+  - nearest.refSeq
+  - nearestTss.refSeq
   - phastCons
   - phyloP
   - cadd
@@ -66,7 +66,7 @@ tracks:
   - clinvar
   tracks:
   - build_author: ec2-user
-    build_date: 2017-12-19T16:46:00
+    build_date: 2017-12-26T04:49:00
     local_files:
     - chr*.fa.gz
     name: ref
@@ -102,9 +102,9 @@ tracks:
         - chrY.fa.gz
       completed: 2017-11-24T02:27:00
       name: fetch
-    version: 16
+    version: 18
   - build_author: ec2-user
-    build_date: 2017-12-19T16:46:00
+    build_date: 2017-12-26T04:49:00
     dist: true
     features:
     - name
@@ -112,12 +112,17 @@ tracks:
     from: txStart
     local_files:
     - hg19.refGene.chr*.with_dbnsfp.gz
-    name: refSeq.nearest
+    name: nearest.refSeq
     to: txEnd
     type: nearest
-    version: 7
+    utils:
+    - args:
+        renameTo: nearest.refSeq
+      completed: 2017-12-24T20:10:00
+      name: renameTrack
+    version: 9
   - build_author: ec2-user
-    build_date: 2017-12-19T16:46:00
+    build_date: 2017-12-26T04:49:00
     dist: true
     features:
     - name
@@ -125,11 +130,16 @@ tracks:
     from: txStart
     local_files:
     - hg19.refGene.chr*.with_dbnsfp.gz
-    name: refSeq.nearestTss
+    name: nearestTss.refSeq
     type: nearest
-    version: 7
+    utils:
+    - args:
+        renameTo: nearestTss.refSeq
+      completed: 2017-12-24T20:10:00
+      name: renameTrack
+    version: 9
   - build_author: ec2-user
-    build_date: 2017-12-19T16:46:00
+    build_date: 2017-12-26T04:49:00
     local_files:
     - chr*.phastCons100way.wigFix.gz
     name: phastCons
@@ -165,9 +175,9 @@ tracks:
         - chrM.phastCons100way.wigFix.gz
       completed: 2017-11-23T21:05:00
       name: fetch
-    version: 8
+    version: 10
   - build_author: ec2-user
-    build_date: 2017-12-19T16:46:00
+    build_date: 2017-12-26T04:49:00
     local_files:
     - chr*.phyloP100way.wigFix.gz
     name: phyloP
@@ -203,9 +213,9 @@ tracks:
         - chrM.phyloP100way.wigFix.gz
       completed: 2017-11-23T21:10:00
       name: fetch
-    version: 7
+    version: 9
   - build_author: ec2-user
-    build_date: 2017-12-19T16:46:00
+    build_date: 2017-12-26T04:49:00
     caddToBed_date: 2017-04-22T06:41:00
     liftOverCadd_date: 2017-07-28T17:35:00
     local_files:
@@ -216,9 +226,9 @@ tracks:
     sort_date: 2017-01-20T16:06:00
     sorted_guaranteed: 1
     type: cadd
-    version: 7
+    version: 9
   - build_author: ec2-user
-    build_date: 2017-12-19T16:46:00
+    build_date: 2017-12-26T04:49:00
     build_field_transformations:
       alleleFreqs: split [,]
       alleleNs: split [,]
@@ -243,9 +253,9 @@ tracks:
         sql: SELECT * FROM hg19.snp150 WHERE chrom = %chromosomes%
       completed: 2017-11-24T03:23:00
       name: fetch
-    version: 16
+    version: 18
   - build_author: ec2-user
-    build_date: 2017-12-19T16:46:00
+    build_date: 2017-12-26T04:49:00
     build_row_filters:
       AS_FilterStatus: == PASS
     features:
@@ -296,9 +306,9 @@ tracks:
     - gnomad.genomes.r2.0.2.sites.chr*.vcf.bgz
     name: gnomad.genomes
     type: vcf
-    version: 10
+    version: 12
   - build_author: ec2-user
-    build_date: 2017-12-19T16:46:00
+    build_date: 2017-12-26T04:49:00
     build_row_filters:
       AS_FilterStatus: == PASS
     features:
@@ -349,28 +359,28 @@ tracks:
     - gnomad.exomes.r2.0.2.sites.vcf.bgz
     name: gnomad.exomes
     type: vcf
-    version: 10
+    version: 12
   - build_author: ec2-user
-    build_date: 2017-12-19T16:46:00
+    build_date: 2017-12-26T21:53:00
     build_field_transformations:
-      egenetics.expression: split [;]
-      gnfAtlas.expression: split [;]
-      go.biologicalProcess: split [;]
-      go.cellularComponent: split [;]
-      go.molecularFunction: split [;]
-      uniprot.diseaseDescription: split [;]
-      uniprot.function: split [;]
-      uniprot.tissue: split [;]
+      description: split [;]
+      ensemblID: split [;]
+      kgID: split [;]
+      mRNA: split [;]
+      protAcc: split [;]
+      rfamAcc: split [;]
+      spDisplayID: split [;]
+      spID: split [;]
+      tRnaName: split [;]
     features:
     - name
     - name2
-    - geneSymbol
+    - description
     - kgID
     - mRNA
     - spID
     - spDisplayID
     - protAcc
-    - description
     - rfamAcc
     - tRnaName
     - ensemblID
@@ -387,61 +397,65 @@ tracks:
       - chromEnd
       track: clinvar
     local_files:
-    - hg19.refGene.chr12.with_dbnsfp.gz
-    - hg19.refGene.chr16.with_dbnsfp.gz
-    - hg19.refGene.chr11.with_dbnsfp.gz
-    - hg19.refGene.chr15.with_dbnsfp.gz
-    - hg19.refGene.chr1.with_dbnsfp.gz
-    - hg19.refGene.chr10.with_dbnsfp.gz
-    - hg19.refGene.chr14.with_dbnsfp.gz
-    - hg19.refGene.chr13.with_dbnsfp.gz
-    - hg19.refGene.chr3.with_dbnsfp.gz
-    - hg19.refGene.chr17.with_dbnsfp.gz
-    - hg19.refGene.chr22.with_dbnsfp.gz
-    - hg19.refGene.chr2.with_dbnsfp.gz
-    - hg19.refGene.chr20.with_dbnsfp.gz
-    - hg19.refGene.chr19.with_dbnsfp.gz
-    - hg19.refGene.chr18.with_dbnsfp.gz
-    - hg19.refGene.chr21.with_dbnsfp.gz
-    - hg19.refGene.chrX.with_dbnsfp.gz
-    - hg19.refGene.chr9.with_dbnsfp.gz
-    - hg19.refGene.chr4.with_dbnsfp.gz
-    - hg19.refGene.chr5.with_dbnsfp.gz
-    - hg19.refGene.chr6.with_dbnsfp.gz
-    - hg19.refGene.chr8.with_dbnsfp.gz
-    - hg19.refGene.chrM.with_dbnsfp.gz
-    - hg19.refGene.chr7.with_dbnsfp.gz
-    - hg19.refGene.chrY.with_dbnsfp.gz
+    - hg19.kgXref.chr7.with_dbnsfp.gz
+    - hg19.kgXref.chr8.with_dbnsfp.gz
+    - hg19.kgXref.chr4.with_dbnsfp.gz
+    - hg19.kgXref.chr5.with_dbnsfp.gz
+    - hg19.kgXref.chr6.with_dbnsfp.gz
+    - hg19.kgXref.chr2.with_dbnsfp.gz
+    - hg19.kgXref.chr3.with_dbnsfp.gz
+    - hg19.kgXref.chr1.with_dbnsfp.gz
+    - hg19.kgXref.chr12.with_dbnsfp.gz
+    - hg19.kgXref.chr14.with_dbnsfp.gz
+    - hg19.kgXref.chr10.with_dbnsfp.gz
+    - hg19.kgXref.chr13.with_dbnsfp.gz
+    - hg19.kgXref.chr16.with_dbnsfp.gz
+    - hg19.kgXref.chr9.with_dbnsfp.gz
+    - hg19.kgXref.chr11.with_dbnsfp.gz
+    - hg19.kgXref.chr15.with_dbnsfp.gz
+    - hg19.kgXref.chr20.with_dbnsfp.gz
+    - hg19.kgXref.chr22.with_dbnsfp.gz
+    - hg19.kgXref.chr19.with_dbnsfp.gz
+    - hg19.kgXref.chr17.with_dbnsfp.gz
+    - hg19.kgXref.chr18.with_dbnsfp.gz
+    - hg19.kgXref.chr21.with_dbnsfp.gz
+    - hg19.kgXref.chrX.with_dbnsfp.gz
+    - hg19.kgXref.chrM.with_dbnsfp.gz
+    - hg19.kgXref.chrY.with_dbnsfp.gz
     name: refSeq
     type: gene
     utils:
     - args:
         connection:
           database: hg19
-        sql: SELECT r.name, chrom, strand, txStart, txEnd, cdsStart, cdsEnd, exonCount,
-          exonStarts, exonEnds, score, name2, kgID, mRNA, spID, spDisplayID, refseq,
-          protAcc, description, rfamAcc, tRnaName, value AS 'ensemblID', geneSymbol
-          FROM refGene r LEFT JOIN kgXref k ON r.name = k.refseq LEFT JOIN knownToEnsembl
-          e ON k.kgID = e.name WHERE chrom = %chromosomes%;
-      completed: 2017-11-28T03:38:00
+        sql: SELECT r.*, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.kgID, '')) SEPARATOR
+          ';') FROM kgXref x WHERE x.refseq=r.name) AS kgID, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.description,
+          '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS description,
+          (SELECT GROUP_CONCAT(DISTINCT(NULLIF(e.value, '')) SEPARATOR ';') FROM knownToEnsembl
+          e JOIN kgXref x ON x.kgID = e.name WHERE x.refseq = r.name) AS ensemblID,
+          (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.tRnaName, '')) SEPARATOR ';') FROM
+          kgXref x WHERE x.refseq=r.name) AS tRnaName, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.spID,
+          '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS spID, (SELECT
+          GROUP_CONCAT(DISTINCT(NULLIF(x.spDisplayID, '')) SEPARATOR ';') FROM kgXref
+          x WHERE x.refseq=r.name) AS spDisplayID, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.protAcc,
+          '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS protAcc, (SELECT
+          GROUP_CONCAT(DISTINCT(NULLIF(x.mRNA, '')) SEPARATOR ';') FROM kgXref x WHERE
+          x.refseq=r.name) AS mRNA, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.rfamAcc,
+          '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS rfamAcc FROM
+          refGene r WHERE chrom=%chromosomes%;
+      completed: 2017-12-26T21:35:00
       name: fetch
     - args:
         geneFile: /mnt/db_backup/dbnsfp/dbNSFP3.5_gene.complete
-      completed: 2017-12-24T18:17:00
+      completed: 2017-12-26T21:46:00
       name: refGeneXdbnsfp
-    version: 15
+    version: 18
   - build_author: ec2-user
-    build_date: 2017-12-24T18:18:00
+    build_date: 2017-12-26T04:49:00
     build_field_transformations:
-      egenetics.expression: split [;]
-      gnfAtlas.expression: split [;]
-      go.biologicalProcess: split [;]
-      go.cellularComponent: split [;]
-      go.molecularFunction: split [;]
-      uniprot.diseaseDescription: split [;]
-      uniprot.function: split [;]
-      uniprot.tissue: split [;]
-    dist: 0
+      pmid: split [;]
+      uniprot.func: split [;]
+    dist: false
     features:
     - name2
     - pLi: number
@@ -495,13 +509,13 @@ tracks:
     local_files:
     - hg19.refGene.chr*.with_dbnsfp.gz
     name: refSeq.gene
-    storeNearest: 0
+    storeNearest: false
     to: txEnd
     type: nearest
-    version: 12
+    version: 14
   - based: 1
     build_author: ec2-user
-    build_date: 2017-12-19T16:46:00
+    build_date: 2017-12-26T04:49:00
     build_field_transformations:
       chrom: chr .
       clinicalSignificance: split [;]
@@ -545,7 +559,7 @@ tracks:
         - ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz
       completed: 2017-11-23T21:04:00
       name: fetch
-    version: 7
+    version: 9
 vcfProcessor: bystro-vcf
-version: 200
+version: 203
 

@@ -89,6 +89,13 @@ sub buildTrack {
   my $txEnd;
   my $txNumber;
 
+  # Get an instance of the merge function that closes over $self
+  # Note that tracking which positinos have been over-written will only work
+  # if there is one chromosome per file, or if all chromosomes are in one file
+  # At least until we share $madeIntoArray (in makeMergeFunc) between threads
+  # Won't be an issue in Go
+  my ($mergeFunc, $cleanUpMerge) = $self->makeMergeFunc();
+
   $pm->run_on_finish( sub {
     my ($pid, $exitCode, $fileName, $exitSignal, $coreDump) = @_;
 
@@ -279,23 +286,6 @@ sub buildTrack {
 
       my $txErrorDbname = $self->getFieldDbName($geneDef->txErrorName);
 
-      my $mainMergeFunc = sub {
-        # Only when called when there is a defined $oldVal
-        my ($chr, $pos, $oldVal, $newVal) = @_;
-        # make it an array of arrays (array of geneTrack site records)
-        if(!ref $oldVal->[0]) {
-          return (undef, [$oldVal, $newVal]);
-        }
-
-        #oldVal is an array of arrays, push on to it
-        my @updatedVal = @$oldVal;
-
-        push @updatedVal, $newVal;
-
-        #TODO: Should we throw any errors?
-        return (undef, \@updatedVal);
-      };
-
       TX_LOOP: for my $chr (@allChrs) {
         # We may want to just update the region track,
         # TODO: Note that this won't store any txErrors
@@ -338,7 +328,7 @@ sub buildTrack {
                 #value <Array[Scalar]>
                 $txInfo->transcriptSites->[$i + 1],
                 #how we handle cases where multiple overlap
-                $mainMergeFunc
+                $mergeFunc
               );
             }
 
@@ -373,6 +363,8 @@ sub buildTrack {
          # We've finished with 1 chromosome, so write that to meta to disk
          # TODO: error check this
         $self->completionMeta->recordCompletion($chr);
+
+        $cleanUpMerge->($chr);
 
         #Commit, sync everything, including completion status, and release mmap
         $self->db->cleanUp();

@@ -81,7 +81,7 @@ sub fetchAndWriteSQLData {
 
     # Get the FQ table name (i.e hg19.refSeq instead of refSeq), to avoid
     if($perChromosome) {
-      $query =~ s/%chromosomes%/'$chr'/;
+      $query =~ s/%chromosomes%/'$chr'/g;
     }
 
     $query =~ m/FROM\s(\S+)/i;
