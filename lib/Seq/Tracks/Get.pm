@@ -31,15 +31,23 @@ sub BUILD {
   #@params $parent, $child
   #if this class has no features, then the track's name is also its only feature
   if($self->noFeatures) {
-    $self->{_noFeatures} = 1;
+    return;
+  }
+
+  $self->{_fDb} = [map { $self->getFieldDbName($_) } @{$self->features}];
+  $self->{_fIdx} = [0 .. $#{$self->features}];
+}
+
+# Decouple from build to allow decoupling from dbName / build order
+sub setHeaders {
+  my $self = shift;
+
+  if($self->noFeatures) {
     $self->headers->addFeaturesToHeader($self->name);
     return;
   }
 
   $self->headers->addFeaturesToHeader($self->features, $self->name);
-
-  $self->{_fieldDbNames} = [map { $self->getFieldDbName($_) } @{$self->features}];
-  $self->{_i} = [0 .. $#{$self->features}];
 }
 
 # Take an array reference containing  (that is passed to this function), and get back all features
@@ -65,7 +73,7 @@ sub get {
 
   #some features simply don't have any features, and for those just return
   #the value they stored
-  if($_[0]->{_noFeatures}) {
+  if(!$_[0]->{_fIdx}) {
     #$outAccum->[$alleleIdx][$positionIdx] = $href->[ $self->{_dbName} ]
     $_[7]->[$_[6]] = $_[1]->[ $_[0]->{_dbName} ];
 
@@ -75,8 +83,9 @@ sub get {
 
   # TODO: decide whether we want to revert to old system of returning a bunch of !
   # one for each feature
+  # This is clunky, to have _i and fieldDbNames
   if(!defined $_[1]->[$_[0]->{_dbName}]) {
-    for my $i (@{$_[0]->{_i}}) {
+    for my $i (@{$_[0]->{_fIdx}}) {
       $_[7]->[$i][$_[6]] = undef;
     }
 
@@ -91,7 +100,7 @@ sub get {
   # #http://ideone.com/WD3Ele
   # return [ map { $_[1]->[$_[0]->{_dbName}][$_] } @{$_[0]->{_fieldDbNames}} ];
   my $idx = 0;
-  for my $fieldDbName (@{$_[0]->{_fieldDbNames}}) {
+  for my $fieldDbName (@{$_[0]->{_fDb}}) {
     #$outAccum->[$idx][$alleleIdx][$positionIdx] = $href->[$self->{_dbName}][$self->{_fieldDbNames}[$idx]] }
     $_[7]->[$idx][$_[6]] = $_[1]->[$_[0]->{_dbName}][$fieldDbName];
     $idx++;

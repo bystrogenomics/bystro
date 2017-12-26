@@ -22,6 +22,8 @@ use Seq::Output::Delimiters;
 use MCE::Loop;
 use MCE::Shared;
 use Try::Tiny;
+use Math::SigFigs qw(:all);
+use Scalar::Util qw/looks_like_number/;
 
 # An archive, containing an "annotation" file
 has annotatedFilePath => (is => 'ro', isa => AbsFile, coerce => 1,
@@ -162,6 +164,8 @@ sub go {
   my $positionDelimiter = $delimiters->positionDelimiter;
   my $valueDelimiter = $delimiters->valueDelimiter;
 
+  $self->log('debug', "alleleDelimiter is $alleleDelimiter , pos delimter is $positionDelimiter, val delimiter is $valueDelimiter");
+
   my $emptyFieldChar = $delimiters->emptyFieldChar;
 
   # We need to flush at the end of each chunk read; so chunk size directly
@@ -255,54 +259,44 @@ sub go {
       my $colIdx = 0;
       my $foundWeird = 0;
       my $alleleIdx;
-      my $posIdx;
-      my $isBool;
+      # my $isBool;
 
       # We use Perl's in-place modification / reference of looped-over variables
       # http://ideone.com/HNgMf7
-      OUTER: for (my $i = 0; $i < @fields; $i++) {
+      for (my $i = 0; $i < @fields; $i++) {
         my $field = $fields[$i];
-
+        # p $field;next;
         #Every value is stored @ [alleleIdx][positionIdx]
         my @out;
 
         if($field ne $emptyFieldChar) {
-          # ES since > 5.2 deprecates lenient boolean
-          $alleleIdx = 0;
-          ALLELE_LOOP: for my $fieldValue ( split("\\$alleleDelimiter", $field) ) {
-            if ($fieldValue eq $emptyFieldChar) {
-              # If the value is empty, then this value is for the default/0 index position
-              # Means it's not an indel
-              $out[$alleleIdx][0] = undef;
+          POS_LOOP: for my $posValue (index($field, $positionDelimiter) > -1 ? split(/[$positionDelimiter]/, $field) : $field) {
+            if ($posValue eq $emptyFieldChar) {
+              push @out, undef;
 
-              $alleleIdx++;
-              next ALLELE_LOOP;
+              next;
             }
+            # p $posValue;
+            my @values;
 
-            $posIdx = 0;
-            POS_LOOP: for my $posValue ( split("\\$positionDelimiter", $fieldValue) ) {
-              if ($posValue eq $emptyFieldChar) {
-                $out[$alleleIdx][$posIdx] = undef;
+            for my $val (split($valueDelimiter, $posValue)) {
+              if(index($val, $alleleDelimiter) > -1) {
+                # p $val;
+                my @inner = map {
+                  $_ ne $emptyFieldChar ? $_ : undef;
+                } split($alleleDelimiter, $val);
 
-                $posIdx++;
-                next POS_LOOP;
-              }
-
-              # ES since > 5.2 deprecates lenient boolean
-              my @values = map {
-                $_ ne $emptyFieldChar ? ($booleanHeaders[$i] ? ($_ ? 'true': 'false') : $_) : undef
-              } split("\\$valueDelimiter", $posValue);
-
-              if(!@values) {
-                $out[$alleleIdx][$posIdx] = undef;
+                push @values, \@inner;
               } else {
-                $out[$alleleIdx][$posIdx] = @values > 1 ? \@values : $values[0];
+                push @values, $val ne $emptyFieldChar ? $val : undef;
               }
-
-              $posIdx++;
             }
 
-            $alleleIdx++;
+            if(!@values) {
+              push @out, undef;
+            } else {
+              push @out, @values > 1 ? \@values : $values[0];
+            }
           }
 
           _populateHashPath(\%rowDocument, $paths[$i], \@out);

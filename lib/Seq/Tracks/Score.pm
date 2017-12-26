@@ -16,10 +16,11 @@ extends 'Seq::Tracks::Get';
 
 has scalingFactor => (is => 'ro', isa => 'Int', default => 100);
 
-sub BUILD {
+override 'BUILD' => sub {
   my $self = shift;
   $self->{_s} = $self->scalingFactor;
-}
+  $self->{_d} = $self->dbName;
+};
 
 sub get {
   #my ($self, $href, $chr, $refBase, $allele, $outAccum, $alleleNumber) = @_
@@ -32,7 +33,7 @@ sub get {
   # $_[6] == <Int> $positionIdx : the position in the indel, if any
   # $_[7] == <ArrayRef> $outAccum : a reference to the output, which we mutate
 
-  $_[7][$_[6]] = defined $_[1]->[ $_[0]->{_dbName} ] ?  $_[1]->[ $_[0]->{_dbName} ] / $_[0]->{_s} : undef;
+  $_[7][$_[6]] = defined $_[1]->[ $_[0]->{_d} ] ?  $_[1]->[ $_[0]->{_d} ] / $_[0]->{_s} : undef;
 
   return $_[7];
 }

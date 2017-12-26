@@ -18,10 +18,13 @@ $order = $order->order;
 
 has scalingFactor => (is => 'ro', isa => 'Int', default => 10);
 
-sub BUILD {
+override 'BUILD' => sub {
   my $self = shift;
+
+  # purely to save accessor time
   $self->{_s} = $self->scalingFactor;
-}
+  $self->{_d} = $self->dbName;
+};
 
 sub get {
   #my ($self, $href, $chr, $refBase, $allele, $outAccum, $alleleNumber) = @_
@@ -45,7 +48,7 @@ sub get {
   # We may have stored an empty array at this position, in case 
   # the CADD scores read were not guaranteed to be sorted
   # Alternatively the CADD data for this position may be missing (not defined)
-  if(!defined $_[1]->[$_[0]->{_dbName}] || !@{$_[1]->[$_[0]->{_dbName}]}) {
+  if(!defined $_[1]->[$_[0]->{_d}] || !@{$_[1]->[$_[0]->{_d}]}) {
     $_[7][$_[6]] = undef;
 
     return $_[7];
@@ -53,14 +56,14 @@ sub get {
   
   #if (defined $order->{ $refBase }{ $altAlleles } ) {
   if (defined $order->{$_[3]}{$_[4]} ) {
-    $_[7][$_[6]] = $_[1]->[$_[0]->{_dbName}][ $order->{$_[3]}{$_[4]} ] / $_[0]->{_s};
+    $_[7][$_[6]] = $_[1]->[$_[0]->{_d}][ $order->{$_[3]}{$_[4]} ] / $_[0]->{_s};
 
     return $_[7];
   }
 
   # For indels, which will be the least frequent, return it all
   if (length( $_[4] ) > 1) {
-    $_[7][$_[6]] = [ map { $_ / $_[0]->{_s} } @{$_[1]->[ $_[0]->{_dbName} ]} ];
+    $_[7][$_[6]] = [ map { $_ / $_[0]->{_s} } @{$_[1]->[ $_[0]->{_d} ]} ];
 
     return $_[7];
   }

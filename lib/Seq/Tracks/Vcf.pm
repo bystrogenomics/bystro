@@ -11,19 +11,24 @@ our $VERSION = '0.001';
 
 use Mouse 2;
 use namespace::autoclean;
-use DDP;
+
 extends 'Seq::Tracks::Get';
 
-__PACKAGE__->meta->make_immutable;
-
-sub BUILD {
+override 'BUILD' => sub {
   my $self = shift;
   $self->{_altIdx} = $self->getFieldDbName('alt');
 
   if(!defined $self->{_altIdx}) {
     die "Couldn't find 'alt' feature, required for Vcf tracks";
   }
-}
+
+  # Skip accesor penalty, the get function in this package may be called
+  # hundreds of millions of times
+  # Could call super(), but I think this makes things clearer
+  $self->{_dbName} = $self->dbName;
+  $self->{_fDb} = [map { $self->getFieldDbName($_) } @{$self->features}];
+  $self->{_fIdx} = [0 .. $#{$self->features}];
+};
 
 sub get {
   # Avoid assignments, save overhead
@@ -60,9 +65,9 @@ sub get {
     if($alt eq $_[4]) {
       # Alt is a scalar, which means there were no overlapping database values
       # at this pposiiton, and all fields represent a single value
-      for my $idx (@{$_[0]->{_fieldIdxRange}}) {
+      for my $i (@{$_[0]->{_fIdx}}) {
         #$outAccum->[$idx][$alleleIdx][$positionIdx] = $href->[$self->{_dbName}][$self->{_fieldDbNames}[$idx]] }
-        $_[7]->[$idx][$_[6]] = $data->[$_[0]->{_fieldDbNames}[$idx]];
+        $_[7]->[$i][$_[6]] = $data->[$_[0]->{_fDb}[$i]];
       }
     }
 
@@ -79,9 +84,9 @@ sub get {
 
   for my $alt (@$alt) {
     if($alt eq $_[4]) {
-      for my $fieldIdx (@{$_[0]->{_fieldIdxRange}}) {
+      for my $i (@{$_[0]->{_fIdx}}) {
         #$outAccum->[$fieldIdx][$alleleIdx][$positionIdx] = $data->[$self->{_fieldDbNames}[$dataIdx]] }
-        $_[7]->[$fieldIdx][$_[6]] = $data->[$_[0]->{_fieldDbNames}[$fieldIdx]][$dataIdx];
+        $_[7]->[$i][$_[6]] = $data->[$_[0]->{_fDb}[$i]][$dataIdx];
       }
 
       #return $outAccum;

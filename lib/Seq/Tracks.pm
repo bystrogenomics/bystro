@@ -300,6 +300,7 @@ sub _buildTrackGetters {
   }
 
   for my $track (@$orderedTrackGettersAref) {
+    $track->setHeaders();
     push @{$trackGettersByType->{$track->type} }, $track;
   }
 

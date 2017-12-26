@@ -177,7 +177,7 @@ sub annotateFile {
   ########################## Write the header ##################################
 
   ######### Build the header, and write it as the first line #############
-  my $headers = Seq::Headers->new();
+  my $finalHeader = Seq::Headers->new();
 
   my $header = <$fh>;
 
@@ -185,7 +185,7 @@ sub annotateFile {
 
   chomp $header;
 
-  my @header = split '\t', $header;
+  my @headerFields = split '\t', $header;
 
   # Our header class checks the name of each feature
   # It may be, more than likely, that the pre-processor names the 4th column 'ref'
@@ -193,7 +193,7 @@ sub annotateFile {
   # This not only now reflects its actual function
   # but prevents name collision issues resulting in the wrong header idx
   # being generated for the ref track
-  $header[3] = $self->discordantField;
+  $headerFields[3] = $self->discordantField;
 
   # Bystro takes data from a file pre-processor, which spits out a common
   # intermediate format
@@ -206,14 +206,14 @@ sub annotateFile {
   # idx 4: the alternate allele
 
   # Prepend all of the headers created by the pre-processor
-  $headers->addFeaturesToHeader(\@header, undef, 1);
+  $finalHeader->addFeaturesToHeader(\@headerFields, undef, 1);
 
-  my $outputHeader = $headers->getString();
+  my $outputHeader = $finalHeader->getString();
 
   say $outFh $outputHeader;
 
   # Now that header is prepared, make the outputter
-  my $outputter = Seq::Output->new({header => $headers});
+  my $outputter = Seq::Output->new({header => $finalHeader});
 
   ########################## Tell stats program about our annotation ##############
   # TODO: error handling if fh fails to open
@@ -237,9 +237,10 @@ sub annotateFile {
     gather => $progressFunc,
   };
 
-  my $trackIndices = $headers->getParentFeaturesMap();
+  my $trackIndices = $finalHeader->getParentFeaturesMap();
 
   my $refTrackIdx = $trackIndices->{$self->{_refTrackGetter}->name};
+
   my @trackGettersExceptReference = @{$self->{_trackGettersExceptReference}};
   my %wantedChromosomes = %{ $self->{_refTrackGetter}->chromosomes };
   my $maxDel = $self->maxDel;

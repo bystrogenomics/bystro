@@ -97,7 +97,7 @@ has '+features' => (
 );
 
 #### Add our other "features", everything we find for this site ####
-sub BUILD {
+override 'BUILD' => sub {
   my $self = shift;
 
   # Private variables, meant to cache often used data
@@ -111,23 +111,12 @@ sub BUILD {
   # Not including the txNumberKey;  this is separate from the annotations, which is 
   # what these keys represent
 
-  #  Prepend some custom features
-  #  Providing 1 as the last argument means "prepend" instead of append
-  #  So these features will come before any other refSeq.* features
-  $self->headers->addFeaturesToHeader([
-    $self->siteTypeKey, $self->exonicAlleleFunctionKey,
-    $self->codonSequenceKey, $self->newCodonKey, $self->refAminoAcidKey,
-    $self->newAminoAcidKey, $self->codonPositionKey,
-    $self->codonNumberKey, $self->strandKey,
-  ], $self->name, 1);
-
   if($self->hasJoin) {
     my $joinTrackName = $self->joinTrackName;
 
     $self->{_hasJoin} = 1;
     
     $self->{_flatJoinFeatures} = [map{ "$joinTrackName.$_" } @{$self->joinTrackFeatures}];
-    $self->headers->addFeaturesToHeader($self->{_flatJoinFeatures}, $self->name);
 
     # TODO: Could theoretically be overwritten by line 114
     #the features specified in the region database which we want for nearest gene records
@@ -141,6 +130,25 @@ sub BUILD {
   for my $fName (@{$self->{_features}}) {
     $self->{_allCachedDbNames}{$fName} = $self->getFieldDbName($fName);
   }
+};
+
+override 'setHeaders' => sub {
+  my $self = shift;
+  my @features = @{$self->features};
+
+  # all of the features that are calculated for every gene track
+  unshift @features, $self->siteTypeKey, $self->exonicAlleleFunctionKey,
+    $self->codonSequenceKey, $self->newCodonKey, $self->refAminoAcidKey,
+    $self->newAminoAcidKey, $self->codonPositionKey,
+    $self->codonNumberKey, $self->strandKey;
+
+  if($self->{_flatJoinFeatures}) {
+    push @features, @{$self->{_flatJoinFeatures}};
+  }
+    #  Prepend some custom features
+  #  Providing 1 as the last argument means "prepend" instead of append
+  #  So these features will come before any other refSeq.* features
+  $self->headers->addFeaturesToHeader(\@features, $self->name);
 
   my @allGeneTrackFeatures = @{ $self->headers->getParentFeatures($self->name) };
   

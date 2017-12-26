@@ -38,24 +38,33 @@ has to => (is => 'ro', isa => 'Maybe[Str]');
 has dist => (is => 'ro', isa => 'Bool', default => 1);
 
 #### Add our other "features", everything we find for this site ####
-sub BUILD {
+override 'BUILD' => sub {
   my $self = shift;
 
   # Avoid accessor penalties in Mouse/Moose;
   $self->{_eq} = !$self->to || $self->from eq $self->to;
   $self->{_fromD} = $self->getFieldDbName($self->from);
   $self->{_toD} = !$self->{_eq} ? $self->getFieldDbName($self->to) : undef;
+
   $self->{_db} = Seq::DBManager->new();
+  $self->{_dbName} = $self->dbName;
+
+  $self->{_dist} = !!$self->dist;
+  $self->{_fieldDbNames} = [map { $self->getFieldDbName($_) } @{$self->features}];
+};
+
+override 'setHeaders' => sub {
+  my $self = shift;
+  my @features = @{$self->features};
 
   if($self->dist) {
-    $self->{_dist} = 1;
-    $self->headers->addFeaturesToHeader('dist', $self->name);
-    push @{$self->{_i}}, $#{$self->features} + 1;
+    push @features, 'dist';
   }
 
-  $self->{_fieldDbNames} = [ map { $self->getFieldDbName($_) } @{$self->features} ];
+  $self->headers->addFeaturesToHeader(\@features, $self->name);
 
-  $self->{_i} = [0 .. $#{$self->features}];
+  # If we have dist, it comes as our last feature
+  $self->{_fIdx} = [0 .. $#{$self->features}];
 };
 
 sub get {
@@ -85,7 +94,7 @@ sub get {
   # WARNING: If $_[1]->[$_[0]->{_dbName} isn't defined, will be treated as the 0 index!!!
   # therefore return here if that is the case
   if(!defined $_[1]->[$_[0]->{_dbName}]) {
-    for my $i (@{$_[0]->{_i}}) {
+    for my $i (@{$_[0]->{_fIdx}}) {
       $_[7]->[$i][$_[6]] = undef;
     }
 
@@ -116,6 +125,7 @@ sub get {
 
   # Calculate distance if requested
   # We always expect from and to fields to be scalars
+  # Notice that dist is our last feature, because $idx incremented +1 here
   if($_[0]->{_dist}) {
     if($_[0]->{_eq} || $_[8] < $geneDb->[$_[0]->{_fromD}]) {
       # We're before the starting position of the nearest region

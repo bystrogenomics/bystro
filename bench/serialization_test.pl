@@ -1,3 +1,4 @@
+use 5.10.0;
 use strict;
 use warnings;
 # use blib;
@@ -9,10 +10,28 @@ use Data::Dumper qw(Dumper);
 use Math::SigFigs qw(:all);
 use DDP;
 use Data::MessagePack;
-use CBOR::XS;
+use CBOR::XS qw(encode_cbor decode_cbor);
 use Getopt::Long qw(GetOptions);
+use Compress::Snappy qw/compress decompress/;
 require bytes;
 
+use lib './lib';
+use Seq::DBManager;
+use Scalar::Util qw/looks_like_number/;
+use Data::Float;
+# my $seq = MockBuilder->new_with_config({config => './config/hg19.yml', debug => 1});
+Seq::DBManager->setGlobalDatabaseDir('/mnt/annotator/bystro-dev/hg19/index');
+Seq::DBManager->setReadOnly(1);
+my $db = Seq::DBManager->new();
+# my $stuff = $db->dbReadOne('chr21', 49e6, 0 , 1);
+# p $stuff;
+my $nobless;
+
+my $mpt = Data::MessagePack->new()->prefer_float32();
+
+my $test = encode_cbor(-24);
+say "length of 64 is  " . (length($test));
+exit;
 #Credit to https://github.com/Sereal/Sereal/wiki/Sereal-Comparison-Graphs
 
 GetOptions(
@@ -31,8 +50,10 @@ GetOptions(
     'small_array'    => \( my $small_array    = 0 ),
     'large_array' => \(my $large_array = 0),
     'large_array_sigfig' => \(my $large_array_sigfig = 0),
+    'real_array' => \(my $real_array = 0),
+    'real_array_sigfig' => \(my $real_array_sigfig = 0),
     'small_hash' => \(my $small_hash = 0),
-    'no_bless|no-bless|nobless'          => \( my $nobless            = 0 ),
+    # 'no_bless|no-bless|nobless'          => \( my $nobless            = 0 ),
     'sereal_only|sereal-only|serealonly' => \( my $sereal_only        = 0 ),
     'diagrams'                           => \( my $diagrams           = 0 ),
     'diagram_output=s'                   => \( my $diagram_output_dir = "" ),
@@ -93,6 +114,15 @@ my %meta = (
             $msgpack = Data::MessagePack->new()->prefer_integer()->prefer_float32();
         },
     },
+    mp_float32_snappy => {
+        enc  => 'compress($::msgpack->pack($data));',
+        dec  => '$::msgpack->unpack(decompress($encoded));',
+        name => 'Data::MsgPack',
+        use  => 'use Data::MessagePack;',
+        init => sub {
+            $msgpack = Data::MessagePack->new()->prefer_integer()->prefer_float32();
+        },
+    },
     mp => {
         enc  => '$::msgpack->pack($data);',
         dec  => '$::msgpack->unpack($encoded);',
@@ -103,8 +133,14 @@ my %meta = (
         },
     },
     cbor => {
-        enc  => '$::cbor->encode($data);',
-        dec  => '$::cbor->decode($encoded);',
+        enc  => 'encode_cbor($data);',
+        dec  => 'decode_cbor($encoded);',
+        name => 'CBOR::XS',
+        use => 'use CBOR::XS qw(encode_cbor decode_cbor);',
+    },
+    cbor_snappy => {
+        enc  => 'compress(encode_cbor($data));',
+        dec  => 'decode_cbor(decompress($encoded));',
         name => 'CBOR::XS',
         use => 'use CBOR::XS qw(encode_cbor decode_cbor);',
         init => sub {
@@ -168,7 +204,7 @@ my %meta = (
                 {
                     %opt,
                     compress           => Sereal::Encoder::SRL_ZLIB,
-                    compress_level     => 1,
+                    compress_level     => 6,
                     compress_threshold => 0,
                 }
             );
@@ -216,56 +252,80 @@ our %encoded;
 our %decoded;
 our %enc_bench;
 our %dec_bench;
-foreach my $key ( sort keys %meta ) {
-    my $info = $meta{$key};
-    $info->{tag}= $key;
-    next if $only    and not $only->{$key}    and $key ne $storable_tag;
-    next if $exclude and     $exclude->{$key} and $key ne $storable_tag;
-    if (my $use= $info->{use}) {
-        $use= [$use] unless ref $use;
-        $use= join ";\n", @$use, 1;
-        unless (eval $use) {
-            warn "Can't load dependencies for $info->{name}, skipping\n";
-            next;
+our %sizes;
+my $dbLength = $db->dbGetNumberOfEntries('chr21');
+p $dbLength;
+
+
+for my $i (20e6 .. 20100000) {
+    my $dbData = $db->dbReadOne('chr21', $i);
+
+    if(!$dbData) {
+        next;
+    }
+
+    foreach my $key ( sort keys %meta ) {
+        my $info = $meta{$key};
+        $info->{tag}= $key;
+        next if $only    and not $only->{$key}    and $key ne $storable_tag;
+        next if $exclude and     $exclude->{$key} and $key ne $storable_tag;
+        if (my $use= $info->{use}) {
+            $use= [$use] unless ref $use;
+            $use= join ";\n", @$use, 1;
+            unless (eval $use) {
+                warn "Can't load dependencies for $info->{name}, skipping\n";
+                next;
+            }
         }
-    }
-    $info->{enc}=~s/\$data/\$::data{$key}/g;
-    $info->{dec}=~s/\$encoded/\$::encoded{$key}/g;
-    $info->{enc}=~s/\$opt/%opt ? "\\%::opt" : ""/ge;
-    $info->{dec}=~s/\$opt/%opt ? "\\%::opt" : ""/ge;
+        $info->{enc}=~s/\$data/\$::data{$key}/g;
+        $info->{dec}=~s/\$encoded/\$::encoded{$key}/g;
+        $info->{enc}=~s/\$opt/%opt ? "\\%::opt" : ""/ge;
+        $info->{dec}=~s/\$opt/%opt ? "\\%::opt" : ""/ge;
 
-    $data{$key}    = make_data();
-    $info->{init}->() if $info->{init};
-    $encoded{$key} = eval $info->{enc}
-      or die "Failed to eval $info->{enc}: $@";
-    $decoded{$key} = eval '$::x = ' . $info->{dec} . '; 1'
-      or die "Failed to eval $info->{dec}: $@\n$encoded{$key}\n";
-    $info->{size}    = bytes::length( $encoded{$key} );
-    next if $only    and not $only->{$key};
-    next if $exclude and     $exclude->{$key};
-    $enc_bench{$key} = '$::x_' . $key . ' = ' . $info->{enc};
-    $dec_bench{$key} = '$::x_' . $key . ' = ' . $info->{dec};
+        $data{$key}    = $dbData;
+        $info->{init}->() if $info->{init};
+        $encoded{$key} = eval $info->{enc}
+          or die "Failed to eval $info->{enc}: $@";
+        $decoded{$key} = eval '$::x = ' . $info->{dec} . '; 1'
+          or die "Failed to eval $info->{dec}: $@\n$encoded{$key}\n";
+        $info->{size}    = bytes::length( $encoded{$key} );
+        next if $only    and not $only->{$key};
+        next if $exclude and     $exclude->{$key};
+        $enc_bench{$key} = '$::x_' . $key . ' = ' . $info->{enc};
+        $dec_bench{$key} = '$::x_' . $key . ' = ' . $info->{dec};
+        $sizes{$info->{tag}} += $info->{size};
+    }
+
+    # my $sereal = $encoded{$sereal_tag};
+    # print($sereal), exit if $dump;
+
+    # my $storable_len = bytes::length($encoded{$storable_tag});
+    # foreach my $info (
+    #     sort { $a->{size} <=> $b->{size} || $a->{name} cmp $b->{name} }
+    #     grep { defined $_->{size} }
+    #     values %meta
+    # ) {
+    #     next unless $info->{size};
+    #     if ($info->{tag} eq $storable_tag) {
+    #         printf "%-40s %12d bytes\n",
+    #             $info->{name} . " ($info->{tag})", $info->{size};
+    #     } else {
+    #         printf "%-40s %12d bytes %6.2f%% of $storable_tag\n",
+    #             $info->{name} . " ($info->{tag})", $info->{size},
+    #             $info->{size} / $storable_len * 100;
+    #     }
+    # }
 }
 
-my $sereal = $encoded{$sereal_tag};
-print($sereal), exit if $dump;
+my @keys = sort {$sizes{$a} <=> $sizes{$b}} keys %sizes;
 
-my $storable_len = bytes::length($encoded{$storable_tag});
-foreach my $info (
-    sort { $a->{size} <=> $b->{size} || $a->{name} cmp $b->{name} }
-    grep { defined $_->{size} }
-    values %meta
-) {
-    next unless $info->{size};
-    if ($info->{tag} eq $storable_tag) {
-        printf "%-40s %12d bytes\n",
-            $info->{name} . " ($info->{tag})", $info->{size};
-    } else {
-        printf "%-40s %12d bytes %6.2f%% of $storable_tag\n",
-            $info->{name} . " ($info->{tag})", $info->{size},
-            $info->{size} / $storable_len * 100;
-    }
+my @results;
+for my $key (@keys) {
+    push @results, [$key, $sizes{$key}];
 }
+
+p @results;
+p %sizes;
 
 our $x;
 my ( $encoder_result, $decoder_result );
@@ -1016,6 +1076,42 @@ sub make_data {
       ];
 
       return $data;
+    } elsif($real_array) {
+      return $db->dbReadOne('chr21',  44492170);
+    } elsif($real_array_sigfig) {
+      state $stuff = $db->dbReadOne('chr21',  44492170);
+
+      sub set {
+        my $val = shift;
+
+        if(ref $val) {
+          for my $v (@$val) {
+            $v = set($v);
+          }
+
+          return $val;
+        }
+
+        if(looks_like_number($val)) {
+          return int($val) == $val ? int($val) : FormatSigFigs($val, 2) + 0 ;
+        }
+
+        return $val;
+      }
+
+      for my $val (@$stuff) {
+        $val = set($val);
+      }
+
+      my $cVal = encode_cbor($stuff);
+      my $decoded = decode_cbor($cVal);
+
+      my $mp = Data::MessagePack->new()->prefer_float32()->prefer_integer();
+      my $mpVal = $mp->pack($stuff);
+      my $decodedMp = $mp->unpack($mpVal);
+      p $decoded;
+      p $decodedMp;
+      return $stuff;
     } elsif($small_hash) {
       return { a => 1, b => 2, c => 3, d => 'string', e => 5.018 };
     } else {    # "large data"
