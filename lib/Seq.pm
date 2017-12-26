@@ -332,7 +332,7 @@ sub annotateFile {
           for my $track (@trackGettersExceptReference) {
             $fields[$trackIndices->{$track->name}] //= [];
 
-            $track->get($indelDbData[$posIdx], $fields[0], $indelRef[$posIdx], $fields[4], 0, $posIdx, $fields[$trackIndices->{$track->name}], $zeroPos + $posIdx);
+            $track->get($indelDbData[$posIdx], $fields[0], $indelRef[$posIdx], $fields[4], $posIdx, $fields[$trackIndices->{$track->name}], $zeroPos + $posIdx);
           }
 
           $fields[$refTrackIdx][$posIdx] = $indelRef[$posIdx];
@@ -344,7 +344,7 @@ sub annotateFile {
       } else {
         for my $track (@trackGettersExceptReference) {
           $fields[$trackIndices->{$track->name}] //= [];
-          $track->get($dataFromDbAref, $fields[0], $fields[3], $fields[4], 0, 0, $fields[$trackIndices->{$track->name}], $zeroPos);
+          $track->get($dataFromDbAref, $fields[0], $fields[3], $fields[4], 0, $fields[$trackIndices->{$track->name}], $zeroPos);
         }
 
         $fields[$refTrackIdx][0] = $self->{_refTrackGetter}->get($dataFromDbAref);

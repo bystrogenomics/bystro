@@ -74,10 +74,9 @@ sub get {
   # $_[2] == <String> $chr  : the chromosome
   # $_[3] == <String> $refBase : ACTG
   # $_[4] == <String> $allele  : the allele (ACTG or -N / +ACTG)
-  # $_[5] == <Int> $alleleIdx  : if this is a single-line multiallelic, the allele index
-  # $_[6] == <Int> $positionIdx : the position in the indel, if any
-  # $_[7] == <ArrayRef> $outAccum : a reference to the output, which we mutate
-  # $_[8] == <Int> $position : the genomic position
+  # $_[5] == <Int> $positionIdx : the position in the indel, if any
+  # $_[6] == <ArrayRef> $outAccum : a reference to the output, which we mutate
+  # $_[7] == <Int> $zeroPos : the 0-based genomic position
   ################# Cache track's region data ##############
   #$self->{_regionData}{$chr} //= $self->{_db}->dbReadAll( $self->regionTrackPath($_[2]) );
 
@@ -87,18 +86,18 @@ sub get {
   # from the starting position w.r.t nearest data
   # However, this also removes useful information when an indel spans
   # multiple regions (in our use case mostly genes)
-  # if($_[6] != 0) {
-  #   return $_[7];
+  # if($_[5] != 0) {
+  #   return $_[6];
   # }
 
   # WARNING: If $_[1]->[$_[0]->{_dbName} isn't defined, will be treated as the 0 index!!!
   # therefore return here if that is the case
   if(!defined $_[1]->[$_[0]->{_dbName}]) {
     for my $i (@{$_[0]->{_fIdx}}) {
-      $_[7]->[$i][$_[6]] = undef;
+      $_[6]->[$i][$_[5]] = undef;
     }
 
-    return $_[7];
+    return $_[6];
   }
 
   $_[0]->{_regionData}{$_[2]} //= $_[0]->{_db}->dbReadAll( $_[0]->regionTrackPath($_[2]) );
@@ -119,7 +118,7 @@ sub get {
   my $idx = 0;
   for my $fieldDbName (@{$_[0]->{_fieldDbNames}}) {
     #$outAccum->[$idx][$alleleIdx][$positionIdx] = $href->[$self->{_dbName}][$self->{_fieldDbNames}[$idx]] }
-    $_[7]->[$idx][$_[6]] = $geneDb->[$fieldDbName];
+    $_[6]->[$idx][$_[5]] = $geneDb->[$fieldDbName];
     $idx++;
   }
 
@@ -127,22 +126,22 @@ sub get {
   # We always expect from and to fields to be scalars
   # Notice that dist is our last feature, because $idx incremented +1 here
   if($_[0]->{_dist}) {
-    if($_[0]->{_eq} || $_[8] < $geneDb->[$_[0]->{_fromD}]) {
+    if($_[0]->{_eq} || $_[7] < $geneDb->[$_[0]->{_fromD}]) {
       # We're before the starting position of the nearest region
       # Or we're only checking one boundary (the from boundary)
-      $_[7]->[$idx][$_[6]] = $geneDb->[$_[0]->{_fromD}] - $_[8];
-    } elsif($_[8] <= $geneDb->[$_[0]->{_toD}]) {
-      # We already know $_[8] >= $geneDb->[$_[0]->{_fromD}]
+      $_[6]->[$idx][$_[5]] = $geneDb->[$_[0]->{_fromD}] - $_[7];
+    } elsif($_[7] <= $geneDb->[$_[0]->{_toD}]) {
+      # We already know $zeroPos >= $geneDb->[$_[0]->{_fromD}]
       # so if we're here, we are within the range of the requested region at this position
       # ie == 0 distance to the region
-      $_[7]->[$idx][$_[6]] = 0
+      $_[6]->[$idx][$_[5]] = 0
     } else {
       # occurs after the 'to' position
-      $_[7]->[$idx][$_[6]] = $geneDb->[$_[0]->{_toD}] - $_[8];
+      $_[6]->[$idx][$_[5]] = $geneDb->[$_[0]->{_toD}] - $_[7];
     }
   }
 
-  return $_[7];
+  return $_[6];
 };
 
 __PACKAGE__->meta->make_immutable;

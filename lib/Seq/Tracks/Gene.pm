@@ -166,36 +166,36 @@ override 'setHeaders' => sub {
   $self->{_siteFidx} = $self->{_featureIdxMap}{$self->siteTypeKey};
   # Avoid accessor penalties by aliasing to the $self hash
   # These correspond to all of the sites held in Gene::Site
-  $self->{_codonFIdx} = $self->{_featureIdxMap}{$self->codonSequenceKey};
+  $self->{_codonSidx} = $self->{_featureIdxMap}{$self->codonSequenceKey};
   $self->{_codonPosFidx} = $self->{_featureIdxMap}{$self->codonPositionKey};
   $self->{_codonNumFidx} = $self->{_featureIdxMap}{$self->codonNumberKey};
 
   # The values for these keys we calculate at get() time.
   $self->{_refAaFidx} = $self->{_featureIdxMap}{$self->refAminoAcidKey};
-  $self->{_altCodonFidx} = $self->{_featureIdxMap}{$self->newCodonKey};
+  $self->{_altCodonSidx} = $self->{_featureIdxMap}{$self->newCodonKey};
   $self->{_altAaFidx} = $self->{_featureIdxMap}{$self->newAminoAcidKey};
   $self->{_alleleFuncFidx} = $self->{_featureIdxMap}{$self->exonicAlleleFunctionKey};
 };
 
 sub get {
-  #my ($self, $href, $chr, $refBase, $allele, $alleleIdx, $positionIdx, $outAccum) = @_;
-  #    $_[0], $_[1], $_[1], $_[3],   $_[4],   $_[5],      $_[6]         $_[7]
+  #my ($self, $href, $chr, $refBase, $allele, $posIdx, $outAccum) = @_;
+  #    $_[0], $_[1], $_[1], $_[3],   $_[4],   $_[5]    $_[6]
   # WARNING: If $_[1]->[$_[0]->{_dbName} isn't defined, will be treated as the 0 index!!!
   # therefore return here if that is the case
   # ~1/2 of sites will have no gene track entry (including all non-coding, 2% coding)
   if(!defined $_[1]->[$_[0]->{_dbName}]) {
     for my $i (@{$_[0]->{_featIdx}}) {
-      $_[7]->[$i][$_[6]] = undef;
+      $_[6]->[$i][$_[5]] = undef;
     }
 
-    return $_[7];
+    return $_[6];
   }
 
-  my ($self, $href, $chr, $refBase, $allele, $alleleIdx, $positionIdx, $outAccum) = @_;
+  my ($self, $href, $chr, $refBase, $allele, $posIdx, $outAccum) = @_;
 
-  my @out;
-  # Set the out array to the size we need; undef for any indices we don't add here
-  $#out = $self->{_lastFeatureIdx};
+  # my @out;
+  # # Set the out array to the size we need; undef for any indices we don't add here
+  # $#out = $self->{_lastFeatureIdx};
 
   # Cached field names to make things easier to read
   my $cachedDbNames = $self->{_allCachedDbNames};
@@ -214,10 +214,8 @@ sub get {
 
   #Reads:
   # ( $href->[$self->{_dbName}] ) {
-  if(defined $href->[$self->{_dbName}] ) {
-    ($txNumbers, $siteData) = $siteUnpacker->unpack($href->[$self->{_dbName}]);
-    $multiple = ref $txNumbers ? $#$txNumbers : 0;
-  }
+  ($txNumbers, $siteData) = $siteUnpacker->unpack($href->[$self->{_dbName}]);
+  $multiple = ref $txNumbers ? $#$txNumbers : 0;
 
   if($self->{_hasJoin}) {
     # For join tracks, use only the entry for the first of multiple transcripts
@@ -225,7 +223,7 @@ sub get {
     my $num = $multiple ? $txNumbers->[0] : $txNumbers;
     # http://ideone.com/jlImGA
     for my $fName ( @{$self->{_flatJoinFeatures}} ) {
-      $out[ $idxMap->{$fName} ] = $geneDb->[$num]{$cachedDbNames->{$fName}};
+      $outAccum->[ $idxMap->{$fName}][$posIdx] = $geneDb->[$num]{$cachedDbNames->{$fName}};
     }
   }
 
@@ -239,16 +237,16 @@ sub get {
   my $hasCodon;
   if($multiple) {
     for my $site (@$siteData) {
-      push @{ $out[$self->{_strandFidx}] }, $site->[$strandIdx];
-      push @{ $out[$self->{_siteFidx}] }, $site->[$siteTypeIdx];
+      push @{ $outAccum->[$self->{_strandFidx}][$posIdx] }, $site->[$strandIdx];
+      push @{ $outAccum->[$self->{_siteFidx}][$posIdx] }, $site->[$siteTypeIdx];
 
-      if(defined $site->[$codonSequenceIdx]) {
-        $hasCodon //= 1;
+      if(!$hasCodon && defined $site->[$codonSequenceIdx]) {
+        $hasCodon = 1;
       }
     }
   } else {
-    $out[$self->{_strandFidx}] = $siteData->[$strandIdx];
-    $out[$self->{_siteFidx}] = $siteData->[$siteTypeIdx];
+    $outAccum->[$self->{_strandFidx}][$posIdx] = $siteData->[$strandIdx];
+    $outAccum->[$self->{_siteFidx}][$posIdx] = $siteData->[$siteTypeIdx];
 
     if(defined $siteData->[$codonSequenceIdx]) {
       $hasCodon = 1;
@@ -258,17 +256,24 @@ sub get {
   #Reads:            $self->{_features}
   if($multiple) {
     for my $feature (@{$self->{_features}}) {
-      $out[$idxMap->{$feature}] = [map { $geneDb->[$_]{$cachedDbNames->{$feature}} } @$txNumbers];
+      $outAccum->[$idxMap->{$feature}][$posIdx] = [map { $geneDb->[$_]{$cachedDbNames->{$feature}} } @$txNumbers];
     }
   } else {
     for my $feature (@{$self->{_features}}) {
-      $out[$idxMap->{$feature}] = $geneDb->[$txNumbers]{$cachedDbNames->{$feature}};
+      $outAccum->[$idxMap->{$feature}][$posIdx] = $geneDb->[$txNumbers]{$cachedDbNames->{$feature}};
     }
   }
 
-  # If we want to be ~ 20-50% faster, move this before the Populate Gene Tracks section
   if(!$hasCodon) {
-    return accumOut($alleleIdx, $positionIdx, $outAccum, \@out);
+    $outAccum->[$self->{_codonPosFidx}][$posIdx] = undef;
+    $outAccum->[$self->{_codonNumFidx}][$posIdx] = undef;
+    $outAccum->[$self->{_alleleFuncFidx}][$posIdx] = undef;
+    $outAccum->[$self->{_refAaFidx}][$posIdx] = undef;
+    $outAccum->[$self->{_altAaFidx}][$posIdx] = undef;
+    $outAccum->[$self->{_codonSidx}][$posIdx] = undef;
+    $outAccum->[$self->{_altCodonSidx}][$posIdx] = undef;
+
+    return;
   }
 
   ######Populate _codon*Key, exonicAlleleFunction, amion acids keys ############
@@ -366,32 +371,17 @@ sub get {
     }
   }
 
-  $out[$self->{_codonPosFidx}] = \@codonPos;
-  $out[$self->{_codonFIdx}] = \@codonSeq;
-  $out[$self->{_codonNumFidx}] = \@codonNum;
-  $out[$self->{_alleleFuncFidx}] = \@funcAccum;
-  $out[$self->{_refAaFidx}] = \@refAA;
-  $out[$self->{_altAaFidx}] = \@newAA;
-  $out[$self->{_altCodonFidx}] = \@newCodon;
+  $outAccum->[$self->{_codonPosFidx}][$posIdx] = \@codonPos;
+  $outAccum->[$self->{_codonNumFidx}][$posIdx] = \@codonNum;
+  $outAccum->[$self->{_alleleFuncFidx}][$posIdx] = \@funcAccum;
+  $outAccum->[$self->{_refAaFidx}][$posIdx] = \@refAA;
+  $outAccum->[$self->{_altAaFidx}][$posIdx] = \@newAA;
+  $outAccum->[$self->{_codonSidx}][$posIdx] = \@codonSeq;
+  $outAccum->[$self->{_altCodonSidx}][$posIdx] = \@newCodon;
 
-  return accumOut($alleleIdx, $positionIdx, $outAccum, \@out);
+  return $outAccum;
 };
 
-sub accumOut {
-  # my ($alleleIdx, $positionIdx, $outAccum, $outAref) = @_;
-  #     $_[0]     , $_[1]       , $_[2]    , $_[3]
-
-  # for my $featureIdx (0 .. $#$outAref) {
-  my $i = 0;
-  for my $feature (@{$_[3]}) {
-    #$outAccum->[$featureIdx][$alleleIdx][$positionIdx] = $outAref->[$featureIdx];
-    $_[2]->[$i][$_[1]] = $feature;
-    $i++;
-  }
-
-  #return $outAccum;
-  return $_[2];
-}
 __PACKAGE__->meta->make_immutable;
 
 1;

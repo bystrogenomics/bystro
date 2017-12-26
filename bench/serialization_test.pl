@@ -30,8 +30,8 @@ my $nobless;
 my $mpt = Data::MessagePack->new()->prefer_float32();
 
 my $test = encode_cbor(-24);
-say "length of 64 is  " . (length($test));
-exit;
+# say "length of 64 is  " . (length($test));
+# exit;
 #Credit to https://github.com/Sereal/Sereal/wiki/Sereal-Comparison-Graphs
 
 GetOptions(
@@ -87,15 +87,15 @@ our (
 my $storable_tag= "strbl";
 my $sereal_tag= "srl";
 my %meta = (
-    jxs => {
-        enc  => '$::jsonxs->encode($data);',
-        dec  => '$::jsonxs->decode($encoded);',
-        name => 'JSON::XS OO',
-        init => sub {
-            $jsonxs = JSON::XS->new()->allow_nonref();
-        },
-        use => 'use JSON::XS qw(decode_json encode_json);',
-    },
+    # jxs => {
+    #     enc  => '$::jsonxs->encode($data);',
+    #     dec  => '$::jsonxs->decode($encoded);',
+    #     name => 'JSON::XS OO',
+    #     init => sub {
+    #         $jsonxs = JSON::XS->new()->allow_nonref();
+    #     },
+    #     use => 'use JSON::XS qw(decode_json encode_json);',
+    # },
     # ddl => {
     #     enc  => 'DumpLimited($data);',
     #     dec  => 'Data::Undump::undump($encoded);',
@@ -123,15 +123,15 @@ my %meta = (
             $msgpack = Data::MessagePack->new()->prefer_integer()->prefer_float32();
         },
     },
-    mp => {
-        enc  => '$::msgpack->pack($data);',
-        dec  => '$::msgpack->unpack($encoded);',
-        name => 'Data::MsgPack',
-        use  => 'use Data::MessagePack;',
-        init => sub {
-            $msgpack = Data::MessagePack->new();
-        },
-    },
+    # mp => {
+    #     enc  => '$::msgpack->pack($data);',
+    #     dec  => '$::msgpack->unpack($encoded);',
+    #     name => 'Data::MsgPack',
+    #     use  => 'use Data::MessagePack;',
+    #     init => sub {
+    #         $msgpack = Data::MessagePack->new();
+    #     },
+    # },
     cbor => {
         enc  => 'encode_cbor($data);',
         dec  => 'decode_cbor($encoded);',
@@ -157,76 +157,76 @@ my %meta = (
     #     dec  => 'eval $encoded;',
     #     name => 'Data::Dumper indented',
     # },
-    $storable_tag => {
-        enc  => 'nfreeze($data);',
-        dec  => 'thaw($encoded);',
-        name => 'Storable',
-    },
-    srl_func => {
-        enc  => 'encode_sereal($data, $opt);',
-        dec  => 'decode_sereal($encoded, $opt);',
-        name => 'Sereal functional',
-    },
-    srl_fwo => {
-        enc  => 'sereal_encode_with_object($::enc,$data);',
-        dec  => 'sereal_decode_with_object($::dec,$encoded);',
-        name => 'Sereal functional with object',
-    },
-    $sereal_tag => {
-        enc  => '$::enc->encode($data);',
-        dec  => '$::dec->decode($encoded);',
-        name => 'Sereal OO',
-        init => sub {
-            $enc = Sereal::Encoder->new( %opt ? \%opt : () );
-            $dec = Sereal::Decoder->new( \%opt ? \%opt : () );
-        },
-    },
-    srl_snpy => {
-        enc  => '$::enc_snappy->encode($data);',
-        dec  => '$::dec_snappy->decode($encoded);',
-        name => 'Sereal OO snappy',
-        init => sub {
-            $enc_snappy = Sereal::Encoder->new(
-                {
-                    %opt,
-                    compress => Sereal::Encoder::SRL_SNAPPY
-                }
-            );
-            $dec_snappy = Sereal::Decoder->new( %opt ? \%opt : () );
-        },
-    },
-    srl_zfast => {
-        enc  => '$::enc_zlib_fast->encode($data);',
-        dec  => '$::dec_zlib_fast->decode($encoded);',
-        name => 'Sereal OO zlib fast',
-        init => sub {
-            $enc_zlib_fast = Sereal::Encoder->new(
-                {
-                    %opt,
-                    compress           => Sereal::Encoder::SRL_ZLIB,
-                    compress_level     => 6,
-                    compress_threshold => 0,
-                }
-            );
-            $dec_zlib_fast = Sereal::Decoder->new( %opt ? \%opt : () );
-        },
-    },
-    srl_zbest => {
-        enc  => '$::enc_zlib_small->encode($data);',
-        dec  => '$::dec_zlib_small->decode($encoded);',
-        name => 'Sereal OO zib best',
-        init => sub {
-            $enc_zlib_small = Sereal::Encoder->new(
-                {
-                    %opt,
-                    compress           => Sereal::Encoder::SRL_ZLIB,
-                    compress_level     => 10,
-                    compress_threshold => 0,
-                }
-            );
-            $dec_zlib_small = Sereal::Decoder->new( %opt ? \%opt : () );
-        },
-    },
+    # $storable_tag => {
+    #     enc  => 'nfreeze($data);',
+    #     dec  => 'thaw($encoded);',
+    #     name => 'Storable',
+    # },
+    # srl_func => {
+    #     enc  => 'encode_sereal($data, $opt);',
+    #     dec  => 'decode_sereal($encoded, $opt);',
+    #     name => 'Sereal functional',
+    # },
+    # srl_fwo => {
+    #     enc  => 'sereal_encode_with_object($::enc,$data);',
+    #     dec  => 'sereal_decode_with_object($::dec,$encoded);',
+    #     name => 'Sereal functional with object',
+    # },
+    # $sereal_tag => {
+    #     enc  => '$::enc->encode($data);',
+    #     dec  => '$::dec->decode($encoded);',
+    #     name => 'Sereal OO',
+    #     init => sub {
+    #         $enc = Sereal::Encoder->new( %opt ? \%opt : () );
+    #         $dec = Sereal::Decoder->new( \%opt ? \%opt : () );
+    #     },
+    # },
+    # srl_snpy => {
+    #     enc  => '$::enc_snappy->encode($data);',
+    #     dec  => '$::dec_snappy->decode($encoded);',
+    #     name => 'Sereal OO snappy',
+    #     init => sub {
+    #         $enc_snappy = Sereal::Encoder->new(
+    #             {
+    #                 %opt,
+    #                 compress => Sereal::Encoder::SRL_SNAPPY
+    #             }
+    #         );
+    #         $dec_snappy = Sereal::Decoder->new( %opt ? \%opt : () );
+    #     },
+    # },
+    # srl_zfast => {
+    #     enc  => '$::enc_zlib_fast->encode($data);',
+    #     dec  => '$::dec_zlib_fast->decode($encoded);',
+    #     name => 'Sereal OO zlib fast',
+    #     init => sub {
+    #         $enc_zlib_fast = Sereal::Encoder->new(
+    #             {
+    #                 %opt,
+    #                 compress           => Sereal::Encoder::SRL_ZLIB,
+    #                 compress_level     => 6,
+    #                 compress_threshold => 0,
+    #             }
+    #         );
+    #         $dec_zlib_fast = Sereal::Decoder->new( %opt ? \%opt : () );
+    #     },
+    # },
+    # srl_zbest => {
+    #     enc  => '$::enc_zlib_small->encode($data);',
+    #     dec  => '$::dec_zlib_small->decode($encoded);',
+    #     name => 'Sereal OO zib best',
+    #     init => sub {
+    #         $enc_zlib_small = Sereal::Encoder->new(
+    #             {
+    #                 %opt,
+    #                 compress           => Sereal::Encoder::SRL_ZLIB,
+    #                 compress_level     => 10,
+    #                 compress_threshold => 0,
+    #             }
+    #         );
+    #         $dec_zlib_small = Sereal::Decoder->new( %opt ? \%opt : () );
+    #     },
+    # },
 );
 if ($only) {
     my @pat= map { split /\s*,\s*/, $_ } @$only;
@@ -257,7 +257,7 @@ my $dbLength = $db->dbGetNumberOfEntries('chr21');
 p $dbLength;
 
 
-for my $i (20e6 .. 20100000) {
+for my $i (16.2e6 .. 17e6) {
     my $dbData = $db->dbReadOne('chr21', $i);
 
     if(!$dbData) {

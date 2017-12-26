@@ -29,13 +29,12 @@ sub get {
   # $_[2] == <String> $chr  : the chromosome
   # $_[3] == <String> $refBase : ACTG
   # $_[4] == <String> $allele  : the allele (ACTG or -N / +ACTG)
-  # $_[5] == <Int> $alleleIdx  : if this is a single-line multiallelic, the allele index
-  # $_[6] == <Int> $positionIdx : the position in the indel, if any
-  # $_[7] == <ArrayRef> $outAccum : a reference to the output, which we mutate
+  # $_[5] == <Int> $positionIdx : the position in the indel, if any
+  # $_[6] == <ArrayRef> $outAccum : a reference to the output, which we mutate
 
-  $_[7][$_[6]] = defined $_[1]->[ $_[0]->{_d} ] ?  $_[1]->[ $_[0]->{_d} ] / $_[0]->{_s} : undef;
+  $_[6][$_[5]] = defined $_[1]->[ $_[0]->{_d} ] ?  $_[1]->[ $_[0]->{_d} ] / $_[0]->{_s} : undef;
 
-  return $_[7];
+  return $_[6];
 }
 
 

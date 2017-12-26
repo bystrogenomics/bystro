@@ -63,9 +63,8 @@ sub get {
   # $_[2] == <String> $chr  : the chromosome
   # $_[3] == <String> $refBase : ACTG
   # $_[4] == <String> $allele  : the allele (ACTG or -N / +ACTG)
-  # $_[5] == <Int> $alleleIdx  : if this is a single-line multiallelic, the allele index
-  # $_[6] == <Int> $positionIdx : the position in the indel, if any
-  # $_[7] == <ArrayRef> $outAccum : a reference to the output, which we mutate
+  # $_[5] == <Int> $positionIdx : the position in the indel, if any
+  # $_[6] == <ArrayRef> $outAccum : a reference to the output, which we mutate
 
   #internally the data is store keyed on the dbName not name, to save space
   # 'some dbName' => someData
@@ -74,11 +73,11 @@ sub get {
   #some features simply don't have any features, and for those just return
   #the value they stored
   if(!$_[0]->{_fIdx}) {
-    #$outAccum->[$alleleIdx][$positionIdx] = $href->[ $self->{_dbName} ]
-    $_[7]->[$_[6]] = $_[1]->[ $_[0]->{_dbName} ];
+    #$outAccum->[$positionIdx] = $href->[ $self->{_dbName} ]
+    $_[6]->[$_[5]] = $_[1]->[ $_[0]->{_dbName} ];
 
     #return #$outAccum;
-    return $_[7];
+    return $_[6];
   }
 
   # TODO: decide whether we want to revert to old system of returning a bunch of !
@@ -86,10 +85,10 @@ sub get {
   # This is clunky, to have _i and fieldDbNames
   if(!defined $_[1]->[$_[0]->{_dbName}]) {
     for my $i (@{$_[0]->{_fIdx}}) {
-      $_[7]->[$i][$_[6]] = undef;
+      $_[6]->[$i][$_[5]] = undef;
     }
 
-    return $_[7];
+    return $_[6];
   }
 
 
@@ -102,12 +101,12 @@ sub get {
   my $idx = 0;
   for my $fieldDbName (@{$_[0]->{_fDb}}) {
     #$outAccum->[$idx][$alleleIdx][$positionIdx] = $href->[$self->{_dbName}][$self->{_fieldDbNames}[$idx]] }
-    $_[7]->[$idx][$_[6]] = $_[1]->[$_[0]->{_dbName}][$fieldDbName];
+    $_[6]->[$idx][$_[5]] = $_[1]->[$_[0]->{_dbName}][$fieldDbName];
     $idx++;
   }
 
   #return #$outAccum;
-  return $_[7];
+  return $_[6];
 }
 __PACKAGE__->meta->make_immutable;
 
