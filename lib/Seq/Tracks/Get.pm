@@ -13,6 +13,8 @@ extends 'Seq::Tracks::Base';
 
 use Seq::Headers;
 
+# Note that Seq::Headeres is a singleton class
+# The headers property is exported only to allow easier overriding of setHeaders
 has headers => (
   is => 'ro',
   init_arg => undef,
@@ -63,7 +65,7 @@ sub get {
   # $_[2] == <String> $chr  : the chromosome
   # $_[3] == <String> $refBase : ACTG
   # $_[4] == <String> $allele  : the allele (ACTG or -N / +ACTG)
-  # $_[5] == <Int> $positionIdx : the position in the indel, if any
+  # $_[5] == <Int> $posIdx : the position in the indel, if any
   # $_[6] == <ArrayRef> $outAccum : a reference to the output, which we mutate
 
   #internally the data is store keyed on the dbName not name, to save space
@@ -73,7 +75,7 @@ sub get {
   #some features simply don't have any features, and for those just return
   #the value they stored
   if(!$_[0]->{_fIdx}) {
-    #$outAccum->[$positionIdx] = $href->[ $self->{_dbName} ]
+    #$outAccum->[$posIdx] = $href->[ $self->{_dbName} ]
     $_[6]->[$_[5]] = $_[1]->[ $_[0]->{_dbName} ];
 
     #return #$outAccum;
@@ -100,7 +102,7 @@ sub get {
   # return [ map { $_[1]->[$_[0]->{_dbName}][$_] } @{$_[0]->{_fieldDbNames}} ];
   my $idx = 0;
   for my $fieldDbName (@{$_[0]->{_fDb}}) {
-    #$outAccum->[$idx][$alleleIdx][$positionIdx] = $href->[$self->{_dbName}][$self->{_fieldDbNames}[$idx]] }
+    #$outAccum->[$idx][$posIdx] = $href->[$self->{_dbName}][$fieldDbName] }
     $_[6]->[$idx][$_[5]] = $_[1]->[$_[0]->{_dbName}][$fieldDbName];
     $idx++;
   }

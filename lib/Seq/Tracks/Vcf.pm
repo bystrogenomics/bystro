@@ -14,7 +14,7 @@ use namespace::autoclean;
 
 extends 'Seq::Tracks::Get';
 
-override 'BUILD' => sub {
+sub BUILD {
   my $self = shift;
   $self->{_altIdx} = $self->getFieldDbName('alt');
 
@@ -24,11 +24,11 @@ override 'BUILD' => sub {
 
   # Skip accesor penalty, the get function in this package may be called
   # hundreds of millions of times
-  # Could call super(), but I think this makes things clearer
-  $self->{_dbName} = $self->dbName;
-  $self->{_fDb} = [map { $self->getFieldDbName($_) } @{$self->features}];
-  $self->{_fIdx} = [0 .. $#{$self->features}];
-};
+  # Provided by Seq::Tracks::Get
+  # $self->{_dbName} = $self->dbName;
+  # $self->{_fDb} = [map { $self->getFieldDbName($_) } @{$self->features}];
+  # $self->{_fIdx} = [0 .. $#{$self->features}];
+}
 
 sub get {
   # Avoid assignments, save overhead

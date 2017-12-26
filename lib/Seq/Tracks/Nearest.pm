@@ -22,9 +22,13 @@ use Mouse 2;
 use namespace::autoclean;
 use DDP;
 
-extends 'Seq::Tracks::Get';
+# Doesn't extend Seq::Tracks::Get to reduce inheritance depth, since most
+# of that class is overriden anyhow (leaving only the headers property inheritance
+# which isn't necessary since Seq::Headers is a singleton class)
+extends 'Seq::Tracks::Base';
 with 'Seq::Tracks::Region::RegionTrackPath';
 
+use Seq::Headers;
 use Seq::DBManager;
 
 # Coordinate we start looking from
@@ -38,34 +42,43 @@ has to => (is => 'ro', isa => 'Maybe[Str]');
 has dist => (is => 'ro', isa => 'Bool', default => 1);
 
 #### Add our other "features", everything we find for this site ####
-override 'BUILD' => sub {
+sub BUILD {
   my $self = shift;
 
   # Avoid accessor penalties in Mouse/Moose;
+
+  # We only have 1 end
   $self->{_eq} = !$self->to || $self->from eq $self->to;
+  # We expect to ALWAYS have a from field
   $self->{_fromD} = $self->getFieldDbName($self->from);
+  # But "to" is optional
   $self->{_toD} = !$self->{_eq} ? $self->getFieldDbName($self->to) : undef;
 
   $self->{_db} = Seq::DBManager->new();
   $self->{_dbName} = $self->dbName;
 
+  # We may or may not want to calculate distance
   $self->{_dist} = !!$self->dist;
   $self->{_fieldDbNames} = [map { $self->getFieldDbName($_) } @{$self->features}];
-};
+}
 
-override 'setHeaders' => sub {
+sub setHeaders {
   my $self = shift;
+
+  my $headers = Seq::Headers->new();
   my @features = @{$self->features};
 
   if($self->dist) {
     push @features, 'dist';
   }
 
-  $self->headers->addFeaturesToHeader(\@features, $self->name);
+  $headers->addFeaturesToHeader(\@features, $self->name);
 
   # If we have dist, it comes as our last feature
+  # We don't have a field db name for dist...this is a calculated feature
+  # so we just want to get into the header, and into the output
   $self->{_fIdx} = [0 .. $#{$self->features}];
-};
+}
 
 sub get {
   #my ($self, $href, $chr, $refBase, $allele, $positionIdx, $outAccum, $position) = @_
@@ -115,6 +128,7 @@ sub get {
 
   # All features from overlapping are already combined into arrays, unlike
   # what gene tracks used to do
+  # Here we accumulate all features, except for the dist (not included in _fieldDbNames)
   my $idx = 0;
   for my $fieldDbName (@{$_[0]->{_fieldDbNames}}) {
     #$outAccum->[$idx][$alleleIdx][$positionIdx] = $href->[$self->{_dbName}][$self->{_fieldDbNames}[$idx]] }

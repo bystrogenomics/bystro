@@ -25,7 +25,19 @@ use Mouse 2;
 use namespace::autoclean;
 use DDP;
 
-extends 'Seq::Tracks::Get';
+# Doesn't extend Seq::Tracks::Get to reduce inheritance depth, since most
+# of that class is overriden anyhow (leaving only the headers property inheritance
+# which isn't necessary since Seq::Headers is a singleton class)
+extends 'Seq::Tracks::Base';
+
+### Set the features default that we get from the Gene track region database ###
+has '+features' => (
+  default => sub {
+    my $geneDef = Seq::Tracks::Gene::Definition->new();
+    return [$geneDef->allUCSCgeneFeatures, $geneDef->txErrorName];
+  },
+);
+
 with 'Seq::Tracks::Region::RegionTrackPath';
 
 use Seq::Tracks::Gene::Site;
@@ -33,6 +45,7 @@ use Seq::Tracks::Gene::Site::SiteTypeMap;
 use Seq::Tracks::Gene::Site::CodonMap;
 use Seq::Tracks::Gene::Definition;
 use Seq::DBManager;
+use Seq::Headers;
 
 ########### @Public attributes##########
 ########### Additional "features" that we will add to our output ##############
@@ -88,16 +101,8 @@ state $codonNumberIdx = $siteUnpacker->codonNumberIdx;
 
 state $negativeStrandTranslation = { A => 'T', C => 'G', G => 'C', T => 'A' };
 
-### Set the features that we get from the Gene track region database ###
-has '+features' => (
-  default => sub { 
-    my $geneDef = Seq::Tracks::Gene::Definition->new();
-    return [$geneDef->allUCSCgeneFeatures, $geneDef->txErrorName]; 
-  },
-);
-
 #### Add our other "features", everything we find for this site ####
-override 'BUILD' => sub {
+sub BUILD {
   my $self = shift;
 
   # Private variables, meant to cache often used data
@@ -130,11 +135,13 @@ override 'BUILD' => sub {
   for my $fName (@{$self->{_features}}) {
     $self->{_allCachedDbNames}{$fName} = $self->getFieldDbName($fName);
   }
-};
+}
 
-override 'setHeaders' => sub {
+sub setHeaders {
   my $self = shift;
   my @features = @{$self->features};
+
+  my $headers = Seq::Headers->new();
 
   # all of the features that are calculated for every gene track
   unshift @features, $self->siteTypeKey, $self->exonicAlleleFunctionKey,
@@ -148,9 +155,9 @@ override 'setHeaders' => sub {
     #  Prepend some custom features
   #  Providing 1 as the last argument means "prepend" instead of append
   #  So these features will come before any other refSeq.* features
-  $self->headers->addFeaturesToHeader(\@features, $self->name);
+  $headers->addFeaturesToHeader(\@features, $self->name);
 
-  my @allGeneTrackFeatures = @{ $self->headers->getParentFeatures($self->name) };
+  my @allGeneTrackFeatures = @{ $headers->getParentFeatures($self->name) };
   
   # This includes features added to header, using addFeatureToHeader 
   # such as the modified nearest feature names ($nTrackPrefix.$_) and join track names
@@ -175,7 +182,7 @@ override 'setHeaders' => sub {
   $self->{_altCodonSidx} = $self->{_featureIdxMap}{$self->newCodonKey};
   $self->{_altAaFidx} = $self->{_featureIdxMap}{$self->newAminoAcidKey};
   $self->{_alleleFuncFidx} = $self->{_featureIdxMap}{$self->exonicAlleleFunctionKey};
-};
+}
 
 sub get {
   #my ($self, $href, $chr, $refBase, $allele, $posIdx, $outAccum) = @_;
