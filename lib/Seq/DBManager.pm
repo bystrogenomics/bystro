@@ -57,18 +57,36 @@ my $internalLog = Log::Fast->new({
 ####################### Static Properties ############################
 state $databaseDir;
 # Each process should open each environment only once.
+# http://www.lmdb.tech/doc/starting.html
 state $envs = {};
 # Read only state is shared across all instances. Lock-less reads are dangerous
 state $dbReadOnly;
 
 # Can call as class method (DBManager->setDefaultDatabaseDir), or as instance method
 sub setGlobalDatabaseDir {
-  $databaseDir = @_ == 2 ? $_[1] : $_[0];
+  my $wantedDir = @_ == 2 ? $_[1] : $_[0];
+
+  if(defined $databaseDir) {
+    $internalLog->WARN("setGlobalDatabaseDir called again, but in different environemnt than previously".
+    " Before: $databaseDir, now: $wantedDir. Keeping $databaseDir");
+
+    return;
+  }
+
+  $databaseDir //= $wantedDir;
 }
 
 # Can call as class method (DBManager->setReadOnly), or as instance method
 sub setReadOnly {
-  $dbReadOnly = @_ == 2 ? $_[1] : $_[0];
+  my $wanted = @_ == 2 ? $_[1] : $_[0];;
+
+  if(defined $dbReadOnly && $dbReadOnly > $wanted && defined $envs && %$envs) {
+    $internalLog->WARN("Environments open: Cannot promote from read only mode to read/write mode");
+
+    return;
+  }
+
+  $dbReadOnly //= @_ == 2 ? $_[1] : $_[0];
 }
 
 # Prepares the class for consumption; should be run before the program can fork
@@ -83,6 +101,7 @@ sub initialize {
 sub BUILD {
   my $self = shift;
 
+  # TODO: think about better way to initialize this class w.r.t databaseDir
   if(!$databaseDir) {
     $self->_errorWithCleanup("DBManager requires databaseDir");
   }

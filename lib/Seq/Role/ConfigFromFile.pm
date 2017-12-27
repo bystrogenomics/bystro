@@ -57,6 +57,12 @@ sub new_with_config {
   my $hash = LoadFile($config);
   %opts = ( %$hash, %$opts );
 
+  # If no "tracks object, nothing left to do"
+  if(! $opts{$tracksKey} ) {
+    $class->new( \%opts );
+    return;
+  }
+
   #Now push every single global option into each individual track
   #Since they are meant to operate as independent units
   my @nonTrackKeys = grep { $_ ne $tracksKey } keys %opts;
@@ -69,11 +75,6 @@ sub new_with_config {
     for my $key (@nonTrackKeys) {
       $trackHref->{$key} = $opts{$key};
     }
-  }
-
-  if ( $opts{debug} ) {
-    say "Data for Role::ConfigFromFile::new_with_config()";
-    p %opts;
   }
 
   $class->new( \%opts );

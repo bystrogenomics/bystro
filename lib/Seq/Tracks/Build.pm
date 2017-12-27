@@ -409,6 +409,7 @@ sub makeMergeFunc {
       #   return;
       # }
 
+      # TODO: Write tests, this doesn't always work
       # oldTrackVal and $newTrackVal should both be arrays, with at least one index
       for (my $i = 0; $i < @$newTrackVal; $i++) {
         if($i > $#$oldTrackVal) {
