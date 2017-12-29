@@ -13,21 +13,23 @@ use namespace::autoclean;
 use Seq::Tracks::Cadd::Order;
 
 # This esesntially is a score track, just needs to lookup the value in the array
-extends 'Seq::Tracks::Score';
+extends 'Seq::Tracks::Get';
+
+has scalingFactor => (is => 'ro', isa => 'Int', default => 10);
+
+sub BUILD {
+  my $self = shift;
+
+  # purely to save accessor time
+  $self->{_s} = $self->scalingFactor;
+
+  #Provided by Seq::Tracks::Get
+  #$self->{_dbName} = $self->dbName;
+}
 
 state $order = Seq::Tracks::Cadd::Order->new();
 $order = $order->order;
 
-# CADD scores use (by default), a lower scaling factor, because
-# We expet cadd scores < 10 to be wholle irrelevant
-# and CADD scores > 15 more or less the same
-# From the 2013 paper, maximum discrimination occurs at 15
-# So we more or less don't care about the decimal; keeping it solely to give some
-# ability to break ties
-has '+scalingFactor' => (default => 10);
-
-#Provided by Seq::Tracks::Get
-#$self->{_dbName} = $self->dbName;
 sub get {
   #my ($self, $href, $chr, $refBase, $allele, $outAccum, $alleleNumber) = @_
   # $_[0] == $self
@@ -43,13 +45,13 @@ sub get {
   # Alternatively the CADD data for this position may be missing (not defined)
   # It's slightly faster to check for truthiness, rather than definition
   # Since we always either store undef or an array, truthiness is sufficient
-  if(!$_[1]->[$_[0]->{_dbName}]) {
+  if(!defined $_[1]->[$_[0]->{_dbName}]) {
     $_[6][$_[5]] = undef;
 
     return $_[6];
   }
 
-  if (!$order->{$_[3]} ) {
+  if(!defined $order->{$_[3]} ) {
     $_[0]->log('warn', "reference base $_[3] doesn't look valid, in Cadd.pm");
     
     $_[6][$_[5]] = undef;
@@ -58,7 +60,7 @@ sub get {
   }
 
   #if (defined $order->{ $refBase }{ $altAlleles } ) {
-  if ($order->{$_[3]}{$_[4]} ) {
+  if (defined $order->{$_[3]}{$_[4]} ) {
     $_[6][$_[5]] = $_[1]->[$_[0]->{_dbName}][ $order->{$_[3]}{$_[4]} ] / $_[0]->{_s};
 
     return $_[6];
