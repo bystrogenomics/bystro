@@ -40,6 +40,11 @@ with 'Seq::Output::Fields';
 # But will need to update makeMergeFunc to not assume an array of values (at least one key => value)
 has '+features' => (required => 1);
 
+# Like Sparse tracks are typically quite small, with potentiall quite large values
+# so to make optimal use of pages
+# lets set a smaller default commitEvery
+has '+commitEvery' => (default => 1e3);
+
 has vcfProcessor => (is => 'ro', isa => 'Str', required => 1, default => 'bystro-vcf');
 
 state $converter = Seq::Tracks::Base::Types->new();
@@ -239,6 +244,11 @@ sub buildTrack {
       my $wantedChr;
       my $refExpected;
       my $dbPos;
+
+      # We use "unsafe" writers, whose active cursors we need to track
+      my %cursors;
+      my $count = 0;
+
       open(my $fh, '-|', "$echoProg $file | " . $self->vcfProcessor . " --emptyField $delim"
         . " --keepId --keepInfo");
 
@@ -254,6 +264,21 @@ sub buildTrack {
 
         # falsy value is ''
         if(($wantedChr && $wantedChr ne $chr) || !$wantedChr) {
+          if($wantedChr) {
+            if($cursors{$wantedChr}) {
+              # Not strictly necessary to call dbEndCursorTxn, since we call cleanUp($wantedChr)
+              # But need to delete $cursors{$wantedChr} to prevent stale cursor
+              $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
+              delete $cursors{$wantedChr};
+            }
+
+            #Commit any remaining transactions, remove the db map from memory
+            #this also has the effect of closing all cursors
+            $self->db->cleanUp($wantedChr);
+
+            $count = 0;
+          }
+
           $wantedChr = $self->chrIsWanted($chr) && $self->completionMeta->okToBuild($chr) ? $chr : '';
         }
 
@@ -268,6 +293,8 @@ sub buildTrack {
         }
 
         $visitedChrs{$wantedChr} //= 1;
+
+        $cursors{$wantedChr} //= $self->db->dbStartCursorTxn($wantedChr);
 
         # 0-based position: VCF is 1-based
         $dbPos = $fields[$posIdx] - 1;
@@ -300,13 +327,25 @@ sub buildTrack {
           next;
         }
 
-        # Write every position to disk
-        # Commit for each position, fast if using MDB_NOSYNC
-        # VCF data usually small...we don't worry much about write times,
-        # and want to make sure we have the latest data when merging
-        # TODO: figure out / test whether commit affects merging ... shouldn't
-        # newer read txn should have newer data
-        $self->db->dbPatch($wantedChr, $self->dbName, $dbPos, $data, $mergeFunc);
+        #Args:                         $cursor,             $chr,       $trackIndex,   $pos,   $trackValue, $mergeFunction
+        $self->db->dbPatchCursorUnsafe($cursors{$wantedChr}, $wantedChr, $self->dbName, $dbPos, $data, $mergeFunc);
+
+        if($count > $self->commitEvery) {
+          $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
+          delete $cursors{$wantedChr};
+
+          $count = 0;
+        }
+
+        $count++;
+      }
+
+      # Close/commit all cursors from visited Chrs (should be at most 1)
+      foreach (keys %visitedChrs) {
+        if($cursors{$_}) {
+          $self->db->dbEndCursorTxn($cursors{$_}, $_);
+          delete $cursors{$_};
+        }
       }
 
       #Commit, sync everything, including completion status, and release mmap

@@ -379,14 +379,11 @@ sub transformField {
   return &{$codeRef}($featureValue);
 }
 
-# Merge sparse data. We intentionally push undefined (or nil if in Go)
-# values, because we want to keep order consistent, so that all records pertaining
-# to one position for this track are kept together
-# Merge functions are only called if there is an $oldTrackVal
-# WARNING: This will not work if you try to build twice, without first deleting
-# that track from the database. It will result in nested arrays.
-# Expects 2 arrays of equal length (some number of features)
+# Merge [featuresOld...] with [featuresNew...]
+# Expects 2 arrays of equal length
+# Won't merge when [featuresNew...] previously merged (duplicate)
 # TODO: allow 2 scalars, or growing one array to match the lenght of the other
+# TODO:  dupsort, dupfixed to optimize storage
 my $mp = Data::MessagePack->new()->canonical()->prefer_float32()->prefer_integer();
 sub makeMergeFunc {
   my $self = shift;
@@ -398,8 +395,6 @@ sub makeMergeFunc {
   return ( sub {
       my ($chr, $pos, $oldTrackVal, $newTrackVal) = @_;
 
-      # TODO: using dupsort fixed (equal length values)
-      # store all hashes of values, to allow check for previously seen values
       my $seen = $self->db->dbReadOne("$tempDbName/$chr", $pos);
 
       if(!ref $newTrackVal || @$newTrackVal != @$oldTrackVal) {
@@ -407,13 +402,18 @@ sub makeMergeFunc {
       }
 
       my $newValHash = md5($mp->pack($newTrackVal));
+      my $oldValHash;
 
       if($seen && $seen->{$newValHash}) {
         return;
       }
 
-      if(!$seen && md5($mp->pack($oldTrackVal)) eq $newValHash) {
-        return;
+      if(!$seen) {
+        $oldValHash = md5($mp->pack($oldTrackVal));
+
+        if($oldValHash eq $newValHash) {
+          return;
+        }
       }
 
       my @updated;
@@ -429,7 +429,11 @@ sub makeMergeFunc {
         $updated[$i] = [@{$oldTrackVal->[$i]}, $newTrackVal->[$i]];
       }
 
-      $seen //= {};
+      if(!$seen) {
+        $seen = {};
+        $seen->{$oldValHash} = 1;
+      }
+
       $seen->{$newValHash} = 1;
 
       $self->db->dbPut("$tempDbName/$chr", $pos, $seen);

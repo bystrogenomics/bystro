@@ -29,6 +29,11 @@ extends 'Seq::Tracks::Build';
 # But will need to update makeMergeFunc to not assume an array of values (at least one key => value)
 has '+features' => (required => 1);
 
+# Sparse tracks are typically quite small, with potentiall quite large values
+# so to make optimal use of pages
+# lets set a smaller default commitEvery
+has '+commitEvery' => (default => 1e3);
+
 #These cannot be overriden (change in api), but users can use fieldMap to rename any field
 #in the input file
 has chromField => (is => 'ro', isa => 'Str', init_arg => undef, lazy => 1, default => 'chrom');
@@ -126,6 +131,10 @@ sub buildTrack {
 
       my ($invalid, $failedFilters, $tooLong) = (0, 0, 0);
 
+      # Faster insert: track cursors
+      my %cursors;
+      my $count = 0;
+
       my ($chr, @fields, @sparseData, $start, $end);
       FH_LOOP: while ( my $line = $fh->getline() ) {
         chomp $line;
@@ -154,8 +163,17 @@ sub buildTrack {
         #If the chromosome is new, write any data we have & see if we want new one
         if( !$wantedChr || ($wantedChr && (!$chr || $wantedChr ne $chr)) ) {
           if($wantedChr) {
+            if($cursors{$wantedChr}) {
+              # Not strictly necessary to call dbEndCursorTxn, since we call cleanUp($wantedChr)
+              # But need to delete $cursors{$wantedChr} to prevent stale cursor
+              $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
+              delete $cursors{$wantedChr};
+            }
+
             #Commit, flush anything remaining to disk, release mapped memory
             $self->db->cleanUp($wantedChr);
+
+            $count = 0;
           }
 
           $wantedChr = $chr && $self->completionMeta->okToBuild($chr) ? $chr : undef;
@@ -198,18 +216,32 @@ sub buildTrack {
         }
 
         for my $pos (($start .. $end)) {
-          # Write every position to disk
-          # Commit for each position, fast if using MDB_NOSYNC
-          # Sparse data usually small...we don't worry much about write times,
-          # and want to make sure we have the latest data when merging
-          # TODO: figure out / test whether commit affects merging ... shouldn't
-          # newer read txn should have newer data
-          $self->db->dbPatch($wantedChr, $self->dbName, $pos, \@sparseData, $mergeFunc);
+          $cursors{$wantedChr} //= $self->db->dbStartCursorTxn($wantedChr);
+
+          #Args:                         $cursor,             $chr,       $trackIndex,   $pos,  $trackValue,  $mergeFunction
+          $self->db->dbPatchCursorUnsafe($cursors{$wantedChr}, $wantedChr, $self->dbName, $pos, \@sparseData, $mergeFunc);
+
+          if($count > $self->commitEvery) {
+            $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
+            delete $cursors{$wantedChr};
+
+            $count = 0;
+          }
+
+          $count++;
         }
 
         undef @sparseData;
         # Track affected chromosomes for completion recording
         $visitedChrs{$wantedChr} //= 1;
+      }
+
+      # Close/commit all cursors from visited Chrs (should be at most 1)
+      foreach (keys %visitedChrs) {
+        if($cursors{$_}) {
+          $self->db->dbEndCursorTxn($cursors{$_}, $_);
+          delete $cursors{$_};
+        }
       }
 
       #Commit, sync everything, including completion status, and release mmap

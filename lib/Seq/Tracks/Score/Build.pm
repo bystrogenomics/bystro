@@ -94,8 +94,8 @@ sub buildTrack{
 
       # We use "unsafe" writers, whose active cursors we need to track
       my %cursors;
-
       my $count = 0;
+
       FH_LOOP: while ( <$fh> ) {
         #super chomp; #trim both ends, but not what's in between
         $_ =~ s/^\s+|\s+$//g;
