@@ -194,13 +194,6 @@ sub buildTrack{
       #Commit, sync everything, including completion status, and release mmap
       $self->db->cleanUp();
 
-      # Record completion. Safe because detected errors throw, kill process
-      foreach (keys %visitedChrs) {
-        $self->completionMeta->recordCompletion($_);
-
-        $self->log('info', $self->name . ": recorded $_ completed from $file");
-      }
-
       if(!close($fh) && $? != 13) {
         $self->log('fatal', $self->name . ": failed to close $file with $! ($?)");
         die $self->name . ": failed to close $file with $!";

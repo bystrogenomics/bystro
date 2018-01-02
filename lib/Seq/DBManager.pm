@@ -530,7 +530,7 @@ sub dbPatchCursorUnsafe {
     $_[1]->_put($_[4], $mp->pack($existingValue), MDB_CURRENT);
   } else {
   #$cursor     #$pos
-    $_[1]->_put($_[4], $mp->pack($existingValue), MDB_APPEND);
+    $_[1]->_put($_[4], $mp->pack($existingValue));
   }
 
   if($LMDB_File::last_err) {
