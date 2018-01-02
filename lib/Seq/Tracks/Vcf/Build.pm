@@ -298,7 +298,11 @@ sub buildTrack {
         $dbPos = $fields[$posIdx] - 1;
 
         if(!looks_like_number($dbPos)) {
-          $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
+          if($cursors{$wantedChr}) {
+            $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
+            delete $cursors{$wantedChr};
+          }
+
           $self->db->cleanUp();
           $pm->finish(255, \"Invalid position @ $chr\: $dbPos");
         }
@@ -321,7 +325,11 @@ sub buildTrack {
 
         if($err) {
           #Commit, sync everything, including completion status, and release mmap
-          $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
+          if($cursors{$wantedChr}) {
+            $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
+            delete $cursors{$wantedChr};
+          }
+
           $self->db->cleanUp();
           $pm->finish(255, \$err);
         }

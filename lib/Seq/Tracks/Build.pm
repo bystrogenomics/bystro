@@ -50,7 +50,7 @@ has completionMeta => (is => 'ro', init_arg => undef, default => sub { my $self 
 
 # Transaction size. If large, re-use of pages may be inefficient
 # https://github.com/LMDB/lmdb/blob/mdb.master/libraries/liblmdb/lmdb.h
-has commitEvery => (is => 'rw', isa => 'Int', lazy => 1, default => 5e3);
+has commitEvery => (is => 'rw', isa => 'Int', lazy => 1, default => 2e4);
 
 # All tracks want to know whether we have 1 chromosome per file or not
 has chrPerFile => (is => 'ro', init_arg => undef, writer => '_setChrPerFile');

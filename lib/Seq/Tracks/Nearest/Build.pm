@@ -625,8 +625,10 @@ sub _writeNearestData {
     }
   }
 
-  $self->db->dbEndCursorTxn($cursor, $chr);
-  undef $cursor;
+  if($cursor) {
+    $self->db->dbEndCursorTxn($cursor, $chr);
+    undef $cursor;
+  }
 
   $self->log('info', $self->name . ": finished for $chr");
 }

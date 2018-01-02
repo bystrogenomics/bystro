@@ -418,8 +418,10 @@ sub buildTrack {
           die $err;
         }
 
-        $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
-        delete $cursors{$wantedChr};
+        if($cursors{$wantedChr}) {
+          $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
+          delete $cursors{$wantedChr};
+        }
 
         if (defined $skipSites{"$wantedChr\_$lastPosition"}) {
           $self->log('debug', $self->name . ": $wantedChr\:$lastPosition: " . $skipSites{"$chr\_$lastPosition"} . ". Skipping.");

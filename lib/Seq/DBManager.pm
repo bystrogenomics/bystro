@@ -122,7 +122,7 @@ my $mp = Data::MessagePack->new()->prefer_integer()->prefer_float32();
 # Read transactions are committed by default
 sub dbReadOne {
   #my ($self, $chr, $posAref, $skipCommit, $stringKeys,) = @_;
-  #== $_[0], $_[1], $_[2], $_[3],          $_[4] (don't assign to avoid copy)
+  #== $_[0], $_[1], $_[2],    $_[3],       $_[4] (don't assign to avoid copy)
 
   #It is possible not to find a database in $dbReadOnly mode (for ex: refSeq for a while didn't have chrM)
   #http://ideone.com/uzpdZ8
@@ -139,9 +139,7 @@ sub dbReadOne {
 
   # Commit unless the user specifically asks not to
   #if(!$skipCommit) {
-  if(!$_[3]) {
-    $db->{db}->Txn->commit();
-  }
+  $db->{db}->Txn->commit() unless $_[3];
 
   if($LMDB_File::last_err) {
     if($LMDB_File::last_err != MDB_NOTFOUND ) {
@@ -200,9 +198,7 @@ sub dbRead {
 
   # Commit unless the user specifically asks not to
   #if(!$skipCommit) {
-  if(!$_[3]) {
-    $txn->commit();
-  }
+  $txn->commit() unless $_[3];
 
   if($LMDB_File::last_err) {
     if($LMDB_File::last_err != MDB_NOTFOUND) {
@@ -314,9 +310,7 @@ sub dbPatchHash {
     }
   }
 
-  if(!$skipCommit) {
-    $db->{db}->Txn->commit();
-  }
+  $db->{db}->Txn->commit() unless $skipCommit;
 
   if($LMDB_File::last_err) {
     if($LMDB_File::last_err != MDB_KEYEXIST) {
@@ -404,9 +398,7 @@ sub dbPatch {
   }
 
  #if(!$skipCommit) {
-  if(!$_[6]) {
-    $txn->commit();
-  }
+  $txn->commit() unless $_[6];
 
   if($LMDB_File::last_err) {
     if($LMDB_File::last_err != MDB_KEYEXIST) {
@@ -447,9 +439,7 @@ sub dbPut {
 
   $db->{db}->Txn->put($db->{dbi}, $pos, $mp->pack( $data ) );
 
-  if(!$skipCommit) {
-    $db->{db}->Txn->commit();
-  }
+  $db->{db}->Txn->commit() unless $skipCommit;
 
   if($LMDB_File::last_err && $LMDB_File::last_err != MDB_KEYEXIST) {
     $self->_errorWithCleanup("dbPut LMDB error: $LMDB_File::last_err");
@@ -479,13 +469,23 @@ sub dbStartCursorTxn {
   # We store data in sequential, integer order
   # in all but the meta tables, which don't use this function
   # LMDB::Cursor::open($txn, $db->{dbi}, my $cursor);
-  return $db->{db}->Cursor;
+  return [$db->{db}, $db->{db}->Cursor];
 }
 
 # Assumes user manages their own transactions
 sub dbReadOneCursorUnsafe {
   #my ($self, $cursor, $pos) = @_;
-  $_[1]->_get($_[2], my $json, MDB_SET);
+  if(!$_[1]->[0]->Alive) {
+    $_[0]->log('warn', "Expected cursor to be alive");
+
+    $_[1]->[0]->Txn = $_[1]->[0]->{env}->BeginTxn();
+    # not strictly necessary, but I am concerned about hard to trace abort bugs related to scope
+    $_[1]->[0]->Txn->AutoCommit(1);
+
+    $_[1]->[1] = $_[1]->[0]->Cursor;
+  }
+
+  $_[1]->[1]->_get($_[2], my $json, MDB_SET);
 
   return $json ? $mp->unpack($json) : undef;
 }
@@ -497,8 +497,18 @@ sub dbPatchCursorUnsafe {
   #my ( $self, $cursor, $chr, $dbName, $pos, $newValue, $mergeFunc) = @_;
   #    $_[0]. $_[1].   $_[2]. $_[3].  $_[4] $_[5].     $_[6]
 
+  if(!$_[1]->[0]->Alive) {
+    $_[0]->log('warn', "Expected cursor to be alive");
+
+    $_[1]->[0]->Txn = $_[1]->[0]->{env}->BeginTxn();
+    # not strictly necessary, but I am concerned about hard to trace abort bugs related to scope
+    $_[1]->[0]->Txn->AutoCommit(1);
+
+    $_[1]->[1] = $_[1]->[0]->Cursor;
+  }
+
 #$cursor->_get($pos)
-  $_[1]->_get($_[4], my $json, MDB_SET);
+  $_[1]->[1]->_get($_[4], my $json, MDB_SET);
 
   my $existingValue = defined $json ? $mp->unpack($json) : [];
 #                            [$dbName]
@@ -532,10 +542,10 @@ sub dbPatchCursorUnsafe {
   # hence, "unsafe"
   if(defined $json) {
   #$cursor      #$pos
-    $_[1]->_put($_[4], $mp->pack($existingValue), MDB_CURRENT);
+    $_[1]->[1]->_put($_[4], $mp->pack($existingValue), MDB_CURRENT);
   } else {
   #$cursor     #$pos
-    $_[1]->_put($_[4], $mp->pack($existingValue));
+    $_[1]->[1]->_put($_[4], $mp->pack($existingValue));
   }
 
   if($LMDB_File::last_err) {
@@ -558,13 +568,13 @@ sub dbEndCursorTxn {
   #.     $_[0], $_[1],   $_[2]
 
   #        $self->_getDbi($chr)
-  my $db = $_[0]->_getDbi($_[2]) or return undef;
+  # my $db = $_[0]->_getDbi($_[2]) or return undef;
 
   #$cursor->close();
-  $_[1]->close();
+  $_[1]->[1]->close();
 
   # closes a write cursor as well; the above $cursor->close() is to be explicit
-  $db->{db}->Txn->commit();
+  $_[1]->[0]->Txn->commit();
 
   if($LMDB_File::last_err) {
     if($LMDB_File::last_err != MDB_NOTFOUND) {
@@ -638,9 +648,7 @@ sub dbReadAll {
   }
 
   #  !$skipCommit
-  if(!$skipCommit) {
-    $db->{db}->Txn->commit();
-  }
+  $db->{db}->Txn->commit() unless $skipCommit;
 
   if($LMDB_File::last_err) {
     if($LMDB_File::last_err != MDB_NOTFOUND) {
@@ -859,7 +867,7 @@ sub _getDbi {
 }
 
 sub dbForceCommit {
-  my ($self, $envName) = @_;
+  my ($self, $envName, $noSync) = @_;
 
   if(defined $envs->{$envName}) {
     if($envs->{$envName}{db}->Alive) {
@@ -870,7 +878,7 @@ sub dbForceCommit {
     # I assume that if the user is forcing commit, they also want the state of the
     # db updated
     # sync(1) flag needed to ensure that disk buffer is flushed with MDB_NOSYNC, MAPASYNC
-    $envs->{$envName}{env}->sync(1);
+    $envs->{$envName}{env}->sync(1) unless $noSync;
   } else {
     $self->_errorWithCleanup('dbManager expects existing environment in dbForceCommit');
   }

@@ -331,6 +331,8 @@ sub buildTrack {
           for my $txData ( @{ $allData{$chr}->{$txStart} } ) {
             my $txNumber = $txData->{$txNumberKey};
 
+            # Important that anything this class needs to commit to db happens
+            # before we open our cursor
             my $txInfo = Seq::Tracks::Gene::Build::TX->new($txData);
 
             if(@{$txInfo->transcriptSites} %2 != 0) {
@@ -338,15 +340,10 @@ sub buildTrack {
               $self->log('fatal', $err);
             }
 
-            my $cursor = $self->db->dbStartCursorTxn($chr);
-
-            my $pos;
+            my $cursor;
+            my $count = 0;
             INNER: for (my $i = 0; $i < @{$txInfo->transcriptSites}; $i += 2) {
-              $pos = $txInfo->transcriptSites->[$i];
-
-              # if($pos == 11049570) {
-              #   p $txInfo->transcriptSites->[$i + 1];
-              # }
+              $cursor //=  $self->db->dbStartCursorTxn($chr);
               # $i corresponds to $pos, $i + 1 to value
               # Commit for every position
               # This also ensures that $mainMergeFunc will always be called with fresh data
@@ -354,12 +351,20 @@ sub buildTrack {
                 $cursor,
                 $chr,
                 $self->dbName,
-                $pos,
+                #pos
+                $txInfo->transcriptSites->[$i],
                 #value <Array[Scalar]>
                 $txInfo->transcriptSites->[$i + 1],
                 #how we handle cases where multiple overlap
                 $mainMergeFunc
               );
+
+              if($count > $self->commitEvery) {
+                $self->db->dbEndCursorTxn($cursor, $chr);
+                undef $cursor;
+              }
+
+              $count++;
             }
 
             # Commits, closes cursor every transcript
