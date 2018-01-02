@@ -29,6 +29,7 @@ cpan install DBI
 cpan install DBD::mysql
 cpan install IO/FDPass.pm
 cpan install Beanstalk::Client
+cpan install Digest::SHA
 
 # Custom branch of msgpack-perl that uses latest msgpack-c and
 # allows prefer_float32 flag for 5-byte float storage

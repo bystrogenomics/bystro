@@ -20,8 +20,7 @@ use Seq::Tracks::Build::CompletionMeta;
 use Seq::Tracks::Base::Types;
 use Seq::Tracks::Build::LocalFilesPaths;
 use Seq::Output::Delimiters;
-use Data::MessagePack;
-use Digest::MD5 qw/md5/;
+
 extends 'Seq::Tracks::Base';
 # All builders need get_read_fh
 with 'Seq::Role::IO';
@@ -51,7 +50,7 @@ has completionMeta => (is => 'ro', init_arg => undef, default => sub { my $self 
 
 # Transaction size. If large, re-use of pages may be inefficient
 # https://github.com/LMDB/lmdb/blob/mdb.master/libraries/liblmdb/lmdb.h
-has commitEvery => (is => 'rw', isa => 'Int', lazy => 1, default => 1e4);
+has commitEvery => (is => 'rw', isa => 'Int', lazy => 1, default => 5e3);
 
 # All tracks want to know whether we have 1 chromosome per file or not
 has chrPerFile => (is => 'ro', init_arg => undef, writer => '_setChrPerFile');
@@ -381,10 +380,13 @@ sub transformField {
 
 # Merge [featuresOld...] with [featuresNew...]
 # Expects 2 arrays of equal length
-# Won't merge when [featuresNew...] previously merged (duplicate)
+# //Won't merge when [featuresNew...] previously merged (duplicate)
+# Note: it is completely unsafe to dbReadOne and commit here for the $chr database
+# may screw up the parent transaction, since we currently use a single
+# transaction per database per thread. We should move away from this.
 # TODO: allow 2 scalars, or growing one array to match the lenght of the other
 # TODO:  dupsort, dupfixed to optimize storage
-my $mp = Data::MessagePack->new()->canonical()->prefer_float32()->prefer_integer();
+# TODO: get reliable de-duping algorithm of deep structures
 sub makeMergeFunc {
   my $self = shift;
 
@@ -395,26 +397,11 @@ sub makeMergeFunc {
   return ( sub {
       my ($chr, $pos, $oldTrackVal, $newTrackVal) = @_;
 
-      my $seen = $self->db->dbReadOne("$tempDbName/$chr", $pos);
-
       if(!ref $newTrackVal || @$newTrackVal != @$oldTrackVal) {
         return("makeMergeFunc accepts only array values of equal length", undef);
       }
 
-      my $newValHash = md5($mp->pack($newTrackVal));
-      my $oldValHash;
-
-      if($seen && $seen->{$newValHash}) {
-        return;
-      }
-
-      if(!$seen) {
-        $oldValHash = md5($mp->pack($oldTrackVal));
-
-        if($oldValHash eq $newValHash) {
-          return;
-        }
-      }
+      my $seen = $self->db->dbReadOne("$tempDbName/$chr", $pos);
 
       my @updated;
       $#updated = $#$oldTrackVal;
@@ -430,13 +417,8 @@ sub makeMergeFunc {
       }
 
       if(!$seen) {
-        $seen = {};
-        $seen->{$oldValHash} = 1;
+        $self->db->dbPut("$tempDbName/$chr", $pos, 1);
       }
-
-      $seen->{$newValHash} = 1;
-
-      $self->db->dbPut("$tempDbName/$chr", $pos, $seen);
 
       return (undef, \@updated);
     },

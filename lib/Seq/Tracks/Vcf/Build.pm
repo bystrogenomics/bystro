@@ -294,17 +294,21 @@ sub buildTrack {
 
         $visitedChrs{$wantedChr} //= 1;
 
-        $cursors{$wantedChr} //= $self->db->dbStartCursorTxn($wantedChr);
-
         # 0-based position: VCF is 1-based
         $dbPos = $fields[$posIdx] - 1;
 
         if(!looks_like_number($dbPos)) {
+          $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
           $self->db->cleanUp();
           $pm->finish(255, \"Invalid position @ $chr\: $dbPos");
         }
 
-        $dbData = $self->db->dbReadOne($wantedChr, $dbPos);
+        $cursors{$wantedChr} //= $self->db->dbStartCursorTxn($wantedChr);
+
+        # We cannot have anything committing while using dbPatchCursorUnsafe
+        # because currently we share one transaction for one db
+        # and the "unsafe" methods expect the current transaction to remain open
+        $dbData = $self->db->dbReadOneCursorUnsafe($cursors{$wantedChr}, $dbPos);
 
         $refExpected = $self->{_refTrack}->get($dbData);
         if($fields[$refIdx] ne $refExpected) {
@@ -317,6 +321,7 @@ sub buildTrack {
 
         if($err) {
           #Commit, sync everything, including completion status, and release mmap
+          $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
           $self->db->cleanUp();
           $pm->finish(255, \$err);
         }

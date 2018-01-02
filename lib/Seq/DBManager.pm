@@ -511,6 +511,11 @@ sub dbPatchCursorUnsafe {
         $_[0]->_errorWithCleanup("dbPatchCursor mergeFunc error: $err");
         return 255;
       }
+
+      # nothing to do; no value returned
+      if(!defined $existingValue->[$_[3]]) {
+        return 0;
+      }
     } else {
       # No overwrite allowed by default
       # just like dbPatch, but no overwrite option
