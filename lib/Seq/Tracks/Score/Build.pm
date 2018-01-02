@@ -40,16 +40,40 @@ sub buildTrack{
   my $fStep = 'fixedStep';
   my $vStep = 'variableStep';
   my $headerRegex = qr/^($fStep|$vStep)\s+chrom=(\S+)\s+start=(\d+)\s+step=(\d+)/;
-    
+
   my @allChrs = $self->allLocalFiles;
-  
+
   #Can't just set to 0, because then the completion code in run_on_finish won't run
   my $pm = Parallel::ForkManager->new($self->max_threads);
+
+  my %completedChrs;
+  $pm->run_on_finish( sub {
+    my ($pid, $exitCode, $fileName, $exitSignal, $coreDump, $errOrChrs) = @_;
+
+    if($exitCode != 0) {
+      my $err = $self->name . ": got exitCode $exitCode for $fileName: $exitSignal . Dump: $coreDump";
+
+      $self->log('fatal', $err);
+    }
+
+    if($errOrChrs && ref $errOrChrs eq 'HASH') {
+      for my $chr (keys %$errOrChrs) {
+        if(!$completedChrs{$chr}) {
+          $completedChrs{$chr} = [$fileName];
+        } else {
+          push @{$completedChrs{$chr}}, $fileName;
+        }
+      }
+    }
+
+    #Only message that is different, in that we don't pass the $fileName
+    $self->log('info', $self->name . ": completed building from $fileName");
+  });
 
   for my $file ( $self->allLocalFiles ) {
     $self->log('info', $self->name . ": beginning to build from $file");
 
-    $pm->start($file) and next; 
+    $pm->start($file) and next;
       unless ( -f $file ) {
         $self->log('fatal', $self->name . ": $file doesn't exist");
         die $self->name . ": $file doesn't exist";
@@ -59,19 +83,22 @@ sub buildTrack{
 
       my $wantedChr;
       my $chrPosition; # absolute by default, 0 index
-      
+
       my $step;
       my $stepType;
 
       my $based = $self->based;
 
       # Which chromosomes we've seen, for recording completionMeta
-      my %visitedChrs; 
+      my %visitedChrs;
+
+      # We use "unsafe" writers, whose active cursors we need to track
+      my %cursors;
 
       my $count = 0;
       FH_LOOP: while ( <$fh> ) {
         #super chomp; #trim both ends, but not what's in between
-        $_ =~ s/^\s+|\s+$//g; 
+        $_ =~ s/^\s+|\s+$//g;
 
         if ( $_ =~ m/$headerRegex/ ) {
           my $chr = $2;
@@ -80,7 +107,7 @@ sub buildTrack{
           $stepType = $1;
 
           my $start = $3;
-          
+
           if(!$chr && $step && $start && $stepType) {
             $self->log('fatal', $self->name . ": require chr, step, start, and step type fields in wig header");
             die $self->name . ": require chr, step, start, and step type fields in wig header";
@@ -93,8 +120,17 @@ sub buildTrack{
 
           if(!$wantedChr || ( $wantedChr && $wantedChr ne $chr) ) {
             if($wantedChr) {
+              if($cursors{$wantedChr}) {
+                # Not strictly necessary to call dbEndCursorTxn, since we call cleanUp($wantedChr)
+                # But need to delete $cursors{$wantedChr} to prevent stale cursor
+                $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
+                delete $cursors{$wantedChr};
+              }
+
               #Commit any remaining transactions, remove the db map from memory
+              #this also has the effect of closing all cursors
               $self->db->cleanUp($wantedChr);
+
               $count = 0;
             }
 
@@ -110,7 +146,7 @@ sub buildTrack{
             }
 
             next FH_LOOP;
-          } 
+          }
 
           # take the offset into account
           $chrPosition = $start - $based;
@@ -122,18 +158,37 @@ sub buildTrack{
           next;
         }
 
-        # there could be more than one chr defined per file, just skip 
+        # there could be more than one chr defined per file, just skip
         # until we get to what we want
         if ( !$wantedChr ) {
           next;
         }
 
-        #Args:             $chr,       $trackIndex,   $pos,         $trackValue,        $mergeFunc, $skipCommit
-        $self->db->dbPatch($wantedChr, $self->dbName, $chrPosition, $self->{_rounder}->round($_), undef, $count < $self->commitEvery, $self->overwrite);
-        $count = $count < $self->commitEvery ? $count + 1 : 0;
+        $cursors{$wantedChr} //= $self->db->dbStartCursorTxn($wantedChr);
+
+        #Args:                         $cursor,             $chr,       $trackIndex,   $pos,         $trackValue
+        $self->db->dbPatchCursorUnsafe($cursors{$wantedChr}, $wantedChr, $self->dbName, $chrPosition, $self->{_rounder}->round($_));
+
+
+        if($count > $self->commitEvery) {
+          $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
+          delete $cursors{$wantedChr};
+
+          $count = 0;
+        }
+
+        $count++;
 
         #this must come AFTER we store the position's data in db, since we have a starting pos
         $chrPosition += $step;
+      }
+
+      # Close/commit all cursors from visited Chrs (should be at most 1)
+      foreach (keys %visitedChrs) {
+        if($cursors{$_}) {
+          $self->db->dbEndCursorTxn($cursors{$_}, $_);
+          delete $cursors{$_};
+        }
       }
 
       #Commit, sync everything, including completion status, and release mmap
@@ -142,6 +197,7 @@ sub buildTrack{
       # Record completion. Safe because detected errors throw, kill process
       foreach (keys %visitedChrs) {
         $self->completionMeta->recordCompletion($_);
+
         $self->log('info', $self->name . ": recorded $_ completed from $file");
       }
 
@@ -151,22 +207,16 @@ sub buildTrack{
       } else {
         $self->log('info', $self->name . ": closed $file with $?");
       }
-    $pm->finish(0);
+    $pm->finish(0, \%visitedChrs);
   }
 
-  $pm->run_on_finish(sub {
-    my ($pid, $exitCode, $fileName) = @_;
+  $pm->wait_all_children();
 
-    if($exitCode != 0) {
-      my $err = $self->name . ": failed building from $fileName: exit code $exitCode";
-      $self->log('fatal', $err);
-      die $err;
-    }
+  for my $chr (keys %completedChrs) {
+    $self->completionMeta->recordCompletion($chr);
 
-    $self->log('info', $self->name . ": completed building from $fileName");
-  });
-  
-  $pm->wait_all_children;
+    $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedChrs{$chr}})));
+  }
 
   return;
 };

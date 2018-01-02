@@ -6,7 +6,7 @@ package Seq::Tracks::Gene::Build;
 
 our $VERSION = '0.001';
 
-# ABSTRACT: Builds Gene Tracks 
+# ABSTRACT: Builds Gene Tracks
 # Stores refSeq data, and generates in-silico transcribed transcripts (and associated fields)
 
 use Mouse 2;
@@ -48,7 +48,7 @@ my $joinTrack;
 sub BUILD {
   my $self = shift;
 
-  # txErrorName isn't a default feature, initializing here to make sure 
+  # txErrorName isn't a default feature, initializing here to make sure
   # we store this value (if calling for first time) before any threads get to it
   $self->getFieldDbName($geneDef->txErrorName);
 
@@ -89,13 +89,24 @@ sub buildTrack {
   my $txEnd;
   my $txNumber;
 
+  my %completedChrs;
   $pm->run_on_finish( sub {
-    my ($pid, $exitCode, $fileName, $exitSignal, $coreDump) = @_;
+    my ($pid, $exitCode, $fileName, $exitSignal, $coreDump, $errOrChrs) = @_;
 
     if($exitCode != 0) {
       my $err = $self->name . ": got exitCode $exitCode for $fileName: $exitSignal . Dump: $coreDump";
 
       $self->log('fatal', $err);
+    }
+
+    if($errOrChrs && ref $errOrChrs eq 'HASH') {
+      for my $chr (keys %$errOrChrs) {
+        if(!$completedChrs{$chr}) {
+          $completedChrs{$chr} = [$fileName];
+        } else {
+          push @{$completedChrs{$chr}}, $fileName;
+        }
+      }
     }
 
     #Only message that is different, in that we don't pass the $fileName
@@ -105,6 +116,8 @@ sub buildTrack {
   # Assume one file per loop, or all sites in one file. Tracks::Build warns if not
   for my $file (@allFiles) {
     $pm->start($file) and next;
+      my %visitedChrs;
+
       my $fh = $self->get_read_fh($file);
 
       my $firstLine = <$fh>;
@@ -239,7 +252,7 @@ sub buildTrack {
         }
 
         #a field added by Bystro
-        # $regionData{$wantedChr}->{$txNumber}{$self->getFieldDbName($geneDef->txSizeName)} = $txEnd + 1 - $txStart; 
+        # $regionData{$wantedChr}->{$txNumber}{$self->getFieldDbName($geneDef->txSizeName)} = $txEnd + 1 - $txStart;
 
         if(defined $txStartData{$wantedChr}{$txStart} ) {
           push @{ $txStartData{$wantedChr}{$txStart} }, [$txNumber, $txEnd];
@@ -297,6 +310,7 @@ sub buildTrack {
       };
 
       TX_LOOP: for my $chr (@allChrs) {
+        $visitedChrs{$chr} //= 1;
         # We may want to just update the region track,
         # TODO: Note that this won't store any txErrors
         if($self->build_region_track_only) {
@@ -313,25 +327,31 @@ sub buildTrack {
 
         my @allTxStartsAscending = sort { $a <=> $b } keys %{ $allData{$chr} };
 
-        my ($txInfo, $txNumber);
         for my $txStart ( @allTxStartsAscending ) {
           for my $txData ( @{ $allData{$chr}->{$txStart} } ) {
-            $txNumber = $txData->{$txNumberKey};
+            my $txNumber = $txData->{$txNumberKey};
 
-            $txInfo = Seq::Tracks::Gene::Build::TX->new($txData);
+            my $txInfo = Seq::Tracks::Gene::Build::TX->new($txData);
 
             if(@{$txInfo->transcriptSites} %2 != 0) {
               my $err = $self->name . ": expected txSiteDataAndPos to contain (position1, value1, position2, value2) data";
               $self->log('fatal', $err);
             }
 
+            my $cursor = $self->db->dbStartCursorTxn($chr);
+
             my $pos;
             INNER: for (my $i = 0; $i < @{$txInfo->transcriptSites}; $i += 2) {
               $pos = $txInfo->transcriptSites->[$i];
+
+              # if($pos == 11049570) {
+              #   p $txInfo->transcriptSites->[$i + 1];
+              # }
               # $i corresponds to $pos, $i + 1 to value
               # Commit for every position
               # This also ensures that $mainMergeFunc will always be called with fresh data
-              $self->db->dbPatch(
+              $self->db->dbPatchCursorUnsafe(
+                $cursor,
                 $chr,
                 $self->dbName,
                 $pos,
@@ -341,6 +361,9 @@ sub buildTrack {
                 $mainMergeFunc
               );
             }
+
+            # Commits, closes cursor every transcript
+            $self->db->dbEndCursorTxn($cursor, $chr);
 
             if( @{$txInfo->transcriptErrors} ) {
               my @errors = @{$txInfo->transcriptErrors};
@@ -358,7 +381,7 @@ sub buildTrack {
         # The database will be re-opened as needed
         $self->db->cleanUp($chr);
 
-        $self->log('info', $self->name . ": finished building transcripts for $chr");
+        $self->log('info', $self->name . ": finished building transcripts for $chr from $file");
 
         $self->_writeRegionData($chr, $regionData{$chr});
 
@@ -370,22 +393,20 @@ sub buildTrack {
 
         delete $txStartData{$chr};
 
-         # We've finished with 1 chromosome, so write that to meta to disk
-         # TODO: error check this
-        $self->completionMeta->recordCompletion($chr);
-
         #Commit, sync everything, including completion status, and release mmap
         $self->db->cleanUp();
-
-        $self->log('info', $self->name . ": recorded $chr completed");
       }
-
-      #Commit, sync everything, including completion status, and release mmap
-      $self->db->cleanUp();
-    $pm->finish(0);
+    $pm->finish(0, \%visitedChrs);
   }
 
-  $pm->wait_all_children;
+  $pm->wait_all_children();
+
+  for my $chr (keys %completedChrs) {
+    $self->completionMeta->recordCompletion($chr);
+
+    $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedChrs{$chr}})));
+  }
+
   return;
 }
 

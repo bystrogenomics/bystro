@@ -44,6 +44,19 @@ sub buildTrack {
 
   my $pm = Parallel::ForkManager->new($self->max_threads);
 
+  ######Record completion status only if the process completed unimpeded ########
+  $pm->run_on_finish(sub {
+    my ($pid, $exitCode, $fileName) = @_;
+
+    if($exitCode != 0) {
+      my $err = $self->name . ": failed to build from $fileName: exit code $exitCode";
+      $self->log('fatal', $err);
+      die $err;
+    }
+
+    $self->log("info", $self->name . ": completed building from $fileName");
+  });
+
   #Perl is dramatically faster when splitting on a constant, so we assume '\t'
   if($self->delimiter ne '\t' && $self->delimiter ne "\t") {
     $self->log("fatal", $self->name . ": requires delimiter to be \\t");
@@ -56,11 +69,11 @@ sub buildTrack {
   # value for those bases that we skip, because we'll ned mergeFunc
   # to know when data was found for a position, and when it is truly missing
   # Because when CADD scores are not sorted, each chromosome-containing file
-  # can potentially have any other chromosome's scores, meaning we may get 
+  # can potentially have any other chromosome's scores, meaning we may get
   # 6-mers or greater for a single position; when that happens the only
-  # sensible solution is to store a missing value; undef would be nice, 
+  # sensible solution is to store a missing value; undef would be nice,
   # but that will never get triggered, unless our database is configured to store
-  # hashes instead of arrays; since a sparse array will contain undef/nil 
+  # hashes instead of arrays; since a sparse array will contain undef/nil
   # for any track at that position that has not yet been inserted into the db
   # For now we require sorting to be guaranteed to simplify this code
   if(!$self->sorted_guaranteed) {
@@ -166,6 +179,9 @@ sub buildTrack {
 
       my ($chr, $wantedChr, $dbPosition);
       my (@caddData, $caddRef, $dbData, $assemblyRefBase, $altAllele, $refBase, $phredScoresAref);
+
+      # Manage our own cursors, to improve performance
+      my %cursors;
       my $count = 0;
       FH_LOOP: while ( my $line = $fh->getline() ) {
         chomp $line;
@@ -191,6 +207,12 @@ sub buildTrack {
           }
 
           if($wantedChr) {
+            if($cursors{$wantedChr}) {
+              # Not strictly necessary, since we call cleanUp
+              $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
+              delete $cursors{$wantedChr};
+            }
+
             #Clean up the database, free memory;
             $self->db->cleanUp($wantedChr);
             #Reset our transaction counter
@@ -302,9 +324,17 @@ sub buildTrack {
 
                 #Since sorting is guaranteed, there is nothing to write here
               } else {
-                #Args:             $chr,       $trackIndex,   $pos,         $trackValue,       $mergeFunc, $skipCommit
-                $self->db->dbPatch($wantedChr, $self->dbName, $lastPosition, $phredScoresAref, undef, $count < $self->commitEvery);
-                $count = $count < $self->commitEvery ? $count + 1 : 0;
+                $cursors{$wantedChr} //= $self->db->dbStartCursorTxn($wantedChr);
+
+                #Args:                         $cursor               $chr,       $trackIndex,   $pos,         $trackValue
+                $self->db->dbPatchCursorUnsafe($cursors{$wantedChr}, $wantedChr, $self->dbName, $lastPosition, $phredScoresAref);
+
+                if($count >= $self->commitEvery) {
+                  $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
+                  delete $cursors{$wantedChr};
+
+                  $count = 0;
+                }
 
                 undef $phredScoresAref;
               }
@@ -388,6 +418,9 @@ sub buildTrack {
           die $err;
         }
 
+        $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
+        delete $cursors{$wantedChr};
+
         if (defined $skipSites{"$wantedChr\_$lastPosition"}) {
           $self->log('debug', $self->name . ": $wantedChr\:$lastPosition: " . $skipSites{"$chr\_$lastPosition"} . ". Skipping.");
 
@@ -437,6 +470,11 @@ sub buildTrack {
        # we have confidence that anything visited is complete
       foreach (keys %visitedChrs) {
         $self->completionMeta->recordCompletion($_);
+
+        if($cursors{$_}) {
+          $self->db->dbEndCursorTxn($cursors{$_}, $_);
+          delete $cursors{$_};
+        }
       }
 
       #Commit any remaining transactions, sync all environments, free memory
@@ -475,24 +513,10 @@ sub buildTrack {
           $self->log('warn', $self->name . ": skipped $missingScorePositions positions because has missing Phred scores: in $file");
         }
 
-
         $self->log('info', $self->name . ": closed $file with $?");
       }
     $pm->finish(0);
   }
-
-  ######Record completion status only if the process completed unimpeded ########
-  $pm->run_on_finish(sub {
-    my ($pid, $exitCode, $fileName) = @_;
-
-    if($exitCode != 0) {
-      my $err = $self->name . ": failed to build from $fileName: exit code $exitCode";
-      $self->log('fatal', $err);
-      die $err;
-    }
-
-    $self->log("info", $self->name . ": completed building from $fileName");
-  });
 
   $pm->wait_all_children;
 

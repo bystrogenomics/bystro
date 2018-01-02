@@ -542,7 +542,7 @@ sub _buildTranscriptSites {
   #However, some sites won't be coding, and those are in our annotation href
 
   #Now compact the site details
-  for my $pos (keys %tempTXsites) {
+  for my $pos (sort {$a <=> $b} keys %tempTXsites) {
     #stores the codon information as binary
     #this was "$self->add_transcript_site($site)"
     # passing args in list context 

@@ -160,7 +160,7 @@ sub BUILD {
   $self->getFieldDbName($self->from);
   $self->getFieldDbName($self->to);
 
-  #Check that 
+  #Check that
 }
 
 # Find all of the nearest genes, for any intergenic regions
@@ -343,7 +343,7 @@ sub buildTrack {
       }
 
       # We've now accumulated everything from this file
-      # So write it. LMDB will serialize writes, so this is fine, even 
+      # So write it. LMDB will serialize writes, so this is fine, even
       # if the file is not properly organized by chromosome
       for my $chr (keys %regionData) {
         $self->_writeNearestData($chr, $regionData{$chr}, \@fieldDbNames);
@@ -419,7 +419,7 @@ sub _writeNearestData {
   }
 
   # Track the longest (further in db toward end of genome) txEnd, because
-  #  in  case of overlapping transcripts, want the points that ARENT 
+  #  in  case of overlapping transcripts, want the points that ARENT
   #  covered by a gene (since those have apriori nearest records: themselves)
   #  This also acts as our starting position
   # my $longestPreviousTxEnd = 0;
@@ -436,6 +436,10 @@ sub _writeNearestData {
 
   my $previousLongestEnd;
   my $previousTxNumber;
+
+  my $cursor;
+
+  my $count = 0;
 
   TXSTART_LOOP: for (my $n = 0; $n < @sorted; $n++) {
     my $start = $sorted[$n][1][$fromDbName];
@@ -478,7 +482,7 @@ sub _writeNearestData {
       $midPoint = $previousLongestEnd + ( ($start - $previousLongestEnd) / 2 );
     }
 
-    #### Accumulate txNumber or longestPreviousTxNumber for positions between transcripts #### 
+    #### Accumulate txNumber or longestPreviousTxNumber for positions between transcripts ####
 
     # If we have no previous end or midpoint, we're starting from 0 index in db
     # and moving until the $start
@@ -490,13 +494,24 @@ sub _writeNearestData {
       # we force both the end and start to be 0-based closed, so start from +1 of previous end
       # and - 1 of the start
       POS_LOOP: for my $pos ( $previousLongestEnd + 1 .. $start - 1 ) {
+        $cursor //= $self->db->dbStartCursorTxn($chr);
+
         if($pos >= $midPoint) {
-          #Args:             $chr,       $trackIndex,   $pos,  $trackValue, $mergeFunc, $skipCommit
-          $self->db->dbPatch($chr, $self->dbName, $pos, $txNumber);
+          #Args:             $cursor, $chr, $dbName, $pos, $newValue
+          $self->db->dbPatchCursorUnsafe($cursor, $chr, $self->dbName, $pos, $txNumber);
         } else {
-          #Args:             $chr,       $trackIndex,   $pos,  $trackValue,             $mergeFunc, $skipCommit
-          $self->db->dbPatch($chr, $self->dbName, $pos, $previousTxNumber);
+          #Args:             $cursor, $chr, $dbName, $pos, $newValue
+          $self->db->dbPatchCursorUnsafe($cursor, $chr, $self->dbName, $pos, $previousTxNumber);
         }
+
+        if($count > $self->commitEvery) {
+          $self->db->dbEndCursorTxn($cursor, $chr);
+          undef $cursor;
+
+          $count = 0;
+        }
+
+        $count++;
       }
     }
 
@@ -507,6 +522,9 @@ sub _writeNearestData {
       # Remember, here longest end is 0-based, closed (last pos is the last 0-based
       # position in the transcript)
       for my $pos ($start .. $longestEnd) {
+        # We may clear this at any point, to prpevent db from over-growing
+        $cursor //= $self->db->dbStartCursorTxn($chr);
+
         # There may be overlaps between adjacent groups of transcripts
         # Since we search for all overlapping transcripts for every position
         # once we've visited one position, we need never visit it again
@@ -522,7 +540,7 @@ sub _writeNearestData {
         # }
 
         my @overlap;
-        
+
         # We investigate everything from the present tx down;
         I_LOOP: for (my $i = $n; $i < @sorted; $i++) {
           my $iFrom = $sorted[$i]->[1][$fromDbName];
@@ -555,10 +573,17 @@ sub _writeNearestData {
           push @globalTxData, $combinedValues->[$toDbName];
         }
 
-        # Assign the transcript number
-        $self->db->dbPatch($chr, $self->dbName, $pos, $txNumber);
+        # Assign the transcript number; args: $cursor, $chr, $dbName, $pos, $newValue)
+        $self->db->dbPatchCursorUnsafe($cursor, $chr, $self->dbName, $pos, $txNumber);
 
-        # $completed{$pos} = 1;
+        if($count > $self->commitEvery) {
+          $self->db->dbEndCursorTxn($cursor, $chr);
+          undef $cursor;
+
+          $count = 0;
+        }
+
+        $count++;
       }
     }
 
@@ -583,10 +608,25 @@ sub _writeNearestData {
   if($self->storeNearest) {
     # Once we've reached the last transcript, we still likely have some data remaining
     END_LOOP: for my $pos ( $previousLongestEnd + 1 .. $genomeNumberOfEntries - 1 ) {
-      #Args:             $chr,       $trackIndex,   $pos,  $trackValue,   $mergeFunc, $skipCommit
-      $self->db->dbPatch($chr, $self->dbName, $pos, $previousTxNumber);
+      # We may clear this at any point, to prpevent db from over-growing
+      $cursor //= $self->db->dbStartCursorTxn($chr);
+
+      #Args:             $cursor, $chr, $dbName, $pos, $newValue)
+      $self->db->dbPatchCursorUnsafe($cursor, $chr, $self->dbName, $pos, $previousTxNumber);
+
+      if($count > $self->commitEvery) {
+        $self->db->dbEndCursorTxn($cursor, $chr);
+        undef $cursor;
+
+        $count = 0;
+      }
+
+      $count++;
     }
   }
+
+  $self->db->dbEndCursorTxn($cursor, $chr);
+  undef $cursor;
 
   $self->log('info', $self->name . ": finished for $chr");
 }
@@ -692,7 +732,7 @@ sub _makeUniqueRegionData {
       # fill missing values with "" during the md5 check
       # However, in the final, unique output, undefined values will remain undefined
       my @nonFromTo;
-      
+
       for my $i (@nonFromToFeatures) {
         #not as clean as having $aRef contain only the [1] values, but maybe less meme
         push @nonFromTo, defined $val->[1][$i] ? $val->[1][$i] : "";

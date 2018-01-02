@@ -42,10 +42,13 @@ sub buildTrack {
       my $count = 0;
       # Record which chromosomes we've worked on
       my %visitedChrs;
+
+      my %cursors;
+
       FH_LOOP: while ( my $line = $fh->getline() ) {
         #super chomp; also helps us avoid weird characters in the fasta data string
         $line =~ s/^\s+|\s+$//g; #trim both ends, but not what's in between
-        
+
         #could do check here for cadd default format
         #for now, let's assume that we put the CADD file into a wigfix format
         if ( $line =~ m/$headerRegex/ ) { #we found a wig header
@@ -55,11 +58,17 @@ sub buildTrack {
             $self->log('fatal', $self->name . ": Require chr in fasta file headers");
             die $self->name . ": Require chr in fasta file headers";
           }
-          
+
           # Our first header, or we found a new chromosome
           if( ($wantedChr && $wantedChr ne $chr) || !$wantedChr) {
             # We switched chromosomes
             if($wantedChr) {
+              if($cursors{$wantedChr}) {
+                # Not strictly necessary, since we cleanUp($wantedChr)
+                $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
+                delete $cursors{$wantedChr};
+              }
+
               $self->db->cleanUp($wantedChr);
               $count = 0;
             }
@@ -76,7 +85,7 @@ sub buildTrack {
             }
 
             next FH_LOOP;
-          } 
+          }
 
           $visitedChrs{$wantedChr} //= 1;
 
@@ -96,11 +105,21 @@ sub buildTrack {
         if( $line =~ $dataRegex ) {
           # Store the uppercase bases; how UCSC does it, how people likely expect it
           for my $char ( split '', uc($1) ) {
-            #Args:             $chr,       $trackIndex,   $pos,         $trackValue,                 $mergeFunc, $skipComit
-            $self->db->dbPatch($wantedChr, $self->dbName, $chrPosition, $baseMapper->baseMap->{$char}, undef, $count < $self->commitEvery);
-            $count = $count < $self->commitEvery ? $count + 1 : 0;
+            $cursors{$wantedChr} //= $self->db->dbStartCursorTxn($wantedChr);
 
-            #must come after, to not be 1 off; assumes fasta file is sorted ascending contiguous 
+            #Args:                         $cursor,             $chr,        $trackIndex,   $pos,         $newValue
+            $self->db->dbPatchCursorUnsafe($cursors{$wantedChr}, $wantedChr, $self->dbName, $chrPosition, $baseMapper->baseMap->{$char});
+
+            if($count > $self->commitEvery) {
+              $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
+              delete $cursors{$wantedChr};
+
+              $count = 0;
+            }
+
+            $count++;
+
+            #must come after, to not be 1 off; assumes fasta file is sorted ascending contiguous
             $chrPosition++;
           }
         }
@@ -138,7 +157,7 @@ sub buildTrack {
   });
 
   $pm->wait_all_children;
-  
+
   return;
 };
 

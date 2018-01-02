@@ -245,6 +245,10 @@ sub annotateFile {
   my %wantedChromosomes = %{ $self->{_refTrackGetter}->chromosomes };
   my $maxDel = $self->maxDel;
 
+  # This is going to be copied on write... avoid a bunch of function calls
+  # Each thread will get its own %cursors object
+  my %cursors = ();
+
   mce_loop_f {
     #my ($mce, $slurp_ref, $chunk_id) = @_;
     #    $_[0], $_[1],     $_[2]
@@ -277,7 +281,15 @@ sub annotateFile {
 
       $zeroPos = $fields[1] - 1;
 
-      $dataFromDbAref = $self->{_db}->dbReadOne($fields[0], $zeroPos, 1);
+      if(!$cursors{$fields[0]}) {
+        $cursors{$fields[0]} = $self->{_db}->dbStartCursorTxn($fields[0]);
+      }
+
+      $dataFromDbAref = $self->{_db}->dbReadOneCursorUnsafe($cursors{$fields[0]}, $zeroPos);
+
+      # if($fields[1] == 10920104) {
+      #   p $dataFromDbAref;
+      # }
 
       if(!defined $dataFromDbAref) {
         $self->_errorWithCleanup("Wrong assembly? $fields[0]\: $fields[1] not found.");
@@ -352,6 +364,10 @@ sub annotateFile {
 
        # 3 holds the input reference, we'll replace this with the discordant status
       $fields[3] = $self->{_refTrackGetter}->get($dataFromDbAref) ne $fields[3] ? 1 : 0;
+
+      # if($fields[1] == 10920104) {
+      #   p @fields;
+      # }
 
       push @lines, \@fields;
     }

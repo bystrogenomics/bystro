@@ -53,7 +53,7 @@ $geneBuilder->buildTrack();
 
 my $mainDbAref = $db->dbReadAll('chrM');
 my $regionDataAref = $db->dbReadAll('refSeq.nearest/chrM');
-
+# p $mainDbAref;
 my $hasNearestCount = 0;
 my $hasNearestTssCount = 0;
 my $nearestDbName = $nearestBuilder->dbName;
@@ -88,13 +88,13 @@ for my $pos (0 .. $#$mainDbAref) {
   my $dbData = $mainDbAref->[$pos];
 
   my @out;
-  my $nGeneData = $nearestGetter->get($dbData, 'chrM', 'C', 'A', 0, 0, \@out, $pos);
+  my $nGeneData = $nearestGetter->get($dbData, 'chrM', 'C', 'A', 0, \@out, $pos);
 
   my @outTss;
-  my $nTssGeneData = $nearestTssGetter->get($dbData, 'chrM', 'C', 'A', 0, 0, \@outTss, $pos);
+  my $nTssGeneData = $nearestTssGetter->get($dbData, 'chrM', 'C', 'A', 0, \@outTss, $pos);
 
   my @outGene;
-  my $geneData = $geneGetter->get($dbData, 'chrM', 'C', 'A', 0, 0, \@outGene, $pos);
+  my $geneData = $geneGetter->get($dbData, 'chrM', 'C', 'A', 0, \@outGene, $pos);
 
   # config features order is name, name2, and then we add dist in the 3rd position
   # so 0 == name 1 == name2 2 == dist

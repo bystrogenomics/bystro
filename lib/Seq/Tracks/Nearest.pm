@@ -129,29 +129,29 @@ sub get {
   # All features from overlapping are already combined into arrays, unlike
   # what gene tracks used to do
   # Here we accumulate all features, except for the dist (not included in _fieldDbNames)
-  my $idx = 0;
+  my $i = 0;
   for my $fieldDbName (@{$_[0]->{_fieldDbNames}}) {
-    #$outAccum->[$idx][$alleleIdx][$positionIdx] = $href->[$self->{_dbName}][$self->{_fieldDbNames}[$idx]] }
-    $_[6]->[$idx][$_[5]] = $geneDb->[$fieldDbName];
-    $idx++;
+    #$outAccum->[$i][$positionIdx] = $href->[$self->{_dbName}][$self->{_fieldDbNames}[$i]] }
+    $_[6]->[$i][$_[5]] = $geneDb->[$fieldDbName];
+    $i++;
   }
 
   # Calculate distance if requested
   # We always expect from and to fields to be scalars
-  # Notice that dist is our last feature, because $idx incremented +1 here
+  # Notice that dist is our last feature, because $i incremented +1 here
   if($_[0]->{_dist}) {
     if($_[0]->{_eq} || $_[7] < $geneDb->[$_[0]->{_fromD}]) {
       # We're before the starting position of the nearest region
       # Or we're only checking one boundary (the from boundary)
-      $_[6]->[$idx][$_[5]] = $geneDb->[$_[0]->{_fromD}] - $_[7];
+      $_[6]->[$i][$_[5]] = $geneDb->[$_[0]->{_fromD}] - $_[7];
     } elsif($_[7] <= $geneDb->[$_[0]->{_toD}]) {
       # We already know $zeroPos >= $geneDb->[$_[0]->{_fromD}]
       # so if we're here, we are within the range of the requested region at this position
       # ie == 0 distance to the region
-      $_[6]->[$idx][$_[5]] = 0
+      $_[6]->[$i][$_[5]] = 0
     } else {
       # occurs after the 'to' position
-      $_[6]->[$idx][$_[5]] = $geneDb->[$_[0]->{_toD}] - $_[7];
+      $_[6]->[$i][$_[5]] = $geneDb->[$_[0]->{_toD}] - $_[7];
     }
   }
 

@@ -1,7 +1,7 @@
 ---
 assembly: hg19
 build_author: ec2-user
-build_date: 2017-12-26T21:53:00
+build_date: 2017-12-30T02:51:00
 chromosomes:
 - chr1
 - chr2
@@ -66,7 +66,7 @@ tracks:
   - clinvar
   tracks:
   - build_author: ec2-user
-    build_date: 2017-12-26T04:49:00
+    build_date: 2017-12-30T02:51:00
     local_files:
     - chr*.fa.gz
     name: ref
@@ -102,16 +102,15 @@ tracks:
         - chrY.fa.gz
       completed: 2017-11-24T02:27:00
       name: fetch
-    version: 18
+    version: 21
   - build_author: ec2-user
-    build_date: 2017-12-26T04:49:00
+    build_date: 2017-12-30T02:51:00
     dist: true
     features:
-    - name
     - name2
     from: txStart
     local_files:
-    - hg19.refGene.chr*.with_dbnsfp.gz
+    - hg19.kgXref.chr*.with_dbnsfp.gz
     name: nearest.refSeq
     to: txEnd
     type: nearest
@@ -120,16 +119,15 @@ tracks:
         renameTo: nearest.refSeq
       completed: 2017-12-24T20:10:00
       name: renameTrack
-    version: 9
+    version: 12
   - build_author: ec2-user
-    build_date: 2017-12-26T04:49:00
+    build_date: 2017-12-30T02:51:00
     dist: true
     features:
-    - name
     - name2
     from: txStart
     local_files:
-    - hg19.refGene.chr*.with_dbnsfp.gz
+    - hg19.kgXref.chr*.with_dbnsfp.gz
     name: nearestTss.refSeq
     type: nearest
     utils:
@@ -137,9 +135,9 @@ tracks:
         renameTo: nearestTss.refSeq
       completed: 2017-12-24T20:10:00
       name: renameTrack
-    version: 9
+    version: 12
   - build_author: ec2-user
-    build_date: 2017-12-26T04:49:00
+    build_date: 2017-12-30T02:51:00
     local_files:
     - chr*.phastCons100way.wigFix.gz
     name: phastCons
@@ -175,9 +173,9 @@ tracks:
         - chrM.phastCons100way.wigFix.gz
       completed: 2017-11-23T21:05:00
       name: fetch
-    version: 10
+    version: 13
   - build_author: ec2-user
-    build_date: 2017-12-26T04:49:00
+    build_date: 2017-12-30T02:51:00
     local_files:
     - chr*.phyloP100way.wigFix.gz
     name: phyloP
@@ -213,9 +211,9 @@ tracks:
         - chrM.phyloP100way.wigFix.gz
       completed: 2017-11-23T21:10:00
       name: fetch
-    version: 9
+    version: 12
   - build_author: ec2-user
-    build_date: 2017-12-26T04:49:00
+    build_date: 2017-12-30T02:51:00
     caddToBed_date: 2017-04-22T06:41:00
     liftOverCadd_date: 2017-07-28T17:35:00
     local_files:
@@ -226,9 +224,9 @@ tracks:
     sort_date: 2017-01-20T16:06:00
     sorted_guaranteed: 1
     type: cadd
-    version: 9
+    version: 12
   - build_author: ec2-user
-    build_date: 2017-12-26T04:49:00
+    build_date: 2017-12-30T02:51:00
     build_field_transformations:
       alleleFreqs: split [,]
       alleleNs: split [,]
@@ -253,9 +251,9 @@ tracks:
         sql: SELECT * FROM hg19.snp150 WHERE chrom = %chromosomes%
       completed: 2017-11-24T03:23:00
       name: fetch
-    version: 18
+    version: 21
   - build_author: ec2-user
-    build_date: 2017-12-26T04:49:00
+    build_date: 2017-12-30T02:51:00
     build_row_filters:
       AS_FilterStatus: == PASS
     features:
@@ -306,9 +304,9 @@ tracks:
     - gnomad.genomes.r2.0.2.sites.chr*.vcf.bgz
     name: gnomad.genomes
     type: vcf
-    version: 12
+    version: 15
   - build_author: ec2-user
-    build_date: 2017-12-26T04:49:00
+    build_date: 2017-12-30T02:51:00
     build_row_filters:
       AS_FilterStatus: == PASS
     features:
@@ -359,9 +357,9 @@ tracks:
     - gnomad.exomes.r2.0.2.sites.vcf.bgz
     name: gnomad.exomes
     type: vcf
-    version: 12
+    version: 15
   - build_author: ec2-user
-    build_date: 2017-12-26T21:53:00
+    build_date: 2017-12-30T02:51:00
     build_field_transformations:
       description: split [;]
       ensemblID: split [;]
@@ -397,31 +395,7 @@ tracks:
       - chromEnd
       track: clinvar
     local_files:
-    - hg19.kgXref.chr7.with_dbnsfp.gz
-    - hg19.kgXref.chr8.with_dbnsfp.gz
-    - hg19.kgXref.chr4.with_dbnsfp.gz
-    - hg19.kgXref.chr5.with_dbnsfp.gz
-    - hg19.kgXref.chr6.with_dbnsfp.gz
-    - hg19.kgXref.chr2.with_dbnsfp.gz
-    - hg19.kgXref.chr3.with_dbnsfp.gz
-    - hg19.kgXref.chr1.with_dbnsfp.gz
-    - hg19.kgXref.chr12.with_dbnsfp.gz
-    - hg19.kgXref.chr14.with_dbnsfp.gz
-    - hg19.kgXref.chr10.with_dbnsfp.gz
-    - hg19.kgXref.chr13.with_dbnsfp.gz
-    - hg19.kgXref.chr16.with_dbnsfp.gz
-    - hg19.kgXref.chr9.with_dbnsfp.gz
-    - hg19.kgXref.chr11.with_dbnsfp.gz
-    - hg19.kgXref.chr15.with_dbnsfp.gz
-    - hg19.kgXref.chr20.with_dbnsfp.gz
-    - hg19.kgXref.chr22.with_dbnsfp.gz
-    - hg19.kgXref.chr19.with_dbnsfp.gz
-    - hg19.kgXref.chr17.with_dbnsfp.gz
-    - hg19.kgXref.chr18.with_dbnsfp.gz
-    - hg19.kgXref.chr21.with_dbnsfp.gz
-    - hg19.kgXref.chrX.with_dbnsfp.gz
-    - hg19.kgXref.chrM.with_dbnsfp.gz
-    - hg19.kgXref.chrY.with_dbnsfp.gz
+    - hg19.kgXref.chr*.with_dbnsfp.gz
     name: refSeq
     type: gene
     utils:
@@ -449,9 +423,9 @@ tracks:
         geneFile: /mnt/db_backup/dbnsfp/dbNSFP3.5_gene.complete
       completed: 2017-12-26T21:46:00
       name: refGeneXdbnsfp
-    version: 18
+    version: 21
   - build_author: ec2-user
-    build_date: 2017-12-26T04:49:00
+    build_date: 2017-12-30T02:51:00
     build_field_transformations:
       pmid: split [;]
       uniprot.func: split [;]
@@ -507,15 +481,15 @@ tracks:
       dbnsfp.pubmedID: pmid
     from: txStart
     local_files:
-    - hg19.refGene.chr*.with_dbnsfp.gz
+    - hg19.kgXref.chr*.with_dbnsfp.gz
     name: refSeq.gene
     storeNearest: false
     to: txEnd
     type: nearest
-    version: 14
+    version: 17
   - based: 1
     build_author: ec2-user
-    build_date: 2017-12-26T04:49:00
+    build_date: 2017-12-30T02:51:00
     build_field_transformations:
       chrom: chr .
       clinicalSignificance: split [;]
@@ -559,7 +533,7 @@ tracks:
         - ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz
       completed: 2017-11-23T21:04:00
       name: fetch
-    version: 9
+    version: 12
 vcfProcessor: bystro-vcf
-version: 203
+version: 206
 

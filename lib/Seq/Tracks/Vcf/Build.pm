@@ -204,6 +204,7 @@ sub buildTrack {
       die $self->name . ": Failed to build $fileName $err";
     }
 
+    # TODO: check for hash ref
     for my $chr (keys %$errOrChrs) {
       if(!$completedDetails{$chr}) {
         $completedDetails{$chr} = [$fileName];
@@ -301,6 +302,10 @@ sub buildTrack {
 
         # Write every position to disk
         # Commit for each position, fast if using MDB_NOSYNC
+        # VCF data usually small...we don't worry much about write times,
+        # and want to make sure we have the latest data when merging
+        # TODO: figure out / test whether commit affects merging ... shouldn't
+        # newer read txn should have newer data
         $self->db->dbPatch($wantedChr, $self->dbName, $dbPos, $data, $mergeFunc);
       }
 

@@ -20,7 +20,8 @@ use Seq::Tracks::Build::CompletionMeta;
 use Seq::Tracks::Base::Types;
 use Seq::Tracks::Build::LocalFilesPaths;
 use Seq::Output::Delimiters;
-
+use Data::MessagePack;
+use Digest::MD5 qw/md5/;
 extends 'Seq::Tracks::Base';
 # All builders need get_read_fh
 with 'Seq::Role::IO';
@@ -50,14 +51,12 @@ has completionMeta => (is => 'ro', init_arg => undef, default => sub { my $self 
 
 # Transaction size. If large, re-use of pages may be inefficient
 # https://github.com/LMDB/lmdb/blob/mdb.master/libraries/liblmdb/lmdb.h
-has commitEvery => (is => 'rw', isa => 'Int', lazy => 1, default => 2e4);
+has commitEvery => (is => 'rw', isa => 'Int', lazy => 1, default => 1e4);
 
 # All tracks want to know whether we have 1 chromosome per file or not
 has chrPerFile => (is => 'ro', init_arg => undef, writer => '_setChrPerFile');
 
-has max_threads => (is => 'ro', isa => 'Int', lazy => 1, default => sub { my $self = shift;
-  return scalar @{$self->local_files};
-});
+has max_threads => (is => 'ro', isa => 'Int', lazy => 1, default => 8);
 ########## Arguments taken from YAML config file or passed some other way ##############
 
 #################################### Required ###################################
@@ -386,6 +385,9 @@ sub transformField {
 # Merge functions are only called if there is an $oldTrackVal
 # WARNING: This will not work if you try to build twice, without first deleting
 # that track from the database. It will result in nested arrays.
+# Expects 2 arrays of equal length (some number of features)
+# TODO: allow 2 scalars, or growing one array to match the lenght of the other
+my $mp = Data::MessagePack->new()->canonical()->prefer_float32()->prefer_integer();
 sub makeMergeFunc {
   my $self = shift;
 
@@ -395,58 +397,42 @@ sub makeMergeFunc {
   my $tempDbName = "$name\_merge_temp";
   return ( sub {
       my ($chr, $pos, $oldTrackVal, $newTrackVal) = @_;
-      my @updated = @$oldTrackVal;
 
+      # TODO: using dupsort fixed (equal length values)
+      # store all hashes of values, to allow check for previously seen values
       my $seen = $self->db->dbReadOne("$tempDbName/$chr", $pos);
 
-      # This doesn't seem to be working reliably
-      # TODO: handle this, to allow idempotent merging
-      # my $hash = md5(defined $newTrackVal ? (ref $newTrackVal ? map { $_ || '' } @{$newTrackVal} : $newTrackVal) : '');
+      if(!ref $newTrackVal || @$newTrackVal != @$oldTrackVal) {
+        return("makeMergeFunc accepts only array values of equal length", undef);
+      }
 
-      # $seen //= {};
+      my $newValHash = md5($mp->pack($newTrackVal));
 
-      # if($seen->{$hash}) {
-      #   return;
-      # }
+      if($seen && $seen->{$newValHash}) {
+        return;
+      }
 
-      # TODO: Write tests, this doesn't always work
+      if(!$seen && md5($mp->pack($oldTrackVal)) eq $newValHash) {
+        return;
+      }
+
+      my @updated;
+      $#updated = $#$oldTrackVal;
+
       # oldTrackVal and $newTrackVal should both be arrays, with at least one index
       for (my $i = 0; $i < @$newTrackVal; $i++) {
-        if($i > $#$oldTrackVal) {
-          # If we're given unequal length values; undef for the existing array at that position
-          $#$oldTrackVal = $i;
+        if(!$seen) {
+          $updated[$i] = [$oldTrackVal->[$i], $newTrackVal->[$i]];
+          next;
         }
 
-        if(ref $newTrackVal->[$i]) {
-          if(ref $newTrackVal->[$i] ne 'ARRAY') {
-            # TODO: move away from fatal, allow graceful exit w/ error message
-            $self->log('fatal', $self->name. ": $name track received new record in mergeFunc that was a non-Array reference");
-            # We should never get here; fatal should exit; however, for consistent return and clarity
-            # and in case API changes
-            return ($self->name. ": $name track received new record in mergeFunc that was a non-Array reference", undef);
-          }
-
-        }
-
-        if($seen) {
-          push @{$updated[$i]}, $newTrackVal->[$i];
-        } else {
-          $updated[$i] = [$updated[$i], $newTrackVal->[$i]];
-        }
+        $updated[$i] = [@{$oldTrackVal->[$i]}, $newTrackVal->[$i]];
       }
 
-     # if($self->name eq 'dbSNP') {
-     #    say "oldVal is";
-     #    p $oldTrackVal;
-     #    say "newTrackVal is";
-     #    p $newTrackVal;
-     #    say "updated is";
-     #    p @updated;
-     #  }
+      $seen //= {};
+      $seen->{$newValHash} = 1;
 
-      if(!$seen) {
-        $self->db->dbPut("$tempDbName/$chr", $pos, 1);
-      }
+      $self->db->dbPut("$tempDbName/$chr", $pos, $seen);
 
       return (undef, \@updated);
     },

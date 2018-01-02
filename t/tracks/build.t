@@ -28,4 +28,18 @@ ok(join(',', @{$result->[1]}) eq join(',', 45, 25));
 ok(join(',', @{$result->[2]}) eq join(',', 22, 21));
 ok(join(',', @{$result->[3]}) eq join(',', 35, 65));
 
+
+@testVals2 = (3334, 225, 201, 605,777, 888);
+($err, $result) = $mergeFunc->($chr, $pos, $result, \@testVals2);
+
+p $result;
+
+# ok(join(',', @{$result->[0]} eq join(',', 67)));
+
+
+@testVals2 = ('short1', 'short2');
+($err, $result) = $mergeFunc->($chr, $pos, $result, \@testVals2);
+
+p $result;
+
 done_testing();
