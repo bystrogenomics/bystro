@@ -245,7 +245,7 @@ sub buildTrack {
       my $refExpected;
       my $dbPos;
 
-      # We use "unsafe" writers, whose active cursors we need to track
+      # We use "unsafe" writers, whose active count we need to track
       my %cursors;
       my $count = 0;
 

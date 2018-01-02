@@ -45,16 +45,28 @@ sub buildTrack {
   my $pm = Parallel::ForkManager->new($self->max_threads);
 
   ######Record completion status only if the process completed unimpeded ########
-  $pm->run_on_finish(sub {
-    my ($pid, $exitCode, $fileName) = @_;
+  my %completedChrs;
+  $pm->run_on_finish( sub {
+    my ($pid, $exitCode, $fileName, $exitSignal, $coreDump, $errOrChrs) = @_;
 
     if($exitCode != 0) {
-      my $err = $self->name . ": failed to build from $fileName: exit code $exitCode";
+      my $err = $self->name . ": got exitCode $exitCode for $fileName: $exitSignal . Dump: $coreDump";
+
       $self->log('fatal', $err);
-      die $err;
     }
 
-    $self->log("info", $self->name . ": completed building from $fileName");
+    if($errOrChrs && ref $errOrChrs eq 'HASH') {
+      for my $chr (keys %$errOrChrs) {
+        if(!$completedChrs{$chr}) {
+          $completedChrs{$chr} = [$fileName];
+        } else {
+          push @{$completedChrs{$chr}}, $fileName;
+        }
+      }
+    }
+
+    #Only message that is different, in that we don't pass the $fileName
+    $self->log('info', $self->name . ": completed building from $fileName");
   });
 
   #Perl is dramatically faster when splitting on a constant, so we assume '\t'
@@ -329,12 +341,14 @@ sub buildTrack {
                 #Args:                         $cursor               $chr,       $trackIndex,   $pos,         $trackValue
                 $self->db->dbPatchCursorUnsafe($cursors{$wantedChr}, $wantedChr, $self->dbName, $lastPosition, $phredScoresAref);
 
-                if($count >= $self->commitEvery) {
+                if($count > $self->commitEvery) {
                   $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
                   delete $cursors{$wantedChr};
 
                   $count = 0;
                 }
+
+                $count++;
 
                 undef $phredScoresAref;
               }
@@ -468,11 +482,8 @@ sub buildTrack {
       undef $wantedChr;
       undef $phredScoresAref;
 
-       # Since any detected errors are fatal, and we expect 1 chr per file or all in 1 file
-       # we have confidence that anything visited is complete
+      # Close any remaining manually-controlled cursors, and commit their associated transaction
       foreach (keys %visitedChrs) {
-        $self->completionMeta->recordCompletion($_);
-
         if($cursors{$_}) {
           $self->db->dbEndCursorTxn($cursors{$_}, $_);
           delete $cursors{$_};
@@ -481,11 +492,6 @@ sub buildTrack {
 
       #Commit any remaining transactions, sync all environments, free memory
       $self->db->cleanUp();
-
-       # We've now synced, ok to write that we're done
-      foreach (keys %visitedChrs) {
-        $self->log('info', $self->name . ": recorded $_ completed");
-      }
 
       if(!close($fh) && $? != 13) {
         $self->log('fatal', $self->name . " failed to close $file with $! ($?)");
@@ -517,10 +523,18 @@ sub buildTrack {
 
         $self->log('info', $self->name . ": closed $file with $?");
       }
-    $pm->finish(0);
+    $pm->finish(0, \%visitedChrs);
   }
 
-  $pm->wait_all_children;
+  $pm->wait_all_children();
+
+  # Now, regardless of whether chromosomes were sorted, or spread across many files
+  # we can record true completion state
+  for my $chr (keys %completedChrs) {
+    $self->completionMeta->recordCompletion($chr);
+
+    $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedChrs{$chr}})));
+  }
 
   #TODO: Implement actual error return codes instead of dying
   return;

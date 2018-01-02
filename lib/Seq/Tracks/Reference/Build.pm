@@ -27,6 +27,31 @@ sub buildTrack {
   my $dataRegex = qr/(\A[ATCGNatcgn]+)\z/xms;
 
   my $pm = Parallel::ForkManager->new($self->max_threads);
+
+  my %completedChrs;
+  $pm->run_on_finish( sub {
+    my ($pid, $exitCode, $fileName, $exitSignal, $coreDump, $errOrChrs) = @_;
+
+    if($exitCode != 0) {
+      my $err = $self->name . ": got exitCode $exitCode for $fileName: $exitSignal . Dump: $coreDump";
+
+      $self->log('fatal', $err);
+    }
+
+    if($errOrChrs && ref $errOrChrs eq 'HASH') {
+      for my $chr (keys %$errOrChrs) {
+        if(!$completedChrs{$chr}) {
+          $completedChrs{$chr} = [$fileName];
+        } else {
+          push @{$completedChrs{$chr}}, $fileName;
+        }
+      }
+    }
+
+    #Only message that is different, in that we don't pass the $fileName
+    $self->log('info', $self->name . ": completed building from $fileName");
+  });
+
   for my $file ( $self->allLocalFiles ) {
     # Expects 1 chr per file for n+1 files, or all chr in 1 file
     # Single writer to reduce copy-on-write db inflation
@@ -125,14 +150,16 @@ sub buildTrack {
         }
       }
 
+      # Get rid of our privately-managed cursors
+      foreach ( keys %visitedChrs ) {
+        if($cursors{$_}) {
+          $self->db->dbEndCursorTxn($cursors{$_}, $_);
+          delete $cursors{$_};
+        }
+      }
+
       #Commit, sync everything, including completion status, and release mmap
       $self->db->cleanUp();
-
-      # Record completion. Safe because detected errors throw, kill process
-      foreach ( keys %visitedChrs ) {
-        $self->completionMeta->recordCompletion($_);
-        $self->log('info', $self->name . ": recorded $_ completed from $file");
-      }
 
       #13 is sigpipe, occurs if closing pipe before cat/pigz finishes
       if(!close($fh) && $? != 13) {
@@ -141,22 +168,18 @@ sub buildTrack {
       } else {
         $self->log('info', $self->name . ": closed $file with $?");
       }
+
     #exit with exit code 0; this only happens if successfully completed
-    $pm->finish(0);
+    $pm->finish(0, \%visitedChrs);
   }
 
-  $pm->run_on_finish( sub {
-    my ($pid, $exitCode, $fileName) = @_;
-    if($exitCode != 0) {
-      my $err = $self->name . "failed to build from $fileName: exit code $exitCode";
-      $self->log('fatal', $err);
-      die $err;
-    }
+  $pm->wait_all_children();
 
-    $self->log('info', $self->name . ": completed building from $fileName");
-  });
+  for my $chr (keys %completedChrs) {
+    $self->completionMeta->recordCompletion($chr);
 
-  $pm->wait_all_children;
+    $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedChrs{$chr}})));
+  }
 
   return;
 };

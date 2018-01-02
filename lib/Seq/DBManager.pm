@@ -451,154 +451,6 @@ sub dbPut {
   return 0;
 }
 
-sub dbStartCursorTxn {
-  #my ( $self, $chr ) = @_;
-
-  #It is possible not to find a database in $dbReadOnly mode (for ex: refSeq for a while didn't have chrM)
-  #http://ideone.com/uzpdZ8
-
-  #        $self->_getDbi($chr)
-  my $db = $_[0]->_getDbi($_[1]) or return;
-
-  if(!$db->{db}->Alive) {
-    $db->{db}->Txn = $db->{env}->BeginTxn();
-    # not strictly necessary, but I am concerned about hard to trace abort bugs related to scope
-    $db->{db}->Txn->AutoCommit(1);
-  }
-
-  # We store data in sequential, integer order
-  # in all but the meta tables, which don't use this function
-  # LMDB::Cursor::open($txn, $db->{dbi}, my $cursor);
-  return [$db->{db}, $db->{db}->Cursor];
-}
-
-# Assumes user manages their own transactions
-sub dbReadOneCursorUnsafe {
-  #my ($self, $cursor, $pos) = @_;
-  if(!$_[1]->[0]->Alive) {
-    $_[0]->log('warn', "Expected cursor to be alive");
-
-    $_[1]->[0]->Txn = $_[1]->[0]->{env}->BeginTxn();
-    # not strictly necessary, but I am concerned about hard to trace abort bugs related to scope
-    $_[1]->[0]->Txn->AutoCommit(1);
-
-    $_[1]->[1] = $_[1]->[0]->Cursor;
-  }
-
-  $_[1]->[1]->_get($_[2], my $json, MDB_SET);
-
-  return $json ? $mp->unpack($json) : undef;
-}
-
-# When you need performance, especially for genome-wide insertions
-# Be an adult, manage your own cursor
-# LMDB tells you : if you commit the cursor is closed, needs to be renewed
-sub dbPatchCursorUnsafe {
-  #my ( $self, $cursor, $chr, $dbName, $pos, $newValue, $mergeFunc) = @_;
-  #    $_[0]. $_[1].   $_[2]. $_[3].  $_[4] $_[5].     $_[6]
-
-  if(!$_[1]->[0]->Alive) {
-    $_[0]->log('warn', "Expected cursor to be alive");
-
-    $_[1]->[0]->Txn = $_[1]->[0]->{env}->BeginTxn();
-    # not strictly necessary, but I am concerned about hard to trace abort bugs related to scope
-    $_[1]->[0]->Txn->AutoCommit(1);
-
-    $_[1]->[1] = $_[1]->[0]->Cursor;
-  }
-
-#$cursor->_get($pos)
-  $_[1]->[1]->_get($_[4], my $json, MDB_SET);
-
-  my $existingValue = defined $json ? $mp->unpack($json) : [];
-#                            [$dbName]
-  if(defined $existingValue->[$_[3]]) {
-    # ($mergeFunc)
-    if($_[6]) {                #[$dbName]=$mergeFunc->($chr, $pos, $existingValue->[$dbName], $newValue);
-      (my $err, $existingValue->[$_[3]]) = $_[6]->($_[2], $_[4], $existingValue->[$_[3]], $_[5]);
-
-      if($err) {
-        $_[0]->_errorWithCleanup("dbPatchCursor mergeFunc error: $err");
-        return 255;
-      }
-
-      # nothing to do; no value returned
-      if(!defined $existingValue->[$_[3]]) {
-        return 0;
-      }
-    } else {
-      # No overwrite allowed by default
-      # just like dbPatch, but no overwrite option
-      # Overwrite is impossible when mergeFunc is defined
-      # TODO: remove overwrite from dbPatch
-      return 0;
-    }
-  } else {
-                  ##[$dbName]#$newValue
-    $existingValue->[$_[3]] = $_[5];
-  }
-
-  #_put as used here will not return errors if the cursor is inactive
-  # hence, "unsafe"
-  if(defined $json) {
-  #$cursor      #$pos
-    $_[1]->[1]->_put($_[4], $mp->pack($existingValue), MDB_CURRENT);
-  } else {
-  #$cursor     #$pos
-    $_[1]->[1]->_put($_[4], $mp->pack($existingValue));
-  }
-
-  if($LMDB_File::last_err) {
-    if($LMDB_File::last_err != MDB_NOTFOUND) {
-    #$self
-      $_[0]->_errorWithCleanup("dbEndCursorTxn LMDB error: $LMDB_File::last_err");
-      return 255;
-    }
-
-    #reset the class error variable, to avoid crazy error reporting later
-    $LMDB_File::last_err = 0;
-  }
-
-  return 0;
-}
-
-# commit
-sub dbEndCursorTxn {
-  # my ( $self, $cursor, $chr ) = @_;
-  #.     $_[0], $_[1],   $_[2]
-
-  #        $self->_getDbi($chr)
-  # my $db = $_[0]->_getDbi($_[2]) or return undef;
-
-  #$cursor->close();
-  $_[1]->[1]->close();
-
-  # closes a write cursor as well; the above $cursor->close() is to be explicit
-  $_[1]->[0]->Txn->commit();
-
-  if($LMDB_File::last_err) {
-    if($LMDB_File::last_err != MDB_NOTFOUND) {
-     #$self->
-      $_[0]->_errorWithCleanup("dbEndCursorTxn LMDB error: $LMDB_File::last_err");
-      return 255;
-    }
-
-    #reset the class error variable, to avoid crazy error reporting later
-    $LMDB_File::last_err = 0;
-  }
-
-  return 0;
-}
-
-sub dbGetNumberOfEntries {
-  my ( $self, $chr ) = @_;
-
-  #get database, but don't create it if it doesn't exist
-  my $db = $self->_getDbi($chr,1);
-
-  return $db ? $db->{env}->stat->{entries} : 0;
-}
-
 #cursor version
 # Read transactions are by default not committed
 sub dbReadAll {
@@ -661,6 +513,151 @@ sub dbReadAll {
   }
 
   return \@out;
+}
+
+################################################################################
+###### For performance reasons we may want to manage our own transactions ######
+######################## WARNING: *UNSAFE* #####################################
+sub dbStartCursorTxn {
+  #my ( $self, $chr ) = @_;
+
+  #It is possible not to find a database in $dbReadOnly mode (for ex: refSeq for a while didn't have chrM)
+  #http://ideone.com/uzpdZ8
+
+  #        $self->_getDbi($chr)
+  my $db = $_[0]->_getDbi($_[1]) or return;
+
+  my $txn = $db->{env}->BeginTxn();
+  $txn->AutoCommit(1);
+
+  # This means LMDB_File will not track our cursor, must close/delete manually
+  LMDB::Cursor::open($txn, $db->{dbi}, my $cursor);
+
+  if(!$cursor) {
+    return;
+  }
+
+  # Unsafe, private LMDB_File method access but Cursor::open does not track cursors
+  $LMDB::Txn::Txns{$$txn}{Cursors}{$$cursor} = 1;
+
+  # We store data in sequential, integer order
+  # in all but the meta tables, which don't use this function
+  # LMDB::Cursor::open($txn, $db->{dbi}, my $cursor);
+  return [$txn, $cursor];
+}
+
+# Assumes user manages their own transactions
+sub dbReadOneCursorUnsafe {
+  #my ($self, $cursor, $pos) = @_;
+  $_[1]->[1]->_get($_[2], my $json, MDB_SET);
+
+  return $json ? $mp->unpack($json) : undef;
+}
+
+# When you need performance, especially for genome-wide insertions
+# Be an adult, manage your own cursor
+# LMDB tells you : if you commit the cursor is closed, needs to be renewed
+sub dbPatchCursorUnsafe {
+  #my ( $self, $cursor, $chr, $dbName, $pos, $newValue, $mergeFunc) = @_;
+  #    $_[0]. $_[1].   $_[2]. $_[3].  $_[4] $_[5].     $_[6]
+
+#$cursor->_get($pos)
+  $_[1]->[1]->_get($_[4], my $json, MDB_SET);
+
+  my $existingValue = defined $json ? $mp->unpack($json) : [];
+#                            [$dbName]
+  if(defined $existingValue->[$_[3]]) {
+    # ($mergeFunc)
+    if($_[6]) {                #[$dbName]=$mergeFunc->($chr, $pos, $existingValue->[$dbName], $newValue);
+      (my $err, $existingValue->[$_[3]]) = $_[6]->($_[2], $_[4], $existingValue->[$_[3]], $_[5]);
+
+      if($err) {
+        $_[0]->_errorWithCleanup("dbPatchCursor mergeFunc error: $err");
+        return 255;
+      }
+
+      # nothing to do; no value returned
+      if(!defined $existingValue->[$_[3]]) {
+        return 0;
+      }
+    } else {
+      # No overwrite allowed by default
+      # just like dbPatch, but no overwrite option
+      # Overwrite is impossible when mergeFunc is defined
+      # TODO: remove overwrite from dbPatch
+      return 0;
+    }
+  } else {
+                  ##[$dbName]#$newValue
+    $existingValue->[$_[3]] = $_[5];
+  }
+
+  #_put as used here will not return errors if the cursor is inactive
+  # hence, "unsafe"
+  if(defined $json) {
+  #$cursor      #$pos
+    $_[1]->[1]->_put($_[4], $mp->pack($existingValue), MDB_CURRENT);
+  } else {
+  #$cursor     #$pos
+    $_[1]->[1]->_put($_[4], $mp->pack($existingValue));
+  }
+
+  if($LMDB_File::last_err) {
+    if($LMDB_File::last_err != MDB_NOTFOUND) {
+    #$self
+      $_[0]->_errorWithCleanup("dbEndCursorTxn LMDB error: $LMDB_File::last_err");
+      return 255;
+    }
+
+    #reset the class error variable, to avoid crazy error reporting later
+    $LMDB_File::last_err = 0;
+  }
+
+  return 0;
+}
+
+# commit and close a self-managed cursor object
+# TODO: Don't close cursor if not needed
+sub dbEndCursorTxn {
+  # my ( $self, $cursor, $chr ) = @_;
+  #.     $_[0], $_[1],   $_[2]
+
+  #        $self->_getDbi($chr)
+  # my $db = $_[0]->_getDbi($_[2]) or return undef;
+  #$cursor->close();
+  $_[1]->[1]->close();
+
+  # closes a write cursor as well; the above $cursor->close() is to be explicit
+  # will not close a MDB_RDONLY cursor
+  $_[1]->[0]->commit();
+
+  # get rid of this object; we want to help user not try to re-use it
+  # TODO: only in case of non-MDB_RDONLY
+  undef $_[1];
+
+  if($LMDB_File::last_err) {
+    if($LMDB_File::last_err != MDB_NOTFOUND) {
+     #$self->
+      $_[0]->_errorWithCleanup("dbEndCursorTxn LMDB error: $LMDB_File::last_err");
+      return 255;
+    }
+
+    #reset the class error variable, to avoid crazy error reporting later
+    $LMDB_File::last_err = 0;
+  }
+
+  return 0;
+}
+
+################################################################################
+
+sub dbGetNumberOfEntries {
+  my ( $self, $chr ) = @_;
+
+  #get database, but don't create it if it doesn't exist
+  my $db = $self->_getDbi($chr,1);
+
+  return $db ? $db->{env}->stat->{entries} : 0;
 }
 
 sub dbDelete {
