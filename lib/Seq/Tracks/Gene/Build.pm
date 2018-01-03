@@ -368,7 +368,11 @@ sub buildTrack {
             }
 
             # Commits, closes cursor every transcript
-            $self->db->dbEndCursorTxn($cursor, $chr);
+            if($cursor) {
+              $self->db->dbEndCursorTxn($cursor, $chr);
+              # not strictly needed
+              undef $cursor;
+            }
 
             if( @{$txInfo->transcriptErrors} ) {
               my @errors = @{$txInfo->transcriptErrors};

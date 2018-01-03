@@ -441,13 +441,16 @@ sub dbPut {
 
   $db->{db}->Txn->commit() unless $skipCommit;
 
-  if($LMDB_File::last_err && $LMDB_File::last_err != MDB_KEYEXIST) {
-    $self->_errorWithCleanup("dbPut LMDB error: $LMDB_File::last_err");
-    return 255;
+  if($LMDB_File::last_err) {
+    if($LMDB_File::last_err != MDB_KEYEXIST) {
+      $self->_errorWithCleanup("dbPut LMDB error: $LMDB_File::last_err");
+      return 255;
+    }
+
+    #reset the class error variable, to avoid crazy error reporting later
+    $LMDB_File::last_err = 0;
   }
 
-  #reset the class error variable, to avoid crazy error reporting later
-  $LMDB_File::last_err = 0;
   return 0;
 }
 
