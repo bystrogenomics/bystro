@@ -252,6 +252,7 @@ sub _buildTranscript {
     # now has database data, or undefined
     # last argument means don't commit this, saves io overhead,
     # committing here to avoid interfering with transactions of the consuming class
+    # TODO: allow dbRead to use read-only transactions
     $db->dbRead($self->chrom, $exonPosHref);
 
     #Now get the base for each item found in $dAref ($exonPosHref);

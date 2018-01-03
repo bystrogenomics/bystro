@@ -340,10 +340,14 @@ sub buildTrack {
               $self->log('fatal', $err);
             }
 
-            my $cursor;
-            my $count = 0;
+            # Note that is Build::TX doesn't close it txn, this will be 
+            # impossible; may be an LMDB_File bug
+            # If that is problematic, placing this before Build::TX will work
+            # for some reason, order of SubTxn's matters
+            # https://github.com/salortiz/LMDB_File/issues/30
+            my $cursor = $self->db->dbStartCursorTxn($chr);
             INNER: for (my $i = 0; $i < @{$txInfo->transcriptSites}; $i += 2) {
-              $cursor //=  $self->db->dbStartCursorTxn($chr);
+              # $cursor //=  $self->db->dbStartCursorTxn($chr);
               # $i corresponds to $pos, $i + 1 to value
               # Commit for every position
               # This also ensures that $mainMergeFunc will always be called with fresh data
@@ -358,21 +362,10 @@ sub buildTrack {
                 #how we handle cases where multiple overlap
                 $mainMergeFunc
               );
-
-              if($count > $self->commitEvery) {
-                $self->db->dbEndCursorTxn($cursor, $chr);
-                undef $cursor;
-              }
-
-              $count++;
             }
 
             # Commits, closes cursor every transcript
-            if($cursor) {
-              $self->db->dbEndCursorTxn($cursor, $chr);
-              # not strictly needed
-              undef $cursor;
-            }
+            $self->db->dbEndCursorTxn($cursor, $chr);
 
             if( @{$txInfo->transcriptErrors} ) {
               my @errors = @{$txInfo->transcriptErrors};
