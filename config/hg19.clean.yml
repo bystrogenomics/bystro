@@ -30,15 +30,13 @@ chromosomes:
 - chrY
 database_dir: '~'
 fileProcessors:
-- args: --emptyField ! --minGq .95
-  handles: snp
-  name: bystro-snp
-- args: --emptyField !
-  handles: vcf
-  name: bystro-vcf
-files: '~'
-files_dir: /mnt/db_backup/hg19/
-snpProcessor: bystro-snp
+  snp:
+    args: '--emptyField ! --minGq .95'
+    program: bystro-snp
+  vcf:
+    args: '--emptyField !'
+    program: bystro-vcf
+files_dir: ~
 statistics:
   dbSNPnameField: dbSNP.name
   exonicAlleleFunctionField: refSeq.exonicAlleleFunction
@@ -534,6 +532,5 @@ tracks:
       completed: 2017-11-23T21:04:00
       name: fetch
     version: 12
-vcfProcessor: bystro-vcf
 version: 206
 

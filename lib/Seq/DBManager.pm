@@ -182,24 +182,14 @@ sub dbRead {
   for my $pos (@{ $_[2] }) {
     $txn->get($dbi, $pos, $json);
 
-    if($LMDB_File::last_err && $LMDB_File::last_err != MDB_NOTFOUND) {
-      $_[0]->_errorWithCleanup("dbRead LMDB error $LMDB_File::last_err");
-      return 255;
-    }
-
-    if(!$json) {
-      #we return exactly the # of items, and order, given to us
-      $pos = undef;
-      next;
-    }
-
-    $pos = $mp->unpack($json);
+    $pos = $json ? $mp->unpack($json) : undef;
   }
 
   # Commit unless the user specifically asks not to
   #if(!$skipCommit) {
   $txn->commit() unless $_[3];
 
+  #substantial to catch any errors
   if($LMDB_File::last_err) {
     if($LMDB_File::last_err != MDB_NOTFOUND) {
       $_[0]->_errorWithCleanup("dbRead LMDB error after loop: $LMDB_File::last_err");
@@ -568,9 +558,46 @@ sub dbStartCursorTxn {
 # Assumes user manages their own transactions
 sub dbReadOneCursorUnsafe {
   #my ($self, $cursor, $pos) = @_;
+      #$_[0]. $_[1].   $_[2]
+
   $_[1]->[1]->_get($_[2], my $json, MDB_SET);
 
+  if($LMDB_File::last_err) {
+    if($LMDB_File::last_err != MDB_NOTFOUND) {
+    #$self
+      $_[0]->_errorWithCleanup("dbEndCursorTxn LMDB error: $LMDB_File::last_err");
+      return 255;
+    }
+
+    #reset the class error variable, to avoid crazy error reporting later
+    $LMDB_File::last_err = 0;
+  }
+
   return $json ? $mp->unpack($json) : undef;
+}
+
+sub dbReadCursorUnsafe {
+  #my ($self, $cursor, $posAref) = @_;
+      #$_[0]. $_[1].   $_[2]
+
+  foreach (@{$_[2]}) {
+    $_[1]->[1]->_get($_, my $json, MDB_SET);
+
+    $_ = $json ? $mp->unpack($json) : undef;
+  }
+
+  if($LMDB_File::last_err) {
+    if($LMDB_File::last_err != MDB_NOTFOUND) {
+    #$self
+      $_[0]->_errorWithCleanup("dbEndCursorTxn LMDB error: $LMDB_File::last_err");
+      return 255;
+    }
+
+    #reset the class error variable, to avoid crazy error reporting later
+    $LMDB_File::last_err = 0;
+  }
+
+  return $_[2];
 }
 
 # When you need performance, especially for genome-wide insertions

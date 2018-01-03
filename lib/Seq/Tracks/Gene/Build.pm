@@ -347,8 +347,7 @@ sub buildTrack {
             # https://github.com/salortiz/LMDB_File/issues/30
             my $cursor = $self->db->dbStartCursorTxn($chr);
             INNER: for (my $i = 0; $i < @{$txInfo->transcriptSites}; $i += 2) {
-              # $cursor //=  $self->db->dbStartCursorTxn($chr);
-              # $i corresponds to $pos, $i + 1 to value
+              # $txInfo->transcriptSites->[$i] corresponds to $pos, $i + 1 to value
               # Commit for every position
               # This also ensures that $mainMergeFunc will always be called with fresh data
               $self->db->dbPatchCursorUnsafe(

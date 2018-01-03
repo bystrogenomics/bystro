@@ -43,10 +43,8 @@ has input_file => (is => 'rw', isa => AbsFile, coerce => 1, required => 1,
 # Maximum (signed) size of del allele
 has maxDel => (is => 'ro', isa => 'Int', default => -32, writer => 'setMaxDel');
 
-has minGq => (is => 'ro', isa => 'Num', default => '.95');
-
-has snpProcessor => (is => 'ro', isa => 'Str', default => 'bystro-snp');
-has vcfProcessor => (is => 'ro', isa => 'Str', default => 'bystro-vcf');
+# TODO: formalize: check that they have name and args properties
+has fileProcessors => (is => 'ro', isa => 'HashRef', default => 'bystro-vcf');
 
 # Defines most of the properties that can be configured at run time
 # Needed because there are variations of Seq.pm, ilke SeqFromQuery.pm
@@ -150,26 +148,19 @@ sub annotateFile {
 
   ################### Creates the output file handler #################
   # Used in makeAnnotationString
-  my $delims = Seq::Output::Delimiters->new();
+  my $errPath = $self->_workingDir->child($self->input_file->basename . '.file-log.log');
 
-  my $errPath = $self->_workingDir->child($self->input_file->basename . '.vcf-log.log');
   my $inPath = $self->inputFilePath;
   my $echoProg = $self->isCompressedSingle($inPath) ? $self->gzip . ' -d -c' : 'cat';
-  my $delim = $delims->emptyFieldChar;
-  my $minGq = $self->minGq;
 
   my $fh;
 
-  # TODO: add support for GQ filtering in vcf
-  if ($type eq 'snp') {
-    open($fh, '-|', "$echoProg $inPath | " . $self->snpProcessor . " --emptyField $delim --minGq $minGq 2> $errPath");
-  } elsif($type eq 'vcf') {
-    # Retruns chr, pos, homozygotes, heterozygotes, alt, ref in that order, tab delim
-    open($fh, '-|', "$echoProg $inPath | " . $self->vcfProcessor . " --emptyField $delim 2> $errPath");
-  } else {
-    $self->_errorWithCleanup("annotateFiles only accepts snp and vcf types");
-    return ("annotateFiles only accepts snp and vcf types", undef);
+  if(!$self->fileProcessors->{$type}) {
+    $self->_errorWithCleanup("No fileProcessors defined for $type file type");
   }
+
+  # TODO: add support for GQ filtering in vcf
+  open($fh, '-|', "$echoProg $inPath | " . $self->fileProcessors->{$type}{program} . " " . $self->fileProcessors->{$type}{args} . " 2> $errPath");
 
   # If user specified a temp output path, use that
   my $outFh = $self->get_write_fh( $self->{_outPath} );
@@ -281,6 +272,8 @@ sub annotateFile {
 
       $zeroPos = $fields[1] - 1;
 
+      # Caveat: It seems that, per database ($chr), we can have only one
+      # read-only transaction; so ... yeah can't combine with dbRead, dbReadOne
       if(!$cursors{$fields[0]}) {
         $cursors{$fields[0]} = $self->{_db}->dbStartCursorTxn($fields[0]);
       }
@@ -314,7 +307,7 @@ sub annotateFile {
             }
 
             #last argument: skip commit
-            $self->{_db}->dbRead($fields[0], \@indelDbData, 1);
+            $self->{_db}->dbReadCursorUnsafe($cursors{$fields[0]},  \@indelDbData);
 
             #Note that the first position keeps the same $inputRef
             #This means in the (rare) discordant multiallelic situation, the reference
@@ -329,7 +322,7 @@ sub annotateFile {
           #It's an insertion, we always read + 1 to the position being annotated
           # which itself is + 1 from the db position, so we read  $out[1][0][0] to get the + 1 base
           # Read without committing by using 1 as last argument
-          @indelDbData = ($dataFromDbAref, $self->{_db}->dbReadOne($fields[0], $fields[1], 1));
+          @indelDbData = ($dataFromDbAref, $self->{_db}->dbReadOneCursorUnsafe($cursors{$fields[0]}, $fields[1]));
 
           #Note that the first position keeps the same $inputRef
           #This means in the (rare) discordant multiallelic situation, the reference
