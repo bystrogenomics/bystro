@@ -309,9 +309,8 @@ sub buildTrack {
 
         $cursors{$wantedChr} //= $self->db->dbStartCursorTxn($wantedChr);
 
-        # We cannot have anything committing while using dbPatchCursorUnsafe
-        # because currently we share one transaction for one db
-        # and the "unsafe" methods expect the current transaction to remain open
+        # We want to keep a consistent view of our universe, so use one transaction
+        # during read/modify/write
         $dbData = $self->db->dbReadOneCursorUnsafe($cursors{$wantedChr}, $dbPos);
 
         $refExpected = $self->{_refTrack}->get($dbData);

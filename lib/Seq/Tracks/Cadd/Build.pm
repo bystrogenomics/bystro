@@ -72,7 +72,6 @@ sub buildTrack {
   #Perl is dramatically faster when splitting on a constant, so we assume '\t'
   if($self->delimiter ne '\t' && $self->delimiter ne "\t") {
     $self->log("fatal", $self->name . ": requires delimiter to be \\t");
-    die $self->name . ": requires delimiter to be \\t";
   }
 
   my $missingValue = undef;
@@ -90,7 +89,6 @@ sub buildTrack {
   # For now we require sorting to be guaranteed to simplify this code
   if(!$self->sorted_guaranteed) {
     $self->log("fatal", $self->name . ": requires sorted_guaranteed to be true");
-    die $self->name . ": requires sorted_guaranteed to be true";
   }
 
   for my $file ( @{$self->local_files} ) {
@@ -110,7 +108,6 @@ sub buildTrack {
         }
 
         $self->log('fatal', $err);
-        die $err;
       }
 
       chomp $versionLine;
@@ -119,7 +116,6 @@ sub buildTrack {
 
       if( index($versionLine, '## CADD') == -1) {
         $self->log('fatal', $self->name . ": first line of $file is not CADD formatted: $_");
-        die $self->name . ": first line of $file is not CADD formatted: $_";
       }
 
       # Cadd's columns descriptor is on the 2nd line
@@ -134,7 +130,6 @@ sub buildTrack {
         }
 
         $self->log('fatal', $err);
-        die $err;
       }
 
       chomp $headerLine;
@@ -215,7 +210,6 @@ sub buildTrack {
             my $err = $self->name . ": changed chromosomes, but unwritten data remained";
 
             $self->log('fatal', $err);
-            die $err;
           }
 
           if($wantedChr) {
@@ -280,7 +274,6 @@ sub buildTrack {
             if(@caddData || $caddRef) {
               my $err = $self->name . ": skipSites and score accumulation should be mutually exclusive";
               $self->log('fatal', $err);
-              die $err;
             }
 
             #Can delete because order guaranteed
@@ -292,16 +285,17 @@ sub buildTrack {
             $self->log('warn', $self->name . ": $wantedChr\:$lastPosition: No scores or warnings accumulated.");
             undef $caddRef;
           } else {
+            $cursors{$wantedChr} //= $self->db->dbStartCursorTxn($wantedChr);
+
             ########### Check refBase against the assembly's reference #############
-            #last argument to skip commit of read
-            #We can read without committing, no real benefit to committing here
-            $dbData = $self->db->dbReadOne($wantedChr, $lastPosition, 1);
+            # We read using our cursor; since in LMDB, cursors are isolated
+            # and therefore don't want to use our helper dbRead class, as inconsistencies may arise
+            $dbData = $self->db->dbReadOneCursorUnsafe($cursors{$wantedChr}, $lastPosition);
             $assemblyRefBase = $refTrack->get($dbData);
 
             if(!defined $assemblyRefBase) {
               my $err = $self->name . ": no assembly ref base found for $wantedChr:$lastPosition";
               $self->log('fatal', $err);
-              die $err;
             }
 
             # When lifted over, reference base is not lifted, can cause mismatch
@@ -336,8 +330,6 @@ sub buildTrack {
 
                 #Since sorting is guaranteed, there is nothing to write here
               } else {
-                $cursors{$wantedChr} //= $self->db->dbStartCursorTxn($wantedChr);
-
                 #Args:                         $cursor               $chr,       $trackIndex,   $pos,         $trackValue
                 $self->db->dbPatchCursorUnsafe($cursors{$wantedChr}, $wantedChr, $self->dbName, $lastPosition, $phredScoresAref);
 
@@ -444,8 +436,7 @@ sub buildTrack {
           delete $skipSites{"$wantedChr\_$lastPosition"};
           #Since sorting is guaranteed, no need to write anything
         } else {
-          #last argument to skip commit of read
-          $dbData = $self->db->dbReadOne($wantedChr, $lastPosition, 1);
+          $dbData = $self->db->dbReadOne($wantedChr, $lastPosition);
           $assemblyRefBase = $refTrack->get($dbData);
 
           if($assemblyRefBase ne $caddRef) {
@@ -467,7 +458,6 @@ sub buildTrack {
               } else {
                 my $err = $self->name . ": $wantedChr\:$lastPosition: Didn't accumulate 3 phredScores, and not because > 3 scores, which should be impossible.";
                 $self->log('fatal', $err);
-                die $err;
               }
             } else {
               #We commit here, because we don't expect any more scores
@@ -495,7 +485,6 @@ sub buildTrack {
 
       if(!close($fh) && $? != 13) {
         $self->log('fatal', $self->name . " failed to close $file with $! ($?)");
-        die $self->name . ": failed to close $file with $!";
       } else {
         if($changedRefPositions > 0) {
           $self->log('warn', $self->name . ": skipped $changedRefPositions positions because CADD Ref didn't match ours: in $file.");
@@ -565,7 +554,6 @@ sub _accumulateScores {
       my $err = $_[0]->name . ": $_[1]\:$_[4]: no score possible for altAllele $aref->[0]";
       #      $self->log
       $_[0]->log('fatal', $err);
-      die $err;
     }
 
     $phredScores[$index] = $aref->[1];

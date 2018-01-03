@@ -381,7 +381,9 @@ sub transformField {
 # Merge [featuresOld...] with [featuresNew...]
 # Expects 2 arrays of equal length
 # //Won't merge when [featuresNew...] previously merged (duplicate)
-# Note: it is completely unsafe to dbReadOne and commit here for the $chr database
+# Note: it is completely unsafe to dbReadOne and not commit here
+# If the user relies on a non DB->Txn transactions, LMDB_File will complain
+# that the transaction should be a sub-transaction
 # may screw up the parent transaction, since we currently use a single
 # transaction per database per thread. We should move away from this.
 # TODO: allow 2 scalars, or growing one array to match the lenght of the other

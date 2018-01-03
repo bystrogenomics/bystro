@@ -482,7 +482,6 @@ sub dbReadAll {
       $cursor->_get($key, $value, MDB_NEXT);
     }
 
-
     #because this error is generated right after the get
     #we want to capture it before the next iteration
     #hence this is not inside while( )
@@ -527,14 +526,31 @@ sub dbStartCursorTxn {
   #        $self->_getDbi($chr)
   my $db = $_[0]->_getDbi($_[1]) or return;
 
-  my $txn = $db->{env}->BeginTxn();
+  # TODO: Investigate why a subtransaction isn't successfully made
+  # when using BeginTxn()
+  # If we create a txn and assign it to DB->Txn, from $db->{env}, before creating a txn here
+  # upon trying to use the parent transaction, we will get a crash (-30782 / BAD_TXN)
+  # no such issue arises the other way around; i.e creating this transaction, then having
+  # a normal DB->Txn created as a nested transaction
+  if($db->{db}->Alive) {
+    $_[0]->_errorWithCleanup("DB alive when calling dbStartCursorTxn; LMDB_File requires to be committed; commit DB->Txn before dbStartCursorTxn");
+    return 255;
+  }
+
+  # Will throw errors saying "should be nested transaction" unlike env->BeginTxn();
+  # to protect against the above BAD_TXN issue
+  my $txn = LMDB::Txn->new($db->{env}, $db->{tflags});
+
+  # my $txn = LMDB::Txn->new($db->{env});
   $txn->AutoCommit(1);
 
   # This means LMDB_File will not track our cursor, must close/delete manually
   LMDB::Cursor::open($txn, $db->{dbi}, my $cursor);
 
+  # TODO: better error handling
   if(!$cursor) {
-    return;
+    $_[0]->_errorWithCleanup("Couldn't open cursor for $_[1]");
+    return 255;
   }
 
   # Unsafe, private LMDB_File method access but Cursor::open does not track cursors
@@ -858,7 +874,7 @@ sub _getDbi {
     return;
   }
 
-  $envs->{$name} = {env => $env, dbi => $DB->dbi, db => $DB};
+  $envs->{$name} = {env => $env, dbi => $DB->dbi, db => $DB, tflags => $flags};
 
   return $envs->{$name};
 }

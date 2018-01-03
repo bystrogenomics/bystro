@@ -251,8 +251,8 @@ sub _buildTranscript {
     # As a result of modifying the reference, each position in exonPosHref
     # now has database data, or undefined
     # last argument means don't commit this, saves io overhead,
-    # no benefit that I can see from committing here
-    $db->dbRead($self->chrom, $exonPosHref, 1);
+    # committing here to avoid interfering with transactions of the consuming class
+    $db->dbRead($self->chrom, $exonPosHref);
 
     #Now get the base for each item found in $dAref ($exonPosHref);
     #This is handled by the refTrack of course
