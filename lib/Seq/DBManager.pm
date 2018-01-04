@@ -869,6 +869,7 @@ sub _getDbi {
     #in the docs
     flags => $flags,
     maxdbs => 0, # Some databases; else we get a MDB_DBS_FULL error (max db limit reached)
+    maxreaders => 128,
   });
 
   if(! $env ) {
@@ -969,7 +970,7 @@ sub _errorWithCleanup {
   say STDERR "LMDB error: $msg";
 
   $self->log('error', $msg);
-  exit(255);
+  die $msg;
 }
 
 __PACKAGE__->meta->make_immutable;
