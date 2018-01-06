@@ -220,7 +220,7 @@ sub buildTrack {
             }
 
             #Clean up the database, free memory;
-            $self->db->cleanUp($wantedChr);
+            $self->db->cleanUp();
             #Reset our transaction counter
             $count = 0;
           }
@@ -524,6 +524,9 @@ sub buildTrack {
 
     $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedChrs{$chr}})));
   }
+
+  # Trying to avoid "destroying active environment"
+  $self->db->cleanUp();
 
   #TODO: Implement actual error return codes instead of dying
   return;

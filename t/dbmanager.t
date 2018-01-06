@@ -11,7 +11,9 @@ use DDP;
 
 system('rm -rf ./t/db/index');
 
-Seq::DBManager::setGlobalDatabaseDir('./t/db/index');
+Seq::DBManager::initialize({
+  databaseDir =>'./t/db/index'
+});
 
 my $db = Seq::DBManager->new();
 
@@ -24,7 +26,6 @@ ok(!%LMDB::Env::Envs, "prior to first transaction, no transactions listed");
 ### Test Unsafe Transactions (Manually Managed) ##########
 my $cursor = $db->dbStartCursorTxn('test');
 
-%LMDB::Env::Envs;
 ok(keys %LMDB::Env::Envs == 1, "after opening cursors, have one transaction");
 
 my ($expected, $err);
@@ -43,6 +44,7 @@ ok(defined $expected, "Before committing, we can see inserted value, as we have 
 ok($#$expected == $dbIdx && !defined $expected->[0] && $expected->[1] eq $val, "dbReadCursorUnsafe returns an array of track data; each index is another track");
 
 $err = $db->dbEndCursorTxn($cursor, 'test');
+
 ok(!defined $cursor, "dbEndCursorTxn undef's the cursor array");
 
 $expected = $db->dbReadOne('test', $pos);

@@ -274,7 +274,7 @@ sub buildTrack {
 
             #Commit any remaining transactions, remove the db map from memory
             #this also has the effect of closing all cursors
-            $self->db->cleanUp($wantedChr);
+            $self->db->cleanUp();
 
             $count = 0;
           }
@@ -374,6 +374,10 @@ sub buildTrack {
 
     $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedDetails{$chr}})));
   }
+
+  # Trying to avoid "Oops! Closing Active Environment";
+  # TODO: ensure that this isn't needed
+  $self->db->cleanUp();
 }
 
 sub _extractHeader {

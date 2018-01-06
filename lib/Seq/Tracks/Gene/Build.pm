@@ -377,13 +377,6 @@ sub buildTrack {
 
         delete $allData{$chr};
 
-        # We map a lot of memory by this point, so release it back to the OS
-        # To reduce likelihood that linux will want to swap
-        # The database will be re-opened as needed
-        $self->db->cleanUp($chr);
-
-        $self->log('info', $self->name . ": finished building transcripts for $chr from $file");
-
         $self->_writeRegionData($chr, $regionData{$chr});
 
         delete $regionData{$chr};
@@ -394,9 +387,17 @@ sub buildTrack {
 
         delete $txStartData{$chr};
 
-        #Commit, sync everything, including completion status, and release mmap
+        $self->log('info', $self->name . ": finished building transcripts for $chr from $file");
+
+        # We map a lot of memory by this point, so release it back to the OS
+        # To reduce likelihood that linux will want to swap
+        # The database will be re-opened as needed
         $self->db->cleanUp();
       }
+
+      #Commit, sync everything, including completion status, and release mmap
+      $self->db->cleanUp();
+
     $pm->finish(0, \%visitedChrs);
   }
 
@@ -407,6 +408,9 @@ sub buildTrack {
 
     $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedChrs{$chr}})));
   }
+
+  # Trying to avoid "Oops! Closing Active Environment";
+  $self->db->cleanUp();
 
   return;
 }

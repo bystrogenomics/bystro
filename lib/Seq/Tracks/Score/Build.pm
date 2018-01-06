@@ -129,7 +129,7 @@ sub buildTrack{
 
               #Commit any remaining transactions, remove the db map from memory
               #this also has the effect of closing all cursors
-              $self->db->cleanUp($wantedChr);
+              $self->db->cleanUp();
 
               $count = 0;
             }
@@ -210,6 +210,10 @@ sub buildTrack{
 
     $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedChrs{$chr}})));
   }
+
+  #Trying to avoid "destroying active environment" and segfault
+  #TODO: remove the need, or otherwise simplify
+  $self->db->cleanUp();
 
   return;
 };

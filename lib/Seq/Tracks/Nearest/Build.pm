@@ -273,21 +273,33 @@ sub buildTrack {
 
         my $chr = $fields[ $allIdx{$self->chromField} ];
 
-        # We may have already finished this chr, or may not have asked for it
-        if( ($wantedChr && $wantedChr ne $chr) || !$wantedChr ) {
-          $wantedChr = $self->chrIsWanted($chr) && $self->completionMeta->okToBuild($chr) ? $chr : undef;
+        # If $wantedChr was set, and we have a new wanted chromosome, because a.t.m
+        # we pre-calculate all region overlaps, all regions must be within a single file
+        if((defined $wantedChr && $wantedChr ne $chr)) {
+          $wantedChr = $self->chrIsWanted($chr);
+
+          if($wantedChr) {
+            $self->log('fatal', "Multiple wanted chromosomes found in $file, expect 1 chromosome per file");
+          }
         }
 
-        if(!$wantedChr) {
-          # if not wanted, and we have one chr per file, exit
-          if($self->chrPerFile) {
-            $self->log('info', $self->name . ": chrs in file $file not wanted or previously completed. Skipping");
-            $skipped = 1;
-            last FH_LOOP;
+        if(!defined $wantedChr) {
+          $wantedChr = $self->chrIsWanted($chr) ? $chr : undef;
+
+          if(!$wantedChr) {
+            next FH_LOOP;
           }
 
-          #not wanted, but multiple chr per file, skip
-          next FH_LOOP;
+          if(!$self->completionMeta->okToBuild($wantedChr)) {
+            if($self->chrPerFile) {
+              $self->log('info', $self->name . ": $wantedChr in $file previously completed. Skipping");
+              $skipped = 1;
+              last FH_LOOP;
+            }
+
+            #not wanted, but multiple chr per file, skip
+            next FH_LOOP;
+          }
         }
 
         my @rowData;
@@ -345,13 +357,14 @@ sub buildTrack {
       # We've now accumulated everything from this file
       # So write it. LMDB will serialize writes, so this is fine, even
       # if the file is not properly organized by chromosome
+      # Requires that each file contains only one kind of chromosome
       for my $chr (keys %regionData) {
         $self->_writeNearestData($chr, $regionData{$chr}, \@fieldDbNames);
 
         # We've finished with 1 chromosome, so write that to meta to disk
         $self->completionMeta->recordCompletion($chr);
 
-        $self->db->cleanUp($chr);
+        $self->db->cleanUp();
       }
 
       #Commit, sync everything, including completion status, and release mmap
@@ -360,6 +373,11 @@ sub buildTrack {
   }
 
   $pm->wait_all_children;
+
+  # Trying to avoid active environment error
+  # TODO: ensure that this isn't needed
+  $self->db->cleanUp();
+
   return;
 }
 

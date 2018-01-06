@@ -1,7 +1,7 @@
 ---
 assembly: hg19
 build_author: ec2-user
-build_date: 2017-12-30T02:51:00
+build_date: 2018-01-03T08:34:00
 chromosomes:
 - chr1
 - chr2
@@ -31,11 +31,12 @@ chromosomes:
 database_dir: '~'
 fileProcessors:
   snp:
-    args: '--emptyField ! --minGq .95'
+    args: --emptyField ! --minGq .95
     program: bystro-snp
   vcf:
-    args: '--emptyField !'
+    args: --emptyField !
     program: bystro-vcf
+files: '~'
 files_dir: ~
 statistics:
   dbSNPnameField: dbSNP.name
@@ -64,7 +65,7 @@ tracks:
   - clinvar
   tracks:
   - build_author: ec2-user
-    build_date: 2017-12-30T02:51:00
+    build_date: 2018-01-03T08:34:00
     local_files:
     - chr*.fa.gz
     name: ref
@@ -100,12 +101,13 @@ tracks:
         - chrY.fa.gz
       completed: 2017-11-24T02:27:00
       name: fetch
-    version: 21
+    version: 22
   - build_author: ec2-user
-    build_date: 2017-12-30T02:51:00
+    build_date: 2018-01-03T08:34:00
     dist: true
     features:
     - name2
+    - name
     from: txStart
     local_files:
     - hg19.kgXref.chr*.with_dbnsfp.gz
@@ -117,12 +119,13 @@ tracks:
         renameTo: nearest.refSeq
       completed: 2017-12-24T20:10:00
       name: renameTrack
-    version: 12
+    version: 13
   - build_author: ec2-user
-    build_date: 2017-12-30T02:51:00
+    build_date: 2018-01-03T08:34:00
     dist: true
     features:
     - name2
+    - name
     from: txStart
     local_files:
     - hg19.kgXref.chr*.with_dbnsfp.gz
@@ -133,9 +136,9 @@ tracks:
         renameTo: nearestTss.refSeq
       completed: 2017-12-24T20:10:00
       name: renameTrack
-    version: 12
+    version: 13
   - build_author: ec2-user
-    build_date: 2017-12-30T02:51:00
+    build_date: 2018-01-03T08:34:00
     local_files:
     - chr*.phastCons100way.wigFix.gz
     name: phastCons
@@ -171,9 +174,9 @@ tracks:
         - chrM.phastCons100way.wigFix.gz
       completed: 2017-11-23T21:05:00
       name: fetch
-    version: 13
+    version: 14
   - build_author: ec2-user
-    build_date: 2017-12-30T02:51:00
+    build_date: 2018-01-03T08:34:00
     local_files:
     - chr*.phyloP100way.wigFix.gz
     name: phyloP
@@ -209,9 +212,9 @@ tracks:
         - chrM.phyloP100way.wigFix.gz
       completed: 2017-11-23T21:10:00
       name: fetch
-    version: 12
+    version: 13
   - build_author: ec2-user
-    build_date: 2017-12-30T02:51:00
+    build_date: 2018-01-03T08:34:00
     caddToBed_date: 2017-04-22T06:41:00
     liftOverCadd_date: 2017-07-28T17:35:00
     local_files:
@@ -222,142 +225,9 @@ tracks:
     sort_date: 2017-01-20T16:06:00
     sorted_guaranteed: 1
     type: cadd
-    version: 12
+    version: 13
   - build_author: ec2-user
-    build_date: 2017-12-30T02:51:00
-    build_field_transformations:
-      alleleFreqs: split [,]
-      alleleNs: split [,]
-      alleles: split [,]
-      func: split [,]
-      observed: split [\/]
-    features:
-    - name
-    - strand
-    - observed
-    - class
-    - func
-    - alleles
-    - alleleNs: number
-    - alleleFreqs: number
-    local_files:
-    - hg19.snp150.chr*.gz
-    name: dbSNP
-    type: sparse
-    utils:
-    - args:
-        sql: SELECT * FROM hg19.snp150 WHERE chrom = %chromosomes%
-      completed: 2017-11-24T03:23:00
-      name: fetch
-    version: 21
-  - build_author: ec2-user
-    build_date: 2017-12-30T02:51:00
-    build_row_filters:
-      AS_FilterStatus: == PASS
-    features:
-    - alt
-    - id
-    - af: number
-    - an: number
-    - an_afr: number
-    - an_amr: number
-    - an_asj: number
-    - an_eas: number
-    - an_fin: number
-    - an_nfe: number
-    - an_oth: number
-    - an_male: number
-    - an_female: number
-    - af_afr: number
-    - af_amr: number
-    - af_asj: number
-    - af_eas: number
-    - af_fin: number
-    - af_nfe: number
-    - af_oth: number
-    - af_male: number
-    - af_female: number
-    fieldMap:
-      AF: af
-      AF_AFR: af_afr
-      AF_AMR: af_amr
-      AF_ASJ: af_asj
-      AF_EAS: af_eas
-      AF_FIN: af_fin
-      AF_Female: af_female
-      AF_Male: af_male
-      AF_NFE: af_nfe
-      AF_OTH: af_oth
-      AN: an
-      AN_AFR: an_afr
-      AN_AMR: an_amr
-      AN_ASJ: an_asj
-      AN_EAS: an_eas
-      AN_FIN: an_fin
-      AN_Female: an_female
-      AN_Male: an_male
-      AN_NFE: an_nfe
-      AN_OTH: an_oth
-    local_files:
-    - gnomad.genomes.r2.0.2.sites.chr*.vcf.bgz
-    name: gnomad.genomes
-    type: vcf
-    version: 15
-  - build_author: ec2-user
-    build_date: 2017-12-30T02:51:00
-    build_row_filters:
-      AS_FilterStatus: == PASS
-    features:
-    - alt
-    - id
-    - af: number
-    - an: number
-    - an_afr: number
-    - an_amr: number
-    - an_asj: number
-    - an_eas: number
-    - an_fin: number
-    - an_nfe: number
-    - an_oth: number
-    - an_male: number
-    - an_female: number
-    - af_afr: number
-    - af_amr: number
-    - af_asj: number
-    - af_eas: number
-    - af_fin: number
-    - af_nfe: number
-    - af_oth: number
-    - af_male: number
-    - af_female: number
-    fieldMap:
-      AF: af
-      AF_AFR: af_afr
-      AF_AMR: af_amr
-      AF_ASJ: af_asj
-      AF_EAS: af_eas
-      AF_FIN: af_fin
-      AF_Female: af_female
-      AF_Male: af_male
-      AF_NFE: af_nfe
-      AF_OTH: af_oth
-      AN: an
-      AN_AFR: an_afr
-      AN_AMR: an_amr
-      AN_ASJ: an_asj
-      AN_EAS: an_eas
-      AN_FIN: an_fin
-      AN_Female: an_female
-      AN_Male: an_male
-      AN_NFE: an_nfe
-      AN_OTH: an_oth
-    local_files:
-    - gnomad.exomes.r2.0.2.sites.vcf.bgz
-    name: gnomad.exomes
-    type: vcf
-    version: 15
-  - build_author: ec2-user
-    build_date: 2017-12-30T02:51:00
+    build_date: 2018-01-03T08:34:00
     build_field_transformations:
       description: split [;]
       ensemblID: split [;]
@@ -421,9 +291,9 @@ tracks:
         geneFile: /mnt/db_backup/dbnsfp/dbNSFP3.5_gene.complete
       completed: 2017-12-26T21:46:00
       name: refGeneXdbnsfp
-    version: 21
+    version: 22
   - build_author: ec2-user
-    build_date: 2017-12-30T02:51:00
+    build_date: 2018-01-03T08:34:00
     build_field_transformations:
       pmid: split [;]
       uniprot.func: split [;]
@@ -484,10 +354,143 @@ tracks:
     storeNearest: false
     to: txEnd
     type: nearest
-    version: 17
+    version: 18
+  - build_author: ec2-user
+    build_date: 2018-01-03T08:34:00
+    build_field_transformations:
+      alleleFreqs: split [,]
+      alleleNs: split [,]
+      alleles: split [,]
+      func: split [,]
+      observed: split [\/]
+    features:
+    - name
+    - strand
+    - observed
+    - class
+    - func
+    - alleles
+    - alleleNs: number
+    - alleleFreqs: number
+    local_files:
+    - hg19.snp150.chr*.gz
+    name: dbSNP
+    type: sparse
+    utils:
+    - args:
+        sql: SELECT * FROM hg19.snp150 WHERE chrom = %chromosomes%
+      completed: 2017-11-24T03:23:00
+      name: fetch
+    version: 22
+  - build_author: ec2-user
+    build_date: 2018-01-03T08:34:00
+    build_row_filters:
+      AS_FilterStatus: == PASS
+    features:
+    - alt
+    - id
+    - af: number
+    - an: number
+    - an_afr: number
+    - an_amr: number
+    - an_asj: number
+    - an_eas: number
+    - an_fin: number
+    - an_nfe: number
+    - an_oth: number
+    - an_male: number
+    - an_female: number
+    - af_afr: number
+    - af_amr: number
+    - af_asj: number
+    - af_eas: number
+    - af_fin: number
+    - af_nfe: number
+    - af_oth: number
+    - af_male: number
+    - af_female: number
+    fieldMap:
+      AF: af
+      AF_AFR: af_afr
+      AF_AMR: af_amr
+      AF_ASJ: af_asj
+      AF_EAS: af_eas
+      AF_FIN: af_fin
+      AF_Female: af_female
+      AF_Male: af_male
+      AF_NFE: af_nfe
+      AF_OTH: af_oth
+      AN: an
+      AN_AFR: an_afr
+      AN_AMR: an_amr
+      AN_ASJ: an_asj
+      AN_EAS: an_eas
+      AN_FIN: an_fin
+      AN_Female: an_female
+      AN_Male: an_male
+      AN_NFE: an_nfe
+      AN_OTH: an_oth
+    local_files:
+    - gnomad.genomes.r2.0.2.sites.chr*.vcf.bgz
+    name: gnomad.genomes
+    type: vcf
+    version: 16
+  - build_author: ec2-user
+    build_date: 2018-01-03T08:34:00
+    build_row_filters:
+      AS_FilterStatus: == PASS
+    features:
+    - alt
+    - id
+    - af: number
+    - an: number
+    - an_afr: number
+    - an_amr: number
+    - an_asj: number
+    - an_eas: number
+    - an_fin: number
+    - an_nfe: number
+    - an_oth: number
+    - an_male: number
+    - an_female: number
+    - af_afr: number
+    - af_amr: number
+    - af_asj: number
+    - af_eas: number
+    - af_fin: number
+    - af_nfe: number
+    - af_oth: number
+    - af_male: number
+    - af_female: number
+    fieldMap:
+      AF: af
+      AF_AFR: af_afr
+      AF_AMR: af_amr
+      AF_ASJ: af_asj
+      AF_EAS: af_eas
+      AF_FIN: af_fin
+      AF_Female: af_female
+      AF_Male: af_male
+      AF_NFE: af_nfe
+      AF_OTH: af_oth
+      AN: an
+      AN_AFR: an_afr
+      AN_AMR: an_amr
+      AN_ASJ: an_asj
+      AN_EAS: an_eas
+      AN_FIN: an_fin
+      AN_Female: an_female
+      AN_Male: an_male
+      AN_NFE: an_nfe
+      AN_OTH: an_oth
+    local_files:
+    - gnomad.exomes.r2.0.2.sites.vcf.bgz
+    name: gnomad.exomes
+    type: vcf
+    version: 16
   - based: 1
     build_author: ec2-user
-    build_date: 2017-12-30T02:51:00
+    build_date: 2018-01-03T08:34:00
     build_field_transformations:
       chrom: chr .
       clinicalSignificance: split [;]
@@ -531,6 +534,6 @@ tracks:
         - ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz
       completed: 2017-11-23T21:04:00
       name: fetch
-    version: 12
-version: 206
+    version: 13
+version: 207
 

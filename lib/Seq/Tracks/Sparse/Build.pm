@@ -171,7 +171,7 @@ sub buildTrack {
             }
 
             #Commit, flush anything remaining to disk, release mapped memory
-            $self->db->cleanUp($wantedChr);
+            $self->db->cleanUp();
 
             $count = 0;
           }
@@ -269,6 +269,10 @@ sub buildTrack {
 
     $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedDetails{$chr}})));
   }
+
+  # Trying to avoid "Oops! Closing Active Environment";
+  # TODO: ensure that this isn't needed
+  $self->db->cleanUp();
 
   return;
 }

@@ -27,18 +27,12 @@ with 'Seq::Role::IO';
 
 #################### Instance Variables #######################################
 ############################# Public Exports ##################################
-has delete => (is => 'ro', lazy => 1, default => 0);
-
-has dryRun => (is => 'ro');
-
 has skipCompletionCheck => (is => 'ro');
-
-has overwrite => (is => 'ro', isa => 'Bool');
 
 # Every builder needs access to the database
 # Don't specify types because we do not allow consumers to set this attribute
-has db => (is => 'ro', init_arg => undef, default => sub { my $self = shift;
-  return Seq::DBManager->new({delete => $self->delete, dryRun => $self->dryRun});
+has db => (is => 'ro', init_arg => undef, default => sub {
+  return Seq::DBManager->new();
 });
 
 # Allows consumers to record track completion, skipping chromosomes that have 
@@ -139,6 +133,12 @@ sub BUILD {
   }
 
   $self->_setChrPerFile(@allLocalFiles > 1 ? 1 : 0);
+
+  # Commit, sync, and remove any databases opened
+  # This is useful because locking may occur if there is an open transaction
+  # before fork(), and to make sure that any database meta data is properly
+  # committed before tracks begin to use that data.
+  Seq::DBManager::cleanUp();
 }
 
 # Configure local_files as abs path, and configure required field (*_field_name)

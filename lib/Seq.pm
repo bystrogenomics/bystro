@@ -52,7 +52,7 @@ has fileProcessors => (is => 'ro', isa => 'HashRef', default => 'bystro-vcf');
 with 'Seq::Definition', 'Seq::Role::Validator';
 
 # To initialize Seq::Base with only getters
-has '+gettersOnly' => (init_arg => undef, default => 1);
+has '+readOnly' => (init_arg => undef, default => 1);
 
 # TODO: further reduce complexity
 sub BUILD {
@@ -66,11 +66,6 @@ sub BUILD {
   # Must come before statistics, which relies on a configured Seq::Tracks
   #Expects DBManager to have been given a database_dir
   $self->{_db} = Seq::DBManager->new();
-
-  # Set the lmdb database to read only, remove locking
-  # We MUST make sure everything is written to the database by this point
-  # Disable this if need to rebuild one of the meta tracks, for one run
-  $self->{_db}->setReadOnly(1);
 
   # We separate out the reference track getter so that we can check for discordant
   # bases, and pass the true reference base to other getters that may want it (like CADD)
@@ -240,6 +235,8 @@ sub annotateFile {
   # Each thread will get its own %cursors object
   my %cursors = ();
 
+  my $db = $self->{_db};
+
   mce_loop_f {
     #my ($mce, $slurp_ref, $chunk_id) = @_;
     #    $_[0], $_[1],     $_[2]
@@ -275,10 +272,10 @@ sub annotateFile {
       # Caveat: It seems that, per database ($chr), we can have only one
       # read-only transaction; so ... yeah can't combine with dbRead, dbReadOne
       if(!$cursors{$fields[0]}) {
-        $cursors{$fields[0]} = $self->{_db}->dbStartCursorTxn($fields[0]);
+        $cursors{$fields[0]} = $db->dbStartCursorTxn($fields[0]);
       }
 
-      $dataFromDbAref = $self->{_db}->dbReadOneCursorUnsafe($cursors{$fields[0]}, $zeroPos);
+      $dataFromDbAref = $db->dbReadOneCursorUnsafe($cursors{$fields[0]}, $zeroPos);
 
       # if($fields[1] == 10920104) {
       #   p $dataFromDbAref;
@@ -307,7 +304,7 @@ sub annotateFile {
             }
 
             #last argument: skip commit
-            $self->{_db}->dbReadCursorUnsafe($cursors{$fields[0]},  \@indelDbData);
+            $db->dbReadCursorUnsafe($cursors{$fields[0]},  \@indelDbData);
 
             #Note that the first position keeps the same $inputRef
             #This means in the (rare) discordant multiallelic situation, the reference
@@ -322,7 +319,7 @@ sub annotateFile {
           #It's an insertion, we always read + 1 to the position being annotated
           # which itself is + 1 from the db position, so we read  $out[1][0][0] to get the + 1 base
           # Read without committing by using 1 as last argument
-          @indelDbData = ($dataFromDbAref, $self->{_db}->dbReadOneCursorUnsafe($cursors{$fields[0]}, $fields[1]));
+          @indelDbData = ($dataFromDbAref, $db->dbReadOneCursorUnsafe($cursors{$fields[0]}, $fields[1]));
 
           #Note that the first position keeps the same $inputRef
           #This means in the (rare) discordant multiallelic situation, the reference
