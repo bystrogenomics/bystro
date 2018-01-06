@@ -273,21 +273,20 @@ sub buildTrack {
 
         my $chr = $fields[ $allIdx{$self->chromField} ];
 
-        # If $wantedChr was set, and we have a new wanted chromosome, because a.t.m
-        # we pre-calculate all region overlaps, all regions must be within a single file
-        if((defined $wantedChr && $wantedChr ne $chr)) {
-          $wantedChr = $self->chrIsWanted($chr);
+        if(!defined $wantedChr || $wantedChr ne $chr) {
+          my $had = defined $wantedChr;
 
-          if($wantedChr) {
-            $self->log('fatal', "Multiple wanted chromosomes found in $file, expect 1 chromosome per file");
-          }
-        }
-
-        if(!defined $wantedChr) {
           $wantedChr = $self->chrIsWanted($chr) ? $chr : undef;
 
-          if(!$wantedChr) {
+          if(!defined $wantedChr) {
             next FH_LOOP;
+          }
+
+          # $wanted
+          # If $wantedChr was set, and we have a new wanted chromosome, because a.t.m
+          # we pre-calculate all region overlaps, all regions must be within a single file
+          if($had && $self->chrPerFile) {
+            $self->log('fatal', "Multiple wanted chromosomes found in $file, expected 1 chromosome per file");
           }
 
           if(!$self->completionMeta->okToBuild($wantedChr)) {
