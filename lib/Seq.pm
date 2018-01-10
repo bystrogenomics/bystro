@@ -146,7 +146,7 @@ sub annotateFile {
   my $errPath = $self->_workingDir->child($self->input_file->basename . '.file-log.log');
 
   my $inPath = $self->inputFilePath;
-  my $echoProg = $self->isCompressedSingle($inPath) ? $self->gzip . ' -d -c' : 'cat';
+  my $echoProg = $self->isCompressedSingle($inPath) ? $self->gzip . ' ' . $self->decompressArgs : 'cat';
 
   my $fh;
 

@@ -39,12 +39,23 @@ has delimiter => (
   writer => '_setDelimiter',
 );
 
-state $tar = which('tar');
-state $gzip = which('pigz') || which('gzip');
-# state $gzip = which('gzip');
-state $tarCompressed = "$tar --use-compress-program=$gzip";
+my $tar = which('tar');
+my $gzip = which('pigz') || which('gzip');
+
+# Without this, pigz -d -c issues many system calls (futex)
+# Thanks to Meltdown, this slows decompression substantially
+# Up to 1 core will be used solely for meltdown-related overhead
+# So disable mutli-threading
+# For compression, tradeoff still worth it
+my $decompressArgs = '-d -c';
+if($gzip =~ /pigz/) {
+ $decompressArgs = "-p 1 $decompressArgs";
+}
+
+my $tarCompressed = "$tar --use-compress-program=$gzip";
 
 has gzip => (is => 'ro', isa => 'Str', init_arg => undef, lazy => 1, default => sub {$gzip});
+has decompressArgs => (is => 'ro', isa => 'Str', init_arg => undef, lazy => 1, default => sub {$decompressArgs});
 
 #@param {Path::Tiny} $file : the Path::Tiny object representing a single input file
 #@param {Str} $innerFile : if passed a tarball, we will want to stream a single file within
@@ -70,7 +81,7 @@ sub get_read_fh {
   if($innerFile) {
     $compressed = $innerFile =~ /\.gz$/ || $innerFile =~ /\.bgz$/ || $innerFile =~ /\.zip$/;
 
-    my $innerCommand = $compressed ? "\"$innerFile\" | $gzip -d -c -" : "\"$innerFile\"";
+    my $innerCommand = $compressed ? "\"$innerFile\" | $gzip $decompressArgs -" : "\"$innerFile\"";
     # We do this because we have not built in error handling from opening streams
 
     my $command;
@@ -95,7 +106,7 @@ sub get_read_fh {
     $compressed = 1;
     #PerlIO::gzip doesn't seem to play nicely with MCE, reads random number of lines
     #and then exits, so use gunzip, standard on linux, and faster
-    open ($fh, '-|', "$gzip -d -c \"$filePath\"") or $self->log('fatal', "Failed to open $filePath due to $!");
+    open ($fh, '-|', "$gzip $decompressArgs \"$filePath\"") or $self->log('fatal', "Failed to open $filePath due to $!");
   } else {
     open ($fh, '-|', "cat \"$filePath\"") or $self->log('fatal', "Failed to open $filePath due to $!");
   };
