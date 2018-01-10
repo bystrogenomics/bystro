@@ -225,7 +225,7 @@ sub buildTrack {
     $self->log('info', $self->name . ": beginning building from $file");
 
     $pm->start($file) and next;
-      my $echoProg = $self->isCompressedSingle($file) ? $self->gzip . ' -d -c' : 'cat';
+      my $echoProg = $self->isCompressedSingle($file) ? $self->gzip . ' ' . $self->decompressArgs : 'cat';
 
       my $errPath = $file . ".build." . localtime() . ".log";
 
