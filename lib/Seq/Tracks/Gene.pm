@@ -185,7 +185,7 @@ sub setHeaders {
 }
 
 sub get {
-  #my ($self, $href, $chr, $refBase, $allele, $posIdx, $outAccum) = @_;
+  #my ($self, $dbData, $chr, $refBase, $allele, $posIdx, $outAccum) = @_;
   #    $_[0], $_[1], $_[1], $_[3],   $_[4],   $_[5]    $_[6]
   # WARNING: If $_[1]->[$_[0]->{_dbName} isn't defined, will be treated as the 0 index!!!
   # therefore return here if that is the case
@@ -198,7 +198,7 @@ sub get {
     return $_[6];
   }
 
-  my ($self, $href, $chr, $refBase, $allele, $posIdx, $outAccum) = @_;
+  my ($self, $dbData, $chr, $refBase, $allele, $posIdx, $outAccum) = @_;
 
   # my @out;
   # # Set the out array to the size we need; undef for any indices we don't add here
@@ -220,8 +220,8 @@ sub get {
   my ($siteData, $txNumbers, $multiple);
 
   #Reads:
-  # ( $href->[$self->{_dbName}] ) {
-  ($txNumbers, $siteData) = $siteUnpacker->unpack($href->[$self->{_dbName}]);
+  # ( $dbData->[$self->{_dbName}] ) {
+  ($txNumbers, $siteData) = $siteUnpacker->unpack($dbData->[$self->{_dbName}]);
   $multiple = ref $txNumbers ? $#$txNumbers : 0;
 
   if($self->{_hasJoin}) {

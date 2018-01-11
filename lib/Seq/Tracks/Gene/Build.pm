@@ -175,11 +175,15 @@ sub buildTrack {
       }
 
       my $skipped = 0;
+      my %seenChrsInFile;
+
       FH_LOOP: while (<$fh>) {
         chomp;
         my @fields = split('\t', $_);
 
         my $chr = $fields[ $allIdx{$self->chrom_field_name} ];
+
+        $seenChrsInFile{$chr} //= 1;
 
         # We may have already finished this chr, or may not have asked for it
         if( ($wantedChr && $wantedChr ne $chr) || !$wantedChr ) {
@@ -276,12 +280,13 @@ sub buildTrack {
         $self->log('info', $self->name . ": closed $file with $?");
       }
 
-      if($skipped) {
+      # If we skipped the $file, will never get here, so this is an error
+      # Can happen if only 1 file, with only 1 chromosome (not building all chrs)
+      if($skipped || (!%allData && scalar keys %seenChrsInFile == 1)) {
         # This returns to parent, in $pm->run_on_finish
         $pm->finish(0);
       }
 
-      # If we skipped the $file, will never get here, so this is an error
       if(!%allData) {
         my $err = $self->name . ": no transcript data accumulated";
         $self->log('fatal', $err);
