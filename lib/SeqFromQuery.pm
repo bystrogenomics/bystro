@@ -4,7 +4,7 @@ use warnings;
 
 # ABSTRACT: Create an annotation from a query
 package SeqFromQuery;
-
+use lib './lib';
 use Mouse 2;
 our $VERSION = '0.001';
 use MCE::Loop;
@@ -12,7 +12,7 @@ use Search::Elasticsearch;
 
 use namespace::autoclean;
 
-use Seq::Output;
+use Seq::Output::Delimiters;
 
 use Cpanel::JSON::XS qw/decode_json encode_json/;
 
@@ -62,13 +62,13 @@ sub annotate {
 
   my $hasSort = $self->inputQueryBody->{sort};
 
-  my $outputter = Seq::Output->new();
+  my $delims = Seq::Output::Delimiters->new();
 
-  my $alleleDelimiter = $outputter->delimiters->alleleDelimiter;
-  my $positionDelimiter = $outputter->delimiters->positionDelimiter;
-  my $valueDelimiter = $outputter->delimiters->valueDelimiter;
-  my $fieldSeparator = $outputter->delimiters->fieldSeparator;
-  my $emptyFieldChar = $outputter->delimiters->emptyFieldChar;
+  my $alleleDelimiter = $delims->alleleDelimiter;
+  my $positionDelimiter = $delims->positionDelimiter;
+  my $valueDelimiter = $delims->valueDelimiter;
+  my $fieldSeparator = $delims->fieldSeparator;
+  my $emptyFieldChar = $delims->emptyFieldChar;
 
   my @fieldNames = @{$self->fieldNames};;
 
