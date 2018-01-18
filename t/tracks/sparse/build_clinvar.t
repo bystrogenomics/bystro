@@ -17,6 +17,12 @@ use Test::More;
 use DDP;
 use Seq::DBManager;
 use Seq;
+use YAML::XS qw/LoadFile/;
+use Path::Tiny;
+
+my $config = LoadFile('./t/tracks/sparse/clinvar-test-config.yml');
+my $dbPath = path($config->{database_dir});
+$dbPath->remove_tree({keep_root => 1});
 
 my $mock = MockBuild->new_with_config({config => './t/tracks/sparse/clinvar-test-config.yml', chromosomes => ['chrY'], verbose => 0 });
 
@@ -40,14 +46,12 @@ my $clinvarTrackGetter = $mock->tracksObj->getTrackGetterByName('clinvar');
   # - alternateAllele
 
 
-my $inputAref = [['chr22', 14000001, 'A', 'G', 'SNP', 'G', 1]];
-
 my $db = Seq::DBManager->new();
 
 # We expect an overlap, first the indel, then the snp
 my $dataAref = $db->dbReadOne('chrY', 2787237 - 1);
 
-# p $dataAref;
+#p $dataAref;
 
 my $clinvarTrackIndex = $clinvarTrackGetter->dbName;
 
@@ -55,7 +59,7 @@ my $clinvarTrackIndex = $clinvarTrackGetter->dbName;
 
 my $clinvarDataAref = $dataAref->[$clinvarTrackIndex];
 my @clinvarData = @$clinvarDataAref;
-p @clinvarData;
+#p @clinvarData;
 
 ok($clinvarData[0][0] == 24776 && $clinvarData[0][1] == 99999);
 ok($clinvarData[1][0] eq "46,XY sex reversal, type 1" && $clinvarData[1][1] eq "46,XY sex reversal, type 1 (FAKE TO TEST OVERLAP)");
@@ -76,13 +80,17 @@ $dataAref = $db->dbRead('chrY', [2787238 - 1 .. 2787240 -1] );
 for my $data (@$dataAref) {
   $clinvarDataAref = $data->[$clinvarTrackIndex];
   @clinvarData = @$clinvarDataAref;
- p @clinvarData;
+  
+  #p @clinvarData;
+
   ok($clinvarData[0] == 24776 );
   ok($clinvarData[1] eq "46,XY sex reversal, type 1");
   ok($clinvarData[2] eq "Pathogenic");
   ok($clinvarData[3] eq "deletion");
   ok($clinvarData[4] eq "germline");
+
   #numberSubmitters
+
   ok($clinvarData[5] == 1);
   ok($clinvarData[6] eq "no assertion criteria provided");
   ok($clinvarData[7] eq "TCTC");
@@ -93,7 +101,7 @@ $dataAref = $db->dbReadOne('chrY', 2787334 - 1);
 
 $clinvarDataAref = $dataAref->[$clinvarTrackIndex];
 @clinvarData = @$clinvarDataAref;
-p @clinvarData;
+#p @clinvarData;
 
 ok($clinvarData[0] == 24780 );
 ok($clinvarData[1][0] eq "46,XY sex reversal, type 1" && $clinvarData[1][1] eq "46,XY true hermaphroditism, SRY-related");
@@ -106,5 +114,7 @@ ok($clinvarData[6] eq "no assertion criteria provided");
 ok($clinvarData[7] eq "G");
 ok($clinvarData[8] eq "C");
 
+$db->cleanUp();
+$dbPath->remove_tree({keep_root => 1});
 done_testing();
 1;

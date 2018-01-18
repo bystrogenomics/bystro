@@ -17,9 +17,10 @@ use Seq::Tracks::Score::Build::Round;
 use YAML::XS qw/LoadFile Dump/;
 
 my $config = LoadFile('./t/utils/filterCadd.yml');
-
-Seq::DBManager::initialize();
-Seq::DBManager::setGlobalDatabaseDir($config->{database_dir});
+p $config->{database_dir};
+Seq::DBManager::initialize({
+  databaseDir => $config->{database_dir},
+});
 
 my $db = Seq::DBManager->new();
 
@@ -32,7 +33,7 @@ print $fh Dump($config);
 my $ref = Seq::Tracks::Reference->new($config->{tracks}{tracks}[0]);
 my $cadd = Seq::Tracks::Cadd->new($config->{tracks}{tracks}[1]);
 
-my $rounder = Seq::Tracks::Score::Build::Round->new();
+my $rounder = Seq::Tracks::Score::Build::Round->new({scalingFactor => 10});
 
 p $cadd;
 

@@ -40,15 +40,9 @@ sub BUILD {
   # To combat this, every time Seq::Base is called, we re-set/initialzied the static
   # properties that create this behavior
   # Initialize it before BUILD, to make this class less dependent on inheritance order
-  Seq::DBManager::initialize();
-
-  # Since we never have more than one database_dir, it's a global property we can set
-  # in this package, which Seq.pm and Seq::Build extend from
-  if(!$self->_decodedConfig->{database_dir}) {
-    die "No database dir configured";
-  }
-
-  Seq::DBManager::setGlobalDatabaseDir($self->_decodedConfig->{database_dir});
+  Seq::DBManager::initialize({
+    databaseDir => $self->_decodedConfig->{database_dir}
+  });
 
   if(!$self->_wantedTrack->{sorted_guaranteed} == 1) {
     die "CADD files must be sorted (sorted_guaranteed == 1), at least by chromosome";
@@ -293,13 +287,13 @@ sub go {
           $pm->finish(255, \$err);
         }
 
-        $caddDbScore = $caddGetter->get($dbVal, $chr, $ref, $alt, 0, 0, $caddDbScore);
+        $caddDbScore = $caddGetter->get($dbVal, $chr, $ref, $alt, 0, $caddDbScore);
 
         # We round the score to check against the db-held value, which is rounded
-        if($rounder->round($score) != $caddDbScore->[0][0]) {
+        if($rounder->round($score) != $rounder->round($caddDbScore->[0])) {
           $db->cleanUp();
 
-          my $err = "$chr\:$pos ($based\-based) : Expected PHRED $caddDbScore->[0][0], found: " . $rounder->round($score);
+          my $err = "$chr\:$pos ($based\-based) : Expected PHRED $caddDbScore->[0], found: " . $rounder->round($score);
           $self->log('error', \$err);
     
           $pm->finish(255, \$err);
