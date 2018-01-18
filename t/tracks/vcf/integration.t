@@ -121,7 +121,7 @@ my $db = Seq::DBManager->new();
 # Therefore it doesn't pass
 
 my $href = $db->dbReadOne('chr22', 15927888 - 1);
-p $href;
+
 #my ($vcf, $href, $chr, $refBase, $allele, $alleleIdx, $positionIdx, $outAccum) = @_;
 # At this position we have CACA,G alleles
 my $out = [];
@@ -263,7 +263,7 @@ my $afFemaleIdx = $vcf->getFieldDbName('af_female');
 # Or if the allele doesn't match exactly.
 $out = [];
 $vcf->get($href, 'chr22', 'C', '+ACA', 0, $out);
-p $out;
+
 my $numFeatures = scalar @{$vcf->features};
 ok(@{$out} == $numFeatures, "vcf array contains an entry for each requested feature");
 
@@ -316,7 +316,7 @@ ok($out->[$anNfeIdx][0] == 8466, "correctly finds first the +ACA allele an_nfe v
 ok($out->[$anOthIdx][0] == 604, "correctly finds first the +ACA allele an_oth value, which has only one value across all alleles");
 ok($out->[$anMaleIdx][0] == 9308, "correctly finds first the +ACA allele an_male value, which has only one value across all alleles");
 ok($out->[$anFemaleIdx][0] == 7232, "correctly finds first the +ACA allele an_female value, which has only one value across all alleles");
-p $out->[$afNfeIdx][0];
+
 ok($out->[$afAfrIdx][0] == 0, "correctly finds first the +ACA allele af_afr value");
 ok($out->[$afAmrIdx][0] == 0, "correctly finds first the +ACA allele af_amr value");
 ok($out->[$afAsjIdx][0] == 0, "correctly finds first the +ACA allele af_asj value");
@@ -585,8 +585,6 @@ $vcf->get($href, 'chr22', 'G', 'T', 0, $multiallelic->[0]);
 
 $vcf->get($href, 'chr22', 'G', 'C', 0, $multiallelic->[1]);
 
-p $multiallelic;
-
 for my $alleleIdx (0 .. $#$multiallelic) {
   for my $feature (@{$vcf->features}) {
     my $featureIdx = $vcf->getFieldDbName($feature);
@@ -622,4 +620,7 @@ for my $alleleIdx (0 .. $#$multiallelic) {
   }
 }
 
+$db->cleanUp();
+
+path($dbPath)->remove_tree({keep_root => 1});
 done_testing();

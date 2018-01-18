@@ -9,6 +9,7 @@ use Mouse 2;
 our $VERSION = '0.001';
 use MCE::Loop;
 use Search::Elasticsearch;
+use DDP;
 
 use namespace::autoclean;
 
@@ -230,6 +231,7 @@ sub _makeOutputString {
 
   # Expects an array of row arrays, which contain an for each column, or an undefined value
   for my $row (@$arrayRef) {
+    # Columns are features
     COLUMN_LOOP: for my $column (@$row) {
       # Some fields may just be missing
       if(!defined $column) {
@@ -237,28 +239,42 @@ sub _makeOutputString {
         next COLUMN_LOOP;
       }
 
-      for my $alleleData (@$column) {
-        POS_LOOP: for my $positionData (@$alleleData) {
-          if(!defined $positionData) {
-            $positionData = $emptyFieldChar;
-            next POS_LOOP;
-          }
+      # Most sites have a single position (not indels)
+      if(@$column == 1) {
+        if(ref $column->[0]) {
+          $column = join($valueDelimiter, map {
+            defined $_ ? (ref $_ ? join($alleleDelimiter, map { defined $_ ? $_ : $emptyFieldChar } @$_) : $_ ) : $emptyFieldChar 
+          } @{$column->[0]});
 
-          if(ref $positionData) {
-            $positionData = join($valueDelimiter, map { $_ || $emptyFieldChar } @$positionData);
-            next POS_LOOP;
-          }
+          next COLUMN_LOOP;
         }
 
-        $alleleData = join($positionDelimiter, @$alleleData);
+        $column = defined $column->[0] ? $column->[0] : $emptyFieldChar;
+
+        next COLUMN_LOOP;
       }
 
-      $column = join($alleleDelimiter, @$column);
+      POS_LOOP: for my $positionData (@$column) {
+        if(!defined $positionData) {
+          $positionData = $emptyFieldChar;
+          next POS_LOOP;
+        }
+
+        if(ref $positionData) {
+          $positionData = join($valueDelimiter, map {
+            defined $_ ? (ref $_ ? join($alleleDelimiter, map { defined $_ ? $_ : $emptyFieldChar } @$_) : $_ ) : $emptyFieldChar 
+          } @$positionData);
+
+          next POS_LOOP;
+        }
+      }
+
+      $column = join($positionDelimiter, @$column);
     }
 
     $row = join($fieldSeparator, @$row);
   }
-
+  
   return join("\n", @$arrayRef);
 }
 

@@ -10,7 +10,9 @@ use DDP;
 
 system('rm -rf ./t/tracks/db/index');
 
-Seq::DBManager::setGlobalDatabaseDir('./t/tracks/db/index');
+Seq::DBManager::initialize({
+  databaseDir => './t/tracks/db/index'
+});
 
 my $t = Seq::Tracks::Build->new({files_dir => './t/tracks/db/raw/', name => 'test', type => 'sparse', chromosomes => ['testChr'], assembly => 'hgTest'});
 
@@ -29,17 +31,18 @@ ok(join(',', @{$result->[2]}) eq join(',', 22, 21));
 ok(join(',', @{$result->[3]}) eq join(',', 35, 65));
 
 
-@testVals2 = (3334, 225, 201, 605,777, 888);
-($err, $result) = $mergeFunc->($chr, $pos, $result, \@testVals2);
-
-p $result;
-
-# ok(join(',', @{$result->[0]} eq join(',', 67)));
+# @testVals2 = (3334, 225, 201, 605,777, 888);
+# ($err, $result) = $mergeFunc->($chr, $pos, $result, \@testVals2);
+# p $result;
+# # ok(join(',', @{$result->[0]} eq join(',', 67)));
 
 
-@testVals2 = ('short1', 'short2');
-($err, $result) = $mergeFunc->($chr, $pos, $result, \@testVals2);
+# @testVals2 = ('short1', 'short2');
+# ($err, $result) = $mergeFunc->($chr, $pos, $result, \@testVals2);
 
-p $result;
+# p $result;
+
+$t->db->cleanUp();
+system('rm -rf ./t/tracks/db/index');
 
 done_testing();

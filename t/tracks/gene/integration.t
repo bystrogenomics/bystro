@@ -30,7 +30,8 @@ my $siteTypes = Seq::Tracks::Gene::Site::SiteTypeMap->new();
 my $seq = MockBuilder->new_with_config({config => './t/tracks/gene/test.yml', debug => 1});
 my $tracks = $seq->tracksObj;
 
-system('rm -rf ' . path($seq->database_dir)->child('*'));
+my $dbPath = path($seq->database_dir);
+$dbPath->remove_tree({keep_root => 1});
 
 my $refBuilder = $tracks->getRefTrackBuilder();
 my $geneBuilder = $tracks->getTrackBuilderByName('refSeq');
@@ -52,8 +53,6 @@ $geneBuilder->buildTrack();
 
 my $db = Seq::DBManager->new();
 
-my $config = $db->getConfig();
-p $config;
 my $mainDbAref = $db->dbReadAll('chrM');
 my $regionDataAref = $db->dbReadAll('refSeq/chrM');
 
@@ -106,5 +105,8 @@ for my $pos (0 .. $#$mainDbAref) {
 }
 
 ok($inGeneCount == $hasGeneCount, "We have a refSeq record for every position from txStart to txEnd");
+
+$db->cleanUp();
+$dbPath->remove_tree({keep_root => 1});
 
 done_testing();
