@@ -156,7 +156,7 @@ sub BUILD {
 
   # Create a clean copy, free of file paths, for github
   $decodedConfig->{database_dir} = '~';
-  $decodedConfig->{files} = '~';
+  $decodedConfig->{files_dir} = '~';
   $decodedConfig->{temp_dir} = '~';
 
   $newConfigPathBase = path($self->config)->basename;
