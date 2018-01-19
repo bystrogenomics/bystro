@@ -227,7 +227,7 @@ sub _makeOutputString {
           }
 
           if(ref $positionData) {
-            $positionData = join($valueDelimiter, map { $_ || $emptyFieldChar } @$positionData);
+            $positionData = join($valueDelimiter, map { defined $_ ? $_ : $emptyFieldChar } @$positionData);
             next POS_LOOP;
           }
         }
