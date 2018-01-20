@@ -76,7 +76,7 @@ index_settings:
                 split_on_case_change: true
             english_stemmer:
                 type: stemmer
-                language: porter2
+                language: light_english
             search_synonym_filter:
                 type: synonym
                 synonyms_path : "analysis/search-synonyms.txt"

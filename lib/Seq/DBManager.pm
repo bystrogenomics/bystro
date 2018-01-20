@@ -466,6 +466,50 @@ sub dbPut {
   return 0;
 }
 
+sub dbDelete {
+  my ($self, $chr, $pos, $stringKeys) = @_;
+
+  if($self->dryRun) {
+    $self->log('info', "DBManager dry run: Would have dbDelete $chr\:$pos");
+    return 0;
+  }
+
+  if(!(defined $chr && defined $pos)) {
+    $self->_errorWithCleanup("dbDelete requires chr and position");
+    return 255;
+  }
+
+  my $db = $self->_getDbi($chr, $stringKeys);
+
+  if(!$db->{db}->Alive) {
+    $db->{db}->Txn = $db->{env}->BeginTxn();
+    # not strictly necessary, but I am concerned about hard to trace abort bugs related to scope
+    $db->{db}->Txn->AutoCommit(1);
+  }
+
+  # Error with LMDB_File api, means $data is required as 3rd argument,
+  # even if it is undef
+  $db->{db}->Txn->del($db->{dbi}, $pos, undef);
+
+  if($LMDB_File::last_err && $LMDB_File::last_err != MDB_NOTFOUND) {
+    $self->_errorWithCleanup("dbDelete LMDB error: $LMDB_File::last_err");
+    return 255;
+  }
+
+  $LMDB_File::last_err = 0;
+
+  $db->{db}->Txn->commit();
+
+  if($LMDB_File::last_err) {
+    $self->_errorWithCleanup("dbDelete commit LMDB error: $LMDB_File::last_err");
+    return 255;
+  }
+
+  #reset the class error variable, to avoid crazy error reporting later
+  $LMDB_File::last_err = 0;
+  return 0;
+}
+
 #cursor version
 # Read transactions are by default not committed
 sub dbReadAll {
@@ -527,6 +571,75 @@ sub dbReadAll {
   }
 
   return \@out;
+}
+
+# Delete all values within a database; a necessity if we want to update a single track
+# TODO: this may inflate database size, because very long-lived transaction
+# maybe should allow to commit
+sub dbDeleteAll {
+  my ( $self, $chr, $dbName, $stringKeys) = @_;
+
+  #It is possible not to find a database in dbReadOnly mode (for ex: refSeq for a while didn't have chrM)
+  #http://ideone.com/uzpdZ8
+  my $db = $self->_getDbi($chr, 0, $stringKeys) or return;
+
+  if(!$db->{db}->Alive) {
+    $db->{db}->Txn = $db->{env}->BeginTxn();
+    # not strictly necessary, but I am concerned about hard to trace abort bugs related to scope
+    $db->{db}->Txn->AutoCommit(1);
+  }
+
+  # We store data in sequential, integer order
+  # in all but the meta tables, which don't use this function
+  # LMDB::Cursor::open($txn, $db->{dbi}, my $cursor);
+  my $cursor = $db->{db}->Cursor;
+
+  my ($key, $value, @out);
+  my $first = 1;
+  while(1) {
+    if($first) {
+      $cursor->_get($key, $value, MDB_FIRST);
+      $first = 0;
+    } else {
+      $cursor->_get($key, $value, MDB_NEXT);
+    }
+
+    #because this error is generated right after the get
+    #we want to capture it before the next iteration
+    #hence this is not inside while( )
+    if($LMDB_File::last_err == MDB_NOTFOUND) {
+      $LMDB_FILE::last_err = 0;
+      last;
+    }
+
+    if($LMDB_FILE::last_err) {
+      $_[0]->_errorWithCleanup("dbReadAll LMDB error $LMDB_FILE::last_err");
+      return 255;
+    }
+
+    my $vals = $mp->unpack($value);
+
+    if($vals->[$dbName]) {
+      $vals->[$dbName] = undef;
+
+      $cursor->_put($key, $mp->pack($vals), MDB_CURRENT);
+    }
+  }
+
+  #  !$skipCommit
+  $db->{db}->Txn->commit();
+
+  if($LMDB_File::last_err) {
+    if($LMDB_File::last_err != MDB_NOTFOUND) {
+      $_[0]->_errorWithCleanup("dbReadAll LMDB error at end: $LMDB_File::last_err");
+      return 255;
+    }
+
+    #reset the class error variable, to avoid crazy error reporting later
+    $LMDB_File::last_err = 0;
+  }
+
+  return 0;
 }
 
 ################################################################################
@@ -742,50 +855,6 @@ sub dbGetNumberOfEntries {
   my $db = $self->_getDbi($chr,1);
 
   return $db ? $db->{env}->stat->{entries} : 0;
-}
-
-sub dbDelete {
-  my ($self, $chr, $pos, $stringKeys) = @_;
-
-  if($self->dryRun) {
-    $self->log('info', "DBManager dry run: Would have dbDelete $chr\:$pos");
-    return 0;
-  }
-
-  if(!(defined $chr && defined $pos)) {
-    $self->_errorWithCleanup("dbDelete requires chr and position");
-    return 255;
-  }
-
-  my $db = $self->_getDbi($chr, $stringKeys);
-
-  if(!$db->{db}->Alive) {
-    $db->{db}->Txn = $db->{env}->BeginTxn();
-    # not strictly necessary, but I am concerned about hard to trace abort bugs related to scope
-    $db->{db}->Txn->AutoCommit(1);
-  }
-
-  # Error with LMDB_File api, means $data is required as 3rd argument,
-  # even if it is undef
-  $db->{db}->Txn->del($db->{dbi}, $pos, undef);
-
-  if($LMDB_File::last_err && $LMDB_File::last_err != MDB_NOTFOUND) {
-    $self->_errorWithCleanup("dbDelete LMDB error: $LMDB_File::last_err");
-    return 255;
-  }
-
-  $LMDB_File::last_err = 0;
-
-  $db->{db}->Txn->commit();
-
-  if($LMDB_File::last_err) {
-    $self->_errorWithCleanup("dbDelete commit LMDB error: $LMDB_File::last_err");
-    return 255;
-  }
-
-  #reset the class error variable, to avoid crazy error reporting later
-  $LMDB_File::last_err = 0;
-  return 0;
 }
 
 #to store any records
