@@ -19,7 +19,7 @@ use Seq::Tracks::Reference::MapBases;
 use Seq::DBManager;
 
 my $baseMapper = Seq::Tracks::Reference::MapBases->new();
-my $siteTypes = Seq::Tracks::Gene::Site::SiteTypeMap->new();
+my $siteTypeMap = Seq::Tracks::Gene::Site::SiteTypeMap->new();
 
 # Defines three tracks, a nearest gene , a nearest tss, and a region track
 # The region track is simply a nearest track for which we storeOverlap and do not storeNearest
@@ -109,6 +109,16 @@ for (my $i = 0; $i < @$features; $i++) {
     next;
   }
 }
+
+# Safe for use when instantiated to static variable; no set - able properties
+my $coding = $siteTypeMap->codingSiteType;
+my $utr5 = $siteTypeMap->fivePrimeSiteType;
+my $utr3 = $siteTypeMap->threePrimeSiteType;
+my $spliceAcceptor = $siteTypeMap->spliceAcSiteType;
+my $spliceDonor = $siteTypeMap->spliceDonSiteType;
+my $ncRNA = $siteTypeMap->ncRNAsiteType;
+my $intronic = $siteTypeMap->intronicSiteType;
+
 #                   txStart  txEnd   cdsStart   cdsEnd    exonStarts          exonEnds
 # NR_033266 chr19 - 60950    70966   70966      70966  3  60950,66345,70927,  61894,66499,70966,
 for my $pos (0 .. 100000) {
@@ -137,35 +147,54 @@ for my $pos (0 .. 100000) {
   # non-coding transcripts don't have UTR3/5 (not translated)
   # exonEnds closed, show this explicitly
   if($pos >= 60950 && $pos < 61894) {
-    ok($out->[$siteTypeIdx][0] eq 'ncRNA');
+    ok($out->[$siteTypeIdx][0] eq $ncRNA);
   }
 
   if($pos >= 61894 && $pos < 66345) {
     if($pos == 61894 || $pos == 61895) {
       # we're on the negative strand, so should be acceptor
-      ok($out->[$siteTypeIdx][0] eq 'spliceAcceptor');
+      ok($out->[$siteTypeIdx][0] eq $spliceAcceptor);
       next;
     }
 
     if($pos == 66343 || $pos == 66344) {
       # we're on the negative strand, so should be donor at "end"
-      ok($out->[$siteTypeIdx][0] eq 'spliceDonor');
+      ok($out->[$siteTypeIdx][0] eq $spliceDonor);
       next;
     }
 
     # we're on the negative strand, so should be donor at "end"
-    ok($out->[$siteTypeIdx][0] eq 'intronic');
+    ok($out->[$siteTypeIdx][0] eq $intronic);
   }
 
   if($pos >= 66345 && $pos < 66499) {
-    ok($out->[$siteTypeIdx][0] eq 'ncRNA');
+    ok($out->[$siteTypeIdx][0] eq $ncRNA);
   }
 
-  # TODO:
   # before 3rd exon
-  # if($pos >= 66499 && $pos < 70927) {
-  #   ok($out->[$siteTypeIdx] eq 'intron');
-  # }
+  # 66499 is exonEnds of exon 2
+  # 70927 is exonStarts of exon 3
+  if($pos >= 66499 && $pos < 70927) {
+    if($pos == 66499 || $pos == 66500) {
+      # negative strand
+      ok($out->[$siteTypeIdx][0] eq $spliceAcceptor);
+      next;
+    }
+
+    if($pos == 70925 || $pos == 70926) {
+      # negative strand
+      ok($out->[$siteTypeIdx][0] eq $spliceDonor);
+      next;
+    }
+
+    ok($out->[$siteTypeIdx][0] eq $intronic);
+  }
+
+  #3rd exon
+  if($pos >= 70927 && $pos < 70966) {
+    ok($out->[$siteTypeIdx][0] eq $ncRNA);
+  }
+
 }
 
 # ok($inGeneCount == $hasGeneCount, "We have a refSeq record for every position from txStart to txEnd");
