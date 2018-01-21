@@ -29,7 +29,7 @@ my $pos = 99;
 my $vals = [0, 1, [2,3], "hello", "world"];
 
 # off the end of $vals; we'll periodically add a val to end at 5th index
-my $dbIdx = 5;
+$dbIdx = 5;
 
 for my $pos (0 .. 100) {
   my @v = @$vals;

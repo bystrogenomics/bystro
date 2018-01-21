@@ -27,7 +27,7 @@ my $siteTypes = Seq::Tracks::Gene::Site::SiteTypeMap->new();
 # such as calculating the maximum range of the overlap: in previous code iterations
 # we removed the non-unique overlapping data, without first looking at the txEnd
 # and therefore had a smaller-than-expected maximum range
-my $seq = MockBuilder->new_with_config({config => './t/tracks/gene/test.yml', debug => 1});
+my $seq = MockBuilder->new_with_config({config => './t/tracks/gene/simple.yml', debug => 1});
 my $tracks = $seq->tracksObj;
 
 my $dbPath = path($seq->database_dir);
