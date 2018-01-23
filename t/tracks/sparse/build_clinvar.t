@@ -28,8 +28,6 @@ my $mock = MockBuild->new_with_config({config => './t/tracks/sparse/clinvar-test
 
 my $trackBuilder = $mock->tracksObj->getTrackBuilderByName('clinvar');
 
-p $trackBuilder;
-
 $trackBuilder->buildTrack();
 
 my $clinvarTrackGetter = $mock->tracksObj->getTrackGetterByName('clinvar');
@@ -117,4 +115,3 @@ ok($clinvarData[8] eq "C");
 $db->cleanUp();
 $dbPath->remove_tree({keep_root => 1});
 done_testing();
-1;

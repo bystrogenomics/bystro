@@ -61,7 +61,6 @@ my $header = Seq::Headers->new();
 
 my $features = $header->getParentFeatures('refSeq');
 
-p $features;
 my ($siteTypeIdx, $funcIdx);
 
 for (my $i = 0; $i < @$features; $i++) {
