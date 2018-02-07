@@ -260,12 +260,6 @@ sub buildTrack {
         }
 
         if(!$wantedChr) {
-          if($self->chrPerFile) {
-            $self->log('info', $self->name . ": skipping $file because found unwanted chr, and expect 1 chr per file");
-
-            last FH_LOOP;
-          }
-
           next FH_LOOP;
         }
 
