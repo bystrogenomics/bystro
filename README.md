@@ -1,4 +1,10 @@
 # Bystro [![DOI](https://zenodo.org/badge/98203430.svg)](https://zenodo.org/badge/latestdoi/98203430)
+
+## Bystro Publication
+For datasets and scripts used, please visit [github.com/bystro-paper](https://github.com/akotlar/bystro-paper)
+
+If using Bystro, please cite [https://doi.org/10.1101/146514](https://doi.org/10.1101/146514)
+
 ## Using Bystro
 For most users, we recommend https://bystro.io .
 
