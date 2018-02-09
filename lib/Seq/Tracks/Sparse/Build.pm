@@ -161,8 +161,8 @@ sub buildTrack {
         $chr = $self->normalizedWantedChr( $fields[ $reqIdxHref->{$self->chromField} ] );
 
         #If the chromosome is new, write any data we have & see if we want new one
-        if( !$wantedChr || ($wantedChr && (!$chr || $wantedChr ne $chr)) ) {
-          if($wantedChr) {
+        if(!defined $wantedChr || (!defined $chr || $wantedChr ne $chr)) {
+          if(defined $wantedChr) {
             if($cursors{$wantedChr}) {
               # Not strictly necessary to call dbEndCursorTxn, since we call cleanUp($wantedChr)
               # But need to delete $cursors{$wantedChr} to prevent stale cursor
@@ -176,16 +176,10 @@ sub buildTrack {
             $count = 0;
           }
 
-          $wantedChr = $chr && $self->completionMeta->okToBuild($chr) ? $chr : undef;
+          $wantedChr = defined $chr && $self->completionMeta->okToBuild($chr) ? $chr : undef;
         }
 
-        if(!$wantedChr) {
-          if($self->chrPerFile) {
-            $self->log('info', $self->name . ": skipping $file because found unwanted chr, and expect 1 chr per file");
-
-            last FH_LOOP;
-          }
-
+        if(!defined $wantedChr) {
           next FH_LOOP;
         }
 
@@ -336,12 +330,12 @@ sub joinTrack {
       # and checks against our list of wanted chromosomes
       $chr = $self->normalizedWantedChr( $fields[ $reqIdxHref->{$self->chromField} ] );
 
-      if(!$chr || $chr ne $wantedChr) {
+      if(!defined $chr || $chr ne $wantedChr) {
+        # TODO: Rethink chrPerFile handling
+        # This should be safe, provided that chrPerFile is a manually-set flag
+        # in the YAML track config
         if($self->chrPerFile) {
-          # Because this is not an unusual occurance; there is only 1 chr wanted
-          # and the function is called once for each chromoosome, we use debug
-          # to reduce log clutter
-          $self->log('debug', $self->name . "join track: chrs in file $file not wanted . Skipping");
+          $self->log('warn', $self->name . "join track: chrs in file $file not wanted . Skipping");
 
           last FH_LOOP;
         }

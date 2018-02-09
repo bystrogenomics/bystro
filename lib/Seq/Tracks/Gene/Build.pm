@@ -174,7 +174,6 @@ sub buildTrack {
         $self->log('fatal', $err);
       }
 
-      my $skipped = 0;
       my %seenChrsInFile;
 
       FH_LOOP: while (<$fh>) {
@@ -185,20 +184,13 @@ sub buildTrack {
 
         $seenChrsInFile{$chr} //= 1;
 
-        # We may have already finished this chr, or may not have asked for it
-        if( ($wantedChr && $wantedChr ne $chr) || !$wantedChr ) {
+        # We may want to support chrPerFile; adds complexity, but easier processing
+        # for some cases
+        if(!defined $wantedChr || $wantedChr ne $chr) {
           $wantedChr = $self->chrIsWanted($chr) && $self->completionMeta->okToBuild($chr) ? $chr : undef;
         }
 
         if(!$wantedChr) {
-          # if not wanted, and we have one chr per file, exit
-          if($self->chrPerFile) {
-            $self->log('info', $self->name . ": chrs in file $file not wanted or previously completed. Skipping");
-            $skipped = 1;
-            last FH_LOOP;
-          }
-
-          #not wanted, but multiple chr per file, skip
           next FH_LOOP;
         }
 
@@ -282,7 +274,7 @@ sub buildTrack {
 
       # If we skipped the $file, will never get here, so this is an error
       # Can happen if only 1 file, with only 1 chromosome (not building all chrs)
-      if($skipped || (!%allData && scalar keys %seenChrsInFile == 1)) {
+      if(!%allData && scalar keys %seenChrsInFile == 1) {
         # This returns to parent, in $pm->run_on_finish
         $pm->finish(0);
       }

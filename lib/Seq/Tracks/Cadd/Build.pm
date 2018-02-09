@@ -205,14 +205,14 @@ sub buildTrack {
           $chr = $fields[0];
         }
 
-        if( !$wantedChr || ($wantedChr && $wantedChr ne $chr) ) {
+        if( !defined $wantedChr || $wantedChr ne $chr ) {
           if( defined $wantedChr && (@caddData || defined $caddRef) ) {
             my $err = $self->name . ": changed chromosomes, but unwritten data remained";
 
             $self->log('fatal', $err);
           }
 
-          if($wantedChr) {
+          if(defined $wantedChr) {
             if($cursors{$wantedChr}) {
               # Not strictly necessary, since we call cleanUp
               $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
@@ -234,13 +234,14 @@ sub buildTrack {
 
         # We expect either one chr per file, or all in one file
         # However, chr-split CADD files may have multiple chromosomes after liftover
+        # TODO: rethink chrPerFile handling
         if(!$wantedChr) {
           # So we require sorted_guranteed flag for "last" optimization
-          if($self->chrPerFile) {
-            $self->log('info', $self->name . ": chrs in file $file not wanted or previously completed. Skipping");
+          # if($self->chrPerFile) {
+          #   $self->log('info', $self->name . ": chrs in file $file not wanted or previously completed. Skipping");
 
-            last FH_LOOP;
-          }
+          #   last FH_LOOP;
+          # }
 
           next FH_LOOP;
         }

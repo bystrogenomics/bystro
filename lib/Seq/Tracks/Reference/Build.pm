@@ -52,7 +52,7 @@ sub buildTrack {
     $self->log('info', $self->name . ": completed building from $fileName");
   });
 
-  for my $file ( $self->allLocalFiles ) {
+  for my $file ($self->allLocalFiles) {
     # Expects 1 chr per file for n+1 files, or all chr in 1 file
     # Single writer to reduce copy-on-write db inflation
     $self->log('info', $self->name . ": Beginning building from $file");
@@ -70,13 +70,13 @@ sub buildTrack {
 
       my %cursors;
 
-      FH_LOOP: while ( my $line = $fh->getline() ) {
+      FH_LOOP: while (my $line = $fh->getline()) {
         #super chomp; also helps us avoid weird characters in the fasta data string
         $line =~ s/^\s+|\s+$//g; #trim both ends, but not what's in between
 
         #could do check here for cadd default format
         #for now, let's assume that we put the CADD file into a wigfix format
-        if ( $line =~ m/$headerRegex/ ) { #we found a wig header
+        if ($line =~ m/$headerRegex/) { #we found a wig header
           my $chr = $1;
 
           if(!$chr) {
@@ -85,9 +85,9 @@ sub buildTrack {
           }
 
           # Our first header, or we found a new chromosome
-          if( ($wantedChr && $wantedChr ne $chr) || !$wantedChr) {
+          if(!defined $wantedChr || $wantedChr ne $chr) {
             # We switched chromosomes
-            if($wantedChr) {
+            if(defined $wantedChr) {
               if($cursors{$wantedChr}) {
                 # Not strictly necessary, since we cleanUp($wantedChr)
                 $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
@@ -101,14 +101,9 @@ sub buildTrack {
             $wantedChr = $self->chrIsWanted($chr) && $self->completionMeta->okToBuild($chr) ? $chr : undef;
           }
 
-          # We expect either one chr per file, or a multi-fasta file
+          # We expect either one chr per file, or a multi-fasta file that is sorted and contiguous
+          # TODO: Handle chrPerFile
           if(!$wantedChr) {
-            if($self->chrPerFile) {
-              $self->log('info', $self->name . ": chrs in file $file not wanted or previously completed. Skipping");
-
-              last FH_LOOP;
-            }
-
             next FH_LOOP;
           }
 
@@ -123,13 +118,13 @@ sub buildTrack {
         }
 
         # If !$wantedChr we're likely in a mult-fasta file; could warn, but that spoils multi-threaded reads
-        if ( !$wantedChr ) {
+        if (!$wantedChr) {
           next;
         }
 
-        if( $line =~ $dataRegex ) {
+        if($line =~ $dataRegex) {
           # Store the uppercase bases; how UCSC does it, how people likely expect it
-          for my $char ( split '', uc($1) ) {
+          for my $char (split '', uc($1)) {
             $cursors{$wantedChr} //= $self->db->dbStartCursorTxn($wantedChr);
 
             #Args:                         $cursor,             $chr,        $trackIndex,   $pos,         $newValue
@@ -151,7 +146,7 @@ sub buildTrack {
       }
 
       # Get rid of our privately-managed cursors
-      foreach ( keys %visitedChrs ) {
+      foreach (keys %visitedChrs) {
         if($cursors{$_}) {
           $self->db->dbEndCursorTxn($cursors{$_}, $_);
           delete $cursors{$_};

@@ -47,7 +47,10 @@ has completionMeta => (is => 'ro', init_arg => undef, default => sub { my $self 
 has commitEvery => (is => 'rw', isa => 'Int', lazy => 1, default => 2e4);
 
 # All tracks want to know whether we have 1 chromosome per file or not
-has chrPerFile => (is => 'ro', init_arg => undef, writer => '_setChrPerFile');
+# If this flag is set, then the consumer can choose to skip entire files
+# if an unexpected chr is found, or if the expected chr is recorded completed
+# Change from b9: this now needs to be manually set, opt-in
+has chrPerFile => (is => 'ro', isa => 'Bool', default => 0);
 
 has max_threads => (is => 'ro', isa => 'Int', lazy => 1, default => 8);
 ########## Arguments taken from YAML config file or passed some other way ##############
@@ -131,8 +134,6 @@ sub BUILD {
       . $self->name . ", but " . scalar @allWantedChrs . " chromosomes. We will "
       . "assume there is only one chromosome per file, and that 1 chromosome isn't accounted for.");
   }
-
-  $self->_setChrPerFile(@allLocalFiles > 1 ? 1 : 0);
 
   # Commit, sync, and remove any databases opened
   # This is useful because locking may occur if there is an open transaction
@@ -445,6 +446,13 @@ sub coerceUndefinedValues {
   }
 
   return $_[1];
+}
+
+sub chrWantedAndIncomplete {
+  #my ($self, $chr) = @_;
+  #    $_[0], $_[1]
+
+  return $_[0]->chrIsWanted($_[1]) && $_[0]->completionMeta->okToBuild($_[1]) ? $_[1] : undef;
 }
 
 sub _isTransformOperator {

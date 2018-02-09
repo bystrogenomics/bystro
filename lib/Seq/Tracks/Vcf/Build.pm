@@ -67,7 +67,7 @@ sub BUILD {
   my $features = $self->features;
 
   if(!@{$features}) {
-    die "VCF build requires INFO features";
+    $self->log('fatal', 'VCF build requires INFO features');
   }
 
   my %featuresMap;
@@ -83,7 +83,7 @@ sub BUILD {
     my $idx;
 
     if($visitedVcfFeatures{$vcfFeature}) {
-      die "Duplicate feature requested: $vcfFeature";
+      $self->log('fatal', "Duplicate feature requested: $vcfFeature");
     }
 
     $visitedVcfFeatures{$vcfFeature} = 1;
@@ -109,7 +109,7 @@ sub BUILD {
     # Some features are placeholders; catch these anyhow so we don't try to look
     # for them in the INFO field
     if(!defined $vcfFeatures->{$vcfFeature} && defined $idx) {
-      die "Currently $vcfFeature is not allowed";
+      $self->log('fatal', "Currently $vcfFeature is not allowed");
     }
 
     #Stores:
@@ -126,7 +126,7 @@ sub BUILD {
   # However, we would reduce confidence users had in the representation stated
   # in the YAML config
   if(!defined $visitedVcfFeatures{alt}) {
-    die "alt (or ALT) field is required for vcf tracks, used to match input alleles";
+    $self->log('fatal', "alt (or ALT) field is required for vcf tracks, used to match input alleles");
   }
 
   $self->{_headerFeatures} = \@headerFeatures;
@@ -206,7 +206,6 @@ sub buildTrack {
       my $err = $errOrChrs ? "due to: $$errOrChrs" : "due to an untimely demise";
 
       $self->log('fatal', $self->name . ": Failed to build $fileName $err");
-      die $self->name . ": Failed to build $fileName $err";
     }
 
     # TODO: check for hash ref
@@ -263,8 +262,8 @@ sub buildTrack {
         $chr = $fields[$chrIdx];
 
         # falsy value is ''
-        if(($wantedChr && $wantedChr ne $chr) || !$wantedChr) {
-          if($wantedChr) {
+        if(!defined $wantedChr || $wantedChr ne $chr) {
+          if(defined $wantedChr) {
             if($cursors{$wantedChr}) {
               # Not strictly necessary to call dbEndCursorTxn, since we call cleanUp($wantedChr)
               # But need to delete $cursors{$wantedChr} to prevent stale cursor
@@ -282,12 +281,12 @@ sub buildTrack {
           $wantedChr = $self->chrIsWanted($chr) && $self->completionMeta->okToBuild($chr) ? $chr : '';
         }
 
-        if(!$wantedChr) {
-          if($self->chrPerFile) {
-            $self->log('info', $self->name . ": skipping $file because found unwanted chr, and expect 1 chr per file");
-
-            last FH_LOOP;
-          }
+        # TODO: rethink chPerFile handling
+        if(!defined $wantedChr) {
+          # if($self->chrPerFile) {
+          #   $self->log('warn', $self->name . ": skipping $file because found unwanted chr, and expect 1 chr per file");
+          #   last FH_LOOP;
+          # }
 
           next FH_LOOP;
         }

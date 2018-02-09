@@ -263,10 +263,11 @@ sub buildTrack {
       # We store everything on the basis of chr, so that we can accept
       # Either a file that contains multiple chromosomes
       # Or multiples file that contains a single chromosome each
-      my $skipped = 0;
       my $fromDbName = $self->getFieldDbName($self->from);
       my $toDbName = $self->getFieldDbName($self->to);
       my $rowIdx = 0;
+
+      #TODO: ADD check if we have any wanted chrs
       FH_LOOP: while (<$fh>) {
         chomp;
         my @fields = split('\t', $_);
@@ -274,31 +275,17 @@ sub buildTrack {
         my $chr = $fields[ $allIdx{$self->chromField} ];
 
         if(!defined $wantedChr || $wantedChr ne $chr) {
-          my $had = defined $wantedChr;
+          $wantedChr = $self->chrIsWanted($chr) && $self->completionMeta->okToBuild($chr) ? $chr : undef;
+        }
 
-          $wantedChr = $self->chrIsWanted($chr) ? $chr : undef;
-
-          if(!defined $wantedChr) {
-            next FH_LOOP;
-          }
-
-          # $wanted
-          # If $wantedChr was set, and we have a new wanted chromosome, because a.t.m
-          # we pre-calculate all region overlaps, all regions must be within a single file
-          if($had && $self->chrPerFile) {
-            $self->log('fatal', "Multiple wanted chromosomes found in $file, expected 1 chromosome per file");
-          }
-
-          if(!$self->completionMeta->okToBuild($wantedChr)) {
-            if($self->chrPerFile) {
-              $self->log('info', $self->name . ": $wantedChr in $file previously completed. Skipping");
-              $skipped = 1;
-              last FH_LOOP;
-            }
-
-            #not wanted, but multiple chr per file, skip
-            next FH_LOOP;
-          }
+        # We no longer care if we have multiple chromosomes in a single file
+        # because memory usage is well controlled despite our use of pre-calculated
+        # overlaps
+        # We also no longer exit if finding an unwanted chromosome, for safety (ensure all sites found)
+        # at expense of runtime
+        # TODO: think about handling chrPerFile
+        if(!defined $wantedChr) {
+          next FH_LOOP;
         }
 
         my @rowData;
@@ -347,10 +334,6 @@ sub buildTrack {
         die $err;
       } else {
         $self->log('info', $self->name . ": closed $file with $?");
-      }
-
-      if($skipped) {
-        $pm->finish(0); #returns to parent process here
       }
 
       # We've now accumulated everything from this file

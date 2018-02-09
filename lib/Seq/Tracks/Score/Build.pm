@@ -118,8 +118,8 @@ sub buildTrack{
             die $self->name . ": variable step not currently supported";
           }
 
-          if(!$wantedChr || ( $wantedChr && $wantedChr ne $chr) ) {
-            if($wantedChr) {
+          if(!defined $wantedChr || $wantedChr ne $chr) {
+            if(defined $wantedChr) {
               if($cursors{$wantedChr}) {
                 # Not strictly necessary to call dbEndCursorTxn, since we call cleanUp($wantedChr)
                 # But need to delete $cursors{$wantedChr} to prevent stale cursor
@@ -137,14 +137,8 @@ sub buildTrack{
             $wantedChr = $self->chrIsWanted($chr) && $self->completionMeta->okToBuild($chr) ? $chr : undef;
           }
 
-          #use may give us one or many files
+          # TODO: handle chrPerFile
           if(!$wantedChr) {
-            if($self->chrPerFile) {
-              $self->log('info', $self->name . ": chrs in file $file not wanted or previously completed. Skipping");
-
-              last FH_LOOP;
-            }
-
             next FH_LOOP;
           }
 
@@ -160,7 +154,7 @@ sub buildTrack{
 
         # there could be more than one chr defined per file, just skip
         # until we get to what we want
-        if ( !$wantedChr ) {
+        if (!$wantedChr) {
           next;
         }
 
