@@ -22,7 +22,7 @@ tracks:
     - chr22
     - chr1
     - chr2
-    filterCadd_completed: 2018-01-23T15:08:00
+    filterCadd_completed: 2018-02-09T03:24:00
     filterCadd_date: 2017-09-12T19:18:00
     local_files:
     - test.filterCadd.cadd.chr22.chr22.filtered.txt

@@ -138,7 +138,7 @@ sub buildTrack{
           }
 
           # TODO: handle chrPerFile
-          if(!$wantedChr) {
+          if(!defined $wantedChr) {
             next FH_LOOP;
           }
 
@@ -154,7 +154,7 @@ sub buildTrack{
 
         # there could be more than one chr defined per file, just skip
         # until we get to what we want
-        if (!$wantedChr) {
+        if (!defined $wantedChr) {
           next;
         }
 

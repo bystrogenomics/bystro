@@ -64,6 +64,8 @@ has refAminoAcidKey => (is => 'ro', default => 'refAminoAcid');
 has newCodonKey => (is => 'ro', default => 'altCodon');
 has newAminoAcidKey => (is => 'ro', default => 'altAminoAcid');
 has exonicAlleleFunctionKey => (is => 'ro', default => 'exonicAlleleFunction');
+has hgvsPkey => (is => 'ro', default => 'hgvsP');
+has hgvsCkey => (is => 'ro', default => 'hgvsC');
 
 ########################## Private Attributes ##################################
 ########## The names of various features. These cannot be configured ##########
@@ -147,7 +149,7 @@ sub setHeaders {
   unshift @features, $self->siteTypeKey, $self->exonicAlleleFunctionKey,
     $self->codonSequenceKey, $self->newCodonKey, $self->refAminoAcidKey,
     $self->newAminoAcidKey, $self->codonPositionKey,
-    $self->codonNumberKey, $self->strandKey;
+    $self->codonNumberKey, $self->strandKey, $self->hgvsCkey, $self->hgvsPkey;
 
   if($self->{_flatJoinFeatures}) {
     push @features, @{$self->{_flatJoinFeatures}};
@@ -182,6 +184,9 @@ sub setHeaders {
   $self->{_altCodonSidx} = $self->{_featureIdxMap}{$self->newCodonKey};
   $self->{_altAaFidx} = $self->{_featureIdxMap}{$self->newAminoAcidKey};
   $self->{_alleleFuncFidx} = $self->{_featureIdxMap}{$self->exonicAlleleFunctionKey};
+
+  $self->{_hgvsCidx} = $self->{_featureIdxMap}{$self->hgvsCkey};
+  $self->{_hgvsPidx} = $self->{_featureIdxMap}{$self->hgvsPkey};
 }
 
 sub get {
@@ -198,7 +203,7 @@ sub get {
     return $_[6];
   }
 
-  my ($self, $dbData, $chr, $refBase, $allele, $posIdx, $outAccum) = @_;
+  my ($self, $dbData, $chr, $ref, $allele, $posIdx, $outAccum) = @_;
 
   # my @out;
   # # Set the out array to the size we need; undef for any indices we don't add here
@@ -285,10 +290,11 @@ sub get {
 
   ######Populate _codon*Key, exonicAlleleFunction, amion acids keys ############
 
-  my ($i, @funcAccum, @codonNum, @codonSeq, @codonPos, @refAA, @newAA, @newCodon);
+  my ($i, @funcAccum, @codonNum, @codonSeq, @codonPos, @refAA, @newAA, @newCodon, @hgvsC, @hgvsP);
   # Set undefs for every position, other than the ones we need
   # So that we don't need to push undef's to keep transcript order
-  $#funcAccum = $#codonNum = $#codonSeq = $#codonPos = $#refAA = $#newAA = $#newCodon = $multiple;
+  $#funcAccum = $#codonNum = $#codonSeq = $#codonPos = $#refAA = $#newAA
+  = $#newCodon = $#hgvsC = $#hgvsP = $multiple;
 
   $i = 0;
 
@@ -315,6 +321,7 @@ sub get {
         }
         
         # For indels we don't store newAA or newCodon
+        # or hgvs notation
       }
 
       $i++;
@@ -374,6 +381,9 @@ sub get {
         $funcAccum[$i] = $replacement;
       }
 
+      $hgvsC[$i] = 'c.' . $ref . ($codonNum[$i] * 3 - (3 - $codonPos[$i])) . $allele;
+      $hgvsP[$i] = 'p.' . $refAA[$i] . $codonNum[$i] . $newAA[$i];
+
       $i++;
     }
   }
@@ -385,6 +395,8 @@ sub get {
   $outAccum->[$self->{_altAaFidx}][$posIdx] = \@newAA;
   $outAccum->[$self->{_codonSidx}][$posIdx] = \@codonSeq;
   $outAccum->[$self->{_altCodonSidx}][$posIdx] = \@newCodon;
+  # $outAccum->[$self->{_hgvsCidx}][$posIdx] = \@hgvsC;
+  # $outAccum->[$self->{_hgvsPidx}][$posIdx] = \@hgvsP;
 
   return $outAccum;
 };

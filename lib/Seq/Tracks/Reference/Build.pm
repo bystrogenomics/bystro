@@ -103,7 +103,7 @@ sub buildTrack {
 
           # We expect either one chr per file, or a multi-fasta file that is sorted and contiguous
           # TODO: Handle chrPerFile
-          if(!$wantedChr) {
+          if(!defined $wantedChr) {
             next FH_LOOP;
           }
 
@@ -118,7 +118,7 @@ sub buildTrack {
         }
 
         # If !$wantedChr we're likely in a mult-fasta file; could warn, but that spoils multi-threaded reads
-        if (!$wantedChr) {
+        if (!defined $wantedChr) {
           next;
         }
 
