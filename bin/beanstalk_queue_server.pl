@@ -153,7 +153,7 @@ while(my $job = $beanstalk->reserve) {
 
     for my $track (@{$configData->{tracks}{tracks}}) {
       # Strip local_files of their directory names, for security reasons
-      $track->{local_files} = ['hidden'];
+      $track->{local_files} = [map { !$_ ? "" : path($_)->basename } @{$track->{local_files}}]
     }
 
     $beanstalkEvents->put({ priority => 0, data => encode_json({
