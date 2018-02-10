@@ -343,6 +343,7 @@ sub buildTrack {
             # for some reason, order of SubTxn's matters
             # https://github.com/salortiz/LMDB_File/issues/30
             my $cursor = $self->db->dbStartCursorTxn($chr);
+
             INNER: for (my $i = 0; $i < @{$txInfo->transcriptSites}; $i += 2) {
               # $txInfo->transcriptSites->[$i] corresponds to $pos, $i + 1 to value
               # Commit for every position
@@ -361,7 +362,7 @@ sub buildTrack {
             }
 
             # Commits, closes cursor every transcript
-            $self->db->dbEndCursorTxn($cursor, $chr);
+            $self->db->dbEndCursorTxn($chr);
 
             if( @{$txInfo->transcriptErrors} ) {
               my @errors = @{$txInfo->transcriptErrors};
@@ -405,9 +406,6 @@ sub buildTrack {
 
     $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedChrs{$chr}})));
   }
-
-  # Trying to avoid "Oops! Closing Active Environment";
-  $self->db->cleanUp();
 
   return;
 }

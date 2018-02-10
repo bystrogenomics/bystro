@@ -695,12 +695,12 @@ sub dbStartCursorTxn {
   # Unsafe, private LMDB_File method access but Cursor::open does not track cursors
   $LMDB::Txn::Txns{$$txn}{Cursors}{$$cursor} = 1;
 
-  $cursors{$chr} = $cursor;
+  $cursors{$chr} = [$txn, $cursor];
 
   # We store data in sequential, integer order
   # in all but the meta tables, which don't use this function
   # LMDB::Cursor::open($txn, $db->{dbi}, my $cursor);
-  return [$txn, $cursor];
+  return $cursors{$chr};
 }
 
 # Assumes user manages their own transactions
@@ -709,11 +709,12 @@ sub dbReadOneCursorUnsafe {
   #my ($self, $cursor, $pos) = @_;
       #$_[0]. $_[1].   $_[2]
 
+  #$cursor->[1]->_get($pos)
   $_[1]->[1]->_get($_[2], my $json, MDB_SET);
 
   if($LMDB_File::last_err) {
     if($LMDB_File::last_err != MDB_NOTFOUND) {
-    #$self
+     #$self->_errorWithCleanup
       $_[0]->_errorWithCleanup("dbEndCursorTxn LMDB error: $LMDB_File::last_err");
       return 255;
     }
@@ -816,25 +817,22 @@ sub dbPatchCursorUnsafe {
 # commit and close a self-managed cursor object
 # TODO: Don't close cursor if not needed
 sub dbEndCursorTxn {
-  my ( $self, $cursor, $chr ) = @_;
-  #.   $_[0], $_[1],   $_[2]
+  my ( $self, $chr ) = @_;
 
-  $cursor->[1]->close();
+  if(!defined $cursors{$chr}) {
+    return 0;
+  }
+
+  $cursors{$chr}->[1]->close();
 
   # closes a write cursor as well; the above $cursor->close() is to be explicit
   # will not close a MDB_RDONLY cursor
-  $cursor->[0]->commit();
+  $cursors{$chr}->[0]->commit();
 
   delete $cursors{$chr};
 
-  # get rid of this object; we want to help user not try to re-use it
-  # TODO: only in case of non-MDB_RDONLY
-  # Modify the original reference, undefine it
-  undef $_[1];
-
   if($LMDB_File::last_err) {
     if($LMDB_File::last_err != MDB_NOTFOUND) {
-     #$self->
       $self->_errorWithCleanup("dbEndCursorTxn LMDB error: $LMDB_File::last_err");
       return 255;
     }

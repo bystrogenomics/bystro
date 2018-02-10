@@ -68,7 +68,7 @@ sub buildTrack {
       # Record which chromosomes we've worked on
       my %visitedChrs;
 
-      my %cursors;
+      my $cursor;
 
       FH_LOOP: while (my $line = $fh->getline()) {
         #super chomp; also helps us avoid weird characters in the fasta data string
@@ -88,13 +88,10 @@ sub buildTrack {
           if(!defined $wantedChr || $wantedChr ne $chr) {
             # We switched chromosomes
             if(defined $wantedChr) {
-              if($cursors{$wantedChr}) {
-                # Not strictly necessary, since we cleanUp($wantedChr)
-                $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
-                delete $cursors{$wantedChr};
-              }
+              # cleans up entire environment, commits/closes all cursors, syncs
+              $self->db->cleanUp();
+              undef $cursor;
 
-              $self->db->cleanUp($wantedChr);
               $count = 0;
             }
 
@@ -125,14 +122,14 @@ sub buildTrack {
         if($line =~ $dataRegex) {
           # Store the uppercase bases; how UCSC does it, how people likely expect it
           for my $char (split '', uc($1)) {
-            $cursors{$wantedChr} //= $self->db->dbStartCursorTxn($wantedChr);
+            $cursor //= $self->db->dbStartCursorTxn($wantedChr);
 
             #Args:                         $cursor,             $chr,        $trackIndex,   $pos,         $newValue
-            $self->db->dbPatchCursorUnsafe($cursors{$wantedChr}, $wantedChr, $self->dbName, $chrPosition, $baseMapper->baseMap->{$char});
+            $self->db->dbPatchCursorUnsafe($cursor, $wantedChr, $self->dbName, $chrPosition, $baseMapper->baseMap->{$char});
 
             if($count > $self->commitEvery) {
-              $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
-              delete $cursors{$wantedChr};
+              $self->db->dbEndCursorTxn($wantedChr);
+              undef $cursor;
 
               $count = 0;
             }
@@ -145,16 +142,9 @@ sub buildTrack {
         }
       }
 
-      # Get rid of our privately-managed cursors
-      foreach (keys %visitedChrs) {
-        if($cursors{$_}) {
-          $self->db->dbEndCursorTxn($cursors{$_}, $_);
-          delete $cursors{$_};
-        }
-      }
-
-      #Commit, sync everything, including completion status, and release mmap
+      #Commit, sync everything, including completion status, commit cursors, and release mmap
       $self->db->cleanUp();
+      undef $cursor;
 
       #13 is sigpipe, occurs if closing pipe before cat/pigz finishes
       if(!close($fh) && $? != 13) {

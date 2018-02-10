@@ -188,7 +188,7 @@ sub buildTrack {
       my (@caddData, $caddRef, $dbData, $assemblyRefBase, $altAllele, $refBase, $phredScoresAref);
 
       # Manage our own cursors, to improve performance
-      my %cursors;
+      my $cursor;
       my $count = 0;
       FH_LOOP: while ( my $line = $fh->getline() ) {
         chomp $line;
@@ -212,15 +212,12 @@ sub buildTrack {
             $self->log('fatal', $err);
           }
 
+          # We switched chromosomes
           if(defined $wantedChr) {
-            if($cursors{$wantedChr}) {
-              # Not strictly necessary, since we call cleanUp
-              $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
-              delete $cursors{$wantedChr};
-            }
-
-            #Clean up the database, free memory;
+            #Clean up the database, commit & close any cursors, free memory;
             $self->db->cleanUp();
+            undef $cursor;
+
             #Reset our transaction counter
             $count = 0;
           }
@@ -236,13 +233,6 @@ sub buildTrack {
         # However, chr-split CADD files may have multiple chromosomes after liftover
         # TODO: rethink chrPerFile handling
         if(!$wantedChr) {
-          # So we require sorted_guranteed flag for "last" optimization
-          # if($self->chrPerFile) {
-          #   $self->log('info', $self->name . ": chrs in file $file not wanted or previously completed. Skipping");
-
-          #   last FH_LOOP;
-          # }
-
           next FH_LOOP;
         }
 
@@ -286,12 +276,12 @@ sub buildTrack {
             $self->log('warn', $self->name . ": $wantedChr\:$lastPosition: No scores or warnings accumulated.");
             undef $caddRef;
           } else {
-            $cursors{$wantedChr} //= $self->db->dbStartCursorTxn($wantedChr);
+            $cursor //= $self->db->dbStartCursorTxn($wantedChr);
 
             ########### Check refBase against the assembly's reference #############
             # We read using our cursor; since in LMDB, cursors are isolated
             # and therefore don't want to use our helper dbRead class, as inconsistencies may arise
-            $dbData = $self->db->dbReadOneCursorUnsafe($cursors{$wantedChr}, $lastPosition);
+            $dbData = $self->db->dbReadOneCursorUnsafe($cursor, $lastPosition);
             $assemblyRefBase = $refTrack->get($dbData);
 
             if(!defined $assemblyRefBase) {
@@ -332,11 +322,11 @@ sub buildTrack {
                 #Since sorting is guaranteed, there is nothing to write here
               } else {
                 #Args:                         $cursor               $chr,       $trackIndex,   $pos,         $trackValue
-                $self->db->dbPatchCursorUnsafe($cursors{$wantedChr}, $wantedChr, $self->dbName, $lastPosition, $phredScoresAref);
+                $self->db->dbPatchCursorUnsafe($cursor, $wantedChr, $self->dbName, $lastPosition, $phredScoresAref);
 
                 if($count > $self->commitEvery) {
-                  $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
-                  delete $cursors{$wantedChr};
+                  $self->db->dbEndCursorTxn($wantedChr);
+                  undef $cursor;
 
                   $count = 0;
                 }
@@ -425,9 +415,9 @@ sub buildTrack {
           die $err;
         }
 
-        if($cursors{$wantedChr}) {
-          $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
-          delete $cursors{$wantedChr};
+        if(defined $cursor) {
+          $self->db->dbEndCursorTxn($wantedChr);
+          undef $cursor;
         }
 
         if (defined $skipSites{"$wantedChr\_$lastPosition"}) {
@@ -473,16 +463,9 @@ sub buildTrack {
       undef $wantedChr;
       undef $phredScoresAref;
 
-      # Close any remaining manually-controlled cursors, and commit their associated transaction
-      foreach (keys %visitedChrs) {
-        if($cursors{$_}) {
-          $self->db->dbEndCursorTxn($cursors{$_}, $_);
-          delete $cursors{$_};
-        }
-      }
-
-      #Commit any remaining transactions, sync all environments, free memory
+      #Commit any remaining transactions, commit & close cursors, sync all environments, free memory
       $self->db->cleanUp();
+      undef $cursor;
 
       if(!close($fh) && $? != 13) {
         $self->log('fatal', $self->name . " failed to close $file with $! ($?)");
@@ -525,9 +508,6 @@ sub buildTrack {
 
     $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedChrs{$chr}})));
   }
-
-  # Trying to avoid "destroying active environment"
-  $self->db->cleanUp();
 
   #TODO: Implement actual error return codes instead of dying
   return;

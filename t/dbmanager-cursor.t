@@ -43,9 +43,7 @@ $expected = $db->dbReadOneCursorUnsafe($cursor, $pos);
 ok(defined $expected, "Before committing, we can see inserted value, as we have stayed within a single transaction");
 ok($#$expected == $dbIdx && !defined $expected->[0] && $expected->[1] eq $val, "dbReadCursorUnsafe returns an array of track data; each index is another track");
 
-$err = $db->dbEndCursorTxn($cursor, 'test');
-
-ok(!defined $cursor, "dbEndCursorTxn undef's the cursor array");
+$err = $db->dbEndCursorTxn('test');
 
 $expected = $db->dbReadOne('test', $pos);
 
@@ -90,7 +88,7 @@ ok($err == 0, "Can run dbPatchCursorUnsafe, with uncommitted child transaction")
 
 ok($expected->[$dbIdx] eq 'HELLO WORLD', "we don't overwrite entries");
 
-$err = $db->dbEndCursorTxn($cursor, 'test');
+$err = $db->dbEndCursorTxn('test');
 
 ok($err == 0, 'dbEndCursorTxn returns 0 upon no error');
 

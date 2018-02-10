@@ -93,7 +93,7 @@ sub buildTrack{
       my %visitedChrs;
 
       # We use "unsafe" writers, whose active cursors we need to track
-      my %cursors;
+      my $cursor;
       my $count = 0;
 
       FH_LOOP: while ( <$fh> ) {
@@ -120,16 +120,10 @@ sub buildTrack{
 
           if(!defined $wantedChr || $wantedChr ne $chr) {
             if(defined $wantedChr) {
-              if($cursors{$wantedChr}) {
-                # Not strictly necessary to call dbEndCursorTxn, since we call cleanUp($wantedChr)
-                # But need to delete $cursors{$wantedChr} to prevent stale cursor
-                $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
-                delete $cursors{$wantedChr};
-              }
-
               #Commit any remaining transactions, remove the db map from memory
               #this also has the effect of closing all cursors
               $self->db->cleanUp();
+              undef $cursor;
 
               $count = 0;
             }
@@ -158,15 +152,15 @@ sub buildTrack{
           next;
         }
 
-        $cursors{$wantedChr} //= $self->db->dbStartCursorTxn($wantedChr);
+        $cursor //= $self->db->dbStartCursorTxn($wantedChr);
 
         #Args:                         $cursor,             $chr,       $trackIndex,   $pos,         $trackValue
-        $self->db->dbPatchCursorUnsafe($cursors{$wantedChr}, $wantedChr, $self->dbName, $chrPosition, $self->{_rounder}->round($_));
+        $self->db->dbPatchCursorUnsafe($cursor, $wantedChr, $self->dbName, $chrPosition, $self->{_rounder}->round($_));
 
 
         if($count > $self->commitEvery) {
-          $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
-          delete $cursors{$wantedChr};
+          $self->db->dbEndCursorTxn($wantedChr);
+          undef $cursor;
 
           $count = 0;
         }
@@ -177,16 +171,9 @@ sub buildTrack{
         $chrPosition += $step;
       }
 
-      # Close/commit all cursors from visited Chrs (should be at most 1)
-      foreach (keys %visitedChrs) {
-        if($cursors{$_}) {
-          $self->db->dbEndCursorTxn($cursors{$_}, $_);
-          delete $cursors{$_};
-        }
-      }
-
       #Commit, sync everything, including completion status, and release mmap
       $self->db->cleanUp();
+      undef $cursor;
 
       if(!close($fh) && $? != 13) {
         $self->log('fatal', $self->name . ": failed to close $file with $! ($?)");
@@ -194,6 +181,7 @@ sub buildTrack{
       } else {
         $self->log('info', $self->name . ": closed $file with $?");
       }
+
     $pm->finish(0, \%visitedChrs);
   }
 
@@ -204,10 +192,6 @@ sub buildTrack{
 
     $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedChrs{$chr}})));
   }
-
-  #Trying to avoid "destroying active environment" and segfault
-  #TODO: remove the need, or otherwise simplify
-  $self->db->cleanUp();
 
   return;
 };

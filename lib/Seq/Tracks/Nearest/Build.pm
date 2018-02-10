@@ -356,10 +356,6 @@ sub buildTrack {
 
   $pm->wait_all_children;
 
-  # Trying to avoid active environment error
-  # TODO: ensure that this isn't needed
-  $self->db->cleanUp();
-
   return;
 }
 
@@ -505,7 +501,7 @@ sub _writeNearestData {
         }
 
         if($count > $self->commitEvery) {
-          $self->db->dbEndCursorTxn($cursor, $chr);
+          $self->db->dbEndCursorTxn($chr);
           undef $cursor;
 
           $count = 0;
@@ -577,7 +573,7 @@ sub _writeNearestData {
         $self->db->dbPatchCursorUnsafe($cursor, $chr, $self->dbName, $pos, $txNumber);
 
         if($count > $self->commitEvery) {
-          $self->db->dbEndCursorTxn($cursor, $chr);
+          $self->db->dbEndCursorTxn($chr);
           undef $cursor;
 
           $count = 0;
@@ -615,7 +611,7 @@ sub _writeNearestData {
       $self->db->dbPatchCursorUnsafe($cursor, $chr, $self->dbName, $pos, $previousTxNumber);
 
       if($count > $self->commitEvery) {
-        $self->db->dbEndCursorTxn($cursor, $chr);
+        $self->db->dbEndCursorTxn($chr);
         undef $cursor;
 
         $count = 0;
@@ -626,7 +622,7 @@ sub _writeNearestData {
   }
 
   if($cursor) {
-    $self->db->dbEndCursorTxn($cursor, $chr);
+    $self->db->dbEndCursorTxn($chr);
     undef $cursor;
   }
 

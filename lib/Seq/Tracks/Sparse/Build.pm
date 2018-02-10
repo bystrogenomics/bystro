@@ -132,7 +132,7 @@ sub buildTrack {
       my ($invalid, $failedFilters, $tooLong) = (0, 0, 0);
 
       # Faster insert: track cursors
-      my %cursors;
+      my $cursor;
       my $count = 0;
 
       my ($chr, @fields, @sparseData, $start, $end);
@@ -163,15 +163,9 @@ sub buildTrack {
         #If the chromosome is new, write any data we have & see if we want new one
         if(!defined $wantedChr || (!defined $chr || $wantedChr ne $chr)) {
           if(defined $wantedChr) {
-            if($cursors{$wantedChr}) {
-              # Not strictly necessary to call dbEndCursorTxn, since we call cleanUp($wantedChr)
-              # But need to delete $cursors{$wantedChr} to prevent stale cursor
-              $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
-              delete $cursors{$wantedChr};
-            }
-
-            #Commit, flush anything remaining to disk, release mapped memory
+            #Commit, commit & close cursors, flush anything remaining to disk, release mapped memory
             $self->db->cleanUp();
+            undef $cursor;
 
             $count = 0;
           }
@@ -210,14 +204,14 @@ sub buildTrack {
         }
 
         for my $pos (($start .. $end)) {
-          $cursors{$wantedChr} //= $self->db->dbStartCursorTxn($wantedChr);
+          $cursor //= $self->db->dbStartCursorTxn($wantedChr);
 
           #Args:                         $cursor,             $chr,       $trackIndex,   $pos,  $trackValue,  $mergeFunction
-          $self->db->dbPatchCursorUnsafe($cursors{$wantedChr}, $wantedChr, $self->dbName, $pos, \@sparseData, $mergeFunc);
+          $self->db->dbPatchCursorUnsafe($cursor, $wantedChr, $self->dbName, $pos, \@sparseData, $mergeFunc);
 
           if($count > $self->commitEvery) {
-            $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
-            delete $cursors{$wantedChr};
+            $self->db->dbEndCursorTxn($wantedChr);
+            undef $cursor;
 
             $count = 0;
           }
@@ -230,16 +224,9 @@ sub buildTrack {
         $visitedChrs{$wantedChr} //= 1;
       }
 
-      # Close/commit all cursors from visited Chrs (should be at most 1)
-      foreach (keys %visitedChrs) {
-        if($cursors{$_}) {
-          $self->db->dbEndCursorTxn($cursors{$_}, $_);
-          delete $cursors{$_};
-        }
-      }
-
-      #Commit, sync everything, including completion status, and release mmap
+      #Commit, sync everything, including completion status, commit/close cursors, and release mmap
       $self->db->cleanUp();
+      undef $cursor;
 
       if(!close($fh) && $? != 13) {
         $self->log('fatal', $self->name . ": couldn't close or read $file due to $! ($?)");
@@ -263,10 +250,6 @@ sub buildTrack {
 
     $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedDetails{$chr}})));
   }
-
-  # Trying to avoid "Oops! Closing Active Environment";
-  # TODO: ensure that this isn't needed
-  $self->db->cleanUp();
 
   return;
 }

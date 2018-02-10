@@ -245,7 +245,7 @@ sub buildTrack {
       my $dbPos;
 
       # We use "unsafe" writers, whose active count we need to track
-      my %cursors;
+      my $cursor;
       my $count = 0;
 
       open(my $fh, '-|', "$echoProg $file | " . $self->vcfProcessor . " --emptyField $delim"
@@ -264,16 +264,10 @@ sub buildTrack {
         # falsy value is ''
         if(!defined $wantedChr || $wantedChr ne $chr) {
           if(defined $wantedChr) {
-            if($cursors{$wantedChr}) {
-              # Not strictly necessary to call dbEndCursorTxn, since we call cleanUp($wantedChr)
-              # But need to delete $cursors{$wantedChr} to prevent stale cursor
-              $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
-              delete $cursors{$wantedChr};
-            }
-
             #Commit any remaining transactions, remove the db map from memory
             #this also has the effect of closing all cursors
             $self->db->cleanUp();
+            undef $cursor;
 
             $count = 0;
           }
@@ -283,11 +277,6 @@ sub buildTrack {
 
         # TODO: rethink chPerFile handling
         if(!defined $wantedChr) {
-          # if($self->chrPerFile) {
-          #   $self->log('warn', $self->name . ": skipping $file because found unwanted chr, and expect 1 chr per file");
-          #   last FH_LOOP;
-          # }
-
           next FH_LOOP;
         }
 
@@ -297,20 +286,17 @@ sub buildTrack {
         $dbPos = $fields[$posIdx] - 1;
 
         if(!looks_like_number($dbPos)) {
-          if($cursors{$wantedChr}) {
-            $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
-            delete $cursors{$wantedChr};
-          }
-
           $self->db->cleanUp();
+          undef $cursor;
+
           $pm->finish(255, \"Invalid position @ $chr\: $dbPos");
         }
 
-        $cursors{$wantedChr} //= $self->db->dbStartCursorTxn($wantedChr);
+        $cursor //= $self->db->dbStartCursorTxn($wantedChr);
 
         # We want to keep a consistent view of our universe, so use one transaction
         # during read/modify/write
-        $dbData = $self->db->dbReadOneCursorUnsafe($cursors{$wantedChr}, $dbPos);
+        $dbData = $self->db->dbReadOneCursorUnsafe($cursor, $dbPos);
 
         $refExpected = $self->{_refTrack}->get($dbData);
         if($fields[$refIdx] ne $refExpected) {
@@ -323,12 +309,9 @@ sub buildTrack {
 
         if($err) {
           #Commit, sync everything, including completion status, and release mmap
-          if($cursors{$wantedChr}) {
-            $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
-            delete $cursors{$wantedChr};
-          }
-
           $self->db->cleanUp();
+          undef $cursor;
+
           $pm->finish(255, \$err);
         }
 
@@ -339,11 +322,11 @@ sub buildTrack {
         }
 
         #Args:                         $cursor,             $chr,       $trackIndex,   $pos,   $trackValue, $mergeFunction
-        $self->db->dbPatchCursorUnsafe($cursors{$wantedChr}, $wantedChr, $self->dbName, $dbPos, $data, $mergeFunc);
+        $self->db->dbPatchCursorUnsafe($cursor, $wantedChr, $self->dbName, $dbPos, $data, $mergeFunc);
 
         if($count > $self->commitEvery) {
-          $self->db->dbEndCursorTxn($cursors{$wantedChr}, $wantedChr);
-          delete $cursors{$wantedChr};
+          $self->db->dbEndCursorTxn($wantedChr);
+          undef $cursor;
 
           $count = 0;
         }
@@ -351,16 +334,9 @@ sub buildTrack {
         $count++;
       }
 
-      # Close/commit all cursors from visited Chrs (should be at most 1)
-      foreach (keys %visitedChrs) {
-        if($cursors{$_}) {
-          $self->db->dbEndCursorTxn($cursors{$_}, $_);
-          delete $cursors{$_};
-        }
-      }
-
       #Commit, sync everything, including completion status, and release mmap
       $self->db->cleanUp();
+      undef $cursor;
 
     $pm->finish(0, \%visitedChrs);
   }
@@ -374,9 +350,7 @@ sub buildTrack {
     $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedDetails{$chr}})));
   }
 
-  # Trying to avoid "Oops! Closing Active Environment";
-  # TODO: ensure that this isn't needed
-  $self->db->cleanUp();
+  return;
 }
 
 sub _extractHeader {
