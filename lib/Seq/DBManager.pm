@@ -1075,9 +1075,6 @@ sub cleanUp {
     }
   }
 
-  #just a precaution, not compatible with windows machines, which we don't support atm anyway
-  system('sync');
-
   return;
 }
 
