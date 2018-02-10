@@ -801,7 +801,7 @@ sub dbPatchCursorUnsafe {
   }
 
   if($LMDB_File::last_err) {
-    if($LMDB_File::last_err != MDB_NOTFOUND) {
+    if($LMDB_File::last_err != MDB_NOTFOUND && $LMDB_File::last_err != MDB_KEYEXIST) {
     #$self
       $_[0]->_errorWithCleanup("dbEndCursorTxn LMDB error: $LMDB_File::last_err");
       return 255;
@@ -831,8 +831,9 @@ sub dbEndCursorTxn {
 
   delete $cursors{$chr};
 
+  # Allow two relatively innocuous errors, kill for anything else
   if($LMDB_File::last_err) {
-    if($LMDB_File::last_err != MDB_NOTFOUND) {
+    if($LMDB_File::last_err != MDB_NOTFOUND && $LMDB_File::last_err != MDB_KEYEXIST) {
       $self->_errorWithCleanup("dbEndCursorTxn LMDB error: $LMDB_File::last_err");
       return 255;
     }
@@ -1038,11 +1039,13 @@ sub dbForceCommit {
 # @param <String> $envName (optional) : the name of a specific environment
 sub cleanUp {
   if(!%envs && !%cursors) {
-    return;
+    return 0;
   }
 
   if(!%envs && %cursors) {
-    return 'dbManager expects no cursors if no environments opened';
+    _fatalError('dbManager expects no cursors if no environments opened');
+
+    return 255;
   }
 
   # We track the unsafe stuff, just as a precaution
@@ -1054,6 +1057,12 @@ sub cleanUp {
       $cursors{$_}[0]->commit();
 
       delete $cursors{$_};
+
+      if ($LMDB_File::last_err && $LMDB_File::last_err != MDB_NOTFOUND && $LMDB_File::last_err != MDB_KEYEXIST) {
+        _fatalError("dbCleanUp LMDB error: $LMDB_File::last_err");
+
+        return 255;
+      }
     }
   }
 
@@ -1072,10 +1081,16 @@ sub cleanUp {
       }
 
       delete $envs{$_};
+
+      if ($LMDB_File::last_err && $LMDB_File::last_err != MDB_NOTFOUND && $LMDB_File::last_err != MDB_KEYEXIST) {
+        _fatalError("dbCleanUp LMDB error: $LMDB_File::last_err");
+
+        return 255;
+      }
     }
   }
 
-  return;
+  return 0;
 }
 
 # Like DESTROY, but Moosier
@@ -1089,17 +1104,20 @@ sub DEMOLISH {
 sub _errorWithCleanup {
   my $msg = @_ == 2 ? $_[1] : $_[0];
 
-  my $errMsg = cleanUp();
+  cleanUp();
 
-  if($errMsg) {
-    $msg .= '; ' . $errMsg;
-  }
+  _fatalError($msg);
+}
+
+sub _fatalError {
+  my $msg = @_ == 2 ? $_[1] : $_[0];
 
   $internalLog->ERR($msg);
+
   # Reset error message, not sure if this is the best way
   $LMDB_File::last_err = 0;
 
-  __PACKAGE__->log('error', $msg);
+  __PACKAGE__->log('fatal', $msg);
   die $msg;
 }
 

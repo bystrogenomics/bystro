@@ -176,9 +176,11 @@ sub _fetchFiles {
     my $command;
 
     if($isRsync) {
-      $command = $self->rsync . " -aPz $remoteUrl $outDir";
+      $command = $self->rsync . " -avPz $remoteUrl $outDir";
     } else {
-      $command = $self->wget . " $remoteUrl -P $outDir";
+      # -N option will clobber only if remote file is newer than local copy
+      # -S preserves timestamp
+      $command = $self->wget . " -N -S $remoteUrl -P $outDir";
     }
 
     $self->log('info', "Fetching: $command");
