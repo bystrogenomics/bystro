@@ -268,6 +268,7 @@ sub buildTrack {
 
         # falsy value is ''
         if(!defined $wantedChr || $wantedChr ne $chr) {
+          # We have a new chromosome
           if(defined $wantedChr) {
             #Commit any remaining transactions, remove the db map from memory
             #this also has the effect of closing all cursors
@@ -305,8 +306,8 @@ sub buildTrack {
 
         $refExpected = $self->{_refTrack}->get($dbData);
         if($fields[$refIdx] ne $refExpected) {
-          $self->log('warn', "Skipping $chr\:$fields[$posIdx]: "
-            . " Discordant. Expected ref: $refExpected, found: ref: $fields[$refIdx], alt:$fields[$altIdx]");
+          $self->log('warn', $self->name . " $chr\:$fields[$posIdx]: "
+            . " Discordant. Expected ref: $refExpected, found: ref: $fields[$refIdx], alt:$fields[$altIdx]. Skipping");
           next;
         }
 
@@ -350,6 +351,11 @@ sub buildTrack {
 
   for my $chr (keys %completedDetails) {
     $self->completionMeta->recordCompletion($chr);
+
+    # cleanUpMerge placed here so that only after all files are processed do we
+    # drop the temporary merge databases
+    # so that if we have out-of-order chromosomes, we do not mishandle
+    # overlapping sites
     $cleanUpMerge->($chr);
 
     $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedDetails{$chr}})));

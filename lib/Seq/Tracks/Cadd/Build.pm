@@ -204,6 +204,8 @@ sub buildTrack {
         # Else it "should" be found in the beginning of the string
         # If not, it will be caught in our if( $self->chrIsWanted($chr) ) check
         # http://ideone.com/Y5PiUa
+        # TODO: use our normalizeChr function to deal with MT if source file
+        # not configured to report M, and chromosomes contains M not MT?
         if(index($fields[0], 'chr') == -1) {
           $chr = "chr$fields[0]";
         } else {

@@ -251,6 +251,11 @@ sub buildTrack {
   # that if chromosomes are mis-sorted, we still build all that is needed
   for my $chr (keys %completedDetails) {
     $self->completionMeta->recordCompletion($chr);
+
+    # cleanUpMerge placed here so that only after all files are processed do we
+    # drop the temporary merge databases
+    # so that if we have out-of-order chromosomes, we do not mishandle
+    # overlapping sites
     $cleanUpMerge->($chr);
 
     $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedDetails{$chr}})));
