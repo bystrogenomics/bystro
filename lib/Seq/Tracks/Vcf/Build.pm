@@ -223,6 +223,11 @@ sub buildTrack {
   for my $file (@{$self->local_files}) {
     $self->log('info', $self->name . ": beginning building from $file");
 
+    # Although this should be unnecessary, environments must be created
+    # within the process that uses them
+    # This provides a measure of safety
+    $self->db->cleanUp();
+
     $pm->start($file) and next;
       my $echoProg = $self->isCompressedSingle($file) ? $self->gzip . ' ' . $self->decompressArgs : 'cat';
 

@@ -115,6 +115,11 @@ sub buildTrack {
 
   # Assume one file per loop, or all sites in one file. Tracks::Build warns if not
   for my $file (@allFiles) {
+    # Although this should be unnecessary, environments must be created
+    # within the process that uses them
+    # This provides a measure of safety
+    $self->db->cleanUp();
+
     $pm->start($file) and next;
       my %visitedChrs;
 

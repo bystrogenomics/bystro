@@ -57,6 +57,11 @@ sub buildTrack {
     # Single writer to reduce copy-on-write db inflation
     $self->log('info', $self->name . ": Beginning building from $file");
 
+    # Although this should be unnecessary, environments must be created
+    # within the process that uses them
+    # This provides a measure of safety
+    $self->db->cleanUp();
+
     $pm->start($file) and next;
       my $fh = $self->get_read_fh($file);
 

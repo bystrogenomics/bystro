@@ -95,6 +95,11 @@ sub buildTrack {
   for my $file (@{$self->local_files}) {
     $self->log('info', $self->name . ": beginning building from $file");
 
+    # Although this should be unnecessary, environments must be created
+    # within the process that uses them
+    # This provides a measure of safety
+    $self->db->cleanUp();
+
     $pm->start($file) and next;
       my $fh = $self->get_read_fh($file);
 
@@ -240,7 +245,7 @@ sub buildTrack {
     $pm->finish(0, \%visitedChrs);
   }
 
-  $pm->wait_all_children;
+  $pm->wait_all_children();
 
   # Defer recording completion state until all requested files visited, to ensure
   # that if chromosomes are mis-sorted, we still build all that is needed

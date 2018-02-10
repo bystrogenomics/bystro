@@ -73,6 +73,11 @@ sub buildTrack{
   for my $file ( $self->allLocalFiles ) {
     $self->log('info', $self->name . ": beginning to build from $file");
 
+    # Although this should be unnecessary, environments must be created
+    # within the process that uses them
+    # This provides a measure of safety
+    $self->db->cleanUp();
+
     $pm->start($file) and next;
       unless ( -f $file ) {
         $self->log('fatal', $self->name . ": $file doesn't exist");

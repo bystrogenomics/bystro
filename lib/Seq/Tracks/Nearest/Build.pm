@@ -207,6 +207,11 @@ sub buildTrack {
 
   # Assume one file per loop, or all sites in one file. Tracks::Build warns if not
   for my $file (@allFiles) {
+    # Although this should be unnecessary, environments must be created
+    # within the process that uses them
+    # This provides a measure of safety
+    $self->db->cleanUp();
+
     $pm->start($file) and next;
       my $fh = $self->get_read_fh($file);
 
@@ -345,8 +350,6 @@ sub buildTrack {
 
         # We've finished with 1 chromosome, so write that to meta to disk
         $self->completionMeta->recordCompletion($chr);
-
-        $self->db->cleanUp();
       }
 
       #Commit, sync everything, including completion status, and release mmap
@@ -354,7 +357,7 @@ sub buildTrack {
     $pm->finish(0);
   }
 
-  $pm->wait_all_children;
+  $pm->wait_all_children();
 
   return;
 }
@@ -621,10 +624,10 @@ sub _writeNearestData {
     }
   }
 
-  if($cursor) {
-    $self->db->dbEndCursorTxn($chr);
-    undef $cursor;
-  }
+  $self->db->dbEndCursorTxn($chr);
+  undef $cursor;
+
+  $self->db->cleanUp();
 
   $self->log('info', $self->name . ": finished for $chr");
 }
