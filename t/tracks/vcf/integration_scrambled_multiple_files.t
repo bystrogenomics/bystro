@@ -578,6 +578,51 @@ ok($secondAllele->[$afOthIdx][0] == unpack('f', pack('f', 1.99742e-01)), "correc
 ok($secondAllele->[$afMaleIdx][0] == unpack('f', pack('f', 1.99192e-01)), "correctly finds the C allele af_male value");
 ok($secondAllele->[$afFemaleIdx][0] == unpack('f', pack('f', 2.02597e-01)), "correctly finds the C allele af_female value");
 
+# this allele is found in the 2nd file as well
+# this tests whether concurrency is broken by having 2 updates issued from one process
+# and only 1 from another process, at roughly the same time
+my $thirdAllele = [];
+$href = $db->dbReadOne('chr22', 15927834 - 1);
+$vcf->get($href, 'chr22', 'G', 'A', 0, $thirdAllele);
+
+ok($thirdAllele->[$trTvIdx][0] == 1, "trTv is 0 for multiallelics. \
+  However, when our vcf parser is passed 2 alleles at the same position, but on different source file lines, it treats that as a SNP.
+  Therefore it calls it as a G->A transition, or 1");
+ok($thirdAllele->[$idIdx][0] eq 'rsFake', "correctly finds the rsid");
+ok($thirdAllele->[$acIdx][0] == 5232, "correctly finds the ac value for a biallelic site");
+ok($thirdAllele->[$afIdx][0] == unpack('f', pack('f', 2.00721e-01)), "correctly finds the af value for a biallelic site");
+ok($thirdAllele->[$anIdx][0] == 26066, "correctly finds the an value for a biallelic site");
+
+ok($thirdAllele->[$acAfrIdx][0] == 1195, "correctly finds the C allele ac_afr value");
+ok($thirdAllele->[$acAmrIdx][0] == 199, "correctly finds C allele allele ac_amr value");
+ok($thirdAllele->[$acAsjIdx][0] == 48, "correctly finds C allele allele ac_asj value");
+ok($thirdAllele->[$acEasIdx][0] == 462, "correctly finds C allele allele ac_eas value");
+ok($thirdAllele->[$acFinIdx][0] == 539, "correctly finds C allele allele ac_fin value");
+ok($thirdAllele->[$acNfeIdx][0] == 2634, "correctly finds C allele allele ac_nfe value");
+ok($thirdAllele->[$acOthIdx][0] == 155, "correctly finds C allele allele ac_oth value");
+ok($thirdAllele->[$acMaleIdx][0] == 2860, "correctly finds C allele allele ac_male value");
+ok($thirdAllele->[$acFemaleIdx][0] == 2372, "correctly finds C allele allele ac_female value");
+
+ok($thirdAllele->[$anAfrIdx][0] == 7838, "correctly finds the C allele an_afr value, which has only one value across all alleles");
+ok($thirdAllele->[$anAmrIdx][0] == 630, "correctly finds the C allele an_amr value, which has only one value across all alleles");
+ok($thirdAllele->[$anAsjIdx][0] == 216, "correctly finds the C allele an_asj value, which has only one value across all alleles");
+ok($thirdAllele->[$anEasIdx][0] == 1372, "correctly finds the C allele an_eas value, which has only one value across all alleles");
+ok($thirdAllele->[$anFinIdx][0] == 2596, "correctly finds the C allele an_fin value, which has only one value across all alleles");
+ok($thirdAllele->[$anNfeIdx][0] == 12638, "correctly finds the C allele an_nfe value, which has only one value across all alleles");
+ok($thirdAllele->[$anOthIdx][0] == 776, "correctly finds the C allele an_oth value, which has only one value across all alleles");
+ok($thirdAllele->[$anMaleIdx][0] == 14358, "correctly finds the C allele an_male value, which has only one value across all alleles");
+ok($thirdAllele->[$anFemaleIdx][0] == 11708, "correctly finds the C allele an_female value, which has only one value across all alleles");
+
+ok($thirdAllele->[$afAfrIdx][0] == unpack('f', pack('f', 1.52462e-01)), "correctly finds the C allele af_afr value");
+ok($thirdAllele->[$afAmrIdx][0] == unpack('f', pack('f', 3.15873e-01)), "correctly finds the C allele af_amr value");
+ok($thirdAllele->[$afAsjIdx][0] == unpack('f', pack('f', 2.22222e-01)), "correctly finds the C allele af_asj value");
+ok($thirdAllele->[$afEasIdx][0] == unpack('f', pack('f', 3.36735e-01)), "correctly finds the C allele af_eas value");
+ok($thirdAllele->[$afFinIdx][0] == unpack('f', pack('f', 2.07627e-01)), "correctly finds the C allele af_fin value");
+ok($thirdAllele->[$afNfeIdx][0] == unpack('f', pack('f', 2.08419e-01)), "correctly finds the C allele af_nfe value");
+ok($thirdAllele->[$afOthIdx][0] == unpack('f', pack('f', 1.99742e-01)), "correctly finds the C allele af_oth value");
+ok($thirdAllele->[$afMaleIdx][0] == unpack('f', pack('f', 1.99192e-01)), "correctly finds the C allele af_male value");
+ok($thirdAllele->[$afFemaleIdx][0] == unpack('f', pack('f', 2.02597e-01)), "correctly finds the C allele af_female value");
+
 # Let's see what happens if a user wants to show both alleles on the same line
 my $multiallelic = [[], []];
 
