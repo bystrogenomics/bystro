@@ -16,6 +16,6 @@ my $rounder = Seq::Tracks::Score::Build::Round->new({
 say "\n Testing rounder functionality \n";
 
 ok ($rounder->round(.068) / $scalingFactor == .068, "as long as enough precision, no rounding");
-ok ($rounder->round(.063) / $scalingFactor == .063, "as long as enough precision, no roundingt");
+ok ($rounder->round(.063) / $scalingFactor == .063, "as long as enough precision, no rounding");
 ok ($rounder->round(.065) / $scalingFactor == .065, "as long as enough precision, no rounding");
 ok ($rounder->round(-0.475554) / $scalingFactor == -0.476, "rounds beyond scaling factor precision to nearest digit");
