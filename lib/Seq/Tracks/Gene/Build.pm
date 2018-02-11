@@ -392,9 +392,6 @@ sub buildTrack {
 
         $self->log('info', $self->name . ": finished building transcripts for $chr from $file");
 
-        # We map a lot of memory by this point, so release it back to the OS
-        # To reduce likelihood that linux will want to swap
-        # The database will be re-opened as needed
         $self->db->cleanUp();
       }
 
@@ -411,6 +408,9 @@ sub buildTrack {
 
     $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedChrs{$chr}})));
   }
+
+  #TODO: figure out why this is necessary, even with DEMOLISH
+  $self->db->cleanUp();
 
   return;
 }
