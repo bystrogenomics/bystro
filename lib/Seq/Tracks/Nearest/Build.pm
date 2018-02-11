@@ -192,13 +192,24 @@ sub buildTrack {
 
   my @fieldDbNames = sort { $a <=> $b } map { $self->getFieldDbName($_) } @{$self->features};
 
+  my %completedChrs;
   $pm->run_on_finish( sub {
-    my ($pid, $exitCode, $fileName, $exitSignal, $coreDump) = @_;
+    my ($pid, $exitCode, $fileName, $exitSignal, $coreDump, $errOrChrs) = @_;
 
     if($exitCode != 0) {
       my $err = $self->name . ": got exitCode $exitCode for $fileName: $exitSignal . Dump: $coreDump";
 
       $self->log('fatal', $err);
+    }
+
+    if($errOrChrs && ref $errOrChrs eq 'HASH') {
+      for my $chr (keys %$errOrChrs) {
+        if(!$completedChrs{$chr}) {
+          $completedChrs{$chr} = [$fileName];
+        } else {
+          push @{$completedChrs{$chr}}, $fileName;
+        }
+      }
     }
 
     #Only message that is different, in that we don't pass the $fileName
@@ -272,15 +283,17 @@ sub buildTrack {
       my $toDbName = $self->getFieldDbName($self->to);
       my $rowIdx = 0;
 
+      my %visitedChrs;
+
       #TODO: ADD check if we have any wanted chrs
       FH_LOOP: while (<$fh>) {
         chomp;
         my @fields = split('\t', $_);
 
-        my $chr = $fields[ $allIdx{$self->chromField} ];
+        my $chr = $fields[$allIdx{$self->chromField}];
 
         if(!defined $wantedChr || $wantedChr ne $chr) {
-          $wantedChr = $self->chrIsWanted($chr) && $self->completionMeta->okToBuild($chr) ? $chr : undef;
+          $wantedChr = $self->chrWantedAndIncomplete($chr);
         }
 
         # We no longer care if we have multiple chromosomes in a single file
@@ -293,6 +306,8 @@ sub buildTrack {
           next FH_LOOP;
         }
 
+        $visitedChrs{$wantedChr} //= 1;
+
         my @rowData;
 
         # Field db names are numerical, from 0 to N - 1
@@ -300,7 +315,7 @@ sub buildTrack {
         # so that if we have sparse feature names, rowData still can accomodate them
         $#rowData = $fieldDbNames[-1];
         ACCUM_VALUES: for my $fieldName (keys %regionIdx) {
-          my $data = $fields[ $regionIdx{$fieldName} ];
+          my $data = $fields[$regionIdx{$fieldName}];
 
           # say split, etc; comes first so that each individual value
           # in an array (if split) can be coerced
@@ -354,10 +369,19 @@ sub buildTrack {
 
       #Commit, sync everything, including completion status, and release mmap
       $self->db->cleanUp();
-    $pm->finish(0);
+    $pm->finish(0, \%visitedChrs);
   }
 
   $pm->wait_all_children();
+
+  for my $chr (keys %completedChrs) {
+    $self->completionMeta->recordCompletion($chr);
+
+    $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedChrs{$chr}})));
+  }
+
+  #TODO: figure out why this is necessary, even with DEMOLISH
+  $self->db->cleanUp();
 
   return;
 }

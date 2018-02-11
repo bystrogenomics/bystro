@@ -175,7 +175,7 @@ sub buildTrack {
             $count = 0;
           }
 
-          $wantedChr = defined $chr && $self->completionMeta->okToBuild($chr) ? $chr : undef;
+          $wantedChr = $self->chrWantedAndIncomplete($chr);
         }
 
         if(!defined $wantedChr) {
@@ -260,6 +260,9 @@ sub buildTrack {
 
     $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedDetails{$chr}})));
   }
+
+  #TODO: figure out why this is necessary, even with DEMOLISH
+  $self->db->cleanUp();
 
   return;
 }

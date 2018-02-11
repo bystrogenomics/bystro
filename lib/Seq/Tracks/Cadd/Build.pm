@@ -212,13 +212,7 @@ sub buildTrack {
           $chr = $fields[0];
         }
 
-        if( !defined $wantedChr || $wantedChr ne $chr ) {
-          if( defined $wantedChr && (@caddData || defined $caddRef) ) {
-            my $err = $self->name . ": changed chromosomes, but unwritten data remained";
-
-            $self->log('fatal', $err);
-          }
-
+        if(!defined $wantedChr || $wantedChr ne $chr) {
           # We switched chromosomes
           if(defined $wantedChr) {
             #Clean up the database, commit & close any cursors, free memory;
@@ -229,9 +223,15 @@ sub buildTrack {
             $count = 0;
           }
 
+          if(defined $wantedChr && (@caddData || defined $caddRef)) {
+            my $err = $self->name . ": changed chromosomes, but unwritten data remained";
+
+            $self->log('fatal', $err);
+          }
+
           # Completion meta checks to see whether this track is already recorded
           # as complete for the chromosome, for this track
-          $wantedChr = $self->chrIsWanted($chr) && $self->completionMeta->okToBuild($chr) ? $chr : undef;
+          $wantedChr = $self->chrWantedAndIncomplete($chr);
           undef @caddData;
           undef $caddRef;
         }
@@ -239,7 +239,7 @@ sub buildTrack {
         # We expect either one chr per file, or all in one file
         # However, chr-split CADD files may have multiple chromosomes after liftover
         # TODO: rethink chrPerFile handling
-        if(!$wantedChr) {
+        if(!defined $wantedChr) {
           next FH_LOOP;
         }
 
@@ -515,6 +515,9 @@ sub buildTrack {
 
     $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedChrs{$chr}})));
   }
+
+  #TODO: figure out why this is necessary, even with DEMOLISH
+  $self->db->cleanUp();
 
   #TODO: Implement actual error return codes instead of dying
   return;

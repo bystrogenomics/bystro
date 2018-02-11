@@ -192,15 +192,15 @@ sub buildTrack {
         # We may want to support chrPerFile; adds complexity, but easier processing
         # for some cases
         if(!defined $wantedChr || $wantedChr ne $chr) {
-          $wantedChr = $self->chrIsWanted($chr) && $self->completionMeta->okToBuild($chr) ? $chr : undef;
+          $wantedChr = $self->chrWantedAndIncomplete($chr);
         }
 
-        if(!$wantedChr) {
+        if(!defined $wantedChr) {
           next FH_LOOP;
         }
 
         # Keep track of our 0-indexed transcript reference numbers
-        if( !$txNumbers{$wantedChr} ) {
+        if(!$txNumbers{$wantedChr}) {
           $txNumbers{$wantedChr} = 0;
         }
 

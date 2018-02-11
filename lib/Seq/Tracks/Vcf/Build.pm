@@ -278,7 +278,7 @@ sub buildTrack {
             $count = 0;
           }
 
-          $wantedChr = $self->chrIsWanted($chr) && $self->completionMeta->okToBuild($chr) ? $chr : '';
+          $wantedChr = $self->chrWantedAndIncomplete($chr);
         }
 
         # TODO: rethink chPerFile handling
@@ -293,7 +293,6 @@ sub buildTrack {
 
         if(!looks_like_number($dbPos)) {
           $self->db->cleanUp();
-          undef $cursor;
 
           $pm->finish(255, \"Invalid position @ $chr\: $dbPos");
         }
@@ -316,7 +315,6 @@ sub buildTrack {
         if($err) {
           #Commit, sync everything, including completion status, and release mmap
           $self->db->cleanUp();
-          undef $cursor;
 
           $pm->finish(255, \$err);
         }
@@ -342,7 +340,6 @@ sub buildTrack {
 
       #Commit, sync everything, including completion status, and release mmap
       $self->db->cleanUp();
-      undef $cursor;
 
     $pm->finish(0, \%visitedChrs);
   }
@@ -361,6 +358,8 @@ sub buildTrack {
     $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedDetails{$chr}})));
   }
 
+  #TODO: figure out why this is necessary, even with DEMOLISH
+  $self->db->cleanUp();
   return;
 }
 

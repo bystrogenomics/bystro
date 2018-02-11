@@ -100,7 +100,7 @@ sub buildTrack {
               $count = 0;
             }
 
-            $wantedChr = $self->chrIsWanted($chr) && $self->completionMeta->okToBuild($chr) ? $chr : undef;
+            $wantedChr = $self->chrWantedAndIncomplete($chr);
           }
 
           # We expect either one chr per file, or a multi-fasta file that is sorted and contiguous
@@ -170,6 +170,9 @@ sub buildTrack {
 
     $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedChrs{$chr}})));
   }
+
+  #TODO: figure out why this is necessary, even with DEMOLISH
+  $self->db->cleanUp();
 
   return;
 };

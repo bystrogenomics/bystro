@@ -2,7 +2,6 @@ use 5.10.0;
 use strict;
 use warnings;
 
-package TestMe;
 use Test::More;
 use lib './lib';
 use Seq::Tracks::Build;

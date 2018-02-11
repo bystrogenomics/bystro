@@ -404,6 +404,8 @@ sub makeMergeFunc {
         return("makeMergeFunc accepts only array values of equal length", undef);
       }
 
+      # commits automatically, so that we are ensured that overlaps
+      # called from different threads succeed
       my $seen = $self->db->dbReadOne("$tempDbName/$chr", $pos);
 
       my @updated;
@@ -420,6 +422,8 @@ sub makeMergeFunc {
       }
 
       if(!$seen) {
+        # commits automatically, so that we are ensured that overlaps
+        # called from different threads succeed
         $self->db->dbPut("$tempDbName/$chr", $pos, 1);
       }
 
@@ -449,10 +453,18 @@ sub coerceUndefinedValues {
 }
 
 sub chrWantedAndIncomplete {
-  #my ($self, $chr) = @_;
-  #    $_[0], $_[1]
+  my ($self, $chr) = @_;
 
-  return $_[0]->chrIsWanted($_[1]) && $_[0]->completionMeta->okToBuild($_[1]) ? $_[1] : undef;
+  # Allow users to pass 0 as a valid chromosome, in case coding is odder than we expect
+  if(!defined $chr || (!$chr && "$chr" eq '')) {
+    return undef;
+  }
+
+  if($self->chrIsWanted($chr) && $self->completionMeta->okToBuild($chr)) {
+    return $chr;
+  }
+
+  return undef;
 }
 
 sub _isTransformOperator {
