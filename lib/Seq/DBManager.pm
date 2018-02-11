@@ -661,7 +661,7 @@ sub dbStartCursorTxn {
   # TODO: Better error handling; since a cursor may be used to read or write
   # in most cases a database not existing indicates we set readOnly or are  need to return an error if the database doesn't exist
   if(!$db) {
-    $self->_errorWithCleanup("Couldn't open $chr database because it doesn't exist. readOnly" . ($instanceConfig{readOnly} ? "set" : "not set"));
+    $self->_errorWithCleanup("Couldn't open $chr database because it doesn't exist. readOnly is " . ($instanceConfig{readOnly} ? "set" : "not set"));
     return 255;
   }
 
