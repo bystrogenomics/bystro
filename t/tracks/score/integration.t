@@ -12,7 +12,7 @@ extends 'Seq::Base';
 use Test::More;
 use Path::Tiny qw/path/;
 use Scalar::Util qw/looks_like_number/;
-use DDP;
+
 use Seq::Tracks::Score::Build::Round;
 use YAML::XS qw/LoadFile/;
 
@@ -32,15 +32,6 @@ my $scoreGetter = $tracks->getTrackGetterByName('phastCons');
 my $db = Seq::DBManager->new();
 
 $scoreBuilder->buildTrack();
-
-
-### We have:
-#name      chrom strand  txStart txEnd
-#NR_137295 chrM  +        1672  3230
-#NR_FAKE1  chrM  +        2000  2300
-#NR_FAKE2  chrM  +        2200  3400
-
-# my $mainDbAref = $db->dbReadAll('chrM');
 
 my @localFiles = @{$scoreBuilder->local_files};
 
