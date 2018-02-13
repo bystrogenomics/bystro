@@ -151,10 +151,10 @@ sub go {
   # ES since > 5.2 deprecates lenient boolean
   my @booleanHeaders = getBooleanHeaders(\@headerFields, $self->indexConfig->{mappings});
 
-  if($self->debug) {
-    say "boolean headers are";
-    p @booleanHeaders;
-  }
+  # if($self->debug) {
+  #   say "boolean headers are";
+  #   p @booleanHeaders;
+  # }
 
   my $delimiters = Seq::Output::Delimiters->new();
 

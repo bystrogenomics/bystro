@@ -12,6 +12,8 @@ use Search::Elasticsearch;
 
 use namespace::autoclean;
 
+use lib './lib';
+
 use Seq::Output;
 
 use Cpanel::JSON::XS qw/decode_json encode_json/;
@@ -140,6 +142,16 @@ sub annotate {
 
   $self->log('info', "Beginning to create annotation from the query");
 
+  my $discordantIdx;
+  my $idx = 0;
+  for my $field (@fieldNames) {
+    if ($field eq 'discordant') {
+      $discordantIdx = $idx;
+    }
+
+    $idx++;
+  }
+
   my $progressHandler = $self->makeLogProgress();
 
   while(my @docs = $scroll->next($batchSize)) {
@@ -156,6 +168,12 @@ sub annotate {
 
       for my $y (0 .. $#fieldNames) {
         $rowData[$y] = _populateArrayPathFromHash($childrenOrOnly[$y], $doc->{_source}{$parentNames[$y]});
+      }
+
+      if($rowData[$discordantIdx][0][0] eq 'false') {
+        $rowData[$discordantIdx][0][0] = 0;
+      } elsif($rowData[$discordantIdx][0][0] eq 'true') {
+        $rowData[$discordantIdx][0][0] = 1;
       }
 
       $sourceData[$i] = \@rowData;
