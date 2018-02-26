@@ -38,6 +38,6 @@ cpanm --uninstall -f Data::MessagePack
 rm -rf msgpack-perl
 git clone --recursive https://github.com/akotlar/msgpack-perl.git && cd msgpack-perl
 perl Makefile.PL
-make test
-make install
+make --quiet test
+make --quiet install
 cd ../ && rm -rf msgpack-perl
