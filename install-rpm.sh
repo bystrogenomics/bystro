@@ -1,32 +1,32 @@
 #!/usr/bin/env bash
 
-sudo yum install gcc -y
-sudo yum install cpan -y
-sudo yum install openssl -y
-sudo yum install openssl-devel -y
+sudo yum install gcc -y -q
+sudo yum install cpan -y -q
+sudo yum install openssl -y -q
+sudo yum install openssl-devel -y -q
 # Not strictly necessary, useful however for much of what we do
-sudo yum install git-all -y
+sudo yum install git-all -y -q
 # pigz for Bystro, used to speed up decompression primarily
-sudo yum install pigz -y
-sudo yum install unzip -y
-sudo yum install wget -y
+sudo yum install pigz -y -q
+sudo yum install unzip -y -q
+sudo yum install wget -y -q
 # For tests involving querying ucsc directly
-sudo yum install mysql-devel -y
+sudo yum install mysql-devel -y -q
 
 # for perlbrew, in case you want to install a different perl version
 #https://www.digitalocean.com/community/tutorials/how-to-install-perlbrew-and-manage-multiple-versions-of-perl-5-on-centos-7
 # centos 7 doesn't include bzip2
-sudo yum install bzip2  -y
-sudo yum install patch -y
+sudo yum install bzip2  -y -q
+sudo yum install patch -y -q
 
 # Bystro uses LMDB as its db engine. Fast, great use of cache
 git clone git://github.com/LMDB/lmdb.git
-make -C lmdb/libraries/liblmdb
-sudo make install -C lmdb/libraries/liblmdb
+make --quiet -C lmdb/libraries/liblmdb
+sudo make --quiet install -C lmdb/libraries/liblmdb
 
 # Bystro is increasingly a golang progrma. Perl currently handles db fetching,
 wget https://storage.googleapis.com/golang/go1.8.linux-amd64.tar.gz
-tar -xvf go1.8.linux-amd64.tar.gz
+tar -xf go1.8.linux-amd64.tar.gz
 sudo mv go /usr/local
 
 # LiftOver is used for the LiftOverCadd.pm package, to liftOver cadd to hg38
