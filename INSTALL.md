@@ -13,7 +13,9 @@ Users of AWS can skip installation altogether, and use the latest public Bystro 
 <h4>(Fedora, Redhat, Centos, openSUSE, Mandriva)</h4>
 
  1. ```wget https://github.com/akotlar/bystro/archive/master.zip -O bystro.zip && unzip bystro.zip && mv bystro-master bystro && cd $_ && ./install-rpm.sh```
-
+ 
+ ## Example of installation on RPM-based Amazon AMI (any 'yum'-capable Amazon AMI)
+Run the script found @ https://github.com/akotlar/bystro-aws 
 
 ## Configuring Bystro for annotation
 Once Bystro is installed, it needs to be configured. The easiest step is choosing the species/assemblies to annotate.
