@@ -1,39 +1,43 @@
-cpan install Mouse
-cpan install Path::Tiny
-cpan install namespace::autoclean
-cpan install DDP
-cpan install YAML::XS
-cpan install Getopt::Long::Descriptive
-cpan install Types::Path::Tiny
-cpan install MCE::Shared
-cpan install List::MoreUtils
-cpan install Log::Fast
-cpan install Parallel::ForkManager
-cpan install Cpanel::JSON::XS
-cpan install Mouse::Meta::Attribute::Custom::Trait::Array
-cpan install Net::HTTP
-cpan install Search::Elasticsearch
-cpan install Math::SigFigs
-# cpan install Data::MessagePack
-cpan install LMDB_File
-cpan install Sort::XS
-cpan install Hash::Merge::Simple
-cpan install PerlIO::utf8_strict
-cpan install PerlIO::gzip
-cpan install MouseX::SimpleConfig
-cpan install MouseX::ConfigFromFile
-cpan install MouseX::Getopt
-cpan install Archive::Extract
-cpan install DBI
+cpan install App::cpanminus
+cpanm install Mouse
+cpanm install Path::Tiny
+cpanm install namespace::autoclean
+cpanm install DDP
+cpanm install YAML::XS
+cpanm install Getopt::Long::Descriptive
+cpanm install Types::Path::Tiny
+cpanm install MCE::Shared
+cpanm install List::MoreUtils
+cpanm install Log::Fast
+cpanm install Parallel::ForkManager
+cpanm install Cpanel::JSON::XS
+cpanm install Mouse::Meta::Attribute::Custom::Trait::Array
+cpanm install Net::HTTP
+cpanm install Search::Elasticsearch
+cpanm install Math::SigFigs
+cpanm install LMDB_File
+cpanm install Sort::XS
+cpanm install Hash::Merge::Simple
+cpanm install PerlIO::utf8_strict
+cpanm install PerlIO::gzip
+cpanm install MouseX::SimpleConfig
+cpanm install MouseX::ConfigFromFile
+cpanm install MouseX::Getopt
+cpanm install Archive::Extract
+cpanm install DBI
 # Needed for fetching SQL (Utils::SqlWriter::Connection)
-cpan install DBD::mysql
-cpan install IO/FDPass.pm
-cpan install Beanstalk::Client
+cpanm install DBD::mysql
+cpanm install IO/FDPass.pm
+cpanm install Beanstalk::Client
 
 # Custom branch of msgpack-perl that uses latest msgpack-c and
 # allows prefer_float32 flag for 5-byte float storage
+cpanm install Module::Install::XSUtil
+cpanm install Module::Install::AuthorTests
+cpanm --uninstall -f Data::MessagePack
+rm -rf msgpack-perl
 git clone --recursive https://github.com/akotlar/msgpack-perl.git && cd msgpack-perl
 perl Makefile.PL
 make test
-sudo make install
+make install
 cd ../ && rm -rf msgpack-perl
