@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+if [[ -n "$1" ]]
+then
+  HOME_DIR=$1
+else
+  HOME_DIR=~
+fi
 
 sudo yum install gcc -y -q;
 sudo yum install cpan -y -q;
@@ -33,9 +39,9 @@ sudo mv go /usr/local;
 # and cadd's GRCh37.p13 MT to hg19
 wget http://hgdownload.cse.ucsc.edu/admin/exe/linux.x86_64/liftOver && chmod +x liftOver && sudo mv $_ /usr/local/bin/;
 
-(echo "" ; echo 'export PATH=$PATH:/usr/local/go/bin') >> ~/.bash_profile;
-(echo ""; echo 'export GOPATH=$HOME/go') >> ~/.bash_profile;
-echo 'export PATH=$PATH:$HOME/go/bin/' >> ~/.bash_profile && source ~/.bash_profile;
+(echo ""; echo 'export PATH=$PATH:/usr/local/go/bin') >> $HOME_DIR/.bash_profile;
+(echo ""; echo "export GOPATH=$HOME_DIR/go") >> $HOME_DIR/.bash_profile;
+echo 'export PATH=$PATH:'$HOME_DIR'/go/bin/' >> $HOME_DIR/.bash_profile && source $HOME_DIR/.bash_profile;
 
 mkdir -p $GOPATH/src/github.com;
 
@@ -56,10 +62,10 @@ rm go1.8*;
 
 # Eases package installation, gives us ability to quickly upgrade perl versions
 wget -O - https://install.perlbrew.pl | bash;
-(echo "" ; echo "source ~/perl5/perlbrew/etc/bashrc") >> ~/.bash_profile && source ~/.bash_profile;
+(echo "" ; echo "source $HOME_DIR/perl5/perlbrew/etc/bashrc") >> $HOME_DIR/.bash_profile && source $HOME_DIR/.bash_profile;
 perlbrew install perl-5.26.0 && perlbrew switch perl-5.26.0;
 
-source ~/.bash_profile;
+source $HOME_DIR/.bash_profile;
 perl -MCPAN -e 'my $c = "CPAN::HandleConfig"; $c->load(doit => 1, autoconfig => 1); $c->edit(prerequisites_policy => "follow"); $c->edit(build_requires_install_policy => "yes"); $c->commit'
 
 ./update-packages.sh;
