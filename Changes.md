@@ -1,3 +1,16 @@
+### Beta 10.1 (2/20/18):
+1. Added SAS population to gnomad.exomes (thanks David Okou)
+
+2. hg38: refetched all sources as of 2/7/18
+  * 2/5/18 variant_summary.txt.gz Clinvar update
+  * gnomAD r2.0.2
+  * dbSNP150
+  
+3. hg19: refetched all sources as of 2/26/18
+  * 2/19/18 variant_summary.txt.gz Clinvar update
+  * gnomAD r2.0.2
+  * dbSNP150
+
 ### Beta 9 (9/13/17):
 1. Added heterozygosity, homozygosity, missingness, sampleMaf fields
 2. Added gnomad.genomes and gnomad.exomes for hg38 (lifted over) and hg19
