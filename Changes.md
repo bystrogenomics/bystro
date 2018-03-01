@@ -1,4 +1,4 @@
-### Beta 10.1 (2/20/18):
+### Beta 10.1 (2/26/18):
 1. Added SAS population to gnomad.exomes (thanks David Okou)
 
 2. hg38: refetched all sources as of 2/7/18
