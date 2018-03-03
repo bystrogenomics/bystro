@@ -2,3 +2,4 @@ config/*.build-bak*
 config/*.utils-bak*
 t/tracks/nearest/db/hg19/index
 t/utils/filterCadd.yml
+*lock.mdb

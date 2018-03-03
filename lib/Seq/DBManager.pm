@@ -155,7 +155,7 @@ sub dbReadOne {
     $LMDB_File::last_err = 0;
   }
 
-  return $json ? $mp->unpack($json) : undef;
+  return defined $json ? $mp->unpack($json) : undef;
 }
 
 # Unsafe for $_[2] ; will be modified if an array is passed
@@ -183,11 +183,11 @@ sub dbRead {
 
   my $json;
 
-  # Modifies $_[2] aka $posAref to avoid extra allocation
+  # Modifies $posAref ($_[2]) to avoid extra allocation
   for my $pos (@{ $_[2] }) {
     $txn->get($dbi, $pos, $json);
 
-    $pos = $json ? $mp->unpack($json) : undef;
+    $pos = defined $json ? $mp->unpack($json) : undef;
   }
 
   # Commit unless the user specifically asks not to
@@ -723,7 +723,7 @@ sub dbReadOneCursorUnsafe {
     $LMDB_File::last_err = 0;
   }
 
-  return $json ? $mp->unpack($json) : undef;
+  return defined $json ? $mp->unpack($json) : undef;
 }
 
 # Don't copy variables on the stack, since this may be called billions of times
@@ -734,7 +734,7 @@ sub dbReadCursorUnsafe {
   foreach (@{$_[2]}) {
     $_[1]->[1]->_get($_, my $json, MDB_SET);
 
-    $_ = $json ? $mp->unpack($json) : undef;
+    $_ = defined $json ? $mp->unpack($json) : undef;
   }
 
   if($LMDB_File::last_err) {
