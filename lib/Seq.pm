@@ -10,11 +10,9 @@ our $VERSION = '0.001';
 
 # TODO: make temp_dir handling more transparent
 use Mouse 2;
-use Types::Path::Tiny qw/AbsPath AbsFile AbsDir/;
+use Types::Path::Tiny qw/AbsFile/;
 
 use namespace::autoclean;
-
-use DDP;
 
 use MCE::Loop;
 
@@ -25,12 +23,7 @@ use Seq::Headers;
 
 use Seq::DBManager;
 use Path::Tiny;
-use File::Which qw/which/;
-use Carp qw/croak/;
 use Scalar::Util qw/looks_like_number/;
-use List::MoreUtils qw/first_index/;
-
-use Cpanel::JSON::XS;
 
 extends 'Seq::Base';
 
@@ -62,20 +55,13 @@ sub BUILD {
     $self->setMaxDel(-$self->maxDel);
   }
 
-  ########### Create DBManager instance, and instantiate track singletons #########
-  # Must come before statistics, which relies on a configured Seq::Tracks
-  #Expects DBManager to have been given a database_dir
-  $self->{_db} = Seq::DBManager->new();
-
-  # We separate out the reference track getter so that we can check for discordant
-  # bases, and pass the true reference base to other getters that may want it (like CADD)
-  # Store these references as hashes, to avoid accessor penalty
-  $self->{_refTrackGetter} = $self->tracksObj->getRefTrackGetter();
-  $self->{_trackGettersExceptReference} = $self->tracksObj->getTrackGettersExceptReference();
-
   ################## Make the full output path ######################
   # The output path always respects the $self->output_file_base attribute path;
   $self->{_outPath} = $self->_workingDir->child($self->outputFilesInfo->{annotation});
+
+  # Must come before statistics, which relies on a configured Seq::Tracks
+  #Expects DBManager to have been given a database_dir
+  $self->{_db} = Seq::DBManager->new();
 }
 
 sub annotate {
@@ -140,6 +126,15 @@ sub annotateFile {
   #Inspired by T.S Wingo: https://github.com/wingolab-org/GenPro/blob/master/bin/vcfToSnp
   my $self = shift;
   my $type = shift;
+
+  ########### Create DBManager instance, and instantiate track singletons #########
+  my $db = $self->{_db};
+
+  # We separate out the reference track getter so that we can check for discordant
+  # bases, and pass the true reference base to other getters that may want it (like CADD)
+  # Store these references as hashes, to avoid accessor penalty
+  my $refTrackGetter = $self->tracksObj->getRefTrackGetter();
+  my @trackGettersExceptReference = @{$self->tracksObj->getTrackGettersExceptReference()};
 
   ################### Creates the output file handler #################
   # Used in makeAnnotationString
@@ -225,17 +220,14 @@ sub annotateFile {
 
   my $trackIndices = $finalHeader->getParentFeaturesMap();
 
-  my $refTrackIdx = $trackIndices->{$self->{_refTrackGetter}->name};
+  my $refTrackIdx = $trackIndices->{$refTrackGetter->name};
 
-  my @trackGettersExceptReference = @{$self->{_trackGettersExceptReference}};
-  my %wantedChromosomes = %{ $self->{_refTrackGetter}->chromosomes };
+  my %wantedChromosomes = %{ $refTrackGetter->chromosomes };
   my $maxDel = $self->maxDel;
 
   # This is going to be copied on write... avoid a bunch of function calls
   # Each thread will get its own %cursors object
   my %cursors = ();
-
-  my $db = $self->{_db};
 
   mce_loop_f {
     #my ($mce, $slurp_ref, $chunk_id) = @_;
@@ -310,7 +302,7 @@ sub annotateFile {
             #This means in the (rare) discordant multiallelic situation, the reference
             #Will be identical between the SNP and DEL alleles
             #faster than perl-style loop (much faster than c-style)
-            @indelRef = ($fields[3], map { $self->{_refTrackGetter}->get($_) } @indelDbData);
+            @indelRef = ($fields[3], map { $refTrackGetter->get($_) } @indelDbData);
 
             #Add the db data that we already have for this position
             unshift @indelDbData, $dataFromDbAref;
@@ -324,7 +316,7 @@ sub annotateFile {
           #Note that the first position keeps the same $inputRef
           #This means in the (rare) discordant multiallelic situation, the reference
           #Will be identical between the SNP and DEL alleles
-          @indelRef = ($fields[3], $self->{_refTrackGetter}->get($indelDbData[1]));
+          @indelRef = ($fields[3], $refTrackGetter->get($indelDbData[1]));
         }
       }
 
@@ -349,11 +341,11 @@ sub annotateFile {
           $track->get($dataFromDbAref, $fields[0], $fields[3], $fields[4], 0, $fields[$trackIndices->{$track->name}], $zeroPos);
         }
 
-        $fields[$refTrackIdx][0] = $self->{_refTrackGetter}->get($dataFromDbAref);
+        $fields[$refTrackIdx][0] = $refTrackGetter->get($dataFromDbAref);
       }
 
        # 3 holds the input reference, we'll replace this with the discordant status
-      $fields[3] = $self->{_refTrackGetter}->get($dataFromDbAref) ne $fields[3] ? 1 : 0;
+      $fields[3] = $refTrackGetter->get($dataFromDbAref) ne $fields[3] ? 1 : 0;
 
       # if($fields[1] == 10920104) {
       #   p @fields;
@@ -382,7 +374,7 @@ sub annotateFile {
     say "Aborted job due to $abortErr";
 
     # Database & tx need to be closed
-    $self->{_db}->cleanUp();
+    $db->cleanUp();
 
     return ('Job aborted due to error', undef);
   }
@@ -405,7 +397,7 @@ sub annotateFile {
     $self->log('error', $err);
   }
 
-  $self->{_db}->cleanUp();
+  $db->cleanUp();
 
   return ($err || undef, $self->outputFilesInfo);
 }
