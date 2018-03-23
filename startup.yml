@@ -1,0 +1,13 @@
+apps:
+- name: BystroAnnotationServer
+  script: bin/beanstalk_queue_server.pl
+  interpreter: "perl"
+  args: --type annotation -q seq-beanstalk-workers/beanstalk1.yaml --max_threads 8 --debug
+- name: BystroSaveServer
+  script: bin/beanstalk_queue_server.pl
+  interpreter: "perl"
+  args: --type saveFromQuery -q seq-beanstalk-workers/beanstalk1.yaml -c elastic-config/config.yml --max_threads 8 --debug
+- name: BystroIndexServer
+  script: bin/beanstalk_queue_index_server.pl
+  interpreter: "perl"
+  args: -q seq-beanstalk-workers/beanstalk1.yaml -c elastic-config/config.yml --max_threads 8 --debug
