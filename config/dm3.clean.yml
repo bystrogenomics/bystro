@@ -27,7 +27,7 @@ statistics:
     tab: .statistics.tsv
   refTrackField: ref
   siteTypeField: refSeq.siteType
-temp_dir: /mnt/annotator/tmp
+temp_dir: ~
 tracks:
 - fetch_date: 2018-05-20T13:41:00
   local_files:
