@@ -27,6 +27,13 @@ statistics:
     tab: .statistics.tsv
   refTrackField: ref
   siteTypeField: refSeq.siteType
+fileProcessors:
+  snp:
+    args: --emptyField ! --minGq .95
+    program: bystro-snp
+  vcf:
+    args: --emptyField ! --keepId --keepPos
+    program: bystro-vcf
 temp_dir: ~
 tracks:
 - fetch_date: 2018-05-20T13:41:00

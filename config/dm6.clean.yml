@@ -23,8 +23,13 @@ statistics:
   siteTypeField: refSeq.siteType
   programPath: bystro-stats
 temp_dir: '~'
-snpProcessor: bystro-snp
-vcfProcessor: bystro-vcf
+fileProcessors:
+  snp:
+    args: --emptyField ! --minGq .95
+    program: bystro-snp
+  vcf:
+    args: --emptyField ! --keepId --keepPos
+    program: bystro-vcf
 tracks:
 - local_files:
   - dm6.fa.gz
