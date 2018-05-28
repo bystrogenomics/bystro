@@ -4,10 +4,14 @@ sort:
     refSeq.codonPosition: avg
     ensGene.codonNumber: avg
     ensGene.codonPosition: avg
-    ncbiRefSeq.codonNumber: avg
-    ncbiRefSeq.codonPosition: avg
 booleanFields:
    - discordant
+# These only refer to searchable exact fields
+# These should be case sensitive, they are, by definition, exact
+# hasExactFields:
+#     - refSeq.name2
+#     - refSeq.spDisplayID
+#     - refSeq.nearest.name2
 post_index_settings:
     index:
         refresh_interval: 15s
@@ -343,67 +347,6 @@ mappings:
                             type: keyword
                             normalizer: uppercase_normalizer
         ensGene:
-            properties:
-                siteType:
-                    type: text
-                    analyzer:  autocomplete_english
-                    #dbSNP func fields are similar to out siteType and exonicAlleleFunction fields
-                    search_analyzer: search_english_func
-                    fields:
-                        exact:
-                            type: keyword
-                            normalizer: lowercase_normalizer
-                exonicAlleleFunction:
-                    type: text
-                    analyzer:  autocomplete_english
-                    search_analyzer: search_english_func
-                    fields:
-                        exact:
-                            type: keyword
-                            normalizer: lowercase_normalizer
-                refCodon:
-                    type: keyword
-                    normalizer:  uppercase_normalizer
-                altCodon:
-                    type: keyword
-                    normalizer: uppercase_normalizer
-                refAminoAcid:
-                    type: text
-                    analyzer: uppercase_keyword_text
-                    search_analyzer: uppercase_keyword_text_amino
-                    fields:
-                        exact:
-                            type: keyword
-                            normalizer: uppercase_normalizer
-                altAminoAcid:
-                    type: text
-                    analyzer:  uppercase_keyword_text
-                    search_analyzer: uppercase_keyword_text_amino
-                    fields:
-                        exact:
-                            type: keyword
-                            normalizer: uppercase_normalizer
-                codonPosition:
-                    type: byte
-                codonNumber:
-                    type: integer
-                strand:
-                    type: keyword
-                name2:
-                    type: keyword
-                    normalizer: uppercase_normalizer
-                name:
-                    type: keyword
-                    normalizer:  uppercase_normalizer
-                nearest:
-                    properties:
-                        name:
-                            type: keyword
-                            normalizer:  uppercase_normalizer
-                        name2:
-                            type: keyword
-                            normalizer: uppercase_normalizer
-        ncbiRefSeq:
             properties:
                 siteType:
                     type: text
