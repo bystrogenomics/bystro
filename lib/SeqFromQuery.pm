@@ -14,7 +14,7 @@ use namespace::autoclean;
 
 use lib './lib';
 
-use Seq::Output;
+use Seq::Output::Delimiters;
 
 use Cpanel::JSON::XS qw/decode_json encode_json/;
 
@@ -62,13 +62,13 @@ sub annotate {
 
   $self->log( 'info', 'Input query is: ' . $prettyCoder->encode($self->inputQueryBody) );
 
-  my $outputter = Seq::Output->new();
+  my $delimiters = Seq::Output::Delimiters->new();
 
-  my $alleleDelimiter = $outputter->delimiters->alleleDelimiter;
-  my $positionDelimiter = $outputter->delimiters->positionDelimiter;
-  my $valueDelimiter = $outputter->delimiters->valueDelimiter;
-  my $fieldSeparator = $outputter->delimiters->fieldSeparator;
-  my $emptyFieldChar = $outputter->delimiters->emptyFieldChar;
+  my $alleleDelimiter = $delimiters->alleleDelimiter;
+  my $positionDelimiter = $delimiters->positionDelimiter;
+  my $valueDelimiter = $delimiters->valueDelimiter;
+  my $fieldSeparator = $delimiters->fieldSeparator;
+  my $emptyFieldChar = $delimiters->emptyFieldChar;
 
   my @fieldNames = @{$self->fieldNames};;
 

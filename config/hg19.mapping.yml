@@ -300,6 +300,11 @@ mappings:
         ref:
             type: keyword
             normalizer: uppercase_normalizer
+        vcfPos:
+            type: integer
+        id:
+            type: keyword
+            normalizer: lowercase_normalizer
         refSeq:
             properties:
                 siteType:
