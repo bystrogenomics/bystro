@@ -1,3 +1,4 @@
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/0859a24d422a4d80a2ad6721e294aa35)](https://app.codacy.com/app/akotlar/bystro?utm_source=github.com&utm_medium=referral&utm_content=akotlar/bystro&utm_campaign=badger)
 # Bystro [![DOI](https://zenodo.org/badge/98203430.svg)](https://zenodo.org/badge/latestdoi/98203430)
 
 ## Bystro Publication
