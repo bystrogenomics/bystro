@@ -3,7 +3,6 @@
 echo -e "\n\nInstalling Debian (rpm) dependencies"
 
 sudo yum install gcc -y -q;
-sudo yum install cpan -y -q;
 sudo yum install openssl -y -q;
 sudo yum install openssl-devel -y -q;
 # Not strictly necessary, useful however for much of what we do
@@ -20,3 +19,8 @@ sudo yum install mysql-devel -y -q;
 # centos 7 doesn't include bzip2
 sudo yum install bzip2  -y -q;
 sudo yum install patch -y -q;
+
+sudo yum install cpan -y -q;
+
+sudo yum install nodejs -y -q;
+sudo npm install -g pm2;

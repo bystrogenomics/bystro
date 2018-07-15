@@ -26,7 +26,7 @@ fi
 
 # Not necessary for first install, but allows us to have a single entry point
 # for installation and updates
-./install/update-packages.sh $INSTALL_DIR
+./install/update-packages.sh
 
 printf "\n\nDone, congrats! REMEMBER TO INCREASE ULIMIT ABOVE 1024 IF RUNNING MANY FORKS\n\n";
 

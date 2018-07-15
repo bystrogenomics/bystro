@@ -24,3 +24,6 @@ sudo apt install -y bzip2
 sudo apt install -y patch
 
 sudo apt install -y cpan
+
+sudo apt install -y nodejs
+sudo npm install -g pm2

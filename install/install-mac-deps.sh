@@ -15,3 +15,6 @@ brew install openssl
 brew upgrade openssl
 brew install wget
 brew install pigz
+
+brew install nodejs
+sudo npm install -g pm2
