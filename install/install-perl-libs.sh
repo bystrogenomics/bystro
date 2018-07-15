@@ -1,3 +1,7 @@
+#!/usr/bin/env bash
+
+echo "Installing perl libs"
+
 cpan install App::cpanminus
 cpanm install Mouse
 cpanm install Path::Tiny
@@ -16,8 +20,6 @@ cpanm install Net::HTTP
 cpanm install Search::Elasticsearch
 cpanm install Math::SigFigs
 cpanm install LMDB_File
-cpanm install Sort::XS
-cpanm install Hash::Merge::Simple
 cpanm install PerlIO::utf8_strict
 cpanm install PerlIO::gzip
 cpanm install MouseX::SimpleConfig

@@ -19,7 +19,6 @@ with 'Seq::Role::Message';
 use Data::MessagePack;
 use LMDB_File qw(:all);
 use Types::Path::Tiny qw/AbsPath/;
-use Sort::XS;
 use DDP;
 use Hash::Merge::Simple qw/ merge /;
 use Path::Tiny;
