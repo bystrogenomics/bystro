@@ -7,13 +7,13 @@ else
   INSTALL_DIR=~
 fi
 
-
 ./install/install-rpm-deps.sh
 
 ./install/install-lmdb-linux.sh
 
 # Bystro is increasingly a golang progrma. Perl currently handles db fetching,
-./install/install-go-linux.sh
+./install/install-go-linux.sh $INSTALL_DIR
+./install/install-go-packages.sh
 
 # LiftOver is used for the LiftOverCadd.pm package, to liftOver cadd to hg38
 # and cadd's GRCh37.p13 MT to hg19
