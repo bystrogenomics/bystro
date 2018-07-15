@@ -6,7 +6,7 @@ else
   DIR=$HOME
 fi
 
-echo -e "\n\nInstalling Go"
+echo -e "\n\nInstalling Go\n"
 
 rm -rf go;
 echo "Deleting /usr/local/go"

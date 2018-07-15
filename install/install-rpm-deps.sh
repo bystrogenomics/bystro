@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-echo -e "\n\nInstalling Debian (rpm) dependencies"
+echo -e "\n\nInstalling Debian (rpm) dependencies\n"
 
 sudo yum install gcc -y -q;
 sudo yum install openssl -y -q;

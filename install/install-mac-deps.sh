@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-echo -e "\n\nInstalling homebrew, and MacOS dependencies using the same"
+echo -e "\n\nInstalling homebrew, and MacOS dependencies using the same\n"
 
 /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
 echo 'export PATH="/usr/local/opt/gettext/bin:$PATH"' >> $HOME/.bash_profile

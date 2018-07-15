@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-echo -e "\n\nInstalling perl libs"
+echo -e "\n\nInstalling perl libs\n"
 
 cpan install App::cpanminus
 

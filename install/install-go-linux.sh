@@ -6,7 +6,7 @@ else
   DIR=$HOME
 fi
 
-echo -e "\n\nInstalling Go in /usr/local"
+echo -e "\n\nInstalling Go in /usr/local\n"
 
 # Clean in case somethign left over from old installation
 rm -rf go

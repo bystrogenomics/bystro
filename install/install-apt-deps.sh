@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-echo -e "\n\nInstalling Ubuntu/Debian (apt-get) dependencies"
+echo -e "\n\nInstalling Ubuntu/Debian (apt-get) dependencies\n"
 
 sudo apt update
 # Installs gcc, and more; may be too much
