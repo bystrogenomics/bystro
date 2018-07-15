@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
+echo "Installing perl libs"
+
 cpan install App::cpanminus
 
-# Needed for msgpack perl
-cpanm install File::Copy::Recursive
 cpanm install Mouse
 cpanm install Path::Tiny
 cpanm install namespace::autoclean
@@ -21,8 +21,6 @@ cpanm install Net::HTTP
 cpanm install Search::Elasticsearch
 cpanm install Math::SigFigs
 cpanm install LMDB_File
-cpanm install Sort::XS
-cpanm install Hash::Merge::Simple
 cpanm install PerlIO::utf8_strict
 cpanm install PerlIO::gzip
 cpanm install MouseX::SimpleConfig
@@ -39,10 +37,14 @@ cpanm install Beanstalk::Client
 # allows prefer_float32 flag for 5-byte float storage
 cpanm install Module::Install::XSUtil
 cpanm install Module::Install::AuthorTests
+
+# A dependency of Data::MessagePack installation
+cpanm install File::Copy::Recursive
+
 cpanm --uninstall -f Data::MessagePack
 rm -rf msgpack-perl
 git clone --recursive https://github.com/akotlar/msgpack-perl.git && cd msgpack-perl
 perl Makefile.PL
-make --quiet test
-make --quiet install
+make test
+sudo make install
 cd ../ && rm -rf msgpack-perl
