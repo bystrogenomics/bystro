@@ -12,7 +12,11 @@ Users of AWS can skip installation altogether, and use the latest public Bystro 
 ## Installation on RPM-based distros
 <h4>(Fedora, Redhat, Centos, openSUSE, Mandriva)</h4>
 
- 1. ```wget https://github.com/akotlar/bystro/archive/master.zip -O bystro.zip && unzip bystro.zip && mv bystro-master bystro && cd $_ && ./install-rpm.sh```
+ 1. ```git clone git@github.com:akotlar/bystro.git && cd bystro && ./install-rpm.sh```
+ 
+## Installation on MacOS (tested on HighSierra, interactive)
+
+ 1. ```git clone git@github.com:akotlar/bystro.git && cd bystro && ./install-mac.sh```
  
  ## Example of installation on RPM-based Amazon AMI (any 'yum'-capable Amazon AMI)
 Run the script found @ https://github.com/akotlar/bystro-aws 
