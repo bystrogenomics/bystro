@@ -42,3 +42,5 @@ ok(@parts == 2, "Splitting on single quoted tab char ('\\t') still works");
 
 @parts2 = split("\t", $line);
 ok(@parts == 2, "Splitting on double quoted tab char (\"\\t\") still works");
+
+done_testing();
