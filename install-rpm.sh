@@ -31,13 +31,16 @@ make --quiet -C lmdb/libraries/liblmdb;
 sudo make --quiet install -C lmdb/libraries/liblmdb;
 
 # Bystro is increasingly a golang progrma. Perl currently handles db fetching,
-wget https://storage.googleapis.com/golang/go1.8.linux-amd64.tar.gz;
-tar -xf go1.8.linux-amd64.tar.gz;
-sudo mv go /usr/local;
+echo "Installing Go"
 
-# LiftOver is used for the LiftOverCadd.pm package, to liftOver cadd to hg38
-# and cadd's GRCh37.p13 MT to hg19
-wget http://hgdownload.cse.ucsc.edu/admin/exe/linux.x86_64/liftOver && chmod +x liftOver && sudo mv $_ /usr/local/bin/;
+rm -rf go
+rm go1.10.3.linux-amd64.tar.gz;
+wget https://dl.google.com/go/go1.10.3.linux-amd64.tar.gz;
+tar -xf go1.10.3.linux-amd64.tar.gz;
+echo "Deleting go in /usr/local"
+sudo rm -rf /usr/local/go
+sudo mv go /usr/local;
+rm go1.10.3.linux-amd64.tar.gz;
 
 (echo ""; echo 'export PATH=$PATH:/usr/local/go/bin') >> $HOME_DIR/.bash_profile;
 (echo ""; echo "export GOPATH=$HOME_DIR/go") >> $HOME_DIR/.bash_profile;
@@ -58,12 +61,15 @@ go install github.com/akotlar/bystro-snp;
 go get github.com/mikefarah/yaml;
 go install github.com/mikefarah/yaml;
 
-rm go1.8*;
+# LiftOver is used for the LiftOverCadd.pm package, to liftOver cadd to hg38
+# and cadd's GRCh37.p13 MT to hg19
+wget http://hgdownload.cse.ucsc.edu/admin/exe/linux.x86_64/liftOver && chmod +x liftOver && sudo mv $_ /usr/local/bin/;
+
 
 # Eases package installation, gives us ability to quickly upgrade perl versions
 wget -O - https://install.perlbrew.pl | bash;
 (echo "" ; echo "source $HOME_DIR/perl5/perlbrew/etc/bashrc") >> $HOME_DIR/.bash_profile && source $HOME_DIR/.bash_profile;
-perlbrew install perl-5.26.0 && perlbrew switch perl-5.26.0;
+perlbrew install perl-5.28.0 && perlbrew switch perl-5.28.0;
 
 source $HOME_DIR/.bash_profile;
 perl -MCPAN -e 'my $c = "CPAN::HandleConfig"; $c->load(doit => 1, autoconfig => 1); $c->edit(prerequisites_policy => "follow"); $c->edit(build_requires_install_policy => "yes"); $c->commit'

@@ -1,4 +1,9 @@
+#!/usr/bin/env bash
+
 cpan install App::cpanminus
+
+# Needed for msgpack perl
+cpanm install File::Copy::Recursive
 cpanm install Mouse
 cpanm install Path::Tiny
 cpanm install namespace::autoclean
