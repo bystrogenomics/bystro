@@ -14,10 +14,12 @@ echo "Installing local perl via perlbrew into $DIR"
 # high sierra doesn't like 5.28.0, even with berkleydb installed (fails test 21, line length)
 cnt=$(perlbrew list | grep perl-5.28.0 | wc -l)
 
-if [ $cnt > 0]; then
+if [ $cnt > 0 ]; then
   perlbrew install perl-5.26.0
 fi
 
 perlbrew switch perl-5.26.0
 
 source ~/.bash_profile;
+
+./install/update-cpan.sh
