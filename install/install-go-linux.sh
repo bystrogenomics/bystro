@@ -2,6 +2,7 @@
 
 echo "Installing Go in /usr/local"
 
+# Clean in case somethign left over from old installation
 rm -rf go
 rm go1.10.3.linux-amd64.tar.gz;
 wget https://dl.google.com/go/go1.10.3.linux-amd64.tar.gz;

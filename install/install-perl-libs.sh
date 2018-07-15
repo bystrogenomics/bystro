@@ -3,6 +3,7 @@
 echo "Installing perl libs"
 
 cpan install App::cpanminus
+
 cpanm install Mouse
 cpanm install Path::Tiny
 cpanm install namespace::autoclean
@@ -36,10 +37,14 @@ cpanm install Beanstalk::Client
 # allows prefer_float32 flag for 5-byte float storage
 cpanm install Module::Install::XSUtil
 cpanm install Module::Install::AuthorTests
+
+# A dependency of Data::MessagePack installation
+cpanm install File::Copy::Recursive
+
 cpanm --uninstall -f Data::MessagePack
 rm -rf msgpack-perl
 git clone --recursive https://github.com/akotlar/msgpack-perl.git && cd msgpack-perl
 perl Makefile.PL
-make --quiet test
-make --quiet install
+make test
+sudo make install
 cd ../ && rm -rf msgpack-perl
