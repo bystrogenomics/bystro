@@ -14,10 +14,12 @@ echo "Installing local perl via perlbrew into $DIR"
 
 cnt=$(perlbrew list | grep perl-5.28.0 | wc -l)
 
-if [ $cnt > 0]; then
+if [ $cnt > 0 ]; then
   perlbrew install perl-5.28.0
 fi
 
 perlbrew switch perl-5.28.0
 
-source ~/.bash_profile;
+source ~/.bash_profile
+
+./install/update-cpan.sh
