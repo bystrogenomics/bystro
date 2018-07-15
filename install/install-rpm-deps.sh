@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-echo "Installing Debian (rpm) dependencies"
+echo -e "\n\nInstalling Debian (rpm) dependencies"
 
 sudo yum install gcc -y -q;
 sudo yum install cpan -y -q;

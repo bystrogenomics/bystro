@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-echo "Installing LMDB"
+echo -e "\n\nInstalling LMDB"
 
 # Bystro uses LMDB as its db engine. Fast, great use of cache
 rm -rf lmdb

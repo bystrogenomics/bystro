@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-echo "Updating go packages"
+echo -e "\n\nUpdating go packages"
 # Update go packages;
 # TODO: combine go packages
 cdir=$(pwd)

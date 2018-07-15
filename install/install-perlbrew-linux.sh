@@ -7,7 +7,7 @@ else
   DIR=$HOME
 fi
 
-echo "Installing local perl via perlbrew into $DIR"
+echo -e "\n\nInstalling local perl via perlbrew into $DIR"
 
 ./install/configure-cpan.sh
 
@@ -16,7 +16,7 @@ echo "Installing local perl via perlbrew into $DIR"
 
 cnt=$(perlbrew list | grep perl-5.28.0 | wc -l)
 
-if [ $cnt > 0]; then
+if [ $cnt > "0" ]; then
   perlbrew install perl-5.28.0
 fi
 

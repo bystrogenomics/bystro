@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-echo "Installing go packages (bystro-vcf, stats, snp)"
+echo -e "\n\nInstalling go packages (bystro-vcf, stats, snp)"
 
 mkdir -p $GOPATH/src/github.com;
 

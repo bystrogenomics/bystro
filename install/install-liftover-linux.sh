@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-echo "Installing liftover into /usr/local/bin/"
+echo -e "\n\nInstalling liftover into /usr/local/bin/"
 
 # LiftOver is used for the LiftOverCadd.pm package, to liftOver cadd to hg38
 # and cadd's GRCh37.p13 MT to hg19

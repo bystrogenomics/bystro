@@ -6,7 +6,7 @@ else
   DIR=~
 fi
 
-echo "Installing local perl via perlbrew into $DIR"
+echo -e "\n\nInstalling local perl via perlbrew into $DIR"
 
 ./install/configure-cpan.sh
 
@@ -14,9 +14,9 @@ echo "Installing local perl via perlbrew into $DIR"
 (echo "" ; echo "source $DIR/perl5/perlbrew/etc/bashrc") | sudo tee -a $HOME/.bash_profile && source $HOME/.bash_profile;
 
 # high sierra doesn't like 5.28.0, even with berkleydb installed (fails test 21, line length)
-cnt=$(perlbrew list | grep perl-5.28.0 | wc -l)
+cnt=$(perlbrew list | grep perl-5.26.0 | wc -l)
 
-if [ $cnt > 0]; then
+if [ $cnt > "0" ]; then
   perlbrew install perl-5.26.0
 fi
 
