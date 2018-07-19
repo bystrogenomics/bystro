@@ -14,7 +14,7 @@ else
 fi
 
 export PERLBREW_ROOT=$DIR/perl5/perlbrew;
-export PERLBREW_HOME=/tmp/.perlbrew;
+export PERLBREW_HOME=$DIR/.perlbrew;
 
 echo -e "\n\nInstalling local perl via perlbrew into $DIR\n";
 
@@ -22,6 +22,7 @@ echo -e "\n\nInstalling local perl via perlbrew into $DIR\n";
 
 if ! cat ~/.bash_profile | grep "perl5\/perlbrew\/etc\/bashrc"; then
   (echo "" ; echo "source $PERLBREW_ROOT/etc/bashrc") | sudo tee -a ~/.bash_profile
+  (echo "" ; echo "export PERLBREW_HOME=$PERLBREW_HOME") | sudo tee -a ~/.bash_profile
 fi
 
 source $PERLBREW_ROOT/etc/bashrc;
