@@ -21,8 +21,10 @@ echo -e "\n\nInstalling local perl via perlbrew into $DIR\n";
 (\curl -L https://install.perlbrew.pl || \wget -O - https://install.perlbrew.pl) | bash
 
 if ! cat ~/.bash_profile | grep "perl5\/perlbrew\/etc\/bashrc"; then
-  (echo "" ; echo "source $PERLBREW_ROOT/etc/bashrc") | sudo tee -a ~/.bash_profile
   (echo "" ; echo "export PERLBREW_HOME=$PERLBREW_HOME") | sudo tee -a ~/.bash_profile
+  # Not 100% sure why this is necessary; something still wonky during perlbrew install
+  (echo "" ; echo "export PERL5LIB=$DIR/perl5/lib/perl5") | sudo tee -a ~/.bash_profile
+  (echo "" ; echo "source $PERLBREW_ROOT/etc/bashrc") | sudo tee -a ~/.bash_profile
 fi
 
 source $PERLBREW_ROOT/etc/bashrc;

@@ -1,10 +1,4 @@
 #!/usr/bin/env bash
-# if [[ -n "$1" ]]
-# then
-#   VERSION=$1
-# else
-#   VERSION=perl-5.28.0
-# fi
 
 echo -e "\n\nInstalling perl libs\n"
 
@@ -54,5 +48,5 @@ rm -rf msgpack-perl
 git clone --recursive https://github.com/akotlar/msgpack-perl.git && cd msgpack-perl
 perl Makefile.PL
 make test
-sudo make install
+make install
 cd ../ && rm -rf msgpack-perl
