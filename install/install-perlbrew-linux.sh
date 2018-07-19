@@ -8,17 +8,11 @@ fi
 
 echo -e "\n\nInstalling local perl via perlbrew into $DIR\n"
 
-# Configure cpan to install locally
-# Not quite sure why not local by default
-./install/configure-cpan.sh
-
 (\curl -L https://install.perlbrew.pl || \wget -O - https://install.perlbrew.pl) | bash
 
-if ! cat ~/.bash_profile | grep "perl5\/etc\/bashrc"; then
-  (echo "" ; echo "source $DIR/perl5/etc/bashrc") | sudo tee -a $HOME/.bash_profile
+if ! cat ~/.bash_profile | grep "perl5\/perlbrew\/etc\/bashrc"; then
+  (echo "" ; echo "source $DIR/perl5/perlbrew/etc/bashrc") | sudo tee -a $HOME/.bash_profile
 fi
-
-. $HOME/.bash_profile;
 
 cnt=$(perlbrew list | grep perl-5.28.0 | wc -l)
 
@@ -27,3 +21,9 @@ if [ $cnt == 0 ]; then
 fi
 
 perlbrew switch perl-5.28.0
+
+. $HOME/.bash_profile
+
+curl -L https://cpanmin.us | perl - App::cpanminus
+
+cpanm --local-lib=~/perl5 local::lib && eval $(perl -I ~/perl5/lib/perl5/ -Mlocal::lib)

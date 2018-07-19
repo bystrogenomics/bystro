@@ -2,8 +2,6 @@
 
 echo -e "\n\nInstalling perl libs\n"
 
-cpan install App::cpanminus
-
 cpanm install Mouse
 cpanm install Path::Tiny
 cpanm install namespace::autoclean
