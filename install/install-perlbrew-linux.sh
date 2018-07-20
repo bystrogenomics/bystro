@@ -32,7 +32,7 @@ echo -e "\n\nInstalling local perl via perlbrew into $DIR\n";
 if ! cat $PROFILE | grep "perl5\/perlbrew\/etc\/bashrc"; then
   (echo "" ; echo "export PERLBREW_HOME=$PERLBREW_HOME") | sudo tee -a $PROFILE
   # Not 100% sure why this is necessary; something still wonky during perlbrew install
-  (echo "" ; echo "export PERL5LIB=PERL5LIB:$LOCAL_LIB") | sudo tee -a $PROFILE
+  (echo "" ; echo 'export PERL5LIB=$PERL5LIB:'$LOCAL_LIB) | sudo tee -a $PROFILE
   (echo "" ; echo "source $PERLBREW_ROOT/etc/bashrc") | sudo tee -a $PROFILE
 fi
 
