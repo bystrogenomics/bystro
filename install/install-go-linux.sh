@@ -6,6 +6,13 @@ else
   DIR=$HOME
 fi
 
+if [[ -n "$2" ]]
+then
+  PROFILE=$2;
+else
+  PROFILE=~/.bash_profile;
+fi
+
 echo -e "\n\nInstalling Go in /usr/local\n"
 
 # Clean in case somethign left over from old installation
@@ -18,4 +25,4 @@ sudo rm -rf /usr/local/go
 sudo mv go /usr/local;
 rm go1.10.3.linux-amd64.tar.gz;
 
-./install/export-go-path-linux.sh $DIR
+. install/export-go-path-linux.sh $DIR $PROFILE
