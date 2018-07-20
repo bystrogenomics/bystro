@@ -10,21 +10,21 @@ fi
 # # LiftOver is used for the LiftOverCadd.pm package, to liftOver cadd to hg38
 # and cadd's GRCh37.p13 MT to hg19
 . install/install-liftover-linux.sh;
-. install/install-rpm-deps.sh;
+. install/install-apt-deps.sh;
 . install/install-lmdb-linux.sh;
 
-. ~/.bash_profile;
+. ~/.profile;
 
 # Perlbrew simplifies version management
-. ./install/install-perlbrew-linux.sh $INSTALL_DIR perl-5.28.0;
+. ./install/install-perlbrew-linux.sh $INSTALL_DIR perl-5.28.0 ~/.profile;
 . ./install/install-perl-libs.sh;
 
-. ~/.bash_profile;
+. ~/.profile;
 
 # # Bystro is increasingly a golang progrma. Perl currently handles db fetching,
-. install/install-go-linux.sh $INSTALL_DIR;
+. install/install-go-linux.sh $INSTALL_DIR ~/.profile;
 
-. ~/.bash_profile;
+. ~/.profile;
 
 . install/install-go-packages.sh;
 . install/update-packages.sh;
