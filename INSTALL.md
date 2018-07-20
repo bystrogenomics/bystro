@@ -7,13 +7,21 @@ The web app provides full functionality for any size experiment (up to 890GB unc
 Users of AWS can skip installation altogether, and use the latest public Bystro AMI
 
  1. Following [Amazon's instructions](http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/usingsharedamis-finding.html), search for the "Bystro" Public AMI
+    * if you use this option, please make sure to ```cd ~/bystro && git checkout b10 && git pull origin b10 && source ./install-rpm.sh``` to update all dependencies
 
-
-## Installation on RPM-based distros
+## Installation on Linux distros that use RPM (yum)
 <h4>(Fedora, Redhat, Centos, openSUSE, Mandriva)</h4>
 
- 1. ```wget https://github.com/akotlar/bystro/archive/master.zip -O bystro.zip && unzip bystro.zip && mv bystro-master bystro && cd $_ && ./install-rpm.sh```
+ 1. ```git clone https://github.com/akotlar/bystro && cd bystro && source ./install-rpm.sh```
 
+## Installation on Linux distros that use APT (apt-get)
+<h4>(Debian, Ubuntu)</h4>
+
+ 1. ```git clone https://github.com/akotlar/bystro && cd bystro && source ./install-apt.sh```
+
+## Installation on MacOS
+
+ 1. ```git clone https://github.com/akotlar/bystro && cd bystro && source ./install-mac.sh```
 
 ## Configuring Bystro for annotation
 Once Bystro is installed, it needs to be configured. The easiest step is choosing the species/assemblies to annotate.
