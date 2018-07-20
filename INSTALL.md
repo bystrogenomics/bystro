@@ -7,6 +7,7 @@ The web app provides full functionality for any size experiment (up to 890GB unc
 Users of AWS can skip installation altogether, and use the latest public Bystro AMI
 
  1. Following [Amazon's instructions](http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/usingsharedamis-finding.html), search for the "Bystro" Public AMI
+ 2. After launching the ami, ```cd ~/bystro && git pull origin b10 && source ./install-rpm.sh``` to update dependencis
 
 
 ## Installation on RPM-based distros
