@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
+if [[ -n "$1" ]]
+then
+  DIR=$1
+else
+  DIR=$HOME
+fi
 
-echo "Installing Go"
+echo -e "\n\nInstalling Go\n"
 
 rm -rf go;
 echo "Deleting /usr/local/go"
@@ -11,4 +17,4 @@ tar -xf go1.10.3.darwin-amd64.tar.gz;
 sudo mv go /usr/local;
 rm go1.10.3.darwin-amd64.tar.gz;
 
-./install/export-go-path-linux.sh;
+./install/export-go-path-linux.sh $DIR
