@@ -42,7 +42,7 @@ cnt=$(perlbrew list | grep $VERSION | wc -l);
 nCores=$(getconf _NPROCESSORS_ONLN);
 
 if [ $cnt == 0 ]; then
-  perlbrew install $VERSION -j nCores;
+  perlbrew install $VERSION -j $nCores;
 fi
 
 perlbrew switch $VERSION;
