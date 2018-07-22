@@ -29,6 +29,10 @@ fi
 . install/install-go-packages.sh;
 . install/update-packages.sh;
 
+. ./install/export-bystro-libs.sh ~/.profile
+
+. ~/.profile;
+
 mkdir -p logs;
 
 printf "\n\nREMEMBER TO INCREASE ULIMIT ABOVE 1024 IF RUNNING MANY FORKS\n\n";
