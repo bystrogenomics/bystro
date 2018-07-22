@@ -16,8 +16,8 @@ fi
 . ~/.bash_profile;
 
 # Perlbrew simplifies version management
-# Mac doesn't like/build 5.28.0 without failing some tests
-. ./install/install-perlbrew-linux.sh $INSTALL_DIR perl-5.26.2;
+# Mac doesn't like/build 5.28.0 or 5.26.2 without failing some tests
+. ./install/install-perlbrew-linux.sh $INSTALL_DIR perl-5.26.0;
 . ./install/install-perl-libs.sh;
 
 # Bystro is increasingly a golang progrma. Perl currently handles db fetching,
@@ -29,6 +29,10 @@ fi
 # Not necessary for first install, but allows us to have a single entry point
 # for installation and updates
 . ./install/update-packages.sh;
+
+. ./install/export-bystro-libs.sh ~/.bash_profile
+
+. ~/.bash_profile;
 
 mkdir -p logs;
 
