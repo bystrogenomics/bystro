@@ -448,7 +448,7 @@ sub _writeRegionData {
     $self->db->dbPatchHash($dbName, $txNumber, $regionsHref->{$txNumber});
   }
 
-  $self->log('info', $self->name . ": finished _writeregions for $chr");
+  $self->log('info', $self->name . ": finished _writeRegionData for $chr");
 }
 
 ############ Joining some other track to Gene track's region db ################
