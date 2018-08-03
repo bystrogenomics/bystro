@@ -130,13 +130,17 @@ sub buildTrack {
 
       ($err, $seenChrs, $data) = $self->_readTxData($fh);
 
+      if($err) {
+        $self->log('fatal', $self->name .": $err");
+      }
+
       # If we fork a process in order to read (example zcat) prevent that process
       # from becoming defunct
       $self->safeCloseBuilderFh($fh, $file, 'fatal');
 
-      my %all = $data->{all};
-      my %txStarts = $data->{txStart};
-      my %regions = $data->{region};
+      my %all = %{$data->{all}};
+      my %txStarts = %{$data->{txStart}};
+      my %regions = %{$data->{region}};
 
       # If we skipped the $file, will never get here, so this is an error
       # Can happen if only 1 file, with only 1 chromosome (not building all chrs)
@@ -265,7 +269,7 @@ sub _getIdx {
 
   chomp $firstLine;
 
-  my %idx;
+  my (%allIdx, %regionIdx);
   # If the user wanted to transform the input field names, do, so source field names match
   # those expected by the track
   my @fields = map{ $self->fieldMap->{$_} || $_ } split('\t', $firstLine);
@@ -274,14 +278,14 @@ sub _getIdx {
   # don't need to know what Gene::TX requires.
   my $fieldIdx = 0;
   for my $field (@fields) {
-    $idx{all}{$field} = $fieldIdx;
+    $allIdx{$field} = $fieldIdx;
     $fieldIdx++;
   }
 
   # Except w.r.t the chromosome field, txStart, txEnd, txNumber definitely need these
-  if(!defined $idx{all}{$self->chrom_field_name}
-  || !defined $idx{all}{$self->txStart_field_name}
-  || !defined $idx{all}{$self->txEnd_field_name} ) {
+  if(!defined $allIdx{$self->chrom_field_name}
+  || !defined $allIdx{$self->txStart_field_name}
+  || !defined $allIdx{$self->txEnd_field_name} ) {
     return ('must provide chrom, txStart, txEnd fields', undef);
   }
 
@@ -289,8 +293,8 @@ sub _getIdx {
   my $err;
 
   REGION_FEATS: for my $field (@{$self->features}) {
-    if(exists $idx{all}{$field} ) {
-      $idx{region}{$field} = $idx{all}{$field};
+    if(exists $allIdx{$field} ) {
+      $regionIdx{$field} = $allIdx{$field};
       next REGION_FEATS;
     }
 
@@ -298,7 +302,10 @@ sub _getIdx {
     last;
   }
 
-  return ($err, \%idx);
+  return ($err, {
+    all => \%allIdx,
+    region => \%regionIdx,
+  });
 }
 
 sub _readTxData {
@@ -320,8 +327,8 @@ sub _readTxData {
 
   ($err, my $idx) = $self->_getIdx($firstLine);
 
-  my %allIdx = $idx->{all};
-  my %regionIdx = $idx->{region};
+  my %allIdx = %{$idx->{all}};
+  my %regionIdx = %{$idx->{region}};
 
   if($err) {
     return $err;
@@ -422,7 +429,7 @@ sub _readTxData {
   $out{all} = \%allData;
   $out{region} = \%regionData;
 
-  return $err, \%out;
+  return ($err, $seenChrs, \%out);
 }
 
 sub _writeRegionData {
