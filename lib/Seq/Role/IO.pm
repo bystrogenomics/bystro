@@ -204,17 +204,13 @@ sub safeOpen {
     return $err;
   }
 
-  #return $fh;
-  return $err;
+  return;
 }
 
 sub safeClose {
   my ($self, $fh, $errCode) = @_;
 
   if(!close($fh)) {
-    # $err = $err || $!;
-  say STDERR "ERROR FROM CLOSE $!";
-    #$self                            #$operand
     $self->log($errCode || 'error', "Couldn't close due to: $!");
     return $!;
   }
@@ -233,7 +229,7 @@ sub getCleanFields {
 
     return \@out;
   }
-  
+
   return undef;
 }
 
