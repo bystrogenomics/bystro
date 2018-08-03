@@ -96,6 +96,6 @@ tracks:
       AF_Male: af_male
       AF_Female: af_female
     local_files:
-    - test_split_part*.vcf
+    - test_split_part*.vcf*
     name: gnomad.genomes.scrambled
     type: vcf
