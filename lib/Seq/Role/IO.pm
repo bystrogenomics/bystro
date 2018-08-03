@@ -179,7 +179,7 @@ sub safeSystem {
   my $return = system($cmd);
 
   if($return > 0) {
-    $self->log($errCode || 'error', "Failed to execute $cmd, with error status $return, due to: $!");
+    $self->log($errCode || 'debug', "Failed to execute $cmd. Return: $return, due to: $! ($?)");
     return $!;
   }
 
@@ -200,7 +200,7 @@ sub safeOpen {
     $err = $err || $!;
 
     #$self    #$errCode                      #$operand
-    $_[0]->log($_[4] || 'error', "Couldn't open $_[3]: $err");
+    $_[0]->log($_[4] || 'debug', "Couldn't open $_[3]: $err ($?)");
     return $err;
   }
 
@@ -211,7 +211,7 @@ sub safeClose {
   my ($self, $fh, $errCode) = @_;
 
   if(!close($fh)) {
-    $self->log($errCode || 'error', "Couldn't close due to: $!");
+    $self->log($errCode || 'debug', "Couldn't close due to: $! ($?)");
     return $!;
   }
 

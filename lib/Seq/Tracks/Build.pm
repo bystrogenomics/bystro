@@ -467,6 +467,40 @@ sub chrWantedAndIncomplete {
   return undef;
 }
 
+sub safeCloseBuilderFh {
+  my ($self, $fh, $fileName, $errCode, $strict) = @_;
+
+  if(!$errCode) {
+    $errCode = 'fatal';
+  }
+
+  #From Seq::Role::IO
+  my $err = $self->safeClose($fh);
+
+  if($err) {
+    #Can happen when closing immediately after opening
+    if($? != 13) {
+      $self->log($errCode, $self->name . ": Failed to close $fileName: $err ($?)");
+      return $err;
+    }
+
+    # We make a choice to ignored exit code 13... it happens a lot
+    # 13 is sigpipe, occurs if closing pipe before cat/pigz finishes
+    $self->log('warn', $self->name . ": Failed to close $fileName: $err ($?)");
+
+    # Make it optional to return a sigpipe error, since controlling
+    # program likely wants to die on error, and sigpipe may not be worth it
+    if($strict) {
+      return $err;
+    }
+
+    return;
+  }
+
+  $self->log('info', $self->name . ": closed $fileName with $?");
+  return;
+}
+
 sub _isTransformOperator {
   my ($self, $value) = @_;
 

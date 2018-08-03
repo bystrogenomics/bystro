@@ -63,7 +63,11 @@ sub buildTrack {
     $self->db->cleanUp();
 
     $pm->start($file) and next;
-      my $fh = $self->getReadFh($file);
+      my ($err, undef, $fh) = $self->getReadFh($file);
+
+      if($err) {
+        $self->log('fatal', $self->name . ": $err");
+      }
 
       my $wantedChr;
 
@@ -152,12 +156,7 @@ sub buildTrack {
       undef $cursor;
 
       #13 is sigpipe, occurs if closing pipe before cat/pigz finishes
-      if(!close($fh) && $? != 13) {
-        $self->log('fatal', $self->name . ": failed to close $file with $! $?");
-        die $self->name . ": failed to close $file with $!";
-      } else {
-        $self->log('info', $self->name . ": closed $file with $?");
-      }
+      $self->safeCloseBuilderFh($fh, $file, 'fatal');
 
     #exit with exit code 0; this only happens if successfully completed
     $pm->finish(0, \%visitedChrs);

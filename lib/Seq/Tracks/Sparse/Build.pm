@@ -101,27 +101,24 @@ sub buildTrack {
     $self->db->cleanUp();
 
     $pm->start($file) and next;
-      my $fh = $self->getReadFh($file);
+      my ($err, undef, $fh) = $self->getReadFh($file);
+
+      if($err) {
+        $self->log('fatal', $self->name . ": $err");
+      }
 
       ############# Get Headers ##############
       my $firstLine = <$fh>;
 
       # Support non-unix line endings
-      my $err = $self->setLineEndings($firstLine);
+      $err = $self->setLineEndings($firstLine);
 
       if($err) {
-        $self->log('fatal', $err);
+        $self->log('fatal', $self->name. ": $err");
       }
 
       if(!$firstLine) {
-        my $err;
-        if(!close($fh) && $? != 13) {
-          $err = $self->name . ": failed to open $file due to $1 ($?)";
-        } else {
-          $err = $self->name . ": $file empty";
-        }
-
-        $self->log('fatal', $err);
+        $self->log('fatal', $self->name . ': failed to read header line');
       }
 
       my ($featureIdxHref, $reqIdxHref, $fieldsToTransformIdx, $fieldsToFilterOnIdx, $numColumns) = 
@@ -233,14 +230,12 @@ sub buildTrack {
       $self->db->cleanUp();
       undef $cursor;
 
-      if(!close($fh) && $? != 13) {
-        $self->log('fatal', $self->name . ": couldn't close or read $file due to $! ($?)");
-      } else {
-        $self->log('info', $self->name . ": $file closed with $?");
-        $self->log('info', $self->name . ": invalid lines found in $file: $invalid");
-        $self->log('info', $self->name . ": lines that didn't pass filters in $file: $failedFilters");
-        $self->log('info', $self->name . ": lines that were longer than " . $self->maxVariantSize . " found in $file: $tooLong");
-      }
+      $self->safeCloseBuilderFh($fh, $file, 'fatal');
+
+      $self->log('info', $self->name . ": $file closed with $?");
+      $self->log('info', $self->name . ": invalid lines found in $file: $invalid");
+      $self->log('info', $self->name . ": lines that didn't pass filters in $file: $failedFilters");
+      $self->log('info', $self->name . ": lines that were longer than " . $self->maxVariantSize . " found in $file: $tooLong");
 
     $pm->finish(0, \%visitedChrs);
   }
@@ -281,21 +276,17 @@ sub joinTrack {
   $self->log('info', $self->name . " join track: called for $wantedChr");
 
   for my $file ($self->allLocalFiles) {
-    my $fh = $self->getReadFh($file);
+    my ($err, undef, $fh) = $self->getReadFh($file);
+
+    if($err) {
+      $self->log('fatal', $err);
+    }
 
     ############# Get Headers ##############
     my $firstLine = <$fh>;
 
     if(!$firstLine) {
-      my $err;
-      if(!close($fh) && $? != 13) {
-        $err = $self->name . " join track: failed to open $file due to $1 ($?)";
-      } else {
-        $err = $self->name . " join track: $file empty";
-      }
-
-      $self->log('fatal', $err);
-      die $err;
+      $self->log('fatal', $self->name . "Couldn't read first line of $file");
     }
 
     my ($featureIdxHref, $reqIdxHref, $fieldsToTransformIdx, $fieldsToFilterOnIdx, $numColumns) = 
@@ -364,14 +355,10 @@ sub joinTrack {
       }
     }
 
-    if(!close($fh) && $? != 13) {
-      $self->log('fatal', $self->name . " join track: failed to close $file with $! ($?)");
-      die $self->name . " join track: failed to close $file with $!";
-    } else {
-      $self->log('info', $self->name . " join track: closed $file with $?");
-      $self->log('info', $self->name . " join track: invalid lines found while joining on $file: $invalid");
-      $self->log('info', $self->name . " join track: lines that didn't pass filters while joining on $file: $failedFilters");
-    }
+    $self->safeCloseBuilderFh($fh, $file, 'fatal');
+
+    $self->log('info', $self->name . " join track: invalid lines found while joining on $file: $invalid");
+    $self->log('info', $self->name . " join track: lines that didn't pass filters while joining on $file: $failedFilters");
   }
 
   $self->log('info', $self->name . " join track: finished for $wantedChr");

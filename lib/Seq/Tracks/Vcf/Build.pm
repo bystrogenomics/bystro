@@ -229,7 +229,7 @@ sub buildTrack {
     $self->db->cleanUp();
 
     $pm->start($file) and next;
-      my $echoProg = $self->isCompressedSingle($file) ? $self->gzip . ' ' . $self->decompressArgs : 'cat';
+      my $prog = $self->isCompressedSingle($file) ? $self->gzip . ' ' . $self->decompressArgs : 'cat';
 
       my $errPath = $file . ".build." . localtime() . ".log";
 
@@ -253,12 +253,12 @@ sub buildTrack {
       my $cursor;
       my $count = 0;
 
-      $self->safeOpen(
-        my $fh,
-        '-|',
-        "$echoProg $file | " . $self->vcfProcessor . " --emptyField $delim" . " --keepId --keepInfo",
-        'fatal'
-      );
+      my $op = "$prog $file | " . $self->vcfProcessor. " --emptyField $delim" . " --keepId --keepInfo";
+      $err = $self->safeOpen(my $fh, '-|', $op);
+
+      if($err) {
+        $self->log('fatal', $self->name . ": $err");
+      }
 
       # TODO: Read header, and configure vcf header feature indices based on that
       my $header = <$fh>;
@@ -314,7 +314,7 @@ sub buildTrack {
           next;
         }
 
-        my ($err, $data) = $self->_extractFeatures(\@fields, $vcfNameMap, $vcfFilterMap);
+        ($err, my $data) = $self->_extractFeatures(\@fields, $vcfNameMap, $vcfFilterMap);
 
         if($err) {
           #Commit, sync everything, including completion status, and release mmap
@@ -342,10 +342,10 @@ sub buildTrack {
         $count++;
       }
 
-      close $fh;
-
       #Commit, sync everything, including completion status, and release mmap
       $self->db->cleanUp();
+
+      $self->safeCloseBuilderFh($fh, $file, 'fatal');
 
     $pm->finish(0, \%visitedChrs);
   }
@@ -375,7 +375,11 @@ sub _extractHeader {
   my $file = shift;
   my $dieIfNotFound = shift;
 
-  my $fh = $self->getReadFh($file);
+  my ($err, undef, $fh) = $self->getReadFh($file);
+
+  if($err) {
+    return ($err, undef, undef);
+  }
 
   my @header;
   while(<$fh>) {
@@ -389,7 +393,11 @@ sub _extractHeader {
     last;
   }
 
-  close $fh;
+  $err = $self->safeCloseBuilderFh($fh, $file, 'error');
+
+  if($err) {
+    return ($err, undef, undef);
+  }
 
   my $idxOfInfo = -9;
   my $idx = -1;

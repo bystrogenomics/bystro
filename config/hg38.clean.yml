@@ -1,7 +1,7 @@
 ---
 assembly: hg38
-build_author: ec2-user
-build_date: 2018-01-20T22:12:00
+build_author: ubuntu
+build_date: 2018-08-03T18:17:00
 chromosomes:
 - chr1
 - chr2
@@ -113,12 +113,6 @@ tracks:
     name: nearest.refSeq
     to: txEnd
     type: nearest
-    utils:
-    - args:
-        renameTo: nearest.refSeq
-      completed: 2017-12-24T20:10:00
-      name: renameTrack
-    version: 17
   - build_author: ec2-user
     build_date: 2018-01-20T22:12:00
     dist: true
@@ -130,11 +124,6 @@ tracks:
     - hg38.kgXref.chr*.with_dbnsfp.gz
     name: nearestTss.refSeq
     type: nearest
-    utils:
-    - args:
-        renameTo: nearestTss.refSeq
-      completed: 2017-12-24T20:10:00
-      name: renameTrack
     version: 17
   - build_author: ec2-user
     build_date: 2018-01-20T22:12:00
@@ -262,31 +251,31 @@ tracks:
       - chromEnd
       track: clinvar
     local_files:
-    - hg38.kgXref.chr5.with_dbnsfp.gz
-    - hg38.kgXref.chr6.with_dbnsfp.gz
-    - hg38.kgXref.chr2.with_dbnsfp.gz
-    - hg38.kgXref.chr3.with_dbnsfp.gz
-    - hg38.kgXref.chr4.with_dbnsfp.gz
-    - hg38.kgXref.chr7.with_dbnsfp.gz
     - hg38.kgXref.chr8.with_dbnsfp.gz
+    - hg38.kgXref.chr6.with_dbnsfp.gz
+    - hg38.kgXref.chr4.with_dbnsfp.gz
+    - hg38.kgXref.chr2.with_dbnsfp.gz
+    - hg38.kgXref.chr5.with_dbnsfp.gz
+    - hg38.kgXref.chr7.with_dbnsfp.gz
+    - hg38.kgXref.chr3.with_dbnsfp.gz
     - hg38.kgXref.chr1.with_dbnsfp.gz
-    - hg38.kgXref.chr14.with_dbnsfp.gz
     - hg38.kgXref.chr12.with_dbnsfp.gz
-    - hg38.kgXref.chr9.with_dbnsfp.gz
-    - hg38.kgXref.chr11.with_dbnsfp.gz
-    - hg38.kgXref.chr13.with_dbnsfp.gz
     - hg38.kgXref.chr10.with_dbnsfp.gz
+    - hg38.kgXref.chr9.with_dbnsfp.gz
     - hg38.kgXref.chr16.with_dbnsfp.gz
     - hg38.kgXref.chr15.with_dbnsfp.gz
-    - hg38.kgXref.chr19.with_dbnsfp.gz
+    - hg38.kgXref.chr11.with_dbnsfp.gz
+    - hg38.kgXref.chr14.with_dbnsfp.gz
+    - hg38.kgXref.chr13.with_dbnsfp.gz
+    - hg38.kgXref.chrM.with_dbnsfp.gz
+    - hg38.kgXref.chrY.with_dbnsfp.gz
     - hg38.kgXref.chr22.with_dbnsfp.gz
+    - hg38.kgXref.chr20.with_dbnsfp.gz
+    - hg38.kgXref.chr17.with_dbnsfp.gz
+    - hg38.kgXref.chr19.with_dbnsfp.gz
     - hg38.kgXref.chr18.with_dbnsfp.gz
     - hg38.kgXref.chr21.with_dbnsfp.gz
-    - hg38.kgXref.chr20.with_dbnsfp.gz
-    - hg38.kgXref.chrM.with_dbnsfp.gz
-    - hg38.kgXref.chr17.with_dbnsfp.gz
     - hg38.kgXref.chrX.with_dbnsfp.gz
-    - hg38.kgXref.chrY.with_dbnsfp.gz
     name: refSeq
     type: gene
     utils:
@@ -308,11 +297,11 @@ tracks:
           x.refseq=r.name) AS mRNA, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.rfamAcc,
           '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS rfamAcc FROM
           refGene r WHERE chrom=%chromosomes%;
-      completed: 2018-01-10T01:15:00
+      completed: 2018-08-03T01:53:00
       name: fetch
     - args:
-        geneFile: /mnt/db_backup/dbnsfp/dbNSFP3.5_gene.complete
-      completed: 2018-01-10T01:18:00
+        geneFile: /mnt/bystro-files/dbnsfp//dbNSFP3.5_gene.complete
+      completed: 2018-08-03T01:56:00
       name: refGeneXdbnsfp
     version: 26
   - build_author: ec2-user
@@ -404,8 +393,8 @@ tracks:
       completed: 2017-11-24T03:23:00
       name: fetch
     version: 26
-  - build_author: ec2-user
-    build_date: 2018-01-20T22:12:00
+  - build_author: ubuntu
+    build_date: 2018-08-03T18:17:00
     build_row_filters:
       AS_FilterStatus: == PASS
     features:
@@ -460,9 +449,9 @@ tracks:
     - gnomad.genomes.r2.0.2.sites.chr*.liftedOver.hg38.vcf.liftedOver.gz
     name: gnomad.genomes
     type: vcf
-    version: 20
-  - build_author: ec2-user
-    build_date: 2018-01-20T22:12:00
+    version: 21
+  - build_author: ubuntu
+    build_date: 2018-08-03T18:17:00
     build_row_filters:
       AS_FilterStatus: == PASS
     features:
@@ -517,10 +506,10 @@ tracks:
     - gnomad.exomes.r2.0.2.sites.liftedOver.hg38.vcf.liftedOver.gz
     name: gnomad.exomes
     type: vcf
-    version: 20
+    version: 21
   - based: 1
-    build_author: ec2-user
-    build_date: 2018-01-20T22:12:00
+    build_author: ubuntu
+    build_date: 2018-08-03T18:17:00
     build_field_transformations:
       chrom: chr .
       clinicalSignificance: split [;]
@@ -562,8 +551,8 @@ tracks:
     - args:
         remoteFiles:
         - ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz
-      completed: 2018-01-10T01:19:00
+      completed: 2018-08-03T01:59:00
       name: fetch
-    version: 17
-version: 211
+    version: 18
+version: 212
 

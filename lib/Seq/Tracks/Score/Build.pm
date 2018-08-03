@@ -34,7 +34,7 @@ sub BUILD {
   $self->{_rounder} = Seq::Tracks::Score::Build::Round->new({scalingFactor => $self->scalingFactor});
 }
 
-sub buildTrack{
+sub buildTrack {
   my $self = shift;
 
   my $fStep = 'fixedStep';
@@ -79,12 +79,11 @@ sub buildTrack{
     $self->db->cleanUp();
 
     $pm->start($file) and next;
-      unless ( -f $file ) {
-        $self->log('fatal', $self->name . ": $file doesn't exist");
-        die $self->name . ": $file doesn't exist";
-      }
+      my ($err, undef, $fh) = $self->getReadFh($file);
 
-      my $fh = $self->getReadFh($file);
+      if($err) {
+        $self->log('fatal', $self->name . ": $err");
+      }
 
       my $wantedChr;
       my $chrPosition; # absolute by default, 0 index
@@ -180,12 +179,7 @@ sub buildTrack{
       $self->db->cleanUp();
       undef $cursor;
 
-      if(!close($fh) && $? != 13) {
-        $self->log('fatal', $self->name . ": failed to close $file with $! ($?)");
-        die $self->name . ": failed to close $file with $!";
-      } else {
-        $self->log('info', $self->name . ": closed $file with $?");
-      }
+      $self->safeCloseBuilderFh($fh, $file, 'fatal');
 
     $pm->finish(0, \%visitedChrs);
   }

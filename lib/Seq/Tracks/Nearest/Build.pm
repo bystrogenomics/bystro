@@ -180,14 +180,8 @@ sub buildTrack {
   # Every row (besides header) describes a transcript
   my %regionData;
 
-  # We organize our data by the "from" position, to simplify look
-  my %txStartData;
-
   my $wantedChr;
-  my %txNumbers;
-  my $allDataHref;
-  my $from;
-  my $to;
+
   my $txNumber;
 
   my @fieldDbNames = sort { $a <=> $b } map { $self->getFieldDbName($_) } @{$self->features};
@@ -224,21 +218,17 @@ sub buildTrack {
     $self->db->cleanUp();
 
     $pm->start($file) and next;
-      my $fh = $self->getReadFh($file);
+      my ($err, undef, $fh)  = $self->getReadFh($file);
+
+      if ($err) {
+        $self->log('fatal', $self->name . ": $err");
+      }
 
       my $firstLine = <$fh>;
 
       # Fatal/exit will only affect that process, won't affect others
       if(!defined $firstLine) {
-        my $err;
-
-        if(!close($fh) && $? != 13) {
-          $err = $self->name . ": $file failed to open due to: $! ($?)";
-        } else {
-          $err = $self->name . ": $file empty";
-        }
-
-        $self->log('fatal', $err);
+        $self->log('fatal', $self->name . ": Failed to read header of $file");
       }
 
       chomp $firstLine;
@@ -346,15 +336,12 @@ sub buildTrack {
         $rowIdx++;
       }
 
+      #Commit, sync everything, including completion status, and release mmap
+      $self->db->cleanUp();
+
       # If we fork a process in order to read (example zcat) prevent that process
       # from becoming defunct
-      if(!close($fh) && $? != 13) {
-        my $err = $self->name . ": failed to close $file due to $! ($?)";
-        $self->log('fatal', $err);
-        die $err;
-      } else {
-        $self->log('info', $self->name . ": closed $file with $?");
-      }
+      $self->safeCloseBuilderFh($fh, $file, 'fatal');
 
       # We've now accumulated everything from this file
       # So write it. LMDB will serialize writes, so this is fine, even

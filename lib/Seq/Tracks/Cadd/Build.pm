@@ -100,19 +100,16 @@ sub buildTrack {
     $self->db->cleanUp();
 
     $pm->start($file) and next;
-      my $fh = $self->getReadFh($file);
+      my ($err, undef, $fh) = $self->getReadFh($file);
+
+      if($err) {
+        $self->log('fatal', $self->name . ": $err");
+      }
 
       my $versionLine = <$fh>;
 
       if(!$versionLine) {
-        my $err;
-        if(!close($fh) && $? != 13) {
-          $err = $self->name . ": failed to open $file due to $1 $($?)";
-        } else {
-          $err = $self->name . ": $file empty";
-        }
-
-        $self->log('fatal', $err);
+        $self->log('fatal', $self->name . ": couldn't read version line of $file");
       }
 
       chomp $versionLine;
@@ -127,14 +124,7 @@ sub buildTrack {
       my $headerLine = <$fh>;
 
       if(!$headerLine) {
-        my $err;
-        if(!close($fh) && $? != 13) {
-          $err = $self->name . ": failed to open $file due to $1 ($?)";
-        } else {
-          $err = $self->name . ": $file empty";
-        }
-
-        $self->log('fatal', $err);
+        $self->log('fatal', $self->name . ": couldn't read header line of $file");
       }
 
       chomp $headerLine;
@@ -474,35 +464,32 @@ sub buildTrack {
       $self->db->cleanUp();
       undef $cursor;
 
-      if(!close($fh) && $? != 13) {
-        $self->log('fatal', $self->name . " failed to close $file with $! ($?)");
-      } else {
-        if($changedRefPositions > 0) {
-          $self->log('warn', $self->name . ": skipped $changedRefPositions positions because CADD Ref didn't match ours: in $file.");
-        }
+      $self->safeCloseBuilderFh($fh, $file, 'fatal');
 
-        if($multiRefPositions > 0) {
-          $self->log('warn', $self->name . ": skipped $multiRefPositions positions because CADD Ref had multiple Ref at that position: in $file.");
-        }
-
-        if($multiScorePositions > 0) {
-          $self->log('warn', $self->name . ": skipped $multiScorePositions positions because found multiple scores: in $file");
-        }
-
-        if($nonACTGrefPositions > 0) {
-          $self->log('warn', $self->name . ": skipped $nonACTGrefPositions positions because found non-ACTG CADD Ref: in $file");
-        }
-
-        if($nonACTGaltPositions > 0) {
-          $self->log('warn', $self->name . ": skipped $nonACTGaltPositions positions because found non-ACTG CADD Alt: in $file");
-        }
-
-        if($missingScorePositions > 0) {
-          $self->log('warn', $self->name . ": skipped $missingScorePositions positions because has missing Phred scores: in $file");
-        }
-
-        $self->log('info', $self->name . ": closed $file with $?");
+      if($changedRefPositions > 0) {
+        $self->log('warn', $self->name . ": skipped $changedRefPositions positions because CADD Ref didn't match ours: in $file.");
       }
+
+      if($multiRefPositions > 0) {
+        $self->log('warn', $self->name . ": skipped $multiRefPositions positions because CADD Ref had multiple Ref at that position: in $file.");
+      }
+
+      if($multiScorePositions > 0) {
+        $self->log('warn', $self->name . ": skipped $multiScorePositions positions because found multiple scores: in $file");
+      }
+
+      if($nonACTGrefPositions > 0) {
+        $self->log('warn', $self->name . ": skipped $nonACTGrefPositions positions because found non-ACTG CADD Ref: in $file");
+      }
+
+      if($nonACTGaltPositions > 0) {
+        $self->log('warn', $self->name . ": skipped $nonACTGaltPositions positions because found non-ACTG CADD Alt: in $file");
+      }
+
+      if($missingScorePositions > 0) {
+        $self->log('warn', $self->name . ": skipped $missingScorePositions positions because has missing Phred scores: in $file");
+      }
+
     $pm->finish(0, \%visitedChrs);
   }
 
