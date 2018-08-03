@@ -16,8 +16,10 @@ fi
 . ~/.bash_profile;
 
 # Perlbrew simplifies version management
-# Mac doesn't like/build 5.28.0 or 5.26.2 without failing some tests
-. ./install/install-perlbrew-linux.sh $INSTALL_DIR perl-5.26.0;
+# Mac doesn't like/build 5.28.0 without failing some tests
+# However, even 5.26.0 and .2 will fail test 21 "wrapped lines longer than"
+# Which seems to be of little consequence
+. ./install/install-perlbrew-linux.sh $INSTALL_DIR perl-5.26.2 ~/.bash_profile 1
 . ./install/install-perl-libs.sh;
 
 # Bystro is increasingly a golang progrma. Perl currently handles db fetching,

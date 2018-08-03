@@ -20,6 +20,13 @@ else
   PROFILE=~/.bash_profile;
 fi
 
+if [[ -n "$4" ]]
+then
+  NOTEST=$4;
+else
+  NOTEST=0;
+fi
+
 export PERLBREW_ROOT=$DIR/perl5/perlbrew;
 export PERLBREW_HOME=$DIR/.perlbrew;
 
@@ -42,7 +49,11 @@ cnt=$(perlbrew list | grep $VERSION | wc -l);
 nCores=$(getconf _NPROCESSORS_ONLN);
 
 if [ $cnt == 0 ]; then
-  perlbrew install $VERSION -j $nCores;
+  if [ $NOTEST == 0 ]; then
+    perlbrew install $VERSION -j $nCores;
+  else
+    perlbrew install $VERSION -j $nCores -n;
+  fi
 fi
 
 perlbrew switch $VERSION;
