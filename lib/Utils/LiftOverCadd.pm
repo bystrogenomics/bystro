@@ -69,7 +69,7 @@ sub go {
   for my $inPath (@$localFilesPathsAref) {
     $self->log('info', "Beginning to lift over $inPath");
 
-    my (undef, $isCompressed, $inFh) = $self->get_read_fh($inPath);
+    my (undef, $isCompressed, $inFh) = $self->getReadFh($inPath);
 
     my $baseName = path($inPath)->basename;
 
@@ -103,7 +103,7 @@ sub go {
     chomp $versionLine;
     chomp $headerLine;
 
-    my $outFh = $self->get_write_fh($liftedPath);
+    my $outFh = $self->getWriteFh($liftedPath);
     say $outFh $versionLine;
     say $outFh $headerLine;
     close $outFh;

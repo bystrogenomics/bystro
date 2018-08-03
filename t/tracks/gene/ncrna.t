@@ -41,7 +41,7 @@ my $refIdx = $refBuilder->dbName;
 
 my @pos = (60950 .. 70966);
 
-my $file = $seq->get_read_fh($refBuilder->local_files->[0]);
+my $file = $seq->getReadFh($refBuilder->local_files->[0]);
 my @sequence = <$file>;
 chomp @sequence;
 

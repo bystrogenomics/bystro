@@ -116,7 +116,7 @@ sub go {
     }
 
     $pm->start($inPath) and next;
-      my $readFh = $self->get_read_fh($inPath);
+      my $readFh = $self->getReadFh($inPath);
 
       my $header = <$readFh>;
       $header .= <$readFh>;
@@ -219,7 +219,7 @@ sub go {
             last;
           }
 
-          $outFh = $self->get_write_fh($outPath);
+          $outFh = $self->getWriteFh($outPath);
 
           print $outFh $header;
         }

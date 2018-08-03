@@ -113,7 +113,7 @@ sub fetchAndWriteSQLData {
     my $targetFile = path($self->outputDir)->child($timestampName)->absolute->stringify;
 
     # prepare file handle
-    my $outFh = $self->get_write_fh($targetFile);
+    my $outFh = $self->getWriteFh($targetFile);
 
     $self->log('info', "Fetching from $databaseName: $query");
     ########### Connect to database ##################

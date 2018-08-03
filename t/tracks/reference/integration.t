@@ -35,7 +35,7 @@ $refBuilder->buildTrack();
 my @localFiles = @{$refBuilder->local_files};
 
 for my $file (@localFiles) {
-  my $fh = $refBuilder->get_read_fh($file);
+  my $fh = $refBuilder->getReadFh($file);
   my ($chr, $pos);
 
   while(<$fh>) {

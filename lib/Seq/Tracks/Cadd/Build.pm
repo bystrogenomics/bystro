@@ -42,7 +42,7 @@ sub BUILD {
 sub buildTrack {
   my $self = shift;
 
-  my $pm = Parallel::ForkManager->new($self->max_threads);
+  my $pm = Parallel::ForkManager->new($self->maxThreads);
 
   ######Record completion status only if the process completed unimpeded ########
   my %completedChrs;
@@ -100,7 +100,7 @@ sub buildTrack {
     $self->db->cleanUp();
 
     $pm->start($file) and next;
-      my $fh = $self->get_read_fh($file);
+      my $fh = $self->getReadFh($file);
 
       my $versionLine = <$fh>;
 

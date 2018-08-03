@@ -101,7 +101,7 @@ sub annotate {
   # The output path always respects the $self->output_file_base attribute path;
   my $outputPath = $self->_workingDir->child($self->outputFilesInfo->{annotation});
 
-  my $outFh = $self->get_write_fh($outputPath);
+  my $outFh = $self->getWriteFh($outputPath);
 
   if(!$outFh) {
     #TODO: should we report $err? less informative, but sometimes $! reports bull
@@ -132,7 +132,7 @@ sub annotate {
   my $batchSize = 4000;
 
   MCE::Loop::init {
-    max_workers => $self->max_threads || 1, chunk_size => $batchSize,
+    max_workers => $self->maxThreads || 1, chunk_size => $batchSize,
     gather => $self->_makeLogProgress($hasSort, $statsFh, $outFh)
   };
 

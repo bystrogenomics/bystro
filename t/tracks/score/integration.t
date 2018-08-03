@@ -46,7 +46,7 @@ my $scalingFactor = $scoreGetter->scalingFactor;
 my $rounder = Seq::Tracks::Score::Build::Round->new({scalingFactor => $scalingFactor});
 
 for my $file (@localFiles) {
-  my $fh = $scoreBuilder->get_read_fh($file);
+  my $fh = $scoreBuilder->getReadFh($file);
   my $step;
   my $pos;
   my $chr;

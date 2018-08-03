@@ -22,7 +22,7 @@ use Seq::Tracks::Build::LocalFilesPaths;
 use Seq::Output::Delimiters;
 
 extends 'Seq::Tracks::Base';
-# All builders need get_read_fh
+# All builders need getReadFh
 with 'Seq::Role::IO';
 
 #################### Instance Variables #######################################
@@ -52,7 +52,7 @@ has commitEvery => (is => 'rw', isa => 'Int', lazy => 1, default => 2e4);
 # Change from b9: this now needs to be manually set, opt-in
 has chrPerFile => (is => 'ro', isa => 'Bool', default => 0);
 
-has max_threads => (is => 'ro', isa => 'Int', lazy => 1, default => 8);
+has maxThreads => (is => 'ro', isa => 'Int', lazy => 1, default => 8);
 ########## Arguments taken from YAML config file or passed some other way ##############
 
 #################################### Required ###################################

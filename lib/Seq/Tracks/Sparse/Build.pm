@@ -61,7 +61,7 @@ sub BUILD {
 sub buildTrack {
   my $self = shift;
 
-  my $pm = Parallel::ForkManager->new($self->max_threads);
+  my $pm = Parallel::ForkManager->new($self->maxThreads);
 
   # Get an instance of the merge function that closes over $self
   # Note that tracking which positinos have been over-written will only work
@@ -101,7 +101,7 @@ sub buildTrack {
     $self->db->cleanUp();
 
     $pm->start($file) and next;
-      my $fh = $self->get_read_fh($file);
+      my $fh = $self->getReadFh($file);
 
       ############# Get Headers ##############
       my $firstLine = <$fh>;
@@ -281,7 +281,7 @@ sub joinTrack {
   $self->log('info', $self->name . " join track: called for $wantedChr");
 
   for my $file ($self->allLocalFiles) {
-    my $fh = $self->get_read_fh($file);
+    my $fh = $self->getReadFh($file);
 
     ############# Get Headers ##############
     my $firstLine = <$fh>;

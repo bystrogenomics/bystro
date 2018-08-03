@@ -38,7 +38,7 @@ GetOptions(
   'd|debug'      => \$debug,
   'q|queueConfig=s'   => \$queueConfigPath,
   'c|connectionConfig=s' => \$connectionConfigPath,
-  'm|max_threads=i' => \$maxThreads,
+  'm|maxThreads=i' => \$maxThreads,
 );
 
 my $conf = LoadFile($queueConfigPath);
@@ -157,7 +157,7 @@ sub handleJob {
   my $logPath = File::Spec->rel2abs( ".", $log_name );
 
   if($maxThreads) {
-    $inputHref->{max_threads} = $maxThreads;
+    $inputHref->{maxThreads} = $maxThreads;
   }
 
   $inputHref->{logPath} = $logPath;

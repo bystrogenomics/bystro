@@ -29,7 +29,7 @@ my $mocker = Mock->new();
 
 $mocker->log('warn', "HELLO WORLD");
 
-my $fh = $mocker->get_read_fh($mocker->logPath);
+my $fh = $mocker->getReadFh($mocker->logPath);
 
 my @lines = <$fh>;
 
@@ -40,7 +40,7 @@ close($fh);
 
 $mocker = Mock->new();
 
-$fh = $mocker->get_read_fh($mocker->logPath);
+$fh = $mocker->getReadFh($mocker->logPath);
 
 @lines = <$fh>;
 
@@ -50,7 +50,7 @@ $mocker->setLogLevel('fatal');
 
 $mocker->log('warn', "A different warning");
 
-$fh = $mocker->get_read_fh($mocker->logPath);
+$fh = $mocker->getReadFh($mocker->logPath);
 
 @lines = <$fh>;
 
@@ -64,7 +64,7 @@ $mocker->setLogLevel('info');
 
 $mocker->log('warn', "A warning above info");
 
-$fh = $mocker->get_read_fh($mocker->logPath);
+$fh = $mocker->getReadFh($mocker->logPath);
 
 @lines = <$fh>;
 
@@ -79,7 +79,7 @@ $mocker->log('warn', "A new warning above info");
 $mocker->log('info', "An info message");
 $mocker->log('error', "An error message");
 
-$fh = $mocker->get_read_fh($mocker->logPath);
+$fh = $mocker->getReadFh($mocker->logPath);
 @lines = <$fh>;
 
 close($fh);

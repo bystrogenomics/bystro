@@ -62,7 +62,7 @@ sub go {
     $self->log('info', "Out path base: $outPathBase");
     $self->log('info', "Reading input file: $inFilePath");
     
-    my (undef, $compressed, $readFh) = $self->get_read_fh($inFilePath);
+    my (undef, $compressed, $readFh) = $self->getReadFh($inFilePath);
 
     my $versionLine = <$readFh>;
     my $headerLine = <$readFh>;
@@ -109,7 +109,7 @@ sub go {
           last;
         }
 
-        $outFhs{$chr} = $self->get_write_fh($outPath);
+        $outFhs{$chr} = $self->getWriteFh($outPath);
 
         $fh = $outFhs{$chr};
 
@@ -148,7 +148,7 @@ sub go {
   for my $outPath (@outPaths) {
     my $gzipPath = $self->gzip;
 
-    my (undef, $compressed, $fh) = $self->get_read_fh($outPath);
+    my (undef, $compressed, $fh) = $self->getReadFh($outPath);
 
     my $outExt = '.sorted' . $outExtPart;
 

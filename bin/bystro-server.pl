@@ -50,7 +50,7 @@ GetOptions(
   't|type=s'     => \$type,
   'q|queueConfig=s'   => \$queueConfigPath,
   'c|connectionConfig=s'   => \$connectionConfigPath,
-  'max_threads=i' => \$maxThreads,
+  'maxThreads=i' => \$maxThreads,
 );
 
 my $conf = LoadFile($queueConfigPath);
@@ -307,7 +307,7 @@ sub coerceInputs {
   );
 
   if($maxThreads) {
-    $commmonArgs{max_threads} = $maxThreads;
+    $commmonArgs{maxThreads} = $maxThreads;
   }
 
   my %combined = (%commmonArgs, %jobSpecificArgs);

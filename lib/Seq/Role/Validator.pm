@@ -45,7 +45,7 @@ sub validateInputFile {
     $inputFileAbsPath = path($inputFileAbsPath);
   }
 
-  my $fh = $self->get_read_fh($inputFileAbsPath);
+  my $fh = $self->getReadFh($inputFileAbsPath);
   my $firstLine = <$fh>;
 
   my $orig = $self->getLineEndings();

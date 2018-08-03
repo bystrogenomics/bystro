@@ -81,7 +81,7 @@ sub setLogPath {
   #$AnyEvent::Log::LOG->log_to_file ($path);
   $Seq::Role::Message::LOG->config({
     #Resutls in deep recursion issue if we include Seq::Role::IO (which requires Role::Message
-    #: fh => $self->get_write_fh($path),
+    #: fh => $self->getWriteFh($path),
     fh => $fh,
   });
 }

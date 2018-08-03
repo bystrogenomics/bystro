@@ -1,6 +1,8 @@
 use 5.10.0;
 use strict;
 use warnings;
+use autodie;
+
 package Seq::Tracks::Vcf::Build;
 
 our $VERSION = '0.001';
@@ -167,7 +169,6 @@ sub BUILD {
   my $tracks = Seq::Tracks->new();
   $self->{_refTrack} = $tracks->getRefTrackGetter();
 
-
   # TODO: Read bystro-vcf header, and configure $vcfFeatures based on that
   # will require either reading the first file in the list, or giving
   # bystro-vcf a "output only the header" feature (but scope creep)
@@ -177,7 +178,7 @@ sub BUILD {
 sub buildTrack {
   my $self = shift;
 
-  my $pm = Parallel::ForkManager->new($self->max_threads);
+  my $pm = Parallel::ForkManager->new($self->maxThreads);
 
   my $outputter = Seq::Output::Delimiters->new();
 
@@ -260,7 +261,7 @@ sub buildTrack {
       my $header = <$fh>;
 
       FH_LOOP: while ( my $line = $fh->getline() ) {
-        chomp;
+        chomp $line;
         # This is the annotation input first 7 lines, plus id, info
         @fields = split '\t', $line;
 
@@ -325,7 +326,7 @@ sub buildTrack {
           next;
         }
 
-        #Args:                         $cursor,             $chr,       $trackIndex,   $pos,   $trackValue, $mergeFunction
+        #Args:                         $cursor, $chr,       $trackIndex,   $pos,   $trackValue, $mergeFunction
         $self->db->dbPatchCursorUnsafe($cursor, $wantedChr, $self->dbName, $dbPos, $data, $mergeFunc);
 
         if($count > $self->commitEvery) {
@@ -337,6 +338,8 @@ sub buildTrack {
 
         $count++;
       }
+
+      close $fh;
 
       #Commit, sync everything, including completion status, and release mmap
       $self->db->cleanUp();
@@ -355,7 +358,8 @@ sub buildTrack {
     # overlapping sites
     $cleanUpMerge->($chr);
 
-    $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedDetails{$chr}})));
+    $self->log('info', $self->name . ": recorded $chr completed, from "
+    . (join(",", @{$completedDetails{$chr}})));
   }
 
   #TODO: figure out why this is necessary, even with DEMOLISH
@@ -368,7 +372,7 @@ sub _extractHeader {
   my $file = shift;
   my $dieIfNotFound = shift;
 
-  my $fh = $self->get_read_fh($file);
+  my $fh = $self->getReadFh($file);
 
   my @header;
   while(<$fh>) {

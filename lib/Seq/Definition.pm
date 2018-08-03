@@ -47,7 +47,7 @@ has statistics => (is => 'ro', isa => 'HashRef');
 # Users may not need statistics
 has run_statistics => (is => 'ro', isa => 'Bool', default => sub {!!$_[0]->statistics});
 
-has max_threads => (is => 'ro', isa => 'Int', lazy => 1, default => 8);
+has maxThreads => (is => 'ro', isa => 'Int', lazy => 1, default => 8);
 
 # has badSamplesField => (is => 'ro', default => 'badSamples', lazy => 1);
 

@@ -26,7 +26,7 @@ sub buildTrack {
   my $headerRegex = qr/\A>([\w\d]+)/;
   my $dataRegex = qr/(\A[ATCGNatcgn]+)\z/xms;
 
-  my $pm = Parallel::ForkManager->new($self->max_threads);
+  my $pm = Parallel::ForkManager->new($self->maxThreads);
 
   my %completedChrs;
   $pm->run_on_finish( sub {
@@ -63,7 +63,7 @@ sub buildTrack {
     $self->db->cleanUp();
 
     $pm->start($file) and next;
-      my $fh = $self->get_read_fh($file);
+      my $fh = $self->getReadFh($file);
 
       my $wantedChr;
 

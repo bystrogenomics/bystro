@@ -68,7 +68,7 @@ sub buildTrack {
   my @allFiles = $self->allLocalFiles;
 
   # Only allow 1 thread because perl eats memory like candy
-  my $pm = Parallel::ForkManager->new($self->max_threads);
+  my $pm = Parallel::ForkManager->new($self->maxThreads);
 
   if($self->join) {
     my $tracks = Seq::Tracks->new();
@@ -123,7 +123,7 @@ sub buildTrack {
     $pm->start($file) and next;
       my %visitedChrs;
 
-      my $fh = $self->get_read_fh($file);
+      my $fh = $self->getReadFh($file);
 
       my $firstLine = <$fh>;
 

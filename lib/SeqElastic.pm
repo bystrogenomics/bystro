@@ -75,7 +75,7 @@ has addedFiles => (is => 'ro', isa => 'ArrayRef');
 # Allows us to use all to to extract just the file we're interested from the compressed tarball
 has inputFileNames => (is => 'ro', isa => 'HashRef');
 
-has max_threads => (is => 'ro', isa => 'Int', default => 8);
+has maxThreads => (is => 'ro', isa => 'Int', default => 8);
 
 with 'Seq::Role::IO', 'Seq::Role::Message', 'MouseX::Getopt';
 
@@ -119,7 +119,7 @@ sub go {
 
   my ($filePath, $annotationFileInCompressed) = $self->_getFilePath();
 
-  (my $err, undef, my $fh) = $self->get_read_fh($filePath, $annotationFileInCompressed);
+  (my $err, undef, my $fh) = $self->getReadFh($filePath, $annotationFileInCompressed);
 
   if($err) {
     #TODO: should we report $err? less informative, but sometimes $! reports bull
@@ -130,14 +130,14 @@ sub go {
 
   my $fieldSeparator = $self->delimiter;
 
-  my $taint_check_regex = $self->taint_check_regex; 
+  my $taintCheckRegex = $self->taintCheckRegex; 
 
   my $firstLine = <$fh>;
 
   chomp $firstLine;
 
   my @headerFields;
-  if ( $firstLine =~ m/$taint_check_regex/xm ) {
+  if ( $firstLine =~ m/$taintCheckRegex/xm ) {
     @headerFields = split $fieldSeparator, $1;
   } else {
     return ("First line of input file has illegal characters", undef);
@@ -171,7 +171,7 @@ sub go {
   # We need to flush at the end of each chunk read; so chunk size directly
   # controls bulk request size, as long as bulk request doesnt hit
   # max_count and max_size thresholds
-  my $chunkSize = $self->getChunkSize($filePath, $self->max_threads);
+  my $chunkSize = $self->getChunkSize($filePath, $self->maxThreads);
   if($chunkSize < 5000) {
     $chunkSize = 5000;
   }
@@ -184,7 +184,7 @@ sub go {
   my $progressFunc = $self->makeLogProgress(1e4);
 
   MCE::Loop::init {
-    max_workers => $self->max_threads, use_slurpio => 1, #Disable on shared storage: parallel_io => 1,
+    max_workers => $self->maxThreads, use_slurpio => 1, #Disable on shared storage: parallel_io => 1,
     chunk_size => $chunkSize . 'K',
     gather => $progressFunc,
   };
@@ -248,7 +248,7 @@ sub go {
     my $idxCount = 0;
     while ( my $line = $MEM_FH->getline() ) {
       #TODO: implement; the default taint check regex doesn't work for annotated files
-      # if (! $line =~ /$taint_check_regex/) {
+      # if (! $line =~ /$taintCheckRegex/) {
       #   next;
       # }
       chomp $line;

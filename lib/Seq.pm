@@ -1,6 +1,7 @@
 use 5.10.0;
 use strict;
 use warnings;
+use autodie;
 
 package Seq;
 
@@ -83,7 +84,7 @@ sub annotate {
 
   # Calling in annotate allows us to error early
   my $err;
-  ($err, $self->{_chunkSize}) = $self->getChunkSize($self->input_file, $self->max_threads);
+  ($err, $self->{_chunkSize}) = $self->getChunkSize($self->input_file, $self->maxThreads);
 
   if($err) {
     $self->_errorWithCleanup($err);
@@ -149,11 +150,14 @@ sub annotateFile {
     $self->_errorWithCleanup("No fileProcessors defined for $type file type");
   }
 
+  my $fp = $self->fileProcessors->{$type};
+  my $args = $fp->{program} . " " . $fp->{args};
+
   # TODO: add support for GQ filtering in vcf
-  open($fh, '-|', "$echoProg $inPath | " . $self->fileProcessors->{$type}{program} . " " . $self->fileProcessors->{$type}{args} . " 2> $errPath");
+  open($fh, '-|', "$echoProg $inPath | $args 2> $errPath");
 
   # If user specified a temp output path, use that
-  my $outFh = $self->get_write_fh( $self->{_outPath} );
+  my $outFh = $self->getWriteFh( $self->{_outPath} );
 
   ########################## Write the header ##################################
 
@@ -211,7 +215,7 @@ sub annotateFile {
   # Report every 1e4 lines, to avoid thrashing receiver
   my $progressFunc = $self->makeLogProgressAndPrint(\$abortErr, $outFh, $statsFh, 1e4);
   MCE::Loop::init {
-    max_workers => $self->max_threads || 8, use_slurpio => 1,
+    max_workers => $self->maxThreads || 8, use_slurpio => 1,
     # bystro-vcf outputs a very small row; fully annotated through the alt column (-ref -discordant)
     # so accumulate less than we would if processing full .snp
     chunk_size => $self->{_chunkSize} > 4192 ? "4192K" : $self->{_chunkSize}. "K",
@@ -239,11 +243,8 @@ sub annotateFile {
 
     my @indelDbData;
     my @indelRef;
-    my $chr;
-    my $inputRef;
     my @lines;
     my $dataFromDbAref;
-    my $dbReference;
     my $zeroPos;
     # Each line is expected to be
     # chrom \t pos \t type \t inputRef \t alt \t hets \t homozygotes \n
@@ -326,7 +327,8 @@ sub annotateFile {
           for my $track (@trackGettersExceptReference) {
             $fields[$trackIndices->{$track->name}] //= [];
 
-            $track->get($indelDbData[$posIdx], $fields[0], $indelRef[$posIdx], $fields[4], $posIdx, $fields[$trackIndices->{$track->name}], $zeroPos + $posIdx);
+            $track->get($indelDbData[$posIdx], $fields[0], $indelRef[$posIdx], $fields[4], $posIdx,
+              $fields[$trackIndices->{$track->name}], $zeroPos + $posIdx);
           }
 
           $fields[$refTrackIdx][$posIdx] = $indelRef[$posIdx];
@@ -338,7 +340,8 @@ sub annotateFile {
       } else {
         for my $track (@trackGettersExceptReference) {
           $fields[$trackIndices->{$track->name}] //= [];
-          $track->get($dataFromDbAref, $fields[0], $fields[3], $fields[4], 0, $fields[$trackIndices->{$track->name}], $zeroPos);
+          $track->get($dataFromDbAref, $fields[0], $fields[3], $fields[4], 0,
+            $fields[$trackIndices->{$track->name}], $zeroPos);
         }
 
         $fields[$refTrackIdx][0] = $refTrackGetter->get($dataFromDbAref);
@@ -354,11 +357,14 @@ sub annotateFile {
       push @lines, \@fields;
     }
 
+    close $MEM_FH;
+
     if(@lines) {
       MCE->gather(scalar @lines, $total - @lines, undef, $outputter->makeOutputString(\@lines));
     } else {
       MCE->gather(0, $total);
     }
+
   } $fh;
 
   # Force flush

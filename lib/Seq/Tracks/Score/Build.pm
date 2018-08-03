@@ -44,7 +44,7 @@ sub buildTrack{
   my @allChrs = $self->allLocalFiles;
 
   #Can't just set to 0, because then the completion code in run_on_finish won't run
-  my $pm = Parallel::ForkManager->new($self->max_threads);
+  my $pm = Parallel::ForkManager->new($self->maxThreads);
 
   my %completedChrs;
   $pm->run_on_finish( sub {
@@ -84,7 +84,7 @@ sub buildTrack{
         die $self->name . ": $file doesn't exist";
       }
 
-      my $fh = $self->get_read_fh($file);
+      my $fh = $self->getReadFh($file);
 
       my $wantedChr;
       my $chrPosition; # absolute by default, 0 index

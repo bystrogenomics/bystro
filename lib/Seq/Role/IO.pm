@@ -23,13 +23,13 @@ with 'Seq::Role::Message';
 # tried various ways of assigning this to an attrib, with the intention that
 # one could change the taint checking characters allowed but this is the simpliest
 # one that worked; wanted it precompiled to improve the speed of checking
-our $taint_check_regex = qr{\A([\+\,\.\-\=\:\/\t\|\s\w\d/]+)\z};
+our $taintCheckRegex = qr{\A([\+\,\.\-\=\:\/\t\|\s\w\d/]+)\z};
 
-has taint_check_regex => (
+has taintCheckRegex => (
   is => 'ro',
   lazy => 1,
   init_arg => undef,
-  default => sub{ $taint_check_regex },
+  default => sub{ $taintCheckRegex },
 );
 
 has delimiter => (
@@ -47,24 +47,29 @@ my $gzip = which('pigz') || which('gzip');
 # Up to 1 core will be used solely for meltdown-related overhead
 # So disable mutli-threading
 # For compression, tradeoff still worth it
-my $decompressArgs = '-d -c';
+my $dcmpArgs = '-d -c';
 if($gzip =~ /pigz/) {
- $decompressArgs = "-p 1 $decompressArgs";
+ $dcmpArgs = "-p 1 $dcmpArgs";
 }
 
 my $tarCompressed = "$tar --use-compress-program=$gzip";
 
 has gzip => (is => 'ro', isa => 'Str', init_arg => undef, lazy => 1, default => sub {$gzip});
-has decompressArgs => (is => 'ro', isa => 'Str', init_arg => undef, lazy => 1, default => sub {$decompressArgs});
+has dcmpArgs => (is => 'ro', isa => 'Str', init_arg => undef, lazy => 1, default => sub {$dcmpArgs});
 
 #@param {Path::Tiny} $file : the Path::Tiny object representing a single input file
 #@param {Str} $innerFile : if passed a tarball, we will want to stream a single file within
 #@return file handle
 # TODO: return error, don't die
-sub get_read_fh {
+sub getReadFh {
   my ( $self, $file, $innerFile) = @_;
   my $fh;
-  
+
+  # Ensures that anything that hasn't been written to a file (from async process)
+  # Is written
+  # This behavior is most obvious with Log::Fast
+  system('sync');
+
   if(ref $file ne 'Path::Tiny' ) {
     $file = path($file)->absolute;
   }
@@ -73,7 +78,6 @@ sub get_read_fh {
 
   if (!$file->is_file) {
     $self->log('fatal', "$filePath does not exist for reading");
-    die;
   }
 
   my $compressed = 0;
@@ -81,7 +85,7 @@ sub get_read_fh {
   if($innerFile) {
     $compressed = $innerFile =~ /\.gz$/ || $innerFile =~ /\.bgz$/ || $innerFile =~ /\.zip$/;
 
-    my $innerCommand = $compressed ? "\"$innerFile\" | $gzip $decompressArgs -" : "\"$innerFile\"";
+    my $innerCommand = $compressed ? "\"$innerFile\" | $gzip $dcmpArgs -" : "\"$innerFile\"";
     # We do this because we have not built in error handling from opening streams
 
     my $command;
@@ -93,7 +97,6 @@ sub get_read_fh {
       $command = "$tar -O -xf \"$filePath\" $innerCommand";
     } else {
       $self->log('fatal', "When inner file provided, must provde a parent file.tar or file.tar.gz");
-      die;
     }
 
     open ($fh, '-|', $command) or $self->log('fatal', "Failed to open $filePath ($innerFile) due to $!");
@@ -106,9 +109,9 @@ sub get_read_fh {
     $compressed = 1;
     #PerlIO::gzip doesn't seem to play nicely with MCE, reads random number of lines
     #and then exits, so use gunzip, standard on linux, and faster
-    open ($fh, '-|', "$gzip $decompressArgs \"$filePath\"") or $self->log('fatal', "Failed to open $filePath due to $!");
+    open ($fh, '-|', "$gzip $dcmpArgs \"$filePath\"") or $self->log('fatal', "Failed to open $filePath due to $!");
   } else {
-    open ($fh, '-|', "cat \"$filePath\"") or $self->log('fatal', "Failed to open $filePath due to $!");
+    open ($fh, '<', $filePath) or $self->log('fatal', "Failed to open $filePath due to $!");
   };
 
   # TODO: return errors, rather than dying
@@ -129,8 +132,10 @@ sub isCompressedSingle {
 }
 
 # TODO: return error if failed
-sub get_write_fh {
+sub getWriteFh {
   my ( $self, $file, $compress ) = @_;
+
+  system('sync');
 
   $self->log('fatal', "get_fh() expected a filename") unless $file;
 
@@ -145,11 +150,30 @@ sub get_write_fh {
   return $fh;
 }
 
+sub safeOpen {
+  #my ($self, $fh, $operator, $operand) = @_;
+  #    $_[0], $_[1], $_[2],   $_[3]
+
+  # Modifies $fh/$_[1] by reference
+  open($_[1], $_[2], $_[3]) or $_[0]->log('fatal', "Couldn't open $_[3]: $!");
+
+  return $_[1];
+}
+
+sub safeClose {
+  #my ($self, $fh) = @_;
+  #    $_[0], $_[1]
+
+  close($_[1]) or $_[0]->log('fatal', "Couldn't close fh: $!");
+
+  return;
+}
+
 sub getCleanFields {
   my ( $self, $line ) = @_;
 
   chomp $line;
-  if ( $line =~ m/$taint_check_regex/xm ) {
+  if ( $line =~ m/$taintCheckRegex/xm ) {
     my @out;
 
     push @out, split $self->delimiter, $1;

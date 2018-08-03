@@ -58,7 +58,7 @@ sub go {
   # We'll update this list of files in the config file
   $self->_wantedTrack->{local_files} = [];
 
-  my $inFh = $self->get_read_fh($inFilePath);
+  my $inFh = $self->getReadFh($inFilePath);
 
   $self->log('info', "Reading $inFilePath");
 
@@ -91,7 +91,7 @@ sub go {
     return;
   }
 
-  my $outFh = $self->get_write_fh($outPath);
+  my $outFh = $self->getWriteFh($outPath);
 
   $self->log('info', "Writing to $outPath");
 

@@ -53,7 +53,7 @@ sub go {
   my %outFhs;
   my %skippedBecauseExists;
 
-  my $dbnsfpFh = $self->get_read_fh($self->geneFile);
+  my $dbnsfpFh = $self->getReadFh($self->geneFile);
 
   my $header = <$dbnsfpFh>;
 
@@ -220,16 +220,16 @@ sub go {
   for my $file (@{$self->{_localFiles}}) {
     $pm->start($file) and next;
 
-    # Need to reset line endings here, or get_read_fh may not operate correctly
+    # Need to reset line endings here, or getReadFh may not operate correctly
     $self->setLineEndings("\n");
 
-    my $fh = $self->get_read_fh($file);
+    my $fh = $self->getReadFh($file);
     my $outFh; 
 
     $file =~ s/.gz$//;
     my $outFile = $file . '.with_dbnsfp.gz';
 
-    $outFh = $self->get_write_fh($outFile);
+    $outFh = $self->getWriteFh($outFile);
 
     my $header = <$fh>;
 

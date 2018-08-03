@@ -2,12 +2,12 @@ apps:
 - name: BystroAnnotationServer
   script: bin/bystro-server.pl
   interpreter: "perl"
-  args: --type annotation -q seq-beanstalk-workers/beanstalk1.yaml --max_threads 8 --debug
+  args: --type annotation -q seq-beanstalk-workers/beanstalk1.yaml --maxThreads 8 --debug
 - name: BystroSaveServer
   script: bin/bystro-server.pl
   interpreter: "perl"
-  args: --type saveFromQuery -q seq-beanstalk-workers/beanstalk1.yaml -c elastic-config/config.yml --max_threads 8 --debug
+  args: --type saveFromQuery -q seq-beanstalk-workers/beanstalk1.yaml -c elastic-config/config.yml --maxThreads 8 --debug
 - name: BystroIndexServer
   script: bin/bystro-index-server.pl
   interpreter: "perl"
-  args: -q seq-beanstalk-workers/beanstalk1.yaml -c elastic-config/config.yml --max_threads 8 --debug
+  args: -q seq-beanstalk-workers/beanstalk1.yaml -c elastic-config/config.yml --maxThreads 8 --debug

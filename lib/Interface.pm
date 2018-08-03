@@ -119,7 +119,7 @@ has wantedChr => (
     qq{Annotate a single chromosome},
 );
 
-has max_threads => (
+has maxThreads => (
   is => 'ro',
   isa => 'Int',
   metaclass => 'Getopt',
@@ -175,8 +175,8 @@ sub annotate {
     $args->{verbose} = $self->verbose;
   }
 
-  if(defined $self->max_threads) {
-    $args->{max_threads} = $self->max_threads;
+  if(defined $self->maxThreads) {
+    $args->{maxThreads} = $self->maxThreads;
   }
 
   my $annotator = Seq->new_with_config($args);

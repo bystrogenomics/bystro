@@ -173,7 +173,7 @@ sub buildTrack {
   my @allFiles = $self->allLocalFiles;
 
   # Only allow 1 thread because perl eats memory like candy
-  my $pm = Parallel::ForkManager->new($self->max_threads);
+  my $pm = Parallel::ForkManager->new($self->maxThreads);
 
   my %allIdx; # a map <Hash> { featureName => columnIndexInFile}
   my %regionIdx; #like allIdx, but only for features going into the region databae
@@ -224,7 +224,7 @@ sub buildTrack {
     $self->db->cleanUp();
 
     $pm->start($file) and next;
-      my $fh = $self->get_read_fh($file);
+      my $fh = $self->getReadFh($file);
 
       my $firstLine = <$fh>;
 
