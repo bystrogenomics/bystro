@@ -1,5 +1,5 @@
 # Bystro installation
-For most users, we recommend not installing the software, and using https://bystr.io, where the software is hosted
+For most users, we recommend not installing the software, and using https://bystro.io, where the software is hosted
 
 The web app provides full functionality for any size experiment (up to 890GB uncompressed/129GB compressed tested), a convenient search interface, and excellent performance
 
@@ -73,7 +73,7 @@ Once Bystro is installed, it needs to be configured. The easiest step is choosin
 Ex: Runing hg38 annotation
 
 ```sh
-bin/annotate.pl --config config/hg38.yml --in /path/in.vcf.gz --out /path/outPrefix --run_statistics [0,1] --compress
+bin/bystro-annotate.pl --config config/hg38.yml --in /path/in.vcf.gz --out /path/outPrefix --run_statistics [0,1] --compress
 ```
 
 The outputs will be:
