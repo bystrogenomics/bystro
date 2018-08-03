@@ -119,14 +119,12 @@ sub go {
 
   my ($filePath, $annotationFileInCompressed) = $self->_getFilePath();
 
-  (my $err, undef, my $fh) = $self->getReadFh($filePath, $annotationFileInCompressed);
+  my ($err, undef, $fh) = $self->getReadFh($filePath, $annotationFileInCompressed);
 
   if($err) {
-    #TODO: should we report $err? less informative, but sometimes $! reports bull
-    #i.e inappropriate ioctl when actually no issue
-    $self->_errorWithCleanup($!);
-    return ($!, undef);
-  }
+    $self->_errorWithCleanup($err);
+    return ($err, undef);
+  };
 
   my $fieldSeparator = $self->delimiter;
 
@@ -176,8 +174,8 @@ sub go {
     $chunkSize = 5000;
   }
 
-  if($chunkSize > 10000) {
-    $chunkSize = 10000;
+  if($chunkSize > 10_000) {
+    $chunkSize = 10_000;
   }
 
   # Report every 10k lines; to avoid oversaturating receiver

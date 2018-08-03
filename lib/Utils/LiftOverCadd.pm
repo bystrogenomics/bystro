@@ -1,3 +1,5 @@
+
+
 use 5.10.0;
 use strict;
 use warnings;
@@ -69,7 +71,7 @@ sub go {
   for my $inPath (@$localFilesPathsAref) {
     $self->log('info', "Beginning to lift over $inPath");
 
-    my (undef, $isCompressed, $inFh) = $self->getReadFh($inPath);
+    my (undef, $isCompressed, $inFh) = $self->getReadFh($inPath, undef, 'fatal');
 
     my $baseName = path($inPath)->basename;
 
@@ -147,4 +149,4 @@ sub go {
 }
 
 __PACKAGE__->meta->make_immutable;
-1;
+1

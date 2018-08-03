@@ -1,7 +1,6 @@
 use 5.10.0;
 use strict;
 use warnings;
-use autodie;
 
 package Seq::Tracks::Vcf::Build;
 
@@ -254,8 +253,12 @@ sub buildTrack {
       my $cursor;
       my $count = 0;
 
-      open(my $fh, '-|', "$echoProg $file | " . $self->vcfProcessor . " --emptyField $delim"
-        . " --keepId --keepInfo");
+      $self->safeOpen(
+        my $fh,
+        '-|',
+        "$echoProg $file | " . $self->vcfProcessor . " --emptyField $delim" . " --keepId --keepInfo",
+        'fatal'
+      );
 
       # TODO: Read header, and configure vcf header feature indices based on that
       my $header = <$fh>;

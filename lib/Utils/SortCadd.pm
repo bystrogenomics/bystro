@@ -41,7 +41,7 @@ sub go {
   my $self = shift;
 
   my %wantedChrs = map { $_ => 1 } @{ $self->_decodedConfig->{chromosomes} };
-    
+
   # record out paths so that we can unix sort those files
   my @outPaths;
   my %outFhs;
@@ -56,13 +56,13 @@ sub go {
     my $outPathBase = substr($inFilePath, 0, rindex($inFilePath, '.') );
 
     $outPathBase =~ s/\.(chr[\w_\-]+)//;
-    
+
     # Store output handles by chromosome, so we can write even if input file
     # out of order
     $self->log('info', "Out path base: $outPathBase");
     $self->log('info', "Reading input file: $inFilePath");
-    
-    my (undef, $compressed, $readFh) = $self->getReadFh($inFilePath);
+
+    my (undef, $compressed, $readFh) = $self->getReadFh($inFilePath, undef, 'fatal');
 
     my $versionLine = <$readFh>;
     my $headerLine = <$readFh>;
@@ -101,7 +101,7 @@ sub go {
         my $outPath = "$outPathBase.$chr$outExt";
 
         $self->log('info', "Found $chr in $inFilePath; creating $outPath");
-        
+
         push @outPaths, $outPath;
 
         if(-e $outPath && !$self->overwrite) {
@@ -116,11 +116,11 @@ sub go {
         print $fh $versionLine;
         print $fh $headerLine;
       }
-      
+
       print $fh $l;
     }
   }
-  
+
   for my $outFh (values %outFhs) {
     close $outFh;
   }
@@ -148,7 +148,7 @@ sub go {
   for my $outPath (@outPaths) {
     my $gzipPath = $self->gzip;
 
-    my (undef, $compressed, $fh) = $self->getReadFh($outPath);
+    my (undef, $compressed, $fh) = $self->getReadFh($outPath, undef, 'fatal');
 
     my $outExt = '.sorted' . $outExtPart;
 

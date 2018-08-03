@@ -173,7 +173,7 @@ sub annotate {
     close $statsFh;
   }
 
-  system('sync');
+  $self->safeSystem('sync');
 
   my $err = $self->_moveFilesToOutputDir();
 
