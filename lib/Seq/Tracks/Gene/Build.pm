@@ -57,23 +57,6 @@ sub BUILD {
   # $self->getFieldDbName($geneDef->txSizeName);
 }
 
-sub dbMergeFunc {
-  # Only when called when there is a defined $oldVal
-  my ($chr, $pos, $oldVal, $newVal) = @_;
-  # make it an array of arrays (array of geneTrack site records)
-  if(!ref $oldVal->[0]) {
-    return (undef, [$oldVal, $newVal]);
-  }
-
-  #oldVal is an array of arrays, push on to it
-  my @updatedVal = @$oldVal;
-
-  push @updatedVal, $newVal;
-
-  #TODO: Should we throw any errors?
-  return (undef, \@updatedVal);
-}
-
 # 1) Store a reference to the corresponding entry in the gene database (region database)
 # 2) Store this codon information at some key, which the Tracks::Region::Gene
 # 3) Store transcript errors, if any
@@ -211,7 +194,7 @@ sub buildTrack {
                 #value <Array[Scalar]>
                 $txInfo->transcriptSites->[$i + 1],
                 #how we handle cases where multiple overlap
-                \&dbMergeFunc
+                \&_dbMergeFunc
               );
             }
 
@@ -262,6 +245,23 @@ sub buildTrack {
   $self->db->cleanUp();
 
   return;
+}
+
+sub _dbMergeFunc {
+  # Only when called when there is a defined $oldVal
+  my ($chr, $pos, $oldVal, $newVal) = @_;
+  # make it an array of arrays (array of geneTrack site records)
+  if(!ref $oldVal->[0]) {
+    return (undef, [$oldVal, $newVal]);
+  }
+
+  #oldVal is an array of arrays, push on to it
+  my @updatedVal = @$oldVal;
+
+  push @updatedVal, $newVal;
+
+  #TODO: Should we throw any errors?
+  return (undef, \@updatedVal);
 }
 
 sub _getIdx {
@@ -449,20 +449,72 @@ sub _writeRegionData {
   }
 
   $self->log('info', $self->name . ": finished _writeRegionData for $chr");
+  return;
 }
 
 ############ Joining some other track to Gene track's region db ################
 
-my $tracks = Seq::Tracks->new();
+# TODO: Add check to see if values have already been entered
+sub _joinTrackMergeFunc {
+  my ($chr, $pos, $oldVal, $newVal) = @_;
+
+  my @updated;
+
+  #If the old value is an array, push the new values on to the old values
+  if(ref $oldVal) {
+    @updated = @$oldVal;
+
+    for my $val (ref $newVal ? @$newVal : $newVal) {
+      if(!defined $val) {
+        next;
+      }
+
+      push @updated, $val;
+    }
+  } else {
+    if(defined $oldVal) {
+      @updated = ($oldVal);
+    }
+
+    for my $val (ref $newVal ? @$newVal : $newVal) {
+      if(!defined $val) {
+        next;
+      }
+
+      # If not array I want to see an error
+      push @updated, $val;
+    }
+  }
+
+  # Try to add as little junk as possible
+  if(@updated == 0) {
+    return (undef, $oldVal);
+  }
+
+  if(@updated == 1) {
+    return (undef, $updated[0]);
+  }
+
+  return (undef, \@updated);
+}
 
 sub _joinTracksToGeneTrackRegionDb {
   my ($self, $chr, $txStarts) = @_;
 
   if(!$self->join) {
-    return $self->log('warn', $self->name . ": join not set in _joinTracksToGeneTrackRegionDb");
+    return $self->name . ": join not set in _joinTracksToGeneTrackRegionDb";
   }
 
-  $self->log('info', $self->name . ": starting _joinTracksToGeneTrackRegionDb for $chr");
+  my $tracks = Seq::Tracks->new();
+  $joinTrack = $tracks->getTrackBuilderByName($self->joinTrackName);
+
+  if(!$joinTrack) {
+    return $self->name . ': join track ' . $self->joinTrackName . ' has no "tracks" .yml entry';
+  }
+
+  $self->log('info', $self->name . ": starting _joinTracksToGeneTrackRegionDb "
+    . "for $chr using: ". $self->joinTrackName);
+
   # Gene tracks cover certain positions, record the start and stop
   my @positionRanges;
   my @txNums;
@@ -476,50 +528,6 @@ sub _joinTracksToGeneTrackRegionDb {
     }
   }
 
-  # TODO: Add check to see if values have already been entered
-  my $mergeFunc = sub {
-    my ($chr, $pos, $oldVal, $newVal) = @_;
-
-    my @updated;
-
-    #If the old value is an array, push the new values on to the old values
-    if(ref $oldVal) {
-      @updated = @$oldVal;
-
-      for my $val (ref $newVal ? @$newVal : $newVal) {
-        if(!defined $val) {
-          next;
-        }
-
-        push @updated, $val;
-      }
-    } else {
-      if(defined $oldVal) {
-        @updated = ($oldVal);
-      }
-
-      for my $val (ref $newVal ? @$newVal : $newVal) {
-        if(!defined $val) {
-          next;
-        }
-
-        # If not array I want to see an error
-        push @updated, $val;
-      }
-    }
-
-    # Try to add as little junk as possible
-    if(@updated == 0) {
-      return (undef, $oldVal);
-    }
-
-    if(@updated == 1) {
-      return (undef, $updated[0]);
-    }
-
-    return (undef, \@updated);
-  };
-
   my $dbName = $self->regionTrackPath($chr);
 
   # For each txNumber, run dbPatchHash on any joining data
@@ -530,31 +538,37 @@ sub _joinTracksToGeneTrackRegionDb {
 
     my %out;
     foreach (keys %$hrefToAdd) {
-      if(defined $hrefToAdd->{$_}) {
-        if(ref $hrefToAdd->{$_} eq 'ARRAY') {
-          my @arr;
-          my %uniq;
-          for my $entry (@{$hrefToAdd->{$_}}) {
-            if(defined $entry) {
-              if(!$uniq{$entry}) {
-                push @arr, $entry;
-              }
-              $uniq{$entry} = 1;
-            }
+      if(!defined $hrefToAdd->{$_}) {
+        next;
+      }
+
+      if(ref $hrefToAdd->{$_} eq 'ARRAY') {
+        my @arr;
+        my %uniq;
+        for my $entry (@{$hrefToAdd->{$_}}) {
+          if(!defined $entry) {
+            next;
           }
 
-          # Don't add empty arrays to the database
-          $hrefToAdd->{$_} = @arr ? \@arr : undef;
+          if($uniq{$entry}) {
+            next;
+          }
+
+          push @arr, $entry;
+          $uniq{$entry} = 1;
         }
 
-        if(defined $hrefToAdd->{$_}) {
-          # Our LMDB writer requires a value, so only add to our list of db entries
-          # to update if we have a value
-          #$self->getFieldDbName generates a name for the field we're joining, named $_
-          $self->db->dbPatchHash($dbName, $txNums[$index], {
-            $self->getFieldDbName($_) => $hrefToAdd->{$_}
-          }, $mergeFunc);
-        }
+        # Don't add empty arrays to the database
+        $hrefToAdd->{$_} = @arr ? \@arr : undef;
+      }
+
+      if(defined $hrefToAdd->{$_}) {
+        # Our LMDB writer requires a value, so only add to our list of db entries
+        # to update if we have a value
+        #$self->getFieldDbName generates a name for the field we're joining, named $_
+        $self->db->dbPatchHash($dbName, $txNums[$index], {
+          $self->getFieldDbName($_) => $hrefToAdd->{$_}
+        }, \&_joinTrackMergeFunc);
       }
     }
 
@@ -564,6 +578,7 @@ sub _joinTracksToGeneTrackRegionDb {
   });
 
   $self->log('info', $self->name . ": finished _joinTracksToGeneTrackRegionDb for $chr");
+  return;
 }
 
 __PACKAGE__->meta->make_immutable;

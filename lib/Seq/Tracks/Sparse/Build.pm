@@ -286,7 +286,7 @@ sub joinTrack {
     my $firstLine = <$fh>;
 
     if(!$firstLine) {
-      $self->log('fatal', $self->name . "Couldn't read first line of $file");
+      $self->log('fatal', $self->name . ": couldn't read first line of $file");
     }
 
     my ($featureIdxHref, $reqIdxHref, $fieldsToTransformIdx, $fieldsToFilterOnIdx, $numColumns) = 
@@ -298,7 +298,6 @@ sub joinTrack {
 
     my ($chr, @fields, %wantedData, $start, $end, $wantedStart, $wantedEnd);
     FH_LOOP: while( my $line = $fh->getline() ) {
-      chomp $line;
       @fields = split('\t', $line);
 
       if(! $self->_validLine(\@fields, $., $reqIdxHref, $numColumns) ) {
@@ -332,6 +331,7 @@ sub joinTrack {
 
       ($start, $end) = $self->_getPositions(\@fields, $reqIdxHref);
 
+
       %wantedData = ();
       FNAMES_LOOP: for my $name (keys %$featureIdxHref) {
         my $value = $self->coerceFeatureType( $name, $fields[ $featureIdxHref->{$name} ] );
@@ -343,12 +343,16 @@ sub joinTrack {
         $wantedStart = $wantedPositionsAref->[$i][0];
         $wantedEnd = $wantedPositionsAref->[$i][1];
 
+        # Report anything larger than maxVariantSize, which at least partially overlaps the wanted interval
         # The join tracks accumulate a large amount of useless (for my current use case) information
         # namely, all of the single nucleotide variants that are already reported for a given position
         # The real use of the join track currently is to report all of the really large variants when they
         # overlap a gene, so let's do just that, by check against our maxVariantSize
-        if( ( ($start >= $wantedStart && $start <= $wantedEnd) || ($end >= $wantedStart && $end <= $wantedEnd) ) &&
-        $end + 1 - $start > $self->maxVariantSize) {
+        if(
+          ($start < $wantedEnd && $end >= $wantedStart && $end <= $wantedEnd)
+          &&
+          $end + 1 - $start > $self->maxVariantSize
+        ) {
           &$callback(\%wantedData, $i);
           undef %wantedData;
         }

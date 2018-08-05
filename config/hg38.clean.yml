@@ -1,7 +1,7 @@
 ---
 assembly: hg38
 build_author: ubuntu
-build_date: 2018-08-03T18:17:00
+build_date: 2018-08-03T22:19:00
 chromosomes:
 - chr1
 - chr2
@@ -394,7 +394,7 @@ tracks:
       name: fetch
     version: 26
   - build_author: ubuntu
-    build_date: 2018-08-03T18:17:00
+    build_date: 2018-08-03T22:19:00
     build_row_filters:
       AS_FilterStatus: == PASS
     features:
@@ -449,9 +449,9 @@ tracks:
     - gnomad.genomes.r2.0.2.sites.chr*.liftedOver.hg38.vcf.liftedOver.gz
     name: gnomad.genomes
     type: vcf
-    version: 21
+    version: 22
   - build_author: ubuntu
-    build_date: 2018-08-03T18:17:00
+    build_date: 2018-08-03T22:19:00
     build_row_filters:
       AS_FilterStatus: == PASS
     features:
@@ -506,7 +506,7 @@ tracks:
     - gnomad.exomes.r2.0.2.sites.liftedOver.hg38.vcf.liftedOver.gz
     name: gnomad.exomes
     type: vcf
-    version: 21
+    version: 22
   - based: 1
     build_author: ubuntu
     build_date: 2018-08-03T18:17:00
@@ -554,5 +554,5 @@ tracks:
       completed: 2018-08-03T01:59:00
       name: fetch
     version: 18
-version: 212
+version: 213
 
