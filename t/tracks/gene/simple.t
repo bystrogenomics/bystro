@@ -91,8 +91,8 @@ for my $pos (0 .. $#$mainDbAref) {
     my $posIdx = 0;
     $geneGetter->get($dbData, 'chrM', $refGetter->get($dbData), 'A', $posIdx, \@out);
 
-    ok($out[$posIdx][$siteTypeIdx] eq $siteTypes->ncRNAsiteType, 'ncRNA site type');
-    ok(!defined $out[$posIdx][$funcIdx], 'ncRNA has no exonicAlleleFunction');
+    ok(join(",", @{$out[$siteTypeIdx]}) eq $siteTypes->ncRNAsiteType, 'ncRNA site type');
+    ok(!defined $out[$funcIdx][0], 'ncRNA has no exonicAlleleFunction');
   }
 
   if(defined $dbData->[$geneDbName]) {

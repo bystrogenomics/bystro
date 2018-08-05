@@ -141,9 +141,7 @@ for my $pos (0 .. 100000) {
 
   my $out = [];
   my $refSeqData = $geneGetter->get($mainDbAref, 'chr19', $refBase, $alt, 0, $out);
-  # p $out->[$siteTypeIdx];
-  # p $out;
-    
+
   # non-coding transcripts don't have UTR3/5 (not translated)
   # exonEnds closed, show this explicitly
   if($pos >= 60950 && $pos < 61894) {

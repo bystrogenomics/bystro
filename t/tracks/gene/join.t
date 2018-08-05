@@ -89,18 +89,16 @@ for my $pos (0 .. $#$mainDbAref) {
     my $posIdx = 0;
     $geneGetter->get($dbData, 'chrM', $refGetter->get($dbData), 'A', $posIdx, \@out);
 
-  if($pos >= 1605) {
-      my $alleleIDs = $out[$posIdx][$alleleIdIdx];
-      p $alleleIDs;
-      p @out;
-      exit;
-  }
 
   if($pos >= 1672 && $pos < 3230) {
     $inGeneCount++;
 
-    ok($out[$posIdx][$siteTypeIdx] eq $siteTypes->ncRNAsiteType, 'ncRNA site type');
-    ok(!defined $out[$posIdx][$funcIdx], 'ncRNA has no exonicAlleleFunction');
+    my $alleleIDs = $out[$posIdx][$alleleIdIdx];
+    my $s = join(",", @{$out[$alleleIdIdx]});
+
+    ok(join(",", @{$out[$alleleIdIdx]}) eq '24587', 'Found the clinvar record');
+    ok(join(",", @{$out[$siteTypeIdx]}) eq $siteTypes->ncRNAsiteType, 'ncRNA site type');
+    ok(!defined $out[$funcIdx][0], 'ncRNA has no exonicAlleleFunction');
   }
 
   if(defined $dbData->[$geneDbName]) {

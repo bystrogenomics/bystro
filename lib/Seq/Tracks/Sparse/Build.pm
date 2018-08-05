@@ -331,7 +331,6 @@ sub joinTrack {
 
       ($start, $end) = $self->_getPositions(\@fields, $reqIdxHref);
 
-
       %wantedData = ();
       FNAMES_LOOP: for my $name (keys %$featureIdxHref) {
         my $value = $self->coerceFeatureType( $name, $fields[ $featureIdxHref->{$name} ] );
@@ -349,13 +348,17 @@ sub joinTrack {
         # The real use of the join track currently is to report all of the really large variants when they
         # overlap a gene, so let's do just that, by check against our maxVariantSize
         if(
-          ($start < $wantedEnd && $end >= $wantedStart && $end <= $wantedEnd)
-          &&
-          $end + 1 - $start > $self->maxVariantSize
+          ($start > $wantedEnd && $end > $wantedEnd)
+          ||
+          ($start < $wantedStart && $end < $wantedStart)
+          ||
+          ($end + 1 - $start <= $self->maxVariantSize)
         ) {
+            next;
+          }
+
           &$callback(\%wantedData, $i);
           undef %wantedData;
-        }
       }
     }
 
