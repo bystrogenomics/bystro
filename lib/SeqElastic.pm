@@ -79,39 +79,62 @@ has maxThreads => (is => 'ro', isa => 'Int', default => 8);
 
 with 'Seq::Role::IO', 'Seq::Role::Message', 'MouseX::Getopt';
 
-sub getBooleanMappings {
-  my ($mapRef, $parentName) = @_;
+sub BUILD {
+  my $self = shift;
 
-  my @booleanMappings;
+  my $delims = Seq::Output::Delimiters->new();
+  # We currently don't support multiallelics on one line
+  # $self->{_alleleDelim} = $delims->alleleDelimiter;
 
-  my $pVal;
-  for my $property (keys %{$mapRef->{properties}}) {
-    $pVal = $mapRef->{properties}{$property};
+  $self->{_fieldSplit} = $delims->splitByField;
+  $self->{_overlapSplit}= $delims->splitByOverlap;
+  $self->{_posSplit} = $delims->splitByPos;
+  $self->{_valSplit} = $delims->splitByVal;
 
-    if(exists $pVal->{fields}) {
-      for my $subProp (keys %{$pVal->{fields}}) {
-        if(exists $pVal->{fields}{$subProp}{type} && $pVal->{fields}{$subProp}{type} eq 'boolean') {
-          push @booleanMappings, "$property.$subProp";
-        }
-      }
-    } elsif(exists $pVal->{properties}) {
-      push @booleanMappings, getBooleanMappings($pVal, $property);
-    } elsif(exists $pVal->{type} && $pVal->{type} eq 'boolean') {
-      push @booleanMappings, $property;
-    }
+  $self->{_missChar} = $delims->emptyFieldChar;
+
+  # Initialize messaging to the queue and logging 
+  Seq::Role::Message::initialize();
+
+  # Seq::Role::Message settings
+  # We manually set the publisher, logPath, verbosity, and debug, because
+  # Seq::Role::Message is meant to be consumed globally, but configured once
+  # Treating publisher, logPath, verbose, debug as instance variables
+  # would result in having to configure this class in every consuming class
+  if(defined $self->publisher) {
+    $self->setPublisher($self->publisher);
   }
 
-  return @booleanMappings;
-}
+  if(defined $self->logPath) {
+    $self->setLogPath($self->logPath);
+  }
 
-sub getBooleanHeaders {
-  my ($headerAref, $mapping) = @_;
+  if(defined $self->verbose) {
+    $self->setVerbosity($self->verbose);
+  }
 
-  my %booleanValues = map { $_ => 1 } getBooleanMappings($mapping);
+  #todo: finisih ;for now we have only one level
+  if ($self->debug) {
+    $self->setLogLevel('DEBUG');
+  } else {
+    $self->setLogLevel('INFO');
+  }
 
-  my @booleanHeaders = map { $booleanValues{$_} ? 1 : 0 } @$headerAref;
+  if(defined $self->inputFileNames) {
+    if(!defined $self->inputDir) {
+      $self->log('warn', "If inputFileNames provided, inputDir required");
+      return ("If inputFileNames provided, inputDir required", undef);
+    }
 
-  return @booleanHeaders;
+    if(!defined $self->inputFileNames->{archived}
+    && !defined $self->inputFileNames->{annnotation}  ) {
+      $self->log('warn', "annotation key required in inputFileNames when compressed key has a value");
+      return ("annotation key required in inputFileNames when compressed key has a value", undef);
+    }
+  } elsif(!defined $self->annotatedFilePath) {
+    $self->log('warn', "if inputFileNames not provided, annotatedFilePath must be passed");
+    return ("if inputFileNames not provided, annotatedFilePath must be passed", undef);
+  }
 }
 
 sub go {
@@ -126,45 +149,25 @@ sub go {
     return ($err, undef);
   };
 
-  my $fieldSeparator = $self->delimiter;
-
-  my $taintCheckRegex = $self->taintCheckRegex; 
+  my $fieldSep = $self->delimiter;
 
   my $firstLine = <$fh>;
 
+  $err = $self->_taintCheck($firstLine);
+
+  if($err) {
+    $self->_errorWithCleanup($err);
+    return ($err, undef);
+  }
+
   chomp $firstLine;
 
-  my @headerFields;
-  if ( $firstLine =~ m/$taintCheckRegex/xm ) {
-    @headerFields = split $fieldSeparator, $1;
-  } else {
-    return ("First line of input file has illegal characters", undef);
-  }
-
-  my @paths = @headerFields;
-  for (my $i = 0; $i < @paths; $i++) {
-    if( index($paths[$i], '.') > -1 ) {
-      $paths[$i] = [ split(/\./, $paths[$i]) ];
-    }
-  }
+  my ($headerAref, $pathAref) = $self->_getHeaderPath($firstLine);
+  my @headerFields = @$headerAref;
+  my @paths = @$pathAref;
 
   # ES since > 5.2 deprecates lenient boolean
-  my @booleanHeaders = getBooleanHeaders(\@headerFields, $self->indexConfig->{mappings});
-
-  if($self->debug) {
-    say "boolean headers are";
-    p @booleanHeaders;
-  }
-
-  my $delimiters = Seq::Output::Delimiters->new();
-
-  my $alleleDelimiter = $delimiters->alleleDelimiter;
-  my $positionDelimiter = $delimiters->positionDelimiter;
-  my $valueDelimiter = $delimiters->valueDelimiter;
-
-  $self->log('debug', "alleleDelimiter is $alleleDelimiter , pos delimter is $positionDelimiter, val delimiter is $valueDelimiter");
-
-  my $emptyFieldChar = $delimiters->emptyFieldChar;
+  my @booleanHeaders = _getBooleanHeaders(\@headerFields, $self->indexConfig->{mappings});
 
   # We need to flush at the end of each chunk read; so chunk size directly
   # controls bulk request size, as long as bulk request doesnt hit
@@ -190,26 +193,7 @@ sub go {
   # TODO: can use connection pool sniffing as well, not doing so atm
   # because not sure if connection sniffing issue exists here as in
   # elasticjs library
-  my $es = Search::Elasticsearch->new($self->connection);
-
-  if(!$es->indices->exists(index => $self->indexName) ) {
-    $es->indices->create(index => $self->indexName, body => {settings => $self->indexConfig->{index_settings}});
-  } else {
-    # Index must be open to put index settings
-    $es->indices->open(index => $self->indexName);
-
-    # Will result in errors [illegal_argument_exception] can't change the number of shards for an index
-    # $es->indices->put_settings(
-    #   index => $self->indexName,
-    #   body => $searchConfig->{index_settings},
-    # );
-  }
-
-  $es->indices->put_mapping(
-    index => $self->indexName,
-    type => $self->indexType,
-    body => $self->indexConfig->{mappings},
-  );
+  my $es = $self->_makeEsConnection();
 
   my $m1 = MCE::Mutex->new;
   tie my $abortErr, 'MCE::Shared', '';
@@ -217,8 +201,8 @@ sub go {
   my $bulk = $es->bulk_helper(
     index       => $self->indexName,
     type        => $self->indexType,
-    max_count   => 5000,
-    max_size    => 10000000,
+    max_count   => 5_000,
+    max_size    => 10_000_000,
     on_error    => sub {
       my ($action, $response, $i) = @_;
       $self->log('warn', "Index error: $action ; $response ; $i");
@@ -234,8 +218,6 @@ sub go {
   mce_loop_f {
     my ($mce, $slurp_ref, $chunk_id) = @_;
 
-    my @lines;
-
     if($abortErr) {
       say "abort error found";
       $mce->abort();
@@ -244,67 +226,14 @@ sub go {
     open my $MEM_FH, '<', $slurp_ref; binmode $MEM_FH, ':raw';
 
     my $idxCount = 0;
+    my $rowDocHref;
     while ( my $line = $MEM_FH->getline() ) {
-      #TODO: implement; the default taint check regex doesn't work for annotated files
-      # if (! $line =~ /$taintCheckRegex/) {
-      #   next;
-      # }
-      chomp $line;
-
-      my @fields = split $fieldSeparator, $line;
-
-      my %rowDocument;
-      my $colIdx = 0;
-      my $foundWeird = 0;
-      my $alleleIdx;
-      # my $isBool;
-
-      # We use Perl's in-place modification / reference of looped-over variables
-      # http://ideone.com/HNgMf7
-      for (my $i = 0; $i < @fields; $i++) {
-        my $field = $fields[$i];
-        # p $field;next;
-        #Every value is stored @ [alleleIdx][positionIdx]
-        my @out;
-
-        if($field ne $emptyFieldChar) {
-          POS_LOOP: for my $posValue (index($field, $positionDelimiter) > -1 ? split(/[$positionDelimiter]/, $field) : $field) {
-            if ($posValue eq $emptyFieldChar) {
-              push @out, undef;
-
-              next;
-            }
-            # p $posValue;
-            my @values;
-
-            for my $val (split($valueDelimiter, $posValue)) {
-              if(index($val, $alleleDelimiter) > -1) {
-                # p $val;
-                my @inner = map {
-                  $_ ne $emptyFieldChar ? $_ : undef;
-                } split($alleleDelimiter, $val);
-
-                push @values, \@inner;
-              } else {
-                push @values, $val ne $emptyFieldChar ? $val : undef;
-              }
-            }
-
-            if(!@values) {
-              push @out, undef;
-            } else {
-              push @out, @values > 1 ? \@values : $values[0];
-            }
-          }
-
-          _populateHashPath(\%rowDocument, $paths[$i], \@out);
-        }
-      }
+      $rowDocHref = $self->_processLine($line);
 
       $bulk->index({
         index => $self->indexName,
         type => $self->indexType,
-        source => \%rowDocument
+        source => $rowDocHref
       });
 
       $idxCount++;
@@ -345,6 +274,104 @@ sub go {
   $self->log('info', "finished indexing");
 
   return (undef, \@headerFields, $self->indexConfig);
+}
+
+sub _makeEsConnection {
+  my $self = shift;
+
+  my $es = Search::Elasticsearch->new($self->connection);
+
+  if(!$es->indices->exists(index => $self->indexName) ) {
+    $es->indices->create(index => $self->indexName, body => {settings => $self->indexConfig->{index_settings}});
+  } else {
+    # Index must be open to put index settings
+    $es->indices->open(index => $self->indexName);
+
+    # Will result in errors [illegal_argument_exception] can't change the number of shards for an index
+    # $es->indices->put_settings(
+    #   index => $self->indexName,
+    #   body => $searchConfig->{index_settings},
+    # );
+  }
+
+  $es->indices->put_mapping(
+    index => $self->indexName,
+    type => $self->indexType,
+    body => $self->indexConfig->{mappings},
+  );
+
+  return $es;
+}
+
+sub _getHeaderPath {
+  my ($self, $line) = @_;
+  chomp $line;
+
+  my @header = $self->{_fieldSplit}->($line);
+
+  my @paths = @header;
+  for (my $i = 0; $i < @paths; $i++) {
+    if( index($paths[$i], '.') > -1 ) {
+      $paths[$i] = [ split(/[.]/, $paths[$i]) ];
+    }
+  }
+
+  return (\@header, \@paths);
+}
+
+sub _taintCheck {
+  my ($self, $line) = @_;
+
+  my $taintCheckRegex = $self->taintCheckRegex;
+
+  if ( $line !~ /$taintCheckRegex/xgm ) {
+    return "First line of input file has illegal characters";
+  }
+
+  return;
+}
+
+sub _processLine {
+  my ($self, $line, $pathsAref) = @_;
+
+  chomp $line;
+
+  my %rowDocument;
+  my $i = -1;
+  for my $field (split $self->{_fieldSep}, $line) {
+    $i++;
+
+     #Every value is stored @ [alleleIdx][positionIdx]
+    my @out;
+
+    if($field ne $self->{_missChar}) {
+      POS_LOOP: for my $posValue ($self->{_posSplit}->($field)) {
+        if ($posValue eq $self->{_missChar}) {
+          push @out, undef;
+
+          next;
+        }
+
+        my @values;
+
+        for my $val ($self->{_valSplit}->($posValue)) {
+          foreach ($self->{_overlapSplit}->($val)) {
+            push @values, $_ ne $self->{_missChar} ? $_ : undef
+          }
+        }
+
+        if(!@values) {
+          push @out, undef;
+        } else {
+          push @out, @values > 1 ? \@values : $values[0];
+        }
+      }
+
+      _populateHashPath(\%rowDocument, $pathsAref->[$i], \@out);
+    }
+  }
+
+  return \%rowDocument;
 }
 
 sub makeLogProgress {
@@ -437,51 +464,41 @@ sub _getFilePath {
   return $self->annotatedFilePath;
 }
 
-sub BUILD {
-  my $self = shift;
+sub _getBooleanMappings {
+  my ($mapRef, $parentName) = @_;
 
-  Seq::Role::Message::initialize();
+  my @booleanMappings;
 
-  # Seq::Role::Message settings
-  # We manually set the publisher, logPath, verbosity, and debug, because
-  # Seq::Role::Message is meant to be consumed globally, but configured once
-  # Treating publisher, logPath, verbose, debug as instance variables
-  # would result in having to configure this class in every consuming class
-  if(defined $self->publisher) {
-    $self->setPublisher($self->publisher);
-  }
+  my $pVal;
+  for my $property (keys %{$mapRef->{properties}}) {
+    $pVal = $mapRef->{properties}{$property};
 
-  if(defined $self->logPath) {
-    $self->setLogPath($self->logPath);
-  }
-
-  if(defined $self->verbose) {
-    $self->setVerbosity($self->verbose);
-  }
-
-  #todo: finisih ;for now we have only one level
-  if ($self->debug) {
-    $self->setLogLevel('DEBUG');
-  } else {
-    $self->setLogLevel('INFO');
-  }
-
-  if(defined $self->inputFileNames) {
-    if(!defined $self->inputDir) {
-      $self->log('warn', "If inputFileNames provided, inputDir required");
-      return ("If inputFileNames provided, inputDir required", undef);
+    if(exists $pVal->{fields}) {
+      for my $subProp (keys %{$pVal->{fields}}) {
+        if(exists $pVal->{fields}{$subProp}{type} && $pVal->{fields}{$subProp}{type} eq 'boolean') {
+          push @booleanMappings, "$property.$subProp";
+        }
+      }
+    } elsif(exists $pVal->{properties}) {
+      push @booleanMappings, _getBooleanMappings($pVal, $property);
+    } elsif(exists $pVal->{type} && $pVal->{type} eq 'boolean') {
+      push @booleanMappings, $property;
     }
-
-    if(!defined $self->inputFileNames->{archived}
-    && !defined $self->inputFileNames->{annnotation}  ) {
-      $self->log('warn', "annotation key required in inputFileNames when compressed key has a value");
-      return ("annotation key required in inputFileNames when compressed key has a value", undef);
-    }
-  } elsif(!defined $self->annotatedFilePath) {
-    $self->log('warn', "if inputFileNames not provided, annotatedFilePath must be passed");
-    return ("if inputFileNames not provided, annotatedFilePath must be passed", undef);
   }
+
+  return @booleanMappings;
 }
+
+sub _getBooleanHeaders {
+  my ($headerAref, $mapping) = @_;
+
+  my %booleanValues = map { $_ => 1 } _getBooleanMappings($mapping);
+
+  my @booleanHeaders = map { $booleanValues{$_} ? 1 : 0 } @$headerAref;
+
+  return @booleanHeaders;
+}
+
 
 sub _errorWithCleanup {
   my ($self, $msg) = @_;

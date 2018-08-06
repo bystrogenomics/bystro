@@ -27,7 +27,8 @@ has fieldSeparator => (is => 'ro', isa => 'Str', default => "\t");
 
 has emptyFieldChar => (is => 'ro',  isa => 'Str', default => '!');
 
-has _makeCleanFunc => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
+# Memoized cleaning function
+has cleanDelims => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
   my $self = shift;
 
   my $vD = $self->valueDelimiter;
@@ -47,11 +48,115 @@ has _makeCleanFunc => (is => 'ro', init_arg => undef, lazy => 1, default => sub 
   }
 });
 
-# Memoized cleaning function
-has cleanDelims => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
+has splitByField => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
   my $self = shift;
 
-  return $self->_makeCleanFunc();
+  my $d = $self->fieldSeparator;
+
+  my $re = qr/[$d]/;
+
+  # Returns unmodified value, or a list of split values
+  # Used in list context either 1 or many values emitted
+  return sub {
+    #my ($line) = @_;
+    #    $_[0]
+
+    # modified $line ($_[0]) directly
+    #/s modifier to squash multiple
+    return split /$re/s, $_[0];
+  }
+});
+
+has splitByPos => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
+  my $self = shift;
+
+  my $d = $self->positionDelimiter;
+
+  my $re = qr/[$d]/;
+
+  # Returns unmodified value, or a list of split values
+  # Used in list context either 1 or many values emitted
+  return sub {
+    #my ($line) = @_;
+    #    $_[0]
+
+    if(index($_[0], $d) == -1 ){
+      return $_[0];
+    }
+
+    # modified $line ($_[0]) directly
+    #/s modifier to squash multiple
+    return split /$re/s, $_[0];
+  }
+});
+
+has splitByOverlap => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
+  my $self = shift;
+
+  my $d = $self->overlapDelimiter;
+
+  my $re = qr/[$d]/;
+
+  # Returns unmodified value, or a list of split values
+  # Used in list context either 1 or many values emitted
+  return sub {
+    #my ($line) = @_;
+    #    $_[0]
+
+    if(index($_[0], $d) == -1 ){
+      return $_[0];
+    }
+
+    # modified $line ($_[0]) directly
+    #/s modifier to squash multiple
+    return split /$re/s, $_[0];
+  }
+});
+
+has splitByValue => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
+  my $self = shift;
+
+  my $d = $self->valueDelimiter;
+
+  my $re = qr/[$d]/;
+
+  # Returns unmodified value, or a list of split values
+  # Used in list context either 1 or many values emitted
+  return sub {
+    #my ($line) = @_;
+    #    $_[0]
+
+    if(index($_[0], $d) == -1 ){
+      return $_[0];
+    }
+
+    # modified $line ($_[0]) directly
+    #/s modifier to squash multiple
+    return split /$re/s, $_[0];
+  }
+});
+
+has splitByAllele => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
+  my $self = shift;
+
+  my $d = $self->alleleDelimiter;
+
+  my $re = qr/[$d]/;
+
+  # Returns unmodified value, or a list of split values
+  # Used in list context either 1 or many values emitted
+  return sub {
+    #my ($line) = @_;
+    #    $_[0]
+
+    if(index($_[0], $d) == -1 ){
+      return $_[0];
+    }
+
+    # modified $line ($_[0]) directly
+    #/s modifier to squash multiple
+    return split /$re/s, $_[0];
+  }
 });
 
 __PACKAGE__->meta->make_immutable();

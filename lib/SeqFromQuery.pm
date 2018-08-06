@@ -65,64 +65,42 @@ sub annotate {
 
   my $delims = Seq::Output::Delimiters->new();
 
-  my $alleleDelimiter = $delims->alleleDelimiter;
-  my $positionDelimiter = $delims->positionDelimiter;
-  my $valueDelimiter = $delims->valueDelimiter;
-  my $fieldSeparator = $delims->fieldSeparator;
-  my $emptyFieldChar = $delims->emptyFieldChar;
+  my $overlapDelim = $delims->overlapDelimiter;
+  my $posDelim = $delims->positionDelimiter;
+  my $valueDelim = $delims->valueDelimiter;
+  my $fieldSep = $delims->fieldSeparator;
+  my $missChar = $delims->emptyFieldChar;
 
-  my @fieldNames = @{$self->fieldNames};;
-
-  my @childrenOrOnly;
-  $#childrenOrOnly = $#fieldNames;
-
-  # Elastic top level of { parent => child } is parent.
-  my @parentNames;
-  $#parentNames = $#fieldNames;
-
-  for my $i (0 .. $#fieldNames) {
-    if( index($fieldNames[$i], '.') > -1 ) {
-      my @path = split(/\./, $fieldNames[$i]);
-      $parentNames[$i] = $path[0];
-
-      if(@path == 2) {
-        $childrenOrOnly[$i] = [ $path[1] ];
-      } elsif(@path > 2) {
-        $childrenOrOnly[$i] = [ @path[ 1 .. $#path] ];
-      }
-
-    } else {
-      $parentNames[$i] = $fieldNames[$i];
-      $childrenOrOnly[$i] = $fieldNames[$i];
-    }
-  }
+  my ($parentsAref, $childrenAref) = $self->_getHeader();
+  my @childrenOrOnly = @$childrenAref;
+  my @parentNames = @$parentsAref;
 
   ################## Make the full output path ######################
   # The output path always respects the $self->output_file_base attribute path;
   my $outputPath = $self->_workingDir->child($self->outputFilesInfo->{annotation});
 
-  my $outFh = $self->getWriteFh($outputPath);
+  my ($err, undef, $outFh) = $self->getWriteFh($outputPath);
 
-  if(!$outFh) {
-    #TODO: should we report $err? less informative, but sometimes $! reports bull
-    #i.e inappropriate ioctl when actually no issue
-    my $err = "Failed to open " . $self->_workingDir;
+  if(!$err) {
     $self->_errorWithCleanup($err);
     return ($err, undef);
   }
 
   # Stats may or may not be provided
-  my $statsFh;
-  my $outputHeader = join($fieldSeparator, @fieldNames);
-
-  # Write the header
+  my @fieldNames = @{$self->fieldNames};
+  my $outputHeader = join($fieldSep, @fieldNames);
 
   say $outFh $outputHeader;
 
-  # TODO: error handling if fh fails to open
+  my $statsFh;
   if($self->run_statistics) {
     my $args = $self->_statisticsRunner->getStatsArguments();
-    open($statsFh, "|-", $args) or $self->log('fatal', "Couldnt open Bystro Statistics due to $! (exit code: $?)");
+    $err = $self->safeOpen($statsFh, "|-", $args);
+
+    if($err) {
+      $self->_errorWithCleanup($err);
+      return ($err, undef);
+    }
 
     say $statsFh $outputHeader;
   }
@@ -160,30 +138,29 @@ sub annotate {
     }
 
     my $outputString = _makeOutputString(\@sourceData, 
-      $emptyFieldChar, $valueDelimiter, $positionDelimiter, $alleleDelimiter, $fieldSeparator);
+      $missChar, $valueDelim, $posDelim, $overlapDelim, $fieldSep);
 
     $mce->gather(scalar @$_, $outputString, $chunkId);
   } $self->_esIterator($batchSize);
 
   ################ Finished writing file. If statistics, print those ##########
-  # Sync to ensure all files written
-  close $outFh;
+  # First sync output to ensure everything needed is written
+  # then close all file handles and move files to output dir
+  $err = $self->safeSystem('sync')
+         ||
+         $self->safeClose($outFh)
+         ||
+         ($statsFh && $self->safeClose($statsFh))
+         ||
+         $self->_moveFilesToOutputDir();
 
-  if($statsFh) {
-    close $statsFh;
-  }
-
-  $self->safeSystem('sync');
-
-  my $err = $self->_moveFilesToOutputDir();
-
-  # If we have an error moving the output files, we should still return all data
-  # that we can
   if($err) {
-    $self->log('error', $err);
+    $self->_errorWithCleanup($err);
+
+    return ($err, undef);
   }
 
-  return ($err || undef, $self->outputFilesInfo);
+  return ($err, $self->outputFilesInfo);
 }
 
 sub _esIterator {
@@ -212,6 +189,38 @@ sub _esIterator {
   };
 }
 
+sub _getHeader {
+  my $self = shift;
+
+  my @fieldNames = @{$self->fieldNames};;
+
+  my @childrenOrOnly;
+  $#childrenOrOnly = $#fieldNames;
+
+  # Elastic top level of { parent => child } is parent.
+  my @parentNames;
+  $#parentNames = $#fieldNames;
+
+  for my $i (0 .. $#fieldNames) {
+    if( index($fieldNames[$i], '.') > -1 ) {
+      my @path = split(/\./, $fieldNames[$i]);
+      $parentNames[$i] = $path[0];
+
+      if(@path == 2) {
+        $childrenOrOnly[$i] = [ $path[1] ];
+      } elsif(@path > 2) {
+        $childrenOrOnly[$i] = [ @path[ 1 .. $#path] ];
+      }
+
+    } else {
+      $parentNames[$i] = $fieldNames[$i];
+      $childrenOrOnly[$i] = $fieldNames[$i];
+    }
+  }
+
+  return (\@parentNames, \@childrenOrOnly);
+}
+
 sub _populateArrayPathFromHash {
   my ($pathAref, $dataForEndOfPath) = @_;
   #     $_[0]  , $_[1]    , $_[2]
@@ -227,7 +236,7 @@ sub _populateArrayPathFromHash {
 }
 
 sub _makeOutputString {
-  my ($arrayRef, $emptyFieldChar, $valueDelimiter, $positionDelimiter, $alleleDelimiter, $fieldSeparator) = @_;
+  my ($arrayRef, $missChar, $valueDelim, $posDelim, $overlapDelim, $fieldSep) = @_;
 
   # Expects an array of row arrays, which contain an for each column, or an undefined value
   for my $row (@$arrayRef) {
@@ -235,46 +244,65 @@ sub _makeOutputString {
     COLUMN_LOOP: for my $column (@$row) {
       # Some fields may just be missing
       if(!defined $column) {
-        $column = $emptyFieldChar;
+        $column = $missChar;
         next COLUMN_LOOP;
       }
 
       # Most sites have a single position (not indels)
+      # Avoid a loop if so
       if(@$column == 1) {
         if(ref $column->[0]) {
-          $column = join($valueDelimiter, map {
-            defined $_ ? (ref $_ ? join($alleleDelimiter, map { defined $_ ? $_ : $emptyFieldChar } @$_) : $_ ) : $emptyFieldChar 
+          $column = join($valueDelim, map {
+            !defined $_
+            ?
+            $missChar
+            :
+            ( ref $_
+              ?
+              join($overlapDelim, map { defined $_ ? $_ : $missChar } @$_)
+              :
+              $_
+            )
           } @{$column->[0]});
 
           next COLUMN_LOOP;
         }
 
-        $column = defined $column->[0] ? $column->[0] : $emptyFieldChar;
+        $column = defined $column->[0] ? $column->[0] : $missChar;
 
         next COLUMN_LOOP;
       }
 
       POS_LOOP: for my $positionData (@$column) {
         if(!defined $positionData) {
-          $positionData = $emptyFieldChar;
+          $positionData = $missChar;
           next POS_LOOP;
         }
 
         if(ref $positionData) {
-          $positionData = join($valueDelimiter, map {
-            defined $_ ? (ref $_ ? join($alleleDelimiter, map { defined $_ ? $_ : $emptyFieldChar } @$_) : $_ ) : $emptyFieldChar 
+          $positionData = join($valueDelim, map {
+            !defined $_
+            ?
+            $missChar
+            :
+            ( ref $_
+              ?
+              join($overlapDelim, map { defined $_ ? $_ : $missChar } @$_)
+              :
+              $_
+            )
           } @$positionData);
 
           next POS_LOOP;
         }
       }
 
-      $column = join($positionDelimiter, @$column);
+      $column = join($posDelim, @$column);
     }
 
-    $row = join($fieldSeparator, @$row);
+    $row = join($fieldSep, @$row);
   }
-  
+
   return join("\n", @$arrayRef);
 }
 
