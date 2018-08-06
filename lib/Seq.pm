@@ -1,4 +1,3 @@
-
 use 5.10.0;
 use strict;
 use warnings;
@@ -63,6 +62,10 @@ sub BUILD {
   # Must come before statistics, which relies on a configured Seq::Tracks
   #Expects DBManager to have been given a database_dir
   $self->{_db} = Seq::DBManager->new();
+
+  # Initializes the tracks
+  # This ensures that the tracks are configured, and headers set
+  $self->{_tracks} = $self->tracksObj;
 }
 
 sub annotate {
@@ -128,23 +131,25 @@ sub annotateFile {
   my $self = shift;
   my $type = shift;
 
-  my ($err, $fhs) = $self->_getFileHandles($type);
+  my ($err, $fh, $outFh, $statsFh) = $self->_getFileHandles($type);
 
   if($err) {
     $self->_errorWithCleanup($err);
     return ($err, undef);
   }
 
-  my ($fh, $outFh, $statsFh) = ($fhs->{in}, $fhs->{out}, $fhs->{stats});
-
   ########################## Write the header ##################################
   my $header = <$fh>;
   $self->setLineEndings($header);
 
   my $finalHeader = $self->_getFinalHeader($header);
-  my $outputHeader = $finalHeader->string();
+  my $outputHeader = $finalHeader->getString();
 
   say $outFh $outputHeader;
+
+  if($statsFh) {
+    say $statsFh $outputHeader;
+  }
 
   # Now that header is prepared, make the outputter
   my $outputter = Seq::Output->new({header => $finalHeader});
@@ -396,12 +401,13 @@ sub makeLogProgressAndPrint {
 sub _getFileHandles {
   my ($self, $type) = @_;
 
-  my (%fhs, $err);
+  my ($outFh, $statsFh, $inFh);
+  my $err;
 
-  ($err, $fhs{in}) = $self->_openAnnotationPipe($type);
+  ($err, $inFh) = $self->_openAnnotationPipe($type);
 
   if($err) {
-    return ($err, undef);
+    return ($err,  undef, undef, undef);
   }
 
   if($self->run_statistics) {
@@ -409,20 +415,21 @@ sub _getFileHandles {
     # TODO: error handling if fh fails to open
     my $statArgs = $self->_statisticsRunner->getStatsArguments();
 
-    $err = $self->safeOpen($fhs{stats}, "|-", $statArgs);
+    $err = $self->safeOpen($statsFh, "|-", $statArgs);
 
     if($err) {
-      return ($err, undef);
+      return ($err,  undef, undef, undef);
     }
   }
 
-  ($err, $fhs{out}) = $self->getWriteFh($self->{_outPath});
+  # $fhs{stats} = $$statsFh;
+  ($err, $outFh) = $self->getWriteFh($self->{_outPath});
 
   if($err) {
-    return ($err, undef);
+    return ($err, undef, undef, undef);
   }
 
-  return (undef, \%fhs);
+  return (undef, $inFh, $outFh, $statsFh);
 }
 
 sub _openAnnotationPipe {

@@ -134,9 +134,9 @@ sub getStatsArguments {
     . "-altColumn $alleleColumnName -homozygotesColumn $homozygotesColumnName "
     . "-heterozygotesColumn $heterozygotesColumnName -siteTypeColumn $siteTypeColumnName "
     . $dbSNPpart
-    . "-emptyField \$\"$emptyFieldString\" "
+    . "-emptyField '$emptyFieldString' "
     . "-exonicAlleleFunctionColumn $exonicAlleleFuncColumnName "
-    . "-primaryDelimiter \$\"$valueDelimiter\" -fieldSeparator \$\"$fieldSeparator\" ");
+    . "-primaryDelimiter '$valueDelimiter' -fieldSeparator '$fieldSeparator' ");
 }
 
 __PACKAGE__->meta->make_immutable;
