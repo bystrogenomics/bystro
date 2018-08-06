@@ -26,4 +26,5 @@ sudo apt install -y patch
 sudo apt install -y cpan
 
 sudo apt install -y nodejs
+sudo apt install -y npm
 sudo npm install -g pm2
