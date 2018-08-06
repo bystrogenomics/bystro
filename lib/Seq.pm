@@ -170,7 +170,7 @@ sub annotateFile {
   my $refTrackGetter = $self->tracksObj->getRefTrackGetter();
   my @trackGettersExceptReference = @{$self->tracksObj->getTrackGettersExceptReference()};
 
-  my $trackIndices = $finalHeader->getParentFeaturesMap();
+  my $trackIndices = $finalHeader->getParentIndices();
   my $refTrackIdx = $trackIndices->{$refTrackGetter->name};
 
   my %wantedChromosomes = %{ $refTrackGetter->chromosomes };

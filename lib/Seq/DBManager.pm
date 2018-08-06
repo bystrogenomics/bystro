@@ -625,7 +625,6 @@ sub dbDeleteAll {
     }
   }
 
-  #  !$skipCommit
   $db->{db}->Txn->commit();
 
   if($LMDB_File::last_err) {
@@ -654,7 +653,6 @@ sub dbStartCursorTxn {
   #It is possible not to find a database in $dbReadOnly mode (for ex: refSeq for a while didn't have chrM)
   #http://ideone.com/uzpdZ8
 
-  #        $self->_getDbi($chr)
   my $db = $self->_getDbi($chr);
 
   # TODO: Better error handling; since a cursor may be used to read or write
@@ -679,7 +677,6 @@ sub dbStartCursorTxn {
   # to protect against the above BAD_TXN issue
   my $txn = LMDB::Txn->new($db->{env}, $db->{tflags});
 
-  # my $txn = LMDB::Txn->new($db->{env});
   $txn->AutoCommit(1);
 
   # This means LMDB_File will not track our cursor, must close/delete manually
@@ -726,11 +723,14 @@ sub dbReadOneCursorUnsafe {
 }
 
 # Don't copy variables on the stack, since this may be called billions of times
+# Instead, modify the passed $posAref (arg 3)
 sub dbReadCursorUnsafe {
   #my ($self, $cursor, $posAref) = @_;
       #$_[0]. $_[1].   $_[2]
 
+  #foreach(@{$posAref})
   foreach (@{$_[2]}) {
+    #$cursor->[1]->_get($_, my $json, MDB_SET);
     $_[1]->[1]->_get($_, my $json, MDB_SET);
 
     $_ = defined $json ? $mp->unpack($json) : undef;
@@ -747,6 +747,7 @@ sub dbReadCursorUnsafe {
     $LMDB_File::last_err = 0;
   }
 
+  #return $posAref;
   return $_[2];
 }
 
@@ -758,7 +759,7 @@ sub dbPatchCursorUnsafe {
   #my ( $self, $cursor, $chr, $dbName, $pos, $newValue, $mergeFunc) = @_;
   #    $_[0]. $_[1].   $_[2]. $_[3].  $_[4] $_[5].     $_[6]
 
-#$cursor->_get($pos)
+  #$cursor->[1]->_get($pos, my $json, MDB_SET);
   $_[1]->[1]->_get($_[4], my $json, MDB_SET);
 
   my $existingValue = defined $json ? $mp->unpack($json) : [];
@@ -785,23 +786,23 @@ sub dbPatchCursorUnsafe {
       return 0;
     }
   } else {
-                  ##[$dbName]#$newValue
+    #$existingValue->[$dbName]= $newValue;
     $existingValue->[$_[3]] = $_[5];
   }
 
   #_put as used here will not return errors if the cursor is inactive
   # hence, "unsafe"
   if(defined $json) {
-  #$cursor      #$pos
+  #$cursor->[1]->_put($pos, $mp->pack($existingValue), MDB_CURRENT);
     $_[1]->[1]->_put($_[4], $mp->pack($existingValue), MDB_CURRENT);
   } else {
-  #$cursor     #$pos
+  #$cursor->[1]->_put($pos, $mp->pack($existingValue));
     $_[1]->[1]->_put($_[4], $mp->pack($existingValue));
   }
 
   if($LMDB_File::last_err) {
     if($LMDB_File::last_err != MDB_NOTFOUND && $LMDB_File::last_err != MDB_KEYEXIST) {
-    #$self
+      #$self->_errorWithCleanup...
       $_[0]->_errorWithCleanup("dbEndCursorTxn LMDB error: $LMDB_File::last_err");
       return 255;
     }

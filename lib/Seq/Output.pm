@@ -10,15 +10,10 @@ use Seq::Headers;
 
 with 'Seq::Role::Message';
 
-use DDP;
-
-# TODO: Configure as singleton
-
+has header => (is => 'ro', isa => 'Seq::Headers', required => 1);
 has delimiters => (is => 'ro', isa => 'Seq::Output::Delimiters', default => sub {
   return Seq::Output::Delimiters->new();
 });
-
-has header => (is => 'ro', isa => 'Seq::Headers', required => 1);
 
 sub BUILD {
   my $self = shift;
