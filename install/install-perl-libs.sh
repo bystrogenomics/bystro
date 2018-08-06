@@ -28,6 +28,7 @@ cpanm install MouseX::ConfigFromFile
 cpanm install MouseX::Getopt
 cpanm install Archive::Extract
 cpanm install DBI
+cpanm install String::Strip
 # Needed for fetching SQL (Utils::SqlWriter::Connection)
 cpanm install DBD::mysql
 cpanm install IO/FDPass.pm

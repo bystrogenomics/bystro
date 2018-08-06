@@ -21,6 +21,9 @@ use Seq::Tracks::Base::Types;
 use Seq::Tracks::Build::LocalFilesPaths;
 use Seq::Output::Delimiters;
 
+# Faster than regex trim
+use String::Strip qw/StripLTSpace/;
+
 extends 'Seq::Tracks::Base';
 # All builders need getReadFh
 with 'Seq::Role::IO';
@@ -109,17 +112,6 @@ has fieldMap => (is => 'ro', isa => 'HashRef', lazy => 1, default => sub {
   return \%data;
 });
 
-# TODO: config output;
-has _emptyFieldRegex => (is => 'ro', isa => 'RegexpRef', init_arg => undef, default => sub { 
-  my $delim = Seq::Output::Delimiters->new();
-
-  my $emptyField = $delim->emptyFieldChar;
-
-  my $regex = qr/^\s*$emptyField\s*$/;
-
-  return $regex;
-});
-
 ################################ Constructor ################################
 sub BUILD {
   my $self = shift;
@@ -137,7 +129,7 @@ sub BUILD {
 
   my $d = Seq::Output::Delimiters->new();
   $self->{_cleanDelims} = $d->cleanDelims;
-
+  $self->{_missChar} = $d->emptyFieldChar;
   # Commit, sync, and remove any databases opened
   # This is useful because locking may occur if there is an open transaction
   # before fork(), and to make sure that any database meta data is properly
@@ -200,7 +192,7 @@ sub coerceFeatureType {
 
     if(!looks_like_number($val)) {
       $_[0]->{_cleanDelims}->($val);
-      $_[0]->coerceUndefinedValues($val);
+      $_[0]->_stripAndCoerceUndef($val);
     }
 
     if( defined $type && defined $val ) {
@@ -445,13 +437,36 @@ sub makeMergeFunc {
   );
 }
 
-sub coerceUndefinedValues {
+sub _stripAndCoerceUndef {
   #my ($self, $dataStr) = @_;
+  state $c1 = 'no assertion criteria provided';
+  state $c2 = 'not provided';
+  state $c3 = 'see cases';
+  state $c4 = 'na';
+  state $c5 = '.';
 
   # Don't waste storage space on NA. In Bystro undef values equal NA (or whatever
   # Output.pm chooses to represent missing data as.
+  StripLTSpace($_[1]);
 
-  if($_[1] =~ /^\s*NA\s*$/i || $_[1] =~/^\s*$/ || $_[1] =~/^\s*\.\s*$/ || $_[1] =~ $_[0]->_emptyFieldRegex) {
+  # Common missing values: not provided and see cases are clinvar-specific
+  my $lc = lc($_[1]);
+
+  if(length($lc) <= 8) {
+    if($lc eq $c5
+    || $lc eq $c4
+    || $lc eq $_[0]->{_missChar}
+    ) {
+      $_[1] = undef;
+      return undef;
+    }
+    return $_[1];
+  }
+
+  if($lc eq $c3
+  || $lc eq $c2
+  || $lc eq $c1
+  ) {
     $_[1] = undef;
     return undef;
   }

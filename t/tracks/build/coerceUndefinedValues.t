@@ -34,31 +34,65 @@ my $seq = Seq::Tracks::Build->new({
 my $delims = Seq::Output::Delimiters->new();
 
 my $test='NA';
-my $res = $seq->coerceUndefinedValues($test);
+my $res = $seq->_stripAndCoerceUndef($test);
 
 ok(!defined $test && !defined $res, "Modifies passed value, and sets NA to undef");
 
 $test='.';
-$res = $seq->coerceUndefinedValues($test);
+$res = $seq->_stripAndCoerceUndef($test);
 
 ok(!defined $test && !defined $res, "Sets . to undef");
 
+$test='see cases';
+$res = $seq->_stripAndCoerceUndef($test);
+
+ok(!defined $test && !defined $res, "'see cases' is not a valid value");
+
+$test='see cases ';
+$res = $seq->_stripAndCoerceUndef($test);
+
+ok(!defined $test && !defined $res, "'see cases' with trailing whitespace not a valid value");
+
+$test=' see cases';
+$res = $seq->_stripAndCoerceUndef($test);
+
+ok(!defined $test && !defined $res, "'see cases' with leading whitespace not a valid value");
+
+$test=' see cases ';
+$res = $seq->_stripAndCoerceUndef($test);
+
+ok(!defined $test && !defined $res, "'see cases' with leading/trailing whitespace is not a valid value");
+
+$test='not provided';
+$res = $seq->_stripAndCoerceUndef($test);
+
+ok(!defined $test && !defined $res, "'not provided' is not a valid value");
+
+$test='no assertion criteria provided';
+$res = $seq->_stripAndCoerceUndef($test);
+
+ok(!defined $test && !defined $res, "'no assertion criteria provided' is not a valid value");
+
 
 $test=$delims->emptyFieldChar;
-$res = $seq->coerceUndefinedValues($test);
+$res = $seq->_stripAndCoerceUndef($test);
 
 ok(!defined $test && !defined $res, "Sets the emptyFieldChar to undef");
 
 $test=' NA ';
-$res = $seq->coerceUndefinedValues($test);
+$res = $seq->_stripAndCoerceUndef($test);
 
 ok(!defined $test && !defined $res, "Whitespace doesnt affect coercion");
 
 my $expected = 'NA / Some value';
 $test='NA / Some value';
-$res = $seq->coerceUndefinedValues($test);
+$res = $seq->_stripAndCoerceUndef($test);
 
 ok($test eq $res && $res eq $expected, "Doesn't clear valued statements");
+
+$test = " SOMETHING NOT NULL ";
+$seq->_stripAndCoerceUndef($test);
+ok($test eq "SOMETHING NOT NULL", "_stripAndCoerceUndef also strips leading/trailing spaces");
 
 done_testing();
 1;
