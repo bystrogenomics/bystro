@@ -158,12 +158,12 @@ sub annotateFile {
   my $abortErr;
 
   # Report every 1e4 lines, to avoid thrashing receiver
-  my $progressFunc = $self->makeLogProgressAndPrint(\$abortErr, $outFh, $statsFh, 1e4);
+  my $progressFunc = $self->makeLogProgressAndPrint(\$abortErr, $outFh, $statsFh, 2e4);
   MCE::Loop::init {
     max_workers => $self->maxThreads || 8, use_slurpio => 1,
     # bystro-vcf outputs a very small row; fully annotated through the alt column (-ref -discordant)
     # so accumulate less than we would if processing full .snp
-    chunk_size => $self->{_chunkSize} > 4192 ? "4192K" : $self->{_chunkSize}. "K",
+    chunk_size => $self->{_chunkSize} > 8192 ? "8192K" : $self->{_chunkSize}. "K",
     gather => $progressFunc,
   };
 
