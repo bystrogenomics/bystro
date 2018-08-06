@@ -88,8 +88,8 @@ sub BUILD {
 
   $self->{_fieldSplit} = $delims->splitByField;
   $self->{_overlapSplit}= $delims->splitByOverlap;
-  $self->{_posSplit} = $delims->splitByPos;
-  $self->{_valSplit} = $delims->splitByVal;
+  $self->{_posSplit} = $delims->splitByPosition;
+  $self->{_valSplit} = $delims->splitByValue;
 
   $self->{_missChar} = $delims->emptyFieldChar;
 
@@ -163,8 +163,8 @@ sub go {
   chomp $firstLine;
 
   my ($headerAref, $pathAref) = $self->_getHeaderPath($firstLine);
+
   my @headerFields = @$headerAref;
-  my @paths = @$pathAref;
 
   # ES since > 5.2 deprecates lenient boolean
   my @booleanHeaders = _getBooleanHeaders(\@headerFields, $self->indexConfig->{mappings});
@@ -228,7 +228,7 @@ sub go {
     my $idxCount = 0;
     my $rowDocHref;
     while ( my $line = $MEM_FH->getline() ) {
-      $rowDocHref = $self->_processLine($line);
+      $rowDocHref = $self->_processLine($line, $pathAref);
 
       $bulk->index({
         index => $self->indexName,
@@ -338,10 +338,10 @@ sub _processLine {
 
   my %rowDocument;
   my $i = -1;
-  for my $field (split $self->{_fieldSep}, $line) {
+  for my $field ($self->{_fieldSplit}->($line)) {
     $i++;
-
-     #Every value is stored @ [alleleIdx][positionIdx]
+    # say STDERR "Field: $field ; i : $i; path: " . ( ref $pathsAref->[$i] ? join(".", @{$pathsAref->[$i]}) : $pathsAref->[$i] );
+    # Every value is stored @ [alleleIdx][positionIdx]
     my @out;
 
     if($field ne $self->{_missChar}) {

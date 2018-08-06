@@ -67,7 +67,7 @@ has splitByField => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
   }
 });
 
-has splitByPos => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
+has splitByPosition => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
   my $self = shift;
 
   my $d = $self->positionDelimiter;
