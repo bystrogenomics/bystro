@@ -1,7 +1,7 @@
 ---
 assembly: hg38
 build_author: ubuntu
-build_date: 2018-08-03T22:19:00
+build_date: 2018-08-06T02:32:00
 chromosomes:
 - chr1
 - chr2
@@ -63,8 +63,8 @@ tracks:
   - dbSNP
   - clinvar
   tracks:
-  - build_author: ec2-user
-    build_date: 2018-01-20T22:12:00
+  - build_author: ubuntu
+    build_date: 2018-08-06T02:32:00
     local_files:
     - chr*.fa.gz
     name: ref
@@ -100,9 +100,9 @@ tracks:
         - chrY.fa.gz
       completed: 2017-11-24T02:27:00
       name: fetch
-    version: 26
-  - build_author: ec2-user
-    build_date: 2018-01-20T22:12:00
+    version: 27
+  - build_author: ubuntu
+    build_date: 2018-08-06T02:32:00
     dist: true
     features:
     - name2
@@ -113,8 +113,9 @@ tracks:
     name: nearest.refSeq
     to: txEnd
     type: nearest
-  - build_author: ec2-user
-    build_date: 2018-01-20T22:12:00
+    version: 1
+  - build_author: ubuntu
+    build_date: 2018-08-06T02:32:00
     dist: true
     features:
     - name2
@@ -124,9 +125,9 @@ tracks:
     - hg38.kgXref.chr*.with_dbnsfp.gz
     name: nearestTss.refSeq
     type: nearest
-    version: 17
-  - build_author: ec2-user
-    build_date: 2018-01-20T22:12:00
+    version: 18
+  - build_author: ubuntu
+    build_date: 2018-08-06T02:32:00
     local_files:
     - chr*.phastCons100way.wigFix.gz
     name: phastCons
@@ -162,9 +163,9 @@ tracks:
         - chrM.phastCons100way.wigFix.gz
       completed: 2017-11-23T21:05:00
       name: fetch
-    version: 18
-  - build_author: ec2-user
-    build_date: 2018-01-20T22:12:00
+    version: 19
+  - build_author: ubuntu
+    build_date: 2018-08-06T02:32:00
     local_files:
     - chr*.phyloP100way.wigFix.gz
     name: phyloP
@@ -200,9 +201,9 @@ tracks:
         - chrM.phyloP100way.wigFix.gz
       completed: 2017-11-23T21:10:00
       name: fetch
-    version: 17
-  - build_author: ec2-user
-    build_date: 2018-01-20T22:12:00
+    version: 18
+  - build_author: ubuntu
+    build_date: 2018-08-06T02:32:00
     caddToBed_date: 2017-04-22T06:41:00
     liftOverCadd_date: 2017-07-28T17:35:00
     local_files:
@@ -213,9 +214,9 @@ tracks:
     sort_date: 2017-01-20T16:06:00
     sorted_guaranteed: 1
     type: cadd
-    version: 17
-  - build_author: ec2-user
-    build_date: 2018-01-20T22:12:00
+    version: 18
+  - build_author: ubuntu
+    build_date: 2018-08-06T02:32:00
     build_field_transformations:
       description: split [;]
       ensemblID: split [;]
@@ -303,9 +304,9 @@ tracks:
         geneFile: /mnt/bystro-files/dbnsfp//dbNSFP3.5_gene.complete
       completed: 2018-08-03T01:56:00
       name: refGeneXdbnsfp
-    version: 26
-  - build_author: ec2-user
-    build_date: 2018-01-20T22:12:00
+    version: 27
+  - build_author: ubuntu
+    build_date: 2018-08-06T02:32:00
     build_field_transformations:
       pmid: split [;]
       uniprot.func: split [;]
@@ -365,9 +366,9 @@ tracks:
     storeNearest: false
     to: txEnd
     type: nearest
-    version: 22
-  - build_author: ec2-user
-    build_date: 2018-01-20T22:12:00
+    version: 23
+  - build_author: ubuntu
+    build_date: 2018-08-06T02:32:00
     build_field_transformations:
       alleleFreqs: split [,]
       alleleNs: split [,]
@@ -392,9 +393,9 @@ tracks:
         sql: SELECT * FROM hg38.snp150 WHERE chrom = %chromosomes%
       completed: 2017-11-24T03:23:00
       name: fetch
-    version: 26
+    version: 27
   - build_author: ubuntu
-    build_date: 2018-08-03T22:19:00
+    build_date: 2018-08-06T02:32:00
     build_row_filters:
       AS_FilterStatus: == PASS
     features:
@@ -451,7 +452,7 @@ tracks:
     type: vcf
     version: 22
   - build_author: ubuntu
-    build_date: 2018-08-03T22:19:00
+    build_date: 2018-08-06T02:32:00
     build_row_filters:
       AS_FilterStatus: == PASS
     features:
@@ -509,7 +510,7 @@ tracks:
     version: 22
   - based: 1
     build_author: ubuntu
-    build_date: 2018-08-03T18:17:00
+    build_date: 2018-08-06T02:32:00
     build_field_transformations:
       chrom: chr .
       clinicalSignificance: split [;]
@@ -553,6 +554,6 @@ tracks:
         - ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz
       completed: 2018-08-03T01:59:00
       name: fetch
-    version: 18
+    version: 19
 version: 213
 
