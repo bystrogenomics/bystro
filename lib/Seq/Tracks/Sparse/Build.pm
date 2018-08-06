@@ -197,9 +197,7 @@ sub buildTrack {
         FNAMES_LOOP: for my $name (keys %$featureIdxHref) {
           my $value = $self->coerceFeatureType( $name, $fields[ $featureIdxHref->{$name} ] );
 
-          if(!exists $fieldDbNames{$name}) {
-            $fieldDbNames{$name} = $self->getFieldDbName($name);
-          }
+          $fieldDbNames{$name} //= $self->getFieldDbName($name);
 
           # getFieldDbName will croak if it can't make or find a dbName
           $sparseData[ $fieldDbNames{$name} ] = $value;

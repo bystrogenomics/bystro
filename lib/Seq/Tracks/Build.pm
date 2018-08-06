@@ -135,6 +135,9 @@ sub BUILD {
       . "assume there is only one chromosome per file, and that 1 chromosome isn't accounted for.");
   }
 
+  my $d = Seq::Output::Delimiters->new();
+  $self->{_cleanDelims} = $d->cleanDelims;
+
   # Commit, sync, and remove any databases opened
   # This is useful because locking may occur if there is an open transaction
   # before fork(), and to make sure that any database meta data is properly
@@ -195,9 +198,12 @@ sub coerceFeatureType {
       next;
     }
 
-    $val = $_[0]->coerceUndefinedValues($val);
+    if(!looks_like_number($val)) {
+      $_[0]->{_cleanDelims}->($val);
+      $_[0]->coerceUndefinedValues($val);
+    }
 
-    if( defined $type ) {
+    if( defined $type && defined $val ) {
       $val = $converter->convert($val, $type);
     }
   }
@@ -446,6 +452,7 @@ sub coerceUndefinedValues {
   # Output.pm chooses to represent missing data as.
 
   if($_[1] =~ /^\s*NA\s*$/i || $_[1] =~/^\s*$/ || $_[1] =~/^\s*\.\s*$/ || $_[1] =~ $_[0]->_emptyFieldRegex) {
+    $_[1] = undef;
     return undef;
   }
 

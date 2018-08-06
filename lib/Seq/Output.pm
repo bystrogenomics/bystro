@@ -122,7 +122,7 @@ sub makeOutputString {
         $row->[$trackIdx] = join($positionDelimiter, @{$row->[$trackIdx]});
       }
     }
-    
+
     $row = join("\t", @$row);
   }
 

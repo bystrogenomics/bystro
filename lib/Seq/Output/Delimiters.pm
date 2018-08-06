@@ -27,7 +27,6 @@ has fieldSeparator => (is => 'ro', isa => 'Str', default => "\t");
 
 has emptyFieldChar => (is => 'ro',  isa => 'Str', default => '!');
 
-
 has _makeCleanFunc => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
   my $self = shift;
 
@@ -56,4 +55,4 @@ has cleanDelims => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
 });
 
 __PACKAGE__->meta->make_immutable();
-return 1;
+1;
