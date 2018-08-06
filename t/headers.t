@@ -5,7 +5,6 @@ use warnings;
 use Test::More;
 use Seq::Output;
 use Seq::Headers;
-use DDP;
 
 my $head = Seq::Headers->new();
 
@@ -15,53 +14,53 @@ my $str = $head->getString();
 my $expected = "first\tsecond\tthird";
 ok($str eq $expected, "Can write basic header");
 
-my $arr = $head->getOrderedHeaderNoMap();
+my $arr = $head->getOrderedHeader();
 ok(join("\t", @$arr) eq $expected, "Store features in order given");
 
 $head->addFeaturesToHeader(['really_first', 'really_second'], undef, 1);
 $expected = "really_first\treally_second\t$expected";
 
-$arr = $head->getOrderedHeaderNoMap();
+$arr = $head->getOrderedHeader();
 
 ok(join("\t", @$arr) eq $expected, "Can prepend multiple features");
 
 $head->addFeaturesToHeader('really_really_first', undef, 1);
 $expected = "really_really_first\t$expected";
 
-$arr = $head->getOrderedHeaderNoMap();
+$arr = $head->getOrderedHeader();
 ok(join("\t", @$arr) eq $expected, "Can prepend features");
 
 $head->initialize();
-$arr = $head->getOrderedHeaderNoMap();
+$arr = $head->getOrderedHeader();
 ok(@$arr == 0, "Can clear header");
 
 $head->addFeaturesToHeader(['child1', 'child2', 'child3'], 'p1');
 $expected = "child1\tchild2\tchild3";
 
-$arr = $head->getOrderedHeaderNoMap();
-p $arr;
+$arr = $head->getOrderedHeader();
+
 ok(join("\t",@{$arr->[0]}) eq $expected, "Can create nested features");
 
 my $idx = $head->getParentIndices();
-p $idx;
+
 ok($idx->{p1} == 0 && keys %$idx == 1, "Can recover top-level feature indices after addition of 1 feature");
 
 $head->addFeaturesToHeader(['c1', 'c2', 'c3'], 'p2');
 my $e2 = "c1\tc2\tc3";
 
-$arr = $head->getOrderedHeaderNoMap();
-p $arr;
+$arr = $head->getOrderedHeader();
+
 ok(join("\t",@{$arr->[0]}) eq $expected && join("\t", @{$arr->[1]}) eq $e2, "Can add nested features");
 
 $idx = $head->getParentIndices();
-p $idx;
+
 ok($idx->{p1} == 0 && $idx->{p2} == 1 && keys %$idx == 2, "Can recover top-level features after addition of 2nd feature");
 
 $head->addFeaturesToHeader(['c1a', 'c2a', 'c3a'], 'p3', 1);
 my $e3 = "c1a\tc2a\tc3a";
 
-$arr = $head->getOrderedHeaderNoMap();
-p $arr;
+$arr = $head->getOrderedHeader();
+
 ok(join("\t", @{$arr->[0]}) eq $e3
 && join("\t",@{$arr->[1]}) eq $expected
 && join("\t", @{$arr->[2]}) eq $e2, "Can prepend nested features");

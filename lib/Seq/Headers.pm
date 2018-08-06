@@ -6,7 +6,6 @@ use 5.10.0;
 use strict;
 use warnings;
 use namespace::autoclean;
-use DDP;
 use List::Util qw/first/;
 
 with 'Seq::Role::Message';
@@ -51,7 +50,7 @@ sub getParentFeatures {
   return $parentChild->{$parentName};
 }
 
-sub getOrderedHeaderNoMap() {
+sub getOrderedHeader() {
   if(@$orderedHeaderCache) {
     return $orderedHeaderCache;
   }

@@ -235,7 +235,7 @@ sub get {
     my $num = $multiple ? $txNumbers->[0] : $txNumbers;
     # http://ideone.com/jlImGA
     for my $fName ( @{$self->{_flatJoinFeatures}} ) {
-      $outAccum->[ $idxMap->{$fName}][$posIdx] = $geneDb->[$num]{$cachedDbNames->{$fName}};
+      $outAccum->[$idxMap->{$fName}][$posIdx] = $geneDb->[$num]{$cachedDbNames->{$fName}};
     }
   }
 
