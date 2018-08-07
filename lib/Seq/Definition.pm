@@ -9,6 +9,7 @@ use DDP;
 use Types::Path::Tiny qw/AbsPath AbsFile AbsDir/;
 use List::MoreUtils qw/first_index/;
 use Mouse::Util::TypeConstraints;
+use File::Copy;
 
 use Seq::Tracks;
 use Seq::Statistics;
@@ -142,36 +143,39 @@ has _statisticsRunner => (is => 'ro', init_arg => undef, lazy => 1, default => s
 sub _moveFilesToOutputDir {
   my $self = shift;
 
-  my $workingDir = $self->_workingDir->stringify;
-  my $outDir = $self->outDir->stringify;
-
+  my $err;
+  my $workDir = $self->_workingDir->stringify();
+  my $outDir = $self->outDir->stringify();
   if($self->archive) {
-    my $supportFiles = join(",", grep { $_ !~ $self->outputFilesInfo->{annotation} } glob($self->_workingDir->child('*')->stringify));
+    my @test =  glob($self->_workingDir->child('*')->stringify);
 
-    # First cp the support files, including statistics
-    my $result = system("cp {$supportFiles} $outDir; sync");
+    my @files = grep { $_ !~ $self->outputFilesInfo->{annotation} } glob($self->_workingDir->child('*')->stringify);
 
-    if($result) {
-      $self->log('error', "Error copying support files: $!");
+    for my $file (@files) {
+      $err = copy($file, $self->outDir->child($file));
+
+      if($err) {
+        return $err;
+      }
     }
 
-    my $compressErr = $self->compressDirIntoTarball( $self->_workingDir, $self->outputFilesInfo->{archived} );
+    $err = $self->compressDirIntoTarball( $self->_workingDir, $self->outputFilesInfo->{archived} );
 
-    if($compressErr) {
-      return $compressErr;
+    if($err) {
+      return $err;
     }
   }
 
   if( $self->outDir eq $self->_workingDir) {
     $self->log('debug', "Nothing to move, workingDir equals outDir");
-    return 0;
+    return;
   }
 
   $self->log('info', "Moving output file to EFS or S3");
 
-  my $result = system("mv $workingDir/* $outDir; sync");
-
-  return $result ? $! : 0;
+  $err = $self->safeSystem("mv $workDir/* $outDir; sync");
+  
+  return $err;
 }
 
 # Replaces periods with _
