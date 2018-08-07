@@ -331,15 +331,15 @@ sub annotateFile {
 
   ################ Finished writing file. If statistics, print those ##########
   # Sync to ensure all files written
-  $err = $self->safeClose($outFh) || ($statsFh && $self->safeClose($statsFh));
-
-  if($err) {
-    $self->_errorWithCleanup("Error closing output file handles due to: $err");
-    return ("Error closing output file handles due to: $err", undef);
-  }
-
-  # Move files only if we successfully sync
-  $err = $self->safeSystem('sync') || $self->_moveFilesToOutputDir();
+  # This simply tries each close/sync/move operation in order
+  # And returns an error early, or proceeds to next operation
+  $err = $self->safeClose($outFh)
+          ||
+          ($statsFh && $self->safeClose($statsFh))
+          ||
+          $self->safeSystem('sync')
+          ||
+          $self->_moveFilesToOutputDir();
 
   if($err) {
     $self->_errorWithCleanup($err);
@@ -348,7 +348,7 @@ sub annotateFile {
 
   $db->cleanUp();
 
-  return ($err || undef, $self->outputFilesInfo);
+  return ($err, $self->outputFilesInfo);
 }
 
 sub makeLogProgressAndPrint {

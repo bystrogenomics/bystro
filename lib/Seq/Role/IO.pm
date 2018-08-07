@@ -125,7 +125,6 @@ sub getReadFh {
     $err = $self->safeOpen($fh, '<', $filePath, $errCode);
   };
 
-  # TODO: return errors, rather than dying
   return ($err, $compressed, $fh);
 }
 
@@ -324,12 +323,9 @@ sub compressDirIntoTarball {
 
   $self->log('debug', "compress command: $tarCommand");
 
-  if(system($tarCommand) ) {
-    $self->log( 'warn', "compressDirIntoTarball failed with $?" );
-    return $?;
-  }
+  my $err = $self->safeSystem($tarCommand);
 
-  return 0;
+  return $err;
 }
 
 sub getCompressedFileSize {
@@ -339,7 +335,12 @@ sub getCompressedFileSize {
     return ('Expect compressed file', undef);
   }
 
-  open(my $fh, "-|", "$gzip -l " . path($filePath)->stringify);
+  my $err = $self->safeOpen(my $fh, "-|", "$gzip -l " . path($filePath)->stringify);
+
+  if($err) {
+    return ($err, undef);
+  }
+
   <$fh>;
   my $sizeLine = <$fh>;
 

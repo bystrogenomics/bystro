@@ -9,7 +9,8 @@ use DDP;
 use Types::Path::Tiny qw/AbsPath AbsFile AbsDir/;
 use List::MoreUtils qw/first_index/;
 use Mouse::Util::TypeConstraints;
-use File::Copy;
+# TODO: Explore portability on windows-based systems w/File Copy
+# use File::Copy;
 
 use Seq::Tracks;
 use Seq::Statistics;
@@ -144,22 +145,28 @@ sub _moveFilesToOutputDir {
   my $self = shift;
 
   my $err;
-  my $workDir = $self->_workingDir->stringify();
   my $outDir = $self->outDir->stringify();
-  if($self->archive) {
-    my @test =  glob($self->_workingDir->child('*')->stringify);
 
-    my @files = grep { $_ !~ $self->outputFilesInfo->{annotation} } glob($self->_workingDir->child('*')->stringify);
+  if($self->archive) {
+    my $an = $self->outputFilesInfo->{annotation};
+    my @files = grep { $_ !~ $an } glob($self->_workingDir->child('*')->stringify);
 
     for my $file (@files) {
-      $err = copy($file, $self->outDir->child($file));
+      $err = $self->safeSystem("cp $file $outDir");
 
       if($err) {
         return $err;
       }
     }
 
-    $err = $self->compressDirIntoTarball( $self->_workingDir, $self->outputFilesInfo->{archived} );
+    # Without the 2 sync operations, support files go missing
+    # This simply executes each operation in turn, or receivs an error early
+    $err = $self->safeSystem("sync")
+           ||
+           $self->compressDirIntoTarball( $self->_workingDir, $self->outputFilesInfo->{archived} )
+           ||
+           $self->safeSystem("sync");
+
 
     if($err) {
       return $err;
@@ -173,8 +180,10 @@ sub _moveFilesToOutputDir {
 
   $self->log('info', "Moving output file to EFS or S3");
 
+  my $workDir = $self->_workingDir->stringify();
+
   $err = $self->safeSystem("mv $workDir/* $outDir; sync");
-  
+
   return $err;
 }
 
