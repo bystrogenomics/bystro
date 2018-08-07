@@ -51,7 +51,15 @@ ok(!defined $test && !defined $res, "'see cases' is not a valid value");
 $test='see cases ';
 $res = $seq->_stripAndCoerceUndef($test);
 
-ok(!defined $test && !defined $res, "'see cases' with trailing whitespace not a valid value");
+$test='unknown';
+$res = $seq->_stripAndCoerceUndef($test);
+
+ok(!defined $test && !defined $res, "' unknown ' with leading/trailing whitespace not a valid value");
+
+$test=' unknown ';
+$res = $seq->_stripAndCoerceUndef($test);
+
+ok(!defined $test && !defined $res, "' unknown ' with leading/trailing whitespace not a valid value");
 
 $test=' see cases';
 $res = $seq->_stripAndCoerceUndef($test);

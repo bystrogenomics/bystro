@@ -439,22 +439,29 @@ sub makeMergeFunc {
 
 sub _stripAndCoerceUndef {
   #my ($self, $dataStr) = @_;
-  state $c1 = 'no assertion criteria provided';
-  state $c2 = 'not provided';
-  state $c3 = 'see cases';
-  state $c4 = 'na';
-  state $c5 = '.';
+  state $cl1 = 'no assertion criteria provided';
+  state $cl2 = 'not provided';
+  state $cl3 = 'see cases';
+  state $cl4 = 'unknown'; #dbsnp
+
+  state $cs1 = 'na';
+  state $cs2 = '.';
 
   # Don't waste storage space on NA. In Bystro undef values equal NA (or whatever
   # Output.pm chooses to represent missing data as.
   StripLTSpace($_[1]);
 
+  if($_[1] eq ''){
+    $_[1] = undef;
+    return $_[1];
+  }
+
   # Common missing values: not provided and see cases are clinvar-specific
   my $lc = lc($_[1]);
 
-  if(length($lc) <= 8) {
-    if($lc eq $c5
-    || $lc eq $c4
+  if(length($lc) < 7) {
+    if($lc eq $cs1
+    || $lc eq $cs2
     || $lc eq $_[0]->{_missChar}
     ) {
       $_[1] = undef;
@@ -463,9 +470,10 @@ sub _stripAndCoerceUndef {
     return $_[1];
   }
 
-  if($lc eq $c3
-  || $lc eq $c2
-  || $lc eq $c1
+  if($lc eq $cl4
+  || $lc eq $cl3
+  || $lc eq $cl2
+  || $lc eq $cl1
   ) {
     $_[1] = undef;
     return undef;

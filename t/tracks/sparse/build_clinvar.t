@@ -66,7 +66,7 @@ ok($clinvarData[3][0] eq "deletion" && $clinvarData[3][1] eq "single nucleotide 
 ok($clinvarData[4][0] eq "germline" && $clinvarData[4][1] eq "germline");
 #numberSubmitters
 ok($clinvarData[5][0] == 1 && $clinvarData[5][1] == 1);
-ok($clinvarData[6][0] eq "no assertion criteria provided" && $clinvarData[6][1] eq "no assertion criteria provided");
+ok(!defined $clinvarData[6][0] && !defined $clinvarData[6][1], "no assertion criteria provided coerced to undefined");
 ok($clinvarData[7][0] eq "TCTC" && $clinvarData[7][1] eq "A");
 ok($clinvarData[8][0] eq "-" && $clinvarData[8][1] eq "G");
 
@@ -90,7 +90,7 @@ for my $data (@$dataAref) {
   #numberSubmitters
 
   ok($clinvarData[5] == 1);
-  ok($clinvarData[6] eq "no assertion criteria provided");
+  ok(!defined $clinvarData[6], "no assertion criteria provided coerced to undefined");
   ok($clinvarData[7] eq "TCTC");
   ok($clinvarData[8] eq "-");
 }
@@ -108,7 +108,7 @@ ok($clinvarData[3] eq "single nucleotide variant");
 ok($clinvarData[4] eq "germline");
 #numberSubmitters
 ok($clinvarData[5] == 1);
-ok($clinvarData[6] eq "no assertion criteria provided");
+ok(!defined $clinvarData[6], "no assertion criteria provided coerced to undefined");
 ok($clinvarData[7] eq "G");
 ok($clinvarData[8] eq "C");
 
