@@ -437,46 +437,37 @@ sub makeMergeFunc {
   );
 }
 
+# TODO: Allow to be configured on per-track basis
 sub _stripAndCoerceUndef {
   #my ($self, $dataStr) = @_;
-  state $cl1 = 'no assertion criteria provided';
-  state $cl2 = 'not provided';
-  state $cl3 = 'see cases';
-  state $cl4 = 'unknown'; #dbsnp
 
-  state $cs1 = 'na';
-  state $cs2 = '.';
+ # TODO: This will be configurable, per-track
+  state $cl = {
+    'no assertion provided' => 1,
+    'no assertion criteria provided' => 1,
+    'no interpretation for the single variant' => 1,
+    'no assertion for the individual variant' => 1,
+    'not provided' => 1,
+    'not specified' => 1,
+    'see cases' => 1,
+    'unknown' => 1
+  };
 
-  # Don't waste storage space on NA. In Bystro undef values equal NA (or whatever
-  # Output.pm chooses to represent missing data as.
+  # STripLTSpace modifies passed string by stripping space from it
+  # This modifies the caller's version
   StripLTSpace($_[1]);
 
-  if($_[1] eq ''){
+  my $v = lc($_[1]);
+
+  # These always get coerced to undef
+  if($v eq '' || $v eq '.' || $v eq 'na' || $v eq $_[0]->{_missChar}){
     $_[1] = undef;
     return $_[1];
   }
 
-  # Common missing values: not provided and see cases are clinvar-specific
-  my $lc = lc($_[1]);
-
-  if(length($lc) < 7) {
-    if($lc eq $cs1
-    || $lc eq $cs2
-    || $lc eq $_[0]->{_missChar}
-    ) {
-      $_[1] = undef;
-      return undef;
-    }
-    return $_[1];
-  }
-
-  if($lc eq $cl4
-  || $lc eq $cl3
-  || $lc eq $cl2
-  || $lc eq $cl1
-  ) {
+  if(exists $cl->{$v}) {
     $_[1] = undef;
-    return undef;
+    return $_[1];
   }
 
   return $_[1];
