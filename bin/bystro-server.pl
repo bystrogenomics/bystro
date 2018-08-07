@@ -213,34 +213,30 @@ while(my $job = $beanstalk->reserve) {
     $job->bury();
 
     if($beanstalkEvents->error) {
-      say "Beanstalkd last error:";
+      say STDERR "Beanstalkd last error:";
       p $beanstalkEvents->error;
     }
 
     next;
   }
 
-  my $data = encode_json({
+  my $data = {
     event => $events->{completed},
     queueID => $job->id,
     submissionID   => $jobDataHref->{submissionID},
     results => {
       outputFileNames => $outputFileNamesHashRef,
     }
-  });
+  };
 
-  say "putting completiong event";
-  p $data;
+  if(defined $debug) {
+    say STDERR "putting completiong event";
+    p $data;
+  }
+
   # Signal completion before completion actually occurs via delete
   # To be conservative; since after delete message is lost
-  $beanstalkEvents->put({ priority => 0, data =>  encode_json({
-    event => $events->{completed},
-    queueID => $job->id,
-    submissionID   => $jobDataHref->{submissionID},
-    results  => {
-      outputFileNames => $outputFileNamesHashRef,
-    }
-  }) } );
+  $beanstalkEvents->put({ priority => 0, data => encode_json($data)} );
 
   $job->delete();
 
