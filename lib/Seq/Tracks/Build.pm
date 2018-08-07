@@ -457,14 +457,21 @@ sub _stripAndCoerceUndef {
   # This modifies the caller's version
   StripLTSpace($_[1]);
 
-  my $v = lc($_[1]);
-
-  # These always get coerced to undef
-  if($v eq '' || $v eq '.' || $v eq 'na' || $v eq $_[0]->{_missChar}){
+  if($_[1] eq '') {
     $_[1] = undef;
     return $_[1];
   }
 
+  my $v = lc($_[1]);
+
+  # These will always get coerced to undef
+  # TODO: we may want to force only the missChar comparison
+  if($v eq '.' || $v eq 'na' || $v eq $_[0]->{_missChar}){
+    $_[1] = undef;
+    return $_[1];
+  }
+
+  # This will be configurable
   if(exists $cl->{$v}) {
     $_[1] = undef;
     return $_[1];
