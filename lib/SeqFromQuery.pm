@@ -4,14 +4,16 @@ use warnings;
 
 # ABSTRACT: Create an annotation from a query
 package SeqFromQuery;
-use lib './lib';
-use Mouse 2;
 our $VERSION = '0.001';
-use MCE::Loop;
-use Search::Elasticsearch;
-use DDP;
 
 use namespace::autoclean;
+
+use lib './lib';
+use Mouse 2;
+
+use MCE::Loop;
+
+use Search::Elasticsearch;
 
 use Seq::Output::Delimiters;
 
@@ -142,11 +144,12 @@ sub annotate {
     max => $self->shards,
   };
 
-  my $progressFunc = $self->_makeLogProgress($hasSort, $statsFh, $outFh);
+  my $progressFunc = $self->_makeLogProgress($hasSort, $outFh, $statsFh, 2e4);
 
   MCE::Loop::init {
-    max_workers => $self->maxThreads || 1, chunk_size => 1,
-    gather => $progressFunc
+    max_workers => $self->maxThreads,
+    chunk_size => 1,
+    gather => $progressFunc,
   };
 
   # We do parallel fetch using sliced scroll queries.
@@ -156,7 +159,6 @@ sub annotate {
   # for bulk queries
   mce_loop {
     my ($mce, $chunkRef, $chunkId) = @_;
-    # p $_;
 
     my $id = $_;
 
@@ -201,8 +203,7 @@ sub annotate {
 
       my $outputString = _makeOutputString(\@sourceData, \%delims);
 
-
-      $progressFunc->(scalar @docs, $outputString, $id);
+      $mce->gather(scalar @docs, $outputString, $id);
     }
   } (0 .. $self->shards - 1);
 
@@ -210,6 +211,9 @@ sub annotate {
   $progressFunc->(0, undef, undef, 1);
 
   MCE::Loop::finish();
+
+  say STDERR "PAST";
+
   ################ Finished writing file. If statistics, print those ##########
   # First sync output to ensure everything needed is written
   # then close all file handles and move files to output dir
@@ -333,50 +337,20 @@ sub _makeLogProgress {
 
   my $hasPublisher = $self->hasPublisher;
 
-  my %result;
-  my $orderId = 1;
+  # my %result;
 
-  if($hasSort) {
-    return sub {
-      my ($progress, $outputStringRef, $chunkId, $flush) = @_;
-
-      if($hasPublisher) {
-        $total += $progress;
-        $throttleIndicator += $_[0];
-
-        if($throttleIndicator >= $throttleThreshold || $flush) {
-          $self->publishProgress($total);
-        }
-      }
-
-      if(!$outputStringRef) {
-        return;
-      }
-
-      $result{ $chunkId } = $outputStringRef;
-
-      say $statsFh $outputStringRef;
-
-      while (1) {
-        last unless exists $result{$orderId};
-
-        say $outFh $outputStringRef;
-
-        $orderId++;
-      }
-    }
-  }
-
+  my $orderId = 0;
   return sub {
-    my ($progress, $outputStringRef, undef, $flush) = @_;
+    my ($progress, $outputStringRef, $chunkId, $flush) = @_;
+
+    $throttleIndicator += $progress;
 
     if($hasPublisher) {
       $total += $progress;
 
-      $throttleIndicator += $_[0];
-
       if($throttleIndicator >= $throttleThreshold || $flush) {
         $self->publishProgress($total);
+        $throttleIndicator = 0;
       }
     }
 
@@ -386,6 +360,24 @@ sub _makeLogProgress {
 
     say $statsFh $outputStringRef;
     say $outFh $outputStringRef;
+
+
+    # TODO: Make ordered print work
+  #   while (1) {
+  #     if(!exists $result{$orderId}) {
+  #       $orderId = 0;
+  #       last;
+  #     }
+
+  #     say $outFh $result{$orderId};
+
+  #     delete $result{$orderId};
+
+  #     $orderId++;
+
+  #   }
+
+    return;
   }
 }
 

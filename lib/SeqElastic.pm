@@ -247,7 +247,7 @@ sub go {
   } $fh;
 
   # Flush
-  &$progressFunc(0, 1);
+  $progressFunc->(0, 1);
 
   MCE::Loop::finish();
 
