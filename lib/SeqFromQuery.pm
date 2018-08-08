@@ -3,11 +3,16 @@ use strict;
 use warnings;
 
 # ABSTRACT: Create an annotation from a query
+# TODO: maxThreads is ignored.
+# 1) igure out if we want to change that.
+#    - It is ignored because the elasticsearch cluster is too slow on a per-shard basis
+# 2) Document it
+
 package SeqFromQuery;
 our $VERSION = '0.001';
 
 use namespace::autoclean;
-
+use DDP;
 use lib './lib';
 use Mouse 2;
 
@@ -19,6 +24,8 @@ use Seq::Output::Delimiters;
 
 use Cpanel::JSON::XS qw/decode_json encode_json/;
 use YAML::XS qw/LoadFile/;
+
+use Math::Round qw/nearest_ceil/;
 
 # Defines basic things needed in builder and annotator, like logPath,
 # Also initializes the database with database_dir
@@ -39,6 +46,9 @@ has indexName => (is => 'ro', required => 1);
 has indexType => (is => 'ro', required => 1);
 
 has assembly => (is => 'ro', isa => 'Str', required => 1);
+
+has configPath => (is => 'ro', isa => 'Str', default => 'config/');
+
 # has commitEvery => (is => 'ro', default => 5000);
 
 # The user may have given some header fields already
@@ -58,6 +68,8 @@ has shards => (is => 'ro', isa => 'Num', lazy => 1, default => sub {
   return $self->indexConfig->{index_settings}->{index}->{number_of_shards};
 });
 
+has maxShards => (is => 'ro', isa => 'Num');
+
 my $prettyCoder = Cpanel::JSON::XS->new->ascii->pretty->allow_nonref;;
 # TODO: This is too complicated, shared with Seq.pm for the most part
 
@@ -67,7 +79,11 @@ around BUILDARGS => sub {
   my %data = %$href;
 
   if($data{indexConfig}) {
-    $data{indexConfig} = decode_json($data{indexConfig});
+    if(!ref $data{indexConfig}) {
+      $data{indexConfig} = decode_json($data{indexConfig});
+    }
+
+    return $class->$orig(\%data);
   }
 
   my $cf = path('config')->child($data{assembly} . '.mapping.yml')->stringify();
@@ -139,15 +155,19 @@ sub annotate {
     $self->log('fatal', "Couldn't find discordant index");
   }
 
+  my $nearestMultiple;
+
+  my $nSlices = $self->_getSlices();
+
   my $slice = {
     field => 'pos',
-    max => $self->shards,
+    max => $nSlices,
   };
 
-  my $progressFunc = $self->_makeLogProgress($hasSort, $outFh, $statsFh, 2e4);
+  my $progressFunc = $self->_makeLogProgress($hasSort, $outFh, $statsFh, 3e4);
 
   MCE::Loop::init {
-    max_workers => $self->maxThreads,
+    max_workers => $nSlices,
     chunk_size => 1,
     gather => $progressFunc,
   };
@@ -205,14 +225,12 @@ sub annotate {
 
       $mce->gather(scalar @docs, $outputString, $id);
     }
-  } (0 .. $self->shards - 1);
+  } (0 .. $nSlices - 1);
 
   # Flush
   $progressFunc->(0, undef, undef, 1);
 
   MCE::Loop::finish();
-
-  say STDERR "PAST";
 
   ################ Finished writing file. If statistics, print those ##########
   # First sync output to ensure everything needed is written
@@ -232,6 +250,22 @@ sub annotate {
   }
 
   return ($err, $self->outputFilesInfo);
+}
+
+sub _getSlices {
+  my $self = shift;
+
+  my $nShards = $self->shards;
+  my $nThreads = $self->maxThreads;
+
+  if($nShards < $nThreads) {
+    my $divisor = nearest_ceil(2,$nThreads / $nShards);
+
+    return $nShards * $divisor ;
+  }
+
+  # each thread runs at < 100% utilization
+  return $nShards * 2;
 }
 
 sub _getHeader {
