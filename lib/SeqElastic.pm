@@ -92,6 +92,7 @@ sub BUILD {
   $self->{_valSplit} = $delims->splitByValue;
 
   $self->{_missChar} = $delims->emptyFieldChar;
+  $self->{_overlapDelim} = $delims->overlapDelimiter;
 
   # Initialize messaging to the queue and logging 
   Seq::Role::Message::initialize();
@@ -338,37 +339,51 @@ sub _processLine {
 
   my %rowDocument;
   my $i = -1;
+  my $od = $self->{_overlapDelim};
+  my $miss = $self->{_missChar};
   for my $field ($self->{_fieldSplit}->($line)) {
     $i++;
+
+    if($field eq $self->{_missChar}) {
+      next;
+    }
+
     # say STDERR "Field: $field ; i : $i; path: " . ( ref $pathsAref->[$i] ? join(".", @{$pathsAref->[$i]}) : $pathsAref->[$i] );
     # Every value is stored @ [alleleIdx][positionIdx]
-    my @out;
+    my @posVals;
 
-    if($field ne $self->{_missChar}) {
+    # TODO: If or when we introduce alleleDelimiter split we will need to remove
+    # [ @values > 1 ? \@values : $values[0] ] and replace with
+    # @values > 1 ? \@values : $values[0]
+
       POS_LOOP: for my $posValue ($self->{_posSplit}->($field)) {
-        if ($posValue eq $self->{_missChar}) {
-          push @out, undef;
+        if ($posValue eq $miss) {
+          push @posVals, undef;
 
           next;
         }
 
         my @values;
+        if(index($posValue, $od) == -1) {
+          @values = map { $_ ne $miss ? $_ : undef } $self->{_valSplit}->($posValue);
+
+          push @posVals, @values > 1 ? \@values : $values[0];
+          next;
+        }
 
         for my $val ($self->{_valSplit}->($posValue)) {
-          foreach ($self->{_overlapSplit}->($val)) {
-            push @values, $_ ne $self->{_missChar} ? $_ : undef
-          }
+          my @inner = map { $_ ne $miss ? $_ : undef } $self->{_overlapSplit}->($val);
+
+          push @values, @inner > 1 ? \@inner : $inner[0];
         }
 
-        if(!@values) {
-          push @out, undef;
-        } else {
-          push @out, @values > 1 ? \@values : $values[0];
-        }
+        push @posVals, @values > 1 ? \@values : $values[0];
       }
 
-      _populateHashPath(\%rowDocument, $pathsAref->[$i], \@out);
-    }
+      # The brackets around \@posVals are to set hierarchy for
+      # in the future allowing merger of multiple alleles (rows)
+      # under that field (as in multiallelics to show independent effects)
+      _populateHashPath(\%rowDocument, $pathsAref->[$i], [\@posVals]);
   }
 
   return \%rowDocument;
