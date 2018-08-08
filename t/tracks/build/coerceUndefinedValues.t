@@ -76,11 +76,31 @@ $res = $seq->_stripAndCoerceUndef($test);
 
 ok(!defined $test && !defined $res, "'not provided' is not a valid value");
 
+$test='not specified';
+$res = $seq->_stripAndCoerceUndef($test);
+
+ok(!defined $test && !defined $res, "'not specified' is not a valid value");
+
+$test='no assertion provided';
+$res = $seq->_stripAndCoerceUndef($test);
+
+ok(!defined $test && !defined $res, "'no assertion provided' is not a valid value");
+
+
 $test='no assertion criteria provided';
 $res = $seq->_stripAndCoerceUndef($test);
 
 ok(!defined $test && !defined $res, "'no assertion criteria provided' is not a valid value");
 
+$test='no interpretation for the single variant';
+$res = $seq->_stripAndCoerceUndef($test);
+
+ok(!defined $test && !defined $res, "'no interpretation for the single variant' is not a valid value");
+
+$test='no assertion for the individual variant';
+$res = $seq->_stripAndCoerceUndef($test);
+
+ok(!defined $test && !defined $res, "'no assertion for the individual variant' is not a valid value");
 
 $test=$delims->emptyFieldChar;
 $res = $seq->_stripAndCoerceUndef($test);
