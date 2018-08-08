@@ -107,7 +107,9 @@ has _workingDir => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
     my $dir = path($self->temp_dir);
     $dir->mkpath;
 
-    return Path::Tiny->tempdir(DIR => $dir, CLEANUP => 1)
+    my $tmp = Path::Tiny->tempdir(DIR => $dir, CLEANUP => 1);
+
+    return $tmp;
   }
 
   return $self->outDir;

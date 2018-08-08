@@ -16,6 +16,7 @@ use namespace::autoclean;
 use Seq::Output::Delimiters;
 
 use Cpanel::JSON::XS qw/decode_json encode_json/;
+use YAML::XS qw/LoadFile/;
 
 # Defines basic things needed in builder and annotator, like logPath,
 # Also initializes the database with database_dir
@@ -42,16 +43,47 @@ has assembly => (is => 'ro', isa => 'Str', required => 1);
 # If so, this is a re-indexing job, and we will want to append the header fields
 has fieldNames => (is => 'ro', isa => 'ArrayRef', required => 1);
 
+has indexConfig => (is => 'ro', isa => 'HashRef', required => 1);
+
 # Elasticsearch connection configuration
 has connection => (is => 'ro', isa => 'HashRef', required => 1);
 
+has batchSize => (is => 'ro', isa => 'Num', default => 5000);
+
+has shards => (is => 'ro', isa => 'Num', lazy => 1, default => sub {
+  my $self = shift;
+
+  return $self->indexConfig->{index_settings}->{index}->{number_of_shards};
+});
+
 my $prettyCoder = Cpanel::JSON::XS->new->ascii->pretty->allow_nonref;;
 # TODO: This is too complicated, shared with Seq.pm for the most part
+
+around BUILDARGS => sub {
+  my ($orig, $class, $href) = @_;
+
+  my %data = %$href;
+
+  if($data{indexConfig}) {
+    $data{indexConfig} = decode_json($data{indexConfig});
+  }
+
+  my $cf = path('config')->child($data{assembly} . '.mapping.yml')->stringify();
+
+  $data{indexConfig} = LoadFile($cf);
+
+  return $class->$orig(\%data);
+};
+
 sub BUILD {
   my $self = shift;
 
   # Makes or fails silently if exists
   $self->outDir->mkpath();
+
+  if(!$self->shards) {
+    $self->log('fatal', "Cannot read number of shards in index");
+  }
 }
 
 sub annotate {
@@ -61,88 +93,123 @@ sub annotate {
 
   $self->log( 'info', 'Input query is: ' . $prettyCoder->encode($self->inputQueryBody) );
 
-  my $hasSort = $self->inputQueryBody->{sort};
+  my $d = Seq::Output::Delimiters->new();
 
-  my $delims = Seq::Output::Delimiters->new();
-
-  my $overlapDelim = $delims->overlapDelimiter;
-  my $posDelim = $delims->positionDelimiter;
-  my $valueDelim = $delims->valueDelimiter;
-  my $fieldSep = $delims->fieldSeparator;
-  my $missChar = $delims->emptyFieldChar;
-
-  my ($parentsAref, $childrenAref) = $self->_getHeader();
-  my @childrenOrOnly = @$childrenAref;
-  my @parentNames = @$parentsAref;
+  my %delims = (
+    'allele' => $d->alleleDelimiter,
+    'pos' => $d->positionDelimiter,
+    'value' => $d->valueDelimiter,
+    'overlap' => $d->overlapDelimiter,
+    'miss' => $d->emptyFieldChar,
+    'fieldSep' => $d->fieldSeparator,
+  );
 
   ################## Make the full output path ######################
   # The output path always respects the $self->output_file_base attribute path;
-  my $outputPath = $self->_workingDir->child($self->outputFilesInfo->{annotation});
+  my ($err, $outFh, $statsFh) = $self->_getFileHandles();
 
-  my ($err, undef, $outFh) = $self->getWriteFh($outputPath);
-
-  if(!$err) {
+  if ($err) {
     $self->_errorWithCleanup($err);
     return ($err, undef);
   }
 
-  # Stats may or may not be provided
+  my $hasSort = $self->inputQueryBody->{sort} && $self->inputQueryBody->{sort} ne '_id';
+
+  my ($parentsAref, $childrenAref) = $self->_getHeader();
+
+  my @childrenOrOnly = @$childrenAref;
+  my @parentNames = @$parentsAref;
+
   my @fieldNames = @{$self->fieldNames};
-  my $outputHeader = join($fieldSep, @fieldNames);
+  my $outputHeader = join($delims{fieldSep}, @fieldNames);
 
   say $outFh $outputHeader;
 
-  my $statsFh;
-  if($self->run_statistics) {
-    my $args = $self->_statisticsRunner->getStatsArguments();
-    $err = $self->safeOpen($statsFh, "|-", $args);
-
-    if($err) {
-      $self->_errorWithCleanup($err);
-      return ($err, undef);
-    }
-
+  if($statsFh) {
     say $statsFh $outputHeader;
   }
 
   $self->log('info', "Beginning to create annotation from the query");
 
-  my $batchSize = 4000;
+  ($err, my $discordantIdx) = $self->_getDiscordantIdx();
 
-  MCE::Loop::init {
-    max_workers => $self->maxThreads || 1, chunk_size => $batchSize,
-    gather => $self->_makeLogProgress($hasSort, $statsFh, $outFh)
+  if($err) {
+    $self->log('fatal', "Couldn't find discordant index");
+  }
+
+  my $slice = {
+    field => 'pos',
+    max => $self->shards,
   };
 
+  my $progressFunc = $self->_makeLogProgress($hasSort, $statsFh, $outFh);
+
+  MCE::Loop::init {
+    max_workers => $self->maxThreads || 1, chunk_size => 1,
+    gather => $progressFunc
+  };
+
+  # We do parallel fetch using sliced scroll queries.
+  # It is far too expensive to do a single-threaded scroll
+  # and pass the entire structure to MCE;
+  # Will get "recursion limit" errors in Storable due to the size of the structure
+  # for bulk queries
   mce_loop {
     my ($mce, $chunkRef, $chunkId) = @_;
+    # p $_;
 
-    my @sourceData;
-    $#sourceData = $#$_;
-    my $i = 0;
+    my $id = $_;
 
-    for my $doc (@$_) {
-      my @rowData;
-      # Initialize all values to undef
-      # Output.pm requires a sparse array for any missing values
-      # To preserve output order
-      $#rowData = $#fieldNames;
+    my $es = Search::Elasticsearch->new($self->connection);
 
-      for my $y (0 .. $#fieldNames) {
-        $rowData[$y] = _populateArrayPathFromHash($childrenOrOnly[$y], $doc->{_source}{$parentNames[$y]});
+    $slice->{id} = $id;
+    $self->inputQueryBody->{slice} = $slice;
+
+    my $scroll = $es->scroll_helper(
+      size        => $self->batchSize,
+      body        => $self->inputQueryBody,
+      index => $self->indexName,
+      type => $self->indexType,
+    );
+
+    while(my @docs = $scroll->next($self->batchSize)) {
+      my @sourceData;
+      $#sourceData = $#docs;
+
+      my $i = 0;
+      for my $doc (@docs) {
+        my @rowData;
+        # Initialize all values to undef
+        # Output.pm requires a sparse array for any missing values
+        # To preserve output order
+        $#rowData = $#fieldNames;
+
+        for my $y (0 .. $#fieldNames) {
+          $rowData[$y] = _populateArrayPathFromHash($childrenOrOnly[$y], $doc->{_source}{$parentNames[$y]});
+        }
+
+        if($rowData[$discordantIdx][0][0] eq 'false') {
+          $rowData[$discordantIdx][0][0] = 0;
+        } elsif($rowData[$discordantIdx][0][0] eq 'true') {
+          $rowData[$discordantIdx][0][0] = 1;
+        }
+
+        $sourceData[$i] = \@rowData;
+
+        $i++;
       }
 
-      $sourceData[$i] = \@rowData;
+      my $outputString = _makeOutputString(\@sourceData, \%delims);
 
-      $i++;
+
+      $progressFunc->(scalar @docs, $outputString, $id);
     }
+  } (0 .. $self->shards - 1);
 
-    my $outputString = _makeOutputString(\@sourceData, 
-      $missChar, $valueDelim, $posDelim, $overlapDelim, $fieldSep);
+  # Flush
+  $progressFunc->(0, undef, undef, 1);
 
-    $mce->gather(scalar @$_, $outputString, $chunkId);
-  } $self->_esIterator($batchSize);
-
+  MCE::Loop::finish();
   ################ Finished writing file. If statistics, print those ##########
   # First sync output to ensure everything needed is written
   # then close all file handles and move files to output dir
@@ -161,32 +228,6 @@ sub annotate {
   }
 
   return ($err, $self->outputFilesInfo);
-}
-
-sub _esIterator {
-  my ($self, $batchSize) = @_;
-  # TODO: can use connection pool sniffing as well, not doing so atm
-  # because not sure if connection sniffing issue exists here as in
-  # elasticjs library
-  my $es = Search::Elasticsearch->new($self->connection);
-
-  my $scroll = $es->scroll_helper(
-    size        => $batchSize,
-    body        => $self->inputQueryBody,
-    index => $self->indexName,
-    type => $self->indexType,
-  );
-
-  return sub {
-     my ($chunkSize) = @_;
-
-     my @docs = $scroll->next($chunkSize);
-     if (@docs) {
-        return @docs;
-     }
-
-     return;
-  };
 }
 
 sub _getHeader {
@@ -236,78 +277,57 @@ sub _populateArrayPathFromHash {
 }
 
 sub _makeOutputString {
-  my ($arrayRef, $missChar, $valueDelim, $posDelim, $overlapDelim, $fieldSep) = @_;
+  my ($arrayRef, $delims) = @_;
 
+  my $emptyFieldChar = $delims->{miss};
   # Expects an array of row arrays, which contain an for each column, or an undefined value
   for my $row (@$arrayRef) {
-    # Columns are features
     COLUMN_LOOP: for my $column (@$row) {
-      # Some fields may just be missing
+      # Some fields may just be missing; we won't store even the
+      # alt/pos [[]] structure for those
       if(!defined $column) {
-        $column = $missChar;
+        $column = $emptyFieldChar;
         next COLUMN_LOOP;
       }
 
-      # Most sites have a single position (not indels)
-      # Avoid a loop if so
-      if(@$column == 1) {
-        if(ref $column->[0]) {
-          $column = join($valueDelim, map {
-            !defined $_
-            ?
-            $missChar
-            :
-            ( ref $_
-              ?
-              join($overlapDelim, map { defined $_ ? $_ : $missChar } @$_)
-              :
-              $_
-            )
-          } @{$column->[0]});
+      for my $alleleData (@$column) {
+        POS_LOOP: for my $positionData (@$alleleData) {
+          if(!defined $positionData) {
+            $positionData = $emptyFieldChar;
+            next POS_LOOP;
+          }
 
-          next COLUMN_LOOP;
+          if(ref $positionData) {
+            $positionData = join($delims->{value}, map {
+              defined $_
+              ?
+              (ref $_ ? join($delims->{overlap}, @$_) : $_)
+              : $emptyFieldChar
+            } @$positionData);
+            next POS_LOOP;
+          }
         }
 
-        $column = defined $column->[0] ? $column->[0] : $missChar;
-
-        next COLUMN_LOOP;
+        $alleleData = join($delims->{pos}, @$alleleData);
       }
 
-      POS_LOOP: for my $positionData (@$column) {
-        if(!defined $positionData) {
-          $positionData = $missChar;
-          next POS_LOOP;
-        }
-
-        if(ref $positionData) {
-          $positionData = join($valueDelim, map {
-            !defined $_
-            ?
-            $missChar
-            :
-            ( ref $_
-              ?
-              join($overlapDelim, map { defined $_ ? $_ : $missChar } @$_)
-              :
-              $_
-            )
-          } @$positionData);
-
-          next POS_LOOP;
-        }
-      }
-
-      $column = join($posDelim, @$column);
+      $column = join($delims->{allele}, @$column);
     }
 
-    $row = join($fieldSep, @$row);
+    $row = join($delims->{fieldSep}, @$row);
   }
 
   return join("\n", @$arrayRef);
 }
 
 sub _makeLogProgress {
-  my ($self, $hasSort, $outFh, $statsFh) = @_;
+  my ($self, $hasSort, $outFh, $statsFh, $throttleThreshold) = @_;
+
+  if(!$throttleThreshold) {
+    $throttleThreshold = 2e4;
+  }
+
+  my $throttleIndicator = 0;
 
   my $total = 0;
 
@@ -318,11 +338,19 @@ sub _makeLogProgress {
 
   if($hasSort) {
     return sub {
-      my ($progress, $outputStringRef, $chunkId) = @_;
+      my ($progress, $outputStringRef, $chunkId, $flush) = @_;
 
       if($hasPublisher) {
         $total += $progress;
-        $self->publishProgress($total);
+        $throttleIndicator += $_[0];
+
+        if($throttleIndicator >= $throttleThreshold || $flush) {
+          $self->publishProgress($total);
+        }
+      }
+
+      if(!$outputStringRef) {
+        return;
       }
 
       $result{ $chunkId } = $outputStringRef;
@@ -340,16 +368,75 @@ sub _makeLogProgress {
   }
 
   return sub {
-    my ($progress, $outputStringRef) = @_;
+    my ($progress, $outputStringRef, undef, $flush) = @_;
 
     if($hasPublisher) {
       $total += $progress;
-      $self->publishProgress($total);
+
+      $throttleIndicator += $_[0];
+
+      if($throttleIndicator >= $throttleThreshold || $flush) {
+        $self->publishProgress($total);
+      }
+    }
+
+    if(!$outputStringRef) {
+      return;
     }
 
     say $statsFh $outputStringRef;
     say $outFh $outputStringRef;
   }
+}
+
+sub _getFileHandles {
+  my $self = shift;
+
+  my ($err, $outFh, $statsFh);
+
+  # _working dir from Seq::Definition
+  my $outPath = $self->_workingDir->child($self->outputFilesInfo->{annotation});
+
+  ($err, $outFh) = $self->getWriteFh($outPath);
+
+  if($err) {
+    return ($err, undef, undef);
+  }
+
+  if(!$self->run_statistics) {
+    return ($err, $outFh, $statsFh);
+  }
+
+  my $args = $self->_statisticsRunner->getStatsArguments();
+  $err = $self->safeOpen($statsFh, "|-", $args);
+
+  if($err) {
+    return ($err, undef, undef);
+  }
+
+  return ($err, $outFh, $statsFh);
+}
+
+sub _getDiscordantIdx {
+  my $self = shift;
+
+  my $idx = 0;
+  my $didx = -1;
+
+  for my $field (@{$self->fieldNames}) {
+    if ($field eq 'discordant') {
+      $didx = $idx;
+      last;
+    }
+
+    $idx++;
+  }
+
+  if($didx == -1) {
+    return ("Couldn't find index", undef);
+  }
+
+  return (undef, $didx);
 }
 
 sub _errorWithCleanup {

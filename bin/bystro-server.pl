@@ -81,6 +81,12 @@ my %requiredByType = (
   }
 );
 
+my %optionalForType = (
+  'saveFromQuery' => {
+    indexConfig => 'indexConfig',
+  }
+);
+
 say "Running queue server of type: $type";
 
 my $configPathBaseDir = "config/";
@@ -275,6 +281,12 @@ sub coerceInputs {
     }
 
     $jobSpecificArgs{$key} = $jobDetailsHref->{$requiredForType->{$key}};
+  }
+
+  my $optionalForType = $optionalForType{$type};
+
+  for my $key (keys %$optionalForType) {
+    $jobSpecificArgs{$key} = $jobDetailsHref->{$optionalForType->{$key}};
   }
 
   my $configFilePath = getConfigFilePath($jobSpecificArgs{assembly});
