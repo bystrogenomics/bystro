@@ -130,7 +130,10 @@ sub annotate {
     return ($err, undef);
   }
 
-  my $hasSort = $self->inputQueryBody->{sort} && $self->inputQueryBody->{sort} ne '_id';
+  $self->_clearUselessSort();
+
+  # TODO: Support sort
+  $self->_cleanQuery();
 
   my ($parentsAref, $childrenAref) = $self->_getHeader();
 
@@ -146,23 +149,31 @@ sub annotate {
     say $statsFh $outputHeader;
   }
 
-  $self->log('info', "Beginning to create annotation from the query");
-
   ($err, my $discordantIdx) = $self->_getDiscordantIdx();
 
   if($err) {
     $self->log('fatal', "Couldn't find discordant index");
   }
 
-  my $nearestMultiple;
+  # TODO: figure out why even with field => 'pos' we get very slow perf
+  # when having slices > shards with very large (1000+ terms) queries
 
-  my $nSlices = $self->_getSlices();
-  say STDERR "slices are $nSlices";
+  my $numTerms = $self->_getNumTerms($self->inputQueryBody);
+
+  # 0 simply means we can't approximate the size
+  my $nSlices;
+  if($numTerms == 0 || $numTerms > 200) {
+    $nSlices = $self->shards;
+  } else {
+    $nSlices = $self->_getSlices();
+  }
+
   my $slice = {
     field => 'pos',
     max => $nSlices,
   };
 
+  my $hasSort = exists $self->inputQueryBody->{sort};
   my $progressFunc = $self->_makeLogProgress($hasSort, $outFh, $statsFh, 3e4);
 
   MCE::Loop::init {
@@ -249,6 +260,63 @@ sub annotate {
   }
 
   return ($err, $self->outputFilesInfo);
+}
+
+sub _cleanQuery {
+  my $self = shift;
+
+  # TODO: Support sort
+  if(exists $self->inputQueryBody->{sort}) {
+    delete $self->inputQueryBody->{sort};
+  }
+
+  if(exists $self->inputQueryBody->{aggs}) {
+    delete $self->inputQueryBody->{aggs};
+  }
+
+  return;
+}
+
+sub _clearUselessSort {
+  my $self = shift;
+
+  if($self->inputQueryBody->{sort}) {
+    if(
+      $self->inputQueryBody->{sort} eq '_doc'
+      ||
+      ( ref $self->inputQueryBody->{sort}
+        && @{$self->inputQueryBody->{sort}} == 1
+        && $self->inputQueryBody->{sort}[0] eq '_doc'
+      )
+    ) {
+      delete $self->inputQueryBody->{sort};
+    }
+  }
+
+  return;
+}
+
+# TODO: Support more versions
+sub _getNumTerms {
+  my $self = shift;
+
+  my $bool = $self->inputQueryBody->{query}{bool};
+
+  if(!$bool) {
+    return 0;
+  }
+
+  my $mustQLen = 0;
+
+  my $mustQuery = $bool->{must}
+                  && $bool->{must}{query_string}
+                  && $bool->{must}{query_string}{query};
+
+  if($mustQuery) {
+    $mustQLen = split(/\s+/, $mustQuery);
+  }
+
+  return $mustQLen;
 }
 
 sub _getSlices {
