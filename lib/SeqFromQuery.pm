@@ -25,7 +25,7 @@ use Seq::Output::Delimiters;
 use Cpanel::JSON::XS qw/decode_json encode_json/;
 use YAML::XS qw/LoadFile/;
 
-use Math::Round qw/nearest_ceil/;
+use Math::Round qw/nhimult/;
 
 # Defines basic things needed in builder and annotator, like logPath,
 # Also initializes the database with database_dir
@@ -259,7 +259,7 @@ sub _getSlices {
   my $nThreads = $self->maxThreads;
 
   if($nShards < $nThreads) {
-    my $divisor = nearest_ceil(2,$nThreads / $nShards);
+    my $divisor = nhimult(2,$nThreads / $nShards);
 
     return $nShards * $divisor ;
   }

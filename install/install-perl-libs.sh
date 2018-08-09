@@ -35,7 +35,8 @@ cpanm install IO/FDPass.pm
 cpanm install Beanstalk::Client
 # Needed for bin/annotate.pl
 cpanm install Hash::Merge::Simple
-cpanm install  Math::Round;
+cpanm install Math::Round;
+cpanm install Sys::CpuAffinity;
 
 # Custom branch of msgpack-perl that uses latest msgpack-c and
 # allows prefer_float32 flag for 5-byte float storage

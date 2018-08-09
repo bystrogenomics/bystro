@@ -24,6 +24,7 @@ use MCE::Shared;
 use Try::Tiny;
 use Math::SigFigs qw(:all);
 use Scalar::Util qw/looks_like_number/;
+use Sys::CpuAffinity;
 
 # An archive, containing an "annotation" file
 has annotatedFilePath => (is => 'ro', isa => AbsFile, coerce => 1,
@@ -75,7 +76,9 @@ has addedFiles => (is => 'ro', isa => 'ArrayRef');
 # Allows us to use all to to extract just the file we're interested from the compressed tarball
 has inputFileNames => (is => 'ro', isa => 'HashRef');
 
-has maxThreads => (is => 'ro', isa => 'Int', default => 8);
+has maxThreads => (is => 'ro', isa => 'Int', lazy => 1, default => sub {
+  return Sys::CpuAffinity::getNumCpus();
+});
 
 with 'Seq::Role::IO', 'Seq::Role::Message', 'MouseX::Getopt';
 

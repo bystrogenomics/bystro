@@ -9,11 +9,15 @@ use DDP;
 use Types::Path::Tiny qw/AbsPath AbsFile AbsDir/;
 use List::MoreUtils qw/first_index/;
 use Mouse::Util::TypeConstraints;
+use Sys::CpuAffinity;
+
 # TODO: Explore portability on windows-based systems w/File Copy
 # use File::Copy;
 
 use Seq::Tracks;
 use Seq::Statistics;
+
+
 
 with 'Seq::Role::IO';
 with 'Seq::Output::Fields';
@@ -49,7 +53,9 @@ has statistics => (is => 'ro', isa => 'HashRef');
 # Users may not need statistics
 has run_statistics => (is => 'ro', isa => 'Bool', default => sub {!!$_[0]->statistics});
 
-has maxThreads => (is => 'ro', isa => 'Int', lazy => 1, default => 8);
+has maxThreads => (is => 'ro', isa => 'Int', lazy => 1, default => sub {
+  return Sys::CpuAffinity::getNumCpus();
+});
 
 # has badSamplesField => (is => 'ro', default => 'badSamples', lazy => 1);
 
