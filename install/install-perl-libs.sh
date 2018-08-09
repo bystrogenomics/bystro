@@ -33,6 +33,9 @@ cpanm install DBD::mysql
 cpanm install IO/FDPass.pm
 cpanm install Beanstalk::Client
 
+cpanm install Math::Round
+cpanm install Sys::CpuAffinity
+
 # Custom branch of msgpack-perl that uses latest msgpack-c and
 # allows prefer_float32 flag for 5-byte float storage
 cpanm install Module::Install::XSUtil

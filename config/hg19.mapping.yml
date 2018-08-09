@@ -646,3 +646,36 @@ mappings:
                             type: half_float
                         af_female:
                             type: half_float
+        cosmic:
+                properties:
+                    coding:
+                        properties:
+                            id:
+                                type: keyword
+                                normalizer: uppercase_normalizer
+                            cnt:
+                                type: integer
+                            cds:
+                                type: keyword
+                                normalizer: uppercase_normalizer
+                            gene:
+                                type: keyword
+                                normalizer: uppercase_normalizer
+                            strand:
+                                type: keyword
+                    nonCoding:
+                        properties:
+                            id:
+                                type: keyword
+                                normalizer: uppercase_normalizer
+                            cnt:
+                                type: integer
+                            cds:
+                                type: keyword
+                                normalizer: uppercase_normalizer
+                            gene:
+                                type: keyword
+                                normalizer: uppercase_normalizer
+                            strand:
+                                type: keyword
+                            

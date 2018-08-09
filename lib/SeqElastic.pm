@@ -9,6 +9,7 @@ use Path::Tiny;
 use Types::Path::Tiny qw/AbsFile AbsPath AbsDir/;
 use Mouse 2;
 use List::MoreUtils qw/first_index/;
+use Sys::CpuAffinity;
 
 our $VERSION = '0.001';
 
@@ -73,7 +74,9 @@ has addedFiles => (is => 'ro', isa => 'ArrayRef');
 # Allows us to use all to to extract just the file we're interested from the compressed tarball
 has inputFileNames => (is => 'ro', isa => 'HashRef');
 
-has max_threads => (is => 'ro', isa => 'Int', default => 8);
+has max_threads => (is => 'ro', isa => 'Int', lazy => 1, default => sub {
+  return Sys::CpuAffinity::getNumCpus();
+});
 
 with 'Seq::Role::IO', 'Seq::Role::Message', 'MouseX::Getopt';
 
