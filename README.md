@@ -3,7 +3,7 @@
 ## Bystro Publication
 For datasets and scripts used, please visit [github.com/bystro-paper](https://github.com/akotlar/bystro-paper)
 
-If using Bystro, please cite [https://doi.org/10.1101/146514](https://doi.org/10.1101/146514)
+If using Bystro, please cite [Kotlar et al, Genome Biology, 2018](https://doi.org/10.1186/s13059-018-1387-3)
 
 ## Using Bystro
 For most users, we recommend https://bystro.io .

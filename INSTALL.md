@@ -1,5 +1,5 @@
 # Bystro installation
-For most users, we recommend not installing the software, and using https://bystr.io, where the software is hosted
+For most users, we recommend not installing the software, and using https://bystro.io, where the software is hosted
 
 The web app provides full functionality for any size experiment (up to 890GB uncompressed/129GB compressed tested), a convenient search interface, and excellent performance
 
@@ -7,13 +7,22 @@ The web app provides full functionality for any size experiment (up to 890GB unc
 Users of AWS can skip installation altogether, and use the latest public Bystro AMI
 
  1. Following [Amazon's instructions](http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/usingsharedamis-finding.html), search for the "Bystro" Public AMI
+ 2. After launching the ami, ```cd ~/bystro && git pull origin b10 && source ./install-rpm.sh``` to update dependencis
 
 
 ## Installation on RPM-based distros
 <h4>(Fedora, Redhat, Centos, openSUSE, Mandriva)</h4>
 
- 1. ```wget https://github.com/akotlar/bystro/archive/master.zip -O bystro.zip && unzip bystro.zip && mv bystro-master bystro && cd $_ && ./install-rpm.sh```
+ 1. ```git clone https://github.com/akotlar/bystro.git && cd bystro && source ./install-rpm.sh```
  
+## Installation on MacOS (tested on HighSierra, interactive)
+
+ 1. ```git clone https://github.com/akotlar/bystro.git && cd bystro && source ./install-mac.sh```
+ 
+## Installation on Debian systems (Ubuntu)
+
+ 1. ```git clone https://github.com/akotlar/bystro.git && cd bystro && source ./install-apt.sh```
+
  ## Example of installation on RPM-based Amazon AMI (any 'yum'-capable Amazon AMI)
 Run the script found @ https://github.com/akotlar/bystro-aws 
 
@@ -64,7 +73,7 @@ Once Bystro is installed, it needs to be configured. The easiest step is choosin
 Ex: Runing hg38 annotation
 
 ```sh
-bin/annotate.pl --config config/hg38.yml --in /path/in.vcf.gz --out /path/outPrefix --run_statistics [0,1] --compress
+bin/bystro-annotate.pl --config config/hg38.yml --in /path/in.vcf.gz --out /path/outPrefix --run_statistics [0,1] --compress
 ```
 
 The outputs will be:
