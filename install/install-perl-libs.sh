@@ -43,6 +43,9 @@ cpanm install Sys::CpuAffinity;
 cpanm install Module::Install::XSUtil
 cpanm install Module::Install::AuthorTests
 
+# For filters
+cpanm install Math::CDF
+
 # A dependency of Data::MessagePack installation
 cpanm install File::Copy::Recursive
 

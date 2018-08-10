@@ -200,9 +200,12 @@ while(my $job = $beanstalk->reserve) {
       p $err;
     }
 
-    if(ref $err eq 'Search::Elasticsearch::Error::Request') {
+    if(ref $err) {
+      say STDERR "Elasticsearch error:";
+      p $err;
+
       # TODO: Improve error handling, this doesn't work reliably
-      if($err->{vars}{body}{status} == 400) {
+      if($err->{vars}{body}{status} && $err->{vars}{body}{status} == 400) {
         $err = "Query failed to parse";
       } else {
         $err = "Issue handling query";

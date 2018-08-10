@@ -28,7 +28,7 @@ use Seq::Output::Delimiters;
 use Cpanel::JSON::XS qw/decode_json encode_json/;
 use YAML::XS qw/LoadFile/;
 
-use Math::Round qw/nhimult/;
+use Math::Round qw/nhimult round/;
 
 # Defines basic things needed in builder and annotator, like logPath,
 # Also initializes the database with database_dir unnecessarily
@@ -160,19 +160,12 @@ sub annotate {
   # TODO: figure out why even with field => 'pos' we get very slow perf
   # when having slices > shards with very large (1000+ terms) queries
 
-  my $numTerms = $self->_getNumTerms($self->inputQueryBody);
-
-  # 0 simply means we can't approximate the size
-  my $nSlices;
-  if($numTerms == 0 || $numTerms > 200) {
-    $nSlices = $self->shards;
-  } else {
-    $nSlices = $self->_getSlices();
-  }
+  my ($nSlices, $batchSize, $timeout) = $self->_getSearchParams();
 
   my $slice = {
     field => 'pos',
     max => $nSlices,
+
   };
 
   my $hasSort = exists $self->inputQueryBody->{sort};
@@ -202,13 +195,14 @@ sub annotate {
     $self->inputQueryBody->{slice} = $slice;
 
     my $scroll = $es->scroll_helper(
-      size        => $self->batchSize,
+      scroll      => $timeout,
+      size        => $batchSize,
       body        => $self->inputQueryBody,
-      index => $self->indexName,
-      type => $self->indexType,
+      index       => $self->indexName,
+      type        => $self->indexType,
     );
 
-    while(my @docs = $scroll->next($self->batchSize)) {
+    while(my @docs = $scroll->next($batchSize)) {
       my @sourceData;
       $#sourceData = $#docs;
 
@@ -266,6 +260,26 @@ sub annotate {
   return ($err, $self->outputFilesInfo);
 }
 
+sub _getSearchParams {
+  my $self = shift;
+
+  my $numTerms = $self->_getNumTerms($self->inputQueryBody);
+
+  # -1 simply means we can't approximate the size
+  my $nSlices;
+  if($numTerms <= 0 || $numTerms > 200) {
+    $nSlices = $self->shards;
+  } else {
+    $nSlices = $self->_getSlices();
+  }
+
+  my $batchSize = $self->batchSize;
+
+  my $timeout = '3m';
+
+  return ($nSlices, $batchSize, $timeout);
+}
+
 sub _cleanQuery {
   my $self = shift;
 
@@ -309,6 +323,21 @@ sub _getNumTerms {
   if(!$bool) {
     return 0;
   }
+
+  # my $hasScripts;
+
+  # # if($bool->{filter}) {
+  # #   my $str = encode_json($bool->{filter});
+
+  # #   if($str =~ /script/isg) {
+  # #     $hasScripts = 1;
+  # #   }
+  # # }
+
+  # # # scripts are very expensive, like large queries
+  # # if($hasScripts) {
+  # #   return -1;
+  # # }
 
   my $mustQLen = 0;
 
@@ -544,6 +573,99 @@ sub _errorWithCleanup {
 
   $self->log('warn', $msg);
   return $msg;
+}
+
+sub makeBinomFilter {
+  my ($self, $snpOnly, $privateMaf, $N, $afFieldsAref, $alpha) = @_;
+
+  return sub {
+     #my ($doc) = @_;
+
+     if($snpOnly && length($_[1]->{'alt'}[0][0][0]) > 1) {
+       return 1;
+     }
+
+     if($_[1]->{'sampleMaf'} <= $privateMaf) {
+       return 1;
+     }
+
+     my $n = $N * (1 - $_[1]->{'missingness'});
+
+     my $ac = $n * $_[1]->{'sampleMaf'};
+
+     for my $field (@{$afFieldsAref}) {
+       if(_binomProb($_[1]->{$field}, $n, $ac) >= $alpha) {
+         return 1;
+       }
+     }
+
+     return 0;
+  }
+}
+
+sub _binomProb {
+  #my ($popAf, $N, $ac) = @_;
+  #    $_[0]  $_[1], $_[2]
+
+  if($_[0] < 0 || $_[0] > 1) {
+    return 0;
+  }
+
+  if($_[1] < 2 || $_[1] > 10_000_000) {
+    return 0;
+  }
+
+  my $q = 1 - $_[0];
+  my $cent = round($_[1] * $_[0]);
+
+  my @L;
+
+  $L[$cent] = 1;
+
+  my $eps = 1e-8 / $_[1];
+  my $tot = 1;
+
+  my $k;
+  for(my $i = $cent - 1; $i >= 0; $i--) {
+    $k = $L[$i + 1] * $q * ($i + 1);
+    $k /= $_[0] * ($_[1] - $i);
+
+    if($k < $eps) {
+      $L[$i] = 0;
+      $i = 0;
+    } else {
+      $L[$i] = $k;
+    }
+
+    $tot += $L[$i];
+  }
+
+  for(my $i = $cent + 1; $i <= $_[1]; $i++) {
+	  $k = $L[$i-1] * $_[0] * ($_[1]-($i-1));
+	  $k /= $q * $i;
+
+	  if($k < $eps) {
+		  $L[$i] = 0;
+		  $i = $_[1];
+	  } else {
+		  $L[$i] = $k;
+	  }
+
+	  $tot += $L[$i];
+  }
+
+  for(my $i = 0; $i <= $_[1]; $i++) {
+    $L[$i] /= $tot;
+    #	print "$i $L[$i]\n";
+  }
+
+  my $rightTail = 0;
+
+  for(my $i = $_[2]; $i<= $_[1]; $i++) {
+    $rightTail += $L[$i];
+  }
+
+  return $rightTail;
 }
 
 __PACKAGE__->meta->make_immutable;
