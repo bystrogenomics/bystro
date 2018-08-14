@@ -84,6 +84,7 @@ my %requiredByType = (
 my %optionalForType = (
   'saveFromQuery' => {
     indexConfig => 'indexConfig',
+    pipeline => 'pipeline',
   }
 );
 
@@ -157,7 +158,15 @@ while(my $job = $beanstalk->reserve) {
 
     $configData->{database_dir} = 'hidden';
 
-    for my $track (@{$configData->{tracks}{tracks}}) {
+    my $trackConfig;
+    if(ref $configData->{tracks} eq 'ARRAY') {
+      $trackConfig = $configData->{tracks};
+    } else {
+      # New version
+      $trackConfig = $configData->{tracks}{tracks};
+    }
+
+    for my $track (@$trackConfig) {
       # Strip local_files of their directory names, for security reasons
       $track->{local_files} = [map { !$_ ? "" : path($_)->basename } @{$track->{local_files}}]
     }
@@ -183,6 +192,9 @@ while(my $job = $beanstalk->reserve) {
       }
 
       $inputHref = {%$inputHref, %$connectionConfig};
+
+      p $inputHref;
+
       $annotate_instance = SeqFromQuery->new_with_config($inputHref);
     }
 

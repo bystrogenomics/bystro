@@ -63,6 +63,17 @@ sub new_with_config {
     return;
   }
 
+  my $trackConfig;
+
+  if(ref $opts{$tracksKey} eq 'ARRAY') {
+    # Back compatibility with b10
+    my $temp = $opts{$tracksKey};
+
+    $opts{$tracksKey} = {
+      $tracksKey => $temp
+    };
+  }
+
   #Now push every single global option into each individual track
   #Since they are meant to operate as independent units
   my @nonTrackKeys = grep { $_ ne $tracksKey } keys %opts;

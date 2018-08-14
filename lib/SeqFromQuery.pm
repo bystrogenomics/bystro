@@ -41,6 +41,9 @@ with 'Seq::Definition';
 # An archive, containing an "annotation" file
 has inputQueryBody => (is => 'ro', isa => 'HashRef', required => 1);
 
+# Post-processing to run, before commiting the annotation
+has pipeline => (is => 'ro', isa => 'ArrayRef[HashRef]');
+
 # Probably the user id
 has indexName => (is => 'ro', required => 1);
 
@@ -132,8 +135,6 @@ sub annotate {
     return ($err, undef);
   }
 
-  $self->_clearUselessSort();
-
   # TODO: Support sort
   $self->_cleanQuery();
 
@@ -171,6 +172,17 @@ sub annotate {
   my $hasSort = exists $self->inputQueryBody->{sort};
   my $progressFunc = $self->_makeLogProgress($hasSort, $outFh, $statsFh, 3e4);
 
+  my @filterFunctions;
+  if($self->pipeline) {
+    my ($err, $filters) = $self->_makePipeline();
+
+    if($err) {
+      return ($err, undef);
+    }
+
+    @filterFunctions = @$filters;
+  }
+
   MCE::Loop::init {
     max_workers => $nSlices,
     chunk_size => 1,
@@ -207,7 +219,18 @@ sub annotate {
       $#sourceData = $#docs;
 
       my $i = 0;
-      for my $doc (@docs) {
+      my $skip;
+      DOCS: for my $doc (@docs) {
+        if(@filterFunctions) {
+          for my $f (@filterFunctions) {
+            $skip = $f->($doc);
+
+            if($skip) {
+              next DOCS;
+            }
+          }
+        }
+
         my @rowData;
         # Initialize all values to undef
         # Output.pm requires a sparse array for any missing values
@@ -260,6 +283,32 @@ sub annotate {
   return ($err, $self->outputFilesInfo);
 }
 
+sub _makePipeline {
+  my $self = shift;
+
+  state $funcs = {
+    binomMaf => \&makeBinomFilter,
+  };
+
+  if(!$self->pipeline) {
+    return (undef, []);
+  }
+
+  my @funcs;
+
+  for my $step (@{$self->pipeline}) {
+    my $makeFunc = $funcs->{$step->{key}};
+
+    if(!$makeFunc) {
+      return ("Couldn't find filtering function for $makeFunc->{key}", undef);
+    }
+
+    push @funcs, $makeFunc->($step);
+  }
+
+  return (undef, \@funcs);
+}
+
 sub _getSearchParams {
   my $self = shift;
 
@@ -267,7 +316,7 @@ sub _getSearchParams {
 
   # -1 simply means we can't approximate the size
   my $nSlices;
-  if($numTerms <= 0 || $numTerms > 200) {
+  if($numTerms < 0 || $numTerms > 200) {
     $nSlices = $self->shards;
   } else {
     $nSlices = $self->_getSlices();
@@ -275,7 +324,7 @@ sub _getSearchParams {
 
   my $batchSize = $self->batchSize;
 
-  my $timeout = '3m';
+  my $timeout = '2m';
 
   return ($nSlices, $batchSize, $timeout);
 }
@@ -284,31 +333,10 @@ sub _cleanQuery {
   my $self = shift;
 
   # TODO: Support sort
-  if(exists $self->inputQueryBody->{sort}) {
-    delete $self->inputQueryBody->{sort};
-  }
+  $self->inputQueryBody->{sort} = ['_doc'];
 
   if(exists $self->inputQueryBody->{aggs}) {
     delete $self->inputQueryBody->{aggs};
-  }
-
-  return;
-}
-
-sub _clearUselessSort {
-  my $self = shift;
-
-  if($self->inputQueryBody->{sort}) {
-    if(
-      $self->inputQueryBody->{sort} eq '_doc'
-      ||
-      ( ref $self->inputQueryBody->{sort}
-        && @{$self->inputQueryBody->{sort}} == 1
-        && $self->inputQueryBody->{sort}[0] eq '_doc'
-      )
-    ) {
-      delete $self->inputQueryBody->{sort};
-    }
   }
 
   return;
@@ -321,9 +349,10 @@ sub _getNumTerms {
   my $bool = $self->inputQueryBody->{query}{bool};
 
   if(!$bool) {
-    return 0;
+    return -1;
   }
 
+  # TODO: handle complex scripts, which are incredibly slow in ES
   # my $hasScripts;
 
   # # if($bool->{filter}) {
@@ -339,14 +368,29 @@ sub _getNumTerms {
   # #   return -1;
   # # }
 
+  my $mustObj = $bool->{must} || $bool->{filter};
+
   my $mustQLen = 0;
+  my $mustQuery = '';
 
-  my $mustQuery = $bool->{must}
-                  && $bool->{must}{query_string}
-                  && $bool->{must}{query_string}{query};
+  for my $obj (ref $mustObj eq 'ARRAY' ? $mustObj : $mustObj) {
+    if($obj->{query_string} && $obj->{query_string}{query}) {
+      $mustQLen += split(/\s+/, $obj->{query_string}{query});
+      next;
+    }
 
-  if($mustQuery) {
-    $mustQLen = split(/\s+/, $mustQuery);
+    if($obj->{match}) {
+      for my $matchProps (values %{$obj->{match}}) {
+        # in the form query: {match: {field: {query: string, operator: string}}
+        if(ref $matchProps) {
+          $mustQLen += split(/\s+/, $matchProps->{query});
+          next;
+        }
+
+        # in the form query: {match: {field: string}}
+        $mustQLen += split(/\s+/, $matchProps);
+      }
+    }
   }
 
   return $mustQLen;
@@ -576,7 +620,13 @@ sub _errorWithCleanup {
 }
 
 sub makeBinomFilter {
-  my ($self, $snpOnly, $privateMaf, $N, $afFieldsAref, $alpha) = @_;
+  my $props = shift;
+
+  my $snpOnly = $props->{snpOnly};
+  my $privateMaf = $props->{privateMaf};
+  my $N = $props->{n};
+  my $afFieldsAref = $props->{estimates};
+  my $alpha = $props->{critValue};
 
   return sub {
      #my ($doc) = @_;
