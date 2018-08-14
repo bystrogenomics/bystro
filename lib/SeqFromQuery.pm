@@ -223,7 +223,7 @@ sub annotate {
       DOCS: for my $doc (@docs) {
         if(@filterFunctions) {
           for my $f (@filterFunctions) {
-            $skip = $f->($doc);
+            $skip = $f->($doc->{_source});
 
             if($skip) {
               next DOCS;
@@ -298,6 +298,8 @@ sub _makePipeline {
 
   for my $step (@{$self->pipeline}) {
     my $makeFunc = $funcs->{$step->{key}};
+
+    say STDERR "FOUND $step->{key}";
 
     if(!$makeFunc) {
       return ("Couldn't find filtering function for $makeFunc->{key}", undef);
@@ -624,51 +626,93 @@ sub makeBinomFilter {
 
   my $snpOnly = $props->{snpOnly};
   my $privateMaf = $props->{privateMaf};
-  my $N = $props->{n};
+  my $N = $props->{numSamples} * 2;
   my $afFieldsAref = $props->{estimates};
   my $alpha = $props->{critValue};
 
+  for my $f (@$afFieldsAref) {
+    say STDERR "FIELD: $f";
+    my @path = split(/[.]/, $f);
+
+    $f = \@path;
+  }
+
+  # Returns 1 if we want to skip this site, 0 otherwise
   return sub {
      #my ($doc) = @_;
+     #    $_[0]
 
-     if($snpOnly && length($_[1]->{'alt'}[0][0][0]) > 1) {
-       return 1;
+                          #$doc
+     if($snpOnly && length($_[0]->{'alt'}[0][0]) > 1) {
+       #0 means don't skip
+       return 0;
      }
-
-     if($_[1]->{'sampleMaf'} <= $privateMaf) {
-       return 1;
+       #$doc
+     if($_[0]->{'sampleMaf'}[0][0] <= $privateMaf) {
+       return 0;
      }
+                      #$doc
+     my $n = $N * (1 - $_[0]->{'missingness'}[0][0]);
+                  #$doc
+     my $ac = $n * $_[0]->{'sampleMaf'}[0][0];
 
-     my $n = $N * (1 - $_[1]->{'missingness'});
+    for my $field (@{$afFieldsAref}) {
+      my $f = $_[0]->{$field->[0]};
 
-     my $ac = $n * $_[1]->{'sampleMaf'};
+      if(@$field == 2) {
+        $f = $f->{$field->[1]};
+      } elsif(@$field == 3) {
+        $f = $f->{$field->[1]}{$field->[2]};
+      } else {
+        for(my $i = 1; $i < @$field; $i++) {
+          $f = $f->{$field->[$i]}
+        }
+      }
 
-     for my $field (@{$afFieldsAref}) {
-       if(_binomProb($_[1]->{$field}, $n, $ac) >= $alpha) {
-         return 1;
-       }
-     }
+      if(!defined $f) {
+        next;
+      }
 
-     return 0;
+                    #$doc
+      if(_binomProb($f->[0][0], $n, $ac) >= $alpha) {
+        return 0;
+      }
+    }
+
+     # 1 means skip
+     return 1;
   }
 }
 
 sub _binomProb {
+  # N is likely the number of chromosomes
   #my ($popAf, $N, $ac) = @_;
   #    $_[0]  $_[1], $_[2]
 
+  #  $popAf       $popAf
   if($_[0] < 0 || $_[0] > 1) {
     return 0;
   }
 
+  #  $N           $N
   if($_[1] < 2 || $_[1] > 10_000_000) {
     return 0;
   }
 
+  #           $popAf
   my $q = 1 - $_[0];
+  #                $N    * $popAf
   my $cent = round($_[1] * $_[0]);
 
+  if($cent == 0) {
+    return 0;
+  }
+
+  p $cent;
+
   my @L;
+  #     $N
+  $#L = $_[1];
 
   $L[$cent] = 1;
 
@@ -678,8 +722,9 @@ sub _binomProb {
   my $k;
   for(my $i = $cent - 1; $i >= 0; $i--) {
     $k = $L[$i + 1] * $q * ($i + 1);
+    #     $popAf   $N
     $k /= $_[0] * ($_[1] - $i);
-
+    p $k;
     if($k < $eps) {
       $L[$i] = 0;
       $i = 0;
@@ -689,13 +734,17 @@ sub _binomProb {
 
     $tot += $L[$i];
   }
+  say STDERR "TOT IS $tot";
+  sleep(1000);
 
   for(my $i = $cent + 1; $i <= $_[1]; $i++) {
+    #               $popAf   $N
 	  $k = $L[$i-1] * $_[0] * ($_[1]-($i-1));
 	  $k /= $q * $i;
 
 	  if($k < $eps) {
 		  $L[$i] = 0;
+      #    $N
 		  $i = $_[1];
 	  } else {
 		  $L[$i] = $k;
@@ -703,14 +752,20 @@ sub _binomProb {
 
 	  $tot += $L[$i];
   }
-
+p @L;
+  #                    $N
   for(my $i = 0; $i <= $_[1]; $i++) {
+    if(!defined $L[$i]) {
+      say STDERR "NOT DEF WHY";
+      sleep(1000);
+    }
     $L[$i] /= $tot;
     #	print "$i $L[$i]\n";
   }
 
   my $rightTail = 0;
 
+  #           $ac         $N
   for(my $i = $_[2]; $i<= $_[1]; $i++) {
     $rightTail += $L[$i];
   }
