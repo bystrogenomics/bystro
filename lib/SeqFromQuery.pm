@@ -27,6 +27,7 @@ use Seq::Output::Delimiters;
 
 use Cpanel::JSON::XS qw/decode_json encode_json/;
 use YAML::XS qw/LoadFile/;
+use Math::Gauss qw/inv_cdf/;
 
 use Math::Round qw/nhimult round/;
 
@@ -180,7 +181,9 @@ sub annotate {
       return ($err, undef);
     }
 
-    @filterFunctions = @$filters;
+    if(defined $filters) {
+      @filterFunctions = @$filters;
+    }
   }
 
   MCE::Loop::init {
@@ -219,13 +222,13 @@ sub annotate {
       $#sourceData = $#docs;
 
       my $i = 0;
-      my $skip;
+      my $skipped = 0;
       DOCS: for my $doc (@docs) {
         if(@filterFunctions) {
           for my $f (@filterFunctions) {
-            $skip = $f->($doc->{_source});
+            if($f->($doc->{_source})) {
+              $skipped++;
 
-            if($skip) {
               next DOCS;
             }
           }
@@ -254,7 +257,7 @@ sub annotate {
 
       my $outputString = _makeOutputString(\@sourceData, \%delims);
 
-      $mce->gather(scalar @docs, $outputString, $id);
+      $mce->gather(scalar @docs - $skipped, $outputString, $id);
     }
   } (0 .. $nSlices - 1);
 
@@ -291,21 +294,25 @@ sub _makePipeline {
   };
 
   if(!$self->pipeline) {
-    return (undef, []);
+    return (undef, undef);
   }
 
   my @funcs;
 
   for my $step (@{$self->pipeline}) {
-    my $makeFunc = $funcs->{$step->{key}};
-
-    say STDERR "FOUND $step->{key}";
-
-    if(!$makeFunc) {
-      return ("Couldn't find filtering function for $makeFunc->{key}", undef);
+    if(!exists $funcs->{$step->{key}}) {
+      $self->log('warn', "Couldn't find function for $step->{key}");
+      next;
     }
 
-    push @funcs, $makeFunc->($step);
+    my $makeFunc = $funcs->{$step->{key}};
+
+    # Skipped for some reason
+    if(!$makeFunc) {
+      next;
+    }
+
+    push @funcs, $makeFunc->($self, $step);
   }
 
   return (undef, \@funcs);
@@ -621,157 +628,299 @@ sub _errorWithCleanup {
   return $msg;
 }
 
+# TODO: add binomial test if n is small
+# Requires numSamples, estimates, and critValue
+# Else will not filter anything
 sub makeBinomFilter {
+  my $self = shift;
   my $props = shift;
 
-  my $snpOnly = $props->{snpOnly};
-  my $privateMaf = $props->{privateMaf};
-  my $N = $props->{numSamples} * 2;
+  my $numSamples = $props->{numSamples} * 2;
+
+  if($numSamples < 2) {
+    return;
+  }
+
   my $afFieldsAref = $props->{estimates};
+
+  if(!@$afFieldsAref) {
+    return;
+  }
+
   my $alpha = $props->{critValue};
 
+  if(!$alpha) {
+    return;
+  }
+
+  if($alpha == 0 || $alpha > .5) {
+    $self->log('error', "Alpha must larger than 0 and smaller than .5");
+    return;
+  }
+
+  # We care only about having more than the expected number of alleles
+  # not less
+  # So for instance, we care about the 95th percentile, not the 5th
+  my $zCrit = inv_cdf(1 - $alpha);
+
+  my $snpOnly = $props->{snpOnly};
+  my $privateMaf = $props->{privateMaf} || 0;
+
+  my $minPossibleEstimate = 1/(2*$numSamples);
+
+  # TODO: Don't defeat? If privateMaf is set, 
+  # then at minimum we should not allow it to be less than $minPossibleEstimate
+  if($privateMaf < $minPossibleEstimate) {
+    $privateMaf = $minPossibleEstimate;
+  }
+
+  # say STDERR "Z IS $zCrit for $alpha, and for .05 is ." . (inv_cdf(.05));
+
   for my $f (@$afFieldsAref) {
-    say STDERR "FIELD: $f";
     my @path = split(/[.]/, $f);
 
     $f = \@path;
   }
 
-  # Returns 1 if we want to skip this site, 0 otherwise
+  # Copy-on-write in multithreaded env; no need to worry about race
+  my($n, $k, $p);
+
+  # binomial approximation
+  # http://www.halotype.com/RKM/figures/TJF/binomial.txt
   return sub {
-     #my ($doc) = @_;
-     #    $_[0]
+    #my $doc = shift;
+    # $_[0]
+                         #$doc->
+    if($snpOnly && length($_[0]->{'alt'}[0][0]) > 1) {
+      #0 means don't skip
+      return 0;
+    }
+      #$doc->
+    if($_[0]->{'sampleMaf'}[0][0] <= $privateMaf) {
+      return 0;
+    }
+                            #$doc->
+    $n = $numSamples * (1 - $_[0]->{'missingness'}[0][0]);
+             #$doc->
+    $k = $n * $_[0]->{'sampleMaf'}[0][0];
 
-                          #$doc
-     if($snpOnly && length($_[0]->{'alt'}[0][0]) > 1) {
-       #0 means don't skip
-       return 0;
-     }
-       #$doc
-     if($_[0]->{'sampleMaf'}[0][0] <= $privateMaf) {
-       return 0;
-     }
-                      #$doc
-     my $n = $N * (1 - $_[0]->{'missingness'}[0][0]);
-                  #$doc
-     my $ac = $n * $_[0]->{'sampleMaf'}[0][0];
+    undef $p;
 
-    for my $field (@{$afFieldsAref}) {
-      my $f = $_[0]->{$field->[0]};
-
-      if(@$field == 2) {
-        $f = $f->{$field->[1]};
-      } elsif(@$field == 3) {
-        $f = $f->{$field->[1]}{$field->[2]};
-      } else {
-        for(my $i = 1; $i < @$field; $i++) {
-          $f = $f->{$field->[$i]}
-        }
-      }
-
-      if(!defined $f) {
+    AF_LOOP: for my $field (@{$afFieldsAref}) {
+       # Avoid auto-vivification
+                #$doc->
+      if(!exists $_[0]->{$field->[0]}) {
         next;
       }
 
-                    #$doc
-      if(_binomProb($f->[0][0], $n, $ac) >= $alpha) {
+      # Example: gnomad.exomes.af
+      if(@$field == 3) {
+                  #$doc->                                       #$doc->
+        if(!exists $_[0]->{$field->[0]}{$field->[1]} || !exists $_[0]->{$field->[0]}{$field->[1]}{$field->[2]}) {
+          next AF_LOOP;
+        }
+
+            #$doc->
+        $p = $_[0]->{$field->[0]}{$field->[1]}{$field->[2]}[0][0];
+      } elsif(@$field == 2) {
+        # Example: dbSNP.alleleFreq
+                   #$doc->
+        if(!exists $_[0]->{$field->[0]}{$field->[1]}) {
+          next AF_LOOP;
+        }
+
+            #$doc->
+        $p = $_[0]->{$field->[0]}{$field->[1]}[0][0];
+      } else {
+        # Try to avoid the expensive loop
+        $p = $_[0]->{$field->[0]};
+
+        for(my $i = 1; $i < @$field; $i++) {
+          if(!exists $p->{$field->[$i]}) {
+            next AF_LOOP;
+          }
+
+          $p = $p->{$field->[$i]}
+        }
+
+        $p = $p->[0][0];
+      }
+
+      # Point here is that if pop estimate is below the minPossible
+      # We have no ability to call a difference
+      # In that case, I think a reasonable action is to include it only
+      # if the allele frequency we have is <= privateMaf || <= $minPossible
+      if(!defined $p || $p <= $minPossibleEstimate) {
+        next AF_LOOP;
+      }
+
+      # TODO: May want to skip to next pop af estimate,
+      # While keeping track of the fact that at least one estimate passed
+      if($p == 1) {
+        return 0;
+      }
+
+      # if(sqrt( $n * $p * (1 - $p) ) == 0) {
+      #   say STDERR "WTF p: $p n: $n , k: $k, zCrit: $zCrit";
+      #   p $_[0];
+      #   sleep(100);
+      # }
+
+      # say STDERR "z is ". abs($n * $p - $k) / sqrt( $n * $p * (1 - $p) ) . " for p: $p n: $n , k: $k, zCrit: $zCrit";
+
+      # if we have fewer alleles than expected, then we definitely
+      # don't have more than the expected number
+      if($k <= $n * $p) {
+        return 0;
+      }
+
+      # TODO: allow flag to be more conservative; drop if doesn't pass in all 
+      # TODO: prevent underflow more consistently
+      # If we have a smaller deviation than allowed by our critical value
+      if( ($k - $n * $p) / sqrt( $n * $p * (1 - $p) ) <= $zCrit) {
         return 0;
       }
     }
 
-     # 1 means skip
-     return 1;
-  }
+    return 1;
 }
 
-sub _binomProb {
-  # N is likely the number of chromosomes
-  #my ($popAf, $N, $ac) = @_;
-  #    $_[0]  $_[1], $_[2]
 
-  #  $popAf       $popAf
-  if($_[0] < 0 || $_[0] > 1) {
-    return 0;
-  }
+  # Returns 1 if we want to skip this site, 0 otherwise
+  # return sub {
+  #    #my ($doc) = @_;
+  #    #    $_[0]
 
-  #  $N           $N
-  if($_[1] < 2 || $_[1] > 10_000_000) {
-    return 0;
-  }
+  #                         #$doc
+  #    if($snpOnly && length($_[0]->{'alt'}[0][0]) > 1) {
+  #      #0 means don't skip
+  #      return 0;
+  #    }
+  #      #$doc
+  #    if($_[0]->{'sampleMaf'}[0][0] <= $privateMaf) {
+  #      return 0;
+  #    }
+  #                     #$doc
+  #    my $n = $N * (1 - $_[0]->{'missingness'}[0][0]);
+  #                 #$doc
+  #    my $ac = $n * $_[0]->{'sampleMaf'}[0][0];
 
-  #           $popAf
-  my $q = 1 - $_[0];
-  #                $N    * $popAf
-  my $cent = round($_[1] * $_[0]);
+  #   for my $field (@{$afFieldsAref}) {
+  #     my $f = $_[0]->{$field->[0]};
 
-  if($cent == 0) {
-    return 0;
-  }
+  #     if(@$field == 2) {
+  #       $f = $f->{$field->[1]};
+  #     } elsif(@$field == 3) {
+  #       $f = $f->{$field->[1]}{$field->[2]};
+  #     } else {
+  #       for(my $i = 1; $i < @$field; $i++) {
+  #         $f = $f->{$field->[$i]}
+  #       }
+  #     }
 
-  p $cent;
+  #     if(!defined $f) {
+  #       next;
+  #     }
 
-  my @L;
-  #     $N
-  $#L = $_[1];
+  #                   #$doc
+  #     if(_binomProb($f->[0][0], $n, $ac) >= $alpha) {
+  #       return 0;
+  #     }
+  #   }
 
-  $L[$cent] = 1;
-
-  my $eps = 1e-8 / $_[1];
-  my $tot = 1;
-
-  my $k;
-  for(my $i = $cent - 1; $i >= 0; $i--) {
-    $k = $L[$i + 1] * $q * ($i + 1);
-    #     $popAf   $N
-    $k /= $_[0] * ($_[1] - $i);
-    p $k;
-    if($k < $eps) {
-      $L[$i] = 0;
-      $i = 0;
-    } else {
-      $L[$i] = $k;
-    }
-
-    $tot += $L[$i];
-  }
-  say STDERR "TOT IS $tot";
-  sleep(1000);
-
-  for(my $i = $cent + 1; $i <= $_[1]; $i++) {
-    #               $popAf   $N
-	  $k = $L[$i-1] * $_[0] * ($_[1]-($i-1));
-	  $k /= $q * $i;
-
-	  if($k < $eps) {
-		  $L[$i] = 0;
-      #    $N
-		  $i = $_[1];
-	  } else {
-		  $L[$i] = $k;
-	  }
-
-	  $tot += $L[$i];
-  }
-p @L;
-  #                    $N
-  for(my $i = 0; $i <= $_[1]; $i++) {
-    if(!defined $L[$i]) {
-      say STDERR "NOT DEF WHY";
-      sleep(1000);
-    }
-    $L[$i] /= $tot;
-    #	print "$i $L[$i]\n";
-  }
-
-  my $rightTail = 0;
-
-  #           $ac         $N
-  for(my $i = $_[2]; $i<= $_[1]; $i++) {
-    $rightTail += $L[$i];
-  }
-
-  return $rightTail;
+  #    # 1 means skip
+  #    return 1;
+  # }
 }
+
+# sub _binomProb {
+#   # N is likely the number of chromosomes
+#   #my ($popAf, $N, $ac) = @_;
+#   #    $_[0]  $_[1], $_[2]
+
+#   #  $popAf       $popAf
+#   if($_[0] < 0 || $_[0] > 1) {
+#     return 0;
+#   }
+
+#   #  $N           $N
+#   if($_[1] < 2 || $_[1] > 10_000_000) {
+#     return 0;
+#   }
+
+#   #           $popAf
+#   my $q = 1 - $_[0];
+#   #                $N    * $popAf
+#   my $cent = round($_[1] * $_[0]);
+
+#   if($cent == 0) {
+#     return 0;
+#   }
+
+#   p $cent;
+
+#   my @L;
+#   #     $N
+#   $#L = $_[1];
+
+#   $L[$cent] = 1;
+
+#   my $eps = 1e-8 / $_[1];
+#   my $tot = 1;
+
+#   my $k;
+#   for(my $i = $cent - 1; $i >= 0; $i--) {
+#     $k = $L[$i + 1] * $q * ($i + 1);
+#     #     $popAf   $N
+#     $k /= $_[0] * ($_[1] - $i);
+#     p $k;
+#     if($k < $eps) {
+#       $L[$i] = 0;
+#       $i = 0;
+#     } else {
+#       $L[$i] = $k;
+#     }
+
+#     $tot += $L[$i];
+#   }
+#   say STDERR "TOT IS $tot";
+#   sleep(1000);
+
+#   for(my $i = $cent + 1; $i <= $_[1]; $i++) {
+#     #               $popAf   $N
+# 	  $k = $L[$i-1] * $_[0] * ($_[1]-($i-1));
+# 	  $k /= $q * $i;
+
+# 	  if($k < $eps) {
+# 		  $L[$i] = 0;
+#       #    $N
+# 		  $i = $_[1];
+# 	  } else {
+# 		  $L[$i] = $k;
+# 	  }
+
+# 	  $tot += $L[$i];
+#   }
+# p @L;
+#   #                    $N
+#   for(my $i = 0; $i <= $_[1]; $i++) {
+#     if(!defined $L[$i]) {
+#       say STDERR "NOT DEF WHY";
+#       sleep(1000);
+#     }
+#     $L[$i] /= $tot;
+#     #	print "$i $L[$i]\n";
+#   }
+
+#   my $rightTail = 0;
+
+#   #           $ac         $N
+#   for(my $i = $_[2]; $i<= $_[1]; $i++) {
+#     $rightTail += $L[$i];
+#   }
+
+#   return $rightTail;
+# }
 
 __PACKAGE__->meta->make_immutable;
 
