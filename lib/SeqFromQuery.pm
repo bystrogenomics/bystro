@@ -31,6 +31,8 @@ use Math::Gauss qw/inv_cdf/;
 
 use Math::Round qw/nhimult round/;
 
+use POSIX qw/lround/;
+
 # Defines basic things needed in builder and annotator, like logPath,
 # Also initializes the database with database_dir unnecessarily
 extends 'Seq::Base';
@@ -632,9 +634,9 @@ sub makeBinomFilter {
   my $self = shift;
   my $props = shift;
 
-  my $numSamples = $props->{numSamples} * 2;
+  my $nChromosomes = $props->{numSamples} * 2;
 
-  if($numSamples < 2) {
+  if($nChromosomes < 2) {
     return;
   }
 
@@ -655,23 +657,29 @@ sub makeBinomFilter {
     return;
   }
 
-  # We care only about having more than the expected number of alleles
-  # not less
-  # So for instance, we care about the 95th percentile, not the 5th
+  # A positive z value
   my $zCrit = inv_cdf(1 - $alpha);
 
   my $snpOnly = $props->{snpOnly};
   my $privateMaf = $props->{privateMaf} || 0;
 
-  my $minPossibleEstimate = 1/(2*$numSamples);
+  my $minPossibleEstimate =  sprintf("%.2f", 1/$nChromosomes);
 
-  # TODO: Don't defeat? If privateMaf is set, 
+  # Different from 1, because of possible rounding
+  # my $minK = 1.5;
+
+  # TODO: Don't defeat? If privateMaf is set,
   # then at minimum we should not allow it to be less than $minPossibleEstimate
   if($privateMaf < $minPossibleEstimate) {
     $privateMaf = $minPossibleEstimate;
   }
 
-  # say STDERR "Z IS $zCrit for $alpha, and for .05 is ." . (inv_cdf(.05));
+  # If we calculate K to be a number not quite 1, count it as 1
+  # for purpose of checking whether we're at minimum
+  my $roundedMinK = 1.1;
+
+  # say STDERR "MIN: $minPossibleEstimate ; snpOnly: $snpOnly ; privateMaf: $minPossibleEstimate ; zCrit: $zCrit; alpha: $alpha";
+  # sleep(1000);
 
   for my $f (@$afFieldsAref) {
     my @path = split(/[.]/, $f);
@@ -680,7 +688,7 @@ sub makeBinomFilter {
   }
 
   # Copy-on-write in multithreaded env; no need to worry about race
-  my($n, $k, $p);
+  my($n, $k, $p, $isRare);
 
   # binomial approximation
   # http://www.halotype.com/RKM/figures/TJF/binomial.txt
@@ -692,17 +700,20 @@ sub makeBinomFilter {
       #0 means don't skip
       return 0;
     }
-      #$doc->
-    if($_[0]->{'sampleMaf'}[0][0] <= $privateMaf) {
-      return 0;
-    }
+
                             #$doc->
-    $n = $numSamples * (1 - $_[0]->{'missingness'}[0][0]);
+    $n = $nChromosomes * (1 - $_[0]->{'missingness'}[0][0]);
              #$doc->
     $k = $n * $_[0]->{'sampleMaf'}[0][0];
 
+    # NOW WE PASS RARE THINGS ONLY IF ESTIMATES ARE ALSO RARE
+    # The 2nd condition is to ensure that we don't consider something like 1.0016
+    # to be more common that our $minimumPossibleEstimate
+    $isRare =  $_[0]->{'sampleMaf'}[0][0] <= $privateMaf || ($n == $nChromosomes && $k < 1.5);
+
     undef $p;
 
+    my $tested = 0;
     AF_LOOP: for my $field (@{$afFieldsAref}) {
        # Avoid auto-vivification
                 #$doc->
@@ -743,40 +754,37 @@ sub makeBinomFilter {
         $p = $p->[0][0];
       }
 
-      # Point here is that if pop estimate is below the minPossible
-      # We have no ability to call a difference
-      # In that case, I think a reasonable action is to include it only
-      # if the allele frequency we have is <= privateMaf || <= $minPossible
-      if(!defined $p || $p <= $minPossibleEstimate) {
+      if(!defined $p) {
         next AF_LOOP;
       }
 
-      # TODO: May want to skip to next pop af estimate,
-      # While keeping track of the fact that at least one estimate passed
-      if($p == 1) {
+      # Handles cases where p == 1 (can't calculate p-value), p == 0, and p <= privateMef
+      # TODO: May want to skip to next pop af estimate is $p == 1
+      # Currently if $p == 1 we allow only if !isRare
+      # Because something that is extremely common in the population
+      # but is rare in ours, will be something very very odd
+      # or an annotation mistake
+      if(($p == 1 && !$isRare) || ($p <= $privateMaf && $isRare)) {
         return 0;
       }
-
-      # if(sqrt( $n * $p * (1 - $p) ) == 0) {
-      #   say STDERR "WTF p: $p n: $n , k: $k, zCrit: $zCrit";
-      #   p $_[0];
-      #   sleep(100);
-      # }
 
       # say STDERR "z is ". abs($n * $p - $k) / sqrt( $n * $p * (1 - $p) ) . " for p: $p n: $n , k: $k, zCrit: $zCrit";
 
-      # if we have fewer alleles than expected, then we definitely
-      # don't have more than the expected number
-      if($k <= $n * $p) {
+      # TODO: allow flag to be more conservative; drop if doesn't pass in all
+      # TODO: prevent underflow more consistently
+      # If we have a smaller deviation than allowed by our critical value
+      if( abs($k - $n * $p) / sqrt( $n * $p * (1 - $p) ) <= $zCrit) {
         return 0;
       }
 
-      # TODO: allow flag to be more conservative; drop if doesn't pass in all 
-      # TODO: prevent underflow more consistently
-      # If we have a smaller deviation than allowed by our critical value
-      if( ($k - $n * $p) / sqrt( $n * $p * (1 - $p) ) <= $zCrit) {
-        return 0;
-      }
+      $tested++;
+    }
+
+    # If the site isn't present in then populations of interest it is
+    # likely to be rare.
+    # In those cases, accept sites thats are rare in our dataset as well
+    if($tested == 0 && $isRare) {
+      return 0;
     }
 
     return 1;
