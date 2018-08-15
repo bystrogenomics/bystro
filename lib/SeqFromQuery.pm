@@ -219,9 +219,8 @@ sub annotate {
 
     while(my @docs = $scroll->next($batchSize)) {
       my @sourceData;
-      $#sourceData = $#docs;
+      # $#sourceData = $#docs;
 
-      my $i = 0;
       my $skipped = 0;
       DOCS: for my $doc (@docs) {
         if(@filterFunctions) {
@@ -250,9 +249,7 @@ sub annotate {
           $rowData[$discordantIdx][0][0] = 1;
         }
 
-        $sourceData[$i] = \@rowData;
-
-        $i++;
+        push @sourceData, \@rowData;
       }
 
       my $outputString = _makeOutputString(\@sourceData, \%delims);
