@@ -27,7 +27,7 @@ use Seq::Output::Delimiters;
 
 use Cpanel::JSON::XS qw/decode_json encode_json/;
 use YAML::XS qw/LoadFile/;
-use Math::Gauss qw/inv_cdf/;
+use Statistics::Distributions qw(chisqrdistr udistr);
 
 use Math::Round qw/nhimult round/;
 
@@ -290,6 +290,7 @@ sub _makePipeline {
 
   state $funcs = {
     binomMaf => \&makeBinomFilter,
+    hwe => \&makeHweFilter,
   };
 
   if(!$self->pipeline) {
@@ -627,6 +628,65 @@ sub _errorWithCleanup {
   return $msg;
 }
 
+sub makeHweFilter {
+  my $self = shift;
+  my $props = shift;
+
+  my $nSamples = $props->{numSamples};
+
+  if($nSamples < 1) {
+    return;
+  }
+
+  my $alpha = $props->{critValue};
+
+  if(!$alpha) {
+    return;
+  }
+
+  # A positive z value
+  my $chiCrit = chisqrdistr(1, $alpha);
+
+  # Copy-on-write in multithreaded env; no need to worry about race
+  my($eHets, $eHomsMajor, $eHomsMinor, $n, $hets, $homsMajor, $homsMinor, $p);
+
+  # binomial approximation
+  # http://www.halotype.com/RKM/figures/TJF/binomial.txt
+  return sub {
+    #my $doc = shift;
+    # $_[0]
+
+    # $q = $_[0]->{'sampleMaf'}[0][0];
+    $p = 1 - $_[0]->{'sampleMaf'}[0][0];
+
+    # TODO: should we allow sites like these? Currently skip
+    if($p == 0) {
+      return 1;
+    }
+
+    $n = $nSamples * (1 - $_[0]->{'missingness'}[0][0]);
+
+    $eHets = 2 * $p * (1 - $p) * $n;
+    $eHomsMajor = ($p ** 2) * $n;
+    $eHomsMinor = $n - ($eHets + $eHomsMajor);
+    
+    $hets = $n * $_[0]->{'heterozygosity'}[0][0];
+    $homsMinor = $n * $_[0]->{'homozygosity'}[0][0];
+    $homsMajor = $n - ($hets + $homsMinor);
+
+    if($eHets == 0 || $eHomsMajor == 0 || $eHomsMinor == 0) {
+      say STDERR "n: $n, missinginess: $_[0]->{'missingness'}[0][0], nSamples: $nSamples, p: $p, eHets: $eHets ; eHomsMajor : $eHomsMajor; eHomsMinor: $eHomsMinor";
+      say STDERR "hets: $hets, homsMajor: $homsMajor; homsMinor: $homsMinor";
+      sleep(1000);
+    }
+    # Returns truthy if test statistic is > $chiCrit, which means 
+    # in rejection region == skip
+    return $chiCrit < ( ($hets - $eHets) ** 2 ) / $eHets
+           + ( ($homsMajor - $eHomsMajor) ** 2) / $eHomsMajor
+           + ( ($homsMinor - $eHomsMinor) ** 2) / $eHomsMinor;
+  }
+}
+
 # TODO: add binomial test if n is small
 # Requires numSamples, estimates, and critValue
 # Else will not filter anything
@@ -657,8 +717,9 @@ sub makeBinomFilter {
     return;
   }
 
-  # A positive z value
-  my $zCrit = inv_cdf(1 - $alpha);
+  # A positive z value; udistr for .05 will give 1.65
+  # unlike Math::Gauss, for which inv_cdf will give -1.65
+  my $zCrit = udistr($alpha);
 
   my $snpOnly = $props->{snpOnly};
   my $privateMaf = $props->{privateMaf} || 0;

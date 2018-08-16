@@ -37,7 +37,9 @@ cpanm install Beanstalk::Client
 cpanm install Hash::Merge::Simple
 cpanm install Math::Round;
 cpanm install Sys::CpuAffinity;
-cpanm install Math::Gauss;
+# cpanm install Math::Gauss;
+cpanm install Statistics::Distributions;
+
 # Custom branch of msgpack-perl that uses latest msgpack-c and
 # allows prefer_float32 flag for 5-byte float storage
 cpanm install Module::Install::XSUtil
