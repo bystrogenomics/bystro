@@ -51,7 +51,7 @@ Please read [FIELDS.md](FIELDS.md)
     ```
     
     Only chr1, chr2, and chr3 will be accepted. However, Bystro tries to make your life easy
-      1. We currently follow UCSC coneventions for ```chromosomes```, meaning they should be prepended by **chr**
+      1. We currently follow UCSC conventions for ```chromosomes```, meaning they should be prepended by **chr**
       2. Bystro will automatically append **chr** to chromosomes read from an input file during annotation. 
       3. Bystro allows the transformation of any field during building, configurable in the YAML config file for that assembly, making it easy to prepend **chr** to the source file chromosome field
       
