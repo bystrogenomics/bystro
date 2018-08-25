@@ -142,7 +142,9 @@ sub BUILD {
 }
 
 sub go {
-  my $self = shift; $self->log( 'info', 'Beginning indexing' );
+  my $self = shift;
+  
+  $self->log( 'info', 'Beginning indexing' );
 
   my ($filePath, $annotationFileInCompressed) = $self->_getFilePath();
 
@@ -153,9 +155,8 @@ sub go {
     return ($err, undef);
   };
 
-  my $fieldSep = $self->delimiter;
-
   my $firstLine = <$fh>;
+  chomp $firstLine;
 
   $err = $self->_taintCheck($firstLine);
 
@@ -164,26 +165,15 @@ sub go {
     return ($err, undef);
   }
 
-  chomp $firstLine;
-
   my ($headerAref, $pathAref) = $self->_getHeaderPath($firstLine);
 
-  my @headerFields = @$headerAref;
-
   # ES since > 5.2 deprecates lenient boolean
-  my @booleanHeaders = _getBooleanHeaders(\@headerFields, $self->indexConfig->{mappings});
+  my @booleanHeaders = _getBooleanHeaders($headerAref, $self->indexConfig->{mappings});
 
   # We need to flush at the end of each chunk read; so chunk size directly
   # controls bulk request size, as long as bulk request doesnt hit
   # max_count and max_size thresholds
-  my $chunkSize = $self->getChunkSize($filePath, $self->maxThreads);
-  if($chunkSize < 5000) {
-    $chunkSize = 5000;
-  }
-
-  if($chunkSize > 10_000) {
-    $chunkSize = 10_000;
-  }
+  my $chunkSize = $self->getChunkSize($filePath, $self->maxThreads, 5_000, 10_000);
 
   # Report every 10k lines; to avoid oversaturating receiver
   my $progressFunc = $self->makeLogProgress(1e4);
@@ -194,30 +184,13 @@ sub go {
     gather => $progressFunc,
   };
 
+  tie my $abortErr, 'MCE::Shared', '';
+
   # TODO: can use connection pool sniffing as well, not doing so atm
   # because not sure if connection sniffing issue exists here as in
   # elasticjs library
   my $es = $self->_makeEsConnection();
-
-  my $m1 = MCE::Mutex->new;
-  tie my $abortErr, 'MCE::Shared', '';
-
-  my $bulk = $es->bulk_helper(
-    index       => $self->indexName,
-    type        => $self->indexType,
-    max_count   => 5_000,
-    max_size    => 10_000_000,
-    on_error    => sub {
-      my ($action, $response, $i) = @_;
-      $self->log('warn', "Index error: $action ; $response ; $i");
-      p @_;
-      $m1->synchronize(sub{ $abortErr = $response} );
-    },           # optional
-    on_conflict => sub {
-      my ($action,$response,$i,$version) = @_;
-      $self->log('warn', "Index conflict: $action ; $response ; $i ; $version");
-    },           # optional
-  );
+  my $bulk = $self->_makeBulkHelper($es, \$abortErr);
 
   mce_loop_f {
     my ($mce, $slurp_ref, $chunk_id) = @_;
@@ -277,7 +250,32 @@ sub go {
 
   $self->log('info', "finished indexing");
 
-  return (undef, \@headerFields, $self->indexConfig);
+  return (undef, $headerAref, $self->indexConfig);
+}
+
+sub _makeBulkHelper {
+  my ($self, $es, $abortErrRef) = @_;
+
+  my $m1 = MCE::Mutex->new;
+
+  my $bulk = $es->bulk_helper(
+    index       => $self->indexName,
+    type        => $self->indexType,
+    max_count   => 5_000,
+    max_size    => 10_000_000,
+    on_error    => sub {
+      my ($action, $response, $i) = @_;
+      $self->log('warn', "Index error: $action ; $response ; $i");
+      p @_;
+      $m1->synchronize(sub{ $$abortErrRef = $response} );
+    },           # optional
+    on_conflict => sub {
+      my ($action,$response,$i,$version) = @_;
+      $self->log('warn', "Index conflict: $action ; $response ; $i ; $version");
+    },           # optional
+  );
+
+  return $bulk
 }
 
 sub _makeEsConnection {

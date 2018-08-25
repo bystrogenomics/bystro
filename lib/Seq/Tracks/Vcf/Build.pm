@@ -50,13 +50,13 @@ has vcfProcessor => (is => 'ro', isa => 'Str', required => 1, default => 'bystro
 
 state $converter = Seq::Tracks::Base::Types->new();
 
-# name followed by index in the intermediate snp file
-# QUAL and FILTER not yet implemented
-# We also allow any fields output by the vcf professor (except info and the related alleleIdx)
+# Defines the indices expected in the intermediate vcf output of
+# $self->vcfProcessor
+# TODO: read these values from the header of a single file
 state $vcfFeatures = {
   chrom => 0, pos => 1, type => 2, ref => 3, alt => 4, trTv => 5,
-  heterozygotes => 6, homozygotes => 8, missingGenos => 10, id => 13,
-  qual => undef, filter => undef};
+  heterozygotes => 6, homozygotes => 8, missingGenos => 10, id => 15
+};
 
 # We can use before BUILD to make any needed modifications to $self->features
 # before those features' indices are stored in the db in Seq::Base
@@ -107,14 +107,8 @@ sub BUILD {
       next;
     }
 
-    # Some features are placeholders; catch these anyhow so we don't try to look
-    # for them in the INFO field
-    if(!defined $vcfFeatures->{$vcfFeature} && defined $idx) {
-      $self->log('fatal', "Currently $vcfFeature is not allowed");
-    }
-
     #Stores:
-    #1) The feature naem (post-transformation)
+    #1) The feature name (post-transformation)
     #2) The index in the intermedaite annotation file
     #3) The index in the database
     push @headerFeatures, [

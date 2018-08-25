@@ -357,7 +357,15 @@ sub getCompressedFileSize {
 
 # returns chunk size in kbytes
 sub getChunkSize {
-  my ($self, $filePath, $parts) = @_;
+  my ($self, $filePath, $parts, $min, $max) = @_;
+
+  if(!$min) {
+    $min = 512;
+  }
+
+  if(!$max) {
+    $max = 1536;
+  }
 
   my $size = path($filePath)->stat()->size;
 
@@ -376,13 +384,13 @@ sub getChunkSize {
 
   my $chunkSize = CORE::int($size / ($parts * 4096));
 
-  if ($chunkSize < 512) {
-    return (undef, 512);
+  if ($chunkSize < $min) {
+    return (undef, $min);
   }
 
   # Cap to make sure memory usage doesn't grow uncontrollably
-  if ($chunkSize > 1536) {
-    return (undef, 1536);
+  if ($chunkSize > $max) {
+    return (undef, $max);
   }
 
   return (undef, $chunkSize);

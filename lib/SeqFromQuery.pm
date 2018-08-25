@@ -121,7 +121,6 @@ sub annotate {
   my $d = Seq::Output::Delimiters->new();
 
   my %delims = (
-    'allele' => $d->alleleDelimiter,
     'pos' => $d->positionDelimiter,
     'value' => $d->valueDelimiter,
     'overlap' => $d->overlapDelimiter,
@@ -481,28 +480,26 @@ sub _makeOutputString {
         next COLUMN_LOOP;
       }
 
-      for my $alleleData (@$column) {
-        POS_LOOP: for my $positionData (@$alleleData) {
-          if(!defined $positionData) {
-            $positionData = $emptyFieldChar;
-            next POS_LOOP;
-          }
-
-          if(ref $positionData) {
-            $positionData = join($delims->{value}, map {
-              defined $_
-              ?
-              (ref $_ ? join($delims->{overlap}, @$_) : $_)
-              : $emptyFieldChar
-            } @$positionData);
-            next POS_LOOP;
-          }
+      # For now, we don't store multiallelics; top level array is placeholder only
+      # With breadth 1
+      POS_LOOP: for my $positionData (@{$column->[0]}) {
+        if(!defined $positionData) {
+          $positionData = $emptyFieldChar;
+          next POS_LOOP;
         }
 
-        $alleleData = join($delims->{pos}, @$alleleData);
+        if(ref $positionData) {
+          $positionData = join($delims->{value}, map {
+            defined $_
+            ?
+            (ref $_ ? join($delims->{overlap}, @$_) : $_)
+            : $emptyFieldChar
+          } @$positionData);
+          next POS_LOOP;
+        }
       }
 
-      $column = join($delims->{allele}, @$column);
+      $column = join($delims->{pos}, @{$column->[0]});
     }
 
     $row = join($delims->{fieldSep}, @$row);
