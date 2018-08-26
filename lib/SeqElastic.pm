@@ -1,3 +1,4 @@
+
 use 5.10.0;
 use strict;
 use warnings;
@@ -176,7 +177,9 @@ sub go {
   my $chunkSize = $self->getChunkSize($filePath, $self->maxThreads, 5_000, 10_000);
 
   # Report every 10k lines; to avoid oversaturating receiver
-  my $progressFunc = $self->makeLogProgress(1e4);
+  my $messageFreq = (2e4 / 4) * $self->maxThreads;
+
+  my $progressFunc = $self->makeLogProgress($messageFreq);
 
   MCE::Loop::init {
     max_workers => $self->maxThreads, use_slurpio => 1, #Disable on shared storage: parallel_io => 1,

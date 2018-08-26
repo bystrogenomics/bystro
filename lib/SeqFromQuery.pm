@@ -171,8 +171,10 @@ sub annotate {
 
   };
 
+  my $messageFreq = (2e4 / 4) * $self->maxThreads;
+
   my $hasSort = exists $self->inputQueryBody->{sort};
-  my $progressFunc = $self->_makeLogProgress($hasSort, $outFh, $statsFh, 3e4);
+  my $progressFunc = $self->_makeLogProgress($hasSort, $outFh, $statsFh, $messageFreq);
 
   my @filterFunctions;
   if($self->pipeline) {

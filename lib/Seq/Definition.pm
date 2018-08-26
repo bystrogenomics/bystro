@@ -149,6 +149,8 @@ has _statisticsRunner => (is => 'ro', init_arg => undef, lazy => 1, default => s
   return undef;
 });
 
+# TODO: This assumes that if workingDir != outDir, the working dir is only for annotation files
+# TODO: Properly set write permissions
 sub _moveFilesToOutputDir {
   my $self = shift;
 
@@ -190,7 +192,7 @@ sub _moveFilesToOutputDir {
 
   my $workDir = $self->_workingDir->stringify();
 
-  $err = $self->safeSystem("mv $workDir/* $outDir; sync");
+  $err = $self->safeSystem("mv $workDir/* $outDir && chmod 777 $outDir/*; sync");
 
   return $err;
 }
