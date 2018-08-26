@@ -55,7 +55,7 @@ sub getFieldDbName {
   if(! exists $_[0]->fieldNamesMap->{$_[0]->name}{ $_[1] } ) {
     $_[0]->addMetaField( $_[1] );
   }
-  
+
   if(!defined $_[0]->fieldNamesMap->{$_[0]->name}->{$_[1]} ) {
     $_[0]->log('warn', "getFieldDbName failed to find or make a dbName for $_[1]");
     return;

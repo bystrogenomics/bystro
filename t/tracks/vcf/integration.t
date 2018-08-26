@@ -332,7 +332,7 @@ ok($out->[$afFemaleIdx][0] == 0, "correctly finds first the +ACA allele af_femal
 # chr22 15927755  . T G 296.53  NON_PASS
 $out = [];
 $href = $db->dbReadOne('chr22', 15927755 - 1);
-$vcf->get($href, 'chr22', 'T', 'G', 0, 0, $out);
+$vcf->get($href, 'chr22', 'T', 'G', 0, $out);
 
 ok(@$out == 0, 'NON PASS/. variants are skipped');
 

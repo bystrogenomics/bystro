@@ -307,27 +307,21 @@ sub transformField {
 
         return $_[0] . $rightHand;
       }
-    }
-
-    if($leftHand eq '-') {
+    } elsif($leftHand eq '-') {
       $codeRef = sub {
         # my $fieldValue = shift;
         # same as $_[0];
 
         return $_[0] - $rightHand;
       }
-    }
-
-    if($leftHand eq '+') {
+    } elsif($leftHand eq '+') {
       $codeRef = sub {
         # my $fieldValue = shift;
         # same as $_[0];
 
         return $_[0] + $rightHand;
       }
-    }
-
-    if($leftHand eq 'split') {
+    } elsif($leftHand eq 'split') {
       $codeRef = sub {
         # my $fieldValue = shift;
         # same as $_[0];
@@ -445,12 +439,18 @@ sub _stripAndCoerceUndef {
  # TODO: This will be configurable, per-track
   state $cl = {
     'no assertion provided' => 1,
+    'no_assertion_provided' => 1,
     'no assertion criteria provided' => 1,
+    'no_assertion_criteria_provided' => 1,
     'no interpretation for the single variant' => 1,
     'no assertion for the individual variant' => 1,
+    'no_assertion_for_the_individual_variant' => 1,
     'not provided' => 1,
+    'not_provided' => 1,
     'not specified' => 1,
+    'not_specified' => 1,
     'see cases' => 1,
+    'see_cases' => 1,
     'unknown' => 1
   };
 

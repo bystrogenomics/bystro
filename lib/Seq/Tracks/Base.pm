@@ -97,7 +97,7 @@ has features => (
   lazy => 1,
   traits   => ['Array'],
   default  => sub{ [] },
-  handles  => { 
+  handles  => {
     noFeatures  => 'is_empty',
   },
 );

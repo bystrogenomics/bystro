@@ -130,7 +130,7 @@ my $out = [];
 # Vcf tracks are going to be treated differently from transcripts and sparse tracks
 # They should return nothing for the nth position in a deletion
 # Or if the allele doesn't match exactly.
-$vcf->get($href, 'chr22', 'C', 'G', 0, 0, $out);
+$vcf->get($href, 'chr22', 'C', 'G', 0, $out);
 
 ok(@{$out} == 0, "Non PASS AS_FilterStatus causes alleles to be skipped in multiallelic (testing build_row_filters on INFO values)");
 
@@ -333,7 +333,7 @@ ok($out->[$afFemaleIdx][0] == 0, "correctly finds first the +ACA allele af_femal
 # chr22 15927755  . T G 296.53  NON_PASS
 $out = [];
 $href = $db->dbReadOne('chr22', 15927755 - 1);
-$vcf->get($href, 'chr22', 'T', 'G', 0, 0, $out);
+$vcf->get($href, 'chr22', 'T', 'G', 0, $out);
 
 ok(@$out == 0, 'NON PASS/. variants are skipped');
 

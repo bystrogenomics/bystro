@@ -1,0 +1,80 @@
+assembly: hg38
+build_author: ec2-user
+build_date: 2017-08-08T03:49:00
+fileProcessors:
+  snp:
+    args: --emptyField ! --minGq .95
+    program: bystro-snp
+  vcf:
+    args: --emptyField !
+    program: bystro-vcf
+chromosomes:
+  - chr1
+database_dir: t/tracks/vcf/index/
+files_dir: t/tracks/vcf/raw/
+temp_dir: "~"
+tracks:
+  tracks:
+    - name: ref
+      type: reference
+    - features:
+        - alt
+        - variation_id: number
+        - allele_id: number
+        - strand
+        - rcv
+        - scv
+        - hgvs_c
+        - hgvs_p
+        - traits
+        - molecular_consequence
+        - clinical_significance
+        - pathogenic: number
+        - likely_pathogenic: number
+        - uncertain_significance: number
+        - likely_benign: number
+        - benign: number
+        - review_status
+        - last_evaluated
+        - submitters
+        - pmids
+        - origin
+        - xrefs
+        - last_evaluated
+      build_field_transformations:
+        molecular_consequence: split [|]
+        clinical_significance: split [|/]
+        review_status: split [|]
+        submitters: split [|]
+        xrefs: split [|]
+        traits: split [|]
+        pmids: split [|]
+        rcv: split [|]
+        scv: split [|]
+      fieldMap:
+        VARIATION_ID: variation_id
+        ALLELE_ID: allele_id
+        RCV: rcv
+        SCV: scv
+        STRAND: strand
+        HGVS_C: hgvs_c
+        HGVS_P: hgvs_p
+        ALL_TRAITS: traits
+        MOLECULAR_CONSEQUENCE: molecular_consequence
+        CLINICAL_SIGNIFICANCE: clinical_significance
+        PATHOGENIC: pathogenic
+        LIKELY_PATHOGENIC: likely_pathogenic
+        UNCERTAIN_SIGNIFICANCE: uncertain_significance
+        LIKELY_BENIGN: likely_benign
+        BENIGN: benign
+        REVIEW_STATUS: review_status
+        LAST_EVALUATED: last_evaluated
+        ALL_SUBMITTERS: submitters
+        ALL_PMIDS: pmids
+        ORIGIN: origin
+        XREFS: xrefs
+        LAST_EVALUATED: last_evaluated
+      local_files:
+        - clinvar_alleles.single.b38.vcf.1lines.gz
+      name: clinvar.match
+      type: vcf

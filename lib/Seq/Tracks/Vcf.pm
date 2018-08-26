@@ -19,7 +19,7 @@ sub BUILD {
   $self->{_altIdx} = $self->getFieldDbName('alt');
 
   if(!defined $self->{_altIdx}) {
-    die "Couldn't find 'alt' feature, required for Vcf tracks";
+    $self->log('fatal', $self->name . ": couldn't find 'alt' feature, required for vcf tracks");
   }
 
   # Skip accesor penalty, the get function in this package may be called
@@ -73,7 +73,6 @@ sub get {
     return $_[6];
   }
 
- 
   # If $alt is a reference (expect array: if not, this is a programmatic error 
   # which we allow to crash the program)
   # then find the matching alt if any, record its index in the database array,

@@ -58,10 +58,6 @@ state $vcfFeatures = {
   heterozygotes => 6, homozygotes => 8, missingGenos => 10, id => 15
 };
 
-# We can use before BUILD to make any needed modifications to $self->features
-# before those features' indices are stored in the db in Seq::Base
-before 'BUILD' => sub {};
-
 sub BUILD {
   my $self = shift;
 
@@ -72,8 +68,13 @@ sub BUILD {
   }
 
   my %featuresMap;
+
   for(my $i = 0; $i < @{$features}; $i++) {
     $featuresMap{lc($features->[$i])} = $i;
+  }
+
+  if(!defined $featuresMap{alt}) {
+    $self->log('fatal', $self->name . ": 'alt' feature not specified, required for vcf tracks");
   }
 
   my %fieldMap = map{ lc($_) => $self->fieldMap->{$_} } keys %{$self->fieldMap};
@@ -495,6 +496,12 @@ sub _extractFeatures {
   # 2) index in intermediate annotation
   # 3) index in database
   for my $arr (@{$self->{_headerFeatures}}) {
+    # $arr->[0] is the fieldName
+    # $arr->[1] is the field idx
+    if($self->hasTransform($arr->[0]) ) {
+      $fieldsAref->[$arr->[1]] = $self->transformField($arr->[0], $fieldsAref->[$arr->[1]]);
+    }
+
     $returnData[$arr->[2]] = $self->coerceFeatureType($arr->[0], $fieldsAref->[$arr->[1]]);
   }
 
@@ -509,7 +516,7 @@ sub _extractFeatures {
     $name = substr($info, 0, index($info, '='));
 
     $entry = $vcfNameMap->{$name} || $vcfFilterMap->{$name};
-    
+
     # p $entry;
     if(!$entry) {
       next;
@@ -537,6 +544,12 @@ sub _extractFeatures {
       }
 
       next;
+    }
+
+    # All field to be split if the user requests that in the YAML config
+    # $entry->[0] is the fieldName
+    if($self->hasTransform($entry->[0]) ) {
+      $val = $self->transformField($entry->[0], $val);
     }
 
     # TODO: support non-scalar values
