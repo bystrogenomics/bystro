@@ -71,12 +71,31 @@ has normalizedWantedChr => (is => 'ro', isa => 'HashRef', init_arg => undef, laz
   # and if MT or M is provided, the other of MT or M
   my %chromosomes = map { $_ => $_ } keys %{$self->chromosomes};
 
+  # Add if not already present
+  if($chromosomes{'MT'}) {
+    $chromosomes{'chrM'} //= 'MT';
+    $chromosomes{'chrMT'} //= 'MT';
+    $chromosomes{'M'} //= 'MT';
+  } elsif($chromosomes{'chrMT'}) {
+    $chromosomes{'chrM'} //= 'chrMT';
+    $chromosomes{'MT'} //= 'chrMT';
+    $chromosomes{'M'} //= 'chrMT';
+  } elsif($chromosomes{'chrM'}) {
+    $chromosomes{'MT'} //= 'chrM';
+    $chromosomes{'chrMT'} //= 'chrM';
+    $chromosomes{'M'} //= 'chrM';
+  } elsif($chromosomes{'M'}) {
+    $chromosomes{'MT'} //= 'M';
+    $chromosomes{'chrMT'} //= 'M';
+    $chromosomes{'chrM'} //= 'M';
+  }
+
   # If provide 'chr' prefixes, map the same chromosomes without those prefixes
   # to the 'chr'-prefix name
   # And vice versa
   for my $chr (keys %chromosomes) {
     if(substr($chr, 0, 3) eq 'chr') {
-      # Modify if not already present, in case user for some reason wants to
+      # Add if not already present, in case user for some reason wants to
       # have chr1 and 1 point to distinct databases.
       my $part = substr($chr, 3);
 
@@ -85,14 +104,6 @@ has normalizedWantedChr => (is => 'ro', isa => 'HashRef', init_arg => undef, laz
       # Modify only if not already present
       $chromosomes{"chr$chr"} //= $chr;
     }
-  }
-
-  if($chromosomes{'chrMT'}) {
-    $chromosomes{'chrM'} //= 'chrMT';
-    $chromosomes{'M'} //= 'chrMT';
-  } elsif($chromosomes{'chrM'}) {
-    $chromosomes{'chrMT'} //= 'chrM';
-    $chromosomes{'MT'} //= 'chrM';
   }
 
   return \%chromosomes;
