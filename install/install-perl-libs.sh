@@ -25,7 +25,8 @@ cpanm install PerlIO::utf8_strict
 cpanm install PerlIO::gzip
 cpanm install MouseX::SimpleConfig
 cpanm install MouseX::ConfigFromFile
-cpanm install MouseX::Getopt
+# May fail installation on 5.28.0 due to minor output formatting issues
+cpanm install MouseX::Getopt --force
 cpanm install Archive::Extract
 cpanm install DBI
 cpanm install String::Strip
