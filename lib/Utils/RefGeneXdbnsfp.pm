@@ -83,7 +83,7 @@ sub go {
 
   my $delims = Seq::Output::Delimiters->new();
   my $posDelim = $delims->positionDelimiter;
-  my $altDelim = $delims->alleleDelimiter;
+  my $ovrDelim = $delims->overlapDelimiter;
   my $valDelim = $delims->valueDelimiter;
 
   # namespace
@@ -123,11 +123,11 @@ sub go {
     # it would require negative lookbehind to correctly split them
     # While that isn't difficult in perl, it wastes performance
     # Replace such values with commas
-    my @innerStuff = $_ =~ m/(?<=[\(\[\{])([^\(\[\{\)\]\}]*[$posDelim$valDelim$altDelim]+[^\(\[\{\)\]\}]+)+(?=[\]\}\)])/g;
+    my @innerStuff = $_ =~ m/(?<=[\(\[\{])([^\(\[\{\)\]\}]*[$posDelim$valDelim$ovrDelim\/]+[^\(\[\{\)\]\}]+)+(?=[\]\}\)])/g;
 
     for my $match (@innerStuff) {
       my $cp = $match;
-      $cp =~ s/[$posDelim$valDelim$altDelim]/,/g;
+      $cp =~ s/[$posDelim$valDelim$ovrDelim\/]/,/g;
       substr($_, index($_, $match), length($match)) = $cp;
     }
 
@@ -157,7 +157,7 @@ sub go {
         # shouldn't be necessary, just in case
         $f =~ s/\s*[^\w\[\]\{\}\(\)]+\s*$//;
 
-        $f =~ s/[$posDelim$valDelim$altDelim]+/,/g;
+        $f =~ s/[$posDelim$valDelim$ovrDelim\/]+/,/g;
 
         if(defined $f && $f ne '') {
           push @out, $f;
