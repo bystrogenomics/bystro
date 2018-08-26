@@ -282,7 +282,7 @@ sub passesFilter {
 
 ######################### Field Transformations ###########################
 #TODO: taint check the modifying value
-state $transformOperators = ['.', 'split', '-', '+'];
+state $transformOperators = ['.', 'split', '-', '+', 'replace'];
 sub transformField {
   state $cachedTransform;
 
@@ -295,7 +295,12 @@ sub transformField {
 
   my $command = $self->build_field_transformations->{$featureName};
 
-  my ($leftHand, $rightHand) = split(' ', $command);
+  my $leftHand = substr($command, 0, index($command, ' '));
+  my $rightHand = substr($command, index($command, ' ') + 1);
+
+  # modifies in place
+  StripLTSpace($leftHand);
+  StripLTSpace($rightHand);
 
   my $codeRef;
 
@@ -347,6 +352,23 @@ sub transformField {
         }
 
         return @out == 1 ? $out[0] : \@out;
+      }
+    } elsif($leftHand eq 'replace') {
+      if(substr($rightHand,0,1) ne '/' || substr($rightHand, -1, 1) ne '/') {
+        $self->log('fatal', $self->name. ": build_field_transformation 'replace' expects /from/to/, found $rightHand");
+      }
+
+      my @parts = split '/', $rightHand;
+
+      my $from = $parts[1];
+      my $to = $parts[2];
+
+      $codeRef = sub {
+        # my $fieldValue = shift;
+        #    $_[0]
+        $_[0] =~ s/$from/$to/gs;
+
+        return $_[0];
       }
     }
   } elsif($self->_isTransformOperator($rightHand) ) {
