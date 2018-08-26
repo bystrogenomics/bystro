@@ -160,7 +160,7 @@ sub buildTrack {
         # Avoids having to use a field transformation, since this may be very common
         # and Bystro typical use is with UCSC-style chromosomes
         # If the chromosome isn't wanted, $chr will be undefined
-        $chr = $self->normalizedWantedChr( $fields[ $reqIdxHref->{$self->chromField} ] );
+        $chr = $self->normalizedWantedChr->{ $fields[ $reqIdxHref->{$self->chromField} ] };
 
         #If the chromosome is new, write any data we have & see if we want new one
         if(!defined $wantedChr || (!defined $chr || $wantedChr ne $chr)) {
@@ -312,7 +312,7 @@ sub joinTrack {
 
       # Transforms $chr if it's not prepended with a 'chr' or is 'chrMT' or 'MT'
       # and checks against our list of wanted chromosomes
-      $chr = $self->normalizedWantedChr( $fields[ $reqIdxHref->{$self->chromField} ] );
+      $chr = $self->normalizedWantedChr->{ $fields[ $reqIdxHref->{$self->chromField} ] };
 
       if(!defined $chr || $chr ne $wantedChr) {
         # TODO: Rethink chrPerFile handling

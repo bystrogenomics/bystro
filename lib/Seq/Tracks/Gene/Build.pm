@@ -346,9 +346,12 @@ sub _readTxData {
 
     $seenChrsInFile{$chr} //= 1;
 
-    # We may want to support chrPerFile; adds complexity, but easier processing
-    # for some cases
-    if(!defined $wantedChr || $wantedChr ne $chr) {
+    # Normalize the representation, such that having or missing 'chr'
+    # or using MT instead of M won't matter
+    $chr = $self->normalizedWantedChr->{ $chr };
+
+    # chr may be undefined
+    if(!defined $wantedChr || (!defined $chr || $wantedChr ne $chr)) {
       $wantedChr = $self->chrWantedAndIncomplete($chr);
     }
 

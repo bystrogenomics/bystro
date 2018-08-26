@@ -93,8 +93,12 @@ sub buildTrack {
             die $self->name . ": Require chr in fasta file headers";
           }
 
-          # Our first header, or we found a new chromosome
-          if(!defined $wantedChr || $wantedChr ne $chr) {
+          # Transforms $chr if it's not prepended with a 'chr' or is 'chrMT' or 'MT'
+          # and checks against our list of wanted chromosomes
+          $chr = $self->normalizedWantedChr->{ $chr };
+
+          # falsy value is ''
+          if(!defined $wantedChr || (!defined $chr || $wantedChr ne $chr)) {
             # We switched chromosomes
             if(defined $wantedChr) {
               # cleans up entire environment, commits/closes all cursors, syncs

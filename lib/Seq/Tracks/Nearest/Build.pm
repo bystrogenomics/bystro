@@ -280,9 +280,12 @@ sub buildTrack {
         chomp;
         my @fields = split('\t', $_);
 
-        my $chr = $fields[$allIdx{$self->chromField}];
+        # Normalize the representation, such that having or missing 'chr'
+        # or using MT instead of M won't matter
+        my $chr = $self->normalizedWantedChr->{ $fields[$allIdx{$self->chromField}] };
 
-        if(!defined $wantedChr || $wantedChr ne $chr) {
+        # falsy value is ''
+        if(!defined $wantedChr || (!defined $chr || $wantedChr ne $chr)) {
           $wantedChr = $self->chrWantedAndIncomplete($chr);
         }
 

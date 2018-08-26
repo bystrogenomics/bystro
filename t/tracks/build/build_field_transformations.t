@@ -28,12 +28,16 @@ my $seq = Seq::Tracks::Build->new({
     features => [
         'someFeature',
         'someOther',
-        'someToSplit'
+        'someToSplit',
+        'someToJoinLeft',
+        'someToJoinRight'
     ],
     build_field_transformations => {
         someFeature => "replace /[.]+/,/",
         someOther => "replace /[.]+/ /",
-        someToSplit => "split [,]+"
+        someToSplit => "split [,]+",
+        someToJoinRight => ". _with_hello_world",
+        someToJoinLeft => "chr ."
     },
     local_files => ['fake'],
     files_dir => './t/tracks/build/db/raw',
@@ -65,6 +69,19 @@ ok(
     && $res->[2] eq $exp[2],
     "can split on simple characters, with 1+ matches"
 );
+
+
+$str = 'some_long_string';
+$expected = 'some_long_string_with_hello_world';
+$res = $seq->transformField('someToJoinRight', $str);
+
+ok($res eq $expected, "can join to right end");
+
+$str = '1';
+$expected = 'chr1';
+$res = $seq->transformField('someToJoinLeft', $str);
+
+ok($res eq $expected, "can join to left end");
 
 
 done_testing();

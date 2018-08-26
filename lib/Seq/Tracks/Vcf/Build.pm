@@ -263,10 +263,12 @@ sub buildTrack {
         # This is the annotation input first 7 lines, plus id, info
         @fields = split '\t', $line;
 
-        $chr = $fields[$chrIdx];
+        # Transforms $chr if it's not prepended with a 'chr' or is 'chrMT' or 'MT'
+        # and checks against our list of wanted chromosomes
+        $chr = $self->normalizedWantedChr->{ $fields[$chrIdx] };
 
         # falsy value is ''
-        if(!defined $wantedChr || $wantedChr ne $chr) {
+        if(!defined $wantedChr || (!defined $chr || $wantedChr ne $chr)) {
           # We have a new chromosome
           if(defined $wantedChr) {
             #Commit any remaining transactions, remove the db map from memory

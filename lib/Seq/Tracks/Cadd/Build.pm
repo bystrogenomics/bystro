@@ -194,15 +194,16 @@ sub buildTrack {
         # Else it "should" be found in the beginning of the string
         # If not, it will be caught in our if( $self->chrIsWanted($chr) ) check
         # http://ideone.com/Y5PiUa
-        # TODO: use our normalizeChr function to deal with MT if source file
-        # not configured to report M, and chromosomes contains M not MT?
-        if(index($fields[0], 'chr') == -1) {
-          $chr = "chr$fields[0]";
-        } else {
-          $chr = $fields[0];
-        }
 
-        if(!defined $wantedChr || $wantedChr ne $chr) {
+        # Normalizes the $chr representation to one we may want but did not specify
+        # Example: 1 becomes chr1, and is checked against our list of wanted chromosomes
+        # Avoids having to use a field transformation, since this may be very common
+        # and Bystro typical use is with UCSC-style chromosomes
+        # If the chromosome isn't wanted, $chr will be undefined
+        $chr = $self->normalizedWantedChr->{ $fields[0] };
+
+        #If the chromosome is new, write any data we have & see if we want new one
+        if(!defined $wantedChr || (!defined $chr || $wantedChr ne $chr)) {
           # We switched chromosomes
           if(defined $wantedChr) {
             #Clean up the database, commit & close any cursors, free memory;
@@ -211,12 +212,12 @@ sub buildTrack {
 
             #Reset our transaction counter
             $count = 0;
-          }
 
-          if(defined $wantedChr && (@caddData || defined $caddRef)) {
-            my $err = $self->name . ": changed chromosomes, but unwritten data remained";
+            if(@caddData || defined $caddRef) {
+              my $err = $self->name . ": changed chromosomes, but unwritten data remained";
 
-            $self->log('fatal', $err);
+              $self->log('fatal', $err);
+            }
           }
 
           # Completion meta checks to see whether this track is already recorded

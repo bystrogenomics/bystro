@@ -58,23 +58,45 @@ has chromosomes => (
   required => 1,
 );
 
-#http://ideone.com/zfZBO2
-# Get the wanted chromosome, or a common transformation if not wanted
-# Since Bystro by default expects to use UCSC's naming convention, this may be useful
-# Chr may not be flagged as wanted, but actually be wanted for several reasons
-# 1) not prepended with 'chr'
-# 2) uses NCBI MT instead of chrM
-sub normalizedWantedChr {
-  #my ($self, $chr) = @_;
-  #    $_[0], $_[1]
+# Memoized normalizer of chromosome names
+# Handles chromosomes with or without 'chr' prefix
+# And interconverts between MT and M, such that the requested
+# (MT or M) is returned for the other of the pair
+# Ex: for "1" we'll accept chr1 or 1, and both will map to "1"
+# Ex: for "chrM" we'll accept chrMT, MT, chrM, M, all mapping to "chrM"
+has normalizedWantedChr => (is => 'ro', isa => 'HashRef', init_arg => undef, lazy => 1, default => sub {
+  my $self = shift;
 
-  #return $self->chromosomes->{$chr} ||
-  return $_[0]->chromosomes->{$_[1]} ||
-    #($chr eq 'chrMT' ? $self->chromosomes->{'chrM'} : undef) ||
-    ($_[1] eq 'chrMT' ? $_[0]->chromosomes->{'chrM'} : undef) ||
-    #(index($chr, 'chr') == -1 ? ($chr eq 'MT' ? $self->chromosomes->{'chrM'} : $self->chromosomes->{'chr' . $chr}) : undef);
-    (index($_[1], 'chr') == -1 ? ($_[1] eq 'MT' ? $_[0]->chromosomes->{'chrM'} : $_[0]->chromosomes->{'chr' . $_[1]}) : undef);
-}
+  # Includes the track chromosomes, with and without "chr" prefixes
+  # and if MT or M is provided, the other of MT or M
+  my %chromosomes = map { $_ => $_ } keys %{$self->chromosomes};
+
+  # If provide 'chr' prefixes, map the same chromosomes without those prefixes
+  # to the 'chr'-prefix name
+  # And vice versa
+  for my $chr (keys %chromosomes) {
+    if(substr($chr, 0, 3) eq 'chr') {
+      # Modify if not already present, in case user for some reason wants to
+      # have chr1 and 1 point to distinct databases.
+      my $part = substr($chr, 3);
+
+      $chromosomes{$part} //= $chr;
+    } else {
+      # Modify only if not already present
+      $chromosomes{"chr$chr"} //= $chr;
+    }
+  }
+
+  if($chromosomes{'chrMT'}) {
+    $chromosomes{'chrM'} //= 'chrMT';
+    $chromosomes{'M'} //= 'chrMT';
+  } elsif($chromosomes{'chrM'}) {
+    $chromosomes{'chrMT'} //= 'chrM';
+    $chromosomes{'MT'} //= 'chrM';
+  }
+
+  return \%chromosomes;
+});
 
 has fieldNames => (is => 'ro', init_arg => undef, default => sub {
   my $self = shift;

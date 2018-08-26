@@ -122,7 +122,12 @@ sub buildTrack {
             die $self->name . ": variable step not currently supported";
           }
 
-          if(!defined $wantedChr || $wantedChr ne $chr) {
+          # Transforms $chr if it's not prepended with a 'chr' or is 'chrMT' or 'MT'
+          # and checks against our list of wanted chromosomes
+          $chr = $self->normalizedWantedChr->{ $chr };
+
+          # falsy value is ''
+          if(!defined $wantedChr || (!defined $chr || $wantedChr ne $chr)) {
             if(defined $wantedChr) {
               #Commit any remaining transactions, remove the db map from memory
               #this also has the effect of closing all cursors
