@@ -1,9 +1,9 @@
-# Bystro [![DOI](https://zenodo.org/badge/98203430.svg)](https://zenodo.org/badge/latestdoi/98203430)
+# Bystro [![DOI](https://zenodo.org/badge/98203430.svg)](https://zenodo.org/badge/latestdoi/98203430) [![Codacy Badge](https://api.codacy.com/project/badge/Grade/0859a24d422a4d80a2ad6721e294aa35)](https://app.codacy.com/app/akotlar/bystro?utm_source=github.com&utm_medium=referral&utm_content=akotlar/bystro&utm_campaign=badger)
 
 ## Bystro Publication
 For datasets and scripts used, please visit [github.com/bystro-paper](https://github.com/akotlar/bystro-paper)
 
-If using Bystro, please cite [https://doi.org/10.1101/146514](https://doi.org/10.1101/146514)
+If using Bystro, please cite [Kotlar et al, Genome Biology, 2018](https://doi.org/10.1186/s13059-018-1387-3)
 
 ## Using Bystro
 For most users, we recommend https://bystro.io .
@@ -51,7 +51,7 @@ Please read [FIELDS.md](FIELDS.md)
     ```
     
     Only chr1, chr2, and chr3 will be accepted. However, Bystro tries to make your life easy
-      1. We currently follow UCSC coneventions for ```chromosomes```, meaning they should be prepended by **chr**
+      1. We currently follow UCSC conventions for ```chromosomes```, meaning they should be prepended by **chr**
       2. Bystro will automatically append **chr** to chromosomes read from an input file during annotation. 
       3. Bystro allows the transformation of any field during building, configurable in the YAML config file for that assembly, making it easy to prepend **chr** to the source file chromosome field
       

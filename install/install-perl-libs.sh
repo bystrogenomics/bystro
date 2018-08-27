@@ -1,4 +1,9 @@
-cpan install App::cpanminus
+#!/usr/bin/env bash
+
+echo -e "\n\nInstalling perl libs\n"
+
+echo "PERL ROOT IN install/install-perl-libs.sh: $PERLBREW_ROOT"
+
 cpanm install Mouse
 cpanm install Path::Tiny
 cpanm install namespace::autoclean
@@ -16,8 +21,6 @@ cpanm install Net::HTTP
 cpanm install Search::Elasticsearch
 cpanm install Math::SigFigs
 cpanm install LMDB_File
-cpanm install Sort::XS
-cpanm install Hash::Merge::Simple
 cpanm install PerlIO::utf8_strict
 cpanm install PerlIO::gzip
 cpanm install MouseX::SimpleConfig
@@ -30,14 +33,24 @@ cpanm install DBD::mysql
 cpanm install IO/FDPass.pm
 cpanm install Beanstalk::Client
 
+cpanm install Math::Round
+cpanm install Sys::CpuAffinity
+
+# Needed for bin/annotate.pl
+cpanm install Hash::Merge::Simple
+cpanm install Sort::XS
 # Custom branch of msgpack-perl that uses latest msgpack-c and
 # allows prefer_float32 flag for 5-byte float storage
 cpanm install Module::Install::XSUtil
 cpanm install Module::Install::AuthorTests
+
+# A dependency of Data::MessagePack installation
+cpanm install File::Copy::Recursive
+
 cpanm --uninstall -f Data::MessagePack
 rm -rf msgpack-perl
 git clone --recursive https://github.com/akotlar/msgpack-perl.git && cd msgpack-perl
 perl Makefile.PL
-make --quiet test
-make --quiet install
+make test
+make install
 cd ../ && rm -rf msgpack-perl

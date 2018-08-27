@@ -9,6 +9,7 @@ use DDP;
 use Types::Path::Tiny qw/AbsPath AbsFile AbsDir/;
 use List::MoreUtils qw/first_index/;
 use Mouse::Util::TypeConstraints;
+use Sys::CpuAffinity;
 
 use Seq::Tracks;
 use Seq::Statistics;
@@ -47,8 +48,9 @@ has statistics => (is => 'ro', isa => 'HashRef');
 # Users may not need statistics
 has run_statistics => (is => 'ro', isa => 'Bool', default => sub {!!$_[0]->statistics});
 
-has max_threads => (is => 'ro', isa => 'Int', lazy => 1, default => 8);
-
+has max_threads => (is => 'ro', isa => 'Int', lazy => 1, default => sub {
+  return Sys::CpuAffinity::getNumCpus();
+});
 # has badSamplesField => (is => 'ro', default => 'badSamples', lazy => 1);
 
 ################ Public Exports ##################

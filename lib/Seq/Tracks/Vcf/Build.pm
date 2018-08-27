@@ -248,7 +248,7 @@ sub buildTrack {
       my $header = <$fh>;
 
       FH_LOOP: while ( my $line = $fh->getline() ) {
-        chomp;
+        chomp $line;
         # This is the annotation input first 7 lines, plus id, info
         @fields = split '\t', $line;
 
