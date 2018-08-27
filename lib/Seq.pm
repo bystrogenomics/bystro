@@ -185,6 +185,10 @@ sub annotateFile {
   # Each thread will get its own %cursors object
   my %cursors = ();
 
+  # TODO: don't annotate MT (GRCh37) if MT not explicitly specified
+  # to avoid issues between GRCh37 and hg19 chrM vs MT
+  # my %normalizedNames = %{$self->normalizedWantedChrs};
+
   mce_loop_f {
     #my ($mce, $slurp_ref, $chunk_id) = @_;
     #    $_[0], $_[1],     $_[2]
@@ -448,6 +452,13 @@ sub _openAnnotationPipe {
   my $args = $fp->{program} . " " . $fp->{args};
 
   my $fh;
+
+  for my $type (keys %{$self->outputFilesInfo}) {
+    if(index($args, "\%$type") > -1) {
+      substr($args, index($args, "\%$type"), length("\%$type"))
+        = $self->_workingDir->child($self->outputFilesInfo->{$type});
+    }
+  }
 
   # TODO:  add support for GQ filtering in vcf
   my $err = $self->safeOpen($fh, '-|', "$echoProg $inPath | $args 2> $errPath");

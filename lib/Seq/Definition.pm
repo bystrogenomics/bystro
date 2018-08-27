@@ -79,6 +79,7 @@ has outputFilesInfo => (is => 'ro', isa => 'HashRef', init_arg => undef, lazy =>
   my $outBaseName = $self->outBaseName;
 
   $out{annotation} = $outBaseName . '.annotation.tsv' . ($self->compress ? ".gz" : "");
+  $out{sampleList} = $outBaseName . '.sample_list';
 
   # Must be lazy in order to allow "revealing module pattern", with __statisticsRunner below
   if($self->run_statistics) {
