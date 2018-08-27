@@ -474,6 +474,7 @@ mappings:
               type: integer
             chromEnd:
               type: integer
+
     nearest:
       properties:
         refSeq:
@@ -588,6 +589,66 @@ mappings:
         alternateAllele:
           type: keyword
           normalizer: uppercase_normalizer
+        match:
+          properties:
+            alt:
+              type: keyword
+            variation_id:
+              type: keyword
+            allele_id:
+              type: keyword
+            strand:
+              type: keyword
+            rcv:
+              type: keyword
+            scv:
+              type: keyword
+            hgvs_c:
+              type: keyword
+            hgvs_p:
+              type: keyword
+            traits:
+              type: text
+              analyzer: autocomplete_english_split
+              search_analyzer: search_english_split
+            molecular_consequence:
+              type: text
+              analyzer: autocomplete_english_split
+              search_analyzer: search_english_split
+            clinical_significance:
+              type: text
+              analyzer: autocomplete_english_split
+              search_analyzer: search_english_split
+            pathogenic:
+              type: short
+            likely_pathogenic:
+              type: short
+            uncertain_significance:
+              type: short
+            likely_benign:
+              type: short
+            benign:
+              type: short
+            review_status:
+              type: text
+              analyzer: autocomplete_english_split
+              search_analyzer: search_english_split
+            last_evaluated:
+              type: keyword #TODO: make date
+            submitters:
+              type: text
+              analyzer: autocomplete_english_split
+              search_analyzer: search_english_split
+            pmids:
+              type: keyword
+            origin:
+              type: text
+              analyzer: autocomplete_english_split
+              search_analyzer: search_english_split
+            xrefs:
+              type: text
+              analyzer: autocomplete_english_split
+              search_analyzer: search_english_split
     gnomad:
       properties:
         genomes:

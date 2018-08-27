@@ -157,8 +157,10 @@ sub annotateFile {
   ######################## Build the fork pool #################################
   my $abortErr;
 
+  my $messageFreq = (2e4 / 4) * $self->maxThreads;
+
   # Report every 1e4 lines, to avoid thrashing receiver
-  my $progressFunc = $self->makeLogProgressAndPrint(\$abortErr, $outFh, $statsFh, 2e4);
+  my $progressFunc = $self->makeLogProgressAndPrint(\$abortErr, $outFh, $statsFh, $messageFreq);
   MCE::Loop::init {
     max_workers => $self->maxThreads || 8, use_slurpio => 1,
     # bystro-vcf outputs a very small row; fully annotated through the alt column (-ref -discordant)
