@@ -173,10 +173,10 @@ sub go {
   # We need to flush at the end of each chunk read; so chunk size directly
   # controls bulk request size, as long as bulk request doesnt hit
   # max_count and max_size thresholds
-  my $chunkSize = $self->getChunkSize($filePath, $self->maxThreads, 5_000, 10_000);
+  my $chunkSize = $self->getChunkSize($filePath, $self->maxThreads, 3_000, 10_000);
 
   # Report every 10k lines; to avoid oversaturating receiver
-  my $messageFreq = (2e4 / 4) * $self->maxThreads;
+  my $messageFreq = (1e4 / 4) * $self->maxThreads;
 
   my $progressFunc = $self->makeLogProgress($messageFreq);
 
@@ -186,13 +186,13 @@ sub go {
     gather => $progressFunc,
   };
 
+  my $mutex = MCE::Mutex->new;
   tie my $abortErr, 'MCE::Shared', '';
 
   # TODO: can use connection pool sniffing as well, not doing so atm
   # because not sure if connection sniffing issue exists here as in
   # elasticjs library
-  my $es = $self->_makeEsConnection();
-  my $bulk = $self->_makeBulkHelper($es, \$abortErr);
+  my $esO = $self->_makeIndex();
 
   mce_loop_f {
     my ($mce, $slurp_ref, $chunk_id) = @_;
@@ -202,17 +202,18 @@ sub go {
       $mce->abort();
     }
 
+    my $es = Search::Elasticsearch->new($self->connection);
+    my $bulk = $self->_makeBulkHelper($es, \$abortErr, $mutex);
+
     open my $MEM_FH, '<', $slurp_ref; binmode $MEM_FH, ':raw';
 
     my $idxCount = 0;
     my $rowDocHref;
     while ( my $line = $MEM_FH->getline() ) {
-      $rowDocHref = $self->_processLine($line, $pathAref);
+      # $rowDocHref = $self->_processLine($line, $pathAref);
 
       $bulk->index({
-        index => $self->indexName,
-        type => $self->indexType,
-        source => $rowDocHref
+        source => $self->_processLine($line, $pathAref)
       });
 
       $idxCount++;
@@ -241,12 +242,12 @@ sub go {
   # modify this with something unexpected
 
   # Re-enable replicas
-  $es->indices->put_settings(
+  $esO->indices->put_settings(
     index => $self->indexName,
     body => $self->indexConfig->{post_index_settings},
   );
 
-  $es->indices->refresh(
+  $esO->indices->refresh(
     index => $self->indexName,
   );
 
@@ -256,9 +257,7 @@ sub go {
 }
 
 sub _makeBulkHelper {
-  my ($self, $es, $abortErrRef) = @_;
-
-  my $m1 = MCE::Mutex->new;
+  my ($self, $es, $abortErrRef, $mutex) = @_;
 
   my $bulk = $es->bulk_helper(
     index       => $self->indexName,
@@ -269,7 +268,7 @@ sub _makeBulkHelper {
       my ($action, $response, $i) = @_;
       $self->log('warn', "Index error: $action ; $response ; $i");
       p @_;
-      $m1->synchronize(sub{ $$abortErrRef = $response} );
+      $mutex->synchronize(sub{ $$abortErrRef = $response} );
     },           # optional
     on_conflict => sub {
       my ($action,$response,$i,$version) = @_;
@@ -280,7 +279,7 @@ sub _makeBulkHelper {
   return $bulk
 }
 
-sub _makeEsConnection {
+sub _makeIndex {
   my $self = shift;
 
   my $es = Search::Elasticsearch->new($self->connection);

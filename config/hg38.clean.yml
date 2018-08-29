@@ -332,7 +332,6 @@ tracks:
         - cnv.score: number
         - cnv.flag
         - pmid: number
-        - rvis_exac: number
       fieldMap:
         dbnsfp.Disease_description: uniprot.disease
         dbnsfp.ExAC_cnv.score: cnv.score

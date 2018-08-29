@@ -308,7 +308,9 @@ sub coerceInputs {
   my $optionalForType = $optionalForType{$type};
 
   for my $key (keys %$optionalForType) {
-    $jobSpecificArgs{$key} = $jobDetailsHref->{$optionalForType->{$key}};
+    if(defined $jobDetailsHref->{$optionalForType->{$key}}) {
+      $jobSpecificArgs{$key} = $jobDetailsHref->{$optionalForType->{$key}};
+    }
   }
 
   my $configFilePath = getConfigFilePath($jobSpecificArgs{assembly});
