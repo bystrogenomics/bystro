@@ -78,6 +78,11 @@ my %requiredByType = (
   },
   'annotation' => {
     input_file => 'inputFilePath',
+  },
+  'export' => {
+    to => 'to',
+    sampleList => 'sampleList',
+    assembly => 'assembly',
   }
 );
 
@@ -196,6 +201,8 @@ while(my $job = $beanstalk->reserve) {
       p $inputHref;
 
       $annotate_instance = SeqFromQuery->new_with_config($inputHref);
+    } elsif($type eq 'export') {
+      $annotate_instance = Export->new_with_config($inputHref);
     }
 
     ($err, $outputFileNamesHashRef) = $annotate_instance->annotate();

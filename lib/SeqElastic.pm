@@ -28,8 +28,7 @@ use Scalar::Util qw/looks_like_number/;
 use Sys::CpuAffinity;
 
 # An archive, containing an "annotation" file
-has annotatedFilePath => (is => 'ro', isa => AbsFile, coerce => 1,
-  writer => '_setAnnotatedFilePath');
+has annotatedFilePath => (is => 'ro', isa => AbsFile, coerce => 1);
 
 has indexConfig => (is => 'ro', isa=> 'HashRef', coerce => 1, required => 1);
 

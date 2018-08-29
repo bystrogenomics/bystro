@@ -69,8 +69,6 @@ sub getReadFh {
     $errCode = 'error';
   }
 
-  my ($err, $fh);
-
   if(ref $file ne 'Path::Tiny' ) {
     $file = path($file)->absolute;
   }
@@ -78,44 +76,28 @@ sub getReadFh {
   my $filePath = $file->stringify;
 
   if (!$file->is_file) {
-    $self->log($errCode, "$filePath does not exist for reading");
+    my $err = "$filePath does not exist for reading";
+    $self->log($errCode, $err);
 
     return ($err, undef, undef);
   }
 
-  my $compressed = 0;
-
   if($innerFile) {
-    $compressed = $innerFile =~ /[.]gz$/ || $innerFile =~ /[.]bgz$/ || $innerFile =~ /[.]zip$/;
+    my ($err, $compressed, $command) = $self->getInnerFileCommand($filePath, $innerFile);
 
-    my $innerCommand = $compressed ? "\"$innerFile\" | $gzip $dcmpArgs -" : "\"$innerFile\"";
-    # We do this because we have not built in error handling from opening streams
-
-    my $command;
-    my $outerCompressed;
-    if($filePath =~ /[.]tar[.]gz$/) {
-      $outerCompressed = 1;
-      $command = "$tarCompressed -O -xf \"$filePath\" $innerCommand";
-    } elsif($filePath =~ /[.]tar$/) {
-      $command = "$tar -O -xf \"$filePath\" $innerCommand";
-    } else {
-      $err = "When inner file provided, must provde a parent file.tar or file.tar.gz";
-
-      $self->log($errCode, $err);
-
+    if($err) {
       return ($err, undef, undef);
     }
 
-    $err = $self->safeOpen($fh, '-|', $command, $errCode);
+    $err = $self->safeOpen(my $fh, '-|', $command, $errCode);
 
-    # From a size standpoint a tarball and a tar file whose inner annotation is compressed are similar
-    # since the annotation dominate
-    $compressed = $compressed || $outerCompressed;
     # If an innerFile is passed, we assume that $file is a path to a tarball
 
     return ($err, $compressed, $fh);
   }
 
+  my $compressed = 0;
+  my ($err, $fh);
   if($filePath =~ /[.]gz$/ || $filePath =~ /[.]bgz$/ || $filePath =~ /[.]zip$/) {
     $compressed = 1;
     #PerlIO::gzip doesn't seem to play nicely with MCE, reads random number of lines
@@ -126,6 +108,38 @@ sub getReadFh {
   };
 
   return ($err, $compressed, $fh);
+}
+
+sub getInnerFileCommand {
+  my ($self, $filePath, $innerFile) = @_;
+
+  my $compressed = $innerFile =~ /[.]gz$/ || $innerFile =~ /[.]bgz$/ || $innerFile =~ /[.]zip$/;
+
+  my $innerCommand = $compressed ? "\"$innerFile\" | $gzip $dcmpArgs -" : "\"$innerFile\"";
+  # We do this because we have not built in error handling from opening streams
+
+  my $err;
+  my $command;
+  my $outerCompressed;
+  if($filePath =~ /[.]tar[.]gz$/) {
+    $outerCompressed = 1;
+    $command = "$tarCompressed -O -xf \"$filePath\" $innerCommand";
+  } elsif($filePath =~ /[.]tar$/) {
+    $command = "$tar -O -xf \"$filePath\" $innerCommand";
+  } else {
+    $err = "When inner file provided, must provde a parent file.tar or file.tar.gz";
+
+    $self->log($errCode, $err);
+
+    return ($err, undef, undef);
+  }
+
+  # From a size standpoint a tarball and a tar file whose inner annotation is compressed are similar
+  # since the annotation dominate
+  $compressed = $compressed || $outerCompressed;
+  # If an innerFile is passed, we assume that $file is a path to a tarball
+
+  return ($err, $compressed, $command);
 }
 
 # Is the file a single compressed file
