@@ -414,7 +414,7 @@ If you wish to drop samples, use
 
 ```bash
 tail –n +18 file_name.statistics.tsv | cut -f1  | head > ids_to_keep
-cat ids_to_keep | awk -F$"\t" '{print $1"\t"$1}' >> ids_to_keep.with_fake_fam
+cat ids_to_keep | awk -F$"\t" '{print $1"\t"$1}' > ids_to_keep.with_fake_fam
 plink --vcf you_vcf_file --no-fid --keep ids_to_keep.with_fake_fam
 ```
 
