@@ -36,6 +36,8 @@ cpanm install Beanstalk::Client
 cpanm install Math::Round
 cpanm install Sys::CpuAffinity
 
+cpanm install Statistics::Distributions
+
 # Needed for bin/annotate.pl
 cpanm install Hash::Merge::Simple
 cpanm install Sort::XS

@@ -11,6 +11,8 @@ has positionDelimiter => (is => 'ro', default => '|');
 
 has alleleDelimiter => (is => 'ro', default => '/');
 
+has overlapDelimiter => (is => 'ro', default => "\\\\");
+
 has fieldSeparator => (is => 'ro', default => "\t");
 
 has emptyFieldChar => (is => 'ro', default => "!");

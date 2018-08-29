@@ -1,3 +1,4 @@
+
 #!/usr/bin/env perl
 # Name:           snpfile_annotate_mongo_redis_queue.pl
 # Description:
@@ -81,6 +82,13 @@ my %requiredByType = (
   }
 );
 
+my %optionalForType = (
+  'saveFromQuery' => {
+    indexConfig => 'indexConfig',
+    pipeline => 'pipeline',
+  }
+);
+
 say "Running queue server of type: $type";
 
 my $configPathBaseDir = "config/";
@@ -151,7 +159,15 @@ while(my $job = $beanstalk->reserve) {
 
     $configData->{database_dir} = 'hidden';
 
-    for my $track (@{$configData->{tracks}}) {
+    my $trackConfig;
+    if(ref $configData->{tracks} eq 'ARRAY') {
+      $trackConfig = $configData->{tracks};
+    } else {
+      # New version
+      $trackConfig = $configData->{tracks}{tracks};
+    }
+
+    for my $track (@$trackConfig) {
       # Strip local_files of their directory names, for security reasons
       $track->{local_files} = [map { !$_ ? "" : path($_)->basename } @{$track->{local_files}}]
     }
@@ -177,6 +193,9 @@ while(my $job = $beanstalk->reserve) {
       }
 
       $inputHref = {%$inputHref, %$connectionConfig};
+
+      p $inputHref;
+
       $annotate_instance = SeqFromQuery->new_with_config($inputHref);
     }
 
@@ -194,9 +213,12 @@ while(my $job = $beanstalk->reserve) {
       p $err;
     }
 
-    if(ref $err eq 'Search::Elasticsearch::Error::Request') {
+    if(ref $err) {
+      say STDERR "Elasticsearch error:";
+      p $err;
+
       # TODO: Improve error handling, this doesn't work reliably
-      if($err->{vars}{body}{status} == 400) {
+      if($err->{vars}{body}{status} && $err->{vars}{body}{status} == 400) {
         $err = "Query failed to parse";
       } else {
         $err = "Issue handling query";
@@ -213,34 +235,30 @@ while(my $job = $beanstalk->reserve) {
     $job->bury();
 
     if($beanstalkEvents->error) {
-      say "Beanstalkd last error:";
+      say STDERR "Beanstalkd last error:";
       p $beanstalkEvents->error;
     }
 
     next;
   }
 
-  my $data = encode_json({
+  my $data = {
     event => $events->{completed},
     queueID => $job->id,
     submissionID   => $jobDataHref->{submissionID},
     results => {
       outputFileNames => $outputFileNamesHashRef,
     }
-  });
+  };
 
-  say "putting completiong event";
-  p $data;
+  if(defined $debug) {
+    say STDERR "putting completiong event";
+    p $data;
+  }
+
   # Signal completion before completion actually occurs via delete
   # To be conservative; since after delete message is lost
-  $beanstalkEvents->put({ priority => 0, data =>  encode_json({
-    event => $events->{completed},
-    queueID => $job->id,
-    submissionID   => $jobDataHref->{submissionID},
-    results  => {
-      outputFileNames => $outputFileNamesHashRef,
-    }
-  }) } );
+  $beanstalkEvents->put({ priority => 0, data => encode_json($data)} );
 
   $job->delete();
 
@@ -279,6 +297,14 @@ sub coerceInputs {
     }
 
     $jobSpecificArgs{$key} = $jobDetailsHref->{$requiredForType->{$key}};
+  }
+
+  my $optionalForType = $optionalForType{$type};
+
+  for my $key (keys %$optionalForType) {
+    if(defined $jobDetailsHref->{$optionalForType->{$key}}) {
+      $jobSpecificArgs{$key} = $jobDetailsHref->{$optionalForType->{$key}};
+    }
   }
 
   my $configFilePath = getConfigFilePath($jobSpecificArgs{assembly});
