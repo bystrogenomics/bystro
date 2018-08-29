@@ -73,7 +73,6 @@ sub annotate {
 
   $self->log( 'info', 'Checking input file format' );
 
-
   # TODO: For now we only accept tab separated files
   # We could change this, although comma separation causes may cause with our fields
   # And is slower, since we cannot split on a constant
