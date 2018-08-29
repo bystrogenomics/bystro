@@ -1,6 +1,6 @@
 # Bystro Tutorial README
 
-[Bystro](https://dev.bystro.io) is a web applicatiom that simplifies genetic
+[Bystro](https://bystro.io) is a web applicatiom that simplifies genetic
 analyses and handles large (Tb) sized experiments. Features include:
 
 1. Genomic annotation of supplied variants
@@ -24,7 +24,7 @@ repository.
 ## Help Guide
 
 Major features are explained in the Bystro help guide which is accessed in the
-[Guide link](https://dev.bystro.io/guide) on the top banner.
+[Guide link](https://bystro.io/guide) on the top banner.
 
 ## Register
 
@@ -35,7 +35,7 @@ Click [sign up](https://bystro.io/signup).
 Bystro enables searching and filtering on publicly annotated genomic data
 without registration.
 
-Public data is accessed using the [Public link](https://dev.bystro.io/public) on the top banner.
+Public data is accessed using the [Public link](https://bystro.io/public) on the top banner.
 
 - 1000 Genomes Phase 3 (2,504 samples, 84.9M variants)
 - Gemini Tutorial Trio data (3 samples, 13K variants)
@@ -49,7 +49,7 @@ must select the correct genomic build. Once the annotation is complete you can
 download the annotation while waiting for the annotation indexing to complete.
 Annotation indexing is needed for the search and filter capabilities.
 
-1. Click [submit](https://dev.bystro.io/submit)
+1. Click [submit](https://bystro.io/submit)
 2. Choose Genome Assembly
 3. Upload
 
@@ -330,7 +330,7 @@ Other things to **note** include:
 
 To save any search results, click the floppy disk icon, which save the
 filtered annotation within the web application. Saved annotations may be
-accessed in the [Results link](https://dev.bystro.io/results) in the top
+accessed in the [Results link](https://bystro.io/results) in the top
 banner.
 
 ### Download Annoation
@@ -354,14 +354,20 @@ file1.statistics.qc.tsv            => all samples 3 SD above and below the mean 
 file1.statistics.tsv               => per sample Tr, Tv, silent, and replacement stats
 ```
 
-## Data for examples
+## Convert bystro annotation to VCF and linkage formats
+
+This is an example of how to use the `bystro_to_vcf` program and `plink` to
+convert the annoation first to a VCF fiel then to a linkage file format,
+which are common formats for genomic analysis.
+
+### Data for examples
 
 ```bash
 git clone https://github.com/akotlar/bystro-tutorial
 cd bystro-tutorial
 ```
 
-## Compile `bystro_to_vcf`
+### Compile `bystro_to_vcf`
 
 This program converts the bystro annoation data to a vcf file. Assuming you are
 in the repository.
@@ -371,7 +377,7 @@ cd src
 gcc -Wall -O3 -pthreads -lm -lz bystro_to_vcf.c -o ../bystro_to_vcf
 ```
 
-## Download genome build
+### Download genome build
 
 These files are needed for the conversion of the bystro annotation to vcf file.
 
@@ -389,14 +395,11 @@ curl -O https://s3.amazonaws.com/bystro-source/hg38.sdx
 curl -O https://s3.amazonaws.com/bystro-source/hg38.seq
 ```
 
-## Convert to vcf
-
-This is an example of how to use the `bystro_to_vcf` file and `plink` to
-convert the annoation to a linkage file format.
+**Conversion Examples**
 
 ```bash
 # convert annotation to vcf
-bystro_to_vcf hg38.sdx <(pigz -d –c ann.tsv.gz)   \
+bystro_to_vcf hg38.sdx <(pigz -d –c ann.tsv.gz) \
  | pigz -c > annotation.vcf.gz
 
 # convert plink to binary linkage format
@@ -411,7 +414,7 @@ If you wish to drop samples, use
 
 ```bash
 tail –n +18 file_name.statistics.tsv | cut -f1  | head > ids_to_keep
-plink --vcf you_vcf_file –keep ids_to_keep
+plink --vcf you_vcf_file --no-fid --keep ids_to_keep
 ```
 
 ## Run SKAT
@@ -422,11 +425,8 @@ you have generated the `annotation.plink` file from above.
 
 ```bash
 bin/run_skat_example.sh
-...
 ```
 
 ## Machine Learning Classifier
 
-```bash
-...
-```
+See [this repository](https://bitbucket.org/akotlar/bystroml/src/master/).
