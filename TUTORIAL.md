@@ -1,4 +1,4 @@
-# Bystro Tutorial README
+# Bystro Tutorial
 
 [Bystro](https://bystro.io) is a web applicatiom that simplifies genetic
 analyses and handles large (Tb) sized experiments. Features include:
