@@ -16,7 +16,7 @@ The open source command line annotator that powers bystro is located at the [bys
 
 ## ACM-BCB 2018 Presentation
 
-(Our ACM-BCB 2018 tutorial slides may be viewed here](tutorial/Presentation1.pdf)
+[Our ACM-BCB 2018 tutorial slides may be viewed here](tutorial/Presentation1.pdf)
 
 ## Bystro Manuscript
 
@@ -41,9 +41,9 @@ without registration.
 
 Public data is accessed using the [Public link](https://bystro.io/public) on the top banner.
 
--   1000 Genomes Phase 3 (2,504 samples, 84.9M variants)
--   Gemini Tutorial Trio data (3 samples, 13K variants)
--   _drosophila Melanogaster_ fly lines from Drosopila Genetics Reference Panel 2 (205 samples, 3M variants)
+- 1000 Genomes Phase 3 (2,504 samples, 84.9M variants)
+- Gemini Tutorial Trio data (3 samples, 13K variants)
+- _drosophila Melanogaster_ fly lines from Drosopila Genetics Reference Panel 2 (205 samples, 3M variants)
 
 ## Annotate
 
@@ -62,9 +62,9 @@ Annotation indexing is needed for the search and filter capabilities.
 These include:
 
 1. RefSeq provides details about the genes, transcripts, codons, amino acids, etc.
-    - Predicted codon change, amino acid substitution
-    - Nearest gene
-    - Nearest transcription start site
+   - Predicted codon change, amino acid substitution
+   - Nearest gene
+   - Nearest transcription start site
 2. Clinvar
 3. CADD, PhyloP, PhasCons
 4. dbSNP, gnomAD
@@ -73,9 +73,9 @@ These include:
 
 Notes:
 
--   missing value is `!`
--   multiple transcripts are delimited by `;`
--   multiallelic sites are delimited by `|`
+- missing value is `!`
+- multiple transcripts are delimited by `;`
+- multiallelic sites are delimited by `|`
 
 A complete, abeit somewhat outdated, description of the fields are
 [here](https://bystro.io/help/fields) and include:
@@ -322,11 +322,11 @@ some IDs as "cases" and others as "controls" to identify case-only results.
 
 Other things to **note** include:
 
--   When multiple filters are supplied on a line and implicit `AND` is used to join them.
--   The exact query that was processed will be displated below the search bar.
--   By default, `missingGenos` is searchable.
--   To avoid searching of the `missingGenos` field, restrict the ID search to heterozygote and homozygote fields by setting the definition of **case** and **control** to only search heterozygote or homozygote fields. For instance, `(heterozygote: ID || homozygote: ID)` will only search for the `ID` in either the heterozygote or homozygote fields.
--   A site with one or more missing genotypes is counted as missing.
+- When multiple filters are supplied on a line and implicit `AND` is used to join them.
+- The exact query that was processed will be displated below the search bar.
+- By default, `missingGenos` is searchable.
+- To avoid searching of the `missingGenos` field, restrict the ID search to heterozygote and homozygote fields by setting the definition of **case** and **control** to only search heterozygote or homozygote fields. For instance, `(heterozygote: ID || homozygote: ID)` will only search for the `ID` in either the heterozygote or homozygote fields.
+- A site with one or more missing genotypes is counted as missing.
 
 ## Save and Download Annotation
 
