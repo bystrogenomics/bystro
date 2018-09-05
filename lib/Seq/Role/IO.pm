@@ -83,7 +83,7 @@ sub getReadFh {
   }
 
   if($innerFile) {
-    my ($err, $compressed, $command) = $self->getInnerFileCommand($filePath, $innerFile);
+    my ($err, $compressed, $command) = $self->getInnerFileCommand($filePath, $innerFile, $errCode);
 
     if($err) {
       return ($err, undef, undef);
@@ -111,7 +111,11 @@ sub getReadFh {
 }
 
 sub getInnerFileCommand {
-  my ($self, $filePath, $innerFile) = @_;
+  my ($self, $filePath, $innerFile, $errCode) = @_;
+
+  if(!$errCode) {
+    $errCode = 'error';
+  }
 
   my $compressed = $innerFile =~ /[.]gz$/ || $innerFile =~ /[.]bgz$/ || $innerFile =~ /[.]zip$/;
 

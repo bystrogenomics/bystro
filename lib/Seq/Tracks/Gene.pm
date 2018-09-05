@@ -8,12 +8,11 @@ our $VERSION = '0.001';
 =head1 DESCRIPTION
 
   @class B<Seq::Gene>
-  
+
   Note: unlike previous Bystro, there is no longer a genomic_type
   Just a siteType, which is Intronic, Coding, 5UTR, etc
   This is just like Annovar's
   We add "Intergenic" if not covered by any gene
-
   This class not longer handles intergenic sites
 
 =cut
@@ -115,14 +114,14 @@ sub BUILD {
   $self->{_dbName} = $self->dbName;
   $self->{_db} = Seq::DBManager->new();
 
-  # Not including the txNumberKey;  this is separate from the annotations, which is 
+  # Not including the txNumberKey;  this is separate from the annotations, which is
   # what these keys represent
 
   if($self->hasJoin) {
     my $joinTrackName = $self->joinTrackName;
 
     $self->{_hasJoin} = 1;
-    
+
     $self->{_flatJoinFeatures} = [map{ "$joinTrackName.$_" } @{$self->joinTrackFeatures}];
 
     # TODO: Could theoretically be overwritten by line 114
@@ -160,8 +159,8 @@ sub setHeaders {
   $headers->addFeaturesToHeader(\@features, $self->name);
 
   my @allGeneTrackFeatures = @{ $headers->getParentFeatures($self->name) };
-  
-  # This includes features added to header, using addFeatureToHeader 
+
+  # This includes features added to header, using addFeatureToHeader
   # such as the modified nearest feature names ($nTrackPrefix.$_) and join track names
   # and siteType, strand, codonNumber, etc.
   for my $i (0 .. $#allGeneTrackFeatures) {
@@ -190,7 +189,7 @@ sub setHeaders {
 }
 
 sub get {
-  #my ($self, $dbData, $chr, $refBase, $allele, $posIdx, $outAccum) = @_;
+  #my ($self, $dbData, $chr, $refBase, $alt, $posIdx, $outAccum) = @_;
   #    $_[0], $_[1], $_[1], $_[3],   $_[4],   $_[5]    $_[6]
   # WARNING: If $_[1]->[$_[0]->{_dbName} isn't defined, will be treated as the 0 index!!!
   # therefore return here if that is the case
@@ -203,7 +202,7 @@ sub get {
     return $_[6];
   }
 
-  my ($self, $dbData, $chr, $ref, $allele, $posIdx, $outAccum) = @_;
+  my ($self, $dbData, $chr, $ref, $alt, $posIdx, $outAccum) = @_;
 
   # my @out;
   # # Set the out array to the size we need; undef for any indices we don't add here
@@ -298,12 +297,12 @@ sub get {
 
   $i = 0;
 
-  if(length($allele) > 1) {
+  if(length($alt) > 1) {
     # Indels get everything besides the _*AminoAcidKey and _newCodonKey
-    my $indelAllele = 
-      substr($allele, 0, 1) eq '+'
-      ? length(substr($allele, 1)) % 3 ? $frameshift : $inFrame
-      : int($allele) % 3 ? $frameshift : $inFrame; 
+    my $indelAllele =
+      substr($alt, 0, 1) eq '+'
+      ? length(substr($alt, 1)) % 3 ? $frameshift : $inFrame
+      : int($alt) % 3 ? $frameshift : $inFrame;
 
     for my $site ($multiple ? @$siteData : $siteData) {
       $codonNum[$i] = $site->[$codonNumberIdx];
@@ -329,7 +328,7 @@ sub get {
   } else {
     # my $newAA;
     # my $refAA;
-    my $alleleCodonSequence;
+    my $altCodonSequence;
 
     SNP_LOOP: for my $site ($multiple ? @$siteData : $siteData) {
       $codonNum[$i] = $site->[$codonNumberIdx];
@@ -349,19 +348,19 @@ sub get {
       }
 
       #make a codon where the reference base is swapped for the allele
-      $alleleCodonSequence = $site->[$codonSequenceIdx];
+      $altCodonSequence = $site->[$codonSequenceIdx];
 
       # If codon is on the opposite strand, invert the allele
       # Note that $site->[$codonPositionIdx] MUST be 0-based for this to work
       if( $site->[$strandIdx] eq '-' ) {
-        substr($alleleCodonSequence, $site->[$codonPositionIdx], 1) = $negativeStrandTranslation->{$allele};
+        substr($altCodonSequence, $site->[$codonPositionIdx], 1) = $negativeStrandTranslation->{$alt};
       } else {
-        substr($alleleCodonSequence, $site->[$codonPositionIdx], 1) = $allele;
+        substr($altCodonSequence, $site->[$codonPositionIdx], 1) = $alt;
       }
 
-      $newCodon[$i] = $alleleCodonSequence;
+      $newCodon[$i] = $altCodonSequence;
 
-      $newAA[$i] = $codonMap->codon2aa($alleleCodonSequence);
+      $newAA[$i] = $codonMap->codon2aa($altCodonSequence);
       $refAA[$i] = $codonMap->codon2aa($site->[$codonSequenceIdx]);
 
       if(!defined $newAA[$i]) {
@@ -381,7 +380,7 @@ sub get {
         $funcAccum[$i] = $replacement;
       }
 
-      # $hgvsC[$i] = 'c.' . $ref . ($codonNum[$i] * 3 - (3 - $codonPos[$i])) . $allele;
+      # $hgvsC[$i] = 'c.' . $ref . ($codonNum[$i] * 3 - (3 - $codonPos[$i])) . $alt;
       # $hgvsP[$i] = 'p.' . $refAA[$i] . $codonNum[$i] . $newAA[$i];
 
       $i++;
