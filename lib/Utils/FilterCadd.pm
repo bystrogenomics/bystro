@@ -44,8 +44,8 @@ sub BUILD {
     databaseDir => $self->_decodedConfig->{database_dir}
   });
 
-  if(!$self->_wantedTrack->{sorted_guaranteed} == 1) {
-    die "CADD files must be sorted (sorted_guaranteed == 1), at least by chromosome";
+  if(!$self->_wantedTrack->{sorted} == 1) {
+    die "CADD files must be sorted (sorted == 1), at least by chromosome";
   }
 }
 

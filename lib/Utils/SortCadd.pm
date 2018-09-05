@@ -188,7 +188,7 @@ sub go {
 
   # Make sure that we indicate to the user that cadd is guaranteed to be sorted
   # This speeds up cadd building
-  $self->_wantedTrack->{sorted_guaranteed} = 1;
+  $self->_wantedTrack->{sorted} = 1;
 
   $self->_backupAndWriteConfig('sortCadd');
 }

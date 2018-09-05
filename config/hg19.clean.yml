@@ -211,7 +211,7 @@ tracks:
       name: cadd
       sortCadd_date: 2017-04-23T15:44:00
       sort_date: 2017-01-20T16:06:00
-      sorted_guaranteed: 1
+      sorted: 1
       type: cadd
       version: 8
     - build_author: ec2-user

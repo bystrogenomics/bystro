@@ -20,7 +20,7 @@ use Scalar::Util qw/looks_like_number/;
 has '+based' => (default => 1);
 
 # CADD files may not be sorted,
-has sorted_guaranteed => (is => 'ro', isa => 'Bool', lazy => 1, default => 0);
+has sorted => (is => 'ro', isa => 'Bool', lazy => 1, default => 0);
 
 has scalingFactor => (is => 'ro', isa => 'Int', default => 10);
 
@@ -87,8 +87,8 @@ sub buildTrack {
   # hashes instead of arrays; since a sparse array will contain undef/nil
   # for any track at that position that has not yet been inserted into the db
   # For now we require sorting to be guaranteed to simplify this code
-  if(!$self->sorted_guaranteed) {
-    $self->log("fatal", $self->name . ": requires sorted_guaranteed to be true");
+  if(!$self->sorted) {
+    $self->log("fatal", $self->name . ": requires sorted to be true");
   }
 
   for my $file ( @{$self->local_files} ) {

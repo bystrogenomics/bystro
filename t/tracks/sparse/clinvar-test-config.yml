@@ -281,7 +281,7 @@ tracks:
     - whole_genome_SNVs.tsv.bed.mapped.chr*.organized-by-chr.txt.sorted.txt.gz
     name: cadd
     sortCadd_date: 2017-01-20T23:53:00
-    sorted_guaranteed: 1
+    sorted: 1
     type: cadd
     version: 33
   - build_author: ec2-user
