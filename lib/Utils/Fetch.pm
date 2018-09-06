@@ -68,7 +68,7 @@ sub go {
 # These are called depending on whether sql_statement or remoteFiles + remoteDir given
 sub _fetchFromUCSCsql {
   my $self = shift;
-  
+
   my $sqlStatement = $self->sql;
 
   # What features are called according to our YAML config spec
@@ -85,7 +85,7 @@ sub _fetchFromUCSCsql {
       # YAML config spec defines optional type on feature names, so some features
       # Can be hashes. Take only the feature name, ignore type, UCSC doesn't use them
       my $featureName;
-      
+
       if(ref $_) {
         ($featureName) = %{$_};
       } else {
@@ -99,7 +99,7 @@ sub _fetchFromUCSCsql {
 
     substr($sqlStatement, $featuresIdx, length($featuresKey) ) = $trackFeatures;
   }
-  
+
   my $config = {
     sql => $sqlStatement,
     assembly => $self->_decodedConfig->{assembly},
@@ -115,7 +115,7 @@ sub _fetchFromUCSCsql {
   my $sqlWriter = Utils::SqlWriter->new($config);
 
   # Returns the relative file names
-  my @writtenFileNames = $sqlWriter->fetchAndWriteSQLData();
+  my @writtenFileNames = $sqlWriter->go();
 
   $self->_wantedTrack->{local_files} = \@writtenFileNames;
 

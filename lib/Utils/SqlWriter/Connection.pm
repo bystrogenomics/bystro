@@ -14,7 +14,7 @@ use namespace::autoclean;
 
 # The actual configuration
 has driver  => ( is => 'ro', isa => 'Str',  default => "DBI:mysql" );
-has host => ( is => 'ro', isa => 'Str', default  => "genome-mysql.cse.ucsc.edu");
+has host => ( is => 'ro', isa => 'Str', default  => "genome-mysql.soe.ucsc.edu");
 has user => ( is => 'ro', isa => 'Str', default => "genome" );
 has password => ( is => 'ro', isa => 'Str', );
 has port     => ( is => 'ro', isa => 'Int', );

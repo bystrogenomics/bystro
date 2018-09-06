@@ -119,6 +119,10 @@ sub annotate {
     return $self->annotateFile('vcf');
   }
 
+  # TODO: Inspect vcf header
+
+  # TODO: support any other file, by checking the extension
+
   # TODO: we don't really check for valid vcf, just assume it is
   # So this message is never reached
   $self->_errorWithCleanup("File type isn\'t vcf or snp. Please use one of these files");
