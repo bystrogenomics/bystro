@@ -396,14 +396,14 @@ sub _readTxData {
 
     $txStart = $rowData{$self->txStart_field_name};
 
-    if(!$txStart) {
+    if(!defined $txStart) {
       return ': missing transcript start ( we expected a value @ ' .
         $self->txStart_field_name . ')';
     }
 
     $txEnd = $rowData{$self->txEnd_field_name};
 
-    if(!$txEnd) {
+    if(!defined $txEnd) {
       return 'missing transcript start ( we expected a value @ ' .
         $self->txEnd_field_name . ')';
     }

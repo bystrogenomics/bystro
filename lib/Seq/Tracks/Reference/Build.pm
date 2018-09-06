@@ -137,7 +137,7 @@ sub buildTrack {
           for my $char (split '', uc($1)) {
             $cursor //= $self->db->dbStartCursorTxn($wantedChr);
 
-            #Args:                         $cursor,             $chr,        $trackIndex,   $pos,         $newValue
+            #Args:                         $cursor, $chr,       $trackIndex,   $pos,         $newValue
             $self->db->dbPatchCursorUnsafe($cursor, $wantedChr, $self->dbName, $chrPosition, $baseMapper->baseMap->{$char});
 
             if($count > $self->commitEvery) {
