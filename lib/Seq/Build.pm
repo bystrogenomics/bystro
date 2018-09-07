@@ -31,6 +31,8 @@ use Utils::Base;
 use List::Util qw/first/;
 use YAML::XS qw/LoadFile Dump/;
 use Path::Tiny qw/path/;
+use String::Strip qw/StripLTSpace/;
+
 use Time::localtime;
 
 has wantedType => (is => 'ro', isa => 'Maybe[Str]', lazy => 1, default => undef);
@@ -69,6 +71,9 @@ sub BUILD {
     my @types = split(/,/, $self->wantedType);
     
     for my $type (@types) {
+      # modifies in place
+      StripLTSpace($type);
+
       my $buildersOfType = $tracks->getTrackBuildersByType($type);
 
       if(!defined $buildersOfType) {
@@ -82,6 +87,9 @@ sub BUILD {
     my @names = split(/,/, $self->wantedName);
     
     for my $name (@names) {
+      # modifies in place
+      StripLTSpace($name);
+
       my $builderOfName = $tracks->getTrackBuilderByName($name);
 
       if(!defined $builderOfName) {

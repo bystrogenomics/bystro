@@ -1,6 +1,4 @@
 assembly: hg19
-build_author: ec2-user
-build_date: 2018-08-27T12:07:00
 chromosomes:
   - chr1
   - chr2
@@ -27,15 +25,15 @@ chromosomes:
   - chrM
   - chrX
   - chrY
-database_dir: "~"
+database_dir: ~
 fileProcessors:
   snp:
     args: --emptyField ! --minGq .95
     program: bystro-snp
   vcf:
-    args: --emptyField ! --sample %sampleList
+    args: --emptyField ! --sample %sampleList --keepId
     program: bystro-vcf
-files_dir: "~"
+files_dir: ~
 statistics:
   dbSNPnameField: dbSNP.name
   exonicAlleleFunctionField: refSeq.exonicAlleleFunction
@@ -62,9 +60,7 @@ tracks:
     - dbSNP
     - clinvar
   tracks:
-    - build_author: ec2-user
-      build_date: 2018-08-27T12:07:00
-      local_files:
+    - local_files:
         - chr*.fa.gz
       name: ref
       type: reference
@@ -201,18 +197,42 @@ tracks:
           completed: 2017-02-03T20:57:00
           name: fetch
       version: 8
-    - build_author: ec2-user
-      build_date: 2018-08-27T12:07:00
-      caddToBed_date: 2017-04-22T06:41:00
-      liftOverCadd_date: 2017-07-28T17:35:00
-      local_files:
-        - whole_genome_SNVs.tsv.bed.chr*.organized-by-chr.txt.sorted.txt.gz
-        - whole_genome_SNVs.tsv.bed.chrM.organized-by-chr.txt.sorted.txt.mapped.gz
+    - local_files:
+        - whole_genome_SNVs.tsv.chr1.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr10.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr11.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr12.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr13.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr14.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr15.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr16.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr17.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr18.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr19.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr2.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr20.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr21.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr22.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr3.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr4.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr5.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr6.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr7.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr8.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr9.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chrX.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chrY.organized-by-chr.txt.sorted.txt.gz
       name: cadd
-      sortCadd_date: 2017-04-23T15:44:00
-      sort_date: 2017-01-20T16:06:00
       sorted: 1
       type: cadd
+      utils:
+        - args:
+            remoteFiles:
+              - http://krishna.gs.washington.edu/download/CADD/v1.4/GRCh37/whole_genome_SNVs.tsv.gz
+          completed: 2018-09-05T15:18:00
+          name: fetch
+        - completed: 2018-09-05T17:10:00
+          name: SortCadd
       version: 8
     - build_author: ec2-user
       build_date: 2018-08-27T12:07:00
@@ -329,6 +349,7 @@ tracks:
         - cnv.score: number
         - cnv.flag
         - pmid: number
+        - rvis: number
       fieldMap:
         dbnsfp.Disease_description: uniprot.disease
         dbnsfp.ExAC_cnv.score: cnv.score
@@ -354,6 +375,7 @@ tracks:
         dbnsfp.LoFtool_score: lofTool
         dbnsfp.P(HI): pHi
         dbnsfp.P(rec): pRec
+        dbnsfp.RVIS_percentile_ExAC: rvis
         dbnsfp.Tissue_specificity(Uniprot): uniprot.tissue
         dbnsfp.Trait_association(GWAS): trait_association
         dbnsfp.pubmedID: pmid

@@ -10,6 +10,8 @@ use Getopt::Long;
 use Path::Tiny qw/path/;
 use Pod::Usage;
 use YAML::XS qw/LoadFile/;
+use String::Strip qw/StripLTSpace/;
+
 use DDP;
 
 use Utils::CaddToBed;
@@ -49,6 +51,9 @@ if ($help || !$yaml_config || !$names) {
 }
 
 for my $wantedName (split ',', $names) {
+  # modifies in place
+  StripLTSpace($wantedName);
+
   my $config = LoadFile($yaml_config);
   my $utilConfigs;
   my $trackIdx = 0;

@@ -286,6 +286,9 @@ state $transformOperators = ['.', 'split', '-', '+', 'replace'];
 sub transformField {
   state $cachedTransform;
 
+  #   $_[0],      $_[1],    $_[2]
+  #my ($self, $featureName, $featureValue) = @_;
+
   if( defined $cachedTransform->{$_[0]->name}{$_[1]} ) {
     return &{ $cachedTransform->{$_[0]->name}{$_[1]} }($_[2]);
   }
