@@ -459,8 +459,8 @@ sub _openAnnotationPipe {
   my $fh;
 
   for my $type (keys %{$self->outputFilesInfo}) {
-    if(index($args, "\%$type") > -1) {
-      substr($args, index($args, "\%$type"), length("\%$type"))
+    if(index($args, "\%$type\%") > -1) {
+      substr($args, index($args, "\%$type\%"), length("\%$type\%"))
         = $self->_workingDir->child($self->outputFilesInfo->{$type});
     }
   }

@@ -33,7 +33,7 @@ fileProcessors:
     args: --emptyField ! --minGq .95
     program: bystro-snp
   vcf:
-    args: --emptyField ! --sample %sampleList
+    args: --emptyField ! --sample %sampleList% --keepId
     program: bystro-vcf
 files_dir: ~
 statistics:
