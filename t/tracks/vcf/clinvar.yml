@@ -40,7 +40,6 @@ tracks:
         - pmids
         - origin
         - xrefs
-        - last_evaluated
       build_field_transformations:
         molecular_consequence: split [|]
         clinical_significance: split [|/]

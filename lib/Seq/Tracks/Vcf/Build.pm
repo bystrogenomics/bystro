@@ -9,18 +9,18 @@ our $VERSION = '0.001';
 =head1 DESCRIPTION
 
   @class Seq::Tracks::Vcf::Build
-  Takes a VCF file, runs it through a vcf pre-processor to get it into 
+  Takes a VCF file, runs it through a vcf pre-processor to get it into
   our internal annotation format, and then uses the info field to build a database
   Will skip discordant sites, logging them
 =cut
 
-# TODO: better error handling in the vcf pre-processor
-# TODO: Support fields delimited by something other than just , for Number=A
-# TODO: Move opening of vcf to Seq::Input::Vcf
-# TODO: Be more explicit with naming of indices from the intermediate annotation output
-# (such as vcfAltIdx = 4, rather than using 4 itself)
+# TODO: allow users to specify info.field to avoid nameclash
 
-# Note ALT field is required, if not found will be appended
+# TODO: better error handling in the vcf pre-processor
+
+# TODO: Support fields delimited by something other than just , for Number=A
+
+# Note alt field is required, if not found will be appended
 use Mouse 2;
 
 use namespace::autoclean;
@@ -52,97 +52,32 @@ state $converter = Seq::Tracks::Base::Types->new();
 
 # Defines the indices expected in the intermediate vcf output of
 # $self->vcfProcessor
-# TODO: read these values from the header of a single file
-state $vcfFeatures = {
-  chrom => 0, pos => 1, type => 2, ref => 3, alt => 4, trTv => 5,
-  heterozygotes => 6, homozygotes => 8, missingGenos => 10, id => 15
-};
+# These fields are required, because we
+# 1) allow any of them to be used under "features"
+# 2) if their names clash with fields in INFO, will ignore the INFO fields
+# TODO: allow users to specify info.field to avoid nameclash
+state $requiredHeader = ['chrom', 'pos', 'ref', 'alt', 'trTv', 'id', 'alleleIdx', 'info'];
 
 sub BUILD {
   my $self = shift;
 
-  my $features = $self->features;
-
-  if(!@{$features}) {
+  if(!@{$self->features}) {
     $self->log('fatal', 'VCF build requires INFO features');
   }
 
-  my %featuresMap;
+  my ($err, $feats) = $self->_findExpectedFeatures($requiredHeader);
 
-  for(my $i = 0; $i < @{$features}; $i++) {
-    $featuresMap{lc($features->[$i])} = $i;
+  if($err) {
+    $self->log('fatal', $self->name . ": $err");
   }
 
-  if(!defined $featuresMap{alt}) {
-    $self->log('fatal', $self->name . ": 'alt' feature not specified, required for vcf tracks");
-  }
+  $self->{_vcfFeatures} = $feats;
 
-  my %fieldMap = map{ lc($_) => $self->fieldMap->{$_} } keys %{$self->fieldMap};
+  $self->{_headerFeatures} = $self->_getHeaderFeatures();
 
-  my %visitedVcfFeatures;
-  my @headerFeatures;
-  for my $vcfFeature (keys %$vcfFeatures) {
-    my $idx;
-
-    if($visitedVcfFeatures{$vcfFeature}) {
-      $self->log('fatal', "Duplicate feature requested: $vcfFeature");
-    }
-
-    $visitedVcfFeatures{$vcfFeature} = 1;
-
-    # Because VCF files are so flexible with feature definitions, it will be
-    # difficult to tell if a certain feature just isn't present in a vcf file
-    # Easier to make feature definition flexible, especially since one 
-    # may correctly surmise that we read the VCF after transformation to intermediate
-    # annotated format
-    my $lcVcfFeature = lc($vcfFeature);
-
-    if(defined $featuresMap{$lcVcfFeature}) {
-      $idx = $featuresMap{$lcVcfFeature};
-    } elsif(defined $fieldMap{$lcVcfFeature} && defined $featuresMap{$fieldMap{$lcVcfFeature}}) {
-      $idx = $featuresMap{$fieldMap{$lcVcfFeature}};
-    }
-
-    # This $vcfFeature isn't requested by the user
-    if(!defined $idx) {
-      next;
-    }
-
-    #Stores:
-    #1) The feature name (post-transformation)
-    #2) The index in the intermedaite annotation file
-    #3) The index in the database
-    push @headerFeatures, [
-      $self->features->[$idx], $vcfFeatures->{$vcfFeature},
-      $self->getFieldDbName($self->features->[$idx])
-    ];
-  }
-
-  # We could also force-add alt; would get properly inserted into db.
-  # However, we would reduce confidence users had in the representation stated
-  # in the YAML config
-  if(!defined $visitedVcfFeatures{alt}) {
-    $self->log('fatal', "alt (or ALT) field is required for vcf tracks, used to match input alleles");
-  }
-
-  $self->{_headerFeatures} = \@headerFeatures;
-
-  my %reverseFieldMap = map { $self->fieldMap->{$_} => $_ } keys %{$self->fieldMap};
-
-  my %infoFeatureNames;
-  for my $feature (@{$self->features}) {
-    my $originalName = $reverseFieldMap{$feature} || $feature;
-
-    # skip the first few columns, don't allow ALT in INFO
-    if(defined $visitedVcfFeatures{lc($originalName)}) {
-      next;
-    }
-
-    $infoFeatureNames{$feature} = $originalName;
-  }
-
-  # TODO: prevent header features from overriding
-  $self->{_infoFeatureNames} = \%infoFeatureNames;
+  # TODO: prevent header features from overriding info fields by using info.field
+  # notation as a feature
+  $self->{_infoFeatureNames} = $self->_getInfoFeatureNames();
   $self->{_numFilters} = scalar keys %{$self->build_row_filters} || 0;
 
   # Precalculate the field db names, for faster accesss
@@ -174,20 +109,18 @@ sub buildTrack {
 
   my $pm = Parallel::ForkManager->new($self->maxThreads);
 
-  my $outputter = Seq::Output::Delimiters->new();
-
-  my $delim = $outputter->emptyFieldChar;
-
   # my $altIdx = $self->headerFeatures->{ALT};
   # my $idIdx = $self->headerFeatures->{ID};
 
   my $lastIdx = $#{$self->features};
 
   # location of these features in input file (intermediate annotation)
-  my $refIdx = $vcfFeatures->{ref};
-  my $posIdx = $vcfFeatures->{pos};
-  my $chrIdx = $vcfFeatures->{chrom};
-  my $altIdx = $vcfFeatures->{alt};
+  my $refIdx = $self->{_vcfFeatures}->{ref};
+  my $posIdx = $self->{_vcfFeatures}->{pos};
+  my $chrIdx = $self->{_vcfFeatures}->{chrom};
+  my $altIdx = $self->{_vcfFeatures}->{alt};
+  my $alleleIdx = $self->{_vcfFeatures}->{alleleIdx};
+  my $infoIdx = $self->{_vcfFeatures}->{info};
 
   # Track over-written positions
   # Hashes all values passed in, to make sure that duplicate values aren't written
@@ -224,10 +157,6 @@ sub buildTrack {
     $self->db->cleanUp();
 
     $pm->start($file) and next;
-      my $prog = $self->isCompressedSingle($file) ? $self->gzip . ' ' . $self->decompressArgs : 'cat';
-
-      my $errPath = $file . ".build." . localtime() . ".log";
-
       my ($err, $vcfNameMap, $vcfFilterMap) = $self->_extractHeader($file);
 
       if($err) {
@@ -248,8 +177,8 @@ sub buildTrack {
       my $cursor;
       my $count = 0;
 
-      my $op = "$prog $file | " . $self->vcfProcessor. " --emptyField $delim" . " --keepId --keepInfo";
-      $err = $self->safeOpen(my $fh, '-|', $op);
+      my $fh;
+      ($err, $fh) = $self->_openVcfPipe($file);
 
       if($err) {
         $self->log('fatal', $self->name . ": $err");
@@ -311,7 +240,7 @@ sub buildTrack {
           next;
         }
 
-        ($err, my $data) = $self->_extractFeatures(\@fields, $vcfNameMap, $vcfFilterMap);
+        ($err, my $data) = $self->_extractFeatures(\@fields, $infoIdx, $alleleIdx, $vcfNameMap, $vcfFilterMap);
 
         if($err) {
           #Commit, sync everything, including completion status, and release mmap
@@ -365,6 +294,150 @@ sub buildTrack {
   #TODO: figure out why this is necessary, even with DEMOLISH
   $self->db->cleanUp();
   return;
+}
+
+sub _findExpectedFeatures {
+  my ($self, $expFeaturesAref) = @_;
+
+  my $file = $self->local_files->[0];
+
+  if(!$file) {
+    return ("Require at least one file in local_file", undef);
+  }
+
+  my ($err, $fh) = $self->_openVcfPipe($self->local_files->[0]);
+
+  if($err) {
+    return ($err, undef);
+  }
+
+  my $header = <$fh>;
+  chomp $header;
+
+  if(!$header) {
+    return ("Couldn't read intermediate header of $file", undef);
+  }
+
+  my @head = split '\t', $header;
+
+  # TODO: expose all features found in the header of the intermediate output
+  ####### we currently don't because results in name clashes with INFO values
+  ####### i.e bystro-vcf now outputs and "ac" field but we may want "info.ac"
+  my %found = map { $_ => -1 } @$expFeaturesAref; #@head;
+
+  my $idx = -1;
+  for my $f (@head) {
+    $idx++;
+
+    if(defined $found{$f} && $found{$f} != -1) {
+      return ("Found $f at least twice in header of $file", undef);
+    }
+
+    $found{$f} = $idx;
+  }
+
+  my @missing = grep { $found{$_} == -1 } @$expFeaturesAref;
+
+  if(@missing) {
+    return ("Couldn't find all expected header fields, missing: " . join(',', @missing), undef);
+  }
+
+  return (undef, \%found);
+}
+
+sub _getInfoFeatureNames {
+  my $self = shift;
+
+  my %reverseFieldMap = map { $self->fieldMap->{$_} => $_ } keys %{$self->fieldMap};
+
+  my %infoFeatureNames;
+  for my $feature (@{$self->features}) {
+    my $originalName = $reverseFieldMap{$feature} || $feature;
+
+    # If we encounter a name clash, choose the intermediate header output
+    # rather than the field in INFO
+    if(defined $self->{_vcfFeatures}{$originalName}) {
+      $self->log('info', $self->name . ": taking $feature from intermediate header, not INFO");
+      next;
+    }
+
+    $infoFeatureNames{$feature} = $originalName;
+  }
+
+  return \%infoFeatureNames;
+}
+
+# Gets the feature names, indices that will be taken from the
+# vcf pre-processor's header, rather than info
+# @return [][]{featureName: string, headerIdx: int, dbFeatureIdx: int}
+sub _getHeaderFeatures {
+  my $self = shift;
+
+  my %featuresMap;
+  my $features = $self->features;
+
+  for(my $i = 0; $i < @{$features}; $i++) {
+    $featuresMap{$features->[$i]} = $i;
+  }
+
+  if(!defined $featuresMap{alt}) {
+    $self->log('fatal', $self->name . ": 'alt' feature not specified, required for vcf tracks");
+  }
+
+  my %fieldMap = map{ $_ => $self->fieldMap->{$_} } keys %{$self->fieldMap};
+
+  my @headerFeatures;
+  for my $fName (keys %{$self->{_vcfFeatures}}) {
+    my $idx;
+
+    # Because VCF files are so flexible with feature definitions, it will be
+    # difficult to tell if a certain feature just isn't present in a vcf file
+    # Easier to make feature definition flexible, especially since one
+    # may correctly surmise that we read the VCF after transformation to intermediate
+    # annotated format
+
+    if(defined $featuresMap{$fName}) {
+      $idx = $featuresMap{$fName};
+    } elsif(defined $fieldMap{$fName} && defined $featuresMap{$fieldMap{$fName}}) {
+      $idx = $featuresMap{$fieldMap{$fName}};
+    }
+
+    # This $fName isn't requested by the user
+    if(!defined $idx) {
+      next;
+    }
+
+    #Stores:
+    #1) The feature name (post-transformation)
+    #2) The feature's index in the pre-processor's header
+    #3) The index in the database
+    push @headerFeatures, [
+      $self->features->[$idx],
+      $self->{_vcfFeatures}{$fName},
+      $self->getFieldDbName($self->features->[$idx])
+    ];
+  }
+
+
+  return \@headerFeatures;
+}
+
+sub _openVcfPipe {
+  my ($self, $file) = @_;
+
+  my $outputter = Seq::Output::Delimiters->new();
+
+  my $delim = $outputter->emptyFieldChar;
+  my $prog = $self->isCompressedSingle($file) ? $self->gzip . ' ' . $self->decompressArgs : 'cat';
+
+  my $errPath = $file . ".build." . localtime() . ".log";
+
+  my $op = "$prog $file | " . $self->vcfProcessor. " --emptyField $delim" . " --keepId --keepInfo";
+
+  my $fh;
+  my $err = $self->safeOpen($fh, '-|', $op);
+
+  return ($err, $fh);
 }
 
 sub _extractHeader {
@@ -475,8 +548,8 @@ sub _extractHeader {
 }
 
 sub _extractFeatures {
-  my ($self, $fieldsAref, $vcfNameMap, $vcfFilterMap, $fieldDbNames) = @_;
-  
+  my ($self, $fieldsAref, $infoIdx, $multiAlleleIdx, $vcfNameMap, $vcfFilterMap) = @_;
+
   # vcfProcessor will split multiallelics, store the alleleIdx
   # my @infoFields = ;
 
@@ -507,9 +580,9 @@ sub _extractFeatures {
     $returnData[$arr->[2]] = $self->coerceFeatureType($arr->[0], $fieldsAref->[$arr->[1]]);
   }
 
-  my $alleleIdx = $fieldsAref->[-2];
+  my $alleleIdx = $fieldsAref->[$multiAlleleIdx];
 
-  for my $info (split ';', $fieldsAref->[-1]) {
+  for my $info (split ';', $fieldsAref->[$infoIdx]) {
     # If # found == scalar @{$self->features}
     if($found == $totalNeeded) {
       last;
