@@ -21,10 +21,11 @@ has positionDelimiter => (is => 'ro', isa => 'Str', default => '|');
 # need rs1;rs2 allele1_a/allele1_b;allele2_a/allele2_b to keep the order
 # of rs1 => [allele1_a, allele1_b] rs2 => [allele2_a,allele2_b]
 # So in short is expected to be used for the 3rd dimension of a 3D array (3-tensor)
-# [ [ [overlapDelimiter] ] ]
-# Using \ because backslash is, at least in our data very infrequently used
-# Regex requires double escaping of \; need to supply \\\\, which returns \\
-has overlapDelimiter => (is => 'ro', isa => 'Str',  default => "\\\\");
+# Using \ is difficult, and while ASCII provides non-printable separators (28, 29, 30, 31)
+# Excel may take issue with them.
+# So using "control" instead (ASCII 1)
+# ASII 254 (extended) "small black square" works well too
+has overlapDelimiter => (is => 'ro', isa => 'Str',  default => chr(1));
 
 has fieldSeparator => (is => 'ro', isa => 'Str', default => "\t");
 
@@ -51,7 +52,7 @@ has cleanDelims => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
     #    $_[0]
 
     # modified $line ($_[0]) directly
-    #/s modifier to squash multiple
+    #/s modifier to include newline
     $_[0] =~ s/$re/$gr/gs;
     $_[0] =~ s/$reEnd//gs;
   }
@@ -70,9 +71,10 @@ has splitByField => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
     #my ($line) = @_;
     #    $_[0]
 
+    # Since we always expect multiple fields, no need to check index
+
     # modified $line ($_[0]) directly
-    #/s modifier to squash multiple
-    return split /$re/s, $_[0];
+    return split /$re/, $_[0];
   }
 });
 
@@ -94,8 +96,7 @@ has splitByPosition => (is => 'ro', init_arg => undef, lazy => 1, default => sub
     }
 
     # modified $line ($_[0]) directly
-    #/s modifier to squash multiple
-    return split /$re/s, $_[0];
+    return split /$re/, $_[0];
   }
 });
 
@@ -117,8 +118,7 @@ has splitByOverlap => (is => 'ro', init_arg => undef, lazy => 1, default => sub 
     }
 
     # modified $line ($_[0]) directly
-    #/s modifier to squash multiple
-    return split /$re/s, $_[0];
+    return split /$re/, $_[0];
   }
 });
 
@@ -140,8 +140,7 @@ has splitByValue => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
     }
 
     # modified $line ($_[0]) directly
-    #/s modifier to squash multiple
-    return split /$re/s, $_[0];
+    return split /$re/, $_[0];
   }
 });
 

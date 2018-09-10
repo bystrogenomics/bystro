@@ -10,11 +10,14 @@ use DDP;
 
 use Seq::Output::Delimiters;
 
-my $delims = Seq::Output::Delimiters->new();
+my $delims = Seq::Output::Delimiters->new({
+});
 
-my $line = "Stuff;1;2;3\\4\t5/6|7";
+my $oD = $delims->overlapDelimiter;
 
-my $expected = "Stuff,1,2,3,4\t5/6,7";
+my $line = "Stuff;1;2;3\x01.dasf_),"."4\t5/6|7";
+p $line;
+my $expected = "Stuff,1,2,3,.dasf_),4\t5/6,7";
 
 $delims->cleanDelims->($line);
 
@@ -27,7 +30,7 @@ ok(@parts == 2, "Splitting on single quoted tab char ('\\t') still works");
 my @parts2 = split("\t", $line);
 ok(@parts == 2, "Splitting on double quoted tab char (\"\\t\") still works");
 
-$line = "Stuff;;1;;2;;;3\\\\4\t5//6||7|";
+$line = "Stuff;;1;;2;;;3"."$oD$oD$oD"."4\t5//6||7|";
 
 $expected = "Stuff,1,2,3,4\t5//6,7";
 
