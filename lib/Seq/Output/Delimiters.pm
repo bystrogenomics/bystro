@@ -7,6 +7,8 @@ use Mouse 2;
 use DDP;
 with 'Seq::Role::Message';
 
+# TODO: initialize as singleton
+
 has valueDelimiter => (is => 'ro', isa => 'Str', default => ';');
 
 has positionDelimiter => (is => 'ro', isa => 'Str', default => '|');
@@ -23,9 +25,11 @@ has positionDelimiter => (is => 'ro', isa => 'Str', default => '|');
 # So in short is expected to be used for the 3rd dimension of a 3D array (3-tensor)
 # Using \ is difficult, and while ASCII provides non-printable separators (28, 29, 30, 31)
 # Excel may take issue with them.
-# So using "control" instead (ASCII 1)
+# Options "control" instead (ASCII 1)
 # ASII 254 (extended) "small black square" works well too
-has overlapDelimiter => (is => 'ro', isa => 'Str',  default => chr(1));
+# ASCII 31: UNIT Separator; intended for the same purpose of tab, may be more broadly supported
+# than other non-printable characters
+has overlapDelimiter => (is => 'ro', isa => 'Str',  default => chr(31));
 
 has fieldSeparator => (is => 'ro', isa => 'Str', default => "\t");
 

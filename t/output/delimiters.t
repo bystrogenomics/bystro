@@ -15,13 +15,13 @@ my $delims = Seq::Output::Delimiters->new({
 
 my $oD = $delims->overlapDelimiter;
 
-my $line = "Stuff;1;2;3\x01.dasf_),"."4\t5/6|7";
-p $line;
+my $line = "Stuff;1;2;3\x1F.dasf_),"."4\t5/6|7";
+
 my $expected = "Stuff,1,2,3,.dasf_),4\t5/6,7";
 
 $delims->cleanDelims->($line);
 
-ok($line eq $expected, "Clean all delimiters, even backslash");
+ok($line eq $expected, "Clean all delimiters, including UNIT SEPARATOR by default");
 
 my @parts = split('\t', $line);
 

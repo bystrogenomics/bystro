@@ -33,36 +33,39 @@ my $seq = Seq::Tracks::Build->new({
     files_dir => './t/tracks/build/db/raw',
 });
 
-my $str = "1: Homo sapiens BRCA1/BRCA2-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)";
+# unit separator
+my $overlap = "\x1f";
+
+my $str = '1: Homo sapiens BRCA1/BRCA2-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
 my $expected = '1: Homo sapiens BRCA1/BRCA2-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
 my $res = $seq->coerceFeatureType('someString', $str);
 
 #modifies passed string, and also returns the modified value
-ok($res eq $str && $str eq $expected,"Can clean string containing /");
+ok($res eq $str && $str eq $expected,'Can clean string containing /');
 
-$str = "2: Homo sapiens BRCA1\x01BRCA2-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)";
+$str = '2: Homo sapiens BRCA1'. $overlap . 'BRCA2-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
 $expected = '2: Homo sapiens BRCA1,BRCA2-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
 $res = $seq->coerceFeatureType('someString', $str);
-p $res;
-ok($res eq $str && $str eq $expected,'Can clean string containing \x01');
 
-$str = "3: Homo sapiens BRCA1\x01BRCA2-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)";
+ok($res eq $str && $str eq $expected,'Can clean string containing \x1f');
+
+$str = '3: Homo sapiens BRCA1'. $overlap . 'BRCA2-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
 $expected = '3: Homo sapiens BRCA1,BRCA2-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
 $res = $seq->coerceFeatureType('someString', $str);
 
-ok($res eq $str && $str eq $expected, 'Can clean string containing 2 \\');
+ok($res eq $str && $str eq $expected, 'Can clean string containing 2 \x1f');
 
-$str = "4: Homo sapiens BRCA1\x01(BRCA2)-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)";
+$str = '4: Homo sapiens BRCA1'. $overlap . '(BRCA2)-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
 $expected = '4: Homo sapiens BRCA1,(BRCA2)-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
 $res = $seq->coerceFeatureType('someString', $str);
 
-ok($res eq $str && $str eq $expected,'Can clean string containing \\(');
+ok($res eq $str && $str eq $expected,'Can clean string containing \x1f(');
 
-$str = "5: Homo sapiens BRCA1\x01.(BRCA2)-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)";
+$str = '5: Homo sapiens BRCA1'. $overlap . '.(BRCA2)-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
 $expected = '5: Homo sapiens BRCA1,.(BRCA2)-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
 $res = $seq->coerceFeatureType('someString', $str);
 
-ok($res eq $str && $str eq $expected,'Can clean string containing \\.(');
+ok($res eq $str && $str eq $expected,'Can clean string containing \x1f.(');
 
 $str = '6: Homo sapiens BRCA1|(BRCA2)-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
 $expected = '6: Homo sapiens BRCA1,(BRCA2)-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
@@ -113,12 +116,12 @@ $res = $seq->coerceFeatureType('someString', $test);
 
 ok(!defined $test && !defined $res);
 
-$test="NA\x01";
+$test='NA' . $overlap;
 $res = $seq->coerceFeatureType('someString', $test);
 
 ok(!defined $test && !defined $res);
 
-$test="NA\x01";
+$test='NA' . $overlap;
 $res = $seq->coerceFeatureType('someString', $test);
 
 ok(!defined $test && !defined $res);
@@ -143,6 +146,6 @@ $expected = '. Hello World';
 $test='. Hello World';
 $res = $seq->coerceFeatureType('someString', $test);
 
-ok($test eq $res && $res eq $expected, "Doesn't strip valued sentences of undef-flagged characters");
+ok($test eq $res && $res eq $expected, 'Doesn\'t strip valued sentences of undef-flagged characters');
 
 done_testing();
