@@ -120,7 +120,15 @@ sub BUILD {
     #index 11
     $self->missingnessField,
     #index 12
+    $self->acField,
+    #index 13
+    $self->anField,
+    #index 14
     $self->sampleMafField,
+    #index 15
+    # $self->vcfPos,
+    # #index 16
+    # $self->idField,
   ], undef, 1);
 
   $self->{_lastHeaderIdx} = $#{$headers->get()};
