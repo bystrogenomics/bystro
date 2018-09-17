@@ -25,7 +25,8 @@ cpanm install PerlIO::utf8_strict
 cpanm install PerlIO::gzip
 cpanm install MouseX::SimpleConfig
 cpanm install MouseX::ConfigFromFile
-cpanm install MouseX::Getopt
+# Fails with 5.28.0 for silly reasons related to help print
+cpanm install MouseX::Getopt -f 
 cpanm install Archive::Extract
 cpanm install DBI
 # Needed for fetching SQL (Utils::SqlWriter::Connection)
@@ -35,6 +36,8 @@ cpanm install Beanstalk::Client
 
 cpanm install Math::Round
 cpanm install Sys::CpuAffinity
+
+cpanm install Statistics::Distributions
 
 # Needed for bin/annotate.pl
 cpanm install Hash::Merge::Simple
