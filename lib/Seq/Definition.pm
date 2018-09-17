@@ -73,6 +73,7 @@ has outputFilesInfo => (is => 'ro', isa => 'HashRef', init_arg => undef, lazy =>
   my $outBaseName = $self->outBaseName;
 
   $out{annotation} = $outBaseName . '.annotation.tsv' . ($self->compress ? ".gz" : "");
+  $out{sampleList} = $outBaseName . '.sample_list';
 
   # Must be lazy in order to allow "revealing module pattern", with __statisticsRunner below
   if($self->run_statistics) {
@@ -141,39 +142,52 @@ has _statisticsRunner => (is => 'ro', init_arg => undef, lazy => 1, default => s
   return undef;
 });
 
+# TODO: This assumes that if workingDir != outDir, the working dir is only for annotation files
+# TODO: Properly set write permissions
 sub _moveFilesToOutputDir {
   my $self = shift;
 
-  my $workingDir = $self->_workingDir->stringify;
-  my $outDir = $self->outDir->stringify;
+  my $err;
+  my $outDir = $self->outDir->stringify();
 
   if($self->archive) {
-    my $supportFiles = join(",", grep { $_ !~ $self->outputFilesInfo->{annotation} } glob($self->_workingDir->child('*')->stringify));
+    my $an = $self->outputFilesInfo->{annotation};
+    my @files = grep { $_ !~ $an } glob($self->_workingDir->child('*')->stringify);
 
-    # First cp the support files, including statistics
-    my $result = system("cp {$supportFiles} $outDir; sync");
+    for my $file (@files) {
+      $err = $self->safeSystem("cp $file $outDir");
 
-    if($result) {
-      $self->log('error', "Error copying support files: $!");
+      if($err) {
+        return $err;
+      }
     }
 
-    my $compressErr = $self->compressDirIntoTarball( $self->_workingDir, $self->outputFilesInfo->{archived} );
+    # Without the 2 sync operations, support files go missing
+    # This simply executes each operation in turn, or receivs an error early
+    $err = $self->safeSystem("sync")
+           ||
+           $self->compressDirIntoTarball( $self->_workingDir, $self->outputFilesInfo->{archived} )
+           ||
+           $self->safeSystem("sync");
 
-    if($compressErr) {
-      return $compressErr;
+
+    if($err) {
+      return $err;
     }
   }
 
   if( $self->outDir eq $self->_workingDir) {
     $self->log('debug', "Nothing to move, workingDir equals outDir");
-    return 0;
+    return;
   }
 
   $self->log('info', "Moving output file to EFS or S3");
 
-  my $result = system("mv $workingDir/* $outDir; sync");
+  my $workDir = $self->_workingDir->stringify();
 
-  return $result ? $! : 0;
+  $err = $self->safeSystem("mv $workDir/* $outDir && chmod 766 $outDir/*; sync");
+
+  return $err;
 }
 
 # Replaces periods with _

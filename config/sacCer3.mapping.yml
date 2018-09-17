@@ -284,6 +284,10 @@ mappings:
       type: half_float
     sampleMaf:
       type: half_float
+    ac:
+      type: integer
+    an:
+      type: integer
     alt:
       type: keyword
       normalizer: uppercase_normalizer

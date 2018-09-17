@@ -68,6 +68,10 @@ sub BUILD {
   # Must come before statistics, which relies on a configured Seq::Tracks
   #Expects DBManager to have been given a database_dir
   $self->{_db} = Seq::DBManager->new();
+
+  # Initializes the tracks
+  # This ensures that the tracks are configured, and headers set
+  $self->{_tracks} = $self->tracksObj;
 }
 
 sub annotate {
@@ -129,103 +133,53 @@ sub annotate {
 }
 
 sub annotateFile {
-  #Inspired by T.S Wingo: https://github.com/wingolab-org/GenPro/blob/master/bin/vcfToSnp
+   #Inspired by T.S Wingo: https://github.com/wingolab-org/GenPro/blob/master/bin/vcfToSnp
   my $self = shift;
   my $type = shift;
 
-  ########### Create DBManager instance, and instantiate track singletons #########
-  my $db = $self->{_db};
+  my ($err, $fh, $outFh, $statsFh) = $self->_getFileHandles($type);
 
-  # We separate out the reference track getter so that we can check for discordant
-  # bases, and pass the true reference base to other getters that may want it (like CADD)
-  # Store these references as hashes, to avoid accessor penalty
-  my $refTrackGetter = $self->tracksObj->getRefTrackGetter();
-  my @trackGettersExceptReference = @{$self->tracksObj->getTrackGettersExceptReference()};
-
-  ################### Creates the output file handler #################
-  # Used in makeAnnotationString
-  my $errPath = $self->_workingDir->child($self->input_file->basename . '.file-log.log');
-
-  my $inPath = $self->inputFilePath;
-  my $echoProg = $self->isCompressedSingle($inPath) ? $self->gzip . ' ' . $self->decompressArgs : 'cat';
-
-  my $fh;
-
-  if(!$self->fileProcessors->{$type}) {
-    $self->_errorWithCleanup("No fileProcessors defined for $type file type");
+  if($err) {
+    $self->_errorWithCleanup($err);
+    return ($err, undef);
   }
 
-  # TODO: add support for GQ filtering in vcf
-  open($fh, '-|', "$echoProg $inPath | " . $self->fileProcessors->{$type}{program} . " " . $self->fileProcessors->{$type}{args} . " 2> $errPath");
-
-  # If user specified a temp output path, use that
-  my $outFh = $self->get_write_fh( $self->{_outPath} );
-
   ########################## Write the header ##################################
-
-  ######### Build the header, and write it as the first line #############
-  my $finalHeader = Seq::Headers->new();
-
   my $header = <$fh>;
-
   $self->setLineEndings($header);
 
-  chomp $header;
-
-  my @headerFields = split '\t', $header;
-
-  # Our header class checks the name of each feature
-  # It may be, more than likely, that the pre-processor names the 4th column 'ref'
-  # We replace this column with trTv
-  # This not only now reflects its actual function
-  # but prevents name collision issues resulting in the wrong header idx
-  # being generated for the ref track
-  $headerFields[3] = $self->discordantField;
-
-  # Bystro takes data from a file pre-processor, which spits out a common
-  # intermediate format
-  # This format is very flexible, in fact Bystro doesn't care about the output
-  # of the pre-processor, provided that the following is found in the corresponding
-  # indices:
-  # idx 0: chromosome,
-  # idx 1: position
-  # idx 3: the reference (we rename this to discordant)
-  # idx 4: the alternate allele
-
-  # Prepend all of the headers created by the pre-processor
-  $finalHeader->addFeaturesToHeader(\@headerFields, undef, 1);
-
+  my $finalHeader = $self->_getFinalHeader($header);
   my $outputHeader = $finalHeader->getString();
 
   say $outFh $outputHeader;
 
-  # Now that header is prepared, make the outputter
-  my $outputter = Seq::Output->new({header => $finalHeader});
-
-  ########################## Tell stats program about our annotation ##############
-  # TODO: error handling if fh fails to open
-  my $statsFh;
-  if($self->run_statistics) {
-    my $args = $self->_statisticsRunner->getStatsArguments();
-    open($statsFh, "|-", $args);
-
+  if($statsFh) {
     say $statsFh $outputHeader;
   }
 
+  # Now that header is prepared, make the outputter
+  my $outputter = Seq::Output->new({header => $finalHeader});
+
+  ######################## Build the fork pool #################################
   my $abortErr;
 
+  my $messageFreq = (2e4 / 4) * $self->max_threads;
+
   # Report every 1e4 lines, to avoid thrashing receiver
-  my $progressFunc = $self->makeLogProgressAndPrint(\$abortErr, $outFh, $statsFh, 2e4);
+  my $progressFunc = $self->makeLogProgressAndPrint(\$abortErr, $outFh, $statsFh, $messageFreq);
   MCE::Loop::init {
     max_workers => $self->max_threads || 8, use_slurpio => 1,
     # bystro-vcf outputs a very small row; fully annotated through the alt column (-ref -discordant)
     # so accumulate less than we would if processing full .snp
-    chunk_size => $self->{_chunkSize} > 4192 ? "4192K" : $self->{_chunkSize}. "K",
+    chunk_size => $self->{_chunkSize} > 8192 ? "8192K" : $self->{_chunkSize}. "K",
     gather => $progressFunc,
   };
 
-  my $trackIndices = $finalHeader->getParentFeaturesMap();
+  my $db = $self->{_db};
+  my $refTrackGetter = $self->{_tracks}->getRefTrackGetter();
+  my @trackGettersExceptReference = @{$self->{_tracks}->getTrackGettersExceptReference()};
 
+  my $trackIndices = $finalHeader->getParentFeaturesMap();
   my $refTrackIdx = $trackIndices->{$refTrackGetter->name};
 
   my %wantedChromosomes = %{ $refTrackGetter->chromosomes };
@@ -374,7 +328,7 @@ sub annotateFile {
 
   system('sync');
 
-  my $err = $self->_moveFilesToOutputDir();
+  $err = $self->_moveFilesToOutputDir();
 
   # If we have an error moving the output files, we should still return all data
   # that we can
@@ -432,6 +386,99 @@ sub makeLogProgressAndPrint {
       print $outFh $_[3];
     }
   }
+}
+
+sub _getFileHandles {
+  my ($self, $type) = @_;
+
+  my ($outFh, $statsFh, $inFh);
+  my $err;
+
+  ($err, $inFh) = $self->_openAnnotationPipe($type);
+
+  if($err) {
+    return ($err,  undef, undef, undef);
+  }
+
+  if($self->run_statistics) {
+    ########################## Tell stats program about our annotation ##############
+    # TODO: error handling if fh fails to open
+    my $statArgs = $self->_statisticsRunner->getStatsArguments();
+
+    $err = $self->safeOpen($statsFh, "|-", $statArgs);
+
+    if($err) {
+      return ($err,  undef, undef, undef);
+    }
+  }
+
+  # $fhs{stats} = $$statsFh;
+  $outFh = $self->get_write_fh($self->{_outPath});
+
+  return (undef, $inFh, $outFh, $statsFh);
+}
+
+sub _openAnnotationPipe {
+  my ($self, $type) = @_;
+
+  my $errPath = $self->_workingDir->child($self->input_file->basename . '.file-log.log');
+
+  my $inPath = $self->inputFilePath;
+  my $echoProg = $self->isCompressedSingle($inPath) ? $self->gzip . ' ' . $self->decompressArgs : 'cat';
+
+  if(!$self->fileProcessors->{$type}) {
+    $self->_errorWithCleanup("No fileProcessors defined for $type file type");
+  }
+
+  my $fp = $self->fileProcessors->{$type};
+  my $args = $fp->{program} . " " . $fp->{args};
+
+  my $fh;
+
+  for my $type (keys %{$self->outputFilesInfo}) {
+    if(index($args, "\%$type\%") > -1) {
+      substr($args, index($args, "\%$type\%"), length("\%$type\%"))
+        = $self->_workingDir->child($self->outputFilesInfo->{$type});
+    }
+  }
+
+  # TODO:  add support for GQ filtering in vcf
+  my $err = $self->safeOpen($fh, '-|', "$echoProg $inPath | $args 2> $errPath");
+
+  return ($err, $fh);
+}
+
+sub _getFinalHeader {
+  my ($self, $header) = @_;
+  ######### Build the header, and write it as the first line #############
+  my $finalHeader = Seq::Headers->new();
+
+  chomp $header;
+
+  my @headerFields = split '\t', $header;
+
+  # Our header class checks the name of each feature
+  # It may be, more than likely, that the pre-processor names the 4th column 'ref'
+  # We replace this column with trTv
+  # This not only now reflects its actual function
+  # but prevents name collision issues resulting in the wrong header idx
+  # being generated for the ref track
+  $headerFields[3] = $self->discordantField;
+
+  # Bystro takes data from a file pre-processor, which spits out a common
+  # intermediate format
+  # This format is very flexible, in fact Bystro doesn't care about the output
+  # of the pre-processor, provided that the following is found in the corresponding
+  # indices:
+  # idx 0: chromosome,
+  # idx 1: position
+  # idx 3: the reference (we rename this to discordant)
+  # idx 4: the alternate allele
+
+  # Prepend all of the headers created by the pre-processor
+  $finalHeader->addFeaturesToHeader(\@headerFields, undef, 1);
+
+  return $finalHeader;
 }
 
 sub _errorWithCleanup {
