@@ -35,7 +35,7 @@ fileProcessors:
     args: --emptyField ! --minGq .95
     program: bystro-snp
   vcf:
-    args: --emptyField ! --keepId --keepPos
+    args: --emptyField ! --sample %sampleList%
     program: bystro-vcf
 statistics:
   dbSNPnameField: dbSNP.name
