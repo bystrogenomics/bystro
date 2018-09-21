@@ -2,8 +2,6 @@
 
 echo -e "\n\nInstalling perl libs\n"
 
-echo "PERL ROOT IN install/install-perl-libs.sh: $PERLBREW_ROOT"
-
 cpanm install Mouse
 cpanm install Path::Tiny
 cpanm install namespace::autoclean
