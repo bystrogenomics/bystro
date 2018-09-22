@@ -2,4 +2,4 @@
 
 echo -e "\n\nUpdating go packages\n"
 
-go get -u all
+go get -u github.com/akotlar/...
