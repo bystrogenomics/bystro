@@ -50,7 +50,7 @@ sub get {
 
   my $data = $_[1]->[$_[0]->{_dbName}];
 
-  if(!defined $data) {
+  if(!$data) {
     return $_[6];
   }
 

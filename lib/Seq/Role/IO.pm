@@ -377,6 +377,9 @@ sub getCompressedFileSize {
 sub getChunkSize {
   my ($self, $filePath, $parts, $min, $max) = @_;
 
+  # If given 0
+  $parts ||= 1;
+
   if(!$min) {
     $min = 512;
   }

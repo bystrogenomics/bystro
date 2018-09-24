@@ -154,9 +154,6 @@ sub annotateFile {
     say $statsFh $outputHeader;
   }
 
-  # Now that header is prepared, make the outputter
-  my $outputter = Seq::Output->new({header => $finalHeader});
-
   ######################## Build the fork pool #################################
   my $abortErr;
 
@@ -179,12 +176,29 @@ sub annotateFile {
   my $db = $self->{_db};
   my $refTrackGetter = $self->tracksObj->getRefTrackGetter();
   my @trackGettersExceptReference = @{$self->tracksObj->getTrackGettersExceptReference()};
+  my @trackIndicesExceptReference = 0 .. $#trackGettersExceptReference;
 
-  my $trackIndices = $finalHeader->getParentIndices();
-  my $refTrackIdx = $trackIndices->{$refTrackGetter->name};
+  my $outIndicesMap = $finalHeader->getParentIndices();
+  my @outIndicesExceptReference = map { $outIndicesMap->{$_->name} } @trackGettersExceptReference;
+
+  ######### Set Outputter #########
+  my @allOutIndices = map { $outIndicesMap->{$_->name} } @{$self->tracksObj->trackGetters};
+
+  # Now that header is prepared, make the outputter
+  # Note, that the only features that we need to iterate over
+  # Are the features that come from our database
+  # Meaning, we can skip anything forwarded from the pre-processor
+  my $outputter = Seq::Output->new({header => $finalHeader, trackOutIndices => \@allOutIndices});
+
+  ###### Processes pre-processor output passed from file reader/producer #######
+  my $refTrackOutIdx = $outIndicesMap->{$refTrackGetter->name};
 
   my %wantedChromosomes = %{ $refTrackGetter->chromosomes };
   my $maxDel = $self->maxDel;
+
+  #Accessors are amazingly slow; it takes as long to call ->name as track->get
+  #after accounting for the nubmer of calls to ->name
+  # my @trackNames = map { $_->name } @{$self->_tracks};
 
   # This is going to be copied on write... avoid a bunch of function calls
   # Each thread will get its own %cursors object
@@ -207,6 +221,7 @@ sub annotateFile {
     my @lines;
     my $dataFromDbAref;
     my $zeroPos;
+
     # Each line is expected to be
     # chrom \t pos \t type \t inputRef \t alt \t hets \t homozygotes \n
     # the chrom is always in ucsc form, chr (the golang program guarantees it)
@@ -281,27 +296,32 @@ sub annotateFile {
       if(@indelDbData) {
         ############### Gather all track data (besides reference) #################
         for my $posIdx (0 .. $#indelDbData) {
-          for my $track (@trackGettersExceptReference) {
-            $fields[$trackIndices->{$track->name}] //= [];
+          for my $trackIndex (@trackIndicesExceptReference) {
+            $fields[$outIndicesExceptReference[$trackIndex]] //= [];
 
-            $track->get($indelDbData[$posIdx], $fields[0], $indelRef[$posIdx], $fields[4], $posIdx,
-              $fields[$trackIndices->{$track->name}], $zeroPos + $posIdx);
+            $trackGettersExceptReference[$trackIndex]->get(
+              $indelDbData[$posIdx], $fields[0], $indelRef[$posIdx], $fields[4], $posIdx,
+              $fields[$outIndicesExceptReference[$trackIndex]], $zeroPos + $posIdx
+            );
           }
 
-          $fields[$refTrackIdx][$posIdx] = $indelRef[$posIdx];
+          $fields[$refTrackOutIdx][$posIdx] = $indelRef[$posIdx];
         }
 
         # If we have multiple indel alleles at one position, need to clear stored values
         @indelDbData = ();
         @indelRef = ();
       } else {
-        for my $track (@trackGettersExceptReference) {
-          $fields[$trackIndices->{$track->name}] //= [];
-          $track->get($dataFromDbAref, $fields[0], $fields[3], $fields[4], 0,
-            $fields[$trackIndices->{$track->name}], $zeroPos);
+         for my $trackIndex (@trackIndicesExceptReference) {
+          $fields[$outIndicesExceptReference[$trackIndex]] //= [];
+
+          $trackGettersExceptReference[$trackIndex]->get(
+            $dataFromDbAref, $fields[0], $fields[3], $fields[4], 0,
+            $fields[$outIndicesExceptReference[$trackIndex]], $zeroPos
+          );
         }
 
-        $fields[$refTrackIdx][0] = $refTrackGetter->get($dataFromDbAref);
+        $fields[$refTrackOutIdx][0] = $refTrackGetter->get($dataFromDbAref);
       }
 
        # 3 holds the input reference, we'll replace this with the discordant status

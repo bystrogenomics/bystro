@@ -76,7 +76,7 @@ sub get {
   #the value they stored
   if(!$_[0]->{_fIdx}) {
     #$outAccum->[$posIdx] = $href->[ $self->{_dbName} ]
-    $_[6]->[$_[5]] = $_[1]->[ $_[0]->{_dbName} ];
+    # $_[6]->[$_[5]] = $_[1]->[ $_[0]->{_dbName} ];
 
     #return #$outAccum;
     return $_[6];

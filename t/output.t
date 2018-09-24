@@ -6,16 +6,33 @@ use Test::More;
 use Seq::Output;
 use Seq::Headers;
 use Seq::Output::Delimiters;
-
+use DDP;
 my $head = Seq::Headers->new();
 
-$head->addFeaturesToHeader(['c1', 'c2', 'c3'], 'track1');
+$head->addFeaturesToHeader('preProcessorHeader1');
+$head->addFeaturesToHeader(['c1a', 'c1b', 'c1c'], 'withFeaturesTrack1');
 $head->addFeaturesToHeader('scalarTrack2');
-$head->addFeaturesToHeader(['c1a', 'c2a'], 'track3');
+$head->addFeaturesToHeader(['c2a', 'c2b'], 'withFeaturesTrack2');
 
-my $outputter = Seq::Output->new({header => $head});
+# trackOutIndices simply tracks Seq features apart from those passed in by
+# a pre-processor
+# this allows us to skip iterating over very long feature arrays on which we do no work
+my $outputter = Seq::Output->new({header => $head, trackOutIndices => [1, 2, 3]});
 
 my $delims = Seq::Output::Delimiters->new();
+
+my $header = $head->getOrderedHeader();
+
+ok(@$header == 4, "Output header matches # of tracks");
+ok(@{$header->[1]} == 3, "First package-defined track has 3 features");
+ok(!ref $header->[2], "Second track has 1 feature");
+ok(@{$header->[3]} == 2, "Third track has 2 features");
+
+my $hStr = $head->getString();
+
+my @headFields = split($delims->fieldSeparator, $hStr);
+
+ok(@headFields == 7, "String header contains all expected fields, including those from pre-processor");
 
 # Everything is output as an array
 # The first level is a track
@@ -32,81 +49,45 @@ my $delims = Seq::Output::Delimiters->new();
 # ###### Outer array is for feature
 # ###### 1st inner array is for position (in indel)
 # ###### 2nd inner array is for multiple values for that feature at that position
-my $expected;
+my $expected = "somePreProcessorVal";
 
 my @t1_f1;
 my @t1_f2;
 my @t1_f3;
 
-$t1_f1[0] = ['transcript1', 'transcript2'];
-$expected = 'transcript1' . $delims->valueDelimiter . 'transcript2';
+my @row = ("somePreProcessorVal", [], [], []);
 
-$t1_f2[0] = [ ['t1_val2_sub_sub1', 't1_val2_sub_sub2'], 't1_val2_sub1' ];
-$expected .= $delims->fieldSeparator
-          . "t1_val2_sub_sub1". $delims->overlapDelimiter . 't1_val2_sub_sub2'
-          . $delims->valueDelimiter . 't1_val2_sub1';
+# No indel
+my $posIdx = 0;
 
-$t1_f3[0] = ['t1_val3'];
-$expected .= $delims->fieldSeparator
-          . 't1_val3';
+my @valsTrack1 = ('transcript1', 'transcript2', "transcript3");
 
-my @t1;
-$t1[0] = \@t1_f1;
-$t1[1] = \@t1_f2;
-$t1[2] = \@t1_f3;
+$row[1][0][$posIdx] = $valsTrack1[0];
+$row[1][1][$posIdx] = $valsTrack1[1];
+$row[1][2][$posIdx] = $valsTrack1[2];
 
-my @t2_f1;
-$t2_f1[0] = 'scalar1';
-$expected .= $delims->fieldSeparator
-          . 'scalar1';
+$expected .= $delims->fieldSeparator . join($delims->fieldSeparator, @valsTrack1);
 
-my @t2;
-$t2[0] = \@t2_f1;
+my $valTrack2 = "someScalarVal1";
 
-my @t3_f1;
-$t3_f1[0] = 't3_val1';
-$expected .= $delims->fieldSeparator
-          . 't3_val1';
+$row[2][$posIdx] = $valTrack2;
 
-my @t3_f2;
-$t3_f2[0] = ['t3_val2_sub1', 't3_val2_sub2'];
-$expected .= $delims->fieldSeparator
-          . 't3_val2_sub1' . $delims->valueDelimiter . 't3_val2_sub2'
-          . "\n";
+$expected .= $delims->fieldSeparator . $valTrack2;
 
-my @t3;
-$t3[0] = \@t3_f1;
-$t3[1] = \@t3_f2;
+my @valsTrack2 = ('track3_feat1', 'track3_feat2');
 
-my @out;
+$row[3][0][$posIdx] = $valsTrack2[0];
+$row[3][1][$posIdx] = $valsTrack2[1];
 
-#track1;
-$out[0] = \@t1;
-#track2;
-$out[1] = \@t2;
-#track3;
-$out[2] = \@t3;
+$expected .= $delims->fieldSeparator . join($delims->fieldSeparator, @valsTrack2) . "\n";
 
-
-my $header = $head->getOrderedHeader();
-
-ok(@$header == 3, "Output header matches # of tracks");
-ok(@{$header->[0]} == 3, "First track has 3 features");
-ok(!ref $header->[1], "Second track has 1 feature");
-ok(@{$header->[2]} == 2, "Third track has 2 features");
-
-my @rows;
-$rows[0] = \@out;
+my @rows = (\@row);
 
 my $str = $outputter->makeOutputString(\@rows);
 
 ok($str eq $expected, "Can make complex output string with nested features, and with overlapping values");
 
-my $hStr = $head->getString();
-
-my @headFields = split($delims->fieldSeparator, $hStr);
 my @rowFields = split($delims->fieldSeparator, $str);
-
 ok(@headFields == @rowFields, "Output string length matches flattened header length");
 
 done_testing();
