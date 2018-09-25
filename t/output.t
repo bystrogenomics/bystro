@@ -12,7 +12,7 @@ my $head = Seq::Headers->new();
 $head->addFeaturesToHeader('preProcessorHeader1');
 $head->addFeaturesToHeader(['c1a', 'c1b', 'c1c'], 'withFeaturesTrack1');
 $head->addFeaturesToHeader('scalarTrack2');
-$head->addFeaturesToHeader(['c2a', 'c2b'], 'withFeaturesTrack2');
+$head->addFeaturesToHeader(['c2a', 'c2b', 'c2c_overlapped_vals'], 'withFeaturesTrack2');
 
 # trackOutIndices simply tracks Seq features apart from those passed in by
 # a pre-processor
@@ -26,13 +26,13 @@ my $header = $head->getOrderedHeader();
 ok(@$header == 4, "Output header matches # of tracks");
 ok(@{$header->[1]} == 3, "First package-defined track has 3 features");
 ok(!ref $header->[2], "Second track has 1 feature");
-ok(@{$header->[3]} == 2, "Third track has 2 features");
+ok(@{$header->[3]} == 3, "Third track has 2 features");
 
 my $hStr = $head->getString();
 
 my @headFields = split($delims->fieldSeparator, $hStr);
 
-ok(@headFields == 7, "String header contains all expected fields, including those from pre-processor");
+ok(@headFields == 8, "String header contains all expected fields, including those from pre-processor");
 
 # Everything is output as an array
 # The first level is a track
@@ -74,12 +74,18 @@ $row[2][$posIdx] = $valTrack2;
 
 $expected .= $delims->fieldSeparator . $valTrack2;
 
-my @valsTrack2 = ('track3_feat1', 'track3_feat2');
+# Separate delimiters so that one can clearly see that track3_feat3_*
+# have a relationship with track3_feat3_val1
+my @valsTrack2 = ('track3_feat1', 'track3_feat2', ['track3_feat3_val1', ['track3_feat3_val2_overlap1', 'track3_feat3_val2_overlap2']]);
 
 $row[3][0][$posIdx] = $valsTrack2[0];
 $row[3][1][$posIdx] = $valsTrack2[1];
+$row[3][2][$posIdx] = $valsTrack2[2];
 
-$expected .= $delims->fieldSeparator . join($delims->fieldSeparator, @valsTrack2) . "\n";
+my $nestedVals = join($delims->overlapDelimiter, @{$valsTrack2[2][1]});
+my $track3field3val = join($delims->valueDelimiter, $valsTrack2[2][0], $nestedVals);
+
+$expected .= $delims->fieldSeparator . join($delims->fieldSeparator, @valsTrack2[0..1], $track3field3val) . "\n";
 
 my @rows = (\@row);
 
@@ -88,6 +94,7 @@ my $str = $outputter->makeOutputString(\@rows);
 ok($str eq $expected, "Can make complex output string with nested features, and with overlapping values");
 
 my @rowFields = split($delims->fieldSeparator, $str);
+
 ok(@headFields == @rowFields, "Output string length matches flattened header length");
 
 done_testing();

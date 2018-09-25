@@ -139,11 +139,6 @@ sub makeOutputString {
 
       # If this track is missing altogether it will be an empty array
       # But it will be an array
-      # if(!defined $row->[$oIdx][0]) {
-      #   $row->[$oIdx] = $info->[2];
-
-      #   next;
-      # }
 
       for my $featIdx (0 .. $featCounts->[$oIdx]) {
         if(!defined $row->[$oIdx][$featIdx]) {
@@ -155,9 +150,6 @@ sub makeOutputString {
         # Typically, we have no indel
         # Which means the feature has only 1 value
         if(@{$row->[$oIdx][$featIdx]} == 1) {
-          # say STDERR "TRUE";
-          # p $row->[$oIdx][$featIdx];
-
           if(!defined $row->[$oIdx][$featIdx][0]) {
             $row->[$oIdx][$featIdx] = $missChar;
             next;
@@ -183,7 +175,7 @@ sub makeOutputString {
                   $_
                 )
               : $missChar
-            } @{$row->[$oIdx][$featIdx]}
+            } @{$row->[$oIdx][$featIdx][0]}
           );
 
           next;
@@ -226,8 +218,6 @@ sub makeOutputString {
           } @$posData);
         }
 
-        # say "HERE";
-        # p $row->[$oIdx][$featIdx];
         $row->[$oIdx][$featIdx] = join($posDelim, @{$row->[$oIdx][$featIdx]});
       }
 
