@@ -1,7 +1,7 @@
 ---
 assembly: hg19
 build_author: ec2-user
-build_date: 2018-09-08T18:46:00
+build_date: 2018-10-02T16:54:00
 chromosomes:
 - chr1
 - chr2
@@ -34,7 +34,7 @@ fileProcessors:
     args: --emptyField ! --minGq .95
     program: bystro-snp
   vcf:
-    args: --emptyField ! --sample %sampleList --keepId
+    args: --emptyField ! --sample %sampleList% --keepId --keepPos
     program: bystro-vcf
 files_dir: '~'
 statistics:
@@ -64,7 +64,7 @@ tracks:
   - clinvar
   tracks:
   - build_author: ec2-user
-    build_date: 2018-09-08T18:46:00
+    build_date: 2018-10-02T16:54:00
     local_files:
     - chr*.fa.gz
     name: ref
@@ -100,9 +100,9 @@ tracks:
         - chrY.fa.gz
       completed: 2017-02-04T22:36:00
       name: fetch
-    version: 9
+    version: 10
   - build_author: ec2-user
-    build_date: 2018-09-08T18:46:00
+    build_date: 2018-10-02T16:54:00
     dist: true
     features:
     - name2
@@ -113,9 +113,9 @@ tracks:
     name: nearest.refSeq
     to: txEnd
     type: nearest
-    version: 2
+    version: 3
   - build_author: ec2-user
-    build_date: 2018-09-08T18:46:00
+    build_date: 2018-10-02T16:54:00
     dist: true
     features:
     - name2
@@ -125,9 +125,9 @@ tracks:
     - hg19.kgXref.chr*.with_dbnsfp.gz
     name: nearestTss.refSeq
     type: nearest
-    version: 2
+    version: 3
   - build_author: ec2-user
-    build_date: 2018-09-08T18:46:00
+    build_date: 2018-10-02T16:54:00
     local_files:
     - chr*.phastCons100way.wigFix.gz
     name: phastCons
@@ -163,9 +163,9 @@ tracks:
         - chrM.phastCons100way.wigFix.gz
       completed: 2017-02-04T16:52:00
       name: fetch
-    version: 9
+    version: 10
   - build_author: ec2-user
-    build_date: 2018-09-08T18:46:00
+    build_date: 2018-10-02T16:54:00
     local_files:
     - chr*.phyloP100way.wigFix.gz
     name: phyloP
@@ -201,9 +201,9 @@ tracks:
         - chrM.phyloP100way.wigFix.gz
       completed: 2017-02-03T20:57:00
       name: fetch
-    version: 9
+    version: 10
   - build_author: ec2-user
-    build_date: 2018-09-08T18:46:00
+    build_date: 2018-10-02T16:54:00
     local_files:
     - whole_genome_SNVs.tsv.chr1.organized-by-chr.txt.sorted.txt.gz
     - whole_genome_SNVs.tsv.chr10.organized-by-chr.txt.sorted.txt.gz
@@ -240,9 +240,9 @@ tracks:
       name: fetch
     - completed: 2018-09-05T17:10:00
       name: SortCadd
-    version: 9
+    version: 10
   - build_author: ec2-user
-    build_date: 2018-09-08T18:46:00
+    build_date: 2018-10-02T16:54:00
     build_field_transformations:
       description: split [;]
       ensemblID: split [;]
@@ -278,30 +278,30 @@ tracks:
       - chromEnd
       track: clinvar
     local_files:
-    - hg19.kgXref.chr1.with_dbnsfp.gz
-    - hg19.kgXref.chr4.with_dbnsfp.gz
-    - hg19.kgXref.chr3.with_dbnsfp.gz
     - hg19.kgXref.chr2.with_dbnsfp.gz
     - hg19.kgXref.chr5.with_dbnsfp.gz
     - hg19.kgXref.chr7.with_dbnsfp.gz
+    - hg19.kgXref.chr3.with_dbnsfp.gz
+    - hg19.kgXref.chr4.with_dbnsfp.gz
+    - hg19.kgXref.chr1.with_dbnsfp.gz
     - hg19.kgXref.chr8.with_dbnsfp.gz
     - hg19.kgXref.chr6.with_dbnsfp.gz
+    - hg19.kgXref.chr15.with_dbnsfp.gz
+    - hg19.kgXref.chr13.with_dbnsfp.gz
+    - hg19.kgXref.chr12.with_dbnsfp.gz
     - hg19.kgXref.chr9.with_dbnsfp.gz
+    - hg19.kgXref.chr14.with_dbnsfp.gz
     - hg19.kgXref.chr10.with_dbnsfp.gz
     - hg19.kgXref.chr11.with_dbnsfp.gz
-    - hg19.kgXref.chr12.with_dbnsfp.gz
-    - hg19.kgXref.chr13.with_dbnsfp.gz
-    - hg19.kgXref.chr14.with_dbnsfp.gz
-    - hg19.kgXref.chr15.with_dbnsfp.gz
     - hg19.kgXref.chr16.with_dbnsfp.gz
-    - hg19.kgXref.chr20.with_dbnsfp.gz
-    - hg19.kgXref.chr19.with_dbnsfp.gz
-    - hg19.kgXref.chr18.with_dbnsfp.gz
-    - hg19.kgXref.chr17.with_dbnsfp.gz
-    - hg19.kgXref.chr21.with_dbnsfp.gz
     - hg19.kgXref.chrX.with_dbnsfp.gz
     - hg19.kgXref.chr22.with_dbnsfp.gz
+    - hg19.kgXref.chr21.with_dbnsfp.gz
+    - hg19.kgXref.chr19.with_dbnsfp.gz
     - hg19.kgXref.chrM.with_dbnsfp.gz
+    - hg19.kgXref.chr17.with_dbnsfp.gz
+    - hg19.kgXref.chr20.with_dbnsfp.gz
+    - hg19.kgXref.chr18.with_dbnsfp.gz
     - hg19.kgXref.chrY.with_dbnsfp.gz
     name: refSeq
     type: gene
@@ -324,15 +324,15 @@ tracks:
           x.refseq=r.name) AS mRNA, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.rfamAcc,
           '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS rfamAcc FROM
           refGene r WHERE chrom=%chromosomes%;
-      completed: 2018-09-07T16:41:00
+      completed: 2018-10-02T15:10:00
       name: fetch
     - args:
         geneFile: /mnt/bystro-files/dbnsfp/dbNSFP3.5_gene.complete
-      completed: 2018-09-07T16:42:00
+      completed: 2018-10-02T15:10:00
       name: refGeneXdbnsfp
-    version: 9
+    version: 10
   - build_author: ec2-user
-    build_date: 2018-09-08T18:46:00
+    build_date: 2018-10-02T16:54:00
     build_field_transformations:
       pmid: split [;]
       uniprot.func: split [;]
@@ -390,9 +390,9 @@ tracks:
     storeNearest: false
     to: txEnd
     type: nearest
-    version: 2
+    version: 3
   - build_author: ec2-user
-    build_date: 2018-09-08T18:46:00
+    build_date: 2018-10-02T16:54:00
     build_field_transformations:
       alleleFreqs: split [,]
       alleleNs: split [,]
@@ -439,11 +439,11 @@ tracks:
     utils:
     - args:
         sql: SELECT * FROM hg19.snp150 WHERE chrom = %chromosomes%
-      completed: 2018-09-07T13:57:00
+      completed: 2018-10-02T13:25:00
       name: fetch
-    version: 9
+    version: 10
   - build_author: ec2-user
-    build_date: 2018-09-08T18:46:00
+    build_date: 2018-10-02T16:54:00
     build_row_filters:
       AS_FilterStatus: == PASS
     features:
@@ -498,9 +498,9 @@ tracks:
     - gnomad.genomes.r2.0.2.sites.chr*.vcf.bgz
     name: gnomad.genomes
     type: vcf
-    version: 9
+    version: 10
   - build_author: ec2-user
-    build_date: 2018-09-08T18:46:00
+    build_date: 2018-10-02T16:54:00
     build_row_filters:
       AS_FilterStatus: == PASS
     features:
@@ -555,10 +555,10 @@ tracks:
     - gnomad.exomes.r2.0.2.sites.vcf.bgz
     name: gnomad.exomes
     type: vcf
-    version: 9
+    version: 10
   - based: 1
     build_author: ec2-user
-    build_date: 2018-09-08T18:46:00
+    build_date: 2018-10-02T16:54:00
     build_field_transformations:
       chrom: chr .
       clinicalSignificance: split [;]
@@ -600,8 +600,8 @@ tracks:
     - args:
         remoteFiles:
         - ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz
-      completed: 2018-09-07T16:42:00
+      completed: 2018-10-02T15:11:00
       name: fetch
-    version: 9
-version: 13
+    version: 10
+version: 14
 

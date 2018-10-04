@@ -86,7 +86,7 @@ sub annotate {
 
   # Calling in annotate allows us to error early
   my $err;
-  ($err, $self->{_chunkSize}) = $self->getChunkSize($self->input_file, $self->maxThreads);
+  ($err, $self->{_chunkSize}) = $self->getChunkSize($self->input_file, $self->maxThreads, 512, 16384);
 
   if($err) {
     $self->_errorWithCleanup($err);
@@ -165,7 +165,7 @@ sub annotateFile {
     max_workers => $self->maxThreads || 8, use_slurpio => 1,
     # bystro-vcf outputs a very small row; fully annotated through the alt column (-ref -discordant)
     # so accumulate less than we would if processing full .snp
-    chunk_size => $self->{_chunkSize} > 8192 ? "8192K" : $self->{_chunkSize}. "K",
+    chunk_size => $self->{_chunkSize}. "K",
     gather => $progressFunc,
   };
 

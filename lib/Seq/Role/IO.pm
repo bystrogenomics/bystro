@@ -385,7 +385,7 @@ sub getChunkSize {
   }
 
   if(!$max) {
-    $max = 1536;
+    $max = 32768;
   }
 
   my $size = path($filePath)->stat()->size;
