@@ -1,7 +1,7 @@
 ---
 assembly: hg19
 build_author: ec2-user
-build_date: 2018-01-17T20:32:00
+build_date: 2018-02-26T22:21:00
 chromosomes:
 - chr1
 - chr2
@@ -30,7 +30,13 @@ chromosomes:
 - chrY
 database_dir: ~
 files_dir: ~
-snpProcessor: bystro-snp
+fileProcessors:
+  snp:
+    args: --emptyField ! --minGq .95
+    program: bystro-snp
+  vcf:
+    args: --emptyField ! --sample %sampleList%
+    program: bystro-vcf
 statistics:
   dbSNPnameField: dbSNP.name
   exonicAlleleFunctionField: refSeq.exonicAlleleFunction
@@ -400,6 +406,5 @@ tracks:
   name: gnomad.exomes
   type: vcf
   version: 6
-vcfProcessor: bystro-vcf
 version: 11
 

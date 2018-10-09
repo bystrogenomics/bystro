@@ -29,7 +29,13 @@ chromosomes:
   - chrY
 database_dir: hidden
 files_dir: hidden
-snpProcessor: bystro-snp
+fileProcessors:
+  snp:
+    args: --emptyField ! --minGq .95
+    program: bystro-snp
+  vcf:
+    args: --emptyField ! --sample %sampleList%
+    program: bystro-vcf
 statistics:
   dbSNPnameField: dbSNP.name
   exonicAlleleFunctionField: refSeq.exonicAlleleFunction
@@ -418,5 +424,4 @@ tracks:
     name: gnomad.exomes
     type: vcf
     version: 4
-vcfProcessor: bystro-vcf
 version: 77

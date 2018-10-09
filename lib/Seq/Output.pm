@@ -18,10 +18,12 @@ has delimiters => (is => 'ro', isa => 'Seq::Output::Delimiters', default => sub 
   return Seq::Output::Delimiters->new();
 });
 
+has header => (is => 'ro', isa => 'Seq::Headers', required => 1);
+
 sub BUILD {
   my $self = shift;
 
-  $self->{_headers} = Seq::Headers->new();
+  $self->{_orderedHeader} = $self->header->getOrderedHeaderNoMap();
 }
 
 # TODO: will be singleton, configured once for all consumers
@@ -47,15 +49,6 @@ sub makeOutputString {
   my $valueDelimiter = $self->delimiters->valueDelimiter;
   my $fieldSeparator = $self->delimiters->fieldSeparator;
 
-  if(!$self->{_multiDepth}) {
-    my @headers = @{ $self->{_headers}->getOrderedHeaderNoMap() };
-
-    $self->{_multiDepth} = { map {
-      $_ => ref $headers[$_] ? 3 : 2;
-    } 0 .. $#headers };
-
-    $self->{_orderedHeader} = \@headers;
-  }
 
   my $trackIdx = -1;
   my $multiallelic;

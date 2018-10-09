@@ -27,11 +27,11 @@ has database_dir => (is => 'ro', required => 1);
 has tracks => (is => 'ro', required => 1);
 
 ############ Public Exports ###################
-has gettersOnly => (is => 'ro', default => 0);
+has readOnly => (is => 'ro', default => 0);
 
 has tracksObj => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
   my $self = shift;
-  return Seq::Tracks->new({tracks => $self->tracks, gettersOnly => $self->gettersOnly });
+  return Seq::Tracks->new({tracks => $self->tracks, gettersOnly => $self->readOnly });
 });
 
 ############# Optional Arguments #############
@@ -100,6 +100,8 @@ sub BUILD {
   if(defined $self->verbose) {
     $self->setVerbosity($self->verbose);
   }
+
+  Seq::DBManager::setReadOnly($self->readOnly);
 
   #todo: finisih ;for now we have only one level
   if ($self->debug) {

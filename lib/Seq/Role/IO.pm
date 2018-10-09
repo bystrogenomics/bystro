@@ -191,6 +191,51 @@ sub checkDelimiter {
   return 0;
 }
 
+# Allows user to return an error; dies with logging by default
+sub safeOpen {
+  #my ($self, $fh, $operator, $operand, $errCode) = @_;
+  #    $_[0], $_[1], $_[2],   $_[3], $_[4]
+
+  # In some cases, file attempting to be read may not have been flushed
+  # Clearest case is Log::Fast
+  my $err = $_[0]->safeSystem('sync');
+
+  # Modifies $fh/$_[1] by reference
+  if($err || !open($_[1], $_[2], $_[3])) {
+    $err = $err || $!;
+
+    #$self    #$errCode                      #$operand
+    $_[0]->log($_[4] || 'debug', "Couldn't open $_[3]: $err ($?)");
+    return $err;
+  }
+
+  return;
+}
+
+sub safeSystem {
+  my ($self, $cmd, $errCode) = @_;
+
+  my $return = system($cmd);
+
+  if($return > 0) {
+    $self->log($errCode || 'debug', "Failed to execute $cmd. Return: $return, due to: $! ($?)");
+    return $!;
+  }
+
+  return;
+}
+
+sub safeClose {
+  my ($self, $fh, $errCode) = @_;
+
+  if(!close($fh)) {
+    $self->log($errCode || 'debug', "Couldn't close due to: $! ($?)");
+    return $!;
+  }
+
+  return;
+}
+
 sub setDelimiter {
   my ($self, $line) = @_;
 

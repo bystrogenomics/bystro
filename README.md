@@ -5,13 +5,15 @@ For datasets and scripts used, please visit [github.com/bystro-paper](https://gi
 
 If using Bystro, please cite [Kotlar et al, Genome Biology, 2018](https://doi.org/10.1186/s13059-018-1387-3)
 
-## Using Bystro
+## Web Tutorial
+Start here: [TUTORIAL.md](TUTORIAL.md) 
+
 For most users, we recommend https://bystro.io .
 
 The web app gives full access to all of Bystro's capabilities, provides a convenient search/filtering interface, supports large data sets (tested up to 890GB uncompressed/129GB compressed), and has excellent performance.
 
 ## Installing Bystro
-Follow the instructions in [INSTALL.md](INSTALL.md)
+Please read: [INSTALL.md](INSTALL.md)
 
 Bystro relies on pluggable (via Bystro's YAML config) pre-processors to normalize variant inputs (**dealing with VCF issues such as padding**), calculate whether a site is a transition or transversion, calculate sample maf, identify hets/homozygotes/missing samples, calculate heterozygosity, homozygosity, missingness, and more.
 1. VCF format: [Bystro-Vcf](https://github.com/akotlar/bystro-vcf)
@@ -51,7 +53,7 @@ Please read [FIELDS.md](FIELDS.md)
     ```
     
     Only chr1, chr2, and chr3 will be accepted. However, Bystro tries to make your life easy
-      1. We currently follow UCSC coneventions for ```chromosomes```, meaning they should be prepended by **chr**
+      1. We currently follow UCSC conventions for ```chromosomes```, meaning they should be prepended by **chr**
       2. Bystro will automatically append **chr** to chromosomes read from an input file during annotation. 
       3. Bystro allows the transformation of any field during building, configurable in the YAML config file for that assembly, making it easy to prepend **chr** to the source file chromosome field
       

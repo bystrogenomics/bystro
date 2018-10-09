@@ -42,18 +42,16 @@ has input_file => (is => 'rw', isa => AbsFile, coerce => 1, required => 1,
 # Maximum (signed) size of del allele
 has maxDel => (is => 'ro', isa => 'Int', default => -32, writer => 'setMaxDel');
 
-has minGq => (is => 'ro', isa => 'Num', default => '.95');
-
-has snpProcessor => (is => 'ro', isa => 'Str', default => 'bystro-snp');
-has vcfProcessor => (is => 'ro', isa => 'Str', default => 'bystro-vcf');
+# TODO: formalize: check that they have name and args properties
+has fileProcessors => (is => 'ro', isa => 'HashRef', default => 'bystro-vcf');
 
 # Defines most of the properties that can be configured at run time
 # Needed because there are variations of Seq.pm, ilke SeqFromQuery.pm
 # Requires logPath to be provided (currently found in Seq::Base)
 with 'Seq::Definition', 'Seq::Role::Validator';
 
-# To initialize Seq::Base with only getters
-has '+gettersOnly' => (init_arg => undef, default => 1);
+# To initialize Seq::Base with only getters and a read-only database
+has '+readOnly' => (init_arg => undef, default => 1);
 
 # TODO: further reduce complexity
 sub BUILD {
@@ -63,77 +61,17 @@ sub BUILD {
     $self->setMaxDel(-$self->maxDel);
   }
 
-  ########### Create DBManager instance, and instantiate track singletons #########
+  ################## Make the full output path ######################
+  # The output path always respects the $self->output_file_base attribute path;
+  $self->{_outPath} = $self->_workingDir->child($self->outputFilesInfo->{annotation});
+
   # Must come before statistics, which relies on a configured Seq::Tracks
   #Expects DBManager to have been given a database_dir
   $self->{_db} = Seq::DBManager->new();
 
-  # Set the lmdb database to read only, remove locking
-  # We MUST make sure everything is written to the database by this point
-  # Disable this if need to rebuild one of the meta tracks, for one run
-  $self->{_db}->setReadOnly(1);
-
-  # We separate out the reference track getter so that we can check for discordant
-  # bases, and pass the true reference base to other getters that may want it (like CADD)
-  # Store these references as hashes, to avoid accessor penalty
-  $self->{_refTrackGetter} = $self->tracksObj->getRefTrackGetter();
-  $self->{_trackGettersExceptReference} = $self->tracksObj->getTrackGettersExceptReference();
-
-  ######### Build the header, and write it as the first line #############
-  my $headers = Seq::Headers->new();
-
-  # Bystro has a single pseudo track, that is always present, regardless of whether
-  # any tracks exist
-  # Note: Field order is required to stay in the follwoing order, because
-  # current API allows use of constant as array index:
-  # these to be configured:
-  # idx 0:  $self->chromField,
-  # idx 1: $self->posField,
-  # idx 2: $self->typeField,
-  # idx 3: $self->discordantField,
-  # index 4: $self->altField,
-  # index 5: $self->heterozygotesField,
-  # index 6: $self->homozygotesField
-  $headers->addFeaturesToHeader([
-    #index 0
-    $self->chromField,
-    #index 1
-    $self->posField,
-    #index 2
-    $self->typeField,
-    #index 3
-    $self->discordantField,
-    #index 4
-    $self->altField,
-    #index 5
-    $self->trTvField,
-    #index 6
-    $self->heterozygotesField,
-    #index 7
-    $self->heterozygosityField,
-    #index 8
-    $self->homozygotesField,
-    #index 9
-    $self->homozygosityField,
-    #index 10
-    $self->missingField,
-    #index 11
-    $self->missingnessField,
-    #index 12
-    $self->sampleMafField,
-  ], undef, 1);
-
-  $self->{_lastHeaderIdx} = $#{$headers->get()};
-
-  $self->{_trackIdx} = $headers->getParentFeaturesMap();
-
-  ################### Creates the output file handler #################
-  # Used in makeAnnotationString
-  $self->{_outputter} = Seq::Output->new();
-
-  ################## Make the full output path ######################
-  # The output path always respects the $self->output_file_base attribute path;
-  $self->{_outPath} = $self->_workingDir->child($self->outputFilesInfo->{annotation});
+  # Initializes the tracks
+  # This ensures that the tracks are configured, and headers set
+  $self->{_tracks} = $self->tracksObj;
 }
 
 sub annotate {
@@ -141,16 +79,6 @@ sub annotate {
 
   $self->log( 'info', 'Checking input file format' );
 
-  my $err;
-  my $fh = $self->get_read_fh($self->input_file);
-  my $firstLine = <$fh>;
-
-  $err = $self->setLineEndings($firstLine);
-
-  if($err) {
-    $self->_errorWithCleanup($err);
-    return ($err, undef);
-  }
 
   # TODO: For now we only accept tab separated files
   # We could change this, although comma separation causes may cause with our fields
@@ -164,6 +92,7 @@ sub annotate {
   # }
 
   # Calling in annotate allows us to error early
+  my $err;
   ($err, $self->{_chunkSize}) = $self->getChunkSize($self->input_file, $self->max_threads);
 
   if($err) {
@@ -204,74 +133,57 @@ sub annotate {
 }
 
 sub annotateFile {
-  #Inspired by T.S Wingo: https://github.com/wingolab-org/GenPro/blob/master/bin/vcfToSnp
+   #Inspired by T.S Wingo: https://github.com/wingolab-org/GenPro/blob/master/bin/vcfToSnp
   my $self = shift;
   my $type = shift;
 
-  my $errPath = $self->_workingDir->child($self->input_file->basename . '.vcf-log.log');
-  my $inPath = $self->inputFilePath;
-  my $echoProg = $self->isCompressedSingle($inPath) ? $self->gzip . ' ' . $self->decompressArgs : 'cat';
-  my $delim = $self->{_outputter}->delimiters->emptyFieldChar;
-  my $minGq = $self->minGq;
-
-  my $fh;
-
-  # TODO: add support for GQ filtering in vcf
-  if ($type eq 'snp') {
-    open($fh, '-|', "$echoProg $inPath | " . $self->snpProcessor . " --emptyField $delim --minGq $minGq 2> $errPath");
-  } elsif($type eq 'vcf') {
-    # Retruns chr, pos, homozygotes, heterozygotes, alt, ref in that order, tab delim
-    open($fh, '-|', "$echoProg $inPath | " . $self->vcfProcessor . " --emptyField $delim 2> $errPath");
-  } else {
-    $self->_errorWithCleanup("annotateFiles only accepts snp and vcf types");
-    return ("annotateFiles only accepts snp and vcf types", undef);
-  }
-
-  # If user specified a temp output path, use that
-  my $outFh = $self->get_write_fh( $self->{_outPath} );
-
-  ########################## Write the header ##################################
-  my $headers = Seq::Headers->new();
-  my $outputHeader = $headers->getString();
-
-  say $outFh $outputHeader;
-
-  ########################## Tell stats program about our annotation ##############
-  # TODO: error handling if fh fails to open
-  my $statsFh;
-  if($self->run_statistics) {
-    my $args = $self->_statisticsRunner->getStatsArguments();
-    open($statsFh, "|-", $args);
-
-    say $statsFh $outputHeader;
-  }
-
-  my $abortErr;
-
-  # Report every 1e4 lines, to avoid thrashing receiver
-  my $progressFunc = $self->makeLogProgressAndPrint(\$abortErr, $outFh, $statsFh, 1e4);
-  MCE::Loop::init {
-    max_workers => $self->max_threads || 8, use_slurpio => 1,
-    # bystro-vcf outputs a very small row; fully annotated through the alt column (-ref -discordant)
-    # so accumulate less than we would if processing full .snp
-    chunk_size => $self->{_chunkSize} > 4192 ? "4192K" : $self->{_chunkSize}. "K",
-    gather => $progressFunc,
-  };
-
-  my $trackIndices = $self->{_trackIdx};
-  my $refTrackIdx = $self->{_trackIdx}{$self->{_refTrackGetter}->name};
-  my @trackGettersExceptReference = @{$self->{_trackGettersExceptReference}};
-  my %wantedChromosomes = %{ $self->{_refTrackGetter}->chromosomes };
-  my $maxDel = $self->maxDel;
-
-  my $err = $self->setLineEndings("\n");
+  my ($err, $fh, $outFh, $statsFh) = $self->_getFileHandles($type);
 
   if($err) {
     $self->_errorWithCleanup($err);
     return ($err, undef);
   }
 
+  ########################## Write the header ##################################
   my $header = <$fh>;
+  $self->setLineEndings($header);
+
+  my $finalHeader = $self->_getFinalHeader($header);
+  my $outputHeader = $finalHeader->getString();
+
+  say $outFh $outputHeader;
+
+  if($statsFh) {
+    say $statsFh $outputHeader;
+  }
+
+  # Now that header is prepared, make the outputter
+  my $outputter = Seq::Output->new({header => $finalHeader});
+
+  ######################## Build the fork pool #################################
+  my $abortErr;
+
+  my $messageFreq = (2e4 / 4) * $self->max_threads;
+
+  # Report every 1e4 lines, to avoid thrashing receiver
+  my $progressFunc = $self->makeLogProgressAndPrint(\$abortErr, $outFh, $statsFh, $messageFreq);
+  MCE::Loop::init {
+    max_workers => $self->max_threads || 8, use_slurpio => 1,
+    # bystro-vcf outputs a very small row; fully annotated through the alt column (-ref -discordant)
+    # so accumulate less than we would if processing full .snp
+    chunk_size => $self->{_chunkSize} > 8192 ? "8192K" : $self->{_chunkSize}. "K",
+    gather => $progressFunc,
+  };
+
+  my $db = $self->{_db};
+  my $refTrackGetter = $self->{_tracks}->getRefTrackGetter();
+  my @trackGettersExceptReference = @{$self->{_tracks}->getTrackGettersExceptReference()};
+
+  my $trackIndices = $finalHeader->getParentFeaturesMap();
+  my $refTrackIdx = $trackIndices->{$refTrackGetter->name};
+
+  my %wantedChromosomes = %{ $refTrackGetter->chromosomes };
+  my $maxDel = $self->maxDel;
 
   mce_loop_f {
     #my ($mce, $slurp_ref, $chunk_id) = @_;
@@ -292,6 +204,7 @@ sub annotateFile {
     # chrom \t pos \t type \t inputRef \t alt \t hets \t homozygotes \n
     # the chrom is always in ucsc form, chr (the golang program guarantees it)
 
+    my $err;
     while (my $line = $MEM_FH->getline()) {
       chomp $line;
 
@@ -302,7 +215,7 @@ sub annotateFile {
         next;
       }
 
-      $dataFromDbAref = $self->{_db}->dbReadOne($fields[0], $fields[1] - 1, 1);
+      $dataFromDbAref = $db->dbReadOne($fields[0], $fields[1] - 1, 1);
 
       if(!defined $dataFromDbAref) {
         $self->_errorWithCleanup("Wrong assembly? $fields[0]\: $fields[1] not found.");
@@ -327,13 +240,13 @@ sub annotateFile {
             }
 
             #last argument: skip commit
-            $self->{_db}->dbRead($fields[0], \@indelDbData, 1);
+            $db->dbRead($fields[0], \@indelDbData, 1);
 
             #Note that the first position keeps the same $inputRef
             #This means in the (rare) discordant multiallelic situation, the reference
             #Will be identical between the SNP and DEL alleles
             #faster than perl-style loop (much faster than c-style)
-            @indelRef = ($fields[3], map { $self->{_refTrackGetter}->get($_) } @indelDbData);
+            @indelRef = ($fields[3], map { $refTrackGetter->get($_) } @indelDbData);
 
             #Add the db data that we already have for this position
             unshift @indelDbData, $dataFromDbAref;
@@ -342,12 +255,12 @@ sub annotateFile {
           #It's an insertion, we always read + 1 to the position being annotated
           # which itself is + 1 from the db position, so we read  $out[1][0][0] to get the + 1 base
           # Read without committing by using 1 as last argument
-          @indelDbData = ($dataFromDbAref, $self->{_db}->dbReadOne($fields[0], $fields[1], 1));
+          @indelDbData = ($dataFromDbAref, $db->dbReadOne($fields[0], $fields[1], 1));
 
           #Note that the first position keeps the same $inputRef
           #This means in the (rare) discordant multiallelic situation, the reference
           #Will be identical between the SNP and DEL alleles
-          @indelRef = ($fields[3], $self->{_refTrackGetter}->get($indelDbData[1]));
+          @indelRef = ($fields[3], $refTrackGetter->get($indelDbData[1]));
         }
       }
 
@@ -372,16 +285,16 @@ sub annotateFile {
           $track->get($dataFromDbAref, $fields[0], $fields[3], $fields[4], 0, 0, $fields[$trackIndices->{$track->name}])
         }
 
-        $fields[$refTrackIdx][0][0] = $self->{_refTrackGetter}->get($dataFromDbAref);
+        $fields[$refTrackIdx][0][0] = $refTrackGetter->get($dataFromDbAref);
       }
 
        # 3 holds the input reference, we'll replace this with the discordant status
-      $fields[3] = $self->{_refTrackGetter}->get($dataFromDbAref) ne $fields[3] ? 1 : 0;
+      $fields[3] = $refTrackGetter->get($dataFromDbAref) ne $fields[3] ? 1 : 0;
       push @lines, \@fields;
     }
 
     if(@lines) {
-      MCE->gather(scalar @lines, $total - @lines, undef, $self->{_outputter}->makeOutputString(\@lines));
+      MCE->gather(scalar @lines, $total - @lines, undef, $outputter->makeOutputString(\@lines));
     } else {
       MCE->gather(0, $total);
     }
@@ -397,10 +310,10 @@ sub annotateFile {
   # to copy the data from a scalar, and don't want to use a hash for this alone
   # So, using a scalar ref to abortErr in the gather function.
   if($abortErr) {
-    say "Aborted job";
+    say "Aborted job due to $abortErr";
 
     # Database & tx need to be closed
-    $self->{_db}->cleanUp();
+    $db->cleanUp();
 
     return ('Job aborted due to error', undef);
   }
@@ -423,7 +336,7 @@ sub annotateFile {
     $self->log('error', $err);
   }
 
-  $self->{_db}->cleanUp();
+  $db->cleanUp();
 
   return ($err || undef, $self->outputFilesInfo);
 }
@@ -473,6 +386,99 @@ sub makeLogProgressAndPrint {
       print $outFh $_[3];
     }
   }
+}
+
+sub _getFileHandles {
+  my ($self, $type) = @_;
+
+  my ($outFh, $statsFh, $inFh);
+  my $err;
+
+  ($err, $inFh) = $self->_openAnnotationPipe($type);
+
+  if($err) {
+    return ($err,  undef, undef, undef);
+  }
+
+  if($self->run_statistics) {
+    ########################## Tell stats program about our annotation ##############
+    # TODO: error handling if fh fails to open
+    my $statArgs = $self->_statisticsRunner->getStatsArguments();
+
+    $err = $self->safeOpen($statsFh, "|-", $statArgs);
+
+    if($err) {
+      return ($err,  undef, undef, undef);
+    }
+  }
+
+  # $fhs{stats} = $$statsFh;
+  $outFh = $self->get_write_fh($self->{_outPath});
+
+  return (undef, $inFh, $outFh, $statsFh);
+}
+
+sub _openAnnotationPipe {
+  my ($self, $type) = @_;
+
+  my $errPath = $self->_workingDir->child($self->input_file->basename . '.file-log.log');
+
+  my $inPath = $self->inputFilePath;
+  my $echoProg = $self->isCompressedSingle($inPath) ? $self->gzip . ' ' . $self->decompressArgs : 'cat';
+
+  if(!$self->fileProcessors->{$type}) {
+    $self->_errorWithCleanup("No fileProcessors defined for $type file type");
+  }
+
+  my $fp = $self->fileProcessors->{$type};
+  my $args = $fp->{program} . " " . $fp->{args};
+
+  my $fh;
+
+  for my $type (keys %{$self->outputFilesInfo}) {
+    if(index($args, "\%$type\%") > -1) {
+      substr($args, index($args, "\%$type\%"), length("\%$type\%"))
+        = $self->_workingDir->child($self->outputFilesInfo->{$type});
+    }
+  }
+
+  # TODO:  add support for GQ filtering in vcf
+  my $err = $self->safeOpen($fh, '-|', "$echoProg $inPath | $args 2> $errPath");
+
+  return ($err, $fh);
+}
+
+sub _getFinalHeader {
+  my ($self, $header) = @_;
+  ######### Build the header, and write it as the first line #############
+  my $finalHeader = Seq::Headers->new();
+
+  chomp $header;
+
+  my @headerFields = split '\t', $header;
+
+  # Our header class checks the name of each feature
+  # It may be, more than likely, that the pre-processor names the 4th column 'ref'
+  # We replace this column with trTv
+  # This not only now reflects its actual function
+  # but prevents name collision issues resulting in the wrong header idx
+  # being generated for the ref track
+  $headerFields[3] = $self->discordantField;
+
+  # Bystro takes data from a file pre-processor, which spits out a common
+  # intermediate format
+  # This format is very flexible, in fact Bystro doesn't care about the output
+  # of the pre-processor, provided that the following is found in the corresponding
+  # indices:
+  # idx 0: chromosome,
+  # idx 1: position
+  # idx 3: the reference (we rename this to discordant)
+  # idx 4: the alternate allele
+
+  # Prepend all of the headers created by the pre-processor
+  $finalHeader->addFeaturesToHeader(\@headerFields, undef, 1);
+
+  return $finalHeader;
 }
 
 sub _errorWithCleanup {
