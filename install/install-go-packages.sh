@@ -11,4 +11,4 @@ go get github.com/akotlar/bystro-vcf;
 go get github.com/akotlar/bystro-snp;
 
 # allows us to modify our config files in place
-go get github.com/mikefarah/yaml;
+go get github.com/mikefarah/yq;
