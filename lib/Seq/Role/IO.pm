@@ -227,7 +227,14 @@ sub safeOpen {
 sub safeClose {
   my ($self, $fh, $errCode) = @_;
 
-  if(!close($fh)) {
+  my $err = $self->safeSystem('sync');
+
+  if ($err) {
+    $self->log($errCode || 'debug', "Couldn't sync before close due to: $err");
+    return $err;
+  }
+
+  if (!close($fh)) {
     $self->log($errCode || 'debug', "Couldn't close due to: $! ($?)");
     return $!;
   }
