@@ -200,9 +200,7 @@ sub annotateFile {
   #after accounting for the nubmer of calls to ->name
   # my @trackNames = map { $_->name } @{$self->_tracks};
 
-  # This is going to be copied on write... avoid a bunch of function calls
-  # Each thread will get its own %cursors object
-  my %cursors = ();
+  
 
   # TODO: don't annotate MT (GRCh37) if MT not explicitly specified
   # to avoid issues between GRCh37 and hg19 chrM vs MT
@@ -221,6 +219,12 @@ sub annotateFile {
     my @lines;
     my $dataFromDbAref;
     my $zeroPos;
+
+    # This is going to be copied on write... avoid a bunch of function calls
+    # Each thread will get its own %cursors object
+    # But start in child because relying on COW seems like it could lead to
+    # future bugs (in, say Rust if sharing between user threads)
+    my %cursors = ();
 
     # Each line is expected to be
     # chrom \t pos \t type \t inputRef \t alt \t hets \t homozygotes \n
