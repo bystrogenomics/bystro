@@ -31,9 +31,6 @@ my $refTrack;
 sub BUILD {
   my $self = shift;
 
-  my $tracks = Seq::Tracks->new();
-  $refTrack = $tracks->getRefTrackGetter();
-
   $self->{_rounder} = Seq::Tracks::Score::Build::Round->new({scalingFactor => $self->scalingFactor});
 }
 ############## Version that does not assume positions in order ################
@@ -41,6 +38,14 @@ sub BUILD {
 # TODO: refactor so that one function handles both main build, and the tail end
 sub buildTrack {
   my $self = shift;
+
+  # TODO: Remove side effects, or think about another initialization method
+  # Unfortunately, it is better to call track getters here
+  # Because builders may have side effects, like updating
+  # the meta database
+  # So we want to call builders BUILD methods first
+  my $tracks = Seq::Tracks->new();
+  $refTrack = $tracks->getRefTrackGetter();
 
   my $pm = Parallel::ForkManager->new($self->maxThreads);
 

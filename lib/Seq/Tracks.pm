@@ -57,7 +57,7 @@ has gettersOnly => (is => 'ro', isa => 'Bool', default => 0);
   # typeName : {
   #  name: someName (optional),
   #  data: {
-  #   feature1:   
+  #   feature1:
 #} } }
 # This is used to check whether this package has been initialized
 has tracks => (
@@ -73,7 +73,7 @@ has outputOrder => (
 # @param <ArrayRef> trackBuilders : ordered track builders
 state $orderedTrackBuildersAref = [];
 has trackBuilders => ( is => 'ro', isa => 'ArrayRef', init_arg => undef, lazy => 1,
-  traits => ['Array'], handles => { allTrackBuilders => 'elements' }, 
+  traits => ['Array'], handles => { allTrackBuilders => 'elements' },
   default => sub { $orderedTrackBuildersAref } );
 
 state $trackBuildersByName = {};
@@ -91,7 +91,7 @@ sub getTrackBuildersByType {
 # @param <ArrayRef> trackGetters : ordered track getters
 state $orderedTrackGettersAref = [];
 has trackGetters => ( is => 'ro', isa => 'ArrayRef', init_arg => undef, lazy => 1,
-  traits => ['Array'], handles => { allTrackGetters => 'elements' } , 
+  traits => ['Array'], handles => { allTrackGetters => 'elements' } ,
   default => sub { $orderedTrackGettersAref } );
 
 state $trackGettersByName = {};
@@ -169,9 +169,10 @@ sub BUILD {
   # i.e Seq.pm passes { tracks => $someTrackConfiguration } and Seq::Tracks::Gene
   # can call  Seq::Tracks::getRefTrackGetter and receive a configured ref track getter
 
-  # However it is important that in long-running parent processes, which may 
+  # However it is important that in long-running parent processes, which may
   # instantiate this program more than once, we do not re-use old configurations
   # So every time the parent passes a tracks object, we re-configure this class
+
   if( !$self->tracks ) {
     if(!_hasTrackGetters() ) {
       $self->log('fatal', 'First time Seq::Tracks is run tracks configuration must be passed');
@@ -191,11 +192,19 @@ sub BUILD {
 
   # If both getters and builders requested, don't mutate the tracks object
   # so that builders get their own distinct configuration
-  my $buildTracks = clone($self->tracks);
+  my $getTracks = clone($self->tracks);
 
-  $self->_buildTrackGetters($self->tracks);
+  # TODO: Lazy, or side-effect free initialization?
+  # Builders may have side effects; they may configure
+  # the db features available, including any private features
+  # If so, create those first
 
-  $self->_buildTrackBuilders($buildTracks);
+  $self->_buildTrackBuilders($self->tracks);
+
+  # This ordering necessarily means that Builders cannot have getters in their
+  # BUILD step / initialization
+  # Need to wait for this to run, after BUILD
+  $self->_buildTrackGetters($getTracks);
 }
 
 ################### Private builders #####################
@@ -265,7 +274,7 @@ sub _buildTrackGetters {
       $trackHref->{ref} = $trackBuildersByName->{ $trackHref->{ref} };
     }
 
-    #class 
+    #class
     my $className = $self->_toTrackGetterClass( $trackHref->{type} );
 
     my $track = $className->new($trackHref);
@@ -278,14 +287,14 @@ sub _buildTrackGetters {
     }
 
     if(exists $seenTrackNames{ $track->{name} } ) {
-      $self->log('fatal', "More than one track with the same name 
+      $self->log('fatal', "More than one track with the same name
         exists: $trackHref->{name}. Each track name must be unique
       . Overriding the last object for this name, with the new")
     }
 
     #we use the track name rather than the trackHref name
     #because at the moment, users are allowed to rename their tracks
-    #by name : 
+    #by name :
       #   something : someOtherName
     $trackGettersByName->{$track->{name}} = $track;
 
@@ -329,7 +338,7 @@ sub _buildTrackBuilders {
     if($trackHref->{ref}) {
       $trackHref->{ref} = $trackBuildersByName->{ $trackHref->{ref} };
     }
-    #class 
+    #class
     my $className = $self->_toTrackBuilderClass( $trackHref->{type} );
 
     my $track = $className->new($trackHref);
@@ -343,17 +352,17 @@ sub _buildTrackBuilders {
 
     #we use the track name rather than the trackHref name
     #because at the moment, users are allowed to rename their tracks
-    #by name : 
+    #by name :
       #   something : someOtherName
     if(exists $seenTrackNames{ $track->{name} } ) {
-      $self->log('fatal', "More than one track with the same name 
+      $self->log('fatal', "More than one track with the same name
         exists: $trackHref->{name}. Each track name must be unique
       . Overriding the last object for this name, with the new")
     }
 
     #we use the track name rather than the trackHref name
     #because at the moment, users are allowed to rename their tracks
-    #by name : 
+    #by name :
       #   something : someOtherName
     #TODO: make this go away by automating track name conversion/storing in db
     $trackBuildersByName->{$track->{name} } = $track;

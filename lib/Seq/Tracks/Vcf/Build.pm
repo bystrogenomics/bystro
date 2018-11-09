@@ -95,9 +95,6 @@ sub BUILD {
 
   $self->{_fieldDbNames} = \%fieldDbNames;
 
-  my $tracks = Seq::Tracks->new();
-  $self->{_refTrack} = $tracks->getRefTrackGetter();
-
   # TODO: Read bystro-vcf header, and configure $vcfFeatures based on that
   # will require either reading the first file in the list, or giving
   # bystro-vcf a "output only the header" feature (but scope creep)
@@ -106,6 +103,14 @@ sub BUILD {
 # has altName => (is => '')
 sub buildTrack {
   my $self = shift;
+
+  # TODO: Remove side effects, or think about another initialization method
+  # Unfortunately, it is better to call track getters here
+  # Because builders may have side effects, like updating
+  # the meta database
+  # So we want to call builders BUILD methods first
+  my $tracks = Seq::Tracks->new();
+  $self->{_refTrack} = $tracks->getRefTrackGetter();
 
   my $pm = Parallel::ForkManager->new($self->maxThreads);
 
@@ -592,7 +597,6 @@ sub _extractFeatures {
 
     $entry = $vcfNameMap->{$name} || $vcfFilterMap->{$name};
 
-    # p $entry;
     if(!$entry) {
       next;
     }

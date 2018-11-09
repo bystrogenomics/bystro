@@ -9,6 +9,7 @@ cpanm install DDP
 cpanm install YAML::XS
 cpanm install Getopt::Long::Descriptive
 cpanm install Types::Path::Tiny
+cpanm install Sereal # extra MCE performance
 cpanm install MCE::Shared
 cpanm install List::MoreUtils
 cpanm install Log::Fast
@@ -18,6 +19,9 @@ cpanm install Mouse::Meta::Attribute::Custom::Trait::Array
 cpanm install Net::HTTP
 cpanm install Search::Elasticsearch
 cpanm install Math::SigFigs
+# For now we use our own library
+# Avoid issues with system liblmdb
+env ALIEN_INSTALL_TYPE=share cpanm Alien::LMDB
 cpanm install LMDB_File
 cpanm install PerlIO::utf8_strict
 cpanm install PerlIO::gzip
@@ -52,8 +56,20 @@ cpanm install File::Copy::Recursive
 
 cpanm --uninstall -f Data::MessagePack
 rm -rf msgpack-perl
-git clone --recursive https://github.com/akotlar/msgpack-perl.git && cd msgpack-perl
+git clone --recursive https://github.com/akotlar/msgpack-perl && cd msgpack-perl
 perl Makefile.PL
 make test
 make install
 cd ../ && rm -rf msgpack-perl
+
+# If we want to use our own install
+# cpanm install Test::Exception
+# # Avoid issues with system liblmdb
+# env ALIEN_INSTALL_TYPE=share cpanm Alien::LMDB
+# rm -rf LMDB_File
+# git clone --recursive https://github.com/akotlar/LMDB_File.git && cd LMDB_File
+# cd liblmdb/libraries/liblmdb/ && make && sudo make install
+# cd -
+# perl Makefile.PL
+# make test && make install
+# cd ../ && rm -rf LMDB_File

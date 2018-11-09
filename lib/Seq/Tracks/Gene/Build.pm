@@ -30,12 +30,31 @@ my $geneDef = Seq::Tracks::Gene::Definition->new();
 # We don't remap field names
 # It's easier to remember the real names than real names + our domain-specific names
 
-#can be overwritten if needed in the config file, as described in Tracks::Build
-has chrom_field_name => (is => 'ro', lazy => 1, default => 'chrom' );
-has txStart_field_name => (is => 'ro', lazy => 1, default => 'txStart' );
-has txEnd_field_name => (is => 'ro', lazy => 1, default => 'txEnd' );
+# Required, or must be mapped using 'fieldMap' in YAML
+my @coordinateFields = (
+  'chrom', 'txStart', 'txEnd', 'cdsStart', 'cdsEnd', 'exonStarts', 'exonEnds', 'strand'
+);
 
-has build_region_track_only => (is => 'ro', lazy => 1, default => 0);
+my %coordinateFields = map { $_ => 1 } @coordinateFields;
+
+my %coordinateTransforms = (
+  exonStarts => sub {
+    return [split ',', $_[0]];
+  },
+  exonEnds => sub {
+    return [split ',', $_[0]];
+  }
+);
+
+# has chrom_field_name => (is => 'ro', lazy => 1, default => 'chrom' );
+# has txStart_field_name => (is => 'ro', lazy => 1, default => 'txStart' );
+# has txEnd_field_name => (is => 'ro', lazy => 1, default => 'txEnd' );
+# has cdsStart_field_name => (is => 'ro', lazy => 1, default => 'txStart' );
+# has cdsEnd_field_name => (is => 'ro', lazy => 1, default => 'txEnd' );
+# has exonStarts_field_name => (is => 'ro', lazy => 1, default => 'txStart' );
+# has txEnd_field_name => (is => 'ro', lazy => 1, default => 'txEnd' );
+
+has build_region_track_only => (is => 'ro', isa => 'Bool', coerce => 1, lazy => 1, default => 0);
 has join => (is => 'ro', isa => 'HashRef');
 
 # These are the features stored in the Gene track's region database
@@ -49,12 +68,11 @@ my $joinTrack;
 sub BUILD {
   my $self = shift;
 
-  # txErrorName isn't a default feature, initializing here to make sure
-  # we store this value (if calling for first time) before any threads get to it
-  $self->getFieldDbName($geneDef->txErrorName);
-
-  #similarly for $txSize
-  # $self->getFieldDbName($geneDef->txSizeName);
+ $self->getFieldDbName($geneDef->txErrorName);
+  # Do this before we build, to avoid threading-related issues
+  for my $f (@coordinateFields) {
+    $self->getFieldDbName($f);
+  }
 }
 
 # 1) Store a reference to the corresponding entry in the gene database (region database)
@@ -65,7 +83,8 @@ sub BUILD {
 # 6) Write nearest genes if user wants those
 sub buildTrack {
   my $self = shift;
-
+  # txErrorName isn't a default feature, initializing here to make sure
+  # we store this value (if calling for first time) before any threads get to it
   my @allFiles = $self->allLocalFiles;
 
   # Only allow 1 thread because perl eats memory like candy
@@ -174,7 +193,7 @@ sub buildTrack {
               $self->log('fatal', $err);
             }
 
-            # Note that is Build::TX doesn't close it txn, this will be 
+            # Note that is Build::TX doesn't close it txn, this will be
             # impossible; may be an LMDB_File bug
             # If that is problematic, placing this before Build::TX will work
             # for some reason, order of SubTxn's matters
@@ -282,16 +301,19 @@ sub _getIdx {
     $fieldIdx++;
   }
 
-  # Except w.r.t the chromosome field, txStart, txEnd, txNumber definitely need these
-  if(!defined $allIdx{$self->chrom_field_name}
-  || !defined $allIdx{$self->txStart_field_name}
-  || !defined $allIdx{$self->txEnd_field_name} ) {
-    return ('must provide chrom, txStart, txEnd fields', undef);
+  my $err;
+
+  # Some featuers are core to transcript building
+  for my $reqField (@coordinateFields) {
+    if(!defined $allIdx{$reqField}) {
+      $err = 'Must provide, or map via "fieldMap" in the YAML config
+        the following fields: ' . join(',', @coordinateFields);
+
+      return ($err, undef);
+    }
   }
 
   # Region database features; as defined by user in the YAML config, or our default
-  my $err;
-
   REGION_FEATS: for my $field (@{$self->features}) {
     if(exists $allIdx{$field} ) {
       $regionIdx{$field} = $allIdx{$field};
@@ -342,7 +364,8 @@ sub _readTxData {
     chomp;
     @fields = split('\t', $_);
 
-    $chr = $fields[ $allIdx{$self->chrom_field_name} ];
+    $chr = $fields[ $allIdx{'chrom'} ];
+    $txStart = $fields[ $allIdx{'chrom'} ];
 
     $seenChrsInFile{$chr} //= 1;
 
@@ -374,6 +397,14 @@ sub _readTxData {
         $fields[ $allIdx{$fieldName} ] = $self->transformField($fieldName, $fields[ $allIdx{$fieldName} ]);
       }
 
+      # TODO: This could lead to surprising behavior
+      # User can modify this behavior by passing a transform above
+      # But the expectation of $coordinateTransforms{$fieldName} should be
+      # documented, since not all transforms will work
+      if($coordinateTransforms{$fieldName}) {
+        $fields[ $allIdx{$fieldName} ] = $coordinateTransforms{$fieldName}->($fields[ $allIdx{$fieldName} ]);
+      }
+
       my $data = $self->coerceFeatureType($fieldName, $fields[ $allIdx{$fieldName} ]);
 
       if(!defined $data) {
@@ -386,7 +417,7 @@ sub _readTxData {
 
       $rowData{$fieldName} = $data;
 
-      if(!defined $regionIdx{$fieldName} ) {
+      if(!(defined $regionIdx{$fieldName} || defined $coordinateFields{$fieldName})) {
         next ACCUM_VALUES;
       }
 
@@ -394,18 +425,18 @@ sub _readTxData {
       $regionData{$wantedChr}->{$txNumber}{ $fieldDbName } = $data;
     }
 
-    $txStart = $rowData{$self->txStart_field_name};
+    $txStart = $rowData{'txStart'};
 
     if(!defined $txStart) {
       return ': missing transcript start ( we expected a value @ ' .
-        $self->txStart_field_name . ')';
+        'txStart' . ')';
     }
 
-    $txEnd = $rowData{$self->txEnd_field_name};
+    $txEnd = $rowData{'txEnd'};
 
     if(!defined $txEnd) {
       return 'missing transcript start ( we expected a value @ ' .
-        $self->txEnd_field_name . ')';
+        'txEnd' . ')';
     }
 
     #a field added by Bystro

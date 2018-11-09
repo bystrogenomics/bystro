@@ -97,13 +97,13 @@ has exonEnds => (
 
 has cdsStart => (
   is => 'ro',
-  isa => 'Str',
+  isa => 'Int',
   required => 1,
 );
 
 has cdsEnd => (
   is => 'ro',
-  isa => 'Str',
+  isa => 'Int',
   required => 1,
 );
 

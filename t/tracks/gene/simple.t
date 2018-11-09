@@ -39,12 +39,6 @@ my $geneBuilder = $tracks->getTrackBuilderByName('refSeq');
 my $refGetter = $tracks->getRefTrackGetter();
 my $geneGetter = $tracks->getTrackGetterByName('refSeq');
 
-my $siteTypeDbName = $geneGetter->getFieldDbName('siteType');
-my $funcDbName = $geneGetter->getFieldDbName('exonicAlleleFunction');
-# my $funcDbName = $geneGetter->getFieldDbName('exonicAlleleFunction');
-# my $funcDbName = $geneGetter->getFieldDbName('exonicAlleleFunction');
-# my $funcDbName = $geneGetter->getFieldDbName('exonicAlleleFunction');
-
 $refBuilder->buildTrack();
 $geneBuilder->buildTrack();
 
