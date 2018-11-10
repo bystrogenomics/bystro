@@ -24,27 +24,28 @@ use Mouse 2;
 use namespace::autoclean;
 use DDP;
 
-# Doesn't extend Seq::Tracks::Get to reduce inheritance depth, since most
-# of that class is overriden anyhow (leaving only the headers property inheritance
-# which isn't necessary since Seq::Headers is a singleton class)
-extends 'Seq::Tracks::Base';
-
-### Set the features default that we get from the Gene track region database ###
-has '+features' => (
-  default => sub {
-    my $geneDef = Seq::Tracks::Gene::Definition->new();
-    return [ $geneDef->allUCSCgeneFeatures, $geneDef->txErrorName ];
-  },
-);
-
-with 'Seq::Tracks::Region::RegionTrackPath';
-
 use Seq::Tracks::Gene::Site;
 use Seq::Tracks::Gene::Site::SiteTypeMap;
 use Seq::Tracks::Gene::Site::CodonMap;
 use Seq::Tracks::Gene::Definition;
 use Seq::DBManager;
 use Seq::Headers;
+
+# Doesn't extend Seq::Tracks::Get to reduce inheritance depth, since most
+# of that class is overriden anyhow (leaving only the headers property inheritance
+# which isn't necessary since Seq::Headers is a singleton class)
+extends 'Seq::Tracks::Base';
+
+my $geneDef = Seq::Tracks::Gene::Definition->new();
+
+### Set the features default that we get from the Gene track region database ###
+has '+features' => (
+  default => sub {
+    return [ @{$geneDef->ucscGeneAref}, $geneDef->txErrorName ];
+  },
+);
+
+with 'Seq::Tracks::Region::RegionTrackPath';
 
 ########### @Public attributes##########
 ########### Additional "features" that we will add to our output ##############
@@ -63,6 +64,18 @@ has refAminoAcidKey         => ( is => 'ro', default => 'refAminoAcid' );
 has newCodonKey             => ( is => 'ro', default => 'altCodon' );
 has newAminoAcidKey         => ( is => 'ro', default => 'altAminoAcid' );
 has exonicAlleleFunctionKey => ( is => 'ro', default => 'exonicAlleleFunction' );
+
+# This is just the index corresponding to the transcript in the region db
+# Not a real feature; we need to ask for "txNumberKey"
+# In a future API, it may be worthwhile just storing a 'txNumber'
+# property in the region database, to allow a user to just write 'txNumber'
+# as a feature
+# This is needed, because, as insane as it is, the transcript 'name'
+# is not a unique key, and therefore is not a primary key, which makes it
+# useless for lookup
+has txNumberKey => ( is => 'ro', lazy => 1, default => 'txNumber');
+has reportTxNumber => (is => 'ro', isa => 'Bool', default => 0);
+
 # has hgvsPkey => (is => 'ro', default => 'hgvsP');
 # has hgvsCkey => (is => 'ro', default => 'hgvsC');
 
@@ -164,7 +177,12 @@ sub setHeaders {
 
   my $headers = Seq::Headers->new();
 
-  # all of the features that are calculated for every gene track
+  ########################## Create the header #################################
+  # don't mutate $self->features or flatJoinFeatures
+  # those features should be keys in the region db
+  # whereas siteType, exonicAlleleFunction, etc may be computed features
+  # TODO: have clearer separation between computed and stored features
+  ##############################################################################
   unshift @features, $self->siteTypeKey, $self->exonicAlleleFunctionKey,
   $self->codonSequenceKey, $self->newCodonKey, $self->refAminoAcidKey,
   $self->newAminoAcidKey, $self->codonPositionKey,
@@ -173,6 +191,11 @@ sub setHeaders {
   if ( $self->{_flatJoinFeatures} ) {
     push @features, @{ $self->{_flatJoinFeatures} };
   }
+
+  if($self->reportTxNumber) {
+    push @features, $self->txNumberKey;
+  }
+
   #  Prepend some custom features
   #  Providing 1 as the last argument means "prepend" instead of append
   #  So these features will come before any other refSeq.* features
@@ -180,15 +203,20 @@ sub setHeaders {
 
   my @allGeneTrackFeatures = @{ $headers->getParentFeatures( $self->name ) };
 
-  # This includes features added to header, using addFeatureToHeader
+  # Get the output index of each feature we added to the header
+  # This is the index in this tracks output array
+  # and includes features added to header, using addFeatureToHeader
   # such as the modified nearest feature names ($nTrackPrefix.$_) and join track names
   # and siteType, strand, codonNumber, etc.
   for my $i ( 0 .. $#allGeneTrackFeatures ) {
     $self->{_featureIdxMap}{ $allGeneTrackFeatures[$i] } = $i;
   }
 
-  $self->{_lastFeatureIdx} = $#allGeneTrackFeatures;
-  $self->{_featIdx}        = [ 0 .. $#allGeneTrackFeatures ];
+  ############### Store the output indices for computed features ###############
+  # so that we can manually include them in the output
+  my $lastFeatIdx = $#allGeneTrackFeatures;
+
+  $self->{_featIdx}        = [ 0 .. $lastFeatIdx ];
 
   $self->{_strandFidx} = $self->{_featureIdxMap}{ $self->strandKey };
   $self->{_siteFidx}   = $self->{_featureIdxMap}{ $self->siteTypeKey };
@@ -203,6 +231,8 @@ sub setHeaders {
   $self->{_altCodonSidx}   = $self->{_featureIdxMap}{ $self->newCodonKey };
   $self->{_altAaFidx}      = $self->{_featureIdxMap}{ $self->newAminoAcidKey };
   $self->{_alleleFuncFidx} = $self->{_featureIdxMap}{ $self->exonicAlleleFunctionKey };
+
+  $self->{_txNumberFidx} =  $self->{_featureIdxMap}{ $self->txNumberKey };
 
   # $self->{_hgvsCidx} = $self->{_featureIdxMap}{$self->hgvsCkey};
   # $self->{_hgvsPidx} = $self->{_featureIdxMap}{$self->hgvsPkey};
@@ -226,7 +256,6 @@ sub get {
 
   # my @out;
   # # Set the out array to the size we need; undef for any indices we don't add here
-  # $#out = $self->{_lastFeatureIdx};
 
   # Cached field names to make things easier to read
   my $cachedDbNames = $self->{_allCachedDbNames};
@@ -257,6 +286,11 @@ sub get {
       $outAccum->[ $idxMap->{$fName} ][$posIdx] =
       $geneDb->[$num]{ $cachedDbNames->{$fName} };
     }
+  }
+
+  # Needs to be done early, in case !hasCodon
+  if(defined $self->{_txNumberFidx}) {
+    $outAccum->[ $self->{_txNumberFidx} ][$posIdx] = $txNumbers;
   }
 
   ################## Populate site information ########################
@@ -417,16 +451,29 @@ sub get {
     }
   }
 
-  $outAccum->[ $self->{_codonPosFidx} ][$posIdx]   = \@codonPos;
-  $outAccum->[ $self->{_codonNumFidx} ][$posIdx]   = \@codonNum;
-  $outAccum->[ $self->{_alleleFuncFidx} ][$posIdx] = \@funcAccum;
-  $outAccum->[ $self->{_refAaFidx} ][$posIdx]      = \@refAA;
-  $outAccum->[ $self->{_altAaFidx} ][$posIdx]      = \@newAA;
-  $outAccum->[ $self->{_codonSidx} ][$posIdx]      = \@codonSeq;
-  $outAccum->[ $self->{_altCodonSidx} ][$posIdx]   = \@newCodon;
+  if($multiple) {
+    $outAccum->[ $self->{_codonPosFidx} ][$posIdx]   = \@codonPos;
+    $outAccum->[ $self->{_codonNumFidx} ][$posIdx]   = \@codonNum;
+    $outAccum->[ $self->{_alleleFuncFidx} ][$posIdx] = \@funcAccum;
+    $outAccum->[ $self->{_refAaFidx} ][$posIdx]      = \@refAA;
+    $outAccum->[ $self->{_altAaFidx} ][$posIdx]      = \@newAA;
+    $outAccum->[ $self->{_codonSidx} ][$posIdx]      = \@codonSeq;
+    $outAccum->[ $self->{_altCodonSidx} ][$posIdx]   = \@newCodon;
+
+    return $outAccum;
+  }
+
+  # All values should be scalars if possible and if there's only 1
+  $outAccum->[ $self->{_codonPosFidx} ][$posIdx]   = $codonPos[0];
+  $outAccum->[ $self->{_codonNumFidx} ][$posIdx]   = $codonNum[0];
+  $outAccum->[ $self->{_alleleFuncFidx} ][$posIdx] = $funcAccum[0];
+  $outAccum->[ $self->{_refAaFidx} ][$posIdx]      = $refAA[0];
+  $outAccum->[ $self->{_altAaFidx} ][$posIdx]      = $newAA[0];
+  $outAccum->[ $self->{_codonSidx} ][$posIdx]      = $codonSeq[0];
+  $outAccum->[ $self->{_altCodonSidx} ][$posIdx]   = $newCodon[0];
+
   # $outAccum->[$self->{_hgvsCidx}][$posIdx] = \@hgvsC;
   # $outAccum->[$self->{_hgvsPidx}][$posIdx] = \@hgvsP;
-
   return $outAccum;
 }
 

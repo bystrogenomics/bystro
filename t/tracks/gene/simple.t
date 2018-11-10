@@ -13,7 +13,7 @@ use Test::More;
 use Path::Tiny qw/path/;
 use Scalar::Util qw/looks_like_number/;
 use YAML::XS qw/LoadFile/;
-use DDP;
+
 use Seq::Tracks::Gene::Site::SiteTypeMap;
 use Seq::Tracks::Reference::MapBases;
 
@@ -22,7 +22,7 @@ my $siteTypes = Seq::Tracks::Gene::Site::SiteTypeMap->new();
 
 # Defines three tracks, a nearest gene , a nearest tss, and a region track
 # The region track is simply a nearest track for which we storeOverlap and do not storeNearest
-# To show what happens when multiple transcripts (as in NR_FAKE3, NR_FAKE3B, NR_FAKE3C) 
+# To show what happens when multiple transcripts (as in NR_FAKE3, NR_FAKE3B, NR_FAKE3C)
 # all share 100% of their data, except have different txEnd's, which could reveal issues with our uniqueness algorithm
 # such as calculating the maximum range of the overlap: in previous code iterations
 # we removed the non-unique overlapping data, without first looking at the txEnd
@@ -55,7 +55,9 @@ my $header = Seq::Headers->new();
 
 my $features = $header->getParentFeatures('refSeq');
 
-my ($siteTypeIdx, $funcIdx);
+# my $txNumberOutIdx = first_index { $_ eq $geneGetter->txNumberKey } @$features;
+
+my ($siteTypeIdx, $funcIdx, $txNumberOutIdx);
 
 for (my $i = 0; $i < @$features; $i++) {
   my $feat = $features->[$i];
@@ -67,6 +69,11 @@ for (my $i = 0; $i < @$features; $i++) {
 
   if($feat eq 'exonicAlleleFunction') {
     $funcIdx = $i;
+    next;
+  }
+
+  if($feat eq $geneGetter->txNumberKey) {
+    $txNumberOutIdx = $i;
     next;
   }
 }
@@ -81,12 +88,14 @@ for my $pos (0 .. $#$mainDbAref) {
     $inGeneCount++;
 
     my @out;
+
     # not an indel
     my $posIdx = 0;
     $geneGetter->get($dbData, 'chrM', $refGetter->get($dbData), 'A', $posIdx, \@out);
 
     ok(join(",", @{$out[$siteTypeIdx]}) eq $siteTypes->ncRNAsiteType, 'ncRNA site type');
     ok(!defined $out[$funcIdx][0], 'ncRNA has no exonicAlleleFunction');
+    ok($out[$txNumberOutIdx][0] == 0, 'txNumber is outputted if requested');
   }
 
   if(defined $dbData->[$geneDbName]) {

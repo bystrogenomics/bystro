@@ -1,27 +1,27 @@
----
 assembly: hg19
 chromosomes:
-- chrM
+  - chrM
 database_dir: t/tracks/gene/db/index
 files_dir: t/tracks/gene/db/raw
 temp_dir: /mnt/annotator/bystro-dev/tmp
 tracks:
   tracks:
-  - local_files:
-    - chrM.fa.gz
-    name: ref
-    type: reference
-  - features:
-    - kgID
-    - mRNA
-    - spID
-    - spDisplayID
-    - protAcc
-    - description
-    - rfamAcc
-    - name
-    - name2
-    local_files:
-    - hg19.refGene.chrM
-    name: refSeq
-    type: gene
+    - local_files:
+        - chrM.fa.gz
+      name: ref
+      type: reference
+    - features:
+        - kgID
+        - mRNA
+        - spID
+        - spDisplayID
+        - protAcc
+        - description
+        - rfamAcc
+        - name
+        - name2
+      reportTxNumber: true
+      local_files:
+        - hg19.refGene.chrM
+      name: refSeq
+      type: gene

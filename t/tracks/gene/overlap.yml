@@ -34,6 +34,7 @@ tracks:
         - name2
       local_files:
         - hg19.kgXref.fetch.gz
+      reportTxNumber: true
       name: refSeq
       type: gene
       utils:

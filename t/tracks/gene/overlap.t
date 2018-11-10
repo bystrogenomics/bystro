@@ -62,7 +62,8 @@ my $header = Seq::Headers->new();
 
 my $features = $header->getParentFeatures('refSeq');
 
-my ($siteTypeIdx, $funcIdx, $nameIdx, $name2Idx, $spDispIdx, $mrnaIdx, $spIdx, $descIdx);
+my ($siteTypeIdx, $funcIdx, $nameIdx, $name2Idx, $spDispIdx,
+    $mrnaIdx, $spIdx, $descIdx, $txNumberIdx);
 
 my $dbLen = $db->dbGetNumberOfEntries('chr10');
 
@@ -109,6 +110,11 @@ for (my $i = 0; $i < @$features; $i++) {
     $descIdx = $i;
     next;
   }
+
+  if($feat eq 'txNumber') {
+    $txNumberIdx = $i;
+    next;
+  }
 }
 
 # Safe for use when instantiated to static variable; no set - able properties
@@ -152,10 +158,16 @@ for my $pos (0 .. $dbLen - 1) {
   my $siteType = $out->[$siteTypeIdx][$posIdx];
   my $names = $out->[$nameIdx][$posIdx];
   my $symbol = $out->[$name2Idx][$posIdx];
+  my $txNumber = $out->[$txNumberIdx][$posIdx];
 
-  # Exon is NM_019046, none others overlap
+  # Tx is NM_019046, none others overlap
+  # It is the 3rd tx in the list (NM_001009941 is 1st/idx 0, NM_001009943 is 2nd/idx 1)
   if($pos < 16361) {
     ok(!ref $siteType);
+
+    ok($txNumber == 2, "The 3rd transcript in the input file is NM_019046,
+      and we get the correct txNumber");
+    ok($names eq 'NM_019046');
 
     # last exon is utr3; this tx is on negative strand so first exon is really last
     # exonStarts: 0,16371,18572,21280,22243,23997,26121,27315,
@@ -181,6 +193,17 @@ for my $pos (0 .. $dbLen - 1) {
 
      next;
   }
+
+  # The merge order may not be completely deterministic
+  # However, txNumber is always the order found in the input file
+  # and the txNumber will always match the transcript, no matter 
+  # whether that tx is merged first, second, or third
+  ok($txNumber->[0] == 2 &&
+     $txNumber->[1] == 0 &&
+     $txNumber->[2] == 1, "Can output txNumbers");
+  ok($names->[0] eq 'NM_019046', "Can get the correct tx name for 1st merged");
+  ok($names->[1] eq 'NM_001009941', "Can get the correct tx name for 2nd merged");
+  ok($names->[2] eq 'NM_001009943', "Can get the correct tx name for 3rd merged");
 
   # first condition not needed, simply for consistency
   # 1652 is the first exonEnds for NM_001009943 and NM_001009941, and the 2nd for NM_019046
