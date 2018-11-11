@@ -20,8 +20,10 @@ state $orderedHeaderCache = [];
 state $strHeaderCache = '';
 # { childFeature1 => idx, childFeature2 => idx;
 state $orderMapCache = {};
+# { $parent => { $child1 => idxChild1, $child2 => idxChild2 }}
+my %parentChildHash;
 
-# All singleton tracks have an initialize method, which clears 
+# All singleton tracks have an initialize method, which clears
 sub initialize {
   _clearCache();
 
@@ -33,9 +35,10 @@ sub initialize {
 
 sub _clearCache {
    # These get initialize/cleared every time feature added
-   # They simply track different views of 
+   # They simply track different views of
   $orderedHeaderCache = [];
   $orderMapCache = {};
+  undef %parentChildHash;
   $strHeaderCache = '';
 
   return;
@@ -48,6 +51,38 @@ sub get {
 sub getParentFeatures {
   my ($self, $parentName) = @_;
   return $parentChild->{$parentName};
+}
+
+sub getFeatureIdx {
+  my ($self, $parentName, $childName) = @_;
+
+  if(!%parentChildHash) {
+    my $i = -1;
+    for my $entry (values @$orderedHeaderFeaturesAref) {
+      $i++;
+
+      if(ref $entry) {
+        # One key only, the parent name (trackName)
+        my ($trackName) = keys %{$entry};
+
+        my %children;
+        my $y = -1;
+        for my $childName (@{$entry->{$trackName}}) {
+          $y++;
+          $children{$childName} = $y;
+        }
+
+        $parentChildHash{$trackName} = \%children;
+        next;
+      }
+
+      $parentChildHash{'_masterBystro_'} //= {};
+      $parentChildHash{'_masterBystro_'}{$entry} = $i;
+    }
+  }
+
+  $parentName ||= '_masterBystro_';
+  return $parentChildHash{$parentName}{$childName};
 }
 
 sub getOrderedHeader() {
@@ -65,7 +100,7 @@ sub getOrderedHeader() {
     }
   }
 
-  return $orderedHeaderCache; 
+  return $orderedHeaderCache;
 }
 
 # Retrieves child feature
@@ -130,7 +165,7 @@ sub addFeaturesToHeader {
     for my $headerEntry (@$orderedHeaderFeaturesAref) {
       if(!ref $headerEntry) {
         if($parent eq $headerEntry) {
-          $self->log('warning', "$parent equals $headerEntry, which has no 
+          $self->log('warning', "$parent equals $headerEntry, which has no
             child features, which was not what we expected");
         }
         next;

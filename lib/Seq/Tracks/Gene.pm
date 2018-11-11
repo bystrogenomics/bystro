@@ -49,7 +49,7 @@ with 'Seq::Tracks::Region::RegionTrackPath';
 
 ########### @Public attributes##########
 ########### Additional "features" that we will add to our output ##############
-### Users may configure these ####
+### Users may configure these; they are not stored, but computed ####
 
 # These are features defined by Gene::Site, but we name them in Seq::Tracks::Gene
 # Because it gets really confusing to track down the features defined in Seq::Tracks::Gene::Site
@@ -64,6 +64,9 @@ has refAminoAcidKey         => ( is => 'ro', default => 'refAminoAcid' );
 has newCodonKey             => ( is => 'ro', default => 'altCodon' );
 has newAminoAcidKey         => ( is => 'ro', default => 'altAminoAcid' );
 has exonicAlleleFunctionKey => ( is => 'ro', default => 'exonicAlleleFunction' );
+
+# This is actually a stored value, added automatically
+# has txErrorKey => (is => 'ro', default => 'txError');
 
 # This is just the index corresponding to the transcript in the region db
 # Not a real feature; we need to ask for "txNumberKey"
