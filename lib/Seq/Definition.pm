@@ -14,7 +14,6 @@ use Sys::CpuAffinity;
 # TODO: Explore portability on windows-based systems w/File Copy
 # use File::Copy;
 
-use Seq::Tracks;
 use Seq::Statistics;
 
 

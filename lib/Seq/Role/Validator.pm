@@ -24,8 +24,6 @@ use Seq::InputFile;
 
 with 'Seq::Role::IO', 'Seq::Role::Message';
 
-has assembly => (is => 'ro', required => 1);
-
 has _inputFileBaseName => (
   isa => 'Str',
   is => 'ro',

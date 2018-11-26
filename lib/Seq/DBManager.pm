@@ -957,13 +957,9 @@ sub _getDbi {
 
   $dbPath = $dbPath->stringify;
 
-  my $flags;
+  my $flags = 0;
   if($instanceConfig{readOnly}) {
-    $flags = MDB_NOLOCK | MDB_NOSYNC | MDB_RDONLY | MDB_NORDAHEAD;
-  } else {
-    # We read synchronously during building, which is our only mixed workload
-    # TODO: allow caller to configure
-    $flags = MDB_NOSYNC;
+    $flags = MDB_NOLOCK | MDB_RDONLY | MDB_NORDAHEAD;
   }
 
   my $env = LMDB::Env->new($dbPath, {
@@ -1010,6 +1006,10 @@ sub _getDbi {
     $self->_errorWithCleanup("Failed to commit open db tx because: $err");
     return;
   }
+
+  # Goal is to allow database open commit to happen with fsync on
+  # And afterwards disable fsync
+  $env->set_flags(MDB_NOSYNC, 1);
 
   $envs{$name} = {env => $env, dbi => $DB->dbi, db => $DB, tflags => $flags};
 
