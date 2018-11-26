@@ -26,7 +26,7 @@ $Seq::Role::Message::LOG = Log::Fast->new({
   level           => 'INFO',
   prefix          =>  '%D %T ',
   type            => 'fh',
-  fh              => \*STDOUT,
+  fh              => \*STDERR,
 });
 
 $Seq::Role::Message::mapLevels = {
@@ -103,7 +103,7 @@ sub setVerbosity {
 
   if($verboseLevel != 0 && $verboseLevel != 1 && $verboseLevel != 2) {
     # Should log this
-    say "Verbose level must be 0, 1, or 2, setting to 10000 (no verbose output)";
+    say STDERR "Verbose level must be 0, 1, or 2, setting to 10000 (no verbose output)";
     $verbose = 10000;
     return;
   }
@@ -206,7 +206,7 @@ sub log {
   # So if verbosity is set to 1, only err, warn, and fatal messages
   # will be printed to sdout
   if($verbose <= $mapSeverity{$_[1]}) {
-    say "[$_[1]] $_[2]" ;
+    say STDERR "[$_[1]] $_[2]" ;
   }
 
   return;
