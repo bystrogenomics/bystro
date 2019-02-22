@@ -216,23 +216,20 @@ while(my $job = $beanstalk->reserve) {
     if(ref $err) {
       say STDERR "Elasticsearch error:";
       p $err;
-
-      # TODO: Improve error handling, this doesn't work reliably
-      if($err->{vars}{body}{status} && $err->{vars}{body}{status} == 400) {
-        $err = "Query failed to parse";
-      } else {
-        $err = "Issue handling query";
-      }
     }
 
-    $beanstalkEvents->put( { priority => 0, data => encode_json({
+    $err = "There was an issue, sorry!";
+
+    my $data = {
       event => $events->{failed},
       reason => $err,
       queueID => $job->id,
-      submissionID  => $jobDataHref->{submissionID},
-    }) } );
+      submissionID   => $jobDataHref->{submissionID},
+    };
 
-    $job->bury();
+    $beanstalkEvents->put( { priority => 0, data => encode_json($data) } );
+
+    $job->delete();
 
     if($beanstalkEvents->error) {
       say STDERR "Beanstalkd last error:";

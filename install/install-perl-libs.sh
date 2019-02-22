@@ -11,6 +11,7 @@ cpanm install DDP
 cpanm install YAML::XS
 cpanm install Getopt::Long::Descriptive
 cpanm install Types::Path::Tiny
+cpanm install Sereal # extra MCE performance
 cpanm install MCE::Shared
 cpanm install List::MoreUtils
 cpanm install Log::Fast
