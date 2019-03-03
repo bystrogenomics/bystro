@@ -4,7 +4,7 @@ import jobStore, { addCallback, removeCallback } from "../libs/jobTracker";
 
 console.info("job tracker", jobStore);
 
-let _callbackId = null;
+let _callbackId: number;
 class Jobs extends React.Component {
   state = {
     allJobs: {}
@@ -14,6 +14,7 @@ class Jobs extends React.Component {
     super(props);
 
     _callbackId = addCallback("all", () => {
+      console.info("CALLED");
       this.setState({
         allJobs: jobStore.all
       });

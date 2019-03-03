@@ -25,11 +25,11 @@ const callbacks = new Callbacks();
 export const addCallback = callbacks.add;
 export const removeCallback = callbacks.remove;
 
-setTimeout(() => {
-  _all = {
-    1: "something",
-    2: "else"
-  };
+_all = {
+  1: "something",
+  2: "else"
+};
 
+for (let i = 0; i < 1000; i++) {
   callbacks.call(types.all);
-}, 2000);
+}
