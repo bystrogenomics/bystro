@@ -7,16 +7,21 @@ console.info("job tracker", jobStore);
 let _callbackId: number;
 class Jobs extends React.Component {
   state = {
-    allJobs: {}
+    jobs: {}
   };
+
+  static async getInitialProps({ query }: any) {
+    return {
+      type: query.type || "public"
+    };
+  }
 
   constructor(props: any) {
     super(props);
 
-    _callbackId = addCallback("all", () => {
-      console.info("CALLED");
+    _callbackId = addCallback(props.type, () => {
       this.setState({
-        allJobs: jobStore.all
+        jobs: jobStore[props.type]
       });
     });
   }
@@ -26,9 +31,9 @@ class Jobs extends React.Component {
   }
 
   render() {
-    return Object.keys(this.state.allJobs).map((key, idx) => (
+    return Object.keys(this.state.jobs).map((key, idx) => (
       <div key={idx}>
-        {key}:{this.state.allJobs[key]}
+        {key}:{this.state.jobs[key]}
       </div>
     ));
   }

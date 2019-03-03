@@ -3,8 +3,11 @@ import Link from "next/link";
 
 export default () => (
   <div id="header">
-    <Link href="/jobs">
-      <a>Jobs</a>
+    <Link href="/">
+      <a className="link home">/</a>
+    </Link>
+    <Link href="/jobs" prefetch>
+      <a className="link">Jobs</a>
     </Link>
   </div>
 );

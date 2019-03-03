@@ -5,6 +5,7 @@ export default class Callbacks {
   constructor() {
     this._callbacks = {
       all: [],
+      public: [],
       incomplete: []
     };
   }
@@ -35,12 +36,8 @@ export default class Callbacks {
       delete this._callbackTimeouts[type];
     }
 
-    this._callbackTimeouts[type] = setTimeout(
-      ctx => {
-        ctx._callbacks[type].forEach(v => v());
-      },
-      100,
-      this
-    );
+    this._callbackTimeouts[type] = setTimeout(() => {
+      this._callbacks[type].forEach(v => v());
+    }, 100);
   };
 }

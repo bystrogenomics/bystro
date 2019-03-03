@@ -12,6 +12,9 @@ let _shared = {};
 export default {
   get all() {
     return _all;
+  },
+  get public() {
+    return _public;
   }
 };
 
@@ -25,11 +28,11 @@ const callbacks = new Callbacks();
 export const addCallback = callbacks.add;
 export const removeCallback = callbacks.remove;
 
-_all = {
+_public = {
   1: "something",
   2: "else"
 };
 
 for (let i = 0; i < 1000; i++) {
-  callbacks.call(types.all);
+  callbacks.call(types.public);
 }
