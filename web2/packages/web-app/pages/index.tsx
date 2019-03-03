@@ -1,5 +1,6 @@
-import DefaultView from "../components/DefaultView";
+import DefaultView from "../components/DefaultView/DefaultView";
 import "../styles/pages/index.scss";
+import jobTracker from "../libs/jobTracker";
 
 export default () => (
   <div id="index" className="center">

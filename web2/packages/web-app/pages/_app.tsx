@@ -1,5 +1,6 @@
 import React from "react";
 import App, { Container } from "next/app";
+import Header from "../components/Header/Header";
 
 import "../styles/main.scss";
 
@@ -19,6 +20,7 @@ class MyApp extends App {
 
     return (
       <div id="site-theme">
+        <Header />
         <Container>
           <Component {...pageProps} />
         </Container>
