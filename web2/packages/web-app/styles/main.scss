@@ -1,0 +1,65 @@
+@import "variables/margin.scss";
+
+#site-theme {
+  font-family: "Raleway";
+  color: #000;
+
+  $size: 16px;
+
+  font-size: $size;
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5 {
+    margin: 0px 0px $margin 0px;
+  }
+
+  h1 {
+    font-size: 60 * 0.0625rem;
+  }
+
+  h2 {
+    font-size: 48 * 0.0625rem;
+  }
+
+  h3 {
+    font-size: 34 * 0.0625rem;
+  }
+
+  h4 {
+    font-size: 24 * 0.0625rem;
+  }
+
+  h5 {
+    font-size: 20 * 0.0625rem;
+  }
+
+  .subtitle {
+    font-size: 14 * 0.0625rem;
+  }
+
+  p {
+    margin-top: $margin;
+  }
+
+  display: flex;
+  height: 100vh;
+
+  a {
+    text-decoration: none;
+    color: #000;
+
+    &:hover {
+      color: #333;
+    }
+  }
+  .center {
+    align-content: center;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    display: flex;
+  }
+}

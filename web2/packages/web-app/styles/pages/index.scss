@@ -1,0 +1,11 @@
+@import "../variables/margin.scss";
+
+#site-theme {
+  #index {
+    flex-direction: column;
+
+    .subtitle + .subtitle {
+      margin-top: $margin / 2;
+    }
+  }
+}

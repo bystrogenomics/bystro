@@ -1,0 +1,46 @@
+{
+  "name": "web",
+  "version": "0.1.0",
+  "description": "Bystro's next-gen web app",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "next build",
+    "dev": "next",
+    "start": "next start"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/akotlar/bystro.git"
+  },
+  "keywords": [
+    "bioinformatics",
+    "genetics",
+    "web"
+  ],
+  "author": "Alex Kotlar",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/akotlar/bystro/issues"
+  },
+  "homepage": "https://github.com/akotlar/bystro#readme",
+  "dependencies": {
+    "@zeit/next-css": "^1.0.1",
+    "@zeit/next-sass": "^1.0.1",
+    "@zeit/next-typescript": "^1.1.1",
+    "@zeit/next-workers": "^1.0.0",
+    "fork-ts-checker-webpack-plugin": "^0.5.2",
+    "next": "^8.0.3",
+    "node-sass": "^4.11.0",
+    "react": "^16.8.3",
+    "react-dom": "^16.8.3",
+    "typescript": "^3.3.3333",
+    "worker-loader": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/next": "^8.0.1",
+    "@types/node": "^11.10.4",
+    "@types/react": "^16.8.6",
+    "@types/react-dom": "^16.8.2"
+  }
+}
