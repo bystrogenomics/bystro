@@ -21,9 +21,11 @@ class MyApp extends App {
     return (
       <div id="site-theme">
         <Header />
-        <Container>
-          <Component {...pageProps} />
-        </Container>
+        <div id="main">
+          <Container>
+            <Component {...pageProps} />
+          </Container>
+        </div>
       </div>
     );
   }

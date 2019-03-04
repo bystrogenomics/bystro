@@ -2,12 +2,11 @@ import React from "react";
 import { view } from "react-easy-state";
 import jobStore, { addCallback, removeCallback } from "../libs/jobTracker";
 
-console.info("job tracker", jobStore);
-
 let _callbackId: number;
 class Jobs extends React.Component {
   state = {
-    jobs: {}
+    jobs: {},
+    jobType: ""
   };
 
   static async getInitialProps({ query }: any) {
@@ -19,6 +18,8 @@ class Jobs extends React.Component {
   constructor(props: any) {
     super(props);
 
+    this.state.jobType = props.type;
+
     _callbackId = addCallback(props.type, () => {
       this.setState({
         jobs: jobStore[props.type]
@@ -27,7 +28,7 @@ class Jobs extends React.Component {
   }
 
   componentWillUnmount() {
-    removeCallback(_callbackId);
+    removeCallback(this.state.jobType, _callbackId);
   }
 
   render() {

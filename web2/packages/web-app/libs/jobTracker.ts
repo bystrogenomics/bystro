@@ -23,7 +23,14 @@ enum types {
   "public" = "public"
 }
 
-const callbacks = new Callbacks();
+const callbacks = new Callbacks({
+  public: [],
+  all: [],
+  completed: [],
+  shared: [],
+  deleted: [],
+  failed: []
+});
 
 export const addCallback = callbacks.add;
 export const removeCallback = callbacks.remove;

@@ -9,9 +9,7 @@ export default () => (
         Bystro
       </a>
     </h1>
-    <div className="subtitle">
-      Variant annotation & filtering for any size data.
-    </div>
+    <div className="subtitle">Genomic analysis for any size data</div>
     <div className="subtitle">
       Please cite our{" "}
       <a target="_blank" href="https://doi.org/10.1186/s13059-018-1387-3">
