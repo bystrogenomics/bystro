@@ -8,7 +8,6 @@ export default class Callbacks {
 
   add = (type: string, action: () => void) => {
     this._callbacks[type].push(action);
-    console.info("added", this._callbacks[type]);
     return this._callbacks[type].length;
   };
 

@@ -1,6 +1,11 @@
 import fetch from "isomorphic-unfetch";
 import Callbacks from "./callbacks";
 
+// enum types {
+//   "all" = "all",
+//   "public" = "public"
+// }
+
 let _all = {};
 let _completed = {};
 let _incomplete = {};
@@ -8,20 +13,6 @@ let _failed = {};
 let _deleted = {};
 let _public = {};
 let _shared = {};
-
-export default {
-  get all() {
-    return _all;
-  },
-  get public() {
-    return _public;
-  }
-};
-
-enum types {
-  "all" = "all",
-  "public" = "public"
-}
 
 const callbacks = new Callbacks({
   public: [],
@@ -35,11 +26,23 @@ const callbacks = new Callbacks({
 export const addCallback = callbacks.add;
 export const removeCallback = callbacks.remove;
 
-_public = {
-  1: "something",
-  2: "else"
+export default {
+  get all() {
+    return _all;
+  },
+  get public() {
+    return _public;
+  }
 };
 
-for (let i = 0; i < 1000; i++) {
-  callbacks.call(types.public);
+if (typeof window !== undefined) {
+  fetch("http://localhost:9001/api/jobs/list/all/public")
+    .then(r => r.json())
+    .then(data => {
+      console.info("data", data);
+    })
+    .catch(e => {
+      console.info(e.message);
+      console.info("failed to fetch", e.message);
+    });
 }
