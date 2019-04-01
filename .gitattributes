@@ -1,4 +1,4 @@
-# Explicitly declare all files in install/ folder to retain
-#   LF end-of-line (only \n, not \r\n), even on Windows
+# Explicitly declare all files to retain LF end-of-line 
+#   (only \n, not \r\n), even on Windows
 
-install/* text eol=lf
+* text eol=lf
