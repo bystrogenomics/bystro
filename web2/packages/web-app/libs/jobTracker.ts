@@ -1,6 +1,9 @@
 import fetch from "isomorphic-unfetch";
 import Callbacks from "./callbacks";
+import getConfig from "next/config";
 
+const url = getConfig().publicRuntimeConfig.API.BASE_URL;
+console.info("url", url);
 // enum types {
 //   "all" = "all",
 //   "public" = "public"
@@ -36,10 +39,11 @@ export default {
 };
 
 if (typeof window !== undefined) {
-  fetch("http://localhost:9001/api/jobs/list/all/public")
+  fetch(`${url}/jobs/list/all/public`)
     .then(r => r.json())
     .then(data => {
-      console.info("data", data);
+      _public = data;
+      callbacks.call("public", data);
     })
     .catch(e => {
       console.info(e.message);

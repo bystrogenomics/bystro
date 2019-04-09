@@ -1,3 +1,4 @@
+require("dotenv").config();
 const withTypescript = require("@zeit/next-typescript");
 const withCss = require("@zeit/next-css");
 const withSass = require("@zeit/next-sass");
@@ -14,3 +15,9 @@ const webpack = {
 };
 
 module.exports = withCss(withSass(withTypescript(webpack)));
+
+module.exports.publicRuntimeConfig = {
+  API: {
+    BASE_URL: process.env.API_BASE_URL
+  }
+};
