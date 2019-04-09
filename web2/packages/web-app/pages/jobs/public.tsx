@@ -5,6 +5,15 @@ import jobTracker, { addCallback, removeCallback } from "../../libs/jobTracker";
 let _callbackId: number;
 const queryType = "public";
 
+// https://stackoverflow.com/questions/46709773/typescript-react-rendering-an-array-from-a-stateless-functional-component
+const JobList = (props: { jobs: any }) => (
+  <React.Fragment>
+    {Object.keys(props.jobs).map((key, idx) => (
+      <p key={idx}>{props.jobs[key].name}</p>
+    ))}
+  </React.Fragment>
+);
+
 class Jobs extends React.Component {
   state = {
     jobs: jobTracker.public,
@@ -23,13 +32,10 @@ class Jobs extends React.Component {
     this.state.jobType = props.type;
 
     _callbackId = addCallback(props.type, data => {
-      console.info("updated", data);
       this.setState(() => ({
         jobs: data
       }));
     });
-
-    console.info("data", this.state.jobs);
   }
 
   componentWillUnmount() {
@@ -37,9 +43,11 @@ class Jobs extends React.Component {
   }
 
   render() {
-    return Object.keys(this.state.jobs).map((key, idx) => (
-      <div key={idx}>{this.state.jobs[key]["_id"]}</div>
-    ));
+    return (
+      <div>
+        <JobList jobs={this.state.jobs} />
+      </div>
+    );
   }
 }
 
