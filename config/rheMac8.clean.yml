@@ -35,7 +35,6 @@ fileProcessors:
     args: --emptyField ! --keepId --keepPos
     program: bystro-vcf
 statistics:
-  dbSNPnameField: ~
   exonicAlleleFunctionField: refSeq.exonicAlleleFunction
   outputExtensions:
     json: .statistics.json
