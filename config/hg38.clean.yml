@@ -1,6 +1,6 @@
 assembly: hg38
 build_author: ec2-user
-build_date: '2018-02-07T03:22:00'
+build_date: "2018-02-07T03:22:00"
 chromosomes:
   - chr1
   - chr2
@@ -34,7 +34,7 @@ fileProcessors:
     args: --emptyField ! --minGq .95
     program: bystro-snp
   vcf:
-    args: --emptyField ! --sample %sampleList%
+    args: --emptyField ! --sample %sampleList% --keepPos
     program: bystro-vcf
 statistics:
   dbSNPnameField: dbSNP.name
@@ -49,11 +49,11 @@ statistics:
 temp_dir: hidden
 tracks:
   - build_author: ec2-user
-    build_date: '2018-02-07T03:22:00'
+    build_date: "2018-02-07T03:22:00"
     local_files:
       - chr*.fa.gz
     name: ref
-    remote_dir: 'http://hgdownload.soe.ucsc.edu/goldenPath/hg38/chromosomes/'
+    remote_dir: "http://hgdownload.soe.ucsc.edu/goldenPath/hg38/chromosomes/"
     remote_files:
       - chr1.fa.gz
       - chr2.fa.gz
@@ -83,7 +83,7 @@ tracks:
     type: reference
     version: 2
   - build_author: ec2-user
-    build_date: '2018-02-07T03:22:00'
+    build_date: "2018-02-07T03:22:00"
     features:
       - kgID
       - mRNA
@@ -118,7 +118,7 @@ tracks:
     type: gene
     version: 2
   - build_author: ec2-user
-    build_date: '2018-02-07T03:22:00'
+    build_date: "2018-02-07T03:22:00"
     local_files:
       - chr*.phastCons100way.wigFix.gz
     name: phastCons
@@ -153,7 +153,7 @@ tracks:
     type: score
     version: 2
   - build_author: ec2-user
-    build_date: '2018-02-07T03:22:00'
+    build_date: "2018-02-07T03:22:00"
     local_files:
       - chr*.phyloP100way.wigFix.gz
     name: phyloP
@@ -188,9 +188,9 @@ tracks:
     type: score
     version: 2
   - build_author: ec2-user
-    build_date: '2018-02-07T03:22:00'
-    caddToBed_date: '2017-01-19T04:37:00'
-    filterCadd_date: '2017-08-28T18:28:00'
+    build_date: "2018-02-07T03:22:00"
+    caddToBed_date: "2017-01-19T04:37:00"
+    filterCadd_date: "2017-08-28T18:28:00"
     local_files:
       - >-
         whole_genome_SNVs.tsv.bed.mapped.chr19.organized-by-chr.txt.sorted.chr19.filtered.txt.gz
@@ -242,17 +242,17 @@ tracks:
       - >-
         whole_genome_SNVs.tsv.bed.mapped.chrX.organized-by-chr.txt.sorted.chrX.filtered.txt.gz
     name: cadd
-    sortCadd_date: '2017-01-20T23:53:00'
+    sortCadd_date: "2017-01-20T23:53:00"
     sorted_guaranteed: 1
     type: cadd
     version: 2
   - build_author: ec2-user
-    build_date: '2018-02-07T03:22:00'
+    build_date: "2018-02-07T03:22:00"
     build_field_transformations:
-      alleleFreqs: 'split [,]'
-      alleleNs: 'split [,]'
-      alleles: 'split [,]'
-      func: 'split [,]'
+      alleleFreqs: "split [,]"
+      alleleNs: "split [,]"
+      alleles: "split [,]"
+      func: "split [,]"
       observed: 'split [\/]'
     features:
       - name
@@ -271,14 +271,14 @@ tracks:
     version: 2
   - based: 1
     build_author: ec2-user
-    build_date: '2018-02-07T03:22:00'
+    build_date: "2018-02-07T03:22:00"
     build_field_transformations:
       chrom: chr .
-      clinicalSignificance: 'split [;]'
-      origin: 'split [;]'
-      phenotypeList: 'split [;]'
-      reviewStatus: 'split [;]'
-      type: 'split [;]'
+      clinicalSignificance: "split [;]"
+      origin: "split [;]"
+      phenotypeList: "split [;]"
+      reviewStatus: "split [;]"
+      type: "split [;]"
     build_row_filters:
       Assembly: == GRCh38
     features:
@@ -292,7 +292,7 @@ tracks:
       - referenceAllele
       - alternateAllele
     fieldMap:
-      '#AlleleID': alleleID
+      "#AlleleID": alleleID
       AlternateAllele: alternateAllele
       Chromosome: chrom
       ClinicalSignificance: clinicalSignificance
@@ -313,7 +313,7 @@ tracks:
     type: sparse
     version: 2
   - build_author: ec2-user
-    build_date: '2018-02-07T03:22:00'
+    build_date: "2018-02-07T03:22:00"
     build_row_filters:
       AS_FilterStatus: == PASS
     features:
@@ -368,7 +368,7 @@ tracks:
     type: vcf
     version: 4
   - build_author: ec2-user
-    build_date: '2018-02-07T03:22:00'
+    build_date: "2018-02-07T03:22:00"
     build_row_filters:
       AS_FilterStatus: == PASS
     features:
