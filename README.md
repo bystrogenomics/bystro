@@ -13,6 +13,8 @@ For most users, we recommend https://bystro.io .
 The web app gives full access to all of Bystro's capabilities, provides a convenient search/filtering interface, supports large data sets (tested up to 890GB uncompressed/129GB compressed), and has excellent performance.
 
 ## Installing Bystro
+*Check out the master branch for the upcoming release*
+
 Please read: [INSTALL.md](INSTALL.md)
 
 Bystro relies on pluggable (via Bystro's YAML config) pre-processors to normalize variant inputs (**dealing with VCF issues such as padding**), calculate whether a site is a transition or transversion, calculate sample maf, identify hets/homozygotes/missing samples, calculate heterozygosity, homozygosity, missingness, and more.
