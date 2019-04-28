@@ -1,0 +1,9 @@
+[package]
+name = "bystro-vcf"
+version = "0.1.0"
+authors = ["Alex Kotlar <akotlar@bu.edu>"]
+edition = "2018"
+
+[dependencies]
+crossbeam-channel = "0.3.8"
+num_cpus = "1.10.0"
