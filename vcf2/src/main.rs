@@ -151,37 +151,34 @@ fn filter_passes(
         && (excluded_filters.len() == 0 || !excluded_filters.contains_key(filter_field))
 }
 
-type SnpType<'a> = (&'a [u8], &'a [u8], &'a u8, &'a u8);
-type DelType<'a> = (&'a [u8], u32, &'a u8, u32);
-type InsType<'a> = (&'a [u8], &'a [u8], &'a u8, &'a [u8]);
+type SnpType<'a> = (&'a [u8], &'a u8, &'a u8);
+type DelType<'a> = (u32, &'a u8, u32);
+type InsType<'a> = (&'a [u8], &'a u8, &'a [u8]);
+type Multi<'a> = (&'a [u8], Vec<u32>, Vec<&'a u8>, Vec<Vec<u8>>);
 
 enum VariantEnum<'a> {
     Snp(SnpType<'a>),
     Del(DelType<'a>),
     Ins(InsType<'a>),
-    Multi((&'a [u8], Vec<u32>, Vec<&'a u8>, Vec<Vec<u8>>)),
+    Multi(Multi<'a>),
     None,
 }
 
+// fn get_allele_count<T: it>(variants: T) {
+//     return T.len();
+// }
 // fn process_snp
 // type VariantType<'a> = &'a Variants<'a>;
 
 // site_type, positions, refs, alts, altIndices
 fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<'a> {
-    // println!(
-    //     "{} {} {}",
-    //     from_utf8(pos).unwrap(),
-    //     from_utf8(refr).unwrap(),
-    //     from_utf8(alt).unwrap()
-    // );
-
     if alt.len() == 1 {
         if !snp_is_valid(alt) {
             return VariantEnum::None;
         }
 
         if refr.len() == 1 {
-            return VariantEnum::Snp((SNP, pos, &refr[0], &alt[0]));
+            return VariantEnum::Snp((pos, &refr[0], &alt[0]));
         }
 
         // TODO: Do we need this check
@@ -198,16 +195,15 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
         let pos = u32::from_radix_10(pos).0;
         // let allele = Vec::with_capacity(1);
 
-        return VariantEnum::Del((DEL, pos + 1, &refr[0], 1 - refr.len() as u32));
+        return VariantEnum::Del((pos + 1, &refr[0], 1 - refr.len() as u32));
     } else if refr.len() == 1 && rfind_bytes(alt, &[b',']) == None {
-        // println!("IN");
         if alt[0] == refr[0] {
             return VariantEnum::None;
         }
 
-        return VariantEnum::Ins((DEL, pos, &refr[0], &alt[1..alt.len()]));
+        return VariantEnum::Ins((pos, &refr[0], &alt[1..alt.len()]));
     }
-    // println!("PAST");
+
     let mut positions: Vec<u32> = Vec::new();
     let mut references: Vec<&u8> = Vec::new();
     let mut alleles: Vec<Vec<u8>> = Vec::new();
@@ -228,8 +224,6 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
         n_alleles += 1;
 
         if !alt_is_valid(t_alt) {
-            // println!("{:?}", std::str::from_utf8(alt));
-            // println!("{:?}", std::str::from_utf8(t_alt));
             continue;
         }
 
@@ -334,7 +328,6 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
                 r_idx -= 1;
             }
 
-            // println!("len1 {}", r_idx);
             // Then, we require an exact match from left edge, for the difference between the
             // length of the ref, and the shared suffix
             // Ex: alt: TAGCTT ref: TAT
@@ -363,15 +356,6 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
             // The ref is ref[2 - 1] or ref[1]
             offset = { refr_len + r_idx } as usize;
 
-            // println!(
-            //     "Offset {}",
-            //     // refr_len,
-            //     // std::str::from_utf8(refr).unwrap(),
-            //     // std::str::from_utf8(t_alt).unwrap(),
-            //     offset,
-            //     // r_idx
-            // );
-
             // TODO: DO we need this check
             // if refr[0..offset] != t_alt[0..offset] {
             //     println!("WTF");
@@ -393,16 +377,8 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
             // rIdx == -1 , real alt == tAlt[len(ref) - 1:len(tAlt) - 1] == tALt[2:5]
             // let mut allele = Vec::new();
             // allele.push(t_alt[i]);
-            // println!(
-            //     "Before {} {} {} {} {}",
-            //     std::str::from_utf8(refr).unwrap(),
-            //     offset,
-            //     talt_len,
-            //     r_idx,
-            //     { talt_len + r_idx } as usize
-            // );
             alleles.push(Vec::from(&t_alt[offset..{ talt_len + r_idx } as usize]));
-            // println!("After");
+
             continue;
         }
 
@@ -418,17 +394,12 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
 
         // Just like insertion, but try to match all bases from 1 base downstream of tAlt to ref
         // let mut r_idx = 0;
-        // println!("before r_idx {}", r_idx);
         while talt_len + r_idx > 1
             && refr_len + r_idx > 0
             && t_alt[{ talt_len + r_idx - 1 } as usize] == refr[{ refr_len + r_idx - 1 } as usize]
         {
             r_idx -= 1;
         }
-
-        // println!("len2 {}", r_idx);
-
-        // println!("after r_idx {}", r_idx);
 
         offset = { talt_len + r_idx } as usize;
 
@@ -441,12 +412,7 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
         positions.push(pos + offset as u32);
         // we want the base after the last shared
         references.push(&refr[offset]);
-        // println!(
-        //     "Allele {} {} {}",
-        //     from_utf8(refr).unwrap(),
-        //     from_utf8(t_alt).unwrap(),
-        //     -(refr_len + r_idx - offset as i32)
-        // );
+
         let mut allele = Vec::new();
         itoa::write(&mut allele, -(refr_len + r_idx - offset as i32)).unwrap();
         alleles.push(allele);
@@ -488,13 +454,11 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
     // let n_fields = header.len();
 
     // let mut multiallelic = false;
-    // let mut homs: Vec<&str> = Vec::new();
-    // let mut hets: Vec<&str> = Vec::new();
-    // let mut missing: Vec<&str> = Vec::new();
-
-    // let mut effective_samples: f64;
-    // let mut ac: u32;
-    // let mut an: u32;
+    let mut homs: Vec<Vec<&str>> = Vec::new();
+    let mut hets: Vec<Vec<&str>> = Vec::new();
+    let mut missing: Vec<Vec<&str>> = Vec::new();
+    let mut ac: Vec<u32> = Vec::new();
+    let mut an: Vec<u32> = Vec::new();
 
     // let empty_field = "!";
     // let field_delim = ";";
@@ -510,13 +474,23 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
     let mut n_count = 0;
     let mut snp_count = 0;
     let mut multi_count = 0;
-    for row in rows.iter() {
-        // let row: Vec<&str> = row.split("\t").map(|field| field).collect();
+    let mut ins_count = 0;
+    let mut del_count = 0;
+    let mut simple_gt = false;
 
-        let mut chrom: &[u8] = b"";
-        let mut pos: &[u8] = b"";
-        let mut refr: &[u8] = b"";
-        let mut alt: &[u8] = b"";
+    let mut chrom: &[u8] = b"";
+    let mut pos: &[u8] = b"";
+    let mut refr: &[u8] = b"";
+    let mut alt: &[u8] = b"";
+
+    let mut alleles: VariantEnum = VariantEnum::None;
+    let mut found_ac = 0;
+    for row in rows.iter() {
+        an.clear();
+        ac.clear();
+        homs.clear();
+        hets.clear();
+        missing.clear();
 
         for (idx, field) in row.split(|byt| *byt == b'\t').enumerate() {
             if idx == chrom_idx {
@@ -525,7 +499,6 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
             }
 
             if idx == pos_idx {
-                // println!("POS: {}", from_utf8(field).unwrap());
                 pos = field;
                 continue;
             }
@@ -541,82 +514,88 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
             }
 
             if idx == filter_idx {
-                // println!("STUFF: {} {} ", refr, alt);
-
                 if !filter_passes(field, &allowed_filters, &excluded_filters) {
                     break;
                 }
+
+                alleles = get_alleles(pos, refr, alt);
+
+                match alleles {
+                    VariantEnum::Multi(v) => {
+                        found_ac = v.3.len();
+                        continue;
+                    }
+                    VariantEnum::None => {
+                        // TODO: LOG
+                        break;
+                    }
+                    _ => {
+                        found_ac = 1;
+                        continue;
+                    }
+                }
+                // continue;
             }
 
-            if idx > filter_idx {
-                // println!("STUFF: {} {} ", refr, alt);
+            if idx == format_idx {
+                simple_gt = rfind_bytes(alt, &[b':']) == None;
 
-                // let variants = match get_alleles(pos, refr, alt) {
-                //     Some(v) => v,
-                //     None => break,
-                // };
+                missing.resize(found_ac as usize, Vec::new());
+                hets.resize(found_ac as usize, Vec::new());
+                homs.resize(found_ac as usize, Vec::new());
+                ac.resize(found_ac as usize, 0);
+                an.resize(found_ac as usize, 0);
 
-                // if let v = Variants::Many {}
+                continue;
+            }
 
-                match get_alleles(pos, refr, alt) {
-                    //
-                    VariantEnum::Snp(v) => snp_count += 1,
-                    VariantEnum::Ins(v) => snp_count += 1,
-                    VariantEnum::Del(v) => snp_count += 1,
-                    VariantEnum::Multi(v) => {
-                        multi_count += 1;
+            if idx > format_idx {
+                // println!(" {}", found_ac);
+                if field[0] == b'.' {
+                    missing[0].push(&header[idx]);
+                    continue;
+                }
 
-                        // println!(
-                        //     "Len: {}, pos: {:?}, alt: {:?}",
-                        //     v.3.len(),
-                        //     v.1,
-                        //     v.3.iter().map(|alt| std::str::from_utf8(alt).unwrap())
-                        // );
+                // TODO: check that this shouldn't be field[2]
+                // TODO: match to alleles
+                if field[1] == b'|' || field[3] == b'|' {
+                    if simple_gt {
+                        if field == b"0|0" {
+                            an[0] += 2;
 
-                        // for alt in v.3.iter() {
+                            // println!("GOT IT {}", from_utf8(field).unwrap());
 
-                        // }
-                        // .map(|alt| );
+                            continue;
+                        }
+
+                        if field == b"0|1" || field == b"1|0" {
+                            an[0] += 2;
+                            ac[0] += 1;
+                            hets[0].push(&header[idx]);
+
+                            continue;
+                        }
+
+                        if field == b"1|1" {
+                            an[0] += 2;
+                            ac[0] += 2;
+                            hets[0].push(&header[idx]);
+
+                            continue;
+                        }
                     }
-                    VariantEnum::None => break,
-                };
-
-                // println!("{:?}", std::str::from_utf8(variants.1).unwrap());
-
-                // if n_samples == 0 {}
-
-                // match variants {
-                //     Variants::One {
-                //         site_type,
-                //         pos,
-                //         refs,
-                //         alts,
-                //     } => println!("{}", site_type),
-                //     Variants::Many {
-                //         site_type,
-                //         pos,
-                //         refs,
-                //         alts,
-                //     } => println!("NOPE"),
-                // }
-                break;
+                }
             }
         }
-
-        // if idx != n_fields {
-        //     panic!("Row too short");
-        // }
-
-        // let (type, pos, refs, alts, alt_idxs) := get_alleles(record[chrom_idx], record[pos_idx], record[ref_idx], record[alt_idx])
 
         n_count += 1;
     }
 
-    if multi_count > 0 {
-        // println!("{} {} ", snp_count, multi_count);
+    // if multi_count > 0 {
+    //     println!("{} {} {} {} ", snp_count, ins_count, del_count, multi_count);
 
-        return n_count;
-    }
+    //     return n_count;
+    // }
 
     n_count
 }
@@ -640,14 +619,14 @@ fn main() -> Result<(), std::io::Error> {
             .collect(),
     );
 
-    println!("HEADER: {:?}", header);
+    // println!("HEADER: {:?}", header);
 
     if header.len() == 9 {
         info!("Found 9 header fields. When genotypes present, we expect 1+ samples after FORMAT (10 fields minimum)")
     }
 
     for i in 0..n_cpus {
-        println!("Spawning thread {}", i);
+        // println!("Spawning thread {}", i);
         let r = r1.clone();
         let s = s2.clone();
         let header = Arc::clone(&header);
@@ -695,13 +674,13 @@ fn main() -> Result<(), std::io::Error> {
         thread_completed += 1;
         total += r2.recv().unwrap();
 
-        println! {"Threads {} completed", thread_completed};
+        // println! {"Threads {} completed", thread_completed};
 
         if thread_completed == n_cpus {
             break;
         }
     }
-    println!("TOTAL {} {}", total, n_count);
+    // println!("TOTAL {} {}", total, n_count);
     assert_eq!(total, n_count);
 
     return Ok(());
