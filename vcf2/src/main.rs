@@ -10,6 +10,7 @@ use crossbeam_channel::unbounded;
 use hashbrown::HashMap;
 use itoa;
 use num_cpus;
+use twoway::rfind_bytes;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 // use bytes::buf::Writer;
@@ -145,12 +146,14 @@ fn filter_passes(
         && (excluded_filters.len() == 0 || !excluded_filters.contains_key(filter_field))
 }
 
-type SNP<'a> = (&'a [u8], &'a [u8], &'a u8, &'a u8);
+type SnpType<'a> = (&'a [u8], &'a [u8], &'a u8, &'a u8);
+type DelType<'a> = (&'a [u8], u32, &'a u8, u32);
+type InsType<'a> = (&'a [u8], &'a [u8], &'a u8, &'a [u8]);
 
 enum VariantEnum<'a> {
-    Snp(SNP<'a>),
-    // Del((&'a [u8], u32, &'a u8, Vec<u8>)),
-    // Ins((&'a [u8], u32, &'a u8, Vec<u8>)),
+    Snp(SnpType<'a>),
+    Del(DelType<'a>),
+    Ins(InsType<'a>),
     Multi((&'a [u8], Vec<u32>, Vec<&'a u8>, Vec<Vec<u8>>)),
     None,
 }
@@ -160,9 +163,13 @@ enum VariantEnum<'a> {
 
 // site_type, positions, refs, alts, altIndices
 fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<'a> {
-    if alt.len() == 1 && refr.len() == 1 {
+    if alt.len() == 1 {
         if !snp_is_valid(alt) {
             return VariantEnum::None;
+        }
+
+        if refr.len() == 1 {
+            return VariantEnum::Snp((SNP, pos, &refr[0], &alt[0]));
         }
 
         // TODO: Do we need this check
@@ -170,7 +177,23 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
             return VariantEnum::None;
         }
 
-        return VariantEnum::Snp((SNP, pos, &refr[0], &alt[0]));
+        // simple deletion must have 1 base padding match
+        if alt[0] != refr[0] {
+            // TODO: Error
+            return VariantEnum::None;
+        }
+
+        let pos = u32::from_radix_10(pos).0;
+        // let allele = Vec::with_capacity(1);
+
+        return VariantEnum::Del((DEL, pos + 1, &refr[0], 1 - refr.len() as u32));
+    } else if refr.len() == 1 && rfind_bytes(alt, &[b',']) == None {
+        // println!("IN");
+        if alt[0] == refr[0] {
+            return VariantEnum::None;
+        }
+
+        return VariantEnum::Ins((DEL, pos, &refr[0], &alt[1..alt.len()]));
     }
 
     let mut positions: Vec<u32> = Vec::new();
@@ -218,204 +241,208 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
         }
 
         // Simple deletion
-        if alt.len() == 1 {
-            // complex deletion, but most likely error
-            if t_alt[0] != refr[0] {
-                // TODO: log
-                continue;
-            }
+        // if alt.len() == 1 {
+        //     // complex deletion, but most likely error
+        //     if t_alt[0] != refr[0] {
+        //         // TODO: log
+        //         continue;
+        //     }
 
-            // We use 0 padding for deletions, showing 1st deleted base as ref
-            // Therefore need to shift pos & ref by 1
-            positions.push(pos + 1);
-            references.push(&refr[1]);
+        //     // We use 0 padding for deletions, showing 1st deleted base as ref
+        //     // Therefore need to shift pos & ref by 1
+        //     positions.push(pos + 1);
+        //     references.push(&refr[1]);
 
-            // TODO: error handling/log
-            let mut allele = Vec::new();
-            itoa::write(&mut allele, 1 - refr.len() as i32).unwrap();
-            alleles.push(allele);
-        }
+        //     // TODO: error handling/log
+        //     let mut allele = Vec::new();
+        //     itoa::write(&mut allele, 1 - refr.len() as i32).unwrap();
+        //     alleles.push(allele);
+        // }
 
-        // If we're here, ref and alt are both > 1 base long
-        // could be a weird SNP (multiple bases are SNPS, len(ref) == len(alt))
-        // could be a weird deletion/insertion
-        // could be a completely normal multiallelic (due to padding, shifted)
+        // // If we're here, ref and alt are both > 1 base long
+        // // could be a weird SNP (multiple bases are SNPS, len(ref) == len(alt))
+        // // could be a weird deletion/insertion
+        // // could be a completely normal multiallelic (due to padding, shifted)
 
-        //1st check for MNPs and extra-padding SNPs
-        if refr.len() == t_alt.len() {
-            for i in 0..refr.len() {
-                if refr[i] != t_alt[i] {
-                    positions.push(pos + i as u32);
-                    references.push(&refr[i]);
+        // //1st check for MNPs and extra-padding SNPs
+        // if refr.len() == t_alt.len() {
+        //     for i in 0..refr.len() {
+        //         if refr[i] != t_alt[i] {
+        //             positions.push(pos + i as u32);
+        //             references.push(&refr[i]);
 
-                    let mut allele = Vec::with_capacity(1);
-                    allele.push(t_alt[i]);
-                    alleles.push(allele);
-                }
-            }
+        //             let mut allele = Vec::with_capacity(1);
+        //             allele.push(t_alt[i]);
+        //             alleles.push(allele);
+        //         }
+        //     }
 
-            continue;
-        }
+        //     continue;
+        // }
 
-        // Find the allele representation that minimizes padding, while still checking
-        // that the site isn't a mixed type (indel + snp) and checking for intercolation
-        // Essentially, Occam's Razor for padding: minimize the number of steps away
-        // from left edge to explan the allele
-        // EX:
-        // If ref == AATCG
-        // If alt == AG
-        // One interpretation of this site is mixed A->G -3 (-TCG)
-        // Another is -3 (-ATC) between the A (0-index) and G (4-index) in ref
-        // We prefer the latter approach
-        // Ex2: ref: TT alt: TCGATT
-        // We prefer +CGAT
+        // // Find the allele representation that minimizes padding, while still checking
+        // // that the site isn't a mixed type (indel + snp) and checking for intercolation
+        // // Essentially, Occam's Razor for padding: minimize the number of steps away
+        // // from left edge to explan the allele
+        // // EX:
+        // // If ref == AATCG
+        // // If alt == AG
+        // // One interpretation of this site is mixed A->G -3 (-TCG)
+        // // Another is -3 (-ATC) between the A (0-index) and G (4-index) in ref
+        // // We prefer the latter approach
+        // // Ex2: ref: TT alt: TCGATT
+        // // We prefer +CGAT
 
-        // Like http://www.cureffi.org/2014/04/24/converting-genetic-variants-to-their-minimal-representation/
-        // we will use a simple heuristic:
-        // 1) For insertions, figure out the shared right edge, from 1 base downstream of first ref base
-        // Then, check if the remaining ref bases match the left edge of the alt
-        // If they don't, skip that site
-        // 2) For deletions, the same, except replace the role of ref with the tAlt
+        // // Like http://www.cureffi.org/2014/04/24/converting-genetic-variants-to-their-minimal-representation/
+        // // we will use a simple heuristic:
+        // // 1) For insertions, figure out the shared right edge, from 1 base downstream of first ref base
+        // // Then, check if the remaining ref bases match the left edge of the alt
+        // // If they don't, skip that site
+        // // 2) For deletions, the same, except replace the role of ref with the tAlt
 
-        // Our method should be substantially faster, since we don't need to calculate
-        // the min(len(ref), len(tAlt))
-        // and because we don't create a new slice for every shared ref/alt at right edges and left
+        // // Our method should be substantially faster, since we don't need to calculate
+        // // the min(len(ref), len(tAlt))
+        // // and because we don't create a new slice for every shared ref/alt at right edges and left
 
-        if t_alt.len() > refr.len() {
-            let mut r_idx = 0;
+        // if t_alt.len() > refr.len() {
+        //     let mut r_idx = 0;
 
-            while t_alt.len() + r_idx > 0
-                && refr.len() + r_idx > 1
-                && t_alt[t_alt.len() + r_idx - 1] == refr[refr.len() + r_idx - 1]
-            {
-                r_idx -= 1;
-            }
+        //     while t_alt.len() + r_idx > 0
+        //         && refr.len() + r_idx > 1
+        //         && t_alt[t_alt.len() + r_idx - 1] == refr[refr.len() + r_idx - 1]
+        //     {
+        //         r_idx -= 1;
+        //     }
 
-            println!("r+idx {}", r_idx);
-            // Then, we require an exact match from left edge, for the difference between the
-            // length of the ref, and the shared suffix
-            // Ex: alt: TAGCTT ref: TAT
-            // We shared 1 base at right edge, so expect that len(ref) - 1, or 3 - 1 = 2 bases of ref
-            // match the left edge of alt
-            // Here that is TA, for an insertion of +GCT
-            // Ex2: alt: TAGCAT ref: TAT
-            // Here the AT of the ref matches the last 2 bases of alt
-            // So we expect len(ref) - 2 == 1 base of ref to match left edge of the alt (T), for +AGC
-            // Ex3: alt TAGTAT ref: TAT
-            // Since our loop doesn't check the last base of ref, as in ex2, +AGC
-            // This mean we always prefer a 1-base padding, when possible
-            // Ex4: alt TAGTAT ref: TGG
-            // In this case, we require len(ref) - 0 bases in the ref to match left edge of alt
-            // Since they don't (TAG != TGG), we call this complex and move on
+        //     println!("r+idx {}", r_idx);
+        //     // Then, we require an exact match from left edge, for the difference between the
+        //     // length of the ref, and the shared suffix
+        //     // Ex: alt: TAGCTT ref: TAT
+        //     // We shared 1 base at right edge, so expect that len(ref) - 1, or 3 - 1 = 2 bases of ref
+        //     // match the left edge of alt
+        //     // Here that is TA, for an insertion of +GCT
+        //     // Ex2: alt: TAGCAT ref: TAT
+        //     // Here the AT of the ref matches the last 2 bases of alt
+        //     // So we expect len(ref) - 2 == 1 base of ref to match left edge of the alt (T), for +AGC
+        //     // Ex3: alt TAGTAT ref: TAT
+        //     // Since our loop doesn't check the last base of ref, as in ex2, +AGC
+        //     // This mean we always prefer a 1-base padding, when possible
+        //     // Ex4: alt TAGTAT ref: TGG
+        //     // In this case, we require len(ref) - 0 bases in the ref to match left edge of alt
+        //     // Since they don't (TAG != TGG), we call this complex and move on
 
-            // Insertion
-            // If pos is 100 and ref is AATCG
-            // and alt is AAAAATCG (len == 7)
-            // we expect lIdx to be 2
-            // and rIdx to be -3
-            // alt[2] is the first non-ref base
-            // and alt[len(alt) - 3] == alt[4] is the last non-ref base
-            // The position is intPos + lIdx or 100 + 2 - 1 == 101 (100, 101 are padding bases,
-            // and we want to keep the last reference base
-            // The ref is ref[2 - 1] or ref[1]
-            let offset = refr.len() + r_idx;
+        //     // Insertion
+        //     // If pos is 100 and ref is AATCG
+        //     // and alt is AAAAATCG (len == 7)
+        //     // we expect lIdx to be 2
+        //     // and rIdx to be -3
+        //     // alt[2] is the first non-ref base
+        //     // and alt[len(alt) - 3] == alt[4] is the last non-ref base
+        //     // The position is intPos + lIdx or 100 + 2 - 1 == 101 (100, 101 are padding bases,
+        //     // and we want to keep the last reference base
+        //     // The ref is ref[2 - 1] or ref[1]
+        //     let offset = refr.len() + r_idx;
 
-            if refr[0..offset] != t_alt[0..offset] {
-                // TODO: LOG
-                continue;
-            }
+        //     if refr[0..offset] != t_alt[0..offset] {
+        //         // TODO: LOG
+        //         continue;
+        //     }
 
-            // position is offset by len(ref) + 1 - rIdx
-            // ex1: alt: TAGCTT ref: TAT
-            // here we match the first base, so -1
-            // we require remainder of left edge to be present,
-            // or len(ref) - 1 == 2
-            // so intPos + 2 - 1 for last padding base (the A in TA) (intPos + 2 is first unique base)
-            positions.push(pos + offset as u32 - 1);
-            references.push(&refr[offset - 1]);
+        //     // position is offset by len(ref) + 1 - rIdx
+        //     // ex1: alt: TAGCTT ref: TAT
+        //     // here we match the first base, so -1
+        //     // we require remainder of left edge to be present,
+        //     // or len(ref) - 1 == 2
+        //     // so intPos + 2 - 1 for last padding base (the A in TA) (intPos + 2 is first unique base)
+        //     positions.push(pos + offset as u32 - 1);
+        //     references.push(&refr[offset - 1]);
 
-            // Similarly, the alt allele starts from len(ref) + rIdx, and ends at len(tAlt) + rIdx
-            // from ex: TAGCTT ref: TAT :
-            // rIdx == -1 , real alt == tAlt[len(ref) - 1:len(tAlt) - 1] == tALt[2:5]
-            // let mut allele = Vec::new();
-            // allele.push(t_alt[i]);
-            alleles.push(Vec::from(&refr[offset..t_alt.len() + r_idx]));
+        //     // Similarly, the alt allele starts from len(ref) + rIdx, and ends at len(tAlt) + rIdx
+        //     // from ex: TAGCTT ref: TAT :
+        //     // rIdx == -1 , real alt == tAlt[len(ref) - 1:len(tAlt) - 1] == tALt[2:5]
+        //     // let mut allele = Vec::new();
+        //     // allele.push(t_alt[i]);
+        //     alleles.push(Vec::from(&refr[offset..t_alt.len() + r_idx]));
 
-            continue;
-        }
+        //     continue;
+        // }
 
-        // Deletion
-        // If pos is 100 and alt is AATCG
-        // and ref is AAAAATCG (len == 7)
-        // we expect lIdx to be 2
-        // and rIdx to be -3
-        // and alt is -3 or len(ref) + rIdx - lIdx == 8 + -3 - 2
-        // position is the first deleted base, or intPos + lIdx == 100 + 2 == 102
-        // where (100, 101) are the two padding bases
-        // ref is the first deleted base or ref[lIdx] == ref[2]
+        // // Deletion
+        // // If pos is 100 and alt is AATCG
+        // // and ref is AAAAATCG (len == 7)
+        // // we expect lIdx to be 2
+        // // and rIdx to be -3
+        // // and alt is -3 or len(ref) + rIdx - lIdx == 8 + -3 - 2
+        // // position is the first deleted base, or intPos + lIdx == 100 + 2 == 102
+        // // where (100, 101) are the two padding bases
+        // // ref is the first deleted base or ref[lIdx] == ref[2]
 
-        // Just like insertion, but try to match all bases from 1 base downstream of tAlt to ref
-        let mut r_idx = 0;
-        // println!("before r_idx {}", r_idx);
-        while t_alt.len() + r_idx > 1
-            && refr.len() + r_idx > 0
-            && t_alt[t_alt.len() + r_idx - 1] == refr[refr.len() + r_idx - 1]
-        {
-            r_idx -= 1;
-        }
+        // // Just like insertion, but try to match all bases from 1 base downstream of tAlt to ref
+        // let mut r_idx = 0;
+        // // println!("before r_idx {}", r_idx);
+        // while t_alt.len() + r_idx > 1
+        //     && refr.len() + r_idx > 0
+        //     && t_alt[t_alt.len() + r_idx - 1] == refr[refr.len() + r_idx - 1]
+        // {
+        //     r_idx -= 1;
+        // }
 
-        // println!("after r_idx {}", r_idx);
+        // // println!("after r_idx {}", r_idx);
 
-        let offset = t_alt.len() + r_idx;
-        // println!("offset {}", offset);
-        if refr[0..offset] != t_alt[0..offset] {
-            //TODO: LOG
-            continue;
-        }
-        // println!("past {} {}", refr.len(), offset);
-        positions.push(pos + offset as u32);
-        // we want the base after the last shared
-        references.push(&refr[offset]);
+        // let offset = t_alt.len() + r_idx;
+        // // println!("offset {}", offset);
+        // if refr[0..offset] != t_alt[0..offset] {
+        //     //TODO: LOG
+        //     continue;
+        // }
+        // // println!("past {} {}", refr.len(), offset);
+        // positions.push(pos + offset as u32);
+        // // we want the base after the last shared
+        // references.push(&refr[offset]);
 
-        let mut allele = Vec::new();
-        itoa::write(
-            &mut allele,
-            -(refr.len() as i32 + r_idx as i32 - offset as i32),
-        )
-        .unwrap();
-        alleles.push(allele);
+        // let mut allele = Vec::new();
+        // itoa::write(
+        //     &mut allele,
+        //     -(refr.len() as i32 + r_idx as i32 - offset as i32),
+        // )
+        // .unwrap();
+        // alleles.push(allele);
     }
-
-    if n_alleles == 0 || alleles.len() == 0 {
+    // println!(
+    //     "{} {}",
+    //     std::str::from_utf8(refr).unwrap(),
+    //     std::str::from_utf8(alt).unwrap()
+    // );
+    if n_alleles == 0 {
         return VariantEnum::None;
     }
 
-    if n_alleles > 1 {
-        return VariantEnum::Multi((MULTI, positions, references, alleles));
-    }
+    // if n_alleles > 1 {
+    return VariantEnum::Multi((MULTI, positions, references, alleles));
+    // }
 
-    if alleles[0].len() > 1 {
-        // println!("before");
-        if alleles[0][0] == b'-' {
-            // println!("in");
-            return VariantEnum::Multi((DEL, positions, references, alleles));
-        }
+    // if alleles[0].len() > 1 {
+    //     // println!("before");
+    //     if alleles[0][0] == b'-' {
+    //         // println!("in");
+    //         return VariantEnum::Multi((DEL, positions, references, alleles));
+    //     }
 
-        return VariantEnum::Multi((INS, positions, references, alleles));
-    }
+    //     return VariantEnum::Multi((INS, positions, references, alleles));
+    // }
 
-    // A 1 allele site where the variant was an MNP
-    // They may be sparse or complete, so we empirically check for their presence
-    // If the MNP is really just a snp, there is only 1 allele, and reduces to snp
-    // > 1, these are labeled differently to allow people to jointly consider the effects
-    // of the array of SNPs, since we at the moment consider their effects only independently
-    // (which has advantages for CADD, phyloP, phastCons, clinvar, etc reporting)
-    if alleles.len() > 1 {
-        return VariantEnum::Multi((MNP, positions, references, alleles));
-    }
+    // // A 1 allele site where the variant was an MNP
+    // // They may be sparse or complete, so we empirically check for their presence
+    // // If the MNP is really just a snp, there is only 1 allele, and reduces to snp
+    // // > 1, these are labeled differently to allow people to jointly consider the effects
+    // // of the array of SNPs, since we at the moment consider their effects only independently
+    // // (which has advantages for CADD, phyloP, phastCons, clinvar, etc reporting)
+    // if alleles.len() > 1 {
+    //     return VariantEnum::Multi((MNP, positions, references, alleles));
+    // }
 
-    // TODO: check that this is righ
-    return VariantEnum::Multi((SNP, positions, references, alleles));
+    // // TODO: check that this is righ
+    // return VariantEnum::Multi((SNP, positions, references, alleles));
 }
 
 fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
@@ -495,8 +522,10 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
                 match get_alleles(pos, refr, alt) {
                     //
                     VariantEnum::Snp(v) => snp_count += 1,
+                    VariantEnum::Ins(v) => snp_count += 1,
+                    VariantEnum::Del(v) => snp_count += 1,
                     VariantEnum::Multi(v) => multi_count += 1,
-                    _ => break,
+                    VariantEnum::None => break,
                 };
 
                 // println!("{:?}", std::str::from_utf8(variants.1).unwrap());
@@ -529,7 +558,10 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
         n_count += 1;
     }
 
-    // println!("{} {} ", snp_count, multi_count);
+    if multi_count > 0 {
+        return n_count;
+        // println!("{} {} ", snp_count, multi_count);
+    }
 
     n_count
 }
