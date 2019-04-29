@@ -11,7 +11,7 @@ use crossbeam_channel::unbounded;
 use hashbrown::HashMap;
 use itoa;
 use num_cpus;
-use twoway::rfind_bytes;
+use twoway::find_bytes;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 // use bytes::buf::Writer;
@@ -196,7 +196,7 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
         // let allele = Vec::with_capacity(1);
 
         return VariantEnum::Del((pos + 1, &refr[0], 1 - refr.len() as u32));
-    } else if refr.len() == 1 && rfind_bytes(alt, &[b',']) == None {
+    } else if refr.len() == 1 && find_bytes(alt, &[b',']) == None {
         if alt[0] == refr[0] {
             return VariantEnum::None;
         }
@@ -454,11 +454,12 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
     // let n_fields = header.len();
 
     // let mut multiallelic = false;
-    let mut homs: Vec<Vec<&str>> = Vec::new();
-    let mut hets: Vec<Vec<&str>> = Vec::new();
-    let mut missing: Vec<Vec<&str>> = Vec::new();
+    let mut homs: Vec<Vec<u32>> = Vec::new();
+    let mut hets: Vec<Vec<u32>> = Vec::new();
+    // Even in multiallelic case, missing in one means missing in all
+    let mut missing: Vec<u32> = Vec::new();
     let mut ac: Vec<u32> = Vec::new();
-    let mut an: Vec<u32> = Vec::new();
+    let mut an: u32 = 0;
 
     // let empty_field = "!";
     // let field_delim = ";";
@@ -484,14 +485,8 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
     let mut alt: &[u8] = b"";
 
     let mut alleles: VariantEnum = VariantEnum::None;
-    let mut found_ac = 0;
+    let mut found_ac: u32 = 0;
     for row in rows.iter() {
-        an.clear();
-        ac.clear();
-        homs.clear();
-        hets.clear();
-        missing.clear();
-
         for (idx, field) in row.split(|byt| *byt == b'\t').enumerate() {
             if idx == chrom_idx {
                 chrom = field;
@@ -522,7 +517,7 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
 
                 match alleles {
                     VariantEnum::Multi(v) => {
-                        found_ac = v.3.len();
+                        found_ac = v.3.len() as u32;
                         continue;
                     }
                     VariantEnum::None => {
@@ -538,64 +533,93 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
             }
 
             if idx == format_idx {
-                simple_gt = rfind_bytes(alt, &[b':']) == None;
+                // simple_gt = find_bytes(alt, &[b':']) == None;
 
-                missing.resize(found_ac as usize, Vec::new());
-                hets.resize(found_ac as usize, Vec::new());
-                homs.resize(found_ac as usize, Vec::new());
-                ac.resize(found_ac as usize, 0);
-                an.resize(found_ac as usize, 0);
+                an = 0;
+
+                missing.clear();
+                hets = vec![Vec::new(); found_ac as usize];
+                homs = vec![Vec::new(); found_ac as usize];
+                ac = vec![0; found_ac as usize];
 
                 continue;
             }
 
             if idx > format_idx {
-                // println!(" {}", found_ac);
-                if field[0] == b'.' {
-                    missing[0].push(&header[idx]);
-                    continue;
+                // TODO: Check quality if available
+                if field.len() < 4 && field[1] == b'|' || field[1] == b'/' {
+                    if field.len() == 3 || field[3] == b':' {
+                        if field[0] == b'.' || field[2] == b'.' {
+                            missing.push(idx as u32);
+                            continue;
+                        }
+
+                        if field[0] == b'0' && field[2] == b'0' {
+                            an += 2;
+                            continue;
+                        }
+
+                        if field[0] == b'1' && field[2] == b'0'
+                            || (field[0] == b'0' && field[2] == b'1')
+                        {
+                            an += 2;
+                            ac[0] += 1;
+                            hets[0].push(idx as u32);
+
+                            continue;
+                        }
+
+                        if field[0] == b'1' && field[2] == b'1' {
+                            an += 2;
+                            ac[0] += 2;
+                            homs[0].push(idx as u32);
+
+                            continue;
+                        }
+                    }
                 }
 
-                // TODO: check that this shouldn't be field[2]
-                // TODO: match to alleles
-                if field[1] == b'|' || field[3] == b'|' {
-                    if simple_gt {
-                        if field == b"0|0" {
-                            an[0] += 2;
+                for gt in field.split(|byt| *byt == b'|' || *byt == b'/') {
+                    if gt[0] == b'.' {
+                        missing.push(idx as u32);
+                        break;
+                    }
 
-                            // println!("GOT IT {}", from_utf8(field).unwrap());
+                    if gt.len() == 1 || gt.len() == 2 {
+                        let gtn = u32::from_radix_10(gt);
 
+                        if gtn.1 == 0 {
+                            panic!("WTF");
+                        }
+
+                        an += 1;
+
+                        if gtn.0 == 0 {
                             continue;
                         }
 
-                        if field == b"0|1" || field == b"1|0" {
-                            an[0] += 2;
-                            ac[0] += 1;
-                            hets[0].push(&header[idx]);
+                        // TODO: What do for complex or malformed alleles that we skipped?
+                        // Currently we're counting against an
+                        // Count genotype? no?
 
+                        if gtn.0 > found_ac {
                             continue;
                         }
 
-                        if field == b"1|1" {
-                            an[0] += 2;
-                            ac[0] += 2;
-                            hets[0].push(&header[idx]);
-
-                            continue;
-                        }
+                        ac[{ gtn.0 - 1 } as usize] += 1;
                     }
                 }
             }
         }
 
         n_count += 1;
+
+        if an == 0 {
+            continue;
+        }
+
+        let mut buffer = Vec::with_capacity(100_000);
     }
-
-    // if multi_count > 0 {
-    //     println!("{} {} {} {} ", snp_count, ins_count, del_count, multi_count);
-
-    //     return n_count;
-    // }
 
     n_count
 }
