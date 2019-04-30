@@ -3,8 +3,10 @@
 use std::fmt::{Debug, Display};
 use std::io;
 use std::io::prelude::*;
+use std::io::prelude::*;
+use std::io::BufWriter;
 use std::mem::transmute;
-// use std::str::from_utf8;
+use std::str::from_utf8;
 use std::thread;
 
 use atoi::FromRadix10;
@@ -33,7 +35,7 @@ const filter_idx: usize = 6;
 const info_idx: usize = 7;
 const format_idx: usize = 8;
 
-const NotTrTv: u8 = b'0';
+const NotTsTv: u8 = b'0';
 const Tr: u8 = b'1';
 const Tv: u8 = b'2';
 
@@ -82,7 +84,7 @@ lazy_static! {
 // }
 
 // TODO: Add error handling
-fn get_header<T: BufRead>(reader: &mut T) -> String {
+fn get_header<T: BufRead>(reader: &mut T) -> Vec<u8> {
     let mut line: String = String::with_capacity(10_000);
     reader.read_line(&mut line).unwrap();
 
@@ -108,7 +110,7 @@ fn get_header<T: BufRead>(reader: &mut T) -> String {
     //https://users.rust-lang.org/t/trim-string-in-place/15809/9
     line.truncate(line.trim_end().len());
 
-    line
+    Vec::from(line.as_bytes())
 }
 
 fn get_tr_tv(refr: u8, alt: u8) -> u8 {
@@ -440,11 +442,41 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
     panic!("WTF");
 }
 
-fn to_native_bytes(x: u32) -> [u8; 4] {
-    unsafe { transmute(x) }
-}
+// fn write_sampels(&mut buffer: Vec<u8>, n_samples: usize, n_missing: usize, samples: &Vec<u8>) {
+//     let effective_samples = { n_samples - n_missing } as f32;
 
-fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
+//     if samples.len() == 0 {
+//         buffer.push(b'!');
+//         buffer.push(b'\t');
+//         buffer.push(b'0');
+//         buffer.push(b'\t');
+
+//         return;
+//     }
+//     let mut idx = 0;
+//     let sample_len = samples.len();
+//     for sample_idx in samples {
+//         // println!("{} {} {}", sample_idx, *sample_idx as usize, header.len());
+//         buffer.extend_from_slice(&header[*sample_idx as usize]);
+
+//         idx += 1;
+
+//         if idx < het_len {
+//             buffer.push(field_delim);
+//         }
+//     }
+
+//     buffer.push(b'\t');
+
+//     // println!("{} {}", hets[i].len(), effective_samples);
+
+//     // let mut bytes = [b'\0'; 20];
+//     dtoa::write(&mut bytes[..], { hets[i].len() as f32 / effective_samples }).unwrap();
+//     // println!("{}", from_utf8(&bytes).unwrap());
+//     buffer.extend_from_slice(&bytes);
+// }
+
+fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
     let n_samples = header.len() - 9;
     // let n_fields = header.len();
 
@@ -456,8 +488,8 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
     let mut ac: Vec<u32> = Vec::new();
     let mut an: u32 = 0;
 
-    // let empty_field = "!";
-    // let field_delim = ";";
+    let empty_field = b'!';
+    let field_delim = b';';
     // let keep_pos = true;
     // let keep_id = false;
     // let keep_info = false;
@@ -476,6 +508,10 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
     let mut alt: &[u8] = b"";
 
     let mut gt_range: &[u8];
+    let mut buffer = Vec::with_capacity(100_000);
+
+    let mut writer = std::io::stdout();
+
     for row in rows.iter() {
         let mut alleles: VariantEnum = VariantEnum::None;
         let mut found_ac: u32 = 0;
@@ -618,33 +654,168 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
             continue;
         }
 
-        let mut buffer = Vec::with_capacity(100_000);
-        buffer.extend_from_slice(&chrom);
-        buffer.push(b'\t');
-        buffer.extend_from_slice(&pos);
-        buffer.push(b'\t');
-        buffer.extend_from_slice(&chrom);
-        buffer.push(b'\t');
-
         match alleles {
             VariantEnum::Multi(v) => {
-                let (site_type, pos, refr, alt) = v;
+                let (site_type, t_pos, t_refr, t_alt) = v;
+                let mut bytes = [b'\0'; 40];
 
-                for i in 0..pos.len() {
-                    buffer.extend_from_slice(&to_native_bytes(pos[i]));
+                for i in 0..t_pos.len() {
+                    // println!("Before {} {} {} {} ", i, ac.len(), t_pos.len(), found_ac);
+                    if n_samples > 0 && ac[i] == 0 {
+                        continue;
+                    }
+
+                    if chrom[0] != b'c' {
+                        buffer.extend_from_slice(b"chr");
+                    }
+
+                    buffer.extend_from_slice(&chrom);
+                    buffer.push(b'\t');
+
+                    itoa::write(&mut bytes[..], t_pos[i]).unwrap();
+
+                    buffer.extend_from_slice(&bytes);
                     buffer.push(b'\t');
                     buffer.extend_from_slice(site_type);
                     buffer.push(b'\t');
-                    buffer.push(*refr[i]);
+                    buffer.push(*t_refr[i]);
                     buffer.push(b'\t');
-                    buffer.extend_from_slice(&alt[i]);
+                    buffer.extend_from_slice(&t_alt[i]);
                     buffer.push(b'\t');
-                    buffer.push(NotTrTv);
+                    buffer.push(NotTsTv);
                     buffer.push(b'\t');
+
+                    let effective_samples = { n_samples - missing.len() } as f32;
+
+                    if hets[i].len() == 0 {
+                        buffer.push(empty_field);
+                        buffer.push(b'\t');
+                        buffer.push(b'0');
+                    } else {
+                        let mut idx = 0;
+
+                        for sample_idx in &hets[i] {
+                            // println!("{} {} {}", sample_idx, *sample_idx as usize, header.len());
+                            buffer.extend_from_slice(&header[*sample_idx as usize]);
+
+                            idx += 1;
+
+                            if idx < hets[i].len() {
+                                buffer.push(field_delim);
+                            }
+                        }
+
+                        buffer.push(b'\t');
+
+                        // println!("{} {}", hets[i].len(), effective_samples);
+
+                        // let mut bytes = [b'\0'; 20];
+                        dtoa::write(&mut bytes[..], { hets[i].len() as f32 / effective_samples })
+                            .unwrap();
+                        // println!("{}", from_utf8(&bytes).unwrap());
+                        buffer.extend_from_slice(&bytes);
+                    }
+
+                    buffer.push(b'\t');
+
+                    if homs[i].len() == 0 {
+                        buffer.push(empty_field);
+                        buffer.push(b'\t');
+                        buffer.push(b'0');
+                        buffer.push(b'\t');
+                    } else {
+                        let mut idx = 0;
+
+                        for sample_idx in &homs[i] {
+                            // println!("{} {} {}", sample_idx, *sample_idx as usize, header.len());
+                            buffer.extend_from_slice(&header[*sample_idx as usize]);
+
+                            idx += 1;
+
+                            if idx < homs[i].len() {
+                                buffer.push(field_delim);
+                            }
+                        }
+
+                        buffer.push(b'\t');
+
+                        // println!("{} {}", homs[i].len(), effective_samples);
+
+                        // let mut bytes = [b'\0'; 20];
+                        dtoa::write(&mut bytes[..], { homs[i].len() as f32 / effective_samples })
+                            .unwrap();
+                        // println!("{}", from_utf8(&bytes).unwrap());
+                        buffer.extend_from_slice(&bytes);
+                    }
+
+                    buffer.push(b'\t');
+
+                    if missing.len() == 0 {
+                        buffer.push(empty_field);
+                        buffer.push(b'\t');
+                        buffer.push(b'0');
+                        buffer.push(b'\t');
+                    } else {
+                        let mut idx = 0;
+
+                        for sample_idx in &missing {
+                            // println!("{} {} {}", sample_idx, *sample_idx as usize, header.len());
+                            buffer.extend_from_slice(&header[*sample_idx as usize]);
+
+                            idx += 1;
+
+                            if idx < missing.len() {
+                                buffer.push(field_delim);
+                            }
+                        }
+
+                        buffer.push(b'\t');
+
+                        // println!("{} {}", homs[i].len(), effective_samples);
+
+                        // let mut bytes = [b'\0'; 20];
+                        dtoa::write(&mut bytes[..], { missing.len() as f32 / effective_samples })
+                            .unwrap();
+                        // println!("{}", from_utf8(&bytes).unwrap());
+                        buffer.extend_from_slice(&bytes);
+                    }
+
+                    buffer.push(b'\t');
+
+                    if ac[i] == 0 {
+                        buffer.push(b'0');
+                        buffer.push(b'\t');
+                        itoa::write(&mut bytes[..], an).unwrap();
+                        buffer.extend_from_slice(&bytes);
+                    } else {
+                        itoa::write(&mut bytes[..], ac[i]).unwrap();
+                        buffer.extend_from_slice(&bytes);
+                        buffer.push(b'\t');
+                        itoa::write(&mut bytes[..], an).unwrap();
+                        buffer.extend_from_slice(&bytes);
+                        buffer.push(b'\t');
+                        dtoa::write(&mut bytes[..], { ac[i] as f32 / an as f32 }).unwrap();
+
+                        buffer.extend_from_slice(&bytes);
+                    }
+
+                    // write_samples(&mut buffer, hets, homs, missing, ac, an)
+                    buffer.push(b'\n');
                 }
             }
             VariantEnum::Snp(v) => {
                 let (pos, refr, alt) = v;
+
+                if n_samples > 0 && ac[0] == 0 {
+                    continue;
+                }
+
+                if chrom[0] != b'c' {
+                    buffer.extend_from_slice(b"chr");
+                }
+
+                buffer.extend_from_slice(&chrom);
+                buffer.push(b'\t');
 
                 buffer.extend_from_slice(pos);
                 buffer.push(b'\t');
@@ -655,7 +826,8 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
                 buffer.push(*alt);
                 buffer.push(b'\t');
                 buffer.push(TSTV[*refr as usize][*alt as usize]);
-                buffer.push(b'\t');
+
+                buffer.push(b'\n');
             }
             // VariantEnum::Del(v) => {
             //     let (pos, refr, alt) = v;
@@ -668,7 +840,7 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
             //     buffer.push(b'\t');
             //     buffer.push(*alt);
             //     buffer.push(b'\t');
-            //     buffer.push(NotTrTv);
+            //     buffer.push(NotTsTv);
             //     buffer.push(b'\t');
             // }
             // VariantEnum::Ins(v) => {
@@ -682,7 +854,7 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
             //     buffer.push(b'\t');
             //     buffer.push(*alt);
             //     buffer.push(b'\t');
-            //     buffer.push(NotTrTv);
+            //     buffer.push(NotTsTv);
             //     buffer.push(b'\t');
             // }
             VariantEnum::None => {
@@ -700,6 +872,8 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
         // }
     }
 
+    writer.write_all(&buffer).unwrap();
+
     n_count
 }
 
@@ -715,10 +889,10 @@ fn main() -> Result<(), std::io::Error> {
     let mut len: usize;
     let mut n_count = 0;
 
-    let header: Arc<Vec<String>> = Arc::new(
+    let header: Arc<Vec<Vec<u8>>> = Arc::new(
         get_header(&mut stdin_lock)
-            .split("\t")
-            .map(|field| field.to_string())
+            .split(|b| *b == b'\t')
+            .map(|sample| Vec::from(sample))
             .collect(),
     );
 
