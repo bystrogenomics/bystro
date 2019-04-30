@@ -3,6 +3,7 @@ use std::error::Error;
 use std::fmt::{Debug, Display};
 use std::io;
 use std::io::prelude::*;
+use std::mem::transmute;
 use std::str::from_utf8;
 use std::thread;
 
@@ -10,8 +11,8 @@ use atoi::FromRadix10;
 use crossbeam_channel::unbounded;
 use hashbrown::HashMap;
 use itoa;
+use memchr::memchr;
 use num_cpus;
-use twoway::find_bytes;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 // use bytes::buf::Writer;
@@ -46,10 +47,10 @@ const DINS: &[u8] = b"DENOVO_INS";
 const DDEL: &[u8] = b"DENOVO_DEL";
 const DMULTI: &[u8] = b"DENOVO_MULTIALLELIC";
 
-const A: u8 = 'A' as u8;
-const C: u8 = 'C' as u8;
-const G: u8 = 'G' as u8;
-const T: u8 = 'T' as u8;
+const A: u8 = b'A';
+const C: u8 = b'C';
+const G: u8 = b'G';
+const T: u8 = b'T';
 
 lazy_static! {
     static ref ACTG: [u8; 256] = {
@@ -66,19 +67,29 @@ lazy_static! {
         let mut all: [[u8; 256]; 256] = [[0u8; 256]; 256];
         let mut ref_a = [0; 256];
         let mut ref_c = [0; 256];
+        let mut ref_g = [0; 256];
+        let mut ref_t = [0; 256];
 
         ref_a[G as usize] = Tr;
         ref_a[C as usize] = Tv;
         ref_a[T as usize] = Tv;
 
+        ref_g[A as usize] = Tr;
+        ref_g[C as usize] = Tv;
+        ref_g[T as usize] = Tv;
+
         ref_c[T as usize] = Tr;
         ref_c[A as usize] = Tv;
         ref_c[G as usize] = Tv;
 
+        ref_t[C as usize] = Tr;
+        ref_t[A as usize] = Tv;
+        ref_t[G as usize] = Tv;
+
         all[A as usize] = ref_a;
-        all[G as usize] = ref_a;
+        all[G as usize] = ref_g;
         all[C as usize] = ref_c;
-        all[G as usize] = ref_c;
+        all[G as usize] = ref_t;
 
         all
     };
@@ -196,7 +207,7 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
         // let allele = Vec::with_capacity(1);
 
         return VariantEnum::Del((pos + 1, &refr[0], 1 - refr.len() as u32));
-    } else if refr.len() == 1 && find_bytes(alt, &[b',']) == None {
+    } else if refr.len() == 1 && memchr(b',', alt) == None {
         if alt[0] == refr[0] {
             return VariantEnum::None;
         }
@@ -449,8 +460,12 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
     panic!("WTF");
 }
 
+fn to_native_bytes(x: u32) -> [u8; 4] {
+    unsafe { std::mem::transmute(x) }
+}
+
 fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
-    // let n_samples = header.len() - 9;
+    let n_samples = header.len() - 9;
     // let n_fields = header.len();
 
     // let mut multiallelic = false;
@@ -484,10 +499,12 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
     let mut refr: &[u8] = b"";
     let mut alt: &[u8] = b"";
 
-    let mut alleles: VariantEnum = VariantEnum::None;
-    let mut found_ac: u32 = 0;
+    let mut gt_range: &[u8];
     for row in rows.iter() {
-        for (idx, field) in row.split(|byt| *byt == b'\t').enumerate() {
+        let mut alleles: VariantEnum = VariantEnum::None;
+        let mut found_ac: u32 = 0;
+
+        'field_loop: for (idx, field) in row.split(|byt| *byt == b'\t').enumerate() {
             if idx == chrom_idx {
                 chrom = field;
                 continue;
@@ -514,8 +531,10 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
                 }
 
                 alleles = get_alleles(pos, refr, alt);
+                // {
+                // let test = &alleles;
 
-                match alleles {
+                match &alleles {
                     VariantEnum::Multi(v) => {
                         found_ac = v.3.len() as u32;
                         continue;
@@ -529,14 +548,12 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
                         continue;
                     }
                 }
-                // continue;
             }
 
             if idx == format_idx {
-                // simple_gt = find_bytes(alt, &[b':']) == None;
-
                 an = 0;
 
+                simple_gt = memchr(b':', field) == None;
                 missing.clear();
                 hets = vec![Vec::new(); found_ac as usize];
                 homs = vec![Vec::new(); found_ac as usize];
@@ -547,7 +564,7 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
 
             if idx > format_idx {
                 // TODO: Check quality if available
-                if field.len() < 4 && field[1] == b'|' || field[1] == b'/' {
+                if field.len() >= 3 && (field[1] == b'|' || field[1] == b'/') {
                     if field.len() == 3 || field[3] == b':' {
                         if field[0] == b'.' || field[2] == b'.' {
                             missing.push(idx as u32);
@@ -579,46 +596,114 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
                     }
                 }
 
-                for gt in field.split(|byt| *byt == b'|' || *byt == b'/') {
-                    if gt[0] == b'.' {
-                        missing.push(idx as u32);
-                        break;
+                if simple_gt {
+                    gt_range = field;
+                } else {
+                    // TODO: Don't rely on format?
+                    let end = memchr(b':', field).unwrap();
+                    gt_range = &field[0..end];
+                }
+
+                if memchr(b'.', gt_range) != None {
+                    missing.push(idx as u32);
+                    continue 'field_loop;
+                }
+
+                for gt in gt_range.split(|byt| *byt == b'|' || *byt == b'/') {
+                    let gtn = u32::from_radix_10(gt);
+
+                    if gtn.1 == 0 {
+                        // TODO: Handle failure
+                        panic!("WTF");
                     }
 
-                    if gt.len() == 1 || gt.len() == 2 {
-                        let gtn = u32::from_radix_10(gt);
+                    an += 1;
 
-                        if gtn.1 == 0 {
-                            panic!("WTF");
-                        }
-
-                        an += 1;
-
-                        if gtn.0 == 0 {
-                            continue;
-                        }
-
-                        // TODO: What do for complex or malformed alleles that we skipped?
-                        // Currently we're counting against an
-                        // Count genotype? no?
-
-                        if gtn.0 > found_ac {
-                            continue;
-                        }
-
-                        ac[{ gtn.0 - 1 } as usize] += 1;
+                    if gtn.0 == 0 {
+                        continue;
                     }
+
+                    // TODO: What do for complex or malformed alleles that we skipped?
+                    // Currently we're counting against an
+                    // Count genotype? no?
+
+                    if gtn.0 > found_ac {
+                        continue;
+                    }
+
+                    ac[{ gtn.0 - 1 } as usize] += 1;
                 }
             }
         }
 
         n_count += 1;
 
-        if an == 0 {
+        if n_samples > 0 && an == 0 {
             continue;
         }
 
         let mut buffer = Vec::with_capacity(100_000);
+        buffer.extend_from_slice(&chrom);
+        buffer.push(b'\t');
+        buffer.extend_from_slice(&pos);
+        buffer.push(b'\t');
+        buffer.extend_from_slice(&chrom);
+        buffer.push(b'\t');
+
+        match alleles {
+            VariantEnum::Multi(v) => {
+                let (site_type, pos, refr, alt) = v;
+
+                for i in 0..pos.len() {
+                    buffer.extend_from_slice(&to_native_bytes(pos[i]));
+                    buffer.push(b'\t');
+                    buffer.extend_from_slice(site_type);
+                    buffer.push(b'\t');
+                    buffer.push(*refr[i]);
+                    buffer.push(b'\t');
+                    buffer.extend_from_slice(&alt[i]);
+                    buffer.push(b'\t');
+                    // MULTIALLELIC always considered not tr or tv, because they're weird
+                    buffer.push(NotTrTv);
+                    buffer.push(b'\t');
+                }
+            }
+            VariantEnum::Snp(v) => {
+                let (pos, refr, alt) = v;
+
+                buffer.extend_from_slice(pos);
+                buffer.push(b'\t');
+                buffer.extend_from_slice(SNP);
+                buffer.push(b'\t');
+                buffer.push(*refr);
+                buffer.push(b'\t');
+                buffer.push(*alt);
+                buffer.push(b'\t');
+                // FIXME: FIX, DOESN'T WORK
+                // println!(
+                //     "{} {} {} {} {:?}",
+                //     from_utf8(&[*refr]).unwrap(),
+                //     *refr as usize,
+                //     from_utf8(&[*alt]).unwrap(),
+                //     *alt as usize,
+                //     from_utf8(&[TSTV[*refr as usize][*alt as usize]]).unwrap()
+                // );
+                buffer.push(TSTV[*refr as usize][*alt as usize]);
+                buffer.push(b'\t');
+            }
+            VariantEnum::None => {
+                // TODO: LOG
+                continue;
+            }
+            _ => {
+                // found_ac = 1;
+                // continue;
+            }
+        }
+
+        // if buffer.len() > 0 {
+        //     println!("YAY");
+        // }
     }
 
     n_count
