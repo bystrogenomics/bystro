@@ -1,10 +1,10 @@
 // TODO: replace panics with proper error handling
-use std::error::Error;
+// use std::error::Error;
 use std::fmt::{Debug, Display};
 use std::io;
 use std::io::prelude::*;
 use std::mem::transmute;
-use std::str::from_utf8;
+// use std::str::from_utf8;
 use std::thread;
 
 use atoi::FromRadix10;
@@ -14,7 +14,7 @@ use itoa;
 use memchr::memchr;
 use num_cpus;
 
-use byteorder::{LittleEndian, ReadBytesExt};
+// use byteorder::{LittleEndian, ReadBytesExt};
 // use bytes::buf::Writer;
 use std::sync::Arc;
 
@@ -42,10 +42,10 @@ const INS: &[u8] = b"INS";
 const DEL: &[u8] = b"DEL";
 const MNP: &[u8] = b"MNP";
 const MULTI: &[u8] = b"MULTIALLELIC";
-const DSNP: &[u8] = b"DENOVO_SNP";
-const DINS: &[u8] = b"DENOVO_INS";
-const DDEL: &[u8] = b"DENOVO_DEL";
-const DMULTI: &[u8] = b"DENOVO_MULTIALLELIC";
+// const DSNP: &[u8] = b"DENOVO_SNP";
+// const DINS: &[u8] = b"DENOVO_INS";
+// const DDEL: &[u8] = b"DENOVO_DEL";
+// const DMULTI: &[u8] = b"DENOVO_MULTIALLELIC";
 
 const A: u8 = b'A';
 const C: u8 = b'C';
@@ -53,53 +53,33 @@ const G: u8 = b'G';
 const T: u8 = b'T';
 
 lazy_static! {
-    static ref ACTG: [u8; 256] = {
-        let mut actg = [0; 256];
-
-        actg[A as usize] = 1;
-        actg[C as usize] = 1;
-        actg[G as usize] = 1;
-        actg[T as usize] = 1;
-
-        actg
-    };
     static ref TSTV: [[u8; 256]; 256] = {
         let mut all: [[u8; 256]; 256] = [[0u8; 256]; 256];
-        let mut ref_a = [0; 256];
-        let mut ref_c = [0; 256];
-        let mut ref_g = [0; 256];
-        let mut ref_t = [0; 256];
 
-        ref_a[G as usize] = Tr;
-        ref_a[C as usize] = Tv;
-        ref_a[T as usize] = Tv;
+        all[G as usize][A as usize] = Tr;
+        all[A as usize][G as usize] = Tr;
+        all[C as usize][T as usize] = Tr;
+        all[T as usize][C as usize] = Tr;
 
-        ref_g[A as usize] = Tr;
-        ref_g[C as usize] = Tv;
-        ref_g[T as usize] = Tv;
+        all[C as usize][A as usize] = Tv;
+        all[T as usize][A as usize] = Tv;
+        all[C as usize][G as usize] = Tv;
+        all[T as usize][G as usize] = Tv;
 
-        ref_c[T as usize] = Tr;
-        ref_c[A as usize] = Tv;
-        ref_c[G as usize] = Tv;
-
-        ref_t[C as usize] = Tr;
-        ref_t[A as usize] = Tv;
-        ref_t[G as usize] = Tv;
-
-        all[A as usize] = ref_a;
-        all[G as usize] = ref_g;
-        all[C as usize] = ref_c;
-        all[G as usize] = ref_t;
+        all[A as usize][T as usize] = Tv;
+        all[G as usize][T as usize] = Tv;
+        all[A as usize][C as usize] = Tv;
+        all[G as usize][C as usize] = Tr;
 
         all
     };
 }
 
-pub trait FormatError: Debug + Display {
-    fn description(&self) -> &str {
-        "Wrong header"
-    }
-}
+// pub trait FormatError: Debug + Display {
+//     fn description(&self) -> &str {
+//         "Wrong header"
+//     }
+// }
 
 // TODO: Add error handling
 fn get_header<T: BufRead>(reader: &mut T) -> String {
@@ -461,7 +441,7 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
 }
 
 fn to_native_bytes(x: u32) -> [u8; 4] {
-    unsafe { std::mem::transmute(x) }
+    unsafe { transmute(x) }
 }
 
 fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
@@ -488,10 +468,6 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
 
     let excluded_filters: HashMap<&[u8], bool> = HashMap::new();
     let mut n_count = 0;
-    let mut snp_count = 0;
-    let mut multi_count = 0;
-    let mut ins_count = 0;
-    let mut del_count = 0;
     let mut simple_gt = false;
 
     let mut chrom: &[u8] = b"";
@@ -663,7 +639,6 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
                     buffer.push(b'\t');
                     buffer.extend_from_slice(&alt[i]);
                     buffer.push(b'\t');
-                    // MULTIALLELIC always considered not tr or tv, because they're weird
                     buffer.push(NotTrTv);
                     buffer.push(b'\t');
                 }
@@ -679,18 +654,37 @@ fn process_lines(header: &Vec<String>, rows: Vec<Vec<u8>>) -> usize {
                 buffer.push(b'\t');
                 buffer.push(*alt);
                 buffer.push(b'\t');
-                // FIXME: FIX, DOESN'T WORK
-                // println!(
-                //     "{} {} {} {} {:?}",
-                //     from_utf8(&[*refr]).unwrap(),
-                //     *refr as usize,
-                //     from_utf8(&[*alt]).unwrap(),
-                //     *alt as usize,
-                //     from_utf8(&[TSTV[*refr as usize][*alt as usize]]).unwrap()
-                // );
                 buffer.push(TSTV[*refr as usize][*alt as usize]);
                 buffer.push(b'\t');
             }
+            // VariantEnum::Del(v) => {
+            //     let (pos, refr, alt) = v;
+
+            //     buffer.extend_from_slice(pos);
+            //     buffer.push(b'\t');
+            //     buffer.extend_from_slice(SNP);
+            //     buffer.push(b'\t');
+            //     buffer.push(*refr);
+            //     buffer.push(b'\t');
+            //     buffer.push(*alt);
+            //     buffer.push(b'\t');
+            //     buffer.push(NotTrTv);
+            //     buffer.push(b'\t');
+            // }
+            // VariantEnum::Ins(v) => {
+            //     let (pos, refr, alt) = v;
+
+            //     buffer.extend_from_slice(pos);
+            //     buffer.push(b'\t');
+            //     buffer.extend_from_slice(SNP);
+            //     buffer.push(b'\t');
+            //     buffer.push(*refr);
+            //     buffer.push(b'\t');
+            //     buffer.push(*alt);
+            //     buffer.push(b'\t');
+            //     buffer.push(NotTrTv);
+            //     buffer.push(b'\t');
+            // }
             VariantEnum::None => {
                 // TODO: LOG
                 continue;
@@ -783,13 +777,11 @@ fn main() -> Result<(), std::io::Error> {
         thread_completed += 1;
         total += r2.recv().unwrap();
 
-        // println! {"Threads {} completed", thread_completed};
-
         if thread_completed == n_cpus {
             break;
         }
     }
-    // println!("TOTAL {} {}", total, n_count);
+
     assert_eq!(total, n_count);
 
     return Ok(());
