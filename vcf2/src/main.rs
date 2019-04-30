@@ -471,7 +471,7 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
 //     // println!("{} {}", hets[i].len(), effective_samples);
 
 //     // let mut bytes = [b'\0'; 20];
-//     dtoa::write(&mut bytes[..], { hets[i].len() as f32 / effective_samples }).unwrap();
+//     dtoa::write(&mut bytes, { hets[i].len() as f32 / effective_samples }).unwrap();
 //     // println!("{}", from_utf8(&bytes).unwrap());
 //     buffer.extend_from_slice(&bytes);
 // }
@@ -663,15 +663,27 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
         match alleles {
             VariantEnum::Multi(v) => {
                 let (site_type, t_pos, t_refr, t_alt) = v;
-                let effective_samples = { n_samples - missing.len() } as f32;
+
+                let effective_samples: f32;
+                let missingness: f32;
+                if missing.len() > 0 {
+                    missingness = missing.len() as f32 / n_samples as f32;
+                    effective_samples = { n_samples - missing.len() } as f32;
+                } else {
+                    missingness = 0 as f32;
+                    effective_samples = n_samples as f32;
+                }
+
+                let mut bytes = Vec::new();
+                let mut f_buf: [u8; 15];
+                unsafe {
+                    f_buf = std::mem::uninitialized();
+                }
 
                 for i in 0..t_pos.len() {
-                    // println!("Before {} {} {} {} ", i, ac.len(), t_pos.len(), found_ac);
                     if n_samples > 0 && ac[i] == 0 {
                         continue;
                     }
-
-                    buffer.push(b'\t');
 
                     if chrom[0] != b'c' {
                         buffer.extend_from_slice(b"chr");
@@ -679,11 +691,11 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
 
                     buffer.extend_from_slice(&chrom);
                     buffer.push(b'\t');
-                    let mut bytes = [b'\0'; 11];
-                    itoa::write(&mut bytes[..], t_pos[i]).unwrap();
 
+                    itoa::write(&mut bytes, t_pos[i]).unwrap();
                     buffer.extend_from_slice(&bytes);
-                    // reset_buffer(&mut bytes);
+                    bytes.clear();
+
                     buffer.push(b'\t');
 
                     buffer.extend_from_slice(site_type);
@@ -715,14 +727,11 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
 
                         buffer.push(b'\t');
 
-                        // println!("{} {}", hets[i].len(), effective_samples);
-
-                        let mut bytes = [b'\0'; 25];
-                        dtoa::write(&mut bytes[..], { hets[i].len() as f32 / effective_samples })
-                            .unwrap();
-
-                        // buffer.extend_from_slice(&bytes);
-                        reset_buffer(&mut bytes);
+                        unsafe {
+                            let heterozygosity = hets[i].len() as f32 / effective_samples;
+                            let n = ryu::raw::f2s_buffered_n(heterozygosity, &mut f_buf[0]);
+                            buffer.extend_from_slice(&f_buf[0..n]);
+                        }
                     }
 
                     buffer.push(b'\t');
@@ -731,7 +740,6 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
                         buffer.push(empty_field);
                         buffer.push(b'\t');
                         buffer.push(b'0');
-                        buffer.push(b'\t');
                     } else {
                         let mut idx = 0;
 
@@ -748,24 +756,19 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
 
                         buffer.push(b'\t');
 
-                        // println!("{} {}", homs[i].len(), effective_samples);
-
-                        let mut bytes = [b'\0'; 25];
-                        dtoa::write(&mut bytes[..], { homs[i].len() as f32 / effective_samples })
-                            .unwrap();
-
-                        // println!("{}", from_utf8(&bytes).unwrap());
-                        buffer.extend_from_slice(&bytes);
-                        // reset_buffer(&mut bytes);
+                        unsafe {
+                            let homozygosity = homs[i].len() as f32 / effective_samples;
+                            let n = ryu::raw::f2s_buffered_n(homozygosity, &mut f_buf[0]);
+                            buffer.extend_from_slice(&f_buf[0..n]);
+                        }
                     }
 
                     buffer.push(b'\t');
 
-                    if missing.len() == 0 {
+                    if missingness == 0 as f32 {
                         buffer.push(empty_field);
                         buffer.push(b'\t');
                         buffer.push(b'0');
-                        buffer.push(b'\t');
                     } else {
                         let mut idx = 0;
 
@@ -782,15 +785,11 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
 
                         buffer.push(b'\t');
 
-                        // println!("{} {}", homs[i].len(), effective_samples);
-
-                        let mut bytes = [b'\0'; 25];
-                        dtoa::write(&mut bytes[..], { missing.len() as f32 / effective_samples })
-                            .unwrap();
-
-                        // println!("{}", from_utf8(&bytes).unwrap());
-                        buffer.extend_from_slice(&bytes);
-                        // reset_buffer(&mut bytes);
+                        // TODO: do outside loop?
+                        unsafe {
+                            let n = ryu::raw::f2s_buffered_n(missingness, &mut f_buf[0]);
+                            buffer.extend_from_slice(&f_buf[0..n]);
+                        }
                     }
 
                     buffer.push(b'\t');
@@ -799,30 +798,29 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
                         buffer.push(b'0');
                         buffer.push(b'\t');
 
-                        let mut bytes = [b'\0'; 11];
-                        itoa::write(&mut bytes[..], an).unwrap();
-
+                        itoa::write(&mut bytes, an).unwrap();
                         buffer.extend_from_slice(&bytes);
+                        bytes.clear();
                     } else {
-                        let mut bytes = [b'\0'; 11];
-                        itoa::write(&mut bytes[..], ac[i]).unwrap();
-                        // reset_buffer(&mut bytes);
-
+                        itoa::write(&mut bytes, ac[i]).unwrap();
                         buffer.extend_from_slice(&bytes);
+                        bytes.clear();
+
                         buffer.push(b'\t');
 
-                        bytes = [b'\0'; 11];
-                        itoa::write(&mut bytes[..], an).unwrap();
+                        itoa::write(&mut bytes, an).unwrap();
                         buffer.extend_from_slice(&bytes);
+                        bytes.clear();
+
                         buffer.push(b'\t');
 
-                        let mut bytes = [b'\0'; 25];
-                        dtoa::write(&mut bytes[..], { ac[i] as f32 / an as f32 }).unwrap();
-
-                        buffer.extend_from_slice(&bytes);
+                        unsafe {
+                            let sample_maf = ac[i] as f32 / an as f32;
+                            let n = ryu::raw::f2s_buffered_n(sample_maf, &mut f_buf[0]);
+                            buffer.extend_from_slice(&f_buf[0..n]);
+                        };
                     }
 
-                    // write_samples(&mut buffer, hets, homs, missing, ac, an)
                     buffer.push(b'\n');
                 }
             }
