@@ -111,7 +111,7 @@ fn alt_is_valid(alt: &[u8]) -> bool {
         }
     }
 
-    return true;
+    true
 }
 
 fn filter_passes(
@@ -146,17 +146,17 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
             return VariantEnum::Snp((pos, refr[0], alt[0]));
         }
 
-        // TODO: Do we need this check
-        if alt[0] == refr[0] {
-            return VariantEnum::None;
-        }
-
         // simple deletion must have 1 base padding match
         if alt[0] != refr[0] {
             // TODO: Error
             return VariantEnum::None;
         }
 
+        // pos is the next base over (first deleted base)
+        // ref is also the first deleted base, since alt is of 1 padding, that's idx 1 (2nd ref base)
+        // alt == len(alt) - len(ref) for len(alt) < len(ref)
+        // example: alt = A (len == 1), ref = AAATCC (len == 6)
+        // 1 - 6 = -5 (then conver to string)
         let pos = u32::from_radix_10(pos).0 + 1;
 
         return VariantEnum::Del((pos, refr[0], 1 - refr.len() as i32));
@@ -781,6 +781,13 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
             VariantEnum::Del(v) => {
                 let (pos, refr, alt) = v;
 
+                if chrom[0] != b'c' {
+                    buffer.extend_from_slice(b"chr");
+                }
+
+                buffer.extend_from_slice(&chrom);
+                buffer.push(b'\t');
+
                 write_int(&mut buffer, pos, &mut bytes);
                 buffer.push(b'\t');
                 buffer.extend_from_slice(DEL);
@@ -807,6 +814,13 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
             }
             VariantEnum::Ins(v) => {
                 let (pos, refr, alt) = v;
+
+                if chrom[0] != b'c' {
+                    buffer.extend_from_slice(b"chr");
+                }
+
+                buffer.extend_from_slice(&chrom);
+                buffer.push(b'\t');
 
                 buffer.extend_from_slice(pos);
                 buffer.push(b'\t');
