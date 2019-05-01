@@ -490,6 +490,14 @@ fn write_samples(
     write_ac_an(buffer, ac, an, bytes, f_buf);
 }
 
+fn write_chrom(buffer: &mut Vec<u8>, chrom: &[u8]) {
+    if chrom[0] != b'c' {
+        buffer.extend_from_slice(b"chr");
+    }
+
+    buffer.extend_from_slice(&chrom);
+}
+
 fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
     let n_samples = header.len() - 9;
 
@@ -704,11 +712,7 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
                         buffer.push(b'\n');
                     }
 
-                    if chrom[0] != b'c' {
-                        buffer.extend_from_slice(b"chr");
-                    }
-
-                    buffer.extend_from_slice(&chrom);
+                    write_chrom(&mut buffer, &chrom);
                     buffer.push(b'\t');
 
                     itoa::write(&mut bytes, t_pos[i]).unwrap();
@@ -747,11 +751,7 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
                     continue;
                 }
 
-                if chrom[0] != b'c' {
-                    buffer.extend_from_slice(b"chr");
-                }
-
-                buffer.extend_from_slice(&chrom);
+                write_chrom(&mut buffer, &chrom);
                 buffer.push(b'\t');
 
                 buffer.extend_from_slice(pos);
@@ -781,11 +781,7 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
             VariantEnum::Del(v) => {
                 let (pos, refr, alt) = v;
 
-                if chrom[0] != b'c' {
-                    buffer.extend_from_slice(b"chr");
-                }
-
-                buffer.extend_from_slice(&chrom);
+                write_chrom(&mut buffer, &chrom);
                 buffer.push(b'\t');
 
                 write_int(&mut buffer, pos, &mut bytes);
@@ -815,11 +811,7 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
             VariantEnum::Ins(v) => {
                 let (pos, refr, alt) = v;
 
-                if chrom[0] != b'c' {
-                    buffer.extend_from_slice(b"chr");
-                }
-
-                buffer.extend_from_slice(&chrom);
+                write_chrom(&mut buffer, &chrom);
                 buffer.push(b'\t');
 
                 buffer.extend_from_slice(pos);
