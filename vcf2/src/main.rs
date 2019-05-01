@@ -127,7 +127,7 @@ fn filter_passes(
 type SnpType<'a> = (&'a [u8], u8, u8);
 type DelType = (u32, u8, i32);
 type InsType<'a> = (&'a [u8], u8, &'a [u8]);
-type Multi<'a> = (&'a [u8], Vec<u32>, Vec<u8>, Vec<Vec<u8>>);
+type Multi<'a> = (&'a [u8], &'a Vec<u32>, &'a Vec<u8>, &'a Vec<Vec<u8>>);
 
 enum VariantEnum<'a> {
     Snp(SnpType<'a>),
@@ -137,20 +137,23 @@ enum VariantEnum<'a> {
     None,
 }
 
-fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<'a> {
+fn get_alleles<'a, F>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8],mut  mut out: VariantEnum) {
     if alt.len() == 1 {
         if !snp_is_valid(alt[0]) {
-            return VariantEnum::None;
+            out = VariantEnum::None;
+            return;
         }
 
         if refr.len() == 1 {
-            return VariantEnum::Snp((pos, refr[0], alt[0]));
+            *out = VariantEnum::Snp((pos, refr[0], alt[0]));
+            return;
         }
 
         // simple deletion must have 1 base padding match
         if alt[0] != refr[0] {
             // TODO: Error
-            return VariantEnum::None;
+            *out = VariantEnum::None;
+            return;
         }
 
         // pos is the next base over (first deleted base)
@@ -160,17 +163,21 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
         // 1 - 6 = -5 (then conver to string)
         let pos = u32::from_radix_10(pos).0 + 1;
 
-        return VariantEnum::Del((pos, refr[0], 1 - refr.len() as i32));
+        *out = VariantEnum::Del((pos, refr[0], 1 - refr.len() as i32));
+        return;
     } else if refr.len() == 1 && memchr(b',', alt) == None {
         if !alt_is_valid(alt) {
-            return VariantEnum::None;
+            *out = VariantEnum::None;
+            return;
         }
 
         if alt[0] == refr[0] {
-            return VariantEnum::None;
+            *out = VariantEnum::None;
+            return;
         }
 
-        return VariantEnum::Ins((pos, refr[0], &alt[1..alt.len()]));
+        *out = VariantEnum::Ins((pos, refr[0], &alt[1..alt.len()]));
+        return;
     }
 
     let mut positions: Vec<u32> = Vec::new();
@@ -181,7 +188,8 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
 
     if pos == 0 {
         //TODO: error
-        return VariantEnum::None;
+        *out = VariantEnum::None;
+        return;
     }
 
     let mut n_alleles = 0;
@@ -385,11 +393,13 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
     }
 
     if n_alleles == 0 || alleles.len() == 0 {
-        return VariantEnum::None;
+        *out = VariantEnum::None;
+        return;
     }
 
     if n_alleles > 1 {
-        return VariantEnum::Multi((MULTI, positions, references, alleles));
+        *out = VariantEnum::Multi((MULTI, &positions, &references, &alleles));
+        return;
     }
 
     // A single allele
@@ -401,15 +411,18 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
     // of the array of SNPs, since we at the moment consider their effects only independently
     // (which has advantages for CADD, phyloP, phastCons, clinvar, etc reporting)
     if alleles.len() > 1 {
-        return VariantEnum::Multi((MNP, positions, references, alleles));
+        *out = VariantEnum::Multi((MNP, &positions, &references, &alleles));
+        return;
     }
 
     if alleles[0].len() > 1 {
         if alleles[0][0] == b'-' {
-            return VariantEnum::Multi((DEL, positions, references, alleles));
+            *out = VariantEnum::Multi((DEL, &positions, &references, &alleles));
+            return;
         }
 
-        return VariantEnum::Multi((INS, positions, references, alleles));
+        *out = VariantEnum::Multi((INS, &positions, &references, &alleles));
+        return;
     }
 
     panic!("WTF");
@@ -547,7 +560,7 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
     for row in rows.iter() {
         found_ac = 0;
 
-        let mut alleles: VariantEnum = VariantEnum::None;
+        let mut alleles: &VariantEnum = &VariantEnum::None;
 
         'field_loop: for (idx, field) in row.split(|byt| *byt == b'\t').enumerate() {
             if idx == CHROM_IDX {
@@ -575,7 +588,7 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
                     break;
                 }
 
-                alleles = get_alleles(pos, refr, alt);
+                get_alleles(pos, refr, alt, &alleles);
 
                 match &alleles {
                     VariantEnum::Multi(v) => {
@@ -766,11 +779,11 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
                 buffer.push(b'\t');
                 buffer.extend_from_slice(SNP);
                 buffer.push(b'\t');
-                buffer.push(refr);
+                buffer.push(*refr);
                 buffer.push(b'\t');
-                buffer.push(alt);
+                buffer.push(*alt);
                 buffer.push(b'\t');
-                buffer.push(TSTV[refr as usize][alt as usize]);
+                buffer.push(TSTV[*refr as usize][*alt as usize]);
                 buffer.push(b'\t');
 
                 write_samples(
@@ -792,13 +805,13 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
                 write_chrom(&mut buffer, &chrom);
                 buffer.push(b'\t');
 
-                write_int(&mut buffer, pos, &mut bytes);
+                write_int(&mut buffer, *pos, &mut bytes);
                 buffer.push(b'\t');
                 buffer.extend_from_slice(DEL);
                 buffer.push(b'\t');
-                buffer.push(refr);
+                buffer.push(*refr);
                 buffer.push(b'\t');
-                write_int(&mut buffer, alt, &mut bytes);
+                write_int(&mut buffer, *alt, &mut bytes);
                 buffer.push(b'\t');
                 buffer.push(NOT_TSTV);
                 buffer.push(b'\t');
@@ -826,7 +839,7 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
                 buffer.push(b'\t');
                 buffer.extend_from_slice(INS);
                 buffer.push(b'\t');
-                buffer.push(refr);
+                buffer.push(*refr);
                 buffer.push(b'\t');
                 buffer.push(b'+');
                 buffer.extend_from_slice(alt);
