@@ -96,6 +96,7 @@ fn get_header<T: BufRead>(reader: &mut T) -> Vec<u8> {
     Vec::from(line.as_bytes())
 }
 
+#[inline(always)]
 fn snp_is_valid(alt: u8) -> bool {
     return alt == b'A' || alt == b'G' || alt == b'C' || alt == b'T';
 }
@@ -106,7 +107,7 @@ fn alt_is_valid(alt: &[u8]) -> bool {
     }
 
     for i in 1..alt.len() {
-        if !(alt[i] == b'A' || alt[i] == b'G' || alt[i] == b'C' || alt[i] == b'T') {
+        if !snp_is_valid(alt[i]) {
             return false;
         }
     }
@@ -124,13 +125,13 @@ fn filter_passes(
 }
 
 type SnpType<'a> = (&'a [u8], u8, u8);
-type DelType<'a> = (u32, u8, i32);
+type DelType = (u32, u8, i32);
 type InsType<'a> = (&'a [u8], u8, &'a [u8]);
-type Multi<'a> = (&'a [u8], Vec<u32>, Vec<&'a u8>, Vec<Vec<u8>>);
+type Multi<'a> = (&'a [u8], Vec<u32>, Vec<u8>, Vec<Vec<u8>>);
 
 enum VariantEnum<'a> {
     Snp(SnpType<'a>),
-    Del(DelType<'a>),
+    Del(DelType),
     Ins(InsType<'a>),
     Multi(Multi<'a>),
     None,
@@ -173,7 +174,7 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
     }
 
     let mut positions: Vec<u32> = Vec::new();
-    let mut references: Vec<&u8> = Vec::new();
+    let mut references: Vec<u8> = Vec::new();
     let mut alleles: Vec<Vec<u8>> = Vec::new();
 
     let pos = u32::from_radix_10(pos).0;
@@ -199,7 +200,7 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
             // Just a SNP in a multiallelic
             if t_alt.len() == 1 {
                 positions.push(pos);
-                references.push(&refr[0]);
+                references.push(refr[0]);
                 alleles.push(t_alt.to_vec());
                 continue;
             }
@@ -212,9 +213,13 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
             // A simple INS
             // Pos doesn't change, as pos refers to first ref base
             positions.push(pos);
-            references.push(&refr[0]);
+            references.push(refr[0]);
 
-            alleles.push(t_alt[1..t_alt.len()].to_vec());
+            let mut ins = Vec::new();
+            ins.push(b'+');
+            ins.extend_from_slice(&t_alt[1..t_alt.len()]);
+
+            alleles.push(ins);
 
             continue;
         }
@@ -230,7 +235,7 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
             // We use 0 padding for deletions, showing 1st deleted base as ref
             // Therefore need to shift pos & ref by 1
             positions.push(pos + 1);
-            references.push(&refr[1]);
+            references.push(refr[1]);
 
             // TODO: error handling/log
             let mut allele = Vec::new();
@@ -248,7 +253,7 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
             for i in 0..refr.len() {
                 if refr[i] != t_alt[i] {
                     positions.push(pos + i as u32);
-                    references.push(&refr[i]);
+                    references.push(refr[i]);
 
                     alleles.push(vec![t_alt[i]; 1]);
                 }
@@ -335,14 +340,16 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
             // so intPos + 2 - 1 for last padding base (the A in TA) (intPos + 2 is first unique base)
             positions.push(pos + offset as u32 - 1);
 
-            references.push(&refr[offset - 1]);
+            references.push(refr[offset - 1]);
 
             // Similarly, the alt allele starts from len(ref) + rIdx, and ends at len(tAlt) + rIdx
             // from ex: TAGCTT ref: TAT :
             // rIdx == -1 , real alt == tAlt[len(ref) - 1:len(tAlt) - 1] == tALt[2:5]
-            // let mut allele = Vec::new();
-            // allele.push(t_alt[i]);
-            alleles.push(t_alt[offset..{ talt_len + r_idx } as usize].to_vec());
+            let mut ins = Vec::new();
+            ins.push(b'+');
+            ins.extend_from_slice(&t_alt[offset..{ talt_len + r_idx } as usize]);
+
+            alleles.push(ins);
 
             continue;
         }
@@ -370,7 +377,7 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
 
         positions.push(pos + offset as u32);
         // we want the base after the last shared
-        references.push(&refr[offset]);
+        references.push(refr[offset]);
 
         let mut allele = Vec::new();
         itoa::write(&mut allele, -(refr_len + r_idx - offset as i32)).unwrap();
@@ -411,8 +418,8 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
 fn write_samples_type(
     header: &Vec<Vec<u8>>,
     samples: &Vec<u32>,
-    buffer: &mut Vec<u8>,
     n_samples: f32,
+    buffer: &mut Vec<u8>,
     f_buf: &mut [u8; 15],
 ) {
     if samples.len() == 0 {
@@ -475,11 +482,11 @@ fn write_samples(
 ) {
     buffer.push(b'\t');
 
-    write_samples_type(header, homs, buffer, effective_samples, f_buf);
+    write_samples_type(header, homs, effective_samples, buffer, f_buf);
 
     buffer.push(b'\t');
 
-    write_samples_type(header, hets, buffer, effective_samples, f_buf);
+    write_samples_type(header, hets, effective_samples, buffer, f_buf);
 
     buffer.push(b'\t');
 
@@ -535,7 +542,7 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
 
     let mut effective_samples: f32;
     let mut missing_buffer: Vec<u8> = Vec::new();
-    let mut found_ac = 0;
+    let mut found_ac: usize;
     for row in rows.iter() {
         found_ac = 0;
 
@@ -688,8 +695,8 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
         write_samples_type(
             &header,
             &missing,
-            &mut missing_buffer,
             n_samples as f32,
+            &mut missing_buffer,
             &mut f_buf,
         );
 
@@ -723,7 +730,7 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
 
                     buffer.extend_from_slice(site_type);
                     buffer.push(b'\t');
-                    buffer.push(*t_refr[i]);
+                    buffer.push(t_refr[i]);
                     buffer.push(b'\t');
                     buffer.extend_from_slice(&t_alt[i]);
                     buffer.push(b'\t');
@@ -820,6 +827,7 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
                 buffer.push(b'\t');
                 buffer.push(refr);
                 buffer.push(b'\t');
+                buffer.push(b'+');
                 buffer.extend_from_slice(alt);
                 buffer.push(b'\t');
                 buffer.push(NOT_TSTV);
