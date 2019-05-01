@@ -13,8 +13,6 @@ use num_cpus;
 use std::sync::Arc;
 
 #[macro_use]
-extern crate lazy_static;
-#[macro_use]
 extern crate log;
 
 const CHROM_IDX: usize = 0;
@@ -42,28 +40,31 @@ const C: u8 = b'C';
 const G: u8 = b'G';
 const T: u8 = b'T';
 
-lazy_static! {
-    static ref TSTV: [[u8; 256]; 256] = {
-        let mut all: [[u8; 256]; 256] = [[0u8; 256]; 256];
+static TSTV: [[u8; 256]; 256] = {
+    let mut all: [[u8; 256]; 256] = [[0u8; 256]; 256];
 
-        all[G as usize][A as usize] = TS;
-        all[A as usize][G as usize] = TS;
-        all[C as usize][T as usize] = TS;
-        all[T as usize][C as usize] = TS;
+    all[G as usize][A as usize] = TS;
+    all[A as usize][G as usize] = TS;
+    all[C as usize][T as usize] = TS;
+    all[T as usize][C as usize] = TS;
 
-        all[C as usize][A as usize] = TV;
-        all[T as usize][A as usize] = TV;
-        all[C as usize][G as usize] = TV;
-        all[T as usize][G as usize] = TV;
+    all[C as usize][A as usize] = TV;
+    all[T as usize][A as usize] = TV;
+    all[C as usize][G as usize] = TV;
+    all[T as usize][G as usize] = TV;
 
-        all[A as usize][T as usize] = TV;
-        all[G as usize][T as usize] = TV;
-        all[A as usize][C as usize] = TV;
-        all[G as usize][C as usize] = TV;
+    all[A as usize][T as usize] = TV;
+    all[G as usize][T as usize] = TV;
+    all[A as usize][C as usize] = TV;
+    all[G as usize][C as usize] = TV;
 
-        all
-    };
-}
+    all
+};
+
+// #[inline]
+// fn tstv(u8) {
+
+// }
 
 // TODO: Add error handling
 fn get_header<T: BufRead>(reader: &mut T) -> Vec<u8> {
@@ -95,12 +96,12 @@ fn get_header<T: BufRead>(reader: &mut T) -> Vec<u8> {
     Vec::from(line.as_bytes())
 }
 
-fn snp_is_valid(alt: &[u8]) -> bool {
-    return alt[0] == b'A' || alt[0] == b'G' || alt[0] == b'C' || alt[0] == b'T';
+fn snp_is_valid(alt: u8) -> bool {
+    return alt == b'A' || alt == b'G' || alt == b'C' || alt == b'T';
 }
 
 fn alt_is_valid(alt: &[u8]) -> bool {
-    if !snp_is_valid(alt) {
+    if !snp_is_valid(alt[0]) {
         return false;
     }
 
@@ -122,9 +123,9 @@ fn filter_passes(
         && (excluded_filters.len() == 0 || !excluded_filters.contains_key(filter_field))
 }
 
-type SnpType<'a> = (&'a [u8], &'a u8, &'a u8);
-type DelType<'a> = (u32, &'a u8, u32);
-type InsType<'a> = (&'a [u8], &'a u8, &'a [u8]);
+type SnpType<'a> = (&'a [u8], u8, u8);
+type DelType<'a> = (u32, u8, i32);
+type InsType<'a> = (&'a [u8], u8, &'a [u8]);
 type Multi<'a> = (&'a [u8], Vec<u32>, Vec<&'a u8>, Vec<Vec<u8>>);
 
 enum VariantEnum<'a> {
@@ -137,12 +138,12 @@ enum VariantEnum<'a> {
 
 fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<'a> {
     if alt.len() == 1 {
-        if !snp_is_valid(alt) {
+        if !snp_is_valid(alt[0]) {
             return VariantEnum::None;
         }
 
         if refr.len() == 1 {
-            return VariantEnum::Snp((pos, &refr[0], &alt[0]));
+            return VariantEnum::Snp((pos, refr[0], alt[0]));
         }
 
         // TODO: Do we need this check
@@ -156,15 +157,19 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
             return VariantEnum::None;
         }
 
-        let pos = u32::from_radix_10(pos).0;
+        let pos = u32::from_radix_10(pos).0 + 1;
 
-        return VariantEnum::Del((pos + 1, &refr[0], 1 - refr.len() as u32));
+        return VariantEnum::Del((pos, refr[0], 1 - refr.len() as i32));
     } else if refr.len() == 1 && memchr(b',', alt) == None {
+        if !alt_is_valid(alt) {
+            return VariantEnum::None;
+        }
+
         if alt[0] == refr[0] {
             return VariantEnum::None;
         }
 
-        return VariantEnum::Ins((pos, &refr[0], &alt[1..alt.len()]));
+        return VariantEnum::Ins((pos, refr[0], &alt[1..alt.len()]));
     }
 
     let mut positions: Vec<u32> = Vec::new();
@@ -195,7 +200,7 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
             if t_alt.len() == 1 {
                 positions.push(pos);
                 references.push(&refr[0]);
-                alleles.push(Vec::from(t_alt));
+                alleles.push(t_alt.to_vec());
                 continue;
             }
 
@@ -209,7 +214,7 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
             positions.push(pos);
             references.push(&refr[0]);
 
-            alleles.push(Vec::from(&t_alt[1..t_alt.len()]));
+            alleles.push(t_alt[1..t_alt.len()].to_vec());
 
             continue;
         }
@@ -245,9 +250,7 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
                     positions.push(pos + i as u32);
                     references.push(&refr[i]);
 
-                    let mut allele = Vec::with_capacity(1);
-                    allele.push(t_alt[i]);
-                    alleles.push(allele);
+                    alleles.push(vec![t_alt[i]; 1]);
                 }
             }
 
@@ -339,7 +342,7 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> VariantEnum<
             // rIdx == -1 , real alt == tAlt[len(ref) - 1:len(tAlt) - 1] == tALt[2:5]
             // let mut allele = Vec::new();
             // allele.push(t_alt[i]);
-            alleles.push(Vec::from(&t_alt[offset..{ talt_len + r_idx } as usize]));
+            alleles.push(t_alt[offset..{ talt_len + r_idx } as usize].to_vec());
 
             continue;
         }
@@ -432,19 +435,20 @@ fn write_samples_type(
     write_f32(buffer, samples.len() as f32 / n_samples, f_buf);
 }
 
-fn write_ac_an(buffer: &mut Vec<u8>, ac: u32, an: u32, bytes: &mut Vec<u8>) {
+fn write_ac_an(buffer: &mut Vec<u8>, ac: u32, an: u32, bytes: &mut Vec<u8>, f_buf: &mut [u8; 15]) {
     if ac == 0 {
         buffer.push(b'0');
         buffer.push(b'\t');
     } else {
-        write_u32(buffer, ac, bytes);
+        write_int(buffer, ac, bytes);
         buffer.push(b'\t');
     }
-    write_u32(buffer, an, bytes);
+    write_int(buffer, an, bytes);
     buffer.push(b'\t');
+    write_f32(buffer, ac as f32 / an as f32, f_buf);
 }
 
-fn write_u32(buffer: &mut Vec<u8>, val: u32, mut b: &mut Vec<u8>) {
+fn write_int<T: itoa::Integer>(buffer: &mut Vec<u8>, val: T, mut b: &mut Vec<u8>) {
     itoa::write(&mut b, val).unwrap();
     buffer.extend_from_slice(&b);
     b.clear();
@@ -483,7 +487,7 @@ fn write_samples(
 
     buffer.push(b'\t');
 
-    write_ac_an(buffer, ac, an, bytes);
+    write_ac_an(buffer, ac, an, bytes, f_buf);
 }
 
 fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
@@ -523,10 +527,11 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
 
     let mut effective_samples: f32;
     let mut missing_buffer: Vec<u8> = Vec::new();
-
+    let mut found_ac = 0;
     for row in rows.iter() {
+        found_ac = 0;
+
         let mut alleles: VariantEnum = VariantEnum::None;
-        let mut found_ac: u32 = 0;
 
         'field_loop: for (idx, field) in row.split(|byt| *byt == b'\t').enumerate() {
             if idx == CHROM_IDX {
@@ -558,8 +563,7 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
 
                 match &alleles {
                     VariantEnum::Multi(v) => {
-                        found_ac = v.3.len() as u32;
-                        continue;
+                        found_ac = v.3.len();
                     }
                     VariantEnum::None => {
                         // TODO: LOG
@@ -567,9 +571,14 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
                     }
                     _ => {
                         found_ac = 1;
-                        continue;
                     }
                 }
+
+                continue;
+            }
+
+            if n_samples == 0 {
+                break;
             }
 
             if idx == FORMAT_IDX {
@@ -577,9 +586,9 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
 
                 simple_gt = memchr(b':', field) == None;
                 missing.clear();
-                hets = vec![Vec::new(); found_ac as usize];
-                homs = vec![Vec::new(); found_ac as usize];
-                ac = vec![0; found_ac as usize];
+                hets = vec![Vec::new(); found_ac];
+                homs = vec![Vec::new(); found_ac];
+                ac = vec![0; found_ac];
 
                 continue;
             }
@@ -632,7 +641,7 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
                 }
 
                 for gt in gt_range.split(|byt| *byt == b'|' || *byt == b'/') {
-                    let gtn = u32::from_radix_10(gt);
+                    let gtn = usize::from_radix_10(gt);
 
                     if gtn.1 == 0 {
                         // TODO: Handle failure
@@ -653,7 +662,7 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
                         continue;
                     }
 
-                    ac[{ gtn.0 - 1 } as usize] += 1;
+                    ac[{ gtn.0 - 1 }] += 1;
                 }
             }
         }
@@ -691,6 +700,10 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
                         continue;
                     }
 
+                    if i > 0 {
+                        buffer.push(b'\n');
+                    }
+
                     if chrom[0] != b'c' {
                         buffer.extend_from_slice(b"chr");
                     }
@@ -713,8 +726,6 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
                     buffer.push(NOT_TSTV);
                     buffer.push(b'\t');
 
-                    buffer.push(b'\t');
-
                     write_samples(
                         header,
                         &mut buffer,
@@ -727,8 +738,6 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
                         &mut bytes,
                         &mut f_buf,
                     );
-
-                    buffer.push(b'\n');
                 }
             }
             VariantEnum::Snp(v) => {
@@ -749,11 +758,11 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
                 buffer.push(b'\t');
                 buffer.extend_from_slice(SNP);
                 buffer.push(b'\t');
-                buffer.push(*refr);
+                buffer.push(refr);
                 buffer.push(b'\t');
-                buffer.push(*alt);
+                buffer.push(alt);
                 buffer.push(b'\t');
-                buffer.push(TSTV[*refr as usize][*alt as usize]);
+                buffer.push(TSTV[refr as usize][alt as usize]);
                 buffer.push(b'\t');
 
                 write_samples(
@@ -762,7 +771,7 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
                     &hets[0],
                     &homs[0],
                     &missing_buffer,
-                    n_samples as f32,
+                    effective_samples,
                     ac[0],
                     an,
                     &mut bytes,
@@ -772,16 +781,13 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
             VariantEnum::Del(v) => {
                 let (pos, refr, alt) = v;
 
-                write_u32(&mut buffer, pos, &mut bytes);
+                write_int(&mut buffer, pos, &mut bytes);
                 buffer.push(b'\t');
                 buffer.extend_from_slice(DEL);
                 buffer.push(b'\t');
-                buffer.push(*refr);
+                buffer.push(refr);
                 buffer.push(b'\t');
-
-                buffer.push(b'-');
-                write_u32(&mut buffer, alt, &mut bytes);
-
+                write_int(&mut buffer, alt, &mut bytes);
                 buffer.push(b'\t');
                 buffer.push(NOT_TSTV);
                 buffer.push(b'\t');
@@ -792,7 +798,7 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
                     &hets[0],
                     &homs[0],
                     &missing_buffer,
-                    n_samples as f32,
+                    effective_samples,
                     ac[0],
                     an,
                     &mut bytes,
@@ -804,9 +810,9 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
 
                 buffer.extend_from_slice(pos);
                 buffer.push(b'\t');
-                buffer.extend_from_slice(SNP);
+                buffer.extend_from_slice(INS);
                 buffer.push(b'\t');
-                buffer.push(*refr);
+                buffer.push(refr);
                 buffer.push(b'\t');
                 buffer.extend_from_slice(alt);
                 buffer.push(b'\t');
@@ -819,14 +825,16 @@ fn process_lines(header: &Vec<Vec<u8>>, rows: Vec<Vec<u8>>) -> usize {
                     &hets[0],
                     &homs[0],
                     &missing_buffer,
-                    n_samples as f32,
+                    effective_samples,
                     ac[0],
                     an,
                     &mut bytes,
                     &mut f_buf,
                 );
             }
-            VariantEnum::None => {}
+            VariantEnum::None => {
+                continue;
+            }
         }
 
         buffer.push(b'\n');
