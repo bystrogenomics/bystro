@@ -497,6 +497,7 @@ fn write_samples(
     write_ac_an(buffer, ac, an, bytes, f_buf);
 }
 
+#[inline]
 fn write_chrom(buffer: &mut Vec<u8>, chrom: &[u8]) {
     if chrom[0] != b'c' {
         buffer.extend_from_slice(b"chr");
