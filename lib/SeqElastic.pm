@@ -284,18 +284,11 @@ sub _makeIndex {
 
   my $es = Search::Elasticsearch->new($self->connection);
 
-  if(!$es->indices->exists(index => $self->indexName) ) {
-    $es->indices->create(index => $self->indexName, body => {settings => $self->indexConfig->{index_settings}});
-  } else {
-    # Index must be open to put index settings
-    $es->indices->open(index => $self->indexName);
-
-    # Will result in errors [illegal_argument_exception] can't change the number of shards for an index
-    # $es->indices->put_settings(
-    #   index => $self->indexName,
-    #   body => $searchConfig->{index_settings},
-    # );
+  if($es->indices->exists(index => $self->indexName) ) {
+    $es->indices->delete(index => $self->indexName);
   }
+
+  $es->indices->create(index => $self->indexName, body => {settings => $self->indexConfig->{index_settings}});
 
   $es->indices->put_mapping(
     index => $self->indexName,
