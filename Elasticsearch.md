@@ -15,6 +15,7 @@ chown -R elasticsearch /mnt/elasticsearch_nvme1
 chgrp -R elasticsearch /mnt/elasticsearch_nvme1
 
 # Edit /etc/elasticsearch/elasticsearch.yml config to include new discovery.zen.ping.unicast.hosts
+# This should use the internal IP (external should not be generally accessible)
 # We should automate this...have had trouble with the aws plugin, at least at this version
 
 service start elasticsearch
