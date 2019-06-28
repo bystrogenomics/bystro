@@ -7,7 +7,7 @@ service stop elasticsearch
 yum update elasticsearch-5.6.11
 elasticsearch-plugin remove repository-s3
 elasticsearch-plugin install repository-s3
-chown -R /etc/elasticsearch
+chown -R elasticsearch /etc/elasticsearch
 mkfs -t ext4 /dev/nvme0n1
 mount /dev/nvme0n1 /mnt/elasticsearch_nvme1
 mkdir /mnt/elasticsearch_nvme1/nodes
