@@ -18,5 +18,8 @@ chgrp -R elasticsearch /mnt/elasticsearch_nvme1
 # This should use the internal IP (external should not be generally accessible)
 # We should automate this...have had trouble with the aws plugin, at least at this version
 
+# Edit web server .env and all compute nodes bystro/elastic-config/config.yml, adding in the internal (vpc-private) ips of all elasticsearch nodes.
+# In the future we should redploy the relevant pods
+
 service start elasticsearch
 ```
