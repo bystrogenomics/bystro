@@ -31,8 +31,6 @@ use Statistics::Distributions qw(chisqrdistr udistr);
 
 use Math::Round qw/nhimult round/;
 
-use POSIX qw/lround/;
-
 # Defines basic things needed in builder and annotator, like logPath,
 # Also initializes the database with database_dir unnecessarily
 extends 'Seq::Base';
@@ -326,15 +324,19 @@ sub _getSearchParams {
 
   # -1 simply means we can't approximate the size
   my $nSlices;
-  if($numTerms < 0 || $numTerms > 200) {
+  if($numTerms < 0 || $numTerms > 10000) {
     $nSlices = $self->shards;
   } else {
     $nSlices = $self->_getSlices();
   }
 
+  if($nSlices < 1) {
+    $nSlices = 1;
+  }
+
   my $batchSize = $self->batchSize;
 
-  my $timeout = '2m';
+  my $timeout = '200m';
 
   return ($nSlices, $batchSize, $timeout);
 }
@@ -406,6 +408,7 @@ sub _getNumTerms {
   return $mustQLen;
 }
 
+# TODO: better handle huge numbers of terms
 sub _getSlices {
   my $self = shift;
 
