@@ -10,6 +10,7 @@ use Types::Path::Tiny qw/AbsFile AbsPath AbsDir/;
 use Mouse 2;
 use List::MoreUtils qw/first_index/;
 use Sys::CpuAffinity;
+use POSIX qw/ceil/;
 
 our $VERSION = '0.001';
 
@@ -120,6 +121,12 @@ sub go {
 
   my ($filePath, $annotationFileInCompressed) = $self->_getFilePath();
 
+  my $fileSize = -s $filePath;
+
+  my $nIndices = int(ceil($fileSize / 30e9));
+
+  $self->indexConfig->{index_settings}{index}{number_of_shards} = $nIndices;
+
   (my $err, undef, my $fh) = $self->get_read_fh($filePath, $annotationFileInCompressed);
 
   if($err) {
@@ -168,9 +175,7 @@ sub go {
   my $chunkSize = $self->getChunkSize($filePath, $self->max_threads);
   if($chunkSize < 5000) {
     $chunkSize = 5000;
-  }
-
-  if($chunkSize > 10000) {
+  } elsif($chunkSize > 10000) {
     $chunkSize = 10000;
   }
 
