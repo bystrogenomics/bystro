@@ -26,6 +26,7 @@ use Try::Tiny;
 use Math::SigFigs qw(:all);
 use Scalar::Util qw/looks_like_number/;
 use Sys::CpuAffinity;
+use POSIX qw/ceil/;
 
 # An archive, containing an "annotation" file
 has annotatedFilePath => (is => 'ro', isa => AbsFile, coerce => 1);
@@ -147,6 +148,12 @@ sub go {
   $self->log( 'info', 'Beginning indexing' );
 
   my ($filePath, $annotationFileInCompressed) = $self->_getFilePath();
+  
+  my $fileSize = -s $filePath;
+
+  my $nIndices = int(ceil($fileSize / 30e9));
+
+  $self->indexConfig->{index_settings}{index}{number_of_shards} = $nIndices;
 
   my ($err, undef, $fh) = $self->getReadFh($filePath, $annotationFileInCompressed);
 
