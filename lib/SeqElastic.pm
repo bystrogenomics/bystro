@@ -151,7 +151,7 @@ sub go {
   
   my $fileSize = -s $filePath;
 
-  my $nIndices = int(ceil($fileSize / 30e9));
+  my $nIndices = int(ceil($fileSize / 10e9));
 
   $self->indexConfig->{index_settings}{index}{number_of_shards} = $nIndices;
 
