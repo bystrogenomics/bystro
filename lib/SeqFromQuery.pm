@@ -330,8 +330,8 @@ sub _getSearchParams {
     $nSlices = $self->_getSlices();
   }
 
-  if($nSlices < 1) {
-    $nSlices = 1;
+  if($nSlices < 2) {
+    $nSlices = 2;
   }
 
   my $batchSize = $self->batchSize;
