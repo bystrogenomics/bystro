@@ -37,39 +37,22 @@ has _inputFileBaseName => (
 );
 
 sub validateInputFile {
-  my ( $self, $inputFileAbsPath ) = @_;
+  my ( $self, $inputFilePath ) = @_;
 
-  if(!ref $inputFileAbsPath) {
-    $inputFileAbsPath = path($inputFileAbsPath);
+  my @parts = split("/", $inputFilePath);
+
+  my $last = $parts[-1];
+
+  # TODO: support more types
+  for my $type (("vcf", "snp")) {
+    my ($format, $gz) = $last =~ /\.($type)(\.\w+)?/;
+
+    if($format) {
+      return (0, $format);
+    }
   }
 
-  my $fh = $self->getReadFh($inputFileAbsPath);
-  my $firstLine = <$fh>;
-
-  my $orig = $self->getLineEndings();
-
-  my $err = $self->setLineEndings($firstLine);
-
-  if($err) {
-    return ($err, undef);
-  }
-
-  chomp $firstLine;
-
-  my $headerFieldsAref = $self->getCleanFields($firstLine);
-
-  my $inputHandler = Seq::InputFile->new();
-
-  #last argument to not die, we want to be able to convert
-  my $snpHeaderErr = $inputHandler->checkInputFileHeader($headerFieldsAref, 1);
-
-  $self->setLineEndings($orig);
-
-  if(!defined $headerFieldsAref || defined $snpHeaderErr) {
-    return (0, 'vcf');
-  }
-
-  return (0, 'snp');
+  return ("Couldn't identify format of $inputFilePath", "");
 }
 
 1;

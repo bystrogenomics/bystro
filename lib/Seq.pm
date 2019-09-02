@@ -30,8 +30,7 @@ extends 'Seq::Base';
 # We  add a few of our own annotation attributes
 # These will be re-used in the body of the annotation processor below
 # Users may configure these
-has input_file => (is => 'rw', isa => AbsFile, coerce => 1, required => 1,
-  handles  => { inputFilePath => 'stringify' }, writer => 'setInputFile');
+has input_file => (is => 'rw', isa => 'Str', required => 1);
 
 # Maximum (signed) size of del allele
 has maxDel => (is => 'ro', isa => 'Int', default => -32, writer => 'setMaxDel');
@@ -470,7 +469,7 @@ sub _openAnnotationPipe {
 
   my $errPath = $self->_workingDir->child($self->input_file->basename . '.file-log.log');
 
-  my $inPath = $self->inputFilePath;
+  my $inPath = $self->input_file;
   my $echoProg = $self->isCompressedSingle($inPath) ? $self->gzip . ' ' . $self->decompressArgs : 'cat';
 
   if(!$self->fileProcessors->{$type}) {
