@@ -48,7 +48,7 @@ sub validateInputFile {
     my ($format, $gz) = $last =~ /\.($type)(\.\w+)?/;
 
     if($format) {
-      return (0, $format);
+      return (0, lc($format));
     }
   }
 

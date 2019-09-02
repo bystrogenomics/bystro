@@ -72,60 +72,15 @@ sub annotate {
 
   $self->log( 'info', 'Checking input file format' );
 
-  # TODO: For now we only accept tab separated files
-  # We could change this, although comma separation causes may cause with our fields
-  # And is slower, since we cannot split on a constant
-  # We would also need to take care with properly escaping intra-field commas
-  # $err = $self->setDelimiter($firstLine);
-
-  # if($err) {
-  #   $self->_errorWithCleanup($err);
-  #   return ($err, undef);
-  # }
-
-  # Calling in annotate allows us to error early
-  my $err;
-  ($err, $self->{_chunkSize}) = $self->getChunkSize($self->input_file, $self->maxThreads, 100, 16384);
+  my ($err, $fileType) = $self->validateInputFile($self->input_file);
 
   if($err) {
     $self->_errorWithCleanup($err);
     return ($err, undef);
   }
 
-  $self->log('debug', "chunk size is $self->{_chunkSize}");
-
-  #################### Validate the input file ################################
-  # Converts the input file if necessary
-  ($err, my $fileType) = $self->validateInputFile($self->input_file);
-
-  if($err) {
-    $self->_errorWithCleanup($err);
-    return ($err, undef);
-  }
-
-  # TODO: Handle Sig Int (Ctrl + C) to close db, clean up temp dir
-  # local $SIG{INT} = sub {
-  #   my $message = shift;
-  # };
-
-  if($fileType eq 'snp') {
-    $self->log( 'info', 'Beginning annotation' );
-    return $self->annotateFile('snp');
-  }
-
-  if($fileType eq 'vcf') {
-    $self->log( 'info', 'Beginning annotation' );
-    return $self->annotateFile('vcf');
-  }
-
-  # TODO: Inspect vcf header
-
-  # TODO: support any other file, by checking the extension
-
-  # TODO: we don't really check for valid vcf, just assume it is
-  # So this message is never reached
-  $self->_errorWithCleanup("File type isn\'t vcf or snp. Please use one of these files");
-  return ("File type isn\'t vcf or snp. Please use one of these files", undef);
+  $self->log( 'info', 'Beginning annotation' );
+  return $self->annotateFile($fileType);
 }
 
 sub annotateFile {
@@ -157,8 +112,6 @@ sub annotateFile {
   my $abortErr;
 
   my $messageFreq = (2e4 / 4) * $self->maxThreads;
-
-  say STDERR "MAX THREADS  " . $self->maxThreads;
 
   # Report every 1e4 lines, to avoid thrashing receiver
   my $progressFunc = $self->makeLogProgressAndPrint(\$abortErr, $outFh, $statsFh, $messageFreq);
@@ -469,16 +422,17 @@ sub _getFileHandles {
 
 sub _openAnnotationPipe {
   my ($self, $type) = @_;
-  say STDERR "TYPE IS $type";
-  my $inPath = $self->input_file;
-  my $basename = path($inPath)->basename;
-  my $errPath = $self->_workingDir->child($basename . '.file-log.log');
-
-  my $echoProg = $self->getCompressProgWithArgs($inPath);
-
   if(!$self->fileProcessors->{$type}) {
     $self->_errorWithCleanup("No fileProcessors defined for $type file type");
   }
+
+  my $inPath = $self->input_file;
+  my $basename = path($inPath)->basename;
+
+  my $errPath = $self->_workingDir->child($basename . '.file-log.log');
+
+  #cat is wasteful, but we expect no one reads large uncompressed files
+  my $echoProg = $self->getReadArgs($inPath) || "cat $inPath";
 
   my $fp = $self->fileProcessors->{$type};
   my $args = $fp->{program} . " " . $fp->{args};
@@ -492,10 +446,8 @@ sub _openAnnotationPipe {
     }
   }
 
-  say STDERR "ARGS ARE $args";
-
   # TODO:  add support for GQ filtering in vcf
-  my $err = $self->safeOpen($fh, '-|', "$echoProg $inPath | $args 2> $errPath");
+  my $err = $self->safeOpen($fh, '-|', "$echoProg | $args 2> $errPath");
 
   return ($err, $fh);
 }
