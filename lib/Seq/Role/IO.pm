@@ -41,7 +41,8 @@ has delimiter => (
 
 my $tar = which('tar');
 my $gzip = which('pigz') || which('gzip');
-
+my $lz4 = which('lz4');
+say "LZ4 is $lz4";
 # Without this, pigz -d -c issues many system calls (futex)
 # Thanks to Meltdown, this slows decompression substantially
 # Up to 1 core will be used solely for meltdown-related overhead
@@ -98,11 +99,15 @@ sub getReadFh {
 
   my $compressed = 0;
   my ($err, $fh);
-  if($filePath =~ /[.]gz$/ || $filePath =~ /[.]bgz$/ || $filePath =~ /[.]zip$/) {
+  if($filePath =~ /[.]gz$/ || $filePath =~ /[.]bgz$/ || $filePath =~ /[.]zip$/ || $filePath =~ /[.]lz4$/) {
     $compressed = 1;
     #PerlIO::gzip doesn't seem to play nicely with MCE, reads random number of lines
     #and then exits, so use gunzip, standard on linux, and faster
-    $err = $self->safeOpen($fh, '-|', "$gzip $dcmpArgs \"$filePath\"", $errCode);
+    if($filePath =~ /[.]lz4$/) {
+      $err = $self->safeOpen($fh, '-|', "$lz4 -d -c \"$filePath\"", $errCode);
+    } else {
+      $err = $self->safeOpen($fh, '-|', "$gzip $dcmpArgs \"$filePath\"", $errCode);
+    }
   } else {
     $err = $self->safeOpen($fh, '<', $filePath, $errCode);
   };
@@ -117,9 +122,15 @@ sub getInnerFileCommand {
     $errCode = 'error';
   }
 
-  my $compressed = $innerFile =~ /[.]gz$/ || $innerFile =~ /[.]bgz$/ || $innerFile =~ /[.]zip$/;
+  my $compressed = $innerFile =~ /[.]gz$/ || $innerFile =~ /[.]bgz$/ || $innerFile =~ /[.]zip$/ || $filePath =~ /[.]lz4$/;
 
-  my $innerCommand = $compressed ? "\"$innerFile\" | $gzip $dcmpArgs -" : "\"$innerFile\"";
+  my $innerCommand;
+  if($filePath =~ /[.]lz4$/) {
+    $innerCommand = $compressed ? "\"$innerFile\" | $lz4 -d -c -" : "\"$innerFile\"";
+  } else {
+    $innerCommand = $compressed ? "\"$innerFile\" | $gzip $dcmpArgs -" : "\"$innerFile\"";
+  }
+
   # We do this because we have not built in error handling from opening streams
 
   my $err;
@@ -156,7 +167,31 @@ sub isCompressedSingle {
     return 0;
   }
 
-  return $basename =~ /[.]gz$/ || $basename =~ /[.]bgz$/ || $basename =~ /[.]zip$/;
+  if($basename =~ /[.]gz$/ || $basename =~ /[.]bgz$/ || $basename =~ /[.]zip$/ ) {
+    return "gzip";
+  }
+
+  if($basename =~ /[.]lz4$/) {
+    return "lz4";
+  }
+
+  return "";
+}
+
+sub getCompressProgWithArgs {
+  my ($self, $filePath) = @_;
+
+  my $ext = $self->isCompressedSingle($filePath);
+  
+  if(!$ext) {
+    return "cat";
+  }
+  if($ext eq 'gzip') {
+    return "$gzip $dcmpArgs";
+  }
+  if($ext eq 'lz4') {
+    return "$lz4 -d -c";
+  }
 }
 
 # TODO: return error if failed
@@ -179,9 +214,17 @@ sub getWriteFh {
   }
 
   my $fh;
-  if ( $compress || $file =~ /[.]gz$/ || $file =~ /[.]bgz$/ || $file =~ /[.]zip$/ ) {
-    # open($fh, ">:gzip", $file) or die $self->log('fatal', "Couldn't open $file for writing: $!");
-    $err = $self->safeOpen($fh, "|-", "$gzip -c > $file", $errCode);
+  my $hasGz = $file =~ /[.]gz$/ || $file =~ /[.]bgz$/ || $file =~ /[.]zip$/;
+  my $hasLz4 = $file =~ /[.]lz4$/;
+  if ( $hasGz || $hasLz4 || $compress) {
+    if($hasLz4 || $compress =~ /[.]lz4$/) {
+      # open($fh, ">:gzip", $file) or die $self->log('fatal', "Couldn't open $file for writing: $!");
+      say STDERR "DOING LZ4 $lz4 -c > $file";
+      $err = $self->safeOpen($fh, "|-", "$lz4 -c > $file", $errCode);
+    } else {
+      $err = $self->safeOpen($fh, "|-", "$gzip -c > $file", $errCode);
+    }
+    
   } else {
     $err = $self->safeOpen($fh, ">", $file, $errCode);
   }
@@ -356,11 +399,14 @@ sub compressDirIntoTarball {
 sub getCompressedFileSize {
   my ($self, $filePath) = @_;
 
-  if(!$self->isCompressedSingle($filePath)) {
+  my $extType = $self->isCompressedSingle($filePath);
+  if(!$extType) {
     return ('Expect compressed file', undef);
   }
 
-  my $err = $self->safeOpen(my $fh, "-|", "$gzip -l " . path($filePath)->stringify);
+  my $gzProg = $extType eq 'gzip' ? $gzip : $lz4;
+
+  my $err = $self->safeOpen(my $fh, "-|", "$gzProg -l " . path($filePath)->stringify);
 
   if($err) {
     return ($err, undef);

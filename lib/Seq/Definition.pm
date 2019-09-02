@@ -41,7 +41,7 @@ has output_file_base => ( is => 'ro', isa => AbsPath, coerce => 1, required => 1
 has temp_dir => (is => 'ro', isa => 'Maybe[Str]');
 
 # Do we want to compress?
-has compress => (is => 'ro', isa => 'Bool', default => 1);
+has compress => (is => 'ro', isa => 'Str', default => 1);
 
 # Do we want to tarball our results
 has archive => (is => 'ro', isa => 'Bool', default => 0);
@@ -76,8 +76,8 @@ has outputFilesInfo => (is => 'ro', isa => 'HashRef', init_arg => undef, lazy =>
 
   # Must be lazy in order to allow "revealing module pattern", with output_file_base below
   my $outBaseName = $self->outBaseName;
-
-  $out{annotation} = $outBaseName . '.annotation.tsv' . ($self->compress ? ".gz" : "");
+  
+  $out{annotation} = $outBaseName . '.annotation.tsv' . ($self->compress ? "." . $self->compress : "");
   $out{sampleList} = $outBaseName . '.sample_list';
 
   # Must be lazy in order to allow "revealing module pattern", with __statisticsRunner below

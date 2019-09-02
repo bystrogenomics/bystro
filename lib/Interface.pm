@@ -77,7 +77,7 @@ has verbose => (
 
 has compress => (
   is => 'ro', 
-  isa => 'Bool',
+  isa => 'Str',
   metaclass   => 'Getopt',
   documentation =>
     qq{Compress the output?},

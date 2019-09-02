@@ -85,7 +85,7 @@ sub annotate {
 
   # Calling in annotate allows us to error early
   my $err;
-  ($err, $self->{_chunkSize}) = $self->getChunkSize($self->input_file, $self->maxThreads, 512, 16384);
+  ($err, $self->{_chunkSize}) = $self->getChunkSize($self->input_file, $self->maxThreads, 100, 16384);
 
   if($err) {
     $self->_errorWithCleanup($err);
@@ -158,13 +158,16 @@ sub annotateFile {
 
   my $messageFreq = (2e4 / 4) * $self->maxThreads;
 
+  say STDERR "MAX THREADS  " . $self->maxThreads;
+
   # Report every 1e4 lines, to avoid thrashing receiver
   my $progressFunc = $self->makeLogProgressAndPrint(\$abortErr, $outFh, $statsFh, $messageFreq);
   MCE::Loop::init {
-    max_workers => $self->maxThreads || 8, use_slurpio => 1,
+    max_workers => $self->maxThreads,
+    use_slurpio => 1,
     # bystro-vcf outputs a very small row; fully annotated through the alt column (-ref -discordant)
     # so accumulate less than we would if processing full .snp
-    chunk_size => $self->{_chunkSize}. "K",
+    chunk_size => 'auto',
     gather => $progressFunc,
   };
 
@@ -466,11 +469,12 @@ sub _getFileHandles {
 
 sub _openAnnotationPipe {
   my ($self, $type) = @_;
-
-  my $errPath = $self->_workingDir->child($self->input_file->basename . '.file-log.log');
-
+  say STDERR "TYPE IS $type";
   my $inPath = $self->input_file;
-  my $echoProg = $self->isCompressedSingle($inPath) ? $self->gzip . ' ' . $self->decompressArgs : 'cat';
+  my $basename = path($inPath)->basename;
+  my $errPath = $self->_workingDir->child($basename . '.file-log.log');
+
+  my $echoProg = $self->getCompressProgWithArgs($inPath);
 
   if(!$self->fileProcessors->{$type}) {
     $self->_errorWithCleanup("No fileProcessors defined for $type file type");
@@ -487,6 +491,8 @@ sub _openAnnotationPipe {
         = $self->_workingDir->child($self->outputFilesInfo->{$type});
     }
   }
+
+  say STDERR "ARGS ARE $args";
 
   # TODO:  add support for GQ filtering in vcf
   my $err = $self->safeOpen($fh, '-|', "$echoProg $inPath | $args 2> $errPath");
