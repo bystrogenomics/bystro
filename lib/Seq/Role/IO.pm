@@ -261,7 +261,7 @@ sub getWriteFh {
   my $hasGz = $file =~ /[.]gz$/ || $file =~ /[.]bgz$/ || $file =~ /[.]zip$/;
   my $hasLz4 = $file =~ /[.]lz4$/;
   if ( $hasGz || $hasLz4 || $compress) {
-    if($hasLz4 || $compress =~ /[.]lz4$/) {
+    if($hasLz4 || ($compress && $compress =~ /[.]lz4$/)) {
       $err = $self->safeOpen($fh, "|-", "$lz4 -c > $file", $errCode);
     } else {
       $err = $self->safeOpen($fh, "|-", "$gzip -c > $file", $errCode);
