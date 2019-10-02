@@ -1144,11 +1144,7 @@ impl<'a> Header<'a> {
 }
 
 fn main() -> Result<(), io::Error> {
-    let args: Vec<String> = std::env::args().collect();
-
-    // let input_file = std::fs::File::open(&args[1])?;
-    // let decoder = MultiGzDecoder::new(input_file);
-    // let mut reader = std::io::BufReader::with_capacity(16 * 1024 * 1024, decoder);
+    let n_worker_threads = num_cpus::get_physical();
 
     let (head, n_eol_chars) = get_header_and_num_eol_chars(&mut io::stdin().lock());
     let header = Header::new(&head, true);
@@ -1156,7 +1152,7 @@ fn main() -> Result<(), io::Error> {
     header.write_sample_list("sample-list.tsv");
 
     let (s1, r1) = bounded(1e4 as usize);
-
+    let n_samples = header.samples.len() as u32;
     cthread::scope(|scope| {
         scope.spawn(move |_| {
             let max_lines = 32;
@@ -1182,16 +1178,15 @@ fn main() -> Result<(), io::Error> {
                 buf.clear();
 
                 if lines.len() == max_lines {
-                    s1.send(lines.to_owned().unwrap();
-                    lines.clear();
+                    s1.send(lines).unwrap();
+                    lines = Vec::with_capacity(max_lines);
                 }
             }
             // force the receivers to close as well
             drop(s1);
         });
 
-        let n_samples = header.samples.len() as u32;
-        for _ in 0..num_cpus::get() {
+        for _ in 0..n_worker_threads {
             let r = r1.clone();
             // necessary for borrow to work
             let header = &header;
