@@ -10,8 +10,6 @@ use crossbeam_utils::thread as cthread;
 use atoi::FromRadix10;
 use itoa;
 
-// use lz4::Decoder;
-use flate2::read::MultiGzDecoder;
 use memchr::memchr;
 use num_cpus;
 
@@ -1166,7 +1164,7 @@ fn main() -> Result<(), io::Error> {
             let mut lines: Vec<Vec<u8>> = Vec::with_capacity(max_lines);
             let mut buf = Vec::with_capacity(16 * 1024 * 1024);
             let stdin = io::stdin();
-            let mut reader = stdin.lock();
+            let mut reader = std::io::BufReader::with_capacity(16 * 1024 * 1024, stdin.lock());
             loop {
                 // https://stackoverflow.com/questions/43028653/rust-file-i-o-is-very-slow-compared-with-c-is-something-wrong
                 len = reader.read_until(b'\n', &mut buf).unwrap();
