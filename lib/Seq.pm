@@ -435,19 +435,29 @@ sub _openAnnotationPipe {
   my $echoProg = $self->getReadArgs($inPath) || "cat $inPath";
 
   my $fp = $self->fileProcessors->{$type};
-  my $args = $fp->{program} . " " . $fp->{args};
+  
+  my $finalProgram;
+  if($fp->{no_stdin}) {
+    $finalProgram = $fp->{program} . " " . $inPath;
+  } else {
+    $finalProgram = $echoProg . " | " . $fp->{program};
+  }
+  
+  if($fp->{args}) {
+    my $args = $fp->{args};
 
-  my $fh;
-
-  for my $type (keys %{$self->outputFilesInfo}) {
-    if(index($args, "\%$type\%") > -1) {
-      substr($args, index($args, "\%$type\%"), length("\%$type\%"))
-        = $self->_workingDir->child($self->outputFilesInfo->{$type});
+    for my $type (keys %{$self->outputFilesInfo}) {
+      if(index($args, "\%$type\%") > -1) {
+        substr($args, index($args, "\%$type\%"), length("\%$type\%"))
+          = $self->_workingDir->child($self->outputFilesInfo->{$type});
+      }
     }
+
+    $finalProgram .= " $args";
   }
 
-  # TODO:  add support for GQ filtering in vcf
-  my $err = $self->safeOpen($fh, '-|', "$echoProg | $args 2> $errPath");
+  my $fh;
+  my $err = $self->safeOpen($fh, '-|', "$finalProgram 2> $errPath");
 
   return ($err, $fh);
 }

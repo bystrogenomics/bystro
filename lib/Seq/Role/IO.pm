@@ -14,6 +14,7 @@ use Mouse::Role;
 use PerlIO::utf8_strict;
 use PerlIO::gzip;
 use File::Which qw/which/;
+use Sys::CpuAffinity;
 
 use Path::Tiny;
 use Try::Tiny;
@@ -40,7 +41,7 @@ has delimiter => (
 );
 
 my $tar = which('tar');
-my $gzip = which('pigz') || which('gzip');
+my $gzip = which('bgzip') || which('pigz') || which('gzip');
 my $lz4 = which('lz4');
 
 # Without this, pigz -d -c issues many system calls (futex)
@@ -51,6 +52,13 @@ my $lz4 = which('lz4');
 my $gzipDcmpArgs = '-d -c';
 if($gzip =~ /pigz/) {
  $gzipDcmpArgs = "-p 1 $gzipDcmpArgs";
+} elsif($gzip =~ /bgzip/) {
+  $gzipDcmpArgs = "--threads ". Sys::CpuAffinity::getNumCpus() . " $gzipDcmpArgs";
+}
+
+my $gzipCmpArgs = '-c';
+if($gzip =~ /bgzip/) {
+  $gzipCmpArgs = "--threads ". Sys::CpuAffinity::getNumCpus();
 }
 
 my $tarCompressedGzip = "$tar --use-compress-program=$gzip";
@@ -264,7 +272,7 @@ sub getWriteFh {
     if($hasLz4 || ($compress && $compress =~ /[.]lz4$/)) {
       $err = $self->safeOpen($fh, "|-", "$lz4 -c > $file", $errCode);
     } else {
-      $err = $self->safeOpen($fh, "|-", "$gzip -c > $file", $errCode);
+      $err = $self->safeOpen($fh, "|-", "$gzip $gzipCmpArgs > $file", $errCode);
     }
 
   } else {
