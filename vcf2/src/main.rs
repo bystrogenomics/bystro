@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::io;
 use std::io::prelude::*;
 
-use crossbeam_channel::bounded;
-use crossbeam_utils::thread as cthread;
+use crossbeam::channel::bounded;
+use crossbeam::thread as cthread;
 
 use atoi::FromRadix10;
 use itoa;
