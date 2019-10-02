@@ -1198,12 +1198,10 @@ fn main() -> Result<(), io::Error> {
             // necessary for borrow to work
             let header = &header;
             scope.spawn(move |_| loop {
-                let message: Vec<Vec<u8>> = match r.recv() {
-                    Ok(v) => v,
+                match r.recv() {
+                    Ok(message) => process_lines(n_samples, &header, &message),
                     Err(_) => break,
                 };
-
-                process_lines(n_samples, &header, &message);
             });
         }
     })
