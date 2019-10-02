@@ -13,7 +13,6 @@ use itoa;
 use memchr::memchr;
 use num_cpus;
 use std::fs::File;
-
 extern crate log;
 
 const CHROM_IDX: usize = 0;
@@ -1160,7 +1159,7 @@ fn main() -> Result<(), io::Error> {
 
     cthread::scope(|scope| {
         scope.spawn(move |_| {
-            let max_lines = 48;
+            let max_lines = 32;
             let mut len;
             let mut lines: Vec<Vec<u8>> = Vec::with_capacity(max_lines);
             // let mut buf = Vec::with_capacity(16 * 1024 * 1024);
