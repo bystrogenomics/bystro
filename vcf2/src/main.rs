@@ -1162,9 +1162,6 @@ fn main() -> Result<(), io::Error> {
             let max_lines = 32;
             let mut len;
             let mut lines: Vec<Vec<u8>> = Vec::with_capacity(max_lines);
-            // let mut buf = Vec::with_capacity(16 * 1024 * 1024);
-            // let stdin = io::stdin();
-            // let mut reader = std::io::BufReader::with_capacity(16 * 1024 * 1024, stdin.lock());
             let stdin = File::open("/dev/stdin").unwrap();
             let size = stdin.metadata().unwrap().len() as usize;
             let mut reader = std::io::BufReader::with_capacity(16 * 1024 * 1024, stdin);
@@ -1180,12 +1177,13 @@ fn main() -> Result<(), io::Error> {
                     break;
                 }
 
+                // Faster than collecting into buf and then splitting in the thread
                 lines.push(buf[..len - n_eol_chars].to_vec());
                 buf.clear();
 
                 if lines.len() == max_lines {
-                    s1.send(lines).unwrap();
-                    lines = Vec::with_capacity(max_lines);
+                    s1.send(lines.to_owned().unwrap();
+                    lines.clear();
                 }
             }
             // force the receivers to close as well
