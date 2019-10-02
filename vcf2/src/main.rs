@@ -12,6 +12,7 @@ use itoa;
 
 use memchr::memchr;
 use num_cpus;
+use std::fs::File;
 
 extern crate log;
 
@@ -1162,9 +1163,13 @@ fn main() -> Result<(), io::Error> {
             let max_lines = 48;
             let mut len;
             let mut lines: Vec<Vec<u8>> = Vec::with_capacity(max_lines);
-            let mut buf = Vec::with_capacity(16 * 1024 * 1024);
-            let stdin = io::stdin();
-            let mut reader = std::io::BufReader::with_capacity(16 * 1024 * 1024, stdin.lock());
+            // let mut buf = Vec::with_capacity(16 * 1024 * 1024);
+            // let stdin = io::stdin();
+            // let mut reader = std::io::BufReader::with_capacity(16 * 1024 * 1024, stdin.lock());
+            let stdin = File::open("/dev/stdin").unwrap();
+            let size = stdin.metadata().unwrap().len() as usize;
+            let mut reader = std::io::BufReader::with_capacity(16 * 1024 * 1024, stdin);
+            let mut buf = Vec::with_capacity(size);
             loop {
                 // https://stackoverflow.com/questions/43028653/rust-file-i-o-is-very-slow-compared-with-c-is-something-wrong
                 len = reader.read_until(b'\n', &mut buf).unwrap();
