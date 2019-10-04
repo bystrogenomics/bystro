@@ -82,7 +82,7 @@ has outputFilesInfo => (is => 'ro', isa => 'HashRef', init_arg => undef, lazy =>
   my $extension = $self->outputJson ? 'json' : 'tsv';
 
   $out{annotation} = $outBaseName . ".annotation.$extension" . ($self->compress ? "." . $self->compress : "");
-  $out{header} = $outBaseName . ".annotation.header.tsv";
+  $out{header} = $outBaseName . ".annotation.header.json";
   $out{sampleList} = $outBaseName . '.sample_list';
 
   # Must be lazy in order to allow "revealing module pattern", with __statisticsRunner below

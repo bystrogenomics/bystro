@@ -491,6 +491,8 @@ sub _openAnnotationPipe {
 
 sub _getFinalHeader {
   my ($self, $header) = @_;
+  chomp $header;
+
   ######### Build the header, and write it as the first line #############
   my $finalHeader = Seq::Headers->new();
 
@@ -504,11 +506,15 @@ sub _getFinalHeader {
   # idx 3: the reference (we rename this to discordant)
   # idx 4: the alternate allele
   # idx 5: variable: anything the preprocessor provides
-  my $numberSplitFields = 5 + 1;
-
-  chomp $header;
-
-  my @headerFields = split('\t', $header, $numberSplitFields);
+  my $numberSplitFields;
+  my @headerFields;
+  if($self->outputJson) {
+    @headerFields = split('\t', $header);
+    $numberSplitFields = @headerFields;
+  } else {
+    $numberSplitFields = 5 + 1;
+    @headerFields = split('\t', $header, $numberSplitFields);
+  }
 
   # Our header class checks the name of each feature
   # It may be, more than likely, that the pre-processor names the 4th column 'ref'
