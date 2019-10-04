@@ -103,6 +103,7 @@ sub annotateFile {
 
   my ($finalHeader, $numberSplitFields) = $self->_getFinalHeader($header);
 
+  ## A programmatically useful representation of the header
   say $headerFh encode_json($finalHeader->getOrderedHeader());
   my $outputHeader = $finalHeader->getString();
 
