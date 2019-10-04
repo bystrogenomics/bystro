@@ -7,6 +7,7 @@ cpanm install Path::Tiny
 cpanm install namespace::autoclean
 cpanm install DDP
 cpanm install YAML::XS
+cpanm install JSON::XS
 cpanm install Getopt::Long::Descriptive
 cpanm install Types::Path::Tiny
 cpanm install Sereal # extra MCE performance

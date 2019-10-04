@@ -20,7 +20,7 @@ use Seq::InputFile;
 use Seq::Output;
 use Seq::Output::Delimiters;
 use Seq::Headers;
-
+use JSON::XS;
 use Seq::DBManager;
 use Path::Tiny;
 use Scalar::Util qw/looks_like_number/;
@@ -58,6 +58,8 @@ sub BUILD {
   # The output path always respects the $self->output_file_base attribute path;
   $self->{_outPath} = $self->_workingDir->child($self->outputFilesInfo->{annotation});
 
+  $self->{_headerPath} = $self->_workingDir->child($self->outputFilesInfo->{header});
+
   # Must come before statistics, which relies on a configured Seq::Tracks
   #Expects DBManager to have been given a database_dir
   $self->{_db} = Seq::DBManager->new();
@@ -88,7 +90,7 @@ sub annotateFile {
   my $self = shift;
   my $type = shift;
 
-  my ($err, $fh, $outFh, $statsFh) = $self->_getFileHandles($type);
+  my ($err, $fh, $outFh, $statsFh, $headerFh) = $self->_getFileHandles($type);
 
   if($err) {
     $self->_errorWithCleanup($err);
@@ -99,11 +101,15 @@ sub annotateFile {
   my $header = <$fh>;
   $self->setLineEndings($header);
 
-  my $finalHeader = $self->_getFinalHeader($header);
+  my ($finalHeader, $numberSplitFields) = $self->_getFinalHeader($header);
+
+  say $headerFh encode_json($finalHeader->getOrderedHeader());
   my $outputHeader = $finalHeader->getString();
 
-  say $outFh $outputHeader;
-
+  if(!$self->outputJson) {
+    say $outFh $outputHeader;
+  }
+  
   if($statsFh) {
     say $statsFh $outputHeader;
   }
@@ -143,7 +149,16 @@ sub annotateFile {
   # Note, that the only features that we need to iterate over
   # Are the features that come from our database
   # Meaning, we can skip anything forwarded from the pre-processor
+  
   my $outputter = Seq::Output->new({header => $finalHeader, trackOutIndices => \@allOutIndices});
+  # my $outputFn;
+  # if($self->outputJson) {
+  #   $outputFn = \&encode_json;
+  # } else {
+  #   my $outputter = Seq::Output->new({header => $finalHeader, trackOutIndices => \@allOutIndices});
+  #   $outputFn = \$outputter->makeOutputString;
+  # }
+
 
   ###### Processes pre-processor output passed from file reader/producer #######
   my $refTrackOutIdx = $outIndicesMap->{$refTrackGetter->name};
@@ -155,7 +170,7 @@ sub annotateFile {
   #after accounting for the nubmer of calls to ->name
   # my @trackNames = map { $_->name } @{$self->_tracks};
 
-  
+  my $outJson = $self->outputJson;
 
   # TODO: don't annotate MT (GRCh37) if MT not explicitly specified
   # to avoid issues between GRCh37 and hg19 chrM vs MT
@@ -184,11 +199,12 @@ sub annotateFile {
     # Each line is expected to be
     # chrom \t pos \t type \t inputRef \t alt \t hets \t homozygotes \n
     # the chrom is always in ucsc form, chr (the golang program guarantees it)
-
+    my $outputJson = $self->outputJson;
     while (my $line = $MEM_FH->getline()) {
       chomp $line;
 
-      my @fields = split '\t', $line;
+      my @fields = split('\t', $line, $numberSplitFields);
+
       $total++;
 
       if(!$wantedChromosomes{$fields[0]}) {
@@ -292,7 +308,11 @@ sub annotateFile {
     close $MEM_FH;
 
     if(@lines) {
-      MCE->gather(scalar @lines, $total - @lines, undef, $outputter->makeOutputString(\@lines));
+      if($outJson) {
+        MCE->gather(scalar @lines, $total - @lines, undef, encode_json(\@lines));
+      } else {
+        MCE->gather(scalar @lines, $total - @lines, undef, $outputter->makeOutputString(\@lines));
+      }
     } else {
       MCE->gather(0, $total);
     }
@@ -389,7 +409,7 @@ sub makeLogProgressAndPrint {
 sub _getFileHandles {
   my ($self, $type) = @_;
 
-  my ($outFh, $statsFh, $inFh);
+  my ($outFh, $statsFh, $inFh, $headerFh);
   my $err;
 
   ($err, $inFh) = $self->_openAnnotationPipe($type);
@@ -417,7 +437,13 @@ sub _getFileHandles {
     return ($err, undef, undef, undef);
   }
 
-  return (undef, $inFh, $outFh, $statsFh);
+  ($err, $headerFh) = $self->getWriteFh($self->{_headerPath});
+
+  if($err) {
+    return ($err, undef, undef, undef);
+  }
+
+  return (undef, $inFh, $outFh, $statsFh, $headerFh);
 }
 
 sub _openAnnotationPipe {
@@ -467,18 +493,6 @@ sub _getFinalHeader {
   ######### Build the header, and write it as the first line #############
   my $finalHeader = Seq::Headers->new();
 
-  chomp $header;
-
-  my @headerFields = split '\t', $header;
-
-  # Our header class checks the name of each feature
-  # It may be, more than likely, that the pre-processor names the 4th column 'ref'
-  # We replace this column with trTv
-  # This not only now reflects its actual function
-  # but prevents name collision issues resulting in the wrong header idx
-  # being generated for the ref track
-  $headerFields[3] = $self->discordantField;
-
   # Bystro takes data from a file pre-processor, which spits out a common
   # intermediate format
   # This format is very flexible, in fact Bystro doesn't care about the output
@@ -488,11 +502,25 @@ sub _getFinalHeader {
   # idx 1: position
   # idx 3: the reference (we rename this to discordant)
   # idx 4: the alternate allele
+  # idx 5: variable: anything the preprocessor provides
+  my $numberSplitFields = 5 + 1;
+
+  chomp $header;
+
+  my @headerFields = split('\t', $header, $numberSplitFields);
+
+  # Our header class checks the name of each feature
+  # It may be, more than likely, that the pre-processor names the 4th column 'ref'
+  # We replace this column with trTv
+  # This not only now reflects its actual function
+  # but prevents name collision issues resulting in the wrong header idx
+  # being generated for the ref track
+  $headerFields[3] = $self->discordantField;
 
   # Prepend all of the headers created by the pre-processor
   $finalHeader->addFeaturesToHeader(\@headerFields, undef, 1);
 
-  return $finalHeader;
+  return ($finalHeader, $numberSplitFields);
 }
 
 sub _errorWithCleanup {

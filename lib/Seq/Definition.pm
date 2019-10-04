@@ -56,6 +56,8 @@ has maxThreads => (is => 'ro', isa => 'Int', lazy => 1, default => sub {
   return Sys::CpuAffinity::getNumCpus();
 });
 
+has outputJson => (is => 'ro', isa => 'Bool', default => 0);
+
 # has badSamplesField => (is => 'ro', default => 'badSamples', lazy => 1);
 
 ################ Public Exports ##################
@@ -77,7 +79,10 @@ has outputFilesInfo => (is => 'ro', isa => 'HashRef', init_arg => undef, lazy =>
   # Must be lazy in order to allow "revealing module pattern", with output_file_base below
   my $outBaseName = $self->outBaseName;
   
-  $out{annotation} = $outBaseName . '.annotation.tsv' . ($self->compress ? "." . $self->compress : "");
+  my $extension = $self->outputJson ? 'json' : 'tsv';
+
+  $out{annotation} = $outBaseName . ".annotation.$extension" . ($self->compress ? "." . $self->compress : "");
+  $out{header} = $outBaseName . ".annotation.header.tsv";
   $out{sampleList} = $outBaseName . '.sample_list';
 
   # Must be lazy in order to allow "revealing module pattern", with __statisticsRunner below

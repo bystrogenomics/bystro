@@ -9,6 +9,7 @@ use List::Util qw/min max/;
 
 use Seq::Output::Delimiters;
 use Seq::Headers;
+use DDP;
 
 with 'Seq::Role::Message';
 
@@ -80,7 +81,6 @@ sub makeOutputString {
 
   for my $row (@$outputDataAref) {
     next if !$row;
-
     # info = [$outIdx, $numFeatures, $missingValue]
     # if $numFeatures == 0, this track has no features
     TRACK_LOOP: for my $oIdx ( @{$self->{_trackOutIndices}} ) {
