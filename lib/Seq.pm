@@ -125,8 +125,6 @@ sub annotateFile {
   MCE::Loop::init {
     max_workers => $self->maxThreads,
     use_slurpio => 1,
-    # bystro-vcf outputs a very small row; fully annotated through the alt column (-ref -discordant)
-    # so accumulate less than we would if processing full .snp
     chunk_size => 'auto',
     gather => $progressFunc,
   };
