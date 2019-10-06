@@ -4,15 +4,15 @@ use std::collections::HashMap;
 use std::io;
 use std::io::prelude::*;
 
-use crossbeam_channel::bounded;
-use crossbeam_utils::thread as cthread;
+use crossbeam::channel::bounded;
+use crossbeam::thread as cthread;
 
 use atoi::FromRadix10;
 use itoa;
 
 use memchr::memchr;
 use num_cpus;
-
+use std::fs::File;
 extern crate log;
 
 const CHROM_IDX: usize = 0;
@@ -1176,11 +1176,7 @@ impl<'a> Header<'a> {
 }
 
 fn main() -> Result<(), io::Error> {
-    let args: Vec<String> = std::env::args().collect();
-
-    // let input_file = std::fs::File::open(&args[1])?;
-    // let decoder = MultiGzDecoder::new(input_file);
-    // let mut reader = std::io::BufReader::with_capacity(16 * 1024 * 1024, decoder);
+    let n_worker_threads = num_cpus::get_physical();
 
     let (head, n_eol_chars) = get_header_and_num_eol_chars(&mut io::stdin().lock());
     let header = Header::new(&head, true);
@@ -1188,15 +1184,16 @@ fn main() -> Result<(), io::Error> {
     header.write_sample_list("sample-list.tsv");
 
     let (s1, r1) = bounded(1e4 as usize);
-
+    let n_samples = header.samples.len() as u32;
     cthread::scope(|scope| {
         scope.spawn(move |_| {
-            let max_lines = 48;
+            let max_lines = 32;
             let mut len;
             let mut lines: Vec<Vec<u8>> = Vec::with_capacity(max_lines);
-            let mut buf = Vec::with_capacity(16 * 1024 * 1024);
-            let stdin = io::stdin();
-            let mut reader = std::io::BufReader::with_capacity(16 * 1024 * 1024, stdin.lock());
+            let stdin = File::open("/dev/stdin").unwrap();
+            let size = stdin.metadata().unwrap().len() as usize;
+            let mut reader = std::io::BufReader::with_capacity(16 * 1024 * 1024, stdin);
+            let mut buf = Vec::with_capacity(size);
             loop {
                 // https://stackoverflow.com/questions/43028653/rust-file-i-o-is-very-slow-compared-with-c-is-something-wrong
                 len = reader.read_until(b'\n', &mut buf).unwrap();
@@ -1208,6 +1205,7 @@ fn main() -> Result<(), io::Error> {
                     break;
                 }
 
+                // Faster than collecting into buf and then splitting in the thread
                 lines.push(buf[..len - n_eol_chars].to_vec());
                 buf.clear();
 
@@ -1220,8 +1218,7 @@ fn main() -> Result<(), io::Error> {
             drop(s1);
         });
 
-        let n_samples = header.samples.len() as u32;
-        for _ in 0..num_cpus::get() {
+        for _ in 0..n_worker_threads {
             let r = r1.clone();
             // necessary for borrow to work
             let header = &header;
