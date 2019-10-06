@@ -1181,7 +1181,7 @@ impl<'a> Header<'a> {
 }
 
 fn main() -> Result<(), io::Error> {
-    let n_worker_threads = num_cpus::get_physical();
+    let n_worker_threads = num_cpus::get();
 
     let (head, n_eol_chars) = get_header_and_num_eol_chars(&mut io::stdin().lock());
     let header = Header::new(&head, true);
