@@ -720,353 +720,385 @@ fn append_hom_het_multi<'a>(
 }
 
 #[allow(clippy::cognitive_complexity)]
-fn process_lines(n_samples: u32, header: &Header, rows: &[Vec<u8>]) {
+fn process_lines(
+    r: crossbeam_channel::Receiver<std::vec::Vec<std::vec::Vec<u8>>>,
+    n_samples: u32,
+    header: &Header,
+) {
+    let mut buffer = Vec::with_capacity(10_000);
     let mut homs: Vec<Vec<u32>> = Vec::new();
     let mut hets: Vec<Vec<u32>> = Vec::new();
-
-    // Even in multiallelic case, missing in one means missing in all
     let mut missing: Vec<u32> = Vec::new();
     let mut ac: Vec<u32> = Vec::new();
-    // let mut genotype_cache: HashMap<&[u8], (Vec<u8>)>;
-    let mut an: u32 = 0;
-
     let mut allowed_filters: HashMap<&[u8], bool> = HashMap::new();
     allowed_filters.insert(b".", true);
     allowed_filters.insert(b"PASS", true);
-
     let excluded_filters: HashMap<&[u8], bool> = HashMap::new();
+
     let mut simple_gt = false;
-
-    let mut chrom: &[u8] = b"";
-    let mut pos: &[u8] = b"";
-    let mut refr: &[u8] = b"";
-    let mut alt: &[u8] = b"";
-
-    let mut buffer = Vec::with_capacity(10_000);
-
     let mut bytes = Vec::new();
     let mut f_buf: [u8; 16];
-
-    unsafe {
-        f_buf = std::mem::uninitialized();
-    }
-
-    let mut effective_samples: f32;
-    let mut alleles: SiteEnum;
-    let mut gt_range: &[u8];
-
-    'row_loop: for row in rows {
-        alleles = SiteEnum::None;
-        let mut gq_pos: Option<usize> = None;
-
-        'field_loop: for (idx, field) in row.split(|byt| *byt == b'\t').enumerate() {
-            if idx == CHROM_IDX {
-                chrom = field;
-                continue;
-            }
-
-            if idx == POS_IDX {
-                pos = field;
-                continue;
-            }
-
-            if idx == REF_IDX {
-                refr = field;
-                continue;
-            }
-
-            if idx == ALT_IDX {
-                alt = field;
-                continue;
-            }
-
-            if idx == FILTER_IDX {
-                if !filter_passes(field, &allowed_filters, &excluded_filters) {
-                    break;
-                }
-
-                alleles = get_alleles(pos, refr, alt);
-
-                // TODO: This isn't quite right
-                let allele_num: usize;
-                match &alleles {
-                    SiteEnum::None => {
-                        // TODO: LOG
-                        continue 'row_loop;
-                    }
-                    SiteEnum::MultiAllelic(variants) => {
-                        allele_num = variants.len();
-                    }
-                    _ => {
-                        allele_num = 1;
-                    }
-                }
-
-                // No more variant-related work after FILTER_IDX,
-                // until we start using QUAL
-                if n_samples == 0 {
-                    break;
-                }
-
-                an = 0;
-                ac = vec![0; allele_num];
-
+    loop {
+        match r.recv() {
+            Err(_) => break,
+            Ok(message) => {
+                homs.clear();
+                hets.clear();
                 missing.clear();
-                hets = vec![Vec::new(); allele_num];
-                homs = vec![Vec::new(); allele_num];
+                ac.clear();
+                simple_gt = false;
+                buffer.clear();
+                bytes.clear();
+                // Even in multiallelic case, missing in one means missing in all
+                // let mut genotype_cache: HashMap<&[u8], (Vec<u8>)>;
 
-                continue;
-            }
-
-            if idx == FORMAT_IDX {
-                match memchr(b':', field) {
-                    Some(pos) => {
-                        if &field[pos + 1..pos + 2] == b"GQ" {
-                            gq_pos = Some(pos + 1);
-                        } else {
-                            for (idx, val) in field[pos + 1..].split(|x| *x == b':').enumerate() {
-                                if val == b"GQ" {
-                                    gq_pos = Some(idx);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    None => simple_gt = true,
+                unsafe {
+                    f_buf = std::mem::uninitialized();
                 }
 
-                match gq_pos {
-                    Some(pos) => eprintln!("GQ POS: {}", pos),
-                    None => {}
-                }
+                let mut effective_samples: f32;
+                let mut alleles: SiteEnum;
+                let mut gt_range: &[u8];
+                let mut chrom: &[u8] = b"";
+                let mut pos: &[u8] = b"";
+                let mut refr: &[u8] = b"";
+                let mut alt: &[u8] = b"";
+                let mut an: u32 = 0;
 
-                continue;
-            }
+                let rows = &message;
+                'row_loop: for row in rows {
+                    alleles = SiteEnum::None;
+                    let mut gq_pos: Option<usize> = None;
 
-            if idx > FORMAT_IDX {
-                if simple_gt {
-                    gt_range = field;
-                } else {
-                    // TODO: Don't rely on format?
-                    let end = memchr(b':', field).unwrap();
-                    gt_range = &field[0..end];
-
-                    match gq_pos {
-                        Some(offset) => {
-                            let gq = field[end + 1..].split(|x| *x == b':').nth(offset).unwrap();
-
-                            eprintln!("IT IS {:?}", gq);
-                        }
-                        None => {}
-                    }
-                }
-
-                let sample_idx = idx - 9;
-
-                match &alleles {
-                    SiteEnum::MultiAllelic(variants) => {
-                        let mut local_alt_indices_counts = HashMap::new();
-                        let mut local_an_count = 0;
-                        for gt in gt_range.split(|ch| *ch == b'|' || *ch == b'/') {
-                            if gt == b"." {
-                                // A single missing genotype likely means the call is inaccurate
-                                missing.push(sample_idx as u32);
-                                continue 'field_loop;
-                            }
-
-                            if gt == b"0" {
-                                // A single missing genotype likely means the call is inaccurate
-                                local_an_count += 1;
-                                continue;
-                            }
-
-                            local_an_count +=
-                                append_hom_het_multi(&gt, &variants, &mut local_alt_indices_counts);
+                    'field_loop: for (idx, field) in row.split(|byt| *byt == b'\t').enumerate() {
+                        if idx == CHROM_IDX {
+                            chrom = field;
+                            continue;
                         }
 
-                        an += local_an_count as u32;
-                        for (&ac_idx, &ac_cnt) in local_alt_indices_counts.iter() {
-                            ac[ac_idx] += ac_cnt;
+                        if idx == POS_IDX {
+                            pos = field;
+                            continue;
+                        }
 
-                            if local_an_count == ac_cnt {
-                                homs[ac_idx].push(sample_idx as u32);
+                        if idx == REF_IDX {
+                            refr = field;
+                            continue;
+                        }
+
+                        if idx == ALT_IDX {
+                            alt = field;
+                            continue;
+                        }
+
+                        if idx == FILTER_IDX {
+                            if !filter_passes(field, &allowed_filters, &excluded_filters) {
                                 break;
                             }
-                            hets[ac_idx].push(sample_idx as u32);
+
+                            alleles = get_alleles(pos, refr, alt);
+
+                            // TODO: This isn't quite right
+                            let allele_num: usize;
+                            match &alleles {
+                                SiteEnum::None => {
+                                    // TODO: LOG
+                                    continue 'row_loop;
+                                }
+                                SiteEnum::MultiAllelic(variants) => {
+                                    allele_num = variants.len();
+                                }
+                                _ => {
+                                    allele_num = 1;
+                                }
+                            }
+
+                            // No more variant-related work after FILTER_IDX,
+                            // until we start using QUAL
+                            if n_samples == 0 {
+                                break;
+                            }
+
+                            an = 0;
+                            ac = vec![0; allele_num];
+
+                            missing.clear();
+                            hets = vec![Vec::new(); allele_num];
+                            homs = vec![Vec::new(); allele_num];
+
+                            continue;
                         }
-                    }
-                    _ => {
-                        if gt_range.len() == 1 {
-                            if gt_range[0] == b'0' {
-                                an += 1;
-                            } else if gt_range[0] == b'1' {
-                                an += 1;
-                                ac[0] += 1;
-                                homs[0].push(sample_idx as u32);
-                            } else if gt_range[0] == b'.' {
-                                missing.push(sample_idx as u32);
+
+                        if idx == FORMAT_IDX {
+                            match memchr(b':', field) {
+                                Some(pos) => {
+                                    if &field[pos + 1..pos + 2] == b"GQ" {
+                                        gq_pos = Some(pos + 1);
+                                    } else {
+                                        for (idx, val) in
+                                            field[pos + 1..].split(|x| *x == b':').enumerate()
+                                        {
+                                            if val == b"GQ" {
+                                                gq_pos = Some(idx);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                None => simple_gt = true,
+                            }
+
+                            match gq_pos {
+                                Some(pos) => eprintln!("GQ POS: {}", pos),
+                                None => {}
+                            }
+
+                            continue;
+                        }
+
+                        if idx > FORMAT_IDX {
+                            if simple_gt {
+                                gt_range = field;
                             } else {
-                                panic!("Genotype must be 0, 1, or .")
-                            }
+                                // TODO: Don't rely on format?
+                                let end = memchr(b':', field).unwrap();
+                                gt_range = &field[0..end];
 
-                            continue;
-                        }
-                        if gt_range.len() == 3 {
-                            if gt_range[0] == b'.' || gt_range[2] == b'.' {
-                                missing.push(sample_idx as u32);
-                            }
+                                match gq_pos {
+                                    Some(offset) => {
+                                        let gq = field[end + 1..]
+                                            .split(|x| *x == b':')
+                                            .nth(offset)
+                                            .unwrap();
 
-                            if gt_range[0] == b'0' {
-                                if gt_range[2] == b'0' {
-                                    an += 2;
-                                } else if gt_range[2] == b'1' {
-                                    an += 2;
-                                    ac[0] += 1;
-                                    hets[0].push(sample_idx as u32);
-                                } else {
-                                    panic!("Genotype must be 0, 1, or .")
+                                        eprintln!("IT IS {:?}", gq);
+                                    }
+                                    None => {}
                                 }
-
-                                continue;
                             }
 
-                            if field[0] == b'1' {
-                                if field[2] == b'0' {
-                                    an += 2;
-                                    ac[0] += 1;
-                                    hets[0].push(sample_idx as u32);
-                                } else if field[2] == b'1' {
-                                    an += 2;
-                                    ac[0] += 2;
-                                    homs[0].push(sample_idx as u32);
-                                } else {
-                                    panic!("Genotype must be 0, 1, or .")
+                            let sample_idx = idx - 9;
+
+                            match &alleles {
+                                SiteEnum::MultiAllelic(variants) => {
+                                    let mut local_alt_indices_counts = HashMap::new();
+                                    let mut local_an_count = 0;
+                                    for gt in gt_range.split(|ch| *ch == b'|' || *ch == b'/') {
+                                        if gt == b"." {
+                                            // A single missing genotype likely means the call is inaccurate
+                                            missing.push(sample_idx as u32);
+                                            continue 'field_loop;
+                                        }
+
+                                        if gt == b"0" {
+                                            // A single missing genotype likely means the call is inaccurate
+                                            local_an_count += 1;
+                                            continue;
+                                        }
+
+                                        local_an_count += append_hom_het_multi(
+                                            &gt,
+                                            &variants,
+                                            &mut local_alt_indices_counts,
+                                        );
+                                    }
+
+                                    an += local_an_count as u32;
+                                    for (&ac_idx, &ac_cnt) in local_alt_indices_counts.iter() {
+                                        ac[ac_idx] += ac_cnt;
+
+                                        if local_an_count == ac_cnt {
+                                            homs[ac_idx].push(sample_idx as u32);
+                                            break;
+                                        }
+                                        hets[ac_idx].push(sample_idx as u32);
+                                    }
                                 }
+                                _ => {
+                                    if gt_range.len() == 1 {
+                                        if gt_range[0] == b'0' {
+                                            an += 1;
+                                        } else if gt_range[0] == b'1' {
+                                            an += 1;
+                                            ac[0] += 1;
+                                            homs[0].push(sample_idx as u32);
+                                        } else if gt_range[0] == b'.' {
+                                            missing.push(sample_idx as u32);
+                                        } else {
+                                            panic!("Genotype must be 0, 1, or .")
+                                        }
 
-                                continue;
+                                        continue;
+                                    }
+                                    if gt_range.len() == 3 {
+                                        if gt_range[0] == b'.' || gt_range[2] == b'.' {
+                                            missing.push(sample_idx as u32);
+                                        }
+
+                                        if gt_range[0] == b'0' {
+                                            if gt_range[2] == b'0' {
+                                                an += 2;
+                                            } else if gt_range[2] == b'1' {
+                                                an += 2;
+                                                ac[0] += 1;
+                                                hets[0].push(sample_idx as u32);
+                                            } else {
+                                                panic!("Genotype must be 0, 1, or .")
+                                            }
+
+                                            continue;
+                                        }
+
+                                        if field[0] == b'1' {
+                                            if field[2] == b'0' {
+                                                an += 2;
+                                                ac[0] += 1;
+                                                hets[0].push(sample_idx as u32);
+                                            } else if field[2] == b'1' {
+                                                an += 2;
+                                                ac[0] += 2;
+                                                homs[0].push(sample_idx as u32);
+                                            } else {
+                                                panic!("Genotype must be 0, 1, or .")
+                                            }
+
+                                            continue;
+                                        }
+                                        continue;
+                                    }
+
+                                    let mut local_an_count = 0;
+                                    let mut local_ac_count = 0;
+                                    for gt in gt_range.split(|ch| *ch == b'|' || *ch == b'/') {
+                                        if gt == b"." {
+                                            // A single missing genotype likely means the call is inaccurate
+                                            missing.push(sample_idx as u32);
+                                            continue 'field_loop;
+                                        }
+
+                                        local_an_count += 1;
+
+                                        if gt == b"1" {
+                                            local_ac_count += 1;
+                                        }
+                                    }
+                                    ac[0] += local_ac_count;
+                                    an += local_an_count;
+
+                                    if local_ac_count == 0 {
+                                        continue;
+                                    } else if local_ac_count == local_an_count {
+                                        homs[0].push(sample_idx as u32);
+                                    } else {
+                                        hets[0].push(sample_idx as u32);
+                                    }
+                                }
                             }
-
-                            continue;
-                        }
-
-                        let mut local_an_count = 0;
-                        let mut local_ac_count = 0;
-                        for gt in gt_range.split(|ch| *ch == b'|' || *ch == b'/') {
-                            if gt == b"." {
-                                // A single missing genotype likely means the call is inaccurate
-                                missing.push(sample_idx as u32);
-                                continue 'field_loop;
-                            }
-
-                            local_an_count += 1;
-
-                            if gt == b"1" {
-                                local_ac_count += 1;
-                            }
-                        }
-                        ac[0] += local_ac_count;
-                        an += local_an_count;
-
-                        if local_ac_count == 0 {
-                            continue;
-                        } else if local_ac_count == local_an_count {
-                            homs[0].push(sample_idx as u32);
-                        } else {
-                            hets[0].push(sample_idx as u32);
                         }
                     }
-                }
-            }
-        }
-        if n_samples > 0 && an == 0 {
-            continue;
-        }
-
-        if !missing.is_empty() {
-            effective_samples = { n_samples - missing.len() as u32 } as f32;
-        } else {
-            effective_samples = n_samples as f32;
-        }
-
-        match &alleles {
-            SiteEnum::None => continue,
-            SiteEnum::MonoAllelic(allele) => {
-                if n_samples > 0 && ac[0] == 0 {
-                    continue;
-                }
-
-                write_chrom(&mut buffer, &chrom);
-                buffer.push(b'\t');
-
-                allele.write_to_buf(&mut buffer, &mut bytes, None);
-
-                if n_samples > 0 {
-                    write_samples(
-                        header,
-                        &mut buffer,
-                        &hets[0],
-                        &homs[0],
-                        &missing,
-                        effective_samples,
-                        n_samples,
-                        ac[0],
-                        an,
-                        &mut bytes,
-                        &mut f_buf,
-                    );
-                } else {
-                    write_samples_empty(&mut buffer);
-                }
-
-                // vcfPos
-                buffer.push(b'\t');
-                buffer.extend_from_slice(pos);
-                buffer.push(b'\n');
-            }
-            SiteEnum::MultiAllelic(variants) => {
-                for (vidx, variant) in variants.iter().enumerate() {
-                    if n_samples > 0 && ac[vidx] == 0 {
+                    if n_samples > 0 && an == 0 {
                         continue;
                     }
 
-                    write_chrom(&mut buffer, &chrom);
-                    buffer.push(b'\t');
-
-                    // if pos == b"985465" {
-                    //     eprintln!("WRITING {:?}", variant)
-                    // }
-
-                    variant.write_to_buf(&mut buffer, &mut bytes, Some(MULTI));
-
-                    if n_samples > 0 {
-                        write_samples(
-                            header,
-                            &mut buffer,
-                            &hets[vidx],
-                            &homs[vidx],
-                            &missing,
-                            effective_samples,
-                            n_samples,
-                            ac[vidx],
-                            an,
-                            &mut bytes,
-                            &mut f_buf,
-                        );
+                    if !missing.is_empty() {
+                        effective_samples = { n_samples - missing.len() as u32 } as f32;
                     } else {
-                        write_samples_empty(&mut buffer);
+                        effective_samples = n_samples as f32;
                     }
 
-                    // vcfPos
-                    buffer.push(b'\t');
-                    buffer.extend_from_slice(pos);
-                    buffer.push(b'\n');
+                    match &alleles {
+                        SiteEnum::None => continue,
+                        SiteEnum::MonoAllelic(allele) => {
+                            if n_samples > 0 && ac[0] == 0 {
+                                continue;
+                            }
+
+                            write_chrom(&mut buffer, chrom);
+                            buffer.push(b'\t');
+
+                            allele.write_to_buf(&mut buffer, &mut bytes, None);
+
+                            if n_samples > 0 {
+                                write_samples(
+                                    header,
+                                    &mut buffer,
+                                    &hets[0],
+                                    &homs[0],
+                                    &missing,
+                                    effective_samples,
+                                    n_samples,
+                                    ac[0],
+                                    an,
+                                    &mut bytes,
+                                    &mut f_buf,
+                                );
+                            } else {
+                                write_samples_empty(&mut buffer);
+                            }
+
+                            // vcfPos
+                            buffer.push(b'\t');
+                            buffer.extend_from_slice(pos);
+                            buffer.push(b'\n');
+                        }
+                        SiteEnum::MultiAllelic(variants) => {
+                            for (vidx, variant) in variants.iter().enumerate() {
+                                if n_samples > 0 && ac[vidx] == 0 {
+                                    continue;
+                                }
+
+                                write_chrom(&mut buffer, chrom);
+                                buffer.push(b'\t');
+
+                                // if pos == b"985465" {
+                                //     eprintln!("WRITING {:?}", variant)
+                                // }
+
+                                variant.write_to_buf(&mut buffer, &mut bytes, Some(MULTI));
+
+                                if n_samples > 0 {
+                                    write_samples(
+                                        header,
+                                        &mut buffer,
+                                        &hets[vidx],
+                                        &homs[vidx],
+                                        &missing,
+                                        effective_samples,
+                                        n_samples,
+                                        ac[vidx],
+                                        an,
+                                        &mut bytes,
+                                        &mut f_buf,
+                                    );
+                                } else {
+                                    write_samples_empty(&mut buffer);
+                                }
+
+                                // vcfPos
+                                buffer.push(b'\t');
+                                buffer.extend_from_slice(pos);
+                                buffer.push(b'\n');
+                            }
+                        }
+                    }
+                }
+
+                if !buffer.is_empty() {
+                    io::stdout().write_all(&buffer).unwrap();
                 }
             }
         }
-    }
 
-    if !buffer.is_empty() {
-        io::stdout().write_all(&buffer).unwrap();
+        // let mut bytes = Vec::new();
+        // let mut f_buf: [u8; 16];
+
+        // unsafe {
+        //     f_buf = std::mem::uninitialized();
+        // }
+
+        // let mut effective_samples: f32;
+        // let mut alleles: SiteEnum;
+        // let mut gt_range: &[u8];
     }
 }
 
@@ -1193,13 +1225,8 @@ fn main() -> Result<(), io::Error> {
             let r = r1.clone();
             // necessary for borrow to work
             let header = &header;
-            scope.spawn(move |_| loop {
-                let message: Vec<Vec<u8>> = match r.recv() {
-                    Ok(v) => v,
-                    Err(_) => break,
-                };
-
-                process_lines(n_samples, &header, &message);
+            scope.spawn(move |_| {
+                process_lines(r, n_samples, &header);
             });
         }
     })
