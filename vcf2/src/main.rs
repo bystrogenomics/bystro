@@ -1181,23 +1181,23 @@ impl<'a> Header<'a> {
 }
 
 fn main() -> Result<(), io::Error> {
-    let n_worker_threads = num_cpus::get_physical();
+    let n_worker_threads = num_cpus::get();
 
     let (head, n_eol_chars) = get_header_and_num_eol_chars(&mut io::stdin().lock());
     let header = Header::new(&head, true);
     header.write_output_header(io::stdout());
     header.write_sample_list("sample-list.tsv");
 
-    let (s1, r1) = bounded(1e4 as usize);
+    let (s1, r1) = bounded(1e3 as usize);
     let n_samples = header.samples.len() as u32;
     cthread::scope(|scope| {
         scope.spawn(move |_| {
-            let max_lines = 32;
+            let max_lines = 48;
             let mut len;
             let mut lines: Vec<Vec<u8>> = Vec::with_capacity(max_lines);
             let stdin = File::open("/dev/stdin").unwrap();
             let size = stdin.metadata().unwrap().len() as usize;
-            let mut reader = std::io::BufReader::with_capacity(16 * 1024 * 1024, stdin);
+            let mut reader = std::io::BufReader::with_capacity(32 * 1024 * 1024, stdin);
             let mut buf = Vec::with_capacity(size);
             loop {
                 // https://stackoverflow.com/questions/43028653/rust-file-i-o-is-very-slow-compared-with-c-is-something-wrong
