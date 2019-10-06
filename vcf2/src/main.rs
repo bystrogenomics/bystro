@@ -10,9 +10,11 @@ use crossbeam::thread as cthread;
 use atoi::FromRadix10;
 use itoa;
 
+use grep_cli::stdout_buffered_block;
 use memchr::memchr;
 use num_cpus;
 use std::fs::File;
+use termcolor;
 extern crate log;
 
 const CHROM_IDX: usize = 0;
@@ -737,7 +739,8 @@ fn process_lines(
 
     let mut bytes = Vec::new();
     let mut f_buf: [u8; 16];
-    let mut chunk_count = 0;
+    let mut writer = stdout_buffered_block(termcolor::ColorChoice::Never);
+
     loop {
         match r.recv() {
             Err(_) => break,
@@ -763,10 +766,8 @@ fn process_lines(
                 let mut alt: &[u8] = b"";
                 let mut an: u32 = 0;
 
-                let rows = &message;
-                'row_loop: for row in rows {
-                    chunk_count += 1;
-
+                // let rows = &message;
+                'row_loop: for row in &message {
                     alleles = SiteEnum::None;
                     let mut gq_pos: Option<usize> = None;
 
@@ -1083,13 +1084,9 @@ fn process_lines(
                     }
                 }
 
-                if chunk_count > 8 {
-                    if !buffer.is_empty() {
-                        io::stdout().write_all(&buffer).unwrap();
-                        buffer.clear();
-                    }
-
-                    chunk_count = 0;
+                if !buffer.is_empty() {
+                    writer.write(&buffer).unwrap();
+                    buffer.clear();
                 }
             }
         }
@@ -1188,11 +1185,11 @@ fn main() -> Result<(), io::Error> {
     header.write_output_header(io::stdout());
     header.write_sample_list("sample-list.tsv");
 
-    let (s1, r1) = bounded(1e4 as usize);
+    let (s1, r1) = bounded(1e3 as usize);
     let n_samples = header.samples.len() as u32;
     cthread::scope(|scope| {
         scope.spawn(move |_| {
-            let max_lines = 32;
+            let max_lines = 48;
             let mut len;
             let mut lines: Vec<Vec<u8>> = Vec::with_capacity(max_lines);
             let stdin = File::open("/dev/stdin").unwrap();
