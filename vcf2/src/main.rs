@@ -1194,7 +1194,7 @@ fn main() -> Result<(), io::Error> {
             let mut lines: Vec<Vec<u8>> = Vec::with_capacity(max_lines);
             let stdin = File::open("/dev/stdin").unwrap();
             let size = stdin.metadata().unwrap().len() as usize;
-            let mut reader = std::io::BufReader::with_capacity(16 * 1024 * 1024, stdin);
+            let mut reader = std::io::BufReader::with_capacity(32 * 1024 * 1024, stdin);
             let mut buf = Vec::with_capacity(size);
             loop {
                 // https://stackoverflow.com/questions/43028653/rust-file-i-o-is-very-slow-compared-with-c-is-something-wrong
