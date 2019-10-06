@@ -1090,17 +1090,6 @@ fn process_lines(
                 }
             }
         }
-
-        // let mut bytes = Vec::new();
-        // let mut f_buf: [u8; 16];
-
-        // unsafe {
-        //     f_buf = std::mem::uninitialized();
-        // }
-
-        // let mut effective_samples: f32;
-        // let mut alleles: SiteEnum;
-        // let mut gt_range: &[u8];
     }
 }
 
