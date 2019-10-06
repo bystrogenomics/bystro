@@ -725,11 +725,11 @@ fn process_lines(
     n_samples: u32,
     header: &Header,
 ) {
-    let mut buffer = Vec::with_capacity(10_000);
-    let mut homs: Vec<Vec<u32>> = Vec::new();
-    let mut hets: Vec<Vec<u32>> = Vec::new();
-    let mut missing: Vec<u32> = Vec::new();
-    let mut ac: Vec<u32> = Vec::new();
+    let mut buffer = Vec::with_capacity(1_000_000);
+    let mut homs: Vec<Vec<u32>> = Vec::with_capacity(100_000);
+    let mut hets: Vec<Vec<u32>> = Vec::with_capacity(100_000);
+    let mut missing: Vec<u32> = Vec::with_capacity(100_000);
+    let mut ac: Vec<u32> = Vec::with_capacity(100_000);
     let mut allowed_filters: HashMap<&[u8], bool> = HashMap::new();
     allowed_filters.insert(b".", true);
     allowed_filters.insert(b"PASS", true);
@@ -737,6 +737,7 @@ fn process_lines(
 
     let mut bytes = Vec::new();
     let mut f_buf: [u8; 16];
+    let mut chunk_count = 0;
     loop {
         match r.recv() {
             Err(_) => break,
@@ -745,7 +746,6 @@ fn process_lines(
                 hets.clear();
                 missing.clear();
                 ac.clear();
-                buffer.clear();
                 bytes.clear();
                 // Even in multiallelic case, missing in one means missing in all
                 // let mut genotype_cache: HashMap<&[u8], (Vec<u8>)>;
@@ -765,6 +765,8 @@ fn process_lines(
 
                 let rows = &message;
                 'row_loop: for row in rows {
+                    chunk_count += 1;
+
                     alleles = SiteEnum::None;
                     let mut gq_pos: Option<usize> = None;
 
@@ -1081,8 +1083,10 @@ fn process_lines(
                     }
                 }
 
-                if !buffer.is_empty() {
+                if chunk_count >= 10 && !buffer.is_empty() {
                     io::stdout().write_all(&buffer).unwrap();
+                    buffer.clear();
+                    chunk_count = 0;
                 }
             }
         }
