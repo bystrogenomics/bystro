@@ -1085,7 +1085,7 @@ fn process_lines(
                 }
 
                 if !buffer.is_empty() {
-                    writer.write(&buffer).unwrap();
+                    writer.write_all(&buffer).unwrap();
                     buffer.clear();
                 }
             }
