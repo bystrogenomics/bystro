@@ -721,7 +721,7 @@ fn append_hom_het_multi<'a>(
 
 #[allow(clippy::cognitive_complexity)]
 fn process_lines(
-    r: crossbeam_channel::Receiver<std::vec::Vec<std::vec::Vec<u8>>>,
+    r: crossbeam::channel::Receiver<std::vec::Vec<std::vec::Vec<u8>>>,
     n_samples: u32,
     header: &Header,
 ) {
@@ -735,7 +735,6 @@ fn process_lines(
     allowed_filters.insert(b"PASS", true);
     let excluded_filters: HashMap<&[u8], bool> = HashMap::new();
 
-    let mut simple_gt = false;
     let mut bytes = Vec::new();
     let mut f_buf: [u8; 16];
     loop {
@@ -746,7 +745,6 @@ fn process_lines(
                 hets.clear();
                 missing.clear();
                 ac.clear();
-                simple_gt = false;
                 buffer.clear();
                 bytes.clear();
                 // Even in multiallelic case, missing in one means missing in all
@@ -755,7 +753,7 @@ fn process_lines(
                 unsafe {
                     f_buf = std::mem::uninitialized();
                 }
-
+                let mut simple_gt = false;
                 let mut effective_samples: f32;
                 let mut alleles: SiteEnum;
                 let mut gt_range: &[u8];
