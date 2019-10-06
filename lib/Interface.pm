@@ -68,6 +68,16 @@ has overwrite => (
   documentation => qq{Overwrite existing output file.},
 );
 
+has read_ahead => (
+  is          => 'ro',
+  isa         => 'Bool',
+  default     => 0,
+  coerce => 1,
+  required    => 0,
+  metaclass => 'Getopt',
+  documentation => qq{For dense datasets, use system read-ahead},
+);
+
 has debug => (
   is          => 'ro',
   isa         => 'Num',
@@ -177,6 +187,7 @@ sub annotate {
     archive => $self->archive,
     run_statistics => !!$self->run_statistics,
     delete_temp => !!$self->delete_temp,
+    readAhead => $self->read_ahead,
   };
 
   if(defined $self->verbose) {

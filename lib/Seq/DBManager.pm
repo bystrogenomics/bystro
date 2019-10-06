@@ -94,6 +94,10 @@ sub initialize {
     $instanceConfig{readOnly} = 1;
   }
 
+  if($data->{readAhead}) {
+    $instanceConfig{readAhead} = 1;
+  }
+
   shift;
   return __PACKAGE__->new(@_);
 }
@@ -959,7 +963,11 @@ sub _getDbi {
 
   my $flags = 0;
   if($instanceConfig{readOnly}) {
-    $flags = MDB_NOLOCK | MDB_RDONLY | MDB_NORDAHEAD;
+    $flags = MDB_NOLOCK | MDB_RDONLY;
+  }
+
+  if(!$instanceConfig{readAhead}) {
+    $flags = $flags | MDB_NORDAHEAD;
   }
 
   my $env = LMDB::Env->new($dbPath, {
