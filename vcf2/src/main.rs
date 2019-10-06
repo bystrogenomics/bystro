@@ -725,7 +725,7 @@ fn process_lines(
     n_samples: u32,
     header: &Header,
 ) {
-    let mut buffer = Vec::with_capacity(1_000_000);
+    let mut buffer = Vec::with_capacity(100_000);
     let mut homs: Vec<Vec<u32>> = Vec::with_capacity(100_000);
     let mut hets: Vec<Vec<u32>> = Vec::with_capacity(100_000);
     let mut missing: Vec<u32> = Vec::with_capacity(100_000);
@@ -1083,9 +1083,12 @@ fn process_lines(
                     }
                 }
 
-                if chunk_count >= 10 && !buffer.is_empty() {
-                    io::stdout().write_all(&buffer).unwrap();
-                    buffer.clear();
+                if chunk_count > 8 {
+                    if !buffer.is_empty() {
+                        io::stdout().write_all(&buffer).unwrap();
+                        buffer.clear();
+                    }
+
                     chunk_count = 0;
                 }
             }
