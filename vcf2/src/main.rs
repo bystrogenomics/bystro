@@ -581,6 +581,7 @@ fn write_samples_type(
     samples: &[u32],
     n_samples: f32,
     buffer: &mut Vec<u8>,
+    f_buf: &mut [u8; 16],
 ) {
     if samples.is_empty() {
         buffer.extend_from_slice(b"!\t0");
@@ -591,11 +592,11 @@ fn write_samples_type(
 
     buffer.push(b'\t');
 
-    write_f32(buffer, samples.len() as f32 / n_samples);
+    write_f32(buffer, samples.len() as f32 / n_samples, f_buf);
 }
 
 #[inline(always)]
-fn write_ac_an(buffer: &mut Vec<u8>, ac: u32, an: u32, bytes: &mut Vec<u8>) {
+fn write_ac_an(buffer: &mut Vec<u8>, ac: u32, an: u32, bytes: &mut Vec<u8>, f_buf: &mut [u8; 16]) {
     if ac == 0 {
         buffer.extend_from_slice(b"0\t");
     } else {
@@ -604,7 +605,7 @@ fn write_ac_an(buffer: &mut Vec<u8>, ac: u32, an: u32, bytes: &mut Vec<u8>) {
     }
     write_int(buffer, an, bytes);
     buffer.push(b'\t');
-    write_f32(buffer, ac as f32 / an as f32);
+    write_f32(buffer, ac as f32 / an as f32, f_buf);
 }
 
 #[inline(always)]
@@ -615,10 +616,8 @@ fn write_int<T: itoa::Integer>(buffer: &mut Vec<u8>, val: T, mut b: &mut Vec<u8>
 }
 
 #[inline(always)]
-fn write_f32(buffer: &mut Vec<u8>, val: f32) {
-    // let mut buffer = ryu::Buffer::new();
+fn write_f32(buffer: &mut Vec<u8>, val: f32, f_buf: &mut [u8; 16]) {
     unsafe {
-        let mut f_buf: [u8; 16] = std::mem::uninitialized();
         let n = ryu::raw::format32(val, &mut f_buf[0]);
         debug_assert!(n <= f_buf.len());
         buffer.extend_from_slice(&f_buf[0..n]);
@@ -637,20 +636,21 @@ fn write_samples(
     ac: u32,
     an: u32,
     bytes: &mut Vec<u8>,
+    f_buf: &mut [u8; 16],
 ) {
-    write_samples_type(header, bytes, hets, effective_samples, buffer);
+    write_samples_type(header, bytes, hets, effective_samples, buffer, f_buf);
 
     buffer.push(b'\t');
 
-    write_samples_type(header, bytes, homs, effective_samples, buffer);
+    write_samples_type(header, bytes, homs, effective_samples, buffer, f_buf);
 
     buffer.push(b'\t');
 
-    write_samples_type(header, bytes, missing, n_samples as f32, buffer);
+    write_samples_type(header, bytes, missing, n_samples as f32, buffer, f_buf);
 
     buffer.push(b'\t');
 
-    write_ac_an(buffer, ac, an, bytes);
+    write_ac_an(buffer, ac, an, bytes, f_buf);
 }
 
 fn write_samples_empty(buffer: &mut Vec<u8>) {
@@ -738,6 +738,7 @@ fn process_lines(
     let excluded_filters: HashMap<&[u8], bool> = HashMap::new();
 
     let mut bytes = Vec::new();
+    let mut f_buf: [u8; 16] = [0; 16];
     let mut writer = stdout_buffered_block(termcolor::ColorChoice::Never);
     let mut simple_gt;
     let mut effective_samples: f32;
@@ -1033,6 +1034,7 @@ fn process_lines(
                                     ac[0],
                                     an,
                                     &mut bytes,
+                                    &mut f_buf,
                                 );
                             } else {
                                 write_samples_empty(&mut buffer);
@@ -1070,6 +1072,7 @@ fn process_lines(
                                         ac[vidx],
                                         an,
                                         &mut bytes,
+                                        &mut f_buf,
                                     );
                                 } else {
                                     write_samples_empty(&mut buffer);
