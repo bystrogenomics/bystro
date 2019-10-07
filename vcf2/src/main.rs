@@ -581,7 +581,6 @@ fn write_samples_type(
     samples: &[u32],
     n_samples: f32,
     buffer: &mut Vec<u8>,
-    f_buf: &mut [u8; 16],
 ) {
     if samples.is_empty() {
         buffer.extend_from_slice(b"!\t0");
@@ -592,11 +591,11 @@ fn write_samples_type(
 
     buffer.push(b'\t');
 
-    write_f32(buffer, samples.len() as f32 / n_samples, f_buf);
+    write_f32(buffer, samples.len() as f32 / n_samples);
 }
 
 #[inline(always)]
-fn write_ac_an(buffer: &mut Vec<u8>, ac: u32, an: u32, bytes: &mut Vec<u8>, f_buf: &mut [u8; 16]) {
+fn write_ac_an(buffer: &mut Vec<u8>, ac: u32, an: u32, bytes: &mut Vec<u8>) {
     if ac == 0 {
         buffer.extend_from_slice(b"0\t");
     } else {
@@ -605,7 +604,7 @@ fn write_ac_an(buffer: &mut Vec<u8>, ac: u32, an: u32, bytes: &mut Vec<u8>, f_bu
     }
     write_int(buffer, an, bytes);
     buffer.push(b'\t');
-    write_f32(buffer, ac as f32 / an as f32, f_buf);
+    write_f32(buffer, ac as f32 / an as f32);
 }
 
 #[inline(always)]
@@ -616,8 +615,10 @@ fn write_int<T: itoa::Integer>(buffer: &mut Vec<u8>, val: T, mut b: &mut Vec<u8>
 }
 
 #[inline(always)]
-fn write_f32(buffer: &mut Vec<u8>, val: f32, f_buf: &mut [u8; 16]) {
+fn write_f32(buffer: &mut Vec<u8>, val: f32) {
+    // let mut buffer = ryu::Buffer::new();
     unsafe {
+        let mut f_buf: [u8; 16] = std::mem::uninitialized();
         let n = ryu::raw::format32(val, &mut f_buf[0]);
         debug_assert!(n <= f_buf.len());
         buffer.extend_from_slice(&f_buf[0..n]);
@@ -636,21 +637,20 @@ fn write_samples(
     ac: u32,
     an: u32,
     bytes: &mut Vec<u8>,
-    f_buf: &mut [u8; 16],
 ) {
-    write_samples_type(header, bytes, hets, effective_samples, buffer, f_buf);
+    write_samples_type(header, bytes, hets, effective_samples, buffer);
 
     buffer.push(b'\t');
 
-    write_samples_type(header, bytes, homs, effective_samples, buffer, f_buf);
+    write_samples_type(header, bytes, homs, effective_samples, buffer);
 
     buffer.push(b'\t');
 
-    write_samples_type(header, bytes, missing, n_samples as f32, buffer, f_buf);
+    write_samples_type(header, bytes, missing, n_samples as f32, buffer);
 
     buffer.push(b'\t');
 
-    write_ac_an(buffer, ac, an, bytes, f_buf);
+    write_ac_an(buffer, ac, an, bytes);
 }
 
 fn write_samples_empty(buffer: &mut Vec<u8>) {
@@ -738,9 +738,11 @@ fn process_lines(
     let excluded_filters: HashMap<&[u8], bool> = HashMap::new();
 
     let mut bytes = Vec::new();
-    let mut f_buf: [u8; 16];
     let mut writer = stdout_buffered_block(termcolor::ColorChoice::Never);
-
+    let mut simple_gt;
+    let mut effective_samples: f32;
+    let mut an: u32;
+    let mut gt_range: &[u8];
     loop {
         match r.recv() {
             Err(_) => break,
@@ -750,26 +752,24 @@ fn process_lines(
                 missing.clear();
                 ac.clear();
                 bytes.clear();
+
+                // To avoid "possibly uninitialized" eror
+                simple_gt = false;
+                an = 0;
+
                 // Even in multiallelic case, missing in one means missing in all
                 // let mut genotype_cache: HashMap<&[u8], (Vec<u8>)>;
 
-                unsafe {
-                    f_buf = std::mem::uninitialized();
-                }
-                let mut simple_gt = false;
-                let mut effective_samples: f32;
-                let mut alleles: SiteEnum;
-                let mut gt_range: &[u8];
-                let mut chrom: &[u8] = b"";
-                let mut pos: &[u8] = b"";
-                let mut refr: &[u8] = b"";
                 let mut alt: &[u8] = b"";
-                let mut an: u32 = 0;
+                let mut alleles: SiteEnum;
+                let mut refr: &[u8] = b"";
+                let mut pos: &[u8] = b"";
+                let mut chrom: &[u8] = b"";
 
                 // let rows = &message;
                 'row_loop: for row in &message {
                     alleles = SiteEnum::None;
-                    let mut gq_pos: Option<usize> = None;
+                    // let mut gq_pos: Option<usize> = None;
 
                     'field_loop: for (idx, field) in row.split(|byt| *byt == b'\t').enumerate() {
                         if idx == CHROM_IDX {
@@ -820,7 +820,6 @@ fn process_lines(
                                 break;
                             }
 
-                            an = 0;
                             ac = vec![0; allele_num];
 
                             missing.clear();
@@ -831,28 +830,31 @@ fn process_lines(
                         }
 
                         if idx == FORMAT_IDX {
-                            match memchr(b':', field) {
-                                Some(pos) => {
-                                    if &field[pos + 1..pos + 2] == b"GQ" {
-                                        gq_pos = Some(pos + 1);
-                                    } else {
-                                        for (idx, val) in
-                                            field[pos + 1..].split(|x| *x == b':').enumerate()
-                                        {
-                                            if val == b"GQ" {
-                                                gq_pos = Some(idx);
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                                None => simple_gt = true,
+                            if memchr(b':', field) == None {
+                                simple_gt = true;
                             }
+                            // match memchr(b':', field) {
+                            //     Some(pos) => {
+                            //         if &field[pos + 1..pos + 2] == b"GQ" {
+                            //             gq_pos = Some(pos + 1);
+                            //         } else {
+                            //             for (idx, val) in
+                            //                 field[pos + 1..].split(|x| *x == b':').enumerate()
+                            //             {
+                            //                 if val == b"GQ" {
+                            //                     gq_pos = Some(idx);
+                            //                     break;
+                            //                 }
+                            //             }
+                            //         }
+                            //     }
+                            //     None => simple_gt = true,
+                            // }
 
-                            match gq_pos {
-                                Some(pos) => eprintln!("GQ POS: {}", pos),
-                                None => {}
-                            }
+                            // match gq_pos {
+                            //     Some(pos) => eprintln!("GQ POS: {}", pos),
+                            //     None => {}
+                            // }
 
                             continue;
                         }
@@ -865,17 +867,17 @@ fn process_lines(
                                 let end = memchr(b':', field).unwrap();
                                 gt_range = &field[0..end];
 
-                                match gq_pos {
-                                    Some(offset) => {
-                                        let gq = field[end + 1..]
-                                            .split(|x| *x == b':')
-                                            .nth(offset)
-                                            .unwrap();
+                                // match gq_pos {
+                                //     Some(offset) => {
+                                //         let gq = field[end + 1..]
+                                //             .split(|x| *x == b':')
+                                //             .nth(offset)
+                                //             .unwrap();
 
-                                        eprintln!("IT IS {:?}", gq);
-                                    }
-                                    None => {}
-                                }
+                                //         eprintln!("IT IS {:?}", gq);
+                                //     }
+                                //     None => {}
+                                // }
                             }
 
                             let sample_idx = idx - 9;
@@ -1031,7 +1033,6 @@ fn process_lines(
                                     ac[0],
                                     an,
                                     &mut bytes,
-                                    &mut f_buf,
                                 );
                             } else {
                                 write_samples_empty(&mut buffer);
@@ -1069,7 +1070,6 @@ fn process_lines(
                                         ac[vidx],
                                         an,
                                         &mut bytes,
-                                        &mut f_buf,
                                     );
                                 } else {
                                     write_samples_empty(&mut buffer);
