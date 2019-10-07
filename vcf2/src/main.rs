@@ -420,15 +420,15 @@ fn get_alleles<'a>(pos: &'a [u8], refr: &'a [u8], alt: &'a [u8]) -> SiteEnum<'a>
                 }
             }
 
-            if positions.len() == 0 {
+            if positions.is_empty() {
                 variants.push(VariantEnum::None);
                 continue;
             }
             // TODO: Could write as SNP here
             variants.push(VariantEnum::MNP(MNPType {
-                positions: positions,
-                alternates: alternates,
-                references: references,
+                positions,
+                alternates,
+                references,
             }));
             n_valid_alleles += 1;
 
@@ -702,7 +702,7 @@ fn write_chrom(buffer: &mut Vec<u8>, chrom: &[u8]) {
 #[inline]
 fn append_hom_het_multi<'a>(
     gt: &[u8],
-    variants: &Vec<VariantEnum<'a>>,
+    variants: &[VariantEnum<'a>],
     ac_counts: &mut HashMap<usize, u32>,
 ) -> u32 {
     let gtn = usize::from_radix_10(gt);
