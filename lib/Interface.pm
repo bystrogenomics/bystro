@@ -41,6 +41,14 @@ has output_file_base => (
   documentation => qq{Where you want your output.},
 );
 
+has output_json => (
+  is          => 'ro',
+  isa         => 'Bool',
+  cmd_aliases   => [qw/json/],
+  metaclass => 'Getopt',
+  documentation => qq{Do you want to output JSON instead? Incompatible with run_statistics},
+);
+
 has config => (
   is          => 'ro',
   isa         => 'Str',
@@ -58,6 +66,16 @@ has overwrite => (
   required    => 0,
   metaclass => 'Getopt',
   documentation => qq{Overwrite existing output file.},
+);
+
+has read_ahead => (
+  is          => 'ro',
+  isa         => 'Bool',
+  default     => 0,
+  coerce => 1,
+  required    => 0,
+  metaclass => 'Getopt',
+  documentation => qq{For dense datasets, use system read-ahead},
 );
 
 has debug => (
@@ -119,7 +137,7 @@ has wantedChr => (
     qq{Annotate a single chromosome},
 );
 
-has maxThreads => (
+has max_threads => (
   is => 'ro',
   isa => 'Int',
   metaclass => 'Getopt',
@@ -169,14 +187,24 @@ sub annotate {
     archive => $self->archive,
     run_statistics => !!$self->run_statistics,
     delete_temp => !!$self->delete_temp,
+    readAhead => $self->read_ahead,
   };
 
   if(defined $self->verbose) {
     $args->{verbose} = $self->verbose;
   }
 
-  if(defined $self->maxThreads) {
-    $args->{maxThreads} = $self->maxThreads;
+  if(defined $self->max_threads) {
+    $args->{maxThreads} = $self->max_threads;
+  }
+
+  if(defined $self->output_json) {
+    $args->{outputJson} = $self->output_json;
+
+    if($self->run_statistics) {
+      say STDERR "--output_json incompatible with --run_statistics 1";
+      exit(1);
+    }
   }
 
   my $annotator = Seq->new_with_config($args);

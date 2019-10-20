@@ -53,6 +53,8 @@ has verbose => (is => 'ro');
 
 has debug => (is => 'ro', default => 0);
 
+has readAhead => (is => 'ro', default => 0);
+
 sub BUILD {
   my $self = shift;
 
@@ -68,6 +70,7 @@ sub BUILD {
   Seq::DBManager::initialize({
     databaseDir => $self->database_dir,
     readOnly => $self->readOnly,
+    readAhead => $self->readAhead,
   });
 
   # Similarly Seq::Role::Message acts as a singleton

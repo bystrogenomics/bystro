@@ -46,9 +46,29 @@ GetOptions(
   'm|maxThreads=i' => \$maxThreads,
 );
 
-if ($help || !$yaml_config || !$names) {
+if ($help || !$yaml_config) {
   Pod::Usage::pod2usage();
 }
+
+if(!$names) {
+  my $config = LoadFile($yaml_config);
+  my @tracks;
+  for my $track (@{$config->{tracks}{tracks}}) {
+    my $hasUtils = !!$track->{utils};
+
+    if($hasUtils) {
+      push @tracks, $track->{name};
+    }
+  }
+
+  $names = join(",", @tracks);
+}
+
+if(!$names) {
+  say STDERR "No tracks found with 'utils' property";
+}
+
+say "Running utils for : " . $names;
 
 for my $wantedName (split ',', $names) {
   # modifies in place
