@@ -16,6 +16,12 @@ The web app gives full access to all of Bystro's capabilities, provides a conven
 
 ## Installing Bystro
 
+### Current release branch
+The most up-to-date release branch is [found here](https://github.com/akotlar/bystro/tree/b10). You may also download a [release archive](https://github.com/akotlar/bystro/releases) and install from there.
+
+### Master branch instruction
+This branch is under active development, but should be stable enough to build and annotate from.
+
 Please read: [INSTALL.md](INSTALL.md)
 
 Bystro relies on pluggable (via Bystro's YAML config) pre-processors to normalize variant inputs (**dealing with VCF issues such as padding**), calculate whether a site is a transition or transversion, calculate sample maf, identify hets/homozygotes/missing samples, calculate heterozygosity, homozygosity, missingness, and more.
