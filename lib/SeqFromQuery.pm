@@ -813,7 +813,7 @@ sub makeBinomFilter {
         $p = $p->[0][0];
       }
 
-      if(!defined $p) {
+      if(!defined $p || $p == 0) {
         next AF_LOOP;
       }
 
