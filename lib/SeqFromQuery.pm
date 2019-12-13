@@ -763,6 +763,10 @@ sub makeBinomFilter {
 
                             #$doc->
     $n = $nChromosomes * (1 - $_[0]->{'missingness'}[0][0]);
+    
+    if($n == 0) {
+      return 1;
+    }
              #$doc->
     $k = $n * $_[0]->{'sampleMaf'}[0][0];
 
@@ -814,7 +818,7 @@ sub makeBinomFilter {
         $p = $p->[0][0];
       }
 
-      if(!defined $p) {
+      if(!defined $p || $p == 0) {
         next AF_LOOP;
       }
 
