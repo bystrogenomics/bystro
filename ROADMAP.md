@@ -13,9 +13,11 @@
   * Evaluate AWS Fargate
   * Auto-scaling stateful servers, spot-market transient workers. Try to avoid Kubernetes 
 
-## Secondary targets (2021+)
+## Secondary targets (time permitting, or when blocked on Goals)
 1. Migrate to Rust version of bystro-vcf (vcf2 branch)
-2. Native Rust blocked-gzip decompression in bystro-vcf
+2. Native Rust blocked-gzip decompression
+  * To be used in bystro-vcf
+  * Release as Rust package and on pypi using PyO3
 3. Format changes to column-oriented store, Rust client (with Python wrapping) to efficiently select data 
 4. Complete migrate from Angular to React (NextJS, akotlar/bystro:web2 branch)
 
