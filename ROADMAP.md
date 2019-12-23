@@ -3,15 +3,21 @@
 ## Goals
 1. Upgrade databases
 2. Migrate users to master branch (cut Bystro 1.0 release)
-  * Annotate directly from URL (streaming using POSIX pipe, for s3)
+  * Before release:
+    * Annotate directly from URL (streaming using POSIX pipe, for s3)
+    * Improve error messages back to the user
+    * Check test coverage
 3. Support custom annotation sources (integrate akotlar/genpro updates)
 4. Distributed pipeline submissions (run arbitrary code on Bystro annotations)backed by beanstalkd
-5. Web improvements: autocomplete search, tooltips, better listing of available annotation fields, visualizations
+5. Web improvements:
+  * UI: Autocomplete search, tooltips, better listing of available annotation fields, visualizations
+  * Allow annotation by chromosome: position, and make the page indexable by Google
 6. Integration of important statistical tests (single-variant association, burden tests, variance-component tests).
 7. Infrastructure improvements:
   * Upgrade beanstalkd version
   * Evaluate AWS Fargate
-  * Auto-scaling stateful servers, spot-market transient workers. Try to avoid Kubernetes 
+  * Auto-scaling stateful servers, spot-market transient workers. Try to avoid Kubernetes
+  * CI (auto-test) for easier PR evaluation.
 
 ## Secondary targets (time permitting, or when blocked on Goals)
 1. Migrate to Rust version of bystro-vcf (vcf2 branch)
