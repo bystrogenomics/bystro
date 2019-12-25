@@ -1,0 +1,2 @@
+name	chrom	strand	txStart	txEnd	cdsStart	cdsEnd	exonCount	exonStarts	exonEnds	score	name2	kgID	mRNA	spID	spDisplayID	refseq	protAcc	description	rfamAcc	tRnaName	ensemblID	geneSymbol	descriptionNonNull
+NR_033266	chr19	-	60950	70966	70966	70966	3	60950,66345,70927,	61894,66499,70966,	0	WASH5P	unk	unk	-1,-1,-1,	uc010drk.1	Homo sapiens WAS protein family homolog 5 pseudogene (WASH5P), non-coding RNA.	ENST00000606728	NA	Some Rfam	NA	NA	NR_033266	Some non-null description

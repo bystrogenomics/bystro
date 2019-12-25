@@ -13,6 +13,8 @@ extends 'Seq::Tracks::Base';
 
 use Seq::Headers;
 
+# Note that Seq::Headeres is a singleton class
+# The headers property is exported only to allow easier overriding of setHeaders
 has headers => (
   is => 'ro',
   init_arg => undef,
@@ -31,15 +33,23 @@ sub BUILD {
   #@params $parent, $child
   #if this class has no features, then the track's name is also its only feature
   if($self->noFeatures) {
-    $self->{_noFeatures} = 1;
+    return;
+  }
+
+  $self->{_fDb} = [map { $self->getFieldDbName($_) } @{$self->features}];
+  $self->{_fIdx} = [0 .. $#{$self->features}];
+}
+
+# Decouple from build to allow decoupling from dbName / build order
+sub setHeaders {
+  my $self = shift;
+
+  if($self->noFeatures) {
     $self->headers->addFeaturesToHeader($self->name);
     return;
   }
 
-  $self->headers->addFeaturesToHeader([$self->allFeatureNames], $self->name);
-
-  $self->{_fieldDbNames} = [map { $self->getFieldDbName($_) } $self->allFeatureNames];
-  $self->{_fieldIdxRange} = [ 0 .. $#{$self->{_fieldDbNames}} ];
+  $self->headers->addFeaturesToHeader($self->features, $self->name);
 }
 
 # Take an array reference containing  (that is passed to this function), and get back all features
@@ -55,23 +65,34 @@ sub get {
   # $_[2] == <String> $chr  : the chromosome
   # $_[3] == <String> $refBase : ACTG
   # $_[4] == <String> $allele  : the allele (ACTG or -N / +ACTG)
-  # $_[5] == <Int> $alleleIdx  : if this is a single-line multiallelic, the allele index
-  # $_[6] == <Int> $positionIdx : the position in the indel, if any
-  # $_[7] == <ArrayRef> $outAccum : a reference to the output, which we mutate
-  
+  # $_[5] == <Int> $posIdx : the position in the indel, if any
+  # $_[6] == <ArrayRef> $outAccum : a reference to the output, which we mutate
+
   #internally the data is store keyed on the dbName not name, to save space
   # 'some dbName' => someData
   #dbName is simply the track name as stored in the database
 
   #some features simply don't have any features, and for those just return
   #the value they stored
-  if($_[0]->{_noFeatures}) {
-    #$outAccum->[$alleleIdx][$positionIdx] = $href->[ $self->{_dbName} ]
-    $_[7]->[$_[5]][$_[6]] = $_[1]->[ $_[0]->{_dbName} ];
+  if(!$_[0]->{_fIdx}) {
+    #$outAccum->[$posIdx] = $href->[ $self->{_dbName} ]
+    # $_[6]->[$_[5]] = $_[1]->[ $_[0]->{_dbName} ];
 
-    #      $outAccum;
-    return $_[7];
+    #return #$outAccum;
+    return $_[6];
   }
+
+  # TODO: decide whether we want to revert to old system of returning a bunch of !
+  # one for each feature
+  # This is clunky, to have _i and fieldDbNames
+  if(!defined $_[1]->[$_[0]->{_dbName}]) {
+    for my $i (@{$_[0]->{_fIdx}}) {
+      $_[6]->[$i][$_[5]] = undef;
+    }
+
+    return $_[6];
+  }
+
 
   # We have features, so let's find those and return them
   # Since all features are stored in some shortened form in the db, we also
@@ -79,12 +100,15 @@ sub get {
   # and these dbNames will be found as a value of $href->{$self->dbName}
   # #http://ideone.com/WD3Ele
   # return [ map { $_[1]->[$_[0]->{_dbName}][$_] } @{$_[0]->{_fieldDbNames}} ];
-  for my $idx (@{$_[0]->{_fieldIdxRange}}) {
-    #$outAccum->[$idx][$alleleIdx][$positionIdx] = $href->[$self->{_dbName}][$self->{_fieldDbNames}[$idx]] }
-    $_[7]->[$idx][$_[5]][$_[6]] = $_[1]->[$_[0]->{_dbName}][$_[0]->{_fieldDbNames}[$idx]];
+  my $idx = 0;
+  for my $fieldDbName (@{$_[0]->{_fDb}}) {
+    #$outAccum->[$idx][$posIdx] = $href->[$self->{_dbName}][$fieldDbName] }
+    $_[6]->[$idx][$_[5]] = $_[1]->[$_[0]->{_dbName}][$fieldDbName];
+    $idx++;
   }
-        #$outAccum;
-  return $_[7];
+
+  #return #$outAccum;
+  return $_[6];
 }
 __PACKAGE__->meta->make_immutable;
 

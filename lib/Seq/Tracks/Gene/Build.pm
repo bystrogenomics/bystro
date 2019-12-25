@@ -6,12 +6,8 @@ package Seq::Tracks::Gene::Build;
 
 our $VERSION = '0.001';
 
-# ABSTRACT: Builds Gene Tracks 
-    # Stores refSeq data, nearest gene refSeq data, generates
-    # in-silico transcribed transcripts (and associated fields)
-
-    #Inserts a single value <ArrayRef> @ $self->name
-    #If $self->nearest defined, inserts a <Int> @ $self->nearestFeatureName
+# ABSTRACT: Builds Gene Tracks
+# Stores refSeq data, and generates in-silico transcribed transcripts (and associated fields)
 
 use Mouse 2;
 use namespace::autoclean;
@@ -34,12 +30,31 @@ my $geneDef = Seq::Tracks::Gene::Definition->new();
 # We don't remap field names
 # It's easier to remember the real names than real names + our domain-specific names
 
-#can be overwritten if needed in the config file, as described in Tracks::Build
-has chrom_field_name => (is => 'ro', lazy => 1, default => 'chrom' );
-has txStart_field_name => (is => 'ro', lazy => 1, default => 'txStart' );
-has txEnd_field_name => (is => 'ro', lazy => 1, default => 'txEnd' );
+# Required, or must be mapped using 'fieldMap' in YAML
+my @coordinateFields = (
+  'chrom', 'txStart', 'txEnd', 'cdsStart', 'cdsEnd', 'exonStarts', 'exonEnds', 'strand'
+);
 
-has build_region_track_only => (is => 'ro', lazy => 1, default => 0);
+my %coordinateFields = map { $_ => 1 } @coordinateFields;
+
+my %coordinateTransforms = (
+  exonStarts => sub {
+    return [split ',', $_[0]];
+  },
+  exonEnds => sub {
+    return [split ',', $_[0]];
+  }
+);
+
+# has chrom_field_name => (is => 'ro', lazy => 1, default => 'chrom' );
+# has txStart_field_name => (is => 'ro', lazy => 1, default => 'txStart' );
+# has txEnd_field_name => (is => 'ro', lazy => 1, default => 'txEnd' );
+# has cdsStart_field_name => (is => 'ro', lazy => 1, default => 'txStart' );
+# has cdsEnd_field_name => (is => 'ro', lazy => 1, default => 'txEnd' );
+# has exonStarts_field_name => (is => 'ro', lazy => 1, default => 'txStart' );
+# has txEnd_field_name => (is => 'ro', lazy => 1, default => 'txEnd' );
+
+has build_region_track_only => (is => 'ro', isa => 'Bool', coerce => 1, lazy => 1, default => 0);
 has join => (is => 'ro', isa => 'HashRef');
 
 # These are the features stored in the Gene track's region database
@@ -49,15 +64,15 @@ has '+features' => (default => sub{ $geneDef->allUCSCgeneFeatures; });
 
 my $txNumberKey = 'txNumber';
 my $joinTrack;
+
 sub BUILD {
   my $self = shift;
 
-  # txErrorName isn't a default feature, initializing here to make sure 
-  # we store this value (if calling for first time) before any threads get to it
-  $self->getFieldDbName($geneDef->txErrorName);
-
-  #similarly for $txSize
-  # $self->getFieldDbName($geneDef->txSizeName);
+ $self->getFieldDbName($geneDef->txErrorName);
+  # Do this before we build, to avoid threading-related issues
+  for my $f (@coordinateFields) {
+    $self->getFieldDbName($f);
+  }
 }
 
 # 1) Store a reference to the corresponding entry in the gene database (region database)
@@ -68,228 +83,94 @@ sub BUILD {
 # 6) Write nearest genes if user wants those
 sub buildTrack {
   my $self = shift;
-
+  # txErrorName isn't a default feature, initializing here to make sure
+  # we store this value (if calling for first time) before any threads get to it
   my @allFiles = $self->allLocalFiles;
 
   # Only allow 1 thread because perl eats memory like candy
-  my $pm = Parallel::ForkManager->new($self->max_threads);
+  my $pm = Parallel::ForkManager->new($self->maxThreads);
 
-  if($self->join) {
-    my $tracks = Seq::Tracks->new();
-    $joinTrack = $tracks->getTrackBuilderByName($self->joinTrackName);
-  }
+  my %completedChrs;
+  $pm->run_on_finish( sub {
+    my ($pid, $exitCode, $fileName, $exitSignal, $coreDump, $errOrChrs) = @_;
 
-  my %allIdx; # a map <Hash> { featureName => columnIndexInFile}
-  my %regionIdx; #like allIdx, but only for features going into the region databae
-  # Every row (besides header) describes a transcript
-  my %allData;
-  my %regionData;
-  my %txStartData;
+    if($exitCode != 0) {
+      my $err = $self->name . ": got exitCode $exitCode for $fileName: $exitSignal . Dump: $coreDump";
 
-  my $wantedChr;
-  my %txNumbers;
-  my $allDataHref;
-  my $txStart;
-  my $txEnd;
-  my $txNumber;
+      $self->log('fatal', $err);
+    }
+
+    if($errOrChrs && ref $errOrChrs eq 'HASH') {
+      for my $chr (keys %$errOrChrs) {
+        if(!$completedChrs{$chr}) {
+          $completedChrs{$chr} = [$fileName];
+        } else {
+          push @{$completedChrs{$chr}}, $fileName;
+        }
+      }
+    }
+
+    #Only message that is different, in that we don't pass the $fileName
+    $self->log('info', $self->name . ": completed building from $fileName");
+  });
 
   # Assume one file per loop, or all sites in one file. Tracks::Build warns if not
   for my $file (@allFiles) {
+    # Although this should be unnecessary, environments must be created
+    # within the process that uses them
+    # This provides a measure of safety
+    $self->db->cleanUp();
+
     $pm->start($file) and next;
-      my $fh = $self->get_read_fh($file);
+      my ($seenChrs, $data);
 
-      my $firstLine = <$fh>;
+      my ($err, undef, $fh) = $self->getReadFh($file);
 
-      # Fatal/exit will only affect that process, won't affect others
-      if(!defined $firstLine) {
-        my $err;
-
-        if(!close($fh) && $? != 13) {
-          $err = $self->name . ": $file failed to open due to: $! ($?)";
-        } else {
-          $err = $self->name . ": $file empty";
-        }
-
-        $self->log('fatal', $err);
-        die $err;
+      if($err) {
+        $self->log('fatal', $self->name . ": $err");
       }
 
-      chomp $firstLine;
+      ($err, $seenChrs, $data) = $self->_readTxData($fh);
 
-      # Store all features we can find, for Seq::Build::Gene::TX. Avoid autocracy,
-      # don't need to know what Gene::TX requires.
-      my $fieldIdx = 0;
-      for my $field (split '\t', $firstLine) {
-        $allIdx{$field} = $fieldIdx;
-        $fieldIdx++;
-      }
-
-      # Except w.r.t the chromosome field, txStart, txEnd, txNumber definitely need these
-      if(!defined $allIdx{$self->chrom_field_name} || !defined $allIdx{$self->txStart_field_name}
-      || !defined $allIdx{$self->txEnd_field_name} ) {
-        my $err = $self->name . ": must provide chrom, txStart, txEnd fields";
-        $self->log('fatal', $err);
-        die $err;
-      }
-      # Region database features; as defined by user in the YAML config, or our default
-      REGION_FEATS: for my $field ($self->allFeatureNames) {
-        if(exists $allIdx{$field} ) {
-          $regionIdx{$field} = $allIdx{$field};
-          next REGION_FEATS;
-        }
-
-        my $err = $self->name . ": required $field missing in $file header: $firstLine";
-        $self->log('fatal', $err);
-        die $err;
-      }
-
-      my $skipped = 0;
-      FH_LOOP: while (<$fh>) {
-        chomp;
-        my @fields = split('\t', $_);
-
-        my $chr = $fields[ $allIdx{$self->chrom_field_name} ];
-
-        # We may have already finished this chr, or may not have asked for it
-        if( ($wantedChr && $wantedChr ne $chr) || !$wantedChr ) {
-          $wantedChr = $self->chrIsWanted($chr) && $self->completionMeta->okToBuild($chr) ? $chr : undef;
-        }
-
-        if(!$wantedChr) {
-          # if not wanted, and we have one chr per file, exit
-          if($self->chrPerFile) {
-            $self->log('info', $self->name . ": chrs in file $file not wanted or previously completed. Skipping");
-            $skipped = 1;
-            last FH_LOOP;
-          }
-
-          #not wanted, but multiple chr per file, skip
-          next FH_LOOP;
-        }
-
-        # Keep track of our 0-indexed transcript refreence numbers
-        if( !$txNumbers{$wantedChr} ) {
-          $txNumbers{$wantedChr} = 0;
-        }
-
-        $txNumber = $txNumbers{$wantedChr};
-
-        $allDataHref = {};
-
-        my $fieldDbName;
-        ACCUM_VALUES: for my $fieldName (keys %allIdx) {
-          if($self->hasTransform($fieldName) ) {
-            $fields[ $allIdx{$fieldName} ] = $self->transformField($fieldName, $fields[ $allIdx{$fieldName} ]);
-          }
-
-          my $data = $self->coerceFeatureType($fieldName, $fields[ $allIdx{$fieldName} ]);
-
-          if(!defined $data) {
-            next ACCUM_VALUES;
-          }
-
-          # if this is a field that we need to store in the region db
-          # create a shortened field name
-          $fieldDbName = $self->getFieldDbName($fieldName);
-
-          $allDataHref->{$fieldName} = $data;
-
-          if(!defined $regionIdx{$fieldName} ) {
-            next ACCUM_VALUES;
-          }
-
-          #store under a shortened fieldName to save space in the db
-          $regionData{$wantedChr}->{$txNumber}{ $fieldDbName } = $data;
-        }
-
-        $txStart = $allDataHref->{$self->txStart_field_name};
-
-        if(!$txStart) {
-          my $statement =  $self->name . ': missing transcript start ( we expected a value @ ' .
-            $self->txStart_field_name . ')';
-
-          $self->log('fatal', $statement);
-          die $statement;
-        }
-
-        $txEnd = $allDataHref->{$self->txEnd_field_name};
-
-        if(!$txEnd) {
-          my $statement =  $self->name . ': missing transcript start ( we expected a value @ ' .
-            $self->txEnd_field_name . ')';
-
-          $self->log('fatal', $statement);
-          die $statement;
-        }
-
-        #a field added by Bystro
-        # $regionData{$wantedChr}->{$txNumber}{$self->getFieldDbName($geneDef->txSizeName)} = $txEnd + 1 - $txStart; 
-
-        if(defined $txStartData{$wantedChr}{$txStart} ) {
-          push @{ $txStartData{$wantedChr}{$txStart} }, [$txNumber, $txEnd];
-        } else {
-          $txStartData{$wantedChr}{$txStart} = [ [$txNumber, $txEnd] ];
-        }
-
-        $allDataHref->{$txNumberKey} = $txNumber;
-
-        push @{ $allData{$wantedChr}{$txStart} }, $allDataHref;
-
-        $txNumbers{$wantedChr} += 1;
+      if($err) {
+        $self->log('fatal', $self->name .": $err");
       }
 
       # If we fork a process in order to read (example zcat) prevent that process
       # from becoming defunct
-      if(!close($fh) && $? != 13) {
-        my $err = $self->name . ": failed to close $file due to $! ($?)";
-        $self->log('fatal', $err);
-        die $err;
-      } else {
-        $self->log('info', $self->name . ": closed $file with $?");
-      }
+      $self->safeCloseBuilderFh($fh, $file, 'fatal');
 
-      if($skipped) {
+      my %all = %{$data->{all}};
+      my %txStarts = %{$data->{txStart}};
+      my %regions = %{$data->{region}};
+
+      # If we skipped the $file, will never get here, so this is an error
+      # Can happen if only 1 file, with only 1 chromosome (not building all chrs)
+      if(!%all && $seenChrs == 1) {
         # This returns to parent, in $pm->run_on_finish
         $pm->finish(0);
       }
 
-      # If we skipped the $file, will never get here, so this is an error
-      if(!%allData) {
-        my $err = $self->name . ": no transcript data accumulated";
-        $self->log('fatal', $err);
-        die $err;
+      if(!%all) {
+        $self->log('fatal', $self->name . ": no transcript data accumulated");
       }
 
       ############################### Make transcripts #########################
-      my @allChrs = keys %allData;
+      my %visitedChrs;
+
+      my @allChrs = keys %all;
 
       my $txErrorDbname = $self->getFieldDbName($geneDef->txErrorName);
 
-      my $mainMergeFunc = sub {
-        # Only when called when there is a defined $oldVal
-        my ($chr, $pos, $oldVal, $newVal) = @_;
-        # make it an array of arrays (array of geneTrack site records)
-        if(!ref $oldVal->[0]) {
-          return (undef, [$oldVal, $newVal]);
-        }
-
-        #oldVal is an array of arrays, push on to it
-        my @updatedVal = @$oldVal;
-
-        push @updatedVal, $newVal;
-
-        #TODO: Should we throw any errors?
-        return (undef, \@updatedVal);
-      };
-
       TX_LOOP: for my $chr (@allChrs) {
+        $visitedChrs{$chr} //= 1;
         # We may want to just update the region track,
         # TODO: Note that this won't store any txErrors
         if($self->build_region_track_only) {
-          $self->_writeRegionData( $chr, $regionData{$chr});
+          $self->_writeRegionData( $chr, $regions{$chr});
 
           if($self->join) {
-            $self->_joinTracksToGeneTrackRegionDb($chr, $txStartData{$chr} );
+            $self->_joinTracksToGeneTrackRegionDb($chr, $txStarts{$chr} );
           }
 
           next TX_LOOP;
@@ -297,190 +178,389 @@ sub buildTrack {
 
         $self->log('info', $self->name . ": starting to build transcripts for $chr");
 
-        my @allTxStartsAscending = sort { $a <=> $b } keys %{ $allData{$chr} };
+        my @allTxStartsAscending = sort { $a <=> $b } keys %{ $all{$chr} };
 
-        my ($txInfo, $txNumber);
         for my $txStart ( @allTxStartsAscending ) {
-          for my $txData ( @{ $allData{$chr}->{$txStart} } ) {
-            $txNumber = $txData->{$txNumberKey};
+          for my $txData ( @{ $all{$chr}->{$txStart} } ) {
+            my $txNumber = $txData->{$txNumberKey};
 
-            $txInfo = Seq::Tracks::Gene::Build::TX->new($txData);
+            # Important that anything this class needs to commit to db happens
+            # before we open our cursor
+            my $txInfo = Seq::Tracks::Gene::Build::TX->new($txData);
 
             if(@{$txInfo->transcriptSites} %2 != 0) {
-              my $err = $self->name . ": expected txSiteDataAndPos to contain (position1, value1, position2, value2) data";
+              $err = $self->name . ": expected txSiteDataAndPos to contain (position1, value1, position2, value2) data";
               $self->log('fatal', $err);
-              die $err;
             }
 
-            my $pos;
+            # Note that is Build::TX doesn't close it txn, this will be
+            # impossible; may be an LMDB_File bug
+            # If that is problematic, placing this before Build::TX will work
+            # for some reason, order of SubTxn's matters
+            # https://github.com/salortiz/LMDB_File/issues/30
+            my $cursor = $self->db->dbStartCursorTxn($chr);
+
             INNER: for (my $i = 0; $i < @{$txInfo->transcriptSites}; $i += 2) {
-              $pos = $txInfo->transcriptSites->[$i];
-              # $i corresponds to $pos, $i + 1 to value
+              # $txInfo->transcriptSites->[$i] corresponds to $pos, $i + 1 to value
               # Commit for every position
               # This also ensures that $mainMergeFunc will always be called with fresh data
-              $self->db->dbPatch(
+              $self->db->dbPatchCursorUnsafe(
+                $cursor,
                 $chr,
                 $self->dbName,
-                $pos,
+                #pos
+                $txInfo->transcriptSites->[$i],
                 #value <Array[Scalar]>
                 $txInfo->transcriptSites->[$i + 1],
                 #how we handle cases where multiple overlap
-                $mainMergeFunc
+                \&_dbMergeFunc
               );
             }
 
+            # Commits, closes cursor every transcript
+            $self->db->dbEndCursorTxn($chr);
+
             if( @{$txInfo->transcriptErrors} ) {
               my @errors = @{$txInfo->transcriptErrors};
-              $regionData{$chr}->{$txNumber}{$txErrorDbname} = \@errors;
+              $regions{$chr}->{$txNumber}{$txErrorDbname} = \@errors;
             }
           }
 
-          delete $allData{$chr}->{$txStart};
+          delete $all{$chr}->{$txStart};
         }
 
-        delete $allData{$chr};
+        delete $all{$chr};
 
-        # We map a lot of memory by this point, so release it back to the OS
-        # To reduce likelihood that linux will want to swap
-        # The database will be re-opened as needed
-        $self->db->cleanUp($chr);
+        $self->_writeRegionData($chr, $regions{$chr});
 
-        $self->log('info', $self->name . ": finished building transcripts for $chr");
-
-        $self->_writeRegionData($chr, $regionData{$chr});
-
-        delete $regionData{$chr};
+        delete $regions{$chr};
 
         if($self->join) {
-          $self->_joinTracksToGeneTrackRegionDb($chr, $txStartData{$chr} );
+          $self->_joinTracksToGeneTrackRegionDb($chr, $txStarts{$chr} );
         }
 
-        # For gene tracks we require features
-        if(!$self->noNearestFeatures) {
-          $self->_writeNearestGenes($chr, $txStartData{$chr});
-        }
+        delete $txStarts{$chr};
 
-        delete $txStartData{$chr};
+        $self->log('info', $self->name . ": finished building transcripts for $chr from $file");
 
-        #Commit, sync everything, including completion status, and release mmap
-        $self->db->cleanUp($chr);
-
-         # We've finished with 1 chromosome, so write that to meta to disk
-         # TODO: error check this
-        $self->completionMeta->recordCompletion($chr);
-
-        $self->log('info', $self->name . ": recorded $chr completed");
+        $self->db->cleanUp();
       }
 
       #Commit, sync everything, including completion status, and release mmap
       $self->db->cleanUp();
-    $pm->finish(0);
+
+    $pm->finish(0, \%visitedChrs);
   }
 
-  $pm->run_on_finish( sub {
-    my ($pid, $exitCode, $fileName, $exitSignal, $coreDump) = @_;
+  $pm->wait_all_children();
 
-    if($exitCode != 0) {
-      my $err = $self->name . ": got exitCode $exitCode for $fileName: $exitSignal . Dump: $coreDump";
+  for my $chr (keys %completedChrs) {
+    $self->completionMeta->recordCompletion($chr);
 
-      $self->log('fatal', $err);
-      die $err;
-    }
+    $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedChrs{$chr}})));
+  }
 
-    #Only message that is different, in that we don't pass the $fileName
-    $self->log('info', $self->name . ": completed building from $fileName");
-  });
+  #TODO: figure out why this is necessary, even with DEMOLISH
+  $self->db->cleanUp();
 
-  $pm->wait_all_children;
   return;
 }
 
+sub _dbMergeFunc {
+  # Only when called when there is a defined $oldVal
+  my ($chr, $pos, $oldVal, $newVal) = @_;
+  # make it an array of arrays (array of geneTrack site records)
+  if(!ref $oldVal->[0]) {
+    return (undef, [$oldVal, $newVal]);
+  }
+
+  #oldVal is an array of arrays, push on to it
+  my @updatedVal = @$oldVal;
+
+  push @updatedVal, $newVal;
+
+  #TODO: Should we throw any errors?
+  return (undef, \@updatedVal);
+}
+
+sub _getIdx {
+  my ($self, $firstLine) = @_;
+
+  chomp $firstLine;
+
+  my (%allIdx, %regionIdx);
+  # If the user wanted to transform the input field names, do, so source field names match
+  # those expected by the track
+  my @fields = map{ $self->fieldMap->{$_} || $_ } split('\t', $firstLine);
+
+  # Store all features we can find, for Seq::Build::Gene::TX. Avoid autocracy,
+  # don't need to know what Gene::TX requires.
+  my $fieldIdx = 0;
+  for my $field (@fields) {
+    $allIdx{$field} = $fieldIdx;
+    $fieldIdx++;
+  }
+
+  my $err;
+
+  # Some featuers are core to transcript building
+  for my $reqField (@coordinateFields) {
+    if(!defined $allIdx{$reqField}) {
+      $err = 'Must provide, or map via "fieldMap" in the YAML config
+        the following fields: ' . join(',', @coordinateFields);
+
+      return ($err, undef);
+    }
+  }
+
+  # Region database features; as defined by user in the YAML config, or our default
+  REGION_FEATS: for my $field (@{$self->features}) {
+    if(exists $allIdx{$field} ) {
+      $regionIdx{$field} = $allIdx{$field};
+      next REGION_FEATS;
+    }
+
+    $err = $self->name . ": required $field missing in header: $firstLine";
+    last;
+  }
+
+  return ($err, {
+    all => \%allIdx,
+    region => \%regionIdx,
+  });
+}
+
+sub _readTxData {
+  my ($self, $fh) = @_;
+
+  my $firstLine = <$fh>;
+
+  # Fatal/exit will only affect that process, won't affect others
+  if(!defined $firstLine) {
+    return "Couldn't read header";
+  }
+
+  # support non-Unix line endings
+  my $err = $self->setLineEndings($firstLine);
+
+  if($err) {
+    return $err;
+  }
+
+  ($err, my $idx) = $self->_getIdx($firstLine);
+
+  my %allIdx = %{$idx->{all}};
+  my %regionIdx = %{$idx->{region}};
+
+  if($err) {
+    return $err;
+  }
+
+  my ($wantedChr, $txNumber, $txStart, $txEnd, $chr, @fields);
+
+  my (%seenChrsInFile, %txNumbers, %regionData, %txStartData, %allData);
+
+  FH_LOOP: while (<$fh>) {
+    chomp;
+    @fields = split('\t', $_);
+
+    $chr = $fields[ $allIdx{'chrom'} ];
+    $txStart = $fields[ $allIdx{'chrom'} ];
+
+    $seenChrsInFile{$chr} //= 1;
+
+    # Normalize the representation, such that having or missing 'chr'
+    # or using MT instead of M won't matter
+    $chr = $self->normalizedWantedChr->{ $chr };
+
+    # chr may be undefined
+    if(!defined $wantedChr || (!defined $chr || $wantedChr ne $chr)) {
+      $wantedChr = $self->chrWantedAndIncomplete($chr);
+    }
+
+    if(!defined $wantedChr) {
+      next FH_LOOP;
+    }
+
+    # Keep track of our 0-indexed transcript reference numbers
+    if(!$txNumbers{$wantedChr}) {
+      $txNumbers{$wantedChr} = 0;
+    }
+
+    $txNumber = $txNumbers{$wantedChr};
+
+    my %rowData;
+
+    my $fieldDbName;
+    ACCUM_VALUES: for my $fieldName (keys %allIdx) {
+      if($self->hasTransform($fieldName) ) {
+        $fields[ $allIdx{$fieldName} ] = $self->transformField($fieldName, $fields[ $allIdx{$fieldName} ]);
+      }
+
+      # TODO: This could lead to surprising behavior
+      # User can modify this behavior by passing a transform above
+      # But the expectation of $coordinateTransforms{$fieldName} should be
+      # documented, since not all transforms will work
+      if($coordinateTransforms{$fieldName}) {
+        $fields[ $allIdx{$fieldName} ] = $coordinateTransforms{$fieldName}->($fields[ $allIdx{$fieldName} ]);
+      }
+
+      my $data = $self->coerceFeatureType($fieldName, $fields[ $allIdx{$fieldName} ]);
+
+      if(!defined $data) {
+        next ACCUM_VALUES;
+      }
+
+      # if this is a field that we need to store in the region db
+      # create a shortened field name
+      $fieldDbName = $self->getFieldDbName($fieldName);
+
+      $rowData{$fieldName} = $data;
+
+      if(!(defined $regionIdx{$fieldName} || defined $coordinateFields{$fieldName})) {
+        next ACCUM_VALUES;
+      }
+
+      #store under a shortened fieldName to save space in the db
+      $regionData{$wantedChr}->{$txNumber}{ $fieldDbName } = $data;
+    }
+
+    $txStart = $rowData{'txStart'};
+
+    if(!defined $txStart) {
+      return ': missing transcript start ( we expected a value @ ' .
+        'txStart' . ')';
+    }
+
+    $txEnd = $rowData{'txEnd'};
+
+    if(!defined $txEnd) {
+      return 'missing transcript start ( we expected a value @ ' .
+        'txEnd' . ')';
+    }
+
+    #a field added by Bystro
+    # $regionData{$wantedChr}->{$txNumber}{$self->getFieldDbName($geneDef->txSizeName)} = $txEnd + 1 - $txStart;
+
+    if(defined $txStartData{$wantedChr}{$txStart} ) {
+      push @{ $txStartData{$wantedChr}{$txStart} }, [$txNumber, $txEnd];
+    } else {
+      $txStartData{$wantedChr}{$txStart} = [ [$txNumber, $txEnd] ];
+    }
+
+    $rowData{$txNumberKey} = $txNumber;
+
+    push @{ $allData{$wantedChr}{$txStart} }, \%rowData;
+
+    $txNumbers{$wantedChr} += 1;
+  }
+
+  my $seenChrs = keys %seenChrsInFile;
+
+  my %out;
+
+  $out{txStart} = \%txStartData;
+  $out{all} = \%allData;
+  $out{region} = \%regionData;
+
+  return ($err, $seenChrs, \%out);
+}
+
 sub _writeRegionData {
-  my ($self, $chr, $regionDataHref) = @_;
+  my ($self, $chr, $regionsHref) = @_;
 
   $self->log('info', $self->name . ": starting _writeRegionData for $chr");
 
   my $dbName = $self->regionTrackPath($chr);
 
-  my @txNumbers = keys %$regionDataHref;
+  my @txNums = sort { $a <=> $b } keys %$regionsHref;
 
-  for my $txNumber (@txNumbers) {
+  for my $txNumber (@txNums) {
     # Patch one at a time, because we assume performance isn't an issue
     # And neither is size, so hash keys are fine
-    $self->db->dbPatchHash($dbName, $txNumber, $regionDataHref->{$txNumber});
+    # TODO: move away from this; don't store any hashes, use arrays
+    $self->db->dbPatchHash($dbName, $txNumber, $regionsHref->{$txNumber});
   }
 
   $self->log('info', $self->name . ": finished _writeRegionData for $chr");
+  return;
 }
 
 ############ Joining some other track to Gene track's region db ################
 
-my $tracks = Seq::Tracks->new();
+# TODO: Add check to see if values have already been entered
+sub _joinTrackMergeFunc {
+  my ($chr, $pos, $oldVal, $newVal) = @_;
 
-sub _joinTracksToGeneTrackRegionDb {
-  my ($self, $chr, $txStartData) = @_;
+  my @updated;
 
-  if(!$self->join) {
-    return $self->log('warn', $self->name . ": join not set in _joinTracksToGeneTrackRegionDb");
+  #If the old value is an array, push the new values on to the old values
+  if(ref $oldVal) {
+    @updated = @$oldVal;
+
+    for my $val (ref $newVal ? @$newVal : $newVal) {
+      if(!defined $val) {
+        next;
+      }
+
+      push @updated, $val;
+    }
+  } else {
+    if(defined $oldVal) {
+      @updated = ($oldVal);
+    }
+
+    for my $val (ref $newVal ? @$newVal : $newVal) {
+      if(!defined $val) {
+        next;
+      }
+
+      # If not array I want to see an error
+      push @updated, $val;
+    }
   }
 
-  $self->log('info', $self->name . ": starting _joinTracksToGeneTrackRegionDb for $chr");
+  # Try to add as little junk as possible
+  if(@updated == 0) {
+    return (undef, $oldVal);
+  }
+
+  if(@updated == 1) {
+    return (undef, $updated[0]);
+  }
+
+  return (undef, \@updated);
+}
+
+sub _joinTracksToGeneTrackRegionDb {
+  my ($self, $chr, $txStarts) = @_;
+
+  if(!$self->join) {
+    return $self->name . ": join not set in _joinTracksToGeneTrackRegionDb";
+  }
+
+  my $tracks = Seq::Tracks->new();
+  $joinTrack = $tracks->getTrackBuilderByName($self->joinTrackName);
+
+  if(!$joinTrack) {
+    return $self->name . ': join track ' . $self->joinTrackName . ' has no "tracks" .yml entry';
+  }
+
+  $self->log('info', $self->name . ": starting _joinTracksToGeneTrackRegionDb "
+    . "for $chr using: ". $self->joinTrackName);
+
   # Gene tracks cover certain positions, record the start and stop
   my @positionRanges;
-  my @txNumbers;
+  my @txNums;
 
-  for my $txStart (keys %$txStartData) {
-    foreach ( @{ $txStartData->{$txStart} } ) {
+  for my $txStart (keys %$txStarts) {
+    foreach ( @{ $txStarts->{$txStart} } ) {
       my $txNumber = $_->[0];
       my $txEnd = $_->[1];
       push @positionRanges, [ $txStart, $txEnd ];
-      push @txNumbers, $txNumber;
+      push @txNums, $txNumber;
     }
   }
-
-  # TODO: Add check to see if values have already been entered
-  my $mergeFunc = sub {
-    my ($chr, $pos, $oldVal, $newVal) = @_;
-
-    my @updated;
-
-    #If the old value is an array, push the new values on to the old values
-    if(ref $oldVal) {
-      @updated = @$oldVal;
-
-      for my $val (ref $newVal ? @$newVal : $newVal) {
-        if(!defined $val) {
-          next;
-        }
-
-        push @updated, $val;
-      }
-    } else {
-      if(defined $oldVal) {
-        @updated = ($oldVal);
-      }
-
-      for my $val (ref $newVal ? @$newVal : $newVal) {
-        if(!defined $val) {
-          next;
-        }
-
-        # If not array I want to see an error
-        push @updated, $val;
-      }
-    }
-
-    # Try to add as little junk as possible
-    if(@updated == 0) {
-      return (undef, $oldVal);
-    }
-
-    if(@updated == 1) {
-      return (undef, $updated[0]);
-    }
-
-    return (undef, \@updated);
-  };
 
   my $dbName = $self->regionTrackPath($chr);
 
@@ -492,31 +572,37 @@ sub _joinTracksToGeneTrackRegionDb {
 
     my %out;
     foreach (keys %$hrefToAdd) {
-      if(defined $hrefToAdd->{$_}) {
-        if(ref $hrefToAdd->{$_} eq 'ARRAY') {
-          my @arr;
-          my %uniq;
-          for my $entry (@{$hrefToAdd->{$_}}) {
-            if(defined $entry) {
-              if(!$uniq{$entry}) {
-                push @arr, $entry;
-              }
-              $uniq{$entry} = 1;
-            }
+      if(!defined $hrefToAdd->{$_}) {
+        next;
+      }
+
+      if(ref $hrefToAdd->{$_} eq 'ARRAY') {
+        my @arr;
+        my %uniq;
+        for my $entry (@{$hrefToAdd->{$_}}) {
+          if(!defined $entry) {
+            next;
           }
 
-          # Don't add empty arrays to the database
-          $hrefToAdd->{$_} = @arr ? \@arr : undef;
+          if($uniq{$entry}) {
+            next;
+          }
+
+          push @arr, $entry;
+          $uniq{$entry} = 1;
         }
 
-        if(defined $hrefToAdd->{$_}) {
-          # Our LMDB writer requires a value, so only add to our list of db entries
-          # to update if we have a value
-          #$self->getFieldDbName generates a name for the field we're joining, named $_
-          $self->db->dbPatchHash($dbName, $txNumbers[$index], {
-            $self->getFieldDbName($_) => $hrefToAdd->{$_}
-          }, $mergeFunc);
-        }
+        # Don't add empty arrays to the database
+        $hrefToAdd->{$_} = @arr ? \@arr : undef;
+      }
+
+      if(defined $hrefToAdd->{$_}) {
+        # Our LMDB writer requires a value, so only add to our list of db entries
+        # to update if we have a value
+        #$self->getFieldDbName generates a name for the field we're joining, named $_
+        $self->db->dbPatchHash($dbName, $txNums[$index], {
+          $self->getFieldDbName($_) => $hrefToAdd->{$_}
+        }, \&_joinTrackMergeFunc);
       }
     }
 
@@ -526,142 +612,7 @@ sub _joinTracksToGeneTrackRegionDb {
   });
 
   $self->log('info', $self->name . ": finished _joinTracksToGeneTrackRegionDb for $chr");
-}
-
-############### Writing nearest gene data to main database #####################
-
-# Find all of the nearest genes, for any intergenic regions
-# Genic regions by our definition are nearest to themselves
-# All UCSC refGene data is 0-based
-# http://www.noncode.org/cgi-bin/hgTables?db=hg19&hgta_group=genes&hgta_track=refGene&hgta_table=refGene&hgta_doSchema=describe+table+schema
-sub _writeNearestGenes {
-  my ($self, $chr, $txStartData) = @_;
-
-  $self->log('info', $self->name . ": starting _writeNearestGenes for $chr");
-
-  # Get database length : assumes reference track already in the db
-  my $genomeNumberOfEntries = $self->db->dbGetNumberOfEntries($chr);
-
-  my @allTranscriptStarts = sort { $a <=> $b } keys %$txStartData;
-
-  # Track the longest (further in db toward end of genome) txEnd, because
-  #  in  case of overlapping transcripts, want the points that ARENT 
-  #  covered by a gene (since those have apriori nearest records: themselves)
-  #  This also acts as our starting position
-  my $longestPreviousTxEnd = 0;
-  my $longestPreviousTxNumbers;
-
-  my ($txStart, $txNumber, $midPoint, $posTxNumber, $previousTxStart);
-
-  my $count = 0;
-  TXSTART_LOOP: for (my $n = 0; $n < @allTranscriptStarts; $n++) {
-    $txStart = $allTranscriptStarts[$n];
-
-    # If > 1 transcript shares a start, txNumber will be an array of numbers
-    # <ArrayRef[Int]> of length 1 or more
-    # else will be a scalar, save some space in db, and reduce Perl memory growth
-    $txNumber =
-      @{$txStartData->{$txStart}} > 1
-      ? [ map { $_->[0] } @{ $txStartData->{$txStart} } ]
-      : $txStartData->{$txStart}[0][0];
-
-    if($n > 0) {
-      # Look over the upstream txStart, see if it overlaps
-      # We take into account the history of previousTxEnd's, for non-adjacent
-      # overlapping transcripts
-      $previousTxStart = $allTranscriptStarts[$n - 1];
-
-      for my $txItem ( @{ $txStartData->{$previousTxStart} } ) {
-        if($txItem->[1] > $longestPreviousTxEnd) {
-          $longestPreviousTxEnd =  $txItem->[1];
-
-          $longestPreviousTxNumbers = $txItem->[0];
-          next;
-        }
-
-        if($txItem->[1] == $longestPreviousTxEnd) {
-          if(!ref $longestPreviousTxNumbers) {
-            $longestPreviousTxNumbers = [$longestPreviousTxNumbers];
-          }
-
-          push @$longestPreviousTxNumbers, $txItem->[0];
-        }
-      }
-
-      # Take the midpoint of the longestPreviousTxEnd .. txStart - 1 region
-      $midPoint = $longestPreviousTxEnd + ( ( ($txStart - 1) - $longestPreviousTxEnd ) / 2 );
-    }
-
-    #### Accumulate txNumber or longestPreviousTxNumber for positions between transcripts #### 
-
-    # When true, we are not intergenic
-    if($longestPreviousTxEnd < $txStart) {
-      # txEnd is open, 1-based so include, txStart is closed, 0-based, so stop 1 base before it
-      POS_LOOP: for my $pos ( $longestPreviousTxEnd .. $txStart - 1 ) {
-        if($n == 0 || $pos >= $midPoint) {
-          #Args:             $chr,       $trackIndex,   $pos,  $trackValue, $mergeFunc, $skipCommit
-          $self->db->dbPatch($chr, $self->nearestDbName, $pos, $txNumber, undef, $count < $self->commitEvery);
-        } else {
-          #Args:             $chr,       $trackIndex,   $pos,  $trackValue,             $mergeFunc, $skipCommit
-          $self->db->dbPatch($chr, $self->nearestDbName, $pos, $longestPreviousTxNumbers, undef, $count < $self->commitEvery);
-        }
-
-        $count = $count < $self->commitEvery ? $count + 1 : 0;
-      }
-    }
-
-    #Just in case, force commit between these two sections
-    $self->db->dbForceCommit($chr);
-    $count = 0;
-
-    ###### Accumulate txNumber or longestPreviousTxNumber for positions after last transcript in the chr ######
-    if ($n == @allTranscriptStarts - 1) {
-      my $nearestNumber;
-      my $startPoint;
-
-      #maddingly perl reduce doesn't seem to work, despite this being an array
-      my $longestTxEnd = 0;
-      foreach (@{ $txStartData->{$txStart} }) {
-        $longestTxEnd = $longestTxEnd > $_->[1] ? $longestTxEnd : $_->[1];
-      }
-
-      if($longestTxEnd > $longestPreviousTxEnd) {
-        $nearestNumber = $txNumber;
-
-        $startPoint = $longestTxEnd;
-      } elsif ($longestTxEnd == $longestPreviousTxEnd) {
-        $nearestNumber = [
-          ref $longestPreviousTxNumbers ? @$longestPreviousTxNumbers : $longestPreviousTxNumbers,
-          ref $txNumber ? @$txNumber : $txNumber
-        ];
-
-        $startPoint = $longestTxEnd;
-      } else {
-        $nearestNumber = $longestPreviousTxNumbers;
-
-        $startPoint = $longestPreviousTxEnd;
-      }
-
-      if($self->hasDebugLevel) {
-        say "genome last position is @{[$genomeNumberOfEntries-1]}";
-        say "longestTxEnd is $longestTxEnd";
-        say "longestPreviousTxEnd is $longestPreviousTxEnd";
-        say "current end > previous? " . ($longestTxEnd > $longestPreviousTxEnd ? "YES" : "NO");
-        say "previous end equal current? " . ($longestTxEnd == $longestPreviousTxEnd ? "YES" : "NO");
-        say "nearestNumber is";
-        p $nearestNumber;
-        say "starting point in last is $startPoint";
-      }
-
-      END_LOOP: for my $pos ( $startPoint .. $genomeNumberOfEntries - 1 ) {
-        #Args:             $chr,       $trackIndex,   $pos,  $trackValue,   $mergeFunc, $skipCommit
-        $self->db->dbPatch($chr, $self->nearestDbName, $pos, $nearestNumber, undef, $count < $self->commitEvery);
-        $count = $count < $self->commitEvery ? $count + 1 : 0;
-      }
-    }
-  }
-
-  $self->log('info', $self->name . ": finished _writeNearestGenes for $chr");
+  return;
 }
 
 __PACKAGE__->meta->make_immutable;

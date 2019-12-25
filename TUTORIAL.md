@@ -14,6 +14,10 @@ analyses and handles large (Tb) sized experiments. Features include:
 
 The open source command line annotator that powers bystro is located at the [bystro](https://github.com/akotlar/bystro).
 
+## ACM-BCB 2018 Presentation
+
+[Our ACM-BCB 2018 tutorial slides may be viewed here](tutorial/Presentation1.pdf)
+
 ## Bystro Manuscript
 
 Read more examples and data are available in the manuscript, [Kotlar et al, Genome Biology, 2018](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-018-1387-3).
@@ -39,7 +43,7 @@ Public data is accessed using the [Public link](https://bystro.io/public) on the
 
 - 1000 Genomes Phase 3 (2,504 samples, 84.9M variants)
 - Gemini Tutorial Trio data (3 samples, 13K variants)
-- *drosophila Melanogaster* fly lines from Drosopila Genetics Reference Panel 2 (205 samples, 3M variants)
+- _drosophila Melanogaster_ fly lines from Drosopila Genetics Reference Panel 2 (205 samples, 3M variants)
 
 ## Annotate
 
@@ -58,9 +62,9 @@ Annotation indexing is needed for the search and filter capabilities.
 These include:
 
 1. RefSeq provides details about the genes, transcripts, codons, amino acids, etc.
-    - Predicted codon change, amino acid substitution
-    - Nearest gene
-    - Nearest transcription start site
+   - Predicted codon change, amino acid substitution
+   - Nearest gene
+   - Nearest transcription start site
 2. Clinvar
 3. CADD, PhyloP, PhasCons
 4. dbSNP, gnomAD
@@ -314,7 +318,7 @@ some IDs as "cases" and others as "controls" to identify case-only results.
 1. Designate case/control status using `custom-synonyms`
 2. Assign a **cases** label and provide IDs of cases.
 3. Assign a **controls** label and provide IDs of controls.
-4. Search `cases -controls` to get case-only results. *Note that you cannot use a space before the minus (i.e., `-`) symbol.*
+4. Search `cases -controls` to get case-only results. _Note that you cannot use a space before the minus (i.e., `-`) symbol._
 
 Other things to **note** include:
 

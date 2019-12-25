@@ -35,6 +35,20 @@ has logPath => ( is => 'ro', lazy => 1, default => sub {
   return $path->stringify();
 });
 
+# In the new API, the producer passed the index of the utility configuration
+# aka
+# utils:
+#  - name: liftOverCadd
+#    args:
+#     something: 1
+# So that here liftOverCadd is index 0
+# This allows this class to write a "completed" property aka:
+# # utils:
+#  - name: liftOverCadd
+#    args:
+#     something: 1
+#    completed: Date()
+has utilIdx => (is => 'ro', isa => 'Int');
 # Debug log level?
 has debug => (is => 'ro');
 
@@ -83,14 +97,14 @@ sub BUILD {
   # Must happen here, because we need to account for the case where track isn't found
   # And you cannot throw an error from within a default, and I think it is
   # More clear to throw a fatal error from the BUILD method than a builder=> method
-  my $trackIndex = first_index { $_->{name} eq $self->name } @{ $self->_decodedConfig->{tracks} };
+  my $trackIndex = first_index { $_->{name} eq $self->name } @{ $self->_decodedConfig->{tracks}{tracks} };
 
   if($trackIndex == -1) {
     $self->log('fatal', "Desired track " . $self->name . " wasn't found");
     return;
   }
 
-  $self->_setWantedTrack( $self->_decodedConfig->{tracks}[$trackIndex] );
+  $self->_setWantedTrack( $self->_decodedConfig->{tracks}{tracks}[$trackIndex] );
 
   my $dir = path($self->_localFilesDir);
 
@@ -127,8 +141,23 @@ sub BUILD {
   }
 }
 
+sub _writeCompletedDate {
+  my ($self, $prop) = @_;
+
+  if(defined $self->utilIdx) {
+    $self->_wantedTrack->{utils}[$self->utilIdx]{completed} = $self->_dateOfRun;
+  } else {
+    $self->_wantedTrack->{$prop . '_completed'} = $self->_dateOfRun;
+  }
+
+  return;
+}
+
 sub _backupAndWriteConfig {
   my $self = shift;
+  my $utilName = shift;
+
+  $self->_writeCompletedDate($utilName);
 
   my $backPath =  $self->configPath . ".utils-bak." . $self->_dateOfRun;
 

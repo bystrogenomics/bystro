@@ -171,7 +171,7 @@ sub annotate {
 
   };
 
-  my $messageFreq = (2e4 / 4) * $self->max_threads;
+  my $messageFreq = (2e4 / 4) * $self->maxThreads;
 
   my $hasSort = exists $self->inputQueryBody->{sort};
   my $progressFunc = $self->_makeLogProgress($hasSort, $outFh, $statsFh, $messageFreq);
@@ -410,7 +410,7 @@ sub _getSlices {
   my $self = shift;
 
   my $nShards = $self->shards;
-  my $nThreads = $self->max_threads;
+  my $nThreads = $self->maxThreads;
 
   if($nShards < $nThreads) {
     my $divisor = nhimult(2,$nThreads / $nShards);
@@ -574,7 +574,11 @@ sub _getFileHandles {
   # _working dir from Seq::Definition
   my $outPath = $self->_workingDir->child($self->outputFilesInfo->{annotation});
 
-  $outFh = $self->get_write_fh($outPath);
+  ($err, $outFh) = $self->getWriteFh($outPath);
+
+  if($err) {
+    return ($err, undef, undef);
+  }
 
   if(!$self->run_statistics) {
     return ($err, $outFh, $statsFh);
@@ -664,7 +668,7 @@ sub makeHweFilter {
     $eHets = 2 * $p * (1 - $p) * $n;
     $eHomsMajor = ($p ** 2) * $n;
     $eHomsMinor = $n - ($eHets + $eHomsMajor);
-
+    
     $hets = $n * $_[0]->{'heterozygosity'}[0][0];
     $homsMinor = $n * $_[0]->{'homozygosity'}[0][0];
     $homsMajor = $n - ($hets + $homsMinor);
@@ -674,7 +678,7 @@ sub makeHweFilter {
       say STDERR "hets: $hets, homsMajor: $homsMajor; homsMinor: $homsMinor";
       sleep(1000);
     }
-    # Returns truthy if test statistic is > $chiCrit, which means
+    # Returns truthy if test statistic is > $chiCrit, which means 
     # in rejection region == skip
     return $chiCrit < ( ($hets - $eHets) ** 2 ) / $eHets
            + ( ($homsMajor - $eHomsMajor) ** 2) / $eHomsMajor
@@ -759,6 +763,10 @@ sub makeBinomFilter {
 
                             #$doc->
     $n = $nChromosomes * (1 - $_[0]->{'missingness'}[0][0]);
+    
+    if($n == 0) {
+      return 1;
+    }
              #$doc->
     $k = $n * $_[0]->{'sampleMaf'}[0][0];
 
@@ -810,7 +818,7 @@ sub makeBinomFilter {
         $p = $p->[0][0];
       }
 
-      if(!defined $p) {
+      if(!defined $p || $p == 0) {
         next AF_LOOP;
       }
 

@@ -1,0 +1,218 @@
+---
+assembly: hg38
+build_author: ec2-user
+build_date: 2018-09-07T19:32:00
+chromosomes:
+- chr1
+- chr2
+- chr3
+- chr4
+- chr5
+- chr6
+- chr7
+- chr8
+- chr9
+- chr10
+- chr11
+- chr12
+- chr13
+- chr14
+- chr15
+- chr16
+- chr17
+- chr18
+- chr19
+- chr20
+- chr21
+- chr22
+- chrM
+- chrX
+- chrY
+database_dir: ~
+fileProcessors:
+  snp:
+    args: --emptyField ! --minGq .95
+    program: bystro-snp
+  vcf:
+    args: --emptyField ! --sample %sampleList%
+    program: bystro-vcf
+files_dir: ~
+statistics:
+  dbSNPnameField: dbSNP.name
+  exonicAlleleFunctionField: refSeq.exonicAlleleFunction
+  outputExtensions:
+    json: .statistics.json
+    qc: .statistics.qc.tsv
+    tab: .statistics.tsv
+  programPath: bystro-stats
+  refTrackField: ref
+  siteTypeField: refSeq.siteType
+temp_dir: ~
+tracks:
+  outputOrder:
+  - ref
+  - refSeq
+  - nearest.refSeq
+  - cadd
+  tracks:
+  - build_author: ec2-user
+    build_date: 2018-09-07T19:32:00
+    local_files:
+    - chr*.fa.gz
+    name: ref
+    type: reference
+    utils:
+    - args:
+        remoteDir: http://hgdownload.soe.ucsc.edu/goldenPath/hg38/chromosomes/
+        remoteFiles:
+        - chr1.fa.gz
+        - chr2.fa.gz
+        - chr3.fa.gz
+        - chr4.fa.gz
+        - chr5.fa.gz
+        - chr6.fa.gz
+        - chr7.fa.gz
+        - chr8.fa.gz
+        - chr9.fa.gz
+        - chr10.fa.gz
+        - chr11.fa.gz
+        - chr12.fa.gz
+        - chr13.fa.gz
+        - chr14.fa.gz
+        - chr15.fa.gz
+        - chr16.fa.gz
+        - chr17.fa.gz
+        - chr18.fa.gz
+        - chr19.fa.gz
+        - chr20.fa.gz
+        - chr21.fa.gz
+        - chr22.fa.gz
+        - chrM.fa.gz
+        - chrX.fa.gz
+        - chrY.fa.gz
+      completed: 2017-11-24T02:27:00
+      name: fetch
+    version: 28
+  - build_author: ec2-user
+    build_date: 2018-09-07T19:32:00
+    dist: true
+    features:
+    - name2
+    - name
+    from: txStart
+    local_files:
+    - hg38.kgXref.chr*.with_dbnsfp.gz
+    name: nearest.refSeq
+    to: txEnd
+    type: nearest
+    version: 2
+  - build_author: ec2-user
+    build_date: 2018-09-07T19:32:00
+    local_files:
+    - whole_genome_SNVs.tsv.chr1.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.chr10.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.chr11.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.chr12.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.chr13.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.chr14.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.chr15.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.chr16.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.chr17.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.chr18.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.chr19.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.chr2.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.chr20.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.chr21.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.chr22.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.chr3.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.chr4.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.chr5.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.chr6.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.chr7.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.chr8.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.chr9.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.chrX.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.chrY.organized-by-chr.txt.sorted.txt.gz
+    name: cadd
+    sorted: 1
+    type: cadd
+    utils:
+    - args:
+        remoteFiles:
+        - http://krishna.gs.washington.edu/download/CADD/v1.4/GRCh38/whole_genome_SNVs.tsv.gz
+      completed: 2018-09-06T03:52:00
+      name: fetch
+    - completed: 2018-09-06T05:39:00
+      name: SortCadd
+    version: 19
+  - build_author: ec2-user
+    build_date: 2018-09-07T19:32:00
+    build_field_transformations:
+      description: split [;]
+      ensemblID: split [;]
+      kgID: split [;]
+      mRNA: split [;]
+      protAcc: split [;]
+      rfamAcc: split [;]
+      spDisplayID: split [;]
+      spID: split [;]
+      tRnaName: split [;]
+    features:
+    - name
+    - name2
+    local_files:
+    - hg38.kgXref.chr8.with_dbnsfp.gz
+    - hg38.kgXref.chr4.with_dbnsfp.gz
+    - hg38.kgXref.chr3.with_dbnsfp.gz
+    - hg38.kgXref.chr1.with_dbnsfp.gz
+    - hg38.kgXref.chr6.with_dbnsfp.gz
+    - hg38.kgXref.chr2.with_dbnsfp.gz
+    - hg38.kgXref.chr5.with_dbnsfp.gz
+    - hg38.kgXref.chr7.with_dbnsfp.gz
+    - hg38.kgXref.chr10.with_dbnsfp.gz
+    - hg38.kgXref.chr9.with_dbnsfp.gz
+    - hg38.kgXref.chr16.with_dbnsfp.gz
+    - hg38.kgXref.chr11.with_dbnsfp.gz
+    - hg38.kgXref.chr12.with_dbnsfp.gz
+    - hg38.kgXref.chr14.with_dbnsfp.gz
+    - hg38.kgXref.chr15.with_dbnsfp.gz
+    - hg38.kgXref.chr13.with_dbnsfp.gz
+    - hg38.kgXref.chr18.with_dbnsfp.gz
+    - hg38.kgXref.chrY.with_dbnsfp.gz
+    - hg38.kgXref.chrM.with_dbnsfp.gz
+    - hg38.kgXref.chr17.with_dbnsfp.gz
+    - hg38.kgXref.chr22.with_dbnsfp.gz
+    - hg38.kgXref.chr21.with_dbnsfp.gz
+    - hg38.kgXref.chrX.with_dbnsfp.gz
+    - hg38.kgXref.chr19.with_dbnsfp.gz
+    - hg38.kgXref.chr20.with_dbnsfp.gz
+    name: refSeq
+    type: gene
+    utils:
+    - args:
+        connection:
+          database: hg38
+        sql: SELECT r.*, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.kgID, '')) SEPARATOR
+          ';') FROM kgXref x WHERE x.refseq=r.name) AS kgID, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.description,
+          '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS description,
+          (SELECT GROUP_CONCAT(DISTINCT(NULLIF(e.value, '')) SEPARATOR ';') FROM knownToEnsembl
+          e JOIN kgXref x ON x.kgID = e.name WHERE x.refseq = r.name) AS ensemblID,
+          (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.tRnaName, '')) SEPARATOR ';') FROM
+          kgXref x WHERE x.refseq=r.name) AS tRnaName, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.spID,
+          '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS spID, (SELECT
+          GROUP_CONCAT(DISTINCT(NULLIF(x.spDisplayID, '')) SEPARATOR ';') FROM kgXref
+          x WHERE x.refseq=r.name) AS spDisplayID, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.protAcc,
+          '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS protAcc, (SELECT
+          GROUP_CONCAT(DISTINCT(NULLIF(x.mRNA, '')) SEPARATOR ';') FROM kgXref x WHERE
+          x.refseq=r.name) AS mRNA, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.rfamAcc,
+          '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS rfamAcc FROM
+          refGene r WHERE chrom=%chromosomes%;
+      completed: 2018-09-07T14:04:00
+      name: fetch
+    - args:
+        geneFile: /mnt/bystro-files/dbnsfp//dbNSFP3.5_gene.complete
+      completed: 2018-09-07T14:05:00
+      name: refGeneXdbnsfp
+    version: 28
+version: 215
+

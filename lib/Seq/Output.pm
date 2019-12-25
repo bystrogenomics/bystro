@@ -5,14 +5,16 @@ use warnings;
 
 use Mouse 2;
 
+use List::Util qw/min max/;
+
 use Seq::Output::Delimiters;
 use Seq::Headers;
+use DDP;
 
 with 'Seq::Role::Message';
 
-use DDP;
-
-# TODO: Configure as singleton
+has header => (is => 'ro', isa => 'Seq::Headers', required => 1);
+has trackOutIndices => (is => 'ro', isa => 'ArrayRef', required => 1);
 
 has delimiters => (is => 'ro', isa => 'Seq::Output::Delimiters', default => sub {
   return Seq::Output::Delimiters->new();
@@ -23,7 +25,37 @@ has header => (is => 'ro', isa => 'Seq::Headers', required => 1);
 sub BUILD {
   my $self = shift;
 
-  $self->{_orderedHeader} = $self->header->getOrderedHeaderNoMap();
+  my @trackOutIndices = @{$self->trackOutIndices};
+  my $minIdx = min(@trackOutIndices);
+  my $maxIdx = max(@trackOutIndices);
+
+  my $fieldSep = $self->delimiters->fieldSeparator;
+  my $missChar = $self->delimiters->emptyFieldChar;
+
+  $self->{_trackOutIndices} = [];
+  $self->{_trackFeatCount} = [];
+
+  my @header = @{$self->header->getOrderedHeader()};
+
+  # Use array for faster lookup in hot loop
+  @{$self->{_trackFeatCount}} = @header;
+
+  my $outIdx = -1;
+  for my $trackName ( @header ) {
+    $outIdx++;
+
+    if($outIdx < $minIdx || $outIdx > $maxIdx) {
+      next;
+    }
+
+    push @{$self->{_trackOutIndices}}, $outIdx;
+
+    if(ref $trackName) {
+      $self->{_trackFeatCounts}[$outIdx] = $#$trackName;
+    } else {
+      $self->{_trackFeatCounts}[$outIdx] =  0;
+    }
+  }
 }
 
 # TODO: will be singleton, configured once for all consumers
@@ -39,104 +71,164 @@ sub initialize {
 #which we are going to re-use in our output (namely chr, position, type alleles)
 sub makeOutputString {
   my ($self, $outputDataAref) = @_;
-  # my $fieldSeparator = $self->{_fieldSeparator};
-  my $emptyFieldChar = $self->delimiters->emptyFieldChar;
 
-  my $rowIdx;
+  # Re-assigning these isn't a big deal beause makeOutputString
+  # Called very few times; expected to be called every few thousand rows
+  my $missChar = $self->delimiters->emptyFieldChar;
+  my $overlapDelim = $self->delimiters->overlapDelimiter;
+  my $posDelim = $self->delimiters->positionDelimiter;
+  my $valDelim = $self->delimiters->valueDelimiter;
+  my $fieldSep = $self->delimiters->fieldSeparator;
+  my $featCounts = $self->{_trackFeatCounts};
 
-  my $alleleDelimiter = $self->delimiters->alleleDelimiter;
-  my $positionDelimiter = $self->delimiters->positionDelimiter;
-  my $valueDelimiter = $self->delimiters->valueDelimiter;
-  my $fieldSeparator = $self->delimiters->fieldSeparator;
-
-
-  my $trackIdx = -1;
-  my $multiallelic;
-  my $featureData;
   for my $row (@$outputDataAref) {
     next if !$row;
+    # info = [$outIdx, $numFeatures, $missingValue]
+    # if $numFeatures == 0, this track has no features
+    TRACK_LOOP: for my $oIdx ( @{$self->{_trackOutIndices}} ) {
+      # If this track has no features
+      if($featCounts->[$oIdx] == 0) {
+        # We always expect output, for any track
+        # to be at least a 1 member array
+        # because we need to know where in an indel we are
+        # or whether we're in a snp
+        # So... reference for insance is [A] for a snp
+        # and maybe [A, T, C] for a 3 base deletion
 
-    $rowIdx = 0;
-    $trackIdx = 0;
+        # Most common case, not an indel
+        # Currently we have no 0-feature tracks
+        if(@{$row->[$oIdx]} == 1) {
+          if(!defined $row->[$oIdx][0]) {
+            $row->[$oIdx] = $missChar;
 
-    TRACK_LOOP: for my $trackName ( @{$self->{_orderedHeader}} ) {
-      if(ref $trackName) {
-        if(!defined $row->[$trackIdx] || !@{$row->[$trackIdx]}) {
-          $row->[$trackIdx] = join($fieldSeparator, ($emptyFieldChar) x @$trackName);
-
-          $trackIdx++;
-          next TRACK_LOOP;
-        }
-
-        for my $featureIdx (0 .. $#$trackName) {
-          for my $alleleData (@{$row->[$trackIdx][$featureIdx]}) {
-            $alleleData //= $emptyFieldChar;
-
-            for my $positionData (@$alleleData) {
-              $positionData //= $emptyFieldChar;
-
-              if(ref $positionData) {
-                $positionData = join($valueDelimiter, map { 
-                  defined $_
-                  # Unfortunately, prior to 11/30/16 Bystro dbs would merge sparse tracks
-                  # incorrectly, resulting in an extra array depth
-                  ? (ref $_ ? join($valueDelimiter, map { defined $_ ? $_ : $emptyFieldChar } @$_) : $_)
-                  : $emptyFieldChar
-                } @$positionData);
-              }
-            }
-            $alleleData = @$alleleData > 1 ? join($positionDelimiter, @$alleleData) : $alleleData->[0];
-          }
-
-          # p  $row->[$trackIdx][$featureIdx];
-          $row->[$trackIdx][$featureIdx] =
-            @{$row->[$trackIdx][$featureIdx]} > 1 
-            ? join($alleleDelimiter, @{$row->[$trackIdx][$featureIdx]})
-            : $row->[$trackIdx][$featureIdx][0];
-        }
-
-        $row->[$trackIdx] = join($fieldSeparator, @{$row->[$trackIdx]});
-
-      } else {
-        # Nothing to be done, it's already a scalar
-        if(!ref $row->[$trackIdx]) {
-          $row->[$trackIdx] //= $emptyFieldChar;
-
-          $trackIdx++;
-          next TRACK_LOOP
-        }
-
-        if(!defined $row->[$trackIdx] || ref $row->[$trackIdx] && !@{$row->[$trackIdx]}) {
-          $row->[$trackIdx] = $emptyFieldChar;
-
-          $trackIdx++;
-          next TRACK_LOOP;
-        }
-
-        for my $alleleData (@{$row->[$trackIdx]}) {
-          if(!defined $alleleData) {
-            $alleleData = $emptyFieldChar;
             next;
           }
 
-          for my $positionData (@$alleleData) {
-            $positionData //= $emptyFieldChar;
-
-            if(ref $positionData) {
-              $positionData = join($valueDelimiter, map { defined $_ ? $_ : $emptyFieldChar } @$positionData);
-            }
+          if(ref $row->[$oIdx][0]) {
+            $row->[$oIdx] = join($valDelim, @{$row->[$oIdx][0]});
+            next;
           }
 
-          $alleleData = @$alleleData > 1 ? join($positionDelimiter, @$alleleData) : $alleleData->[0];
+          $row->[$oIdx] = $row->[$oIdx][0];
+
+          next;
         }
 
-        $row->[$trackIdx] = join($alleleDelimiter, @{$row->[$trackIdx]});
+        # For things without features, we currently support
+        # ref (scalar), phastCons, phyloP, cadd, which are all scalars
+
+        # If its not a scalar, its because we have an indel
+        # Then, for each position, the thing may be defined, or not
+        # It's an array, for instance, CADD scores are
+        $row->[$oIdx] = join($posDelim,
+          map {
+            defined $_
+            ? (
+                ref $_
+                ?
+                # at this position this feature has multiple values
+                join($valDelim, map { defined $_ ? $_ : $missChar } @$_)
+                :
+                # at this position this feature has 1 value
+                $_
+              )
+            : $missChar
+          } @{$row->[$oIdx]}
+        );
+
+        next;
       }
 
-      $trackIdx++;
+      # If this track is missing altogether it will be an empty array
+      # But it will be an array
+
+      for my $featIdx (0 .. $featCounts->[$oIdx]) {
+        if(!defined $row->[$oIdx][$featIdx]) {
+          $row->[$oIdx][$featIdx] = $missChar;
+
+          next;
+        }
+
+        # Typically, we have no indel
+        # Which means the feature has only 1 value
+        if(@{$row->[$oIdx][$featIdx]} == 1) {
+          if(!defined $row->[$oIdx][$featIdx][0]) {
+            $row->[$oIdx][$featIdx] = $missChar;
+            next;
+          }
+
+          # Typically we have a scalar
+          if(!ref $row->[$oIdx][$featIdx][0]) {
+            $row->[$oIdx][$featIdx] = $row->[$oIdx][$featIdx][0];
+
+            next;
+          }
+
+          $row->[$oIdx][$featIdx] = join($valDelim,
+            map {
+              defined $_
+              ? (
+                  ref $_
+                  ?
+                  # at this position this feature has multiple values
+                  join($overlapDelim, map { defined $_ ? $_ : $missChar } @$_)
+                  :
+                  # at this position this feature has 1 value
+                  $_
+                )
+              : $missChar
+            } @{$row->[$oIdx][$featIdx][0]}
+          );
+
+          next;
+        }
+
+
+        for my $posData (@{$row->[$oIdx][$featIdx]}) {
+          if(!defined $posData) {
+            $posData = $missChar;
+
+            next;
+          }
+
+          # At this position in the indel, value is scalar
+          if(!ref $posData) {
+            next;
+          }
+
+
+          # At this position, the feature is nested to some degree
+          # This is often seen where say one transcript
+          # has many descriptive values in one feature
+          # Say it has 2 names
+          # We want to nest those names, so that we can maintain name/transcript
+          # order, ala
+          # featureTranscrpipt \t featureTranscriptNames
+          # t1;t2 \t t1_name1\\t1_name2;t2_onlyName
+          $posData = join($valDelim, map {
+            defined $_
+            ? (
+                ref $_
+                ?
+                # at this position this feature has multiple values
+                join($overlapDelim, map { defined $_ ? $_ : $missChar } @$_)
+                :
+                # at this position this feature has 1 value
+                $_
+              )
+            : $missChar
+          } @$posData);
+        }
+
+        $row->[$oIdx][$featIdx] = join($posDelim, @{$row->[$oIdx][$featIdx]});
+      }
+
+      # Fields are separated by something like tab
+      $row->[$oIdx] = join($fieldSep, @{$row->[$oIdx]});
     }
-    
-    $row = join("\t", @$row);
+
+    # Tracks are also separated by something like tab
+    $row = join($fieldSep, @$row);
   }
 
   return join("\n", @$outputDataAref) . "\n";

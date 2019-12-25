@@ -26,7 +26,7 @@ sub get {
   # $self->{_dbName} inherited from Seq::Tracks::Get
   # not declared here because putting in a builder here results in 
   # "Oops Destroying Active Enviroment in LMDB_File
-  return $baseMapInverse->{ $_[1]->[ $_[0]->{_dbName} ] };
+  return $baseMapInverse->[ $_[1]->[ $_[0]->{_dbName} ] ];
 }
 
 __PACKAGE__->meta->make_immutable;

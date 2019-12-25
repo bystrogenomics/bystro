@@ -19,7 +19,6 @@ extends 'Seq::Tracks::Build';
 
 use Seq::Tracks::Score::Build::Round;
 
-my $rounder = Seq::Tracks::Score::Build::Round->new();
 # score track could potentially be 0 based
 # http://www1.bioinf.uni-leipzig.de/UCSC/goldenPath/help/wiggle.html
 # if it is the BED format version of the WIG format.
@@ -27,44 +26,83 @@ has '+based' => (
   default => 1,
 );
 
-sub buildTrack{
+has scalingFactor => (is => 'ro', isa => 'Int', default => 100);
+
+sub BUILD {
+  my $self = shift;
+
+  $self->{_rounder} = Seq::Tracks::Score::Build::Round->new({scalingFactor => $self->scalingFactor});
+}
+
+sub buildTrack {
   my $self = shift;
 
   my $fStep = 'fixedStep';
   my $vStep = 'variableStep';
   my $headerRegex = qr/^($fStep|$vStep)\s+chrom=(\S+)\s+start=(\d+)\s+step=(\d+)/;
-    
+
   my @allChrs = $self->allLocalFiles;
-  
+
   #Can't just set to 0, because then the completion code in run_on_finish won't run
-  my $pm = Parallel::ForkManager->new($self->max_threads);
+  my $pm = Parallel::ForkManager->new($self->maxThreads);
+
+  my %completedChrs;
+  $pm->run_on_finish( sub {
+    my ($pid, $exitCode, $fileName, $exitSignal, $coreDump, $errOrChrs) = @_;
+
+    if($exitCode != 0) {
+      my $err = $self->name . ": got exitCode $exitCode for $fileName: $exitSignal . Dump: $coreDump";
+
+      $self->log('fatal', $err);
+    }
+
+    if($errOrChrs && ref $errOrChrs eq 'HASH') {
+      for my $chr (keys %$errOrChrs) {
+        if(!$completedChrs{$chr}) {
+          $completedChrs{$chr} = [$fileName];
+        } else {
+          push @{$completedChrs{$chr}}, $fileName;
+        }
+      }
+    }
+
+    #Only message that is different, in that we don't pass the $fileName
+    $self->log('info', $self->name . ": completed building from $fileName");
+  });
 
   for my $file ( $self->allLocalFiles ) {
     $self->log('info', $self->name . ": beginning to build from $file");
 
-    $pm->start($file) and next; 
-      unless ( -f $file ) {
-        $self->log('fatal', $self->name . ": $file doesn't exist");
-        die $self->name . ": $file doesn't exist";
-      }
+    # Although this should be unnecessary, environments must be created
+    # within the process that uses them
+    # This provides a measure of safety
+    $self->db->cleanUp();
 
-      my $fh = $self->get_read_fh($file);
+    $pm->start($file) and next;
+      my ($err, undef, $fh) = $self->getReadFh($file);
+
+      if($err) {
+        $self->log('fatal', $self->name . ": $err");
+      }
 
       my $wantedChr;
       my $chrPosition; # absolute by default, 0 index
-      
+
       my $step;
       my $stepType;
 
       my $based = $self->based;
 
       # Which chromosomes we've seen, for recording completionMeta
-      my %visitedChrs; 
+      my %visitedChrs;
 
+      # We use "unsafe" writers, whose active cursors we need to track
+      my $cursor;
       my $count = 0;
+
       FH_LOOP: while ( <$fh> ) {
         #super chomp; #trim both ends, but not what's in between
-        $_ =~ s/^\s+|\s+$//g; 
+        $_ =~ s/^\s+|\s+$//g;
 
         if ( $_ =~ m/$headerRegex/ ) {
           my $chr = $2;
@@ -73,7 +111,7 @@ sub buildTrack{
           $stepType = $1;
 
           my $start = $3;
-          
+
           if(!$chr && $step && $start && $stepType) {
             $self->log('fatal', $self->name . ": require chr, step, start, and step type fields in wig header");
             die $self->name . ": require chr, step, start, and step type fields in wig header";
@@ -84,26 +122,28 @@ sub buildTrack{
             die $self->name . ": variable step not currently supported";
           }
 
-          if(!$wantedChr || ( $wantedChr && $wantedChr ne $chr) ) {
-            if($wantedChr) {
+          # Transforms $chr if it's not prepended with a 'chr' or is 'chrMT' or 'MT'
+          # and checks against our list of wanted chromosomes
+          $chr = $self->normalizedWantedChr->{ $chr };
+
+          # falsy value is ''
+          if(!defined $wantedChr || (!defined $chr || $wantedChr ne $chr)) {
+            if(defined $wantedChr) {
               #Commit any remaining transactions, remove the db map from memory
-              $self->db->cleanUp($wantedChr);
+              #this also has the effect of closing all cursors
+              $self->db->cleanUp();
+              undef $cursor;
+
               $count = 0;
             }
 
-            $wantedChr = $self->chrIsWanted($chr) && $self->completionMeta->okToBuild($chr) ? $chr : undef;
+            $wantedChr = $self->chrWantedAndIncomplete($chr);
           }
 
-          #use may give us one or many files
-          if(!$wantedChr) {
-            if($self->chrPerFile) {
-              $self->log('info', $self->name . ": chrs in file $file not wanted or previously completed. Skipping");
-
-              last FH_LOOP;
-            }
-
+          # TODO: handle chrPerFile
+          if(!defined $wantedChr) {
             next FH_LOOP;
-          } 
+          }
 
           # take the offset into account
           $chrPosition = $start - $based;
@@ -115,15 +155,26 @@ sub buildTrack{
           next;
         }
 
-        # there could be more than one chr defined per file, just skip 
+        # there could be more than one chr defined per file, just skip
         # until we get to what we want
-        if ( !$wantedChr ) {
+        if (!defined $wantedChr) {
           next;
         }
 
-        #Args:             $chr,       $trackIndex,   $pos,         $trackValue,        $mergeFunc, $skipCommit
-        $self->db->dbPatch($wantedChr, $self->dbName, $chrPosition, $rounder->round($_), undef, $count < $self->commitEvery);
-        $count = $count < $self->commitEvery ? $count + 1 : 0;
+        $cursor //= $self->db->dbStartCursorTxn($wantedChr);
+
+        #Args:                         $cursor,             $chr,       $trackIndex,   $pos,         $trackValue
+        $self->db->dbPatchCursorUnsafe($cursor, $wantedChr, $self->dbName, $chrPosition, $self->{_rounder}->round($_));
+
+
+        if($count > $self->commitEvery) {
+          $self->db->dbEndCursorTxn($wantedChr);
+          undef $cursor;
+
+          $count = 0;
+        }
+
+        $count++;
 
         #this must come AFTER we store the position's data in db, since we have a starting pos
         $chrPosition += $step;
@@ -131,35 +182,23 @@ sub buildTrack{
 
       #Commit, sync everything, including completion status, and release mmap
       $self->db->cleanUp();
+      undef $cursor;
 
-      # Record completion. Safe because detected errors throw, kill process
-      foreach (keys %visitedChrs) {
-        $self->completionMeta->recordCompletion($_);
-        $self->log('info', $self->name . ": recorded $_ completed from $file");
-      }
+      $self->safeCloseBuilderFh($fh, $file, 'fatal');
 
-      if(!close($fh) && $? != 13) {
-        $self->log('fatal', $self->name . ": failed to close $file with $! ($?)");
-        die $self->name . ": failed to close $file with $!";
-      } else {
-        $self->log('info', $self->name . ": closed $file with $?");
-      }
-    $pm->finish(0);
+    $pm->finish(0, \%visitedChrs);
   }
 
-  $pm->run_on_finish(sub {
-    my ($pid, $exitCode, $fileName) = @_;
+  $pm->wait_all_children();
 
-    if($exitCode != 0) {
-      my $err = $self->name . ": failed building from $fileName: exit code $exitCode";
-      $self->log('fatal', $err);
-      die $err;
-    }
+  for my $chr (keys %completedChrs) {
+    $self->completionMeta->recordCompletion($chr);
 
-    $self->log('info', $self->name . ": completed building from $fileName");
-  });
-  
-  $pm->wait_all_children;
+    $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedChrs{$chr}})));
+  }
+
+  #TODO: figure out why this is necessary, even with DEMOLISH
+  $self->db->cleanUp();
 
   return;
 };

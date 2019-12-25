@@ -11,8 +11,11 @@ use List::MoreUtils qw/first_index/;
 use Mouse::Util::TypeConstraints;
 use Sys::CpuAffinity;
 
-use Seq::Tracks;
+# TODO: Explore portability on windows-based systems w/File::Copy
+
 use Seq::Statistics;
+
+
 
 with 'Seq::Role::IO';
 with 'Seq::Output::Fields';
@@ -37,7 +40,7 @@ has output_file_base => ( is => 'ro', isa => AbsPath, coerce => 1, required => 1
 has temp_dir => (is => 'ro', isa => 'Maybe[Str]');
 
 # Do we want to compress?
-has compress => (is => 'ro', isa => 'Bool', default => 1);
+has compress => (is => 'ro', isa => 'Str', default => 1);
 
 # Do we want to tarball our results
 has archive => (is => 'ro', isa => 'Bool', default => 0);
@@ -48,9 +51,12 @@ has statistics => (is => 'ro', isa => 'HashRef');
 # Users may not need statistics
 has run_statistics => (is => 'ro', isa => 'Bool', default => sub {!!$_[0]->statistics});
 
-has max_threads => (is => 'ro', isa => 'Int', lazy => 1, default => sub {
+has maxThreads => (is => 'ro', isa => 'Int', lazy => 1, default => sub {
   return Sys::CpuAffinity::getNumCpus();
 });
+
+has outputJson => (is => 'ro', isa => 'Bool', default => 0);
+
 # has badSamplesField => (is => 'ro', default => 'badSamples', lazy => 1);
 
 ################ Public Exports ##################
@@ -71,8 +77,11 @@ has outputFilesInfo => (is => 'ro', isa => 'HashRef', init_arg => undef, lazy =>
 
   # Must be lazy in order to allow "revealing module pattern", with output_file_base below
   my $outBaseName = $self->outBaseName;
+  
+  my $extension = $self->outputJson ? 'json' : 'tsv';
 
-  $out{annotation} = $outBaseName . '.annotation.tsv' . ($self->compress ? ".gz" : "");
+  $out{annotation} = $outBaseName . ".annotation.$extension" . ($self->compress ? "." . $self->compress : "");
+  $out{header} = $outBaseName . ".annotation.header.json";
   $out{sampleList} = $outBaseName . '.sample_list';
 
   # Must be lazy in order to allow "revealing module pattern", with __statisticsRunner below
@@ -108,7 +117,9 @@ has _workingDir => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
     my $dir = path($self->temp_dir);
     $dir->mkpath;
 
-    return Path::Tiny->tempdir(DIR => $dir, CLEANUP => 1)
+    my $tmp = Path::Tiny->tempdir(DIR => $dir, CLEANUP => 1);
+
+    return $tmp;
   }
 
   return $self->outDir;
@@ -185,7 +196,7 @@ sub _moveFilesToOutputDir {
 
   my $workDir = $self->_workingDir->stringify();
 
-  $err = $self->safeSystem("mv $workDir/* $outDir && chmod 766 $outDir/*; sync");
+  $err = $self->safeSystem("mv $workDir/* $outDir && chmod 777 $outDir/*; sync");
 
   return $err;
 }

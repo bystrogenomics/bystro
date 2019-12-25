@@ -25,7 +25,6 @@ my ($strand, $siteType, $codonNumber, $codonPosition, $codonSequence);
 
 ($strand, $siteType) = @$unpackedData;
 
-p $unpackedData;
 ok($txNumber == 0, 'returns txNumber');
 ok($strand eq '-', 'reads strand ok');
 ok($siteType eq 'intronic', 'reads intronic ok from shortened site');
@@ -45,14 +44,11 @@ ok($strand eq '+', 'reads strand ok');
 ok($siteType eq 'ncRNA', 'reads intronic ok from shortened site');
 ok(@$unpackedData == 2, 'intronic sites have only siteType and strand');
 
-p $unpackedData;
-
 $packedData = $siteHandler->pack(
   (65000,'exonic', '+', 1, 2, 'ATG')
 );
 
 say "Packed data for (65000, 'Coding', '+', 1, 2, 'ATG') is ";
-p $packedData;
 
 ($txNumber, $unpackedData) = $siteHandler->unpack($packedData);
 
@@ -65,7 +61,5 @@ ok($codonNumber == 1, 'reads codonPosition');
 ok($codonPosition == 2, 'reads codonNumber');
 ok($codonSequence eq 'ATG', 'reads codon sequnce');
 ok(@$unpackedData == 5, 'intronic sites have only siteType and strand');
-
-p $unpackedData;
 
 done_testing();

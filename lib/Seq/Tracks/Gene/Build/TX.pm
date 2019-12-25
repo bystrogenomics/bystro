@@ -97,13 +97,13 @@ has exonEnds => (
 
 has cdsStart => (
   is => 'ro',
-  isa => 'Str',
+  isa => 'Int',
   required => 1,
 );
 
 has cdsEnd => (
   is => 'ro',
-  isa => 'Str',
+  isa => 'Int',
   required => 1,
 );
 
@@ -251,8 +251,9 @@ sub _buildTranscript {
     # As a result of modifying the reference, each position in exonPosHref
     # now has database data, or undefined
     # last argument means don't commit this, saves io overhead,
-    # no benefit that I can see from committing here
-    $db->dbRead($self->chrom, $exonPosHref, 1);
+    # committing here to avoid interfering with transactions of the consuming class
+    # TODO: allow dbRead to use read-only transactions
+    $db->dbRead($self->chrom, $exonPosHref);
 
     #Now get the base for each item found in $dAref ($exonPosHref);
     #This is handled by the refTrack of course
@@ -368,6 +369,13 @@ sub _buildTranscriptAnnotation {
     #coding sequences and splice site annotations, and keep the coding sequence
     #in any overlap
 
+    # CDS End is also half-open (end-open):
+    # https://genome.ucsc.edu/cgi-bin/hgTracks?position=chr1:909955-909955&hgsid=697700417_1ZakBvh4gGAEbl8WSM0gnBFTpnKa&ncbiRefSeqView=full
+    # NM_001160184 is + strand, cdsEnd: 909955 (chr1) in the mysql db
+    # And 909955 corresponds to exon 16 (last base) in ucsc genome browser
+    # And since the browser is 1-based fully-closed interval
+    # cdsEnd must be half-open, end-excluded
+
     #TODO: should we check if start + n is past end? or >= end - $n
 
     #If $i == 0, make sure we don't accidentally call the last exonEnd the first one
@@ -441,8 +449,9 @@ sub _buildTranscriptAnnotation {
       }
 
       #Next calculate UTR regions. We call utr regions from cdsStart to cdsEnd (cdsEnd is oddly closed)
-      #TODO this may be a subtle bug, I think it shuold be $pos <= $codingEnd
-      #On second thought, it looks fine. codingEnd is treated as closed here
+      # $exonPos must be < $codingEnd, because $exonPos is always < $exonEnds[$i]
+      # meaning it is in effect part of a fully-closed niterval,
+      # while $codingEnd is 0-based, half-open, end-excluded
       if( $exonPos < $codingEnd ) {
         if( $exonPos >= $codingStart ) {
           #It's in the body of the translated region
@@ -542,7 +551,7 @@ sub _buildTranscriptSites {
   #However, some sites won't be coding, and those are in our annotation href
 
   #Now compact the site details
-  for my $pos (keys %tempTXsites) {
+  for my $pos (sort {$a <=> $b} keys %tempTXsites) {
     #stores the codon information as binary
     #this was "$self->add_transcript_site($site)"
     # passing args in list context 
@@ -559,6 +568,13 @@ sub _buildTranscriptSites {
 #   1. divisible by 3
 #   2. starts with ATG
 #   3. Ends with stop codon
+
+# Note that is it appropriate, if surprising, to check that the full coding
+# sequence is divisible by 3, rather than just looking for $exonEnd - $exonStart % 3 == 0
+# because splice sites may not be in frame, meaning base 1 of codon N may be on one
+# side of an intron, in one exon, and bases 2 & 3 on the other side, in another exon
+# with the sequence being in-frame only after splicing
+# https://www.biostars.org/p/7019/
 sub _buildTranscriptErrors {
   my $self = shift;
   my $seq =  shift;

@@ -88,10 +88,8 @@ sub go {
   if(-e path($self->_decodedConfig->{database_dir})->child($self->name . '_meta') ) {
     $metaPath->move( path( $self->_decodedConfig->{database_dir} )->child($self->renameTo . '_meta') );
   }
-
-  $self->_wantedTrack->{renameTrack_date} = $self->_dateOfRun;
   
-  $self->_backupAndWriteConfig();
+  $self->_backupAndWriteConfig('renameTrack');
 }
 
 __PACKAGE__->meta->make_immutable;

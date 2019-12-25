@@ -29,6 +29,11 @@ extends 'Seq::Tracks::Build';
 # But will need to update makeMergeFunc to not assume an array of values (at least one key => value)
 has '+features' => (required => 1);
 
+# Sparse tracks are typically quite small, with potentiall quite large values
+# so to make optimal use of pages
+# lets set a smaller default commitEvery
+has '+commitEvery' => (default => 1e3);
+
 #These cannot be overriden (change in api), but users can use fieldMap to rename any field
 #in the input file
 has chromField => (is => 'ro', isa => 'Str', init_arg => undef, lazy => 1, default => 'chrom');
@@ -56,27 +61,64 @@ sub BUILD {
 sub buildTrack {
   my $self = shift;
 
-  my $pm = Parallel::ForkManager->new($self->max_threads);
+  my $pm = Parallel::ForkManager->new($self->maxThreads);
+
+  # Get an instance of the merge function that closes over $self
+  # Note that tracking which positinos have been over-written will only work
+  # if there is one chromosome per file, or if all chromosomes are in one file
+  # At least until we share $madeIntoArray (in makeMergeFunc) between threads
+  # Won't be an issue in Go
+  my ($mergeFunc, $cleanUpMerge) = $self->makeMergeFunc();
+
+  my %completedDetails;
+  $pm->run_on_finish(sub {
+    my ($pid, $exitCode, $fileName, undef, undef, $errOrChrs) = @_;
+
+    if($exitCode != 0) {
+      my $err = $errOrChrs ? "due to: $$errOrChrs" : "due to an untimely demise";
+
+      $self->log('fatal', $self->name . ": Failed to build $fileName $err");
+      die $self->name . ": Failed to build $fileName $err";
+    }
+
+    for my $chr (keys %$errOrChrs) {
+      if(!$completedDetails{$chr}) {
+        $completedDetails{$chr} = [$fileName];
+      } else {
+        push @{$completedDetails{$chr}}, $fileName;
+      }
+    }
+
+    $self->log('info', $self->name . ": completed building from $fileName");
+  });
 
   for my $file (@{$self->local_files}) {
     $self->log('info', $self->name . ": beginning building from $file");
 
+    # Although this should be unnecessary, environments must be created
+    # within the process that uses them
+    # This provides a measure of safety
+    $self->db->cleanUp();
+
     $pm->start($file) and next;
-      my $fh = $self->get_read_fh($file);
+      my ($err, undef, $fh) = $self->getReadFh($file);
+
+      if($err) {
+        $self->log('fatal', $self->name . ": $err");
+      }
 
       ############# Get Headers ##############
       my $firstLine = <$fh>;
 
-      if(!$firstLine) {
-        my $err;
-        if(!close($fh) && $? != 13) {
-          $err = $self->name . ": failed to open $file due to $1 ($?)";
-        } else {
-          $err = $self->name . ": $file empty";
-        }
+      # Support non-unix line endings
+      $err = $self->setLineEndings($firstLine);
 
-        $self->log('fatal', $err);
-        die $err;
+      if($err) {
+        $self->log('fatal', $self->name. ": $err");
+      }
+
+      if(!$firstLine) {
+        $self->log('fatal', $self->name . ': failed to read header line');
       }
 
       my ($featureIdxHref, $reqIdxHref, $fieldsToTransformIdx, $fieldsToFilterOnIdx, $numColumns) = 
@@ -84,18 +126,16 @@ sub buildTrack {
       ############## Read file and insert data into main database #############
       my $wantedChr;
 
-      # Get an instance of the merge function that closes over $self
-      # Note that tracking which positinos have been over-written will only work
-      # if there is one chromosome per file, or if all chromosomes are in one file
-      # At least until we share $madeIntoArray (in makeMergeFunc) between threads
-      # Won't be an issue in Go
-      my $mergeFunc = $self->makeMergeFunc();
       # Record which chromosomes were recorded for completionMeta
       my %visitedChrs;
 
       my %fieldDbNames;
 
       my ($invalid, $failedFilters, $tooLong) = (0, 0, 0);
+
+      # Faster insert: track cursors
+      my $cursor;
+      my $count = 0;
 
       my ($chr, @fields, @sparseData, $start, $end);
       FH_LOOP: while ( my $line = $fh->getline() ) {
@@ -120,25 +160,22 @@ sub buildTrack {
         # Avoids having to use a field transformation, since this may be very common
         # and Bystro typical use is with UCSC-style chromosomes
         # If the chromosome isn't wanted, $chr will be undefined
-        $chr = $self->normalizedWantedChr( $fields[ $reqIdxHref->{$self->chromField} ] );
+        $chr = $self->normalizedWantedChr->{ $fields[ $reqIdxHref->{$self->chromField} ] };
 
         #If the chromosome is new, write any data we have & see if we want new one
-        if( !$wantedChr || ($wantedChr && (!$chr || $wantedChr ne $chr)) ) {
-          if($wantedChr) {
-            #Commit, flush anything remaining to disk, release mapped memory
-            $self->db->cleanUp($wantedChr);
+        if(!defined $wantedChr || (!defined $chr || $wantedChr ne $chr)) {
+          if(defined $wantedChr) {
+            #Commit, commit & close cursors, flush anything remaining to disk, release mapped memory
+            $self->db->cleanUp();
+            undef $cursor;
+
+            $count = 0;
           }
 
-          $wantedChr = $chr && $self->completionMeta->okToBuild($chr) ? $chr : undef;
+          $wantedChr = $self->chrWantedAndIncomplete($chr);
         }
 
-        if(!$wantedChr) {
-          if($self->chrPerFile) {
-            $self->log('info', $self->name . ": skipping $file because found unwanted chr, and expect 1 chr per file");
-
-            last FH_LOOP;
-          }
-
+        if(!defined $wantedChr) {
           next FH_LOOP;
         }
 
@@ -160,18 +197,26 @@ sub buildTrack {
         FNAMES_LOOP: for my $name (keys %$featureIdxHref) {
           my $value = $self->coerceFeatureType( $name, $fields[ $featureIdxHref->{$name} ] );
 
-          if(!exists $fieldDbNames{$name}) {
-            $fieldDbNames{$name} = $self->getFieldDbName($name);
-          }
+          $fieldDbNames{$name} //= $self->getFieldDbName($name);
 
           # getFieldDbName will croak if it can't make or find a dbName
           $sparseData[ $fieldDbNames{$name} ] = $value;
         }
 
         for my $pos (($start .. $end)) {
-          # Write every position to disk
-          # Commit for each position, fast if using MDB_NOSYNC
-          $self->db->dbPatch($wantedChr, $self->dbName, $pos, \@sparseData, $mergeFunc);
+          $cursor //= $self->db->dbStartCursorTxn($wantedChr);
+
+          #Args:                         $cursor,             $chr,       $trackIndex,   $pos,  $trackValue,  $mergeFunction
+          $self->db->dbPatchCursorUnsafe($cursor, $wantedChr, $self->dbName, $pos, \@sparseData, $mergeFunc);
+
+          if($count > $self->commitEvery) {
+            $self->db->dbEndCursorTxn($wantedChr);
+            undef $cursor;
+
+            $count = 0;
+          }
+
+          $count++;
         }
 
         undef @sparseData;
@@ -179,39 +224,38 @@ sub buildTrack {
         $visitedChrs{$wantedChr} //= 1;
       }
 
-      # Record completion. Safe because detected errors throw, kill process
-      foreach (keys %visitedChrs) {
-        $self->completionMeta->recordCompletion($_);
-        $self->log('info', $self->name . ": recorded $_ completed from $file");
-      }
-
-      #Commit, sync everything, including completion status, and release mmap
+      #Commit, sync everything, including completion status, commit/close cursors, and release mmap
       $self->db->cleanUp();
+      undef $cursor;
 
-      if(!close($fh) && $? != 13) {
-        $self->log('fatal', $self->name . ": couldn't close or read $file due to $! ($?)");
-        die $self->name . ": couldn't close or read $file due to $!";
-      } else {
-        $self->log('info', $self->name . ": $file closed with $?");
-        $self->log('info', $self->name . ": invalid lines found in $file: $invalid");
-        $self->log('info', $self->name . ": lines that didn't pass filters in $file: $failedFilters");
-        $self->log('info', $self->name . ": lines that were longer than " . $self->maxVariantSize . " found in $file: $tooLong");
-      }
-    $pm->finish(0);
+      $self->safeCloseBuilderFh($fh, $file, 'fatal');
+
+      $self->log('info', $self->name . ": $file closed with $?");
+      $self->log('info', $self->name . ": invalid lines found in $file: $invalid");
+      $self->log('info', $self->name . ": lines that didn't pass filters in $file: $failedFilters");
+      $self->log('info', $self->name . ": lines that were longer than " . $self->maxVariantSize . " found in $file: $tooLong");
+
+    $pm->finish(0, \%visitedChrs);
   }
 
-  $pm->run_on_finish(sub {
-    my ($pid, $exitCode, $fileName) = @_;
+  $pm->wait_all_children();
 
-    if($exitCode != 0) {
-      $self->log('fatal', $self->name . ": Failed to build $fileName");
-      die $self->name . ": Failed to build $fileName";
-    }
+  # Defer recording completion state until all requested files visited, to ensure
+  # that if chromosomes are mis-sorted, we still build all that is needed
+  for my $chr (keys %completedDetails) {
+    $self->completionMeta->recordCompletion($chr);
 
-    $self->log('info', $self->name . ": completed building from $fileName");
-  });
+    # cleanUpMerge placed here so that only after all files are processed do we
+    # drop the temporary merge databases
+    # so that if we have out-of-order chromosomes, we do not mishandle
+    # overlapping sites
+    $cleanUpMerge->($chr);
 
-  $pm->wait_all_children;
+    $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedDetails{$chr}})));
+  }
+
+  #TODO: figure out why this is necessary, even with DEMOLISH
+  $self->db->cleanUp();
 
   return;
 }
@@ -230,21 +274,17 @@ sub joinTrack {
   $self->log('info', $self->name . " join track: called for $wantedChr");
 
   for my $file ($self->allLocalFiles) {
-    my $fh = $self->get_read_fh($file);
+    my ($err, undef, $fh) = $self->getReadFh($file);
+
+    if($err) {
+      $self->log('fatal', $err);
+    }
 
     ############# Get Headers ##############
     my $firstLine = <$fh>;
 
     if(!$firstLine) {
-      my $err;
-      if(!close($fh) && $? != 13) {
-        $err = $self->name . " join track: failed to open $file due to $1 ($?)";
-      } else {
-        $err = $self->name . " join track: $file empty";
-      }
-
-      $self->log('fatal', $err);
-      die $err;
+      $self->log('fatal', $self->name . ": couldn't read first line of $file");
     }
 
     my ($featureIdxHref, $reqIdxHref, $fieldsToTransformIdx, $fieldsToFilterOnIdx, $numColumns) = 
@@ -256,7 +296,6 @@ sub joinTrack {
 
     my ($chr, @fields, %wantedData, $start, $end, $wantedStart, $wantedEnd);
     FH_LOOP: while( my $line = $fh->getline() ) {
-      chomp $line;
       @fields = split('\t', $line);
 
       if(! $self->_validLine(\@fields, $., $reqIdxHref, $numColumns) ) {
@@ -273,14 +312,14 @@ sub joinTrack {
 
       # Transforms $chr if it's not prepended with a 'chr' or is 'chrMT' or 'MT'
       # and checks against our list of wanted chromosomes
-      $chr = $self->normalizedWantedChr( $fields[ $reqIdxHref->{$self->chromField} ] );
+      $chr = $self->normalizedWantedChr->{ $fields[ $reqIdxHref->{$self->chromField} ] };
 
-      if(!$chr || $chr ne $wantedChr) {
+      if(!defined $chr || $chr ne $wantedChr) {
+        # TODO: Rethink chrPerFile handling
+        # This should be safe, provided that chrPerFile is a manually-set flag
+        # in the YAML track config
         if($self->chrPerFile) {
-          # Because this is not an unusual occurance; there is only 1 chr wanted
-          # and the function is called once for each chromoosome, we use debug
-          # to reduce log clutter
-          $self->log('debug', $self->name . "join track: chrs in file $file not wanted . Skipping");
+          $self->log('warn', $self->name . "join track: chrs in file $file not wanted . Skipping");
 
           last FH_LOOP;
         }
@@ -301,26 +340,30 @@ sub joinTrack {
         $wantedStart = $wantedPositionsAref->[$i][0];
         $wantedEnd = $wantedPositionsAref->[$i][1];
 
+        # Report anything larger than maxVariantSize, which at least partially overlaps the wanted interval
         # The join tracks accumulate a large amount of useless (for my current use case) information
         # namely, all of the single nucleotide variants that are already reported for a given position
         # The real use of the join track currently is to report all of the really large variants when they
         # overlap a gene, so let's do just that, by check against our maxVariantSize
-        if( ( ($start >= $wantedStart && $start <= $wantedEnd) || ($end >= $wantedStart && $end <= $wantedEnd) ) &&
-        $end + 1 - $start > $self->maxVariantSize) {
+        if(
+          ($start > $wantedEnd && $end > $wantedEnd)
+          ||
+          ($start < $wantedStart && $end < $wantedStart)
+          ||
+          ($end + 1 - $start <= $self->maxVariantSize)
+        ) {
+            next;
+          }
+
           &$callback(\%wantedData, $i);
           undef %wantedData;
-        }
       }
     }
 
-    if(!close($fh) && $? != 13) {
-      $self->log('fatal', $self->name . " join track: failed to close $file with $! ($?)");
-      die $self->name . " join track: failed to close $file with $!";
-    } else {
-      $self->log('info', $self->name . " join track: closed $file with $?");
-      $self->log('info', $self->name . " join track: invalid lines found while joining on $file: $invalid");
-      $self->log('info', $self->name . " join track: lines that didn't pass filters while joining on $file: $failedFilters");
-    }
+    $self->safeCloseBuilderFh($fh, $file, 'fatal');
+
+    $self->log('info', $self->name . " join track: invalid lines found while joining on $file: $invalid");
+    $self->log('info', $self->name . " join track: lines that didn't pass filters while joining on $file: $failedFilters");
   }
 
   $self->log('info', $self->name . " join track: finished for $wantedChr");

@@ -26,14 +26,48 @@ sub buildTrack {
   my $headerRegex = qr/\A>([\w\d]+)/;
   my $dataRegex = qr/(\A[ATCGNatcgn]+)\z/xms;
 
-  my $pm = Parallel::ForkManager->new($self->max_threads);
-  for my $file ( $self->allLocalFiles ) {
+  my $pm = Parallel::ForkManager->new($self->maxThreads);
+
+  my %completedChrs;
+  $pm->run_on_finish( sub {
+    my ($pid, $exitCode, $fileName, $exitSignal, $coreDump, $errOrChrs) = @_;
+
+    if($exitCode != 0) {
+      my $err = $self->name . ": got exitCode $exitCode for $fileName: $exitSignal . Dump: $coreDump";
+
+      $self->log('fatal', $err);
+    }
+
+    if($errOrChrs && ref $errOrChrs eq 'HASH') {
+      for my $chr (keys %$errOrChrs) {
+        if(!$completedChrs{$chr}) {
+          $completedChrs{$chr} = [$fileName];
+        } else {
+          push @{$completedChrs{$chr}}, $fileName;
+        }
+      }
+    }
+
+    #Only message that is different, in that we don't pass the $fileName
+    $self->log('info', $self->name . ": completed building from $fileName");
+  });
+
+  for my $file ($self->allLocalFiles) {
     # Expects 1 chr per file for n+1 files, or all chr in 1 file
     # Single writer to reduce copy-on-write db inflation
     $self->log('info', $self->name . ": Beginning building from $file");
 
+    # Although this should be unnecessary, environments must be created
+    # within the process that uses them
+    # This provides a measure of safety
+    $self->db->cleanUp();
+
     $pm->start($file) and next;
-      my $fh = $self->get_read_fh($file);
+      my ($err, undef, $fh) = $self->getReadFh($file);
+
+      if($err) {
+        $self->log('fatal', $self->name . ": $err");
+      }
 
       my $wantedChr;
 
@@ -42,41 +76,46 @@ sub buildTrack {
       my $count = 0;
       # Record which chromosomes we've worked on
       my %visitedChrs;
-      FH_LOOP: while ( my $line = $fh->getline() ) {
+
+      my $cursor;
+
+      FH_LOOP: while (my $line = $fh->getline()) {
         #super chomp; also helps us avoid weird characters in the fasta data string
         $line =~ s/^\s+|\s+$//g; #trim both ends, but not what's in between
-        
+
         #could do check here for cadd default format
         #for now, let's assume that we put the CADD file into a wigfix format
-        if ( $line =~ m/$headerRegex/ ) { #we found a wig header
+        if ($line =~ m/$headerRegex/) { #we found a wig header
           my $chr = $1;
 
           if(!$chr) {
             $self->log('fatal', $self->name . ": Require chr in fasta file headers");
             die $self->name . ": Require chr in fasta file headers";
           }
-          
-          # Our first header, or we found a new chromosome
-          if( ($wantedChr && $wantedChr ne $chr) || !$wantedChr) {
+
+          # Transforms $chr if it's not prepended with a 'chr' or is 'chrMT' or 'MT'
+          # and checks against our list of wanted chromosomes
+          $chr = $self->normalizedWantedChr->{ $chr };
+
+          # falsy value is ''
+          if(!defined $wantedChr || (!defined $chr || $wantedChr ne $chr)) {
             # We switched chromosomes
-            if($wantedChr) {
-              $self->db->cleanUp($wantedChr);
+            if(defined $wantedChr) {
+              # cleans up entire environment, commits/closes all cursors, syncs
+              $self->db->cleanUp();
+              undef $cursor;
+
               $count = 0;
             }
 
-            $wantedChr = $self->chrIsWanted($chr) && $self->completionMeta->okToBuild($chr) ? $chr : undef;
+            $wantedChr = $self->chrWantedAndIncomplete($chr);
           }
 
-          # We expect either one chr per file, or a multi-fasta file
-          if(!$wantedChr) {
-            if($self->chrPerFile) {
-              $self->log('info', $self->name . ": chrs in file $file not wanted or previously completed. Skipping");
-
-              last FH_LOOP;
-            }
-
+          # We expect either one chr per file, or a multi-fasta file that is sorted and contiguous
+          # TODO: Handle chrPerFile
+          if(!defined $wantedChr) {
             next FH_LOOP;
-          } 
+          }
 
           $visitedChrs{$wantedChr} //= 1;
 
@@ -89,56 +128,55 @@ sub buildTrack {
         }
 
         # If !$wantedChr we're likely in a mult-fasta file; could warn, but that spoils multi-threaded reads
-        if ( !$wantedChr ) {
+        if (!defined $wantedChr) {
           next;
         }
 
-        if( $line =~ $dataRegex ) {
+        if($line =~ $dataRegex) {
           # Store the uppercase bases; how UCSC does it, how people likely expect it
-          for my $char ( split '', uc($1) ) {
-            #Args:             $chr,       $trackIndex,   $pos,         $trackValue,                 $mergeFunc, $skipComit
-            $self->db->dbPatch($wantedChr, $self->dbName, $chrPosition, $baseMapper->baseMap->{$char}, undef, $count < $self->commitEvery);
-            $count = $count < $self->commitEvery ? $count + 1 : 0;
+          for my $char (split '', uc($1)) {
+            $cursor //= $self->db->dbStartCursorTxn($wantedChr);
 
-            #must come after, to not be 1 off; assumes fasta file is sorted ascending contiguous 
+            #Args:                         $cursor, $chr,       $trackIndex,   $pos,         $newValue
+            $self->db->dbPatchCursorUnsafe($cursor, $wantedChr, $self->dbName, $chrPosition, $baseMapper->baseMap->{$char});
+
+            if($count > $self->commitEvery) {
+              $self->db->dbEndCursorTxn($wantedChr);
+              undef $cursor;
+
+              $count = 0;
+            }
+
+            $count++;
+
+            #must come after, to not be 1 off; assumes fasta file is sorted ascending contiguous
             $chrPosition++;
           }
         }
       }
 
-      #Commit, sync everything, including completion status, and release mmap
+      #Commit, sync everything, including completion status, commit cursors, and release mmap
       $self->db->cleanUp();
-
-      # Record completion. Safe because detected errors throw, kill process
-      foreach ( keys %visitedChrs ) {
-        $self->completionMeta->recordCompletion($_);
-        $self->log('info', $self->name . ": recorded $_ completed from $file");
-      }
+      undef $cursor;
 
       #13 is sigpipe, occurs if closing pipe before cat/pigz finishes
-      if(!close($fh) && $? != 13) {
-        $self->log('fatal', $self->name . ": failed to close $file with $! $?");
-        die $self->name . ": failed to close $file with $!";
-      } else {
-        $self->log('info', $self->name . ": closed $file with $?");
-      }
+      $self->safeCloseBuilderFh($fh, $file, 'fatal');
+
     #exit with exit code 0; this only happens if successfully completed
-    $pm->finish(0);
+    $pm->finish(0, \%visitedChrs);
   }
 
-  $pm->run_on_finish( sub {
-    my ($pid, $exitCode, $fileName) = @_;
-    if($exitCode != 0) {
-      my $err = $self->name . "failed to build from $fileName: exit code $exitCode";
-      $self->log('fatal', $err);
-      die $err;
-    }
+  $pm->wait_all_children();
 
-    $self->log('info', $self->name . ": completed building from $fileName");
-  });
+  for my $chr (keys %completedChrs) {
+    $self->completionMeta->recordCompletion($chr);
 
-  $pm->wait_all_children;
-  
+    $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedChrs{$chr}})));
+  }
+
+  #TODO: figure out why this is necessary, even with DEMOLISH
+  $self->db->cleanUp();
+
   return;
 };
 

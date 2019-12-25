@@ -7,7 +7,7 @@ package Seq::Statistics;
 use Mouse 2;
 use namespace::autoclean;
 
-use Seq::Output;
+use Seq::Output::Delimiters;
 use Types::Path::Tiny qw/AbsPath AbsFile AbsDir/;
 use File::Which qw/which/;
 
@@ -134,9 +134,9 @@ sub getStatsArguments {
     . "-altColumn $alleleColumnName -homozygotesColumn $homozygotesColumnName "
     . "-heterozygotesColumn $heterozygotesColumnName -siteTypeColumn $siteTypeColumnName "
     . $dbSNPpart
-    . "-emptyField \$\"$emptyFieldString\" "
+    . "-emptyField '$emptyFieldString' "
     . "-exonicAlleleFunctionColumn $exonicAlleleFuncColumnName "
-    . "-primaryDelimiter \$\"$valueDelimiter\" -fieldSeparator \$\"$fieldSeparator\" ");
+    . "-primaryDelimiter '$valueDelimiter' -fieldSeparator '$fieldSeparator' ");
 }
 
 __PACKAGE__->meta->make_immutable;

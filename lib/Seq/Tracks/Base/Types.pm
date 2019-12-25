@@ -41,11 +41,15 @@ has caddType => (is => 'ro', init_arg => undef, lazy => 1, default => sub{$caddT
 state $vcfType = 'vcf';
 has vcfType => (is => 'ro', init_arg => undef, lazy => 1, default => sub{$vcfType});
 
+state $nearestType = 'nearest';
+has nearestType => (is => 'ro', init_arg => undef, lazy => 1, default => sub{$nearestType});
+
+
 has trackTypes => (is => 'ro', init_arg => undef, lazy => 1, default => sub{
   return [$refType, $scoreType, $sparseType, $regionType, $geneType, $caddType, $vcfType]
 });
 
-enum TrackType => [$refType, $scoreType, $sparseType, $regionType, $geneType, $caddType, $vcfType];
+enum TrackType => [$refType, $scoreType, $sparseType, $regionType, $geneType, $caddType, $vcfType, $nearestType];
 
 #Convert types; Could move the conversion code elsewehre,
 #but I wanted types definition close to implementation
@@ -78,6 +82,17 @@ sub convert {
   }
 
   return $typeFunc->{$_[2]}->($_[1], $precision->{$_[2]}); #2nd argument, with $self == $_[0]
+}
+
+# Truncate a number
+sub int {
+  #my ($value, $precision) = @_;
+  #    $_[0], $_[1],
+  if (!looks_like_number($_[0] ) ) {
+    return $_[0];
+  }
+
+  return CORE::int($_[0])
 }
 
 # This is useful, because will convert a string like "1.000000" to an int

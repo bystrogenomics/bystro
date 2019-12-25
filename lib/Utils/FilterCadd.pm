@@ -31,8 +31,6 @@ extends 'Utils::Base';
 
 my $localFilesHandler = Seq::Tracks::Build::LocalFilesPaths->new();
 
-my $rounder = Seq::Tracks::Score::Build::Round->new();
-
 sub BUILD {
   my $self = shift;
 
@@ -42,18 +40,12 @@ sub BUILD {
   # To combat this, every time Seq::Base is called, we re-set/initialzied the static
   # properties that create this behavior
   # Initialize it before BUILD, to make this class less dependent on inheritance order
-  Seq::DBManager::initialize();
+  Seq::DBManager::initialize({
+    databaseDir => $self->_decodedConfig->{database_dir}
+  });
 
-  # Since we never have more than one database_dir, it's a global property we can set
-  # in this package, which Seq.pm and Seq::Build extend from
-  if(!$self->_decodedConfig->{database_dir}) {
-    die "No database dir configured";
-  }
-
-  Seq::DBManager::setGlobalDatabaseDir($self->_decodedConfig->{database_dir});
-
-  if(!$self->_wantedTrack->{sorted_guaranteed} == 1) {
-    die "CADD files must be sorted (sorted_guaranteed == 1), at least by chromosome";
+  if(!$self->_wantedTrack->{sorted} == 1) {
+    die "CADD files must be sorted (sorted == 1), at least by chromosome";
   }
 }
 
@@ -81,6 +73,8 @@ sub go {
   # p %trackConfig;
   # exit;
   my $caddGetter = Seq::Tracks::Cadd->new(\%trackConfig);
+
+  my $rounder = Seq::Tracks::Score::Build::Round->new({scalingFactor => $caddGetter->scalingFactor});
 
   my $db = Seq::DBManager->new();
 
@@ -122,7 +116,7 @@ sub go {
     }
 
     $pm->start($inPath) and next;
-      my $readFh = $self->get_read_fh($inPath);
+      my $readFh = $self->getReadFh($inPath);
 
       my $header = <$readFh>;
       $header .= <$readFh>;
@@ -225,7 +219,7 @@ sub go {
             last;
           }
 
-          $outFh = $self->get_write_fh($outPath);
+          $outFh = $self->getWriteFh($outPath);
 
           print $outFh $header;
         }
@@ -293,13 +287,13 @@ sub go {
           $pm->finish(255, \$err);
         }
 
-        $caddDbScore = $caddGetter->get($dbVal, $chr, $ref, $alt, 0, 0, $caddDbScore);
+        $caddDbScore = $caddGetter->get($dbVal, $chr, $ref, $alt, 0, $caddDbScore);
 
         # We round the score to check against the db-held value, which is rounded
-        if($rounder->round($score) != $caddDbScore->[0][0]) {
+        if($rounder->round($score) != $rounder->round($caddDbScore->[0])) {
           $db->cleanUp();
 
-          my $err = "$chr\:$pos ($based\-based) : Expected PHRED $caddDbScore->[0][0], found: " . $rounder->round($score);
+          my $err = "$chr\:$pos ($based\-based) : Expected PHRED $caddDbScore->[0], found: " . $rounder->round($score);
           $self->log('error', \$err);
     
           $pm->finish(255, \$err);
@@ -317,9 +311,8 @@ sub go {
   $pm->wait_all_children();
 
   $self->_wantedTrack->{local_files} = \@outPaths;
-  $self->_wantedTrack->{filterCadd_date} = $self->_dateOfRun;
 
-  $self->_backupAndWriteConfig();
+  $self->_backupAndWriteConfig('filterCadd');
 
   return 1;
 }

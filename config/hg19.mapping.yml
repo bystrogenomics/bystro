@@ -19,8 +19,8 @@ sort:
   dbSNP.alleleFreqs: min
   refSeq.codonNumber: avg
   refSeq.codonPosition: avg
-booleanFields:
-  - discordant
+# booleanFields:
+#    - discordant
 # These only refer to searchable exact fields
 # These should be case sensitive, they are, by definition, exact
 # hasExactFields:
@@ -37,6 +37,8 @@ index_settings:
     number_of_replicas: 0
     number_of_shards: 6
     codec: best_compression
+    mapping:
+      single_type: true
   analysis:
     normalizer:
       lowercase_normalizer:
@@ -75,12 +77,6 @@ index_settings:
       english_stemmer:
         type: stemmer
         language: light_english
-      english_possessive_stemmer:
-        type: stemmer
-        language: possessive_english
-      english_minimal_stemmer:
-        type: stemmer
-        language: minimal_english
       search_synonym_filter:
         type: synonym
         synonyms_path: "analysis/search-synonyms.txt"
@@ -118,41 +114,42 @@ index_settings:
         token_chars:
           - letter
           - digit
-      # english_stop:
-      #     type: stop
-      #     stopwords:
-      #         - a
-      #         - an
-      #         - and
-      #         - are
-      #         - as
-      #         - at
-      #         - be
-      #         - but
-      #         - by
-      #         - for
-      #         - if
-      #         - in
-      #         - into
-      #         - is
-      #         - it
-      #         - of
-      #         - on
-      #         - or
-      #         - has
-      #         - such
-      #         - that
-      #         - the
-      #         - their
-      #         - then
-      #         - there
-      #         - these
-      #         - they
-      #         - this
-      #         - to
-      #         - was
-      #         - will
-      #         - with
+      english_stop:
+        type: stop
+        stopwords:
+          - a
+          - an
+          - and
+          - are
+          - as
+          - at
+          - be
+          - but
+          - by
+          - for
+          - if
+          - in
+          - into
+          - is
+          - it
+          - of
+          - on
+          - or
+          - has
+          - such
+          - that
+          - the
+          - their
+          - then
+          - there
+          - these
+          - they
+          - this
+          - to
+          - was
+          - will
+          - with
+          - maybe
     analyzer:
       autocomplete_english:
         type: custom
@@ -160,7 +157,7 @@ index_settings:
         filter:
           - lowercase
           - asciifolding
-          #- english_stop
+          # - english_stop
           - catenate_filter
           - english_stemmer
           - autocomplete_filter
@@ -264,8 +261,8 @@ mappings:
     chrom:
       type: keyword
       normalizer: lowercase_normalizer
-      # chr's are very short, and the "prefix" is a completely valid value
-      # so, don't include in all, because many false positivies with ngrams
+    # chr's are very short, and the "prefix" is a completely valid value
+    # so, don't include in all, because many false positivies with ngrams
     pos:
       type: integer
     trTv:
@@ -279,7 +276,7 @@ mappings:
           type: keyword
           normalizer: lowercase_normalizer
     discordant:
-      type: boolean
+      type: byte
     heterozygotes:
       type: keyword
     heterozygosity:
@@ -292,23 +289,18 @@ mappings:
       type: keyword
     missingness:
       type: half_float
-    sampleMaf:
-      type: half_float
     ac:
       type: integer
     an:
       type: integer
+    sampleMaf:
+      type: half_float
     alt:
       type: keyword
       normalizer: uppercase_normalizer
     ref:
       type: keyword
       normalizer: uppercase_normalizer
-    vcfPos:
-      type: integer
-    id:
-      type: keyword
-      normalizer: lowercase_normalizer
     refSeq:
       properties:
         siteType:
@@ -369,6 +361,15 @@ mappings:
         spDisplayID:
           type: keyword
           normalizer: uppercase_normalizer
+        geneSymbol:
+          type: keyword
+          normalizer: uppercase_normalizer
+        tRnaName:
+          type: keyword
+          normalizer: uppercase_normalizer
+        ensemblID:
+          type: keyword
+          normalizer: uppercase_normalizer
         name2:
           type: keyword
           normalizer: uppercase_normalizer
@@ -385,14 +386,57 @@ mappings:
         name:
           type: keyword
           normalizer: uppercase_normalizer
-        nearest:
+        gene:
           properties:
-            name:
-              type: keyword
-              normalizer: uppercase_normalizer
             name2:
               type: keyword
-              normalizer: uppercase_normalizer
+            pLi:
+              type: half_float
+            pRec:
+              type: half_float
+            pNull:
+              type: half_float
+            lofTool:
+              type: half_float
+            lofFdr:
+              type: half_float
+            pHi:
+              type: half_float
+            nonTCGA:
+              properties:
+                pRec:
+                  type: half_float
+                pNull:
+                  type: half_float
+                pLi:
+                  type: half_float
+            nonPsych:
+              properties:
+                pRec:
+                  type: half_float
+                pNull:
+                  type: half_float
+                pLi:
+                  type: half_float
+            # this is a percentile; we don't need much precision
+            gdi:
+              type: scaled_float
+              scaling_factor: 100
+            cnvScore:
+              type: half_float
+            cnvFlag:
+              type: keyword
+            uniprot:
+              properties:
+                func:
+                  type: text
+                  analyzer: autocomplete_english_split
+                  search_analyzer: search_english_description_synonyms
+            pmid:
+              type: integer
+            rvis:
+              type: scaled_float
+              scaling_factor: 100
         clinvar:
           properties:
             alleleID:
@@ -429,6 +473,31 @@ mappings:
             chromStart:
               type: integer
             chromEnd:
+              type: integer
+
+    nearest:
+      properties:
+        refSeq:
+          properties:
+            name:
+              type: keyword
+              normalizer: uppercase_normalizer
+            name2:
+              type: keyword
+              normalizer: uppercase_normalizer
+            dist:
+              type: integer
+    nearestTss:
+      properties:
+        refSeq:
+          properties:
+            name:
+              type: keyword
+              normalizer: uppercase_normalizer
+            name2:
+              type: keyword
+              normalizer: uppercase_normalizer
+            dist:
               type: integer
     phastCons:
       type: scaled_float
@@ -468,10 +537,6 @@ mappings:
         alleles:
           type: keyword
           normalizer: uppercase_normalizer
-        # Sometimes given to us as floats
-        # Alternative is to use scaled_float wiht scaling_factor 10
-        # but very few cases will be affected by using integer
-        # and by very small amount
         alleleNs:
           type: integer
           coerce: true
@@ -524,6 +589,66 @@ mappings:
         alternateAllele:
           type: keyword
           normalizer: uppercase_normalizer
+        match:
+          properties:
+            alt:
+              type: keyword
+            variation_id:
+              type: keyword
+            allele_id:
+              type: keyword
+            strand:
+              type: keyword
+            rcv:
+              type: keyword
+            scv:
+              type: keyword
+            hgvs_c:
+              type: keyword
+            hgvs_p:
+              type: keyword
+            traits:
+              type: text
+              analyzer: autocomplete_english_split
+              search_analyzer: search_english_split
+            molecular_consequence:
+              type: text
+              analyzer: autocomplete_english_split
+              search_analyzer: search_english_split
+            clinical_significance:
+              type: text
+              analyzer: autocomplete_english_split
+              search_analyzer: search_english_split
+            pathogenic:
+              type: short
+            likely_pathogenic:
+              type: short
+            uncertain_significance:
+              type: short
+            likely_benign:
+              type: short
+            benign:
+              type: short
+            review_status:
+              type: text
+              analyzer: autocomplete_english_split
+              search_analyzer: search_english_split
+            last_evaluated:
+              type: keyword #TODO: make date
+            submitters:
+              type: text
+              analyzer: autocomplete_english_split
+              search_analyzer: search_english_split
+            pmids:
+              type: keyword
+            origin:
+              type: text
+              analyzer: autocomplete_english_split
+              search_analyzer: search_english_split
+            xrefs:
+              type: text
+              analyzer: autocomplete_english_split
+              search_analyzer: search_english_split
     gnomad:
       properties:
         genomes:
@@ -555,8 +680,6 @@ mappings:
               type: short
             an_oth:
               type: short
-            an_sas:
-              type: short
             an_male:
               type: short
             an_female:
@@ -574,8 +697,6 @@ mappings:
             af_nfe:
               type: half_float
             af_oth:
-              type: half_float
-            af_sas:
               type: half_float
             af_male:
               type: half_float
@@ -629,8 +750,6 @@ mappings:
               type: integer
             an_oth:
               type: integer
-            an_sas:
-              type: integer
             an_male:
               type: integer
             an_female:
@@ -648,8 +767,6 @@ mappings:
             af_nfe:
               type: half_float
             af_oth:
-              type: half_float
-            af_sas:
               type: half_float
             af_male:
               type: half_float

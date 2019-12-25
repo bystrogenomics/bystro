@@ -41,6 +41,14 @@ has output_file_base => (
   documentation => qq{Where you want your output.},
 );
 
+has output_json => (
+  is          => 'ro',
+  isa         => 'Bool',
+  cmd_aliases   => [qw/json/],
+  metaclass => 'Getopt',
+  documentation => qq{Do you want to output JSON instead? Incompatible with run_statistics},
+);
+
 has config => (
   is          => 'ro',
   isa         => 'Str',
@@ -60,6 +68,16 @@ has overwrite => (
   documentation => qq{Overwrite existing output file.},
 );
 
+has read_ahead => (
+  is          => 'ro',
+  isa         => 'Bool',
+  default     => 0,
+  coerce => 1,
+  required    => 0,
+  metaclass => 'Getopt',
+  documentation => qq{For dense datasets, use system read-ahead},
+);
+
 has debug => (
   is          => 'ro',
   isa         => 'Num',
@@ -77,7 +95,7 @@ has verbose => (
 
 has compress => (
   is => 'ro', 
-  isa => 'Bool',
+  isa => 'Str',
   metaclass   => 'Getopt',
   documentation =>
     qq{Compress the output?},
@@ -169,6 +187,7 @@ sub annotate {
     archive => $self->archive,
     run_statistics => !!$self->run_statistics,
     delete_temp => !!$self->delete_temp,
+    readAhead => $self->read_ahead,
   };
 
   if(defined $self->verbose) {
@@ -176,7 +195,16 @@ sub annotate {
   }
 
   if(defined $self->max_threads) {
-    $args->{max_threads} = $self->max_threads;
+    $args->{maxThreads} = $self->max_threads;
+  }
+
+  if(defined $self->output_json) {
+    $args->{outputJson} = $self->output_json;
+
+    if($self->run_statistics) {
+      say STDERR "--output_json incompatible with --run_statistics 1";
+      exit(1);
+    }
   }
 
   my $annotator = Seq->new_with_config($args);
@@ -200,55 +228,3 @@ Example: {
       },
     };
 =cut
-
-
-# sub _run {
-#   my $self = shift;
-
-#   if ( $self->isProkaryotic ) {
-#     my $args = "--vcf " . $self->snpfile . " --gb " . $self->genBankAnnotation;
-
-#     system( $self->_prokAnnotatorPath . " " . $args );
-#   }
-#   else {
-#     my $aInstance = Seq->new( $self->_annotatorArgsHref );
-#     $aInstance->annotate_snpfile();
-#   }
-# }
-
-###optional
-
-# has genBankAnnotation => (
-#   metaclass   => 'Getopt',
-#   is          => 'ro',
-#   isa         => 'Str',
-#   cmd_aliases => [qw/gb g gen_bank_annotation/],
-#   required    => 0,
-#   documentation =>
-#     qq{GenBank Annotation file path. Required for prokaryotic annotations. Type Str.},
-#   predicate => 'isProkaryotic'
-# );
-
-
-# has serverMode  => (
-#   metaclass => 'Getopt',
-#   is => 'ro',
-#   isa => 'Bool',
-#   cmd_aliases => 'qw/s server/',
-#   required => 0,
-#   default => 0,
-#   documentation => qq{Enables persistent server mode}
-# );
-
-#private vars
-
-# has _prokAnnotatorPath => (
-#   is       => 'ro',
-#   isa      => AbsFile,
-#   required => 1,
-#   init_arg => undef,
-#   default  => sub {
-#     return path( abs_path(__FILE__) )->absolute('/')
-#       ->parent->parent->child('./bin/prokaryotic_annotator/vcf-annotator');
-#   }
-# );

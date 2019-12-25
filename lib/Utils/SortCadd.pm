@@ -37,11 +37,11 @@ sub BUILD {
     $self->_wantedTrack->{name}, $self->_wantedTrack->{local_files});
 }
 
-sub sort {
+sub go {
   my $self = shift;
 
   my %wantedChrs = map { $_ => 1 } @{ $self->_decodedConfig->{chromosomes} };
-    
+
   # record out paths so that we can unix sort those files
   my @outPaths;
   my %outFhs;
@@ -56,13 +56,13 @@ sub sort {
     my $outPathBase = substr($inFilePath, 0, rindex($inFilePath, '.') );
 
     $outPathBase =~ s/\.(chr[\w_\-]+)//;
-    
+
     # Store output handles by chromosome, so we can write even if input file
     # out of order
     $self->log('info', "Out path base: $outPathBase");
     $self->log('info', "Reading input file: $inFilePath");
-    
-    my (undef, $compressed, $readFh) = $self->get_read_fh($inFilePath);
+
+    my (undef, $compressed, $readFh) = $self->getReadFh($inFilePath, undef, 'fatal');
 
     my $versionLine = <$readFh>;
     my $headerLine = <$readFh>;
@@ -101,7 +101,7 @@ sub sort {
         my $outPath = "$outPathBase.$chr$outExt";
 
         $self->log('info', "Found $chr in $inFilePath; creating $outPath");
-        
+
         push @outPaths, $outPath;
 
         if(-e $outPath && !$self->overwrite) {
@@ -109,18 +109,18 @@ sub sort {
           last;
         }
 
-        $outFhs{$chr} = $self->get_write_fh($outPath);
+        $outFhs{$chr} = $self->getWriteFh($outPath);
 
         $fh = $outFhs{$chr};
 
         print $fh $versionLine;
         print $fh $headerLine;
       }
-      
+
       print $fh $l;
     }
   }
-  
+
   for my $outFh (values %outFhs) {
     close $outFh;
   }
@@ -148,7 +148,7 @@ sub sort {
   for my $outPath (@outPaths) {
     my $gzipPath = $self->gzip;
 
-    my (undef, $compressed, $fh) = $self->get_read_fh($outPath);
+    my (undef, $compressed, $fh) = $self->getReadFh($outPath, undef, 'fatal');
 
     my $outExt = '.sorted' . $outExtPart;
 
@@ -186,13 +186,11 @@ sub sort {
 
   $self->_wantedTrack->{local_files} = \@finalOutPaths;
 
-  $self->_wantedTrack->{sortCadd_date} = $self->_dateOfRun;
-
   # Make sure that we indicate to the user that cadd is guaranteed to be sorted
   # This speeds up cadd building
-  $self->_wantedTrack->{sorted_guaranteed} = 1;
+  $self->_wantedTrack->{sorted} = 1;
 
-  $self->_backupAndWriteConfig();
+  $self->_backupAndWriteConfig('sortCadd');
 }
 
 __PACKAGE__->meta->make_immutable;

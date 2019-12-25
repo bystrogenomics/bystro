@@ -4,11 +4,15 @@ For most users, we recommend not installing the software, and using https://byst
 
 The web app provides full functionality for any size experiment (up to 890GB uncompressed/129GB compressed tested), a convenient search interface, and excellent performance
 
-# Docker (recommended)
+## Docker
 
-###### Make sure you have [Docker installed](https://store.docker.com/search?type=edition&offering=community)
+###### The recommended way to use Bystro on the command line
 
-```sh
+Make sure you have [Docker installed](https://store.docker.com/search?type=edition&offering=community)
+
+#### Building the latest version of Bystro in Docker
+
+```
 git clone https://github.com/akotlar/bystro.git && cd bystro
 docker build -t bystro .
 docker run bystro bystro-annotate.pl #Annotate
@@ -53,9 +57,9 @@ The downloaded databases are tar balls, in which the database files that Bystro 
 
    **Example:**
 
-   ```shell
-   pigz -d -c hg38.tar.gz | (cd /where/to/ && tar xvf -)
-   ```
+   ````shell
+   pigz -d -c hg38.tar.gz | (cd /where/to/ && tar xvf -)```
+   ````
 
    In this example the hg38 database would located in `/where/to/hg38/index`
 

@@ -26,13 +26,9 @@ sub okToBuild {
   my ($self, $chr) = @_;
 
   if($self->_isCompleted($chr) ) {
-    if(!$self->db->delete && !$self->skipCompletionCheck) {
+    if(!$self->skipCompletionCheck) {
       $self->log('debug', "$chr recorded completed for " . $self->name . ". Skipping");
       return 0;
-    }
-    # Else we're either erasing or re-creating the db; need to erase completion status
-    if(!$self->db->dryRun) {
-      $self->_eraseCompletionMeta($chr);
     }
   }
 
@@ -42,18 +38,8 @@ sub okToBuild {
 sub recordCompletion {
   my ($self, $chr) = @_;
 
-  # Note that is $self->delete is set, dbPatchMeta will result in deletion of 
-  # the $chr record, ensuring that recordCompletion becomes a deletion operation
-  # Except this is more clear, and better log message.
-  if($self->db->delete) {
-    return $self->log('debug', "Delete set, not recording completion of $chr for ". $self->name);
-  }
-
-  if($self->db->dryRun) {
-    return $self->log('debug', "dryRun set, not recording completion of $chr for ". $self->name);
-  }
-
   # overwrite any existing entry for $chr
+  # dbPatchMeta syncs the meta db automatically
   my $err = $self->db->dbPatchMeta($self->name, $metaKey, { $chr => 1 }, 1 );
 
   if($err) {

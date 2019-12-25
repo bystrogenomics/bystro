@@ -11,18 +11,23 @@ our $VERSION = '0.001';
 
 use Mouse 2;
 use namespace::autoclean;
-use DDP;
-extends 'Seq::Tracks::Get';
 
-__PACKAGE__->meta->make_immutable;
+extends 'Seq::Tracks::Get';
 
 sub BUILD {
   my $self = shift;
   $self->{_altIdx} = $self->getFieldDbName('alt');
 
   if(!defined $self->{_altIdx}) {
-    die "Couldn't find 'alt' feature, required for Vcf tracks";
+    $self->log('fatal', $self->name . ": couldn't find 'alt' feature, required for vcf tracks");
   }
+
+  # Skip accesor penalty, the get function in this package may be called
+  # hundreds of millions of times
+  # Provided by Seq::Tracks::Get
+  # $self->{_dbName} = $self->dbName;
+  # $self->{_fDb} = [map { $self->getFieldDbName($_) } @{$self->features}];
+  # $self->{_fIdx} = [0 .. $#{$self->features}];
 }
 
 sub get {
@@ -33,21 +38,20 @@ sub get {
   # $_[2] == <String> $chr  : the chromosome
   # $_[3] == <String> $refBase : ACTG
   # $_[4] == <String> $allele  : the allele (ACTG or -N / +ACTG)
-  # $_[5] == <Int> $alleleIdx  : if this is a single-line multiallelic, the allele index
-  # $_[6] == <Int> $positionIdx : the position in the indel, if any
-  # $_[7] == <ArrayRef> $outAccum : a reference to the output, which we mutate
+  # $_[5] == <Int> $posIdx : the position in the indel, if any
+  # $_[6] == <ArrayRef> $outAccum : a reference to the output, which we mutate
 
   # Unlike other tracks, for Vcf, we only return exact matches
   # So tiling across the entire deleted region isn't appropriate
   # Could result in false positives during search
-  if($_[6] > 0) {
-    return $_[7];
+  if($_[5] > 0) {
+    return $_[6];
   }
 
   my $data = $_[1]->[$_[0]->{_dbName}];
 
-  if(!defined $data) {
-    return $_[7];
+  if(!$data) {
+    return $_[6];
   }
 
   my $alt = $data->[$_[0]->{_altIdx}];
@@ -60,16 +64,15 @@ sub get {
     if($alt eq $_[4]) {
       # Alt is a scalar, which means there were no overlapping database values
       # at this pposiiton, and all fields represent a single value
-      for my $idx (@{$_[0]->{_fieldIdxRange}}) {
-        #$outAccum->[$idx][$alleleIdx][$positionIdx] = $href->[$self->{_dbName}][$self->{_fieldDbNames}[$idx]] }
-        $_[7]->[$idx][$_[5]][$_[6]] = $data->[$_[0]->{_fieldDbNames}[$idx]];
+      for my $i (@{$_[0]->{_fIdx}}) {
+        #$outAccum->[$idx][$alleleIdx][$posIdx] = $data->[$self->{_fDb}[$i]] }
+        $_[6]->[$i][$_[5]] = $data->[$_[0]->{_fDb}[$i]];
       }
     }
 
-    return $_[7];
+    return $_[6];
   }
 
- 
   # If $alt is a reference (expect array: if not, this is a programmatic error 
   # which we allow to crash the program)
   # then find the matching alt if any, record its index in the database array,
@@ -77,15 +80,16 @@ sub get {
   # All fields are required to have the same depth, during building
   my $dataIdx = 0;
 
+  # Linear search; slow if many alleles, but we expect that at every site has <= 10 alleles
   for my $alt (@$alt) {
     if($alt eq $_[4]) {
-      for my $fieldIdx (@{$_[0]->{_fieldIdxRange}}) {
-        #$outAccum->[$fieldIdx][$alleleIdx][$positionIdx] = $data->[$self->{_fieldDbNames}[$dataIdx]] }
-        $_[7]->[$fieldIdx][$_[5]][$_[6]] = $data->[$_[0]->{_fieldDbNames}[$fieldIdx]][$dataIdx];
+      for my $i (@{$_[0]->{_fIdx}}) {
+        #$outAccum->[$i][$posIdx] = $data->[$self->{_fDb}[$dataIdx]] }
+        $_[6]->[$i][$_[5]] = $data->[$_[0]->{_fDb}[$i]][$dataIdx];
       }
 
       #return $outAccum;
-      return $_[7];
+      return $_[6];
     }
 
     $dataIdx++;
@@ -94,7 +98,7 @@ sub get {
   # If we got to this point, we found nothing.
   # Note that unlike other tracks that tile across indels, we return a single
   # undef, rather than per-alt or per-position in indel
-  return $_[7];
+  return $_[6];
 }
 
 __PACKAGE__->meta->make_immutable;

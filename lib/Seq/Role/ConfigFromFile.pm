@@ -57,23 +57,35 @@ sub new_with_config {
   my $hash = LoadFile($config);
   %opts = ( %$hash, %$opts );
 
+  # If no "tracks object, nothing left to do"
+  if(! $opts{$tracksKey} ) {
+    $class->new( \%opts );
+    return;
+  }
+
+  my $trackConfig;
+
+  if(ref $opts{$tracksKey} eq 'ARRAY') {
+    # Back compatibility with b10
+    my $temp = $opts{$tracksKey};
+
+    $opts{$tracksKey} = {
+      $tracksKey => $temp
+    };
+  }
+
   #Now push every single global option into each individual track
   #Since they are meant to operate as independent units
   my @nonTrackKeys = grep { $_ ne $tracksKey } keys %opts;
 
-  if( ref $opts{$tracksKey} ne 'ARRAY') {
+  if( ref $opts{$tracksKey}{$tracksKey} ne 'ARRAY') {
     croak "expect $tracksKey to contain an array of data";
   }
 
-  for my $trackHref ( @{ $opts{$tracksKey} } ) {
+  for my $trackHref ( @{ $opts{$tracksKey}{$tracksKey} } ) {
     for my $key (@nonTrackKeys) {
       $trackHref->{$key} = $opts{$key};
     }
-  }
-
-  if ( $opts{debug} ) {
-    say "Data for Role::ConfigFromFile::new_with_config()";
-    p %opts;
   }
 
   $class->new( \%opts );

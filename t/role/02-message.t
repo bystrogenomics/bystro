@@ -23,26 +23,30 @@ package TestMessage;
 use Test::More;
 use DDP;
 
-plan tests => 10;
-
 my $mocker = Mock->new();
 
 $mocker->log('warn', "HELLO WORLD");
 
-my $fh = $mocker->get_read_fh($mocker->logPath);
+my ($err, undef, $fh) = $mocker->getReadFh($mocker->logPath);
+ok(!$err, 'No error gets generated on reading fh');
 
 my @lines = <$fh>;
+
+$err = $mocker->safeClose($fh);
+ok(!$err, 'No error gets generated on closing fh');
 
 ok(@lines == 1, 'Only one line gets written');
 ok(index($lines[0], "HELLO WORLD") > -1, 'By default warnings allowed');
 
-close($fh);
-
 $mocker = Mock->new();
 
-$fh = $mocker->get_read_fh($mocker->logPath);
+($err, undef, $fh) = $mocker->getReadFh($mocker->logPath);
+ok(!$err, 'No error gets generated on reading fh nth time');
 
 @lines = <$fh>;
+
+$err = $mocker->safeClose($fh);
+ok(!$err, 'No error gets generated on closing fh nth time');
 
 ok(@lines == 0, "Log file gets cleared");
 
@@ -50,13 +54,15 @@ $mocker->setLogLevel('fatal');
 
 $mocker->log('warn', "A different warning");
 
-$fh = $mocker->get_read_fh($mocker->logPath);
+($err, undef, $fh) = $mocker->getReadFh($mocker->logPath);
+ok(!$err, 'No error gets generated on reading fh nth time');
 
 @lines = <$fh>;
 
-ok(!@lines, "setLogLevel sets log level to fatal, and warning messages don't get stored");
+$err = $mocker->safeClose($fh);
+ok(!$err, 'No error gets generated on closing fh nth time');
 
-close($fh);
+ok(!@lines, "setLogLevel sets log level to fatal, and warning messages don't get stored");
 
 $mocker = Mock->new();
 
@@ -64,25 +70,28 @@ $mocker->setLogLevel('info');
 
 $mocker->log('warn', "A warning above info");
 
-$fh = $mocker->get_read_fh($mocker->logPath);
+($err, undef, $fh) = $mocker->getReadFh($mocker->logPath);
+ok(!$err, 'No error gets generated on reading fh nth time');
 
 @lines = <$fh>;
+$err = $mocker->safeClose($fh);
 
-# If we don't close here, we won't be able to read the file properly
-close($fh);
+ok(!$err, 'No error gets generated on closing fh nth time');
 
 ok(index($lines[0], 'A warning above info') > -1, "Role::Message sets info level, and writes warning messages");
-
 
 $mocker = Mock->new();
 $mocker->log('warn', "A new warning above info");
 $mocker->log('info', "An info message");
 $mocker->log('error', "An error message");
 
-$fh = $mocker->get_read_fh($mocker->logPath);
+($err, undef, $fh) = $mocker->getReadFh($mocker->logPath);
+ok(!$err, 'No error gets generated on reading fh nth time');
+
 @lines = <$fh>;
 
-close($fh);
+$err = $mocker->safeClose($fh);
+ok(!$err, 'No error gets generated on closing fh nth time');
 
 ok(@lines == 3, 'Role::Message properly writes multiple lines');
 ok(index($lines[0], 'A new warning above info') > -1, "Role::Message doesn't overwrite previous messages");
@@ -98,3 +107,5 @@ try {
 };
 
 system('rm ' . $mocker->logPath);
+
+done_testing();

@@ -26,7 +26,7 @@ $Seq::Role::Message::LOG = Log::Fast->new({
   level           => 'INFO',
   prefix          =>  '%D %T ',
   type            => 'fh',
-  fh              => \*STDOUT,
+  fh              => \*STDERR,
 });
 
 $Seq::Role::Message::mapLevels = {
@@ -77,18 +77,18 @@ sub setLogPath {
   my ($self, $path) = @_;
   #open($Seq::Role::Message::Fh, '<', $path);
 
+  #Results in deep recursion issue if we include Seq::Role::IO (which requires Role::Message
   open(my $fh, '>', $path) or die "Couldn't open log path $path";
+
   #$AnyEvent::Log::LOG->log_to_file ($path);
   $Seq::Role::Message::LOG->config({
-    #Resutls in deep recursion issue if we include Seq::Role::IO (which requires Role::Message
-    #: fh => $self->get_write_fh($path),
     fh => $fh,
   });
 }
 
 sub setLogLevel {
   my ($self, $level) = @_;
-  
+
   our $mapLevels;
 
   if($level =~ /debug/i) {
@@ -100,10 +100,10 @@ sub setLogLevel {
 
 sub setVerbosity {
   my ($self, $verboseLevel) = @_;
-  
+
   if($verboseLevel != 0 && $verboseLevel != 1 && $verboseLevel != 2) {
     # Should log this
-    say "Verbose level must be 0, 1, or 2, setting to 10000 (no verbose output)";
+    say STDERR "Verbose level must be 0, 1, or 2, setting to 10000 (no verbose output)";
     $verbose = 10000;
     return;
   }
@@ -139,9 +139,9 @@ sub publishMessage {
 
   # because predicates don't trigger builders, need to check hasPublisherAddress
   return unless $publisher;
-  
+
   $messageBase->{data} = $_[1];
-  
+
   $publisher->put({
     priority => 0,
     data => encode_json($messageBase),
@@ -191,7 +191,7 @@ sub log {
     # $_[0]->publishMessage( "Warning: $_[2]" );
   } elsif( $_[1] eq 'error' ) {
     $Seq::Role::Message::LOG->ERR( "[$_[1]] $_[2]" );
-    
+
     $_[0]->publishMessage( "Error: $_[2]" );
   } elsif( $_[1] eq 'fatal' ) {
     $Seq::Role::Message::LOG->ERR( "[$_[1]] $_[2]" );
@@ -206,7 +206,7 @@ sub log {
   # So if verbosity is set to 1, only err, warn, and fatal messages
   # will be printed to sdout
   if($verbose <= $mapSeverity{$_[1]}) {
-    say "[$_[1]] $_[2]" ;
+    say STDERR "[$_[1]] $_[2]" ;
   }
 
   return;

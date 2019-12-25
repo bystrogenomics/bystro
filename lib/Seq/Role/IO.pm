@@ -14,6 +14,7 @@ use Mouse::Role;
 use PerlIO::utf8_strict;
 use PerlIO::gzip;
 use File::Which qw/which/;
+use Sys::CpuAffinity;
 
 use Path::Tiny;
 use Try::Tiny;
@@ -23,13 +24,13 @@ with 'Seq::Role::Message';
 # tried various ways of assigning this to an attrib, with the intention that
 # one could change the taint checking characters allowed but this is the simpliest
 # one that worked; wanted it precompiled to improve the speed of checking
-our $taint_check_regex = qr{\A([\+\,\.\-\=\:\/\t\|\s\w\d/]+)\z};
+my $taintCheckRegex = qr{\A([\+\,\.\-\=\:\/\t\|\s\w\d/]+)\z};
 
-has taint_check_regex => (
+has taintCheckRegex => (
   is => 'ro',
   lazy => 1,
   init_arg => undef,
-  default => sub{ $taint_check_regex },
+  default => sub{ $taintCheckRegex },
 );
 
 has delimiter => (
@@ -40,79 +41,172 @@ has delimiter => (
 );
 
 my $tar = which('tar');
-my $gzip = which('pigz') || which('gzip');
+my $gzip = which('bgzip') || which('pigz') || which('gzip');
+my $lz4 = which('lz4');
 
 # Without this, pigz -d -c issues many system calls (futex)
 # Thanks to Meltdown, this slows decompression substantially
 # Up to 1 core will be used solely for meltdown-related overhead
 # So disable mutli-threading
 # For compression, tradeoff still worth it
-my $decompressArgs = '-d -c';
+my $gzipDcmpArgs = '-d -c';
 if($gzip =~ /pigz/) {
- $decompressArgs = "-p 1 $decompressArgs";
+ $gzipDcmpArgs = "-p 1 $gzipDcmpArgs";
+} elsif($gzip =~ /bgzip/) {
+  $gzipDcmpArgs = "--threads ". Sys::CpuAffinity::getNumCpus() . " $gzipDcmpArgs";
 }
 
-my $tarCompressed = "$tar --use-compress-program=$gzip";
+my $gzipCmpArgs = '-c';
+if($gzip =~ /bgzip/) {
+  $gzipCmpArgs = "--threads ". Sys::CpuAffinity::getNumCpus();
+}
+
+my $tarCompressedGzip = "$tar --use-compress-program=$gzip";
+my $tarCompressedLZ4 = "$tar --use-compress-program=$lz4";
 
 has gzip => (is => 'ro', isa => 'Str', init_arg => undef, lazy => 1, default => sub {$gzip});
-has decompressArgs => (is => 'ro', isa => 'Str', init_arg => undef, lazy => 1, default => sub {$decompressArgs});
+has decompressArgs => (is => 'ro', isa => 'Str', init_arg => undef, lazy => 1, default => sub {$gzipDcmpArgs});
 
+sub getReadArgs {
+  my ($self, $filePath) = @_;
+
+  my ($remoteCpCmd, $remoteFileSizeCmd) = $self->getRemoteProg($filePath);
+  my $outerCommand = $self->getCompressProgWithArgs($filePath);
+
+  if($remoteCpCmd) {
+    if($outerCommand) {
+      $outerCommand = "$remoteCpCmd | $outerCommand -"
+    } else {
+      $outerCommand = "$remoteCpCmd";
+    }
+  } elsif($outerCommand) {
+    $outerCommand = "$outerCommand $filePath";
+  }
+
+  return $outerCommand;
+}
 #@param {Path::Tiny} $file : the Path::Tiny object representing a single input file
 #@param {Str} $innerFile : if passed a tarball, we will want to stream a single file within
 #@return file handle
-# TODO: return error, don't die
-sub get_read_fh {
-  my ( $self, $file, $innerFile) = @_;
-  my $fh;
-  
-  if(ref $file ne 'Path::Tiny' ) {
-    $file = path($file)->absolute;
+sub getReadFh {
+  my ( $self, $file, $innerFile, $errCode) = @_;
+
+  # By default, we'll return an error, rather than die-ing with log
+  # We wont be able to catch pipe errors however
+  if(!$errCode) {
+    $errCode = 'error';
   }
 
-  my $filePath = $file->stringify;
-
-  if (!$file->is_file) {
-    $self->log('fatal', "$filePath does not exist for reading");
-    die;
+  my $filePath;
+  if(ref $file eq 'Path::Tiny' ) {
+    $filePath = $file->stringify;
+  } else {
+    $filePath = $file;
   }
 
-  my $compressed = 0;
-  my $err;
-  if($innerFile) {
-    $compressed = $innerFile =~ /\.gz$/ || $innerFile =~ /\.bgz$/ || $innerFile =~ /\.zip$/;
+  my $outerCommand = $self->getReadArgs($filePath);
 
-    my $innerCommand = $compressed ? "\"$innerFile\" | $gzip $decompressArgs -" : "\"$innerFile\"";
-    # We do this because we have not built in error handling from opening streams
+  if(!$innerFile) {
+    my ($err, $fh);
 
-    my $command;
-    my $outerCompressed;
-    if($filePath =~ /\.tar.gz$/) {
-      $outerCompressed = 1;
-      $command = "$tarCompressed -O -xf \"$filePath\" $innerCommand";
-    } elsif($filePath =~ /\.tar$/) {
-      $command = "$tar -O -xf \"$filePath\" $innerCommand";
+    if($outerCommand) {
+      $err = $self->safeOpen($fh, '-|', "$outerCommand", $errCode);
     } else {
-      $self->log('fatal', "When inner file provided, must provde a parent file.tar or file.tar.gz");
-      die;
+      $err = $self->safeOpen($fh, '<', $filePath, $errCode);
     }
 
-    open ($fh, '-|', $command) or $self->log('fatal', "Failed to open $filePath ($innerFile) due to $!");
+    my $compressed = !!$outerCommand;
 
-    # From a size standpoint a tarball and a tar file whose inner annotation is compressed are similar
-    # since the annotation dominate
-    $compressed = $compressed || $outerCompressed;
-    # If an innerFile is passed, we assume that $file is a path to a tarball
-  } elsif($filePath =~ /\.gz$/ || $filePath =~ /\.bgz$/ || $filePath =~ /\.zip$/) {
-    $compressed = 1;
-    #PerlIO::gzip doesn't seem to play nicely with MCE, reads random number of lines
-    #and then exits, so use gunzip, standard on linux, and faster
-    open ($fh, '-|', "$gzip $decompressArgs \"$filePath\"") or $self->log('fatal', "Failed to open $filePath due to $!");
+    return ($err, $compressed, $fh);
+  }
+
+
+  # TODO: Check that file exists again
+  # my $filePath;
+  # if($remoteCpCmd) {
+  #   $filePath =
+  #   if(ref $file ne 'Path::Tiny' ) {
+  #   $file = path($file)->absolute;
+
+  #   my $filePath = $file->stringify;
+  # }
+
+
+  # if (!$file->is_file) {
+  #   my $err = "$filePath does not exist for reading";
+  #   $self->log($errCode, $err);
+
+  #   return ($err, undef, undef);
+  # }
+
+  # TODO: FIX
+  # if($innerFile) {
+  #   my ($err, $compressed, $command) = $self->getInnerFileCommand($filePath, $innerFile, $errCode);
+
+  #   if($err) {
+  #     return ($err, undef, undef);
+  #   }
+
+  #   $err = $self->safeOpen(my $fh, '-|', $command, $errCode);
+
+  #   # If an innerFile is passed, we assume that $file is a path to a tarball
+
+  #   return ($err, $compressed, $fh);
+  # }
+
+
+
+}
+
+sub getRemoteProg {
+  my ($self, $filePath) = @_;
+
+  if($filePath =~ /^s3:\/\//) {
+    return ("aws s3 cp $filePath -", "");
+  }
+
+  if($filePath =~ /^gs:\/\//) {
+    return ("gsutil cp $filePath -", "");
+  }
+
+  return "";
+}
+
+sub getInnerFileCommand {
+  my ($self, $filePath, $innerFile, $errCode) = @_;
+
+  if(!$errCode) {
+    $errCode = 'error';
+  }
+
+  my $compressed = $innerFile =~ /[.]gz$/ || $innerFile =~ /[.]bgz$/ || $innerFile =~ /[.]zip$/ || $filePath =~ /[.]lz4$/;
+
+  my $innerCommand;
+  if($filePath =~ /[.]lz4$/) {
+    $innerCommand = $compressed ? "\"$innerFile\" | $lz4 -d -c -" : "\"$innerFile\"";
   } else {
-    open ($fh, '-|', "cat \"$filePath\"") or $self->log('fatal', "Failed to open $filePath due to $!");
-  };
+    $innerCommand = $compressed ? "\"$innerFile\" | $gzip $gzipDcmpArgs -" : "\"$innerFile\"";
+  }
 
-  # TODO: return errors, rather than dying
-  return ($err, $compressed, $fh);
+  # We do this because we have not built in error handling from opening streams
+
+  my $err;
+  my $command;
+  my $outerCompressed;
+
+  if($filePath =~ /[.]tar/) {
+    $command = "$tar -O -xf - $innerCommand";
+  } else {
+    $err = "When inner file provided, must provde a parent file.tar or file.tar.gz";
+
+    $self->log($errCode, $err);
+
+    return ($err, undef, undef);
+  }
+
+  # If an innerFile is passed, we assume that $file is a path to a tarball
+
+  return ($err, $compressed, $command);
 }
 
 # Is the file a single compressed file
@@ -121,42 +215,138 @@ sub isCompressedSingle {
 
   my $basename = path($filePath)->basename();
 
-  if($basename =~ /tar.gz$/) {
+  if($basename =~ /tar[.]gz$/) {
     return 0;
   }
 
-  return $basename =~ /\.gz$/ || $basename =~ /\.bgz$/ || $basename =~ /\.zip$/;
+  if($basename =~ /[.]gz$/ || $basename =~ /[.]bgz$/ || $basename =~ /[.]zip$/ ) {
+    return "gzip";
+  }
+
+  if($basename =~ /[.]lz4$/) {
+    return "lz4";
+  }
+
+  return "";
+}
+
+sub getCompressProgWithArgs {
+  my ($self, $filePath) = @_;
+
+  my $ext = $self->isCompressedSingle($filePath);
+
+  if(!$ext) {
+    return "";
+  }
+  if($ext eq 'gzip') {
+    return "$gzip $gzipDcmpArgs";
+  }
+  if($ext eq 'lz4') {
+    return "$lz4 -d -c";
+  }
 }
 
 # TODO: return error if failed
-sub get_write_fh {
-  my ( $self, $file, $compress ) = @_;
+sub getWriteFh {
+  my ( $self, $file, $compress, $errCode ) = @_;
 
-  $self->log('fatal', "get_fh() expected a filename") unless $file;
-
-  my $fh;
-  if ( $compress || $file =~ /\.gz$/ || $file =~ /\.bgz$/ || $file =~ /\.zip$/ ) {
-    # open($fh, ">:gzip", $file) or die $self->log('fatal', "Couldn't open $file for writing: $!");
-    open($fh, "|-", "$gzip -c > $file") or $self->log('fatal', "Couldn't open gzip $file for writing");
-  } else {
-    open($fh, ">", $file) or return $self->log('fatal', "Couldn't open $file for writing: $!");
+  # By default, we'll return an error, rather than die-ing with log
+  # We wont be able to catch pipe errors however
+  if(!$errCode) {
+    $errCode = 'error';
   }
 
-  return $fh;
+  my $err;
+
+  if(!$file) {
+    $err = 'get_fh() expected a filename';
+    $self->log($errCode, $err);
+
+    return ($err, undef);
+  }
+
+  my $fh;
+  my $hasGz = $file =~ /[.]gz$/ || $file =~ /[.]bgz$/ || $file =~ /[.]zip$/;
+  my $hasLz4 = $file =~ /[.]lz4$/;
+  if ( $hasGz || $hasLz4 || $compress) {
+    if($hasLz4 || ($compress && $compress =~ /[.]lz4$/)) {
+      $err = $self->safeOpen($fh, "|-", "$lz4 -c > $file", $errCode);
+    } else {
+      $err = $self->safeOpen($fh, "|-", "$gzip $gzipCmpArgs > $file", $errCode);
+    }
+
+  } else {
+    $err = $self->safeOpen($fh, ">", $file, $errCode);
+  }
+
+  return ($err, $fh);
+}
+
+# Allows user to return an error, dies with loggin by default
+sub safeSystem {
+  my ($self, $cmd, $errCode) = @_;
+
+  my $return = system($cmd);
+
+  if($return > 0) {
+    $self->log($errCode || 'debug', "Failed to execute $cmd. Return: $return, due to: $! ($?)");
+    return $!;
+  }
+
+  return;
+}
+
+# Allows user to return an error; dies with logging by default
+sub safeOpen {
+  #my ($self, $fh, $operator, $operand, $errCode) = @_;
+  #    $_[0], $_[1], $_[2],   $_[3], $_[4]
+
+  # In some cases, file attempting to be read may not have been flushed
+  # Clearest case is Log::Fast
+  my $err = $_[0]->safeSystem('sync');
+
+  # Modifies $fh/$_[1] by reference
+  if($err || !open($_[1], $_[2], $_[3])) {
+    $err = $err || $!;
+
+    #$self    #$errCode                      #$operand
+    $_[0]->log($_[4] || 'debug', "Couldn't open $_[3]: $err ($?)");
+    return $err;
+  }
+
+  return;
+}
+
+sub safeClose {
+  my ($self, $fh, $errCode) = @_;
+
+  my $err = $self->safeSystem('sync');
+
+  if ($err) {
+    $self->log($errCode || 'debug', "Couldn't sync before close due to: $err");
+    return $err;
+  }
+
+  if (!close($fh)) {
+    $self->log($errCode || 'debug', "Couldn't close due to: $! ($?)");
+    return $!;
+  }
+
+  return;
 }
 
 sub getCleanFields {
   my ( $self, $line ) = @_;
 
   chomp $line;
-  if ( $line =~ m/$taint_check_regex/xm ) {
+  if ( $line =~ m/$taintCheckRegex/xm ) {
     my @out;
 
     push @out, split $self->delimiter, $1;
 
     return \@out;
   }
-  
+
   return undef;
 }
 
@@ -260,7 +450,7 @@ sub makeTarballName {
 sub compressDirIntoTarball {
   my ($self, $dir, $tarballName) = @_;
 
-  if(!$tar) { 
+  if(!$tar) {
     $self->log( 'warn', 'No tar program found');
     return 'No tar program found';
   }
@@ -268,7 +458,7 @@ sub compressDirIntoTarball {
   if(ref $dir) {
     $dir = $dir->stringify;
   }
-  
+
   if(!$tarballName) {
     $self->log('warn', 'must provide baseName or tarballName');
     return 'Must provide baseName or tarballName';
@@ -287,7 +477,7 @@ sub compressDirIntoTarball {
     return 'Directory is empty';
   }
 
-  my $tarProg = $tarballName =~ /tar.gz$/ ? $tarCompressed : $tar;
+  my $tarProg = $tarballName =~ /tar.gz$/ ? $tarCompressedGzip : ($tarballName =~ /tar.lz4$/ ? $tarCompressedLZ4 : "tar");
   my $tarCommand = sprintf("cd %s; $tarProg --exclude '.*' --exclude %s -cf %s * --remove-files",
     $dir,
     $tarballName, #and don't include our new compressed file in our tarball
@@ -295,23 +485,28 @@ sub compressDirIntoTarball {
   );
 
   $self->log('debug', "compress command: $tarCommand");
-    
-  if(system($tarCommand) ) {
-    $self->log( 'warn', "compressDirIntoTarball failed with $?" );
-    return $?;
-  }
 
-  return 0;
+  my $err = $self->safeSystem($tarCommand);
+
+  return $err;
 }
 
 sub getCompressedFileSize {
   my ($self, $filePath) = @_;
 
-  if(!$self->isCompressedSingle($filePath)) {
+  my $extType = $self->isCompressedSingle($filePath);
+  if(!$extType) {
     return ('Expect compressed file', undef);
   }
 
-  open(my $fh, "-|", "$gzip -l " . path($filePath)->stringify);
+  my $gzProg = $extType eq 'gzip' ? $gzip : $lz4;
+
+  my $err = $self->safeOpen(my $fh, "-|", "$gzProg -l " . path($filePath)->stringify);
+
+  if($err) {
+    return ($err, undef);
+  }
+
   <$fh>;
   my $sizeLine = <$fh>;
 
@@ -328,7 +523,18 @@ sub getCompressedFileSize {
 
 # returns chunk size in kbytes
 sub getChunkSize {
-  my ($self, $filePath, $parts) = @_;
+  my ($self, $filePath, $parts, $min, $max) = @_;
+
+  # If given 0
+  $parts ||= 1;
+
+  if(!$min) {
+    $min = 512;
+  }
+
+  if(!$max) {
+    $max = 32768;
+  }
 
   my $size = path($filePath)->stat()->size;
 
@@ -347,13 +553,13 @@ sub getChunkSize {
 
   my $chunkSize = CORE::int($size / ($parts * 4096));
 
-  if ($chunkSize < 512) {
-    return (undef, 512);
+  if ($chunkSize < $min) {
+    return (undef, $min);
   }
 
   # Cap to make sure memory usage doesn't grow uncontrollably
-  if ($chunkSize > 1536) {
-    return (undef, 1536);
+  if ($chunkSize > $max) {
+    return (undef, $max);
   }
 
   return (undef, $chunkSize);

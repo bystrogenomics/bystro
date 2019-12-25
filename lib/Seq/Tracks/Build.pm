@@ -19,24 +19,23 @@ use Seq::DBManager;
 use Seq::Tracks::Build::CompletionMeta;
 use Seq::Tracks::Base::Types;
 use Seq::Tracks::Build::LocalFilesPaths;
-use Seq::Output;
+use Seq::Output::Delimiters;
+
+# Faster than regex trim
+use String::Strip qw/StripLTSpace/;
 
 extends 'Seq::Tracks::Base';
-# All builders need get_read_fh
+# All builders need getReadFh
 with 'Seq::Role::IO';
 
 #################### Instance Variables #######################################
 ############################# Public Exports ##################################
-has delete => (is => 'ro', lazy => 1, default => 0);
-
-has dryRun => (is => 'ro');
-
 has skipCompletionCheck => (is => 'ro');
 
 # Every builder needs access to the database
 # Don't specify types because we do not allow consumers to set this attribute
-has db => (is => 'ro', init_arg => undef, default => sub { my $self = shift;
-  return Seq::DBManager->new({delete => $self->delete, dryRun => $self->dryRun});
+has db => (is => 'ro', init_arg => undef, default => sub {
+  return Seq::DBManager->new();
 });
 
 # Allows consumers to record track completion, skipping chromosomes that have 
@@ -51,11 +50,12 @@ has completionMeta => (is => 'ro', init_arg => undef, default => sub { my $self 
 has commitEvery => (is => 'rw', isa => 'Int', lazy => 1, default => 2e4);
 
 # All tracks want to know whether we have 1 chromosome per file or not
-has chrPerFile => (is => 'ro', init_arg => undef, writer => '_setChrPerFile');
+# If this flag is set, then the consumer can choose to skip entire files
+# if an unexpected chr is found, or if the expected chr is recorded completed
+# Change from b9: this now needs to be manually set, opt-in
+has chrPerFile => (is => 'ro', isa => 'Bool', default => 0);
 
-has max_threads => (is => 'ro', isa => 'Int', lazy => 1, default => sub { my $self = shift;
-  return scalar @{$self->local_files};
-});
+has maxThreads => (is => 'ro', isa => 'Int', lazy => 1, default => 8);
 ########## Arguments taken from YAML config file or passed some other way ##############
 
 #################################### Required ###################################
@@ -101,15 +101,15 @@ has build_field_transformations => (
   default => sub { {} },
 );
 
-# TODO: config output;
-has _emptyFieldRegex => (is => 'ro', isa => 'RegexpRef', init_arg => undef, default => sub { 
-  my $output = Seq::Output->new();
+# The user can rename any input field, this will be used for the feature name
+# This makes it possible to store any name in the db, output file, in place
+# of the field name in the source file used to make the db
+# if fieldMap isn't specified, this property  will be filled with featureName => featureName
+has fieldMap => (is => 'ro', isa => 'HashRef', lazy => 1, default => sub {
+  my $self = shift;
+  my %data = map { $_ => $_ } @{$self->features};
 
-  my $emptyField = $output->delimiters->emptyFieldChar;
-
-  my $regex = qr/^\s*$emptyField\s*$/;
-
-  return $regex;
+  return \%data;
 });
 
 ################################ Constructor ################################
@@ -127,7 +127,15 @@ sub BUILD {
       . "assume there is only one chromosome per file, and that 1 chromosome isn't accounted for.");
   }
 
-  $self->_setChrPerFile(@allLocalFiles > 1 ? 1 : 0);
+  my $d = Seq::Output::Delimiters->new();
+  $self->{_cleanDelims} = $d->cleanDelims;
+  $self->{_missChar} = $d->emptyFieldChar;
+  $self->{_replChar} = $d->globalReplaceChar;
+  # Commit, sync, and remove any databases opened
+  # This is useful because locking may occur if there is an open transaction
+  # before fork(), and to make sure that any database meta data is properly
+  # committed before tracks begin to use that data.
+  Seq::DBManager::cleanUp();
 }
 
 # Configure local_files as abs path, and configure required field (*_field_name)
@@ -138,8 +146,8 @@ sub BUILD {
 # We pass on to classes that extend this: 
 #   chrom_field_name with value "Chromosome"
 my $localFilesHandler = Seq::Tracks::Build::LocalFilesPaths->new();
-sub BUILDARGS {
-  my ($class, $href) = @_;
+around BUILDARGS => sub {
+  my ($orig, $class, $href) = @_;
 
   my %data = %$href;
 
@@ -150,7 +158,7 @@ sub BUILDARGS {
   $data{local_files} = $localFilesHandler->makeAbsolutePaths($href->{files_dir},
     $href->{name}, $href->{local_files});
 
-  return \%data;
+  return $class->$orig(\%data);
 };
 
 #########################Type Conversion, Input Field Filtering #########################
@@ -167,6 +175,7 @@ sub coerceFeatureType {
 
   my $type = $_[0]->getFeatureType( $_[1] );
 
+  # say "$type";
   # Don't mutate the input if no type is stated for the feature
   # if( !defined $type ) {
   #   return $_[2];
@@ -178,7 +187,14 @@ sub coerceFeatureType {
   # http://stackoverflow.com/questions/2059817/why-is-perl-foreach-variable-assignment-modifying-the-values-in-the-array
   # https://ideone.com/gjWQeS
   for my $val (ref $_[2] ? @{ $_[2] } : $_[2]) {
-    $val = $_[0]->coerceUndefinedValues($val);
+    if(!defined $val) {
+      next;
+    }
+
+    if(!looks_like_number($val)) {
+      $_[0]->{_cleanDelims}->($val);
+      $_[0]->_stripAndCoerceUndef($val);
+    }
 
     if( defined $type && defined $val ) {
       $val = $converter->convert($val, $type);
@@ -265,10 +281,13 @@ sub passesFilter {
 }
 
 ######################### Field Transformations ###########################
-#for now I only need string concatenation
-state $transformOperators = ['.', 'split'];
+#TODO: taint check the modifying value
+state $transformOperators = ['.', 'split', '-', '+', 'replace'];
 sub transformField {
   state $cachedTransform;
+
+  #   $_[0],      $_[1],    $_[2]
+  #my ($self, $featureName, $featureValue) = @_;
 
   if( defined $cachedTransform->{$_[0]->name}{$_[1]} ) {
     return &{ $cachedTransform->{$_[0]->name}{$_[1]} }($_[2]);
@@ -279,7 +298,12 @@ sub transformField {
 
   my $command = $self->build_field_transformations->{$featureName};
 
-  my ($leftHand, $rightHand) = split(' ', $command);
+  my $leftHand = substr($command, 0, index($command, ' '));
+  my $rightHand = substr($command, index($command, ' ') + 1);
+
+  # modifies in place
+  StripLTSpace($leftHand);
+  StripLTSpace($rightHand);
 
   my $codeRef;
 
@@ -291,25 +315,67 @@ sub transformField {
 
         return $_[0] . $rightHand;
       }
-    }
+    } elsif($leftHand eq '-') {
+      $codeRef = sub {
+        # my $fieldValue = shift;
+        # same as $_[0];
 
-    if($leftHand eq 'split') {
+        return $_[0] - $rightHand;
+      }
+    } elsif($leftHand eq '+') {
+      $codeRef = sub {
+        # my $fieldValue = shift;
+        # same as $_[0];
+
+        return $_[0] + $rightHand;
+      }
+    } elsif($leftHand eq 'split') {
       $codeRef = sub {
         # my $fieldValue = shift;
         # same as $_[0];
         my @out;
+
+        # if trailing ,; or whichever specified delimiter
+        # remove so that no trailing undef value remains
+        $_[0] =~ s/\s*$rightHand\s*$//;
+
         # Some fields may contain no data after the delimiter,
         # which will lead to blank data, don't keep that
+        # TODO: skipping empty fields is dangerous; may lead to data that is
+        # ordered to fall out of order
+        # evalute the choice on line 349
         foreach(split(/$rightHand/, $_[0]) ) {
-          if($_ ne '') {
+          # Remove trailing/leading whitespace
+          $_ =~ s/^\s+//;
+          $_ =~ s/\s+$//;
+
+          if(defined $_ && $_ ne '') {
             push @out, $_;
           }
         }
 
         return @out == 1 ? $out[0] : \@out;
       }
+    } elsif($leftHand eq 'replace') {
+      if(substr($rightHand,0,1) ne '/' || substr($rightHand, -1, 1) ne '/') {
+        $self->log('fatal', $self->name. ": build_field_transformation 'replace' expects /from/to/, found $rightHand");
+      }
+
+      my @parts = split '/', $rightHand;
+
+      my $from = $parts[1];
+      my $to = $parts[2];
+
+      $codeRef = sub {
+        # my $fieldValue = shift;
+        #    $_[0]
+        $_[0] =~ s/$from/$to/gs;
+
+        return $_[0];
+      }
     }
   } elsif($self->_isTransformOperator($rightHand) ) {
+    # Append text in the other direction
     if($rightHand eq '.') {
       $codeRef = sub {
        # my $fieldValue = shift;
@@ -317,6 +383,8 @@ sub transformField {
         return $leftHand . $_[0];
       }
     }
+
+    # Don't allow +/- as right hand operator, pointless and a little silly
   }
 
   if(!defined $codeRef) {
@@ -329,77 +397,162 @@ sub transformField {
   return &{$codeRef}($featureValue);
 }
 
-# Merge sparse data. We intentionally push undefined (or nil if in Go)
-# values, because we want to keep order consistent, so that all records pertaining
-# to one position for this track are kept together
-# Merge functions are only called if there is an $oldTrackVal
-# WARNING: This will not work if you try to build twice, without first deleting
-# that track from the database. It will result in nested arrays.
+# Merge [featuresOld...] with [featuresNew...]
+# Expects 2 arrays of equal length
+# //Won't merge when [featuresNew...] previously merged (duplicate)
+# Note: it is completely unsafe to dbReadOne and not commit here
+# If the user relies on a non DB->Txn transactions, LMDB_File will complain
+# that the transaction should be a sub-transaction
+# may screw up the parent transaction, since we currently use a single
+# transaction per database per thread. We should move away from this.
+# TODO: allow 2 scalars, or growing one array to match the lenght of the other
+# TODO:  dupsort, dupfixed to optimize storage
+# TODO: get reliable de-duping algorithm of deep structures
 sub makeMergeFunc {
   my $self = shift;
 
   my $name = $self->name;
   my $madeIntoArray = {};
 
-  return sub {
-    my ($chr, $pos, $oldTrackVal, $newTrackVal) = @_;
-    my @updated = @$oldTrackVal;
+  my $tempDbName = "$name\_merge_temp";
+  return ( sub {
+      my ($chr, $pos, $oldTrackVal, $newTrackVal) = @_;
 
-    # oldTrackVal and $newTrackVal should both be arrays, with at least one index
-    for (my $i = 0; $i < @$newTrackVal; $i++) {
-      if($i > $#$oldTrackVal) {
-        push @updated, $newTrackVal->[$i];
-        next;
+      if(!ref $newTrackVal || @$newTrackVal != @$oldTrackVal) {
+        return("makeMergeFunc accepts only array values of equal length", undef);
       }
 
-      if(ref $newTrackVal->[$i]) {
-        if(ref $newTrackVal->[$i] ne 'ARRAY') {
-          # TODO: move away from fatal, allow graceful exit w/ error message
-          $self->log('fatal', $self->name. ": $name track received new record in mergeFunc that was a non-Array reference");
-          # We should never get here; fatal should exit; however, for consistent return and clarity
-          # and in case API changes
-          return ($self->name. ": $name track received new record in mergeFunc that was a non-Array reference", undef);
+      # commits automatically, so that we are ensured that overlaps
+      # called from different threads succeed
+      my $seen = $self->db->dbReadOne("$tempDbName/$chr", $pos);
+
+      my @updated;
+      $#updated = $#$oldTrackVal;
+
+      # oldTrackVal and $newTrackVal should both be arrays, with at least one index
+      for (my $i = 0; $i < @$newTrackVal; $i++) {
+        if(!$seen) {
+          $updated[$i] = [$oldTrackVal->[$i], $newTrackVal->[$i]];
+          next;
         }
 
-        if(!ref $updated[$i]) {
-          $updated[$i] = [$updated[$i], @{$newTrackVal->[$i]}];
-        } else {
-          push @{$updated[$i]}, @{$newTrackVal->[$i]};
-        }
-
-      } else {
-        if(!ref $updated[$i]) {
-
-          $updated[$i] = [$updated[$i], $newTrackVal->[$i]];
-        } else {
-          push @{$updated[$i]}, $newTrackVal->[$i];
-        }
+        $updated[$i] = [@{$oldTrackVal->[$i]}, $newTrackVal->[$i]];
       }
+
+      if(!$seen) {
+        # commits automatically, so that we are ensured that overlaps
+        # called from different threads succeed
+        $self->db->dbPut("$tempDbName/$chr", $pos, 1);
+      }
+
+      return (undef, \@updated);
+    },
+
+    sub {
+      my $chr = shift;
+      $self->db->dbDropDatabase("$tempDbName/$chr", 1);
+
+      say STDERR "Cleaned up $tempDbName/$chr";
     }
-
-    # if($self->name eq 'snp146') {
-    #   say "oldVal is";
-    #   p $oldTrackVal;
-    #   say "newTrackVal is";
-    #   p $newTrackVal;
-    #   say "updated is";
-    #   p @updated;
-    # }
-    return (undef, \@updated);
-  }
+  );
 }
 
-sub coerceUndefinedValues {
+# TODO: Allow to be configured on per-track basis
+sub _stripAndCoerceUndef {
   #my ($self, $dataStr) = @_;
 
-  # Don't waste storage space on NA. In Bystro undef values equal NA (or whatever
-  # Output.pm chooses to represent missing data as.
+ # TODO: This will be configurable, per-track
+  state $cl = {
+    'no assertion provided' => 1,
+    'no_assertion_provided' => 1,
+    'no assertion criteria provided' => 1,
+    'no_assertion_criteria_provided' => 1,
+    'no interpretation for the single variant' => 1,
+    'no assertion for the individual variant' => 1,
+    'no_assertion_for_the_individual_variant' => 1,
+    'not provided' => 1,
+    'not_provided' => 1,
+    'not specified' => 1,
+    'not_specified' => 1,
+    'see cases' => 1,
+    'see_cases' => 1,
+    'unknown' => 1
+  };
 
-  if($_[1] =~ /^\s*NA\s*$/i || $_[1] =~/^\s*$/ || $_[1] =~/^\s*\.\s*$/ || $_[1] =~ $_[0]->_emptyFieldRegex) {
-    return undef;
+  # STripLTSpace modifies passed string by stripping space from it
+  # This modifies the caller's version
+  StripLTSpace($_[1]);
+
+  if($_[1] eq '') {
+    $_[1] = undef;
+    return $_[1];
+  }
+
+  my $v = lc($_[1]);
+
+  # These will always get coerced to undef
+  # TODO: we may want to force only the missChar comparison
+  if($v eq '.' || $v eq 'na' || $v eq $_[0]->{_missChar}){
+    $_[1] = undef;
+    return $_[1];
+  }
+
+  # This will be configurable
+  if(exists $cl->{$v}) {
+    $_[1] = undef;
+    return $_[1];
   }
 
   return $_[1];
+}
+
+sub chrWantedAndIncomplete {
+  my ($self, $chr) = @_;
+
+  # Allow users to pass 0 as a valid chromosome, in case coding is odder than we expect
+  if(!defined $chr || (!$chr && "$chr" eq '')) {
+    return undef;
+  }
+
+  if($self->chrIsWanted($chr) && $self->completionMeta->okToBuild($chr)) {
+    return $chr;
+  }
+
+  return undef;
+}
+
+sub safeCloseBuilderFh {
+  my ($self, $fh, $fileName, $errCode, $strict) = @_;
+
+  if(!$errCode) {
+    $errCode = 'fatal';
+  }
+
+  #From Seq::Role::IO
+  my $err = $self->safeClose($fh);
+
+  if($err) {
+    #Can happen when closing immediately after opening
+    if($? != 13) {
+      $self->log($errCode, $self->name . ": Failed to close $fileName: $err ($?)");
+      return $err;
+    }
+
+    # We make a choice to ignored exit code 13... it happens a lot
+    # 13 is sigpipe, occurs if closing pipe before cat/pigz finishes
+    $self->log('warn', $self->name . ": Failed to close $fileName: $err ($?)");
+
+    # Make it optional to return a sigpipe error, since controlling
+    # program likely wants to die on error, and sigpipe may not be worth it
+    if($strict) {
+      return $err;
+    }
+
+    return;
+  }
+
+  $self->log('info', $self->name . ": closed $fileName with $?");
+  return;
 }
 
 sub _isTransformOperator {
