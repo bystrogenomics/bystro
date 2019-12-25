@@ -86,7 +86,7 @@ sub annotate {
 }
 
 sub annotateFile {
-   #Inspired by T.S Wingo: https://github.com/wingolab-org/GenPro/blob/master/bin/vcfToSnp
+  #Inspired by T.S Wingo: https://github.com/wingolab-org/GenPro/blob/master/bin/vcfToSnp
   my $self = shift;
   my $type = shift;
 
@@ -300,6 +300,7 @@ sub annotateFile {
 
        # 3 holds the input reference, we'll replace this with the discordant status
       $fields[3] = $refTrackGetter->get($dataFromDbAref) ne $fields[3] ? 1 : 0;
+
       push @lines, \@fields;
     }
 

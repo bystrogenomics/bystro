@@ -18,10 +18,6 @@ has homozygosityField => (is => 'ro', default => 'homozygosity', lazy => 1);
 has missingField => (is => 'ro', default => 'missingGenos', lazy => 1);
 has missingnessField => (is => 'ro', default => 'missingness', lazy => 1);
 has sampleMafField => (is => 'ro', default => 'sampleMaf', lazy => 1);
-has idField => (is => 'ro', default => 'id', lazy => 1);
-has acField => (is => 'ro', default => 'ac', lazy => 1);
-has anField => (is => 'ro', default => 'an', lazy => 1);
-has vcfPosField => (is => 'ro', default => 'vcfPos', lazy => 1);
 
 no Mouse::Role;
 1;
