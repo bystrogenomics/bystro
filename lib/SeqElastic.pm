@@ -10,7 +10,6 @@ use Path::Tiny;
 use Types::Path::Tiny qw/AbsFile AbsPath AbsDir/;
 use Mouse 2;
 use List::MoreUtils qw/first_index/;
-use Sys::CpuAffinity;
 
 our $VERSION = '0.001';
 

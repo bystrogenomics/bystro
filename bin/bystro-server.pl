@@ -94,13 +94,6 @@ my %optionalForType = (
   }
 );
 
-my %optionalForType = (
-  'saveFromQuery' => {
-    indexConfig => 'indexConfig',
-    pipeline => 'pipeline',
-  }
-);
-
 say "Running queue server of type: $type";
 
 my $configPathBaseDir = "config/";

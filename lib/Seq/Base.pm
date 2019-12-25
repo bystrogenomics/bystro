@@ -34,7 +34,9 @@ has readOnly => (is => 'ro', default => 0);
 
 has tracksObj => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
   my $self = shift;
-  return Seq::Tracks->new({tracks => $self->tracks, gettersOnly => $self->readOnly });
+	
+  my %config = (%{$self->tracks}, (gettersOnly => $self->readOnly));		
+  return Seq::Tracks->new(%config);
 });
 
 ############# Optional Arguments #############
@@ -97,8 +99,6 @@ sub BUILD {
   if(defined $self->verbose) {
     $self->setVerbosity($self->verbose);
   }
-
-  Seq::DBManager::setReadOnly($self->readOnly);
 
   #todo: finisih ;for now we have only one level
   if ($self->debug) {

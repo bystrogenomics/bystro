@@ -3,16 +3,12 @@
    - see: https://github.com/akotlar/bystro/blob/b10/config/hg19.clean.yml
 2. Support output of a <your_annotation>.sample_list file, which will contain the complete list of inputted samples (found in the .snp or .vcf input file). This will be eventually used to export to vcf/plink.
 3. Backported various simplifications from master branch (b11).
-
-### Beta 10.1 (2/26/18):
-1. Added SAS population to gnomad.exomes (thanks David Okou)
-
-2. hg38: refetched all sources as of 2/7/18
+4. Added SAS population to gnomad.exomes (thanks David Okou)
+5. hg38: refetched all sources as of 2/7/18
   * 2/5/18 variant_summary.txt.gz Clinvar update
   * gnomAD r2.0.2
   * dbSNP150
-  
-3. hg19: refetched all sources as of 2/26/18
+6. hg19: refetched all sources as of 2/26/18
   * 2/19/18 variant_summary.txt.gz Clinvar update
   * gnomAD r2.0.2
   * dbSNP150

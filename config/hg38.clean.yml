@@ -46,7 +46,7 @@ statistics:
   programPath: bystro-stats
   refTrackField: ref
   siteTypeField: refSeq.siteType
-temp_dir: hidden
+temp_dir: "~"
 tracks:
   outputOrder:
     - ref
