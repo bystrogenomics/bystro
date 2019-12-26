@@ -1,8 +1,8 @@
 ---
-assembly: hg19
-build_author: ec2-user
-build_date: 2017-10-07T17:00:00
-chromosomes:
+  assembly: hg19
+  build_author: ec2-user
+  build_date: 2017-10-07T17:00:00
+  chromosomes:
   - chr1
   - chr2
   - chr3
@@ -28,200 +28,199 @@ chromosomes:
   - chrM
   - chrX
   - chrY
-database_dir: "~"
-files: "~"
-files_dir: /mnt/annotator/hg19_ensembl/raw/
-snpProcessor: bystro-snp
-statistics:
-  dbSNPnameField: dbSNP.name
-  exonicAlleleFunctionField: refSeq.exonicAlleleFunction
-  outputExtensions:
-    json: .statistics.json
-    qc: .statistics.qc.tsv
-    tab: .statistics.tsv
-  programPath: bystro-stats
-  refTrackField: ref
-  siteTypeField: refSeq.siteType
-temp_dir: "~"
-tracks:
+  database_dir: '~'
+  files: '~'
+  files_dir: /mnt/annotator/hg19_ensembl/raw/
+  snpProcessor: bystro-snp
+  statistics:
+    dbSNPnameField: dbSNP.name
+    exonicAlleleFunctionField: refSeq.exonicAlleleFunction
+    outputExtensions:
+      json: .statistics.json
+      qc: .statistics.qc.tsv
+      tab: .statistics.tsv
+    programPath: bystro-stats
+    refTrackField: ref
+    siteTypeField: refSeq.siteType
+  temp_dir: '~'
+  tracks:
   - build_author: ec2-user
     build_date: 2017-09-27T18:27:00
     fetch_date: 2017-09-27T02:05:00
     local_files:
-      - chr1.fa.gz
-      - chr2.fa.gz
-      - chr3.fa.gz
-      - chr4.fa.gz
-      - chr5.fa.gz
-      - chr6.fa.gz
-      - chr7.fa.gz
-      - chr8.fa.gz
-      - chr9.fa.gz
-      - chr10.fa.gz
-      - chr11.fa.gz
-      - chr12.fa.gz
-      - chr13.fa.gz
-      - chr14.fa.gz
-      - chr15.fa.gz
-      - chr16.fa.gz
-      - chr17.fa.gz
-      - chr18.fa.gz
-      - chr19.fa.gz
-      - chr20.fa.gz
-      - chr21.fa.gz
-      - chr22.fa.gz
-      - chrM.fa.gz
-      - chrX.fa.gz
-      - chrY.fa.gz
+    - chr1.fa.gz
+    - chr2.fa.gz
+    - chr3.fa.gz
+    - chr4.fa.gz
+    - chr5.fa.gz
+    - chr6.fa.gz
+    - chr7.fa.gz
+    - chr8.fa.gz
+    - chr9.fa.gz
+    - chr10.fa.gz
+    - chr11.fa.gz
+    - chr12.fa.gz
+    - chr13.fa.gz
+    - chr14.fa.gz
+    - chr15.fa.gz
+    - chr16.fa.gz
+    - chr17.fa.gz
+    - chr18.fa.gz
+    - chr19.fa.gz
+    - chr20.fa.gz
+    - chr21.fa.gz
+    - chr22.fa.gz
+    - chrM.fa.gz
+    - chrX.fa.gz
+    - chrY.fa.gz
     name: ref
     remote_dir: http://hgdownload.soe.ucsc.edu/goldenPath/hg19/chromosomes/
     remote_files:
-      - chr1.fa.gz
-      - chr2.fa.gz
-      - chr3.fa.gz
-      - chr4.fa.gz
-      - chr5.fa.gz
-      - chr6.fa.gz
-      - chr7.fa.gz
-      - chr8.fa.gz
-      - chr9.fa.gz
-      - chr10.fa.gz
-      - chr11.fa.gz
-      - chr12.fa.gz
-      - chr13.fa.gz
-      - chr14.fa.gz
-      - chr15.fa.gz
-      - chr16.fa.gz
-      - chr17.fa.gz
-      - chr18.fa.gz
-      - chr19.fa.gz
-      - chr20.fa.gz
-      - chr21.fa.gz
-      - chr22.fa.gz
-      - chrM.fa.gz
-      - chrX.fa.gz
-      - chrY.fa.gz
+    - chr1.fa.gz
+    - chr2.fa.gz
+    - chr3.fa.gz
+    - chr4.fa.gz
+    - chr5.fa.gz
+    - chr6.fa.gz
+    - chr7.fa.gz
+    - chr8.fa.gz
+    - chr9.fa.gz
+    - chr10.fa.gz
+    - chr11.fa.gz
+    - chr12.fa.gz
+    - chr13.fa.gz
+    - chr14.fa.gz
+    - chr15.fa.gz
+    - chr16.fa.gz
+    - chr17.fa.gz
+    - chr18.fa.gz
+    - chr19.fa.gz
+    - chr20.fa.gz
+    - chr21.fa.gz
+    - chr22.fa.gz
+    - chrM.fa.gz
+    - chrX.fa.gz
+    - chrY.fa.gz
     type: reference
     version: 1
   - build_author: ec2-user
     build_date: 2017-10-07T17:00:00
     features:
-      - name
-      - name2
-      - gene
-      - strand
-      - txStart
+    - name
+    - name2
+    - gene
+    - strand
+    - txStart
     fetch_date: 2017-10-07T16:57:00
     join:
       features:
-        - alleleID
-        - phenotypeList
-        - clinicalSignificance
-        - type
-        - origin
-        - numberSubmitters
-        - reviewStatus
-        - chromStart
-        - chromEnd
+      - alleleID
+      - phenotypeList
+      - clinicalSignificance
+      - type
+      - origin
+      - numberSubmitters
+      - reviewStatus
+      - chromStart
+      - chromEnd
       track: clinvar
     local_files:
-      - hg19.ensGene.chr1.gz
-      - hg19.ensGene.chr2.gz
-      - hg19.ensGene.chr3.gz
-      - hg19.ensGene.chr4.gz
-      - hg19.ensGene.chr5.gz
-      - hg19.ensGene.chr6.gz
-      - hg19.ensGene.chr7.gz
-      - hg19.ensGene.chr8.gz
-      - hg19.ensGene.chr9.gz
-      - hg19.ensGene.chr10.gz
-      - hg19.ensGene.chr11.gz
-      - hg19.ensGene.chr12.gz
-      - hg19.ensGene.chr13.gz
-      - hg19.ensGene.chr14.gz
-      - hg19.ensGene.chr15.gz
-      - hg19.ensGene.chr16.gz
-      - hg19.ensGene.chr17.gz
-      - hg19.ensGene.chr18.gz
-      - hg19.ensGene.chr19.gz
-      - hg19.ensGene.chr20.gz
-      - hg19.ensGene.chr21.gz
-      - hg19.ensGene.chr22.gz
-      - hg19.ensGene.chrM.gz
-      - hg19.ensGene.chrX.gz
-      - hg19.ensGene.chrY.gz
+    - hg19.ensGene.chr1.gz
+    - hg19.ensGene.chr2.gz
+    - hg19.ensGene.chr3.gz
+    - hg19.ensGene.chr4.gz
+    - hg19.ensGene.chr5.gz
+    - hg19.ensGene.chr6.gz
+    - hg19.ensGene.chr7.gz
+    - hg19.ensGene.chr8.gz
+    - hg19.ensGene.chr9.gz
+    - hg19.ensGene.chr10.gz
+    - hg19.ensGene.chr11.gz
+    - hg19.ensGene.chr12.gz
+    - hg19.ensGene.chr13.gz
+    - hg19.ensGene.chr14.gz
+    - hg19.ensGene.chr15.gz
+    - hg19.ensGene.chr16.gz
+    - hg19.ensGene.chr17.gz
+    - hg19.ensGene.chr18.gz
+    - hg19.ensGene.chr19.gz
+    - hg19.ensGene.chr20.gz
+    - hg19.ensGene.chr21.gz
+    - hg19.ensGene.chr22.gz
+    - hg19.ensGene.chrM.gz
+    - hg19.ensGene.chrX.gz
+    - hg19.ensGene.chrY.gz
     name: ensembl
-    sql_statement:
-      SELECT ensGene.name,chrom,strand,txStart,txEnd,cdsStart,cdsEnd,exonCount,exonStarts,exonEnds,name2,value
+    sql_statement: SELECT ensGene.name,chrom,strand,txStart,txEnd,cdsStart,cdsEnd,exonCount,exonStarts,exonEnds,name2,value
       AS gene FROM hg19.ensGene LEFT JOIN hg19.ensemblToGeneName ON (hg19.ensGene.name=hg19.ensemblToGeneName.name)
     type: gene
     version: 2
   - build_author: ec2-user
     build_date: 2017-09-27T18:27:00
     local_files:
-      - chr*.phastCons100way.wigFix.gz
+    - chr*.phastCons100way.wigFix.gz
     name: phastCons
     remote_dir: http://hgdownload.soe.ucsc.edu/goldenPath/hg19/phastCons100way/hg19.100way.phastCons/
     remote_files:
-      - chr1.phastCons100way.wigFix.gz
-      - chr2.phastCons100way.wigFix.gz
-      - chr3.phastCons100way.wigFix.gz
-      - chr4.phastCons100way.wigFix.gz
-      - chr5.phastCons100way.wigFix.gz
-      - chr6.phastCons100way.wigFix.gz
-      - chr7.phastCons100way.wigFix.gz
-      - chr8.phastCons100way.wigFix.gz
-      - chr9.phastCons100way.wigFix.gz
-      - chr10.phastCons100way.wigFix.gz
-      - chr11.phastCons100way.wigFix.gz
-      - chr12.phastCons100way.wigFix.gz
-      - chr13.phastCons100way.wigFix.gz
-      - chr14.phastCons100way.wigFix.gz
-      - chr15.phastCons100way.wigFix.gz
-      - chr16.phastCons100way.wigFix.gz
-      - chr17.phastCons100way.wigFix.gz
-      - chr18.phastCons100way.wigFix.gz
-      - chr19.phastCons100way.wigFix.gz
-      - chr20.phastCons100way.wigFix.gz
-      - chr21.phastCons100way.wigFix.gz
-      - chr22.phastCons100way.wigFix.gz
-      - chrX.phastCons100way.wigFix.gz
-      - chrY.phastCons100way.wigFix.gz
-      - chrM.phastCons100way.wigFix.gz
+    - chr1.phastCons100way.wigFix.gz
+    - chr2.phastCons100way.wigFix.gz
+    - chr3.phastCons100way.wigFix.gz
+    - chr4.phastCons100way.wigFix.gz
+    - chr5.phastCons100way.wigFix.gz
+    - chr6.phastCons100way.wigFix.gz
+    - chr7.phastCons100way.wigFix.gz
+    - chr8.phastCons100way.wigFix.gz
+    - chr9.phastCons100way.wigFix.gz
+    - chr10.phastCons100way.wigFix.gz
+    - chr11.phastCons100way.wigFix.gz
+    - chr12.phastCons100way.wigFix.gz
+    - chr13.phastCons100way.wigFix.gz
+    - chr14.phastCons100way.wigFix.gz
+    - chr15.phastCons100way.wigFix.gz
+    - chr16.phastCons100way.wigFix.gz
+    - chr17.phastCons100way.wigFix.gz
+    - chr18.phastCons100way.wigFix.gz
+    - chr19.phastCons100way.wigFix.gz
+    - chr20.phastCons100way.wigFix.gz
+    - chr21.phastCons100way.wigFix.gz
+    - chr22.phastCons100way.wigFix.gz
+    - chrX.phastCons100way.wigFix.gz
+    - chrY.phastCons100way.wigFix.gz
+    - chrM.phastCons100way.wigFix.gz
     type: score
     version: 1
   - build_author: ec2-user
     build_date: 2017-09-27T18:27:00
     local_files:
-      - chr*.phyloP100way.wigFix.gz
+    - chr*.phyloP100way.wigFix.gz
     name: phyloP
     remote_dir: http://hgdownload.soe.ucsc.edu/goldenPath/hg19/phyloP100way/hg19.100way.phyloP100way/
     remote_files:
-      - chr1.phyloP100way.wigFix.gz
-      - chr2.phyloP100way.wigFix.gz
-      - chr3.phyloP100way.wigFix.gz
-      - chr4.phyloP100way.wigFix.gz
-      - chr5.phyloP100way.wigFix.gz
-      - chr6.phyloP100way.wigFix.gz
-      - chr7.phyloP100way.wigFix.gz
-      - chr8.phyloP100way.wigFix.gz
-      - chr9.phyloP100way.wigFix.gz
-      - chr10.phyloP100way.wigFix.gz
-      - chr11.phyloP100way.wigFix.gz
-      - chr12.phyloP100way.wigFix.gz
-      - chr13.phyloP100way.wigFix.gz
-      - chr14.phyloP100way.wigFix.gz
-      - chr15.phyloP100way.wigFix.gz
-      - chr16.phyloP100way.wigFix.gz
-      - chr17.phyloP100way.wigFix.gz
-      - chr18.phyloP100way.wigFix.gz
-      - chr19.phyloP100way.wigFix.gz
-      - chr20.phyloP100way.wigFix.gz
-      - chr21.phyloP100way.wigFix.gz
-      - chr22.phyloP100way.wigFix.gz
-      - chrX.phyloP100way.wigFix.gz
-      - chrY.phyloP100way.wigFix.gz
-      - chrM.phyloP100way.wigFix.gz
+    - chr1.phyloP100way.wigFix.gz
+    - chr2.phyloP100way.wigFix.gz
+    - chr3.phyloP100way.wigFix.gz
+    - chr4.phyloP100way.wigFix.gz
+    - chr5.phyloP100way.wigFix.gz
+    - chr6.phyloP100way.wigFix.gz
+    - chr7.phyloP100way.wigFix.gz
+    - chr8.phyloP100way.wigFix.gz
+    - chr9.phyloP100way.wigFix.gz
+    - chr10.phyloP100way.wigFix.gz
+    - chr11.phyloP100way.wigFix.gz
+    - chr12.phyloP100way.wigFix.gz
+    - chr13.phyloP100way.wigFix.gz
+    - chr14.phyloP100way.wigFix.gz
+    - chr15.phyloP100way.wigFix.gz
+    - chr16.phyloP100way.wigFix.gz
+    - chr17.phyloP100way.wigFix.gz
+    - chr18.phyloP100way.wigFix.gz
+    - chr19.phyloP100way.wigFix.gz
+    - chr20.phyloP100way.wigFix.gz
+    - chr21.phyloP100way.wigFix.gz
+    - chr22.phyloP100way.wigFix.gz
+    - chrX.phyloP100way.wigFix.gz
+    - chrY.phyloP100way.wigFix.gz
+    - chrM.phyloP100way.wigFix.gz
     type: score
     version: 1
   - build_author: ec2-user
@@ -229,8 +228,8 @@ tracks:
     caddToBed_date: 2017-04-22T06:41:00
     liftOverCadd_date: 2017-07-28T17:35:00
     local_files:
-      - whole_genome_SNVs.tsv.bed.chr*.organized-by-chr.txt.sorted.txt.gz
-      - whole_genome_SNVs.tsv.bed.chrM.organized-by-chr.txt.sorted.txt.mapped.gz
+    - whole_genome_SNVs.tsv.bed.chr*.organized-by-chr.txt.sorted.txt.gz
+    - whole_genome_SNVs.tsv.bed.chrM.organized-by-chr.txt.sorted.txt.mapped.gz
     name: cadd
     sortCadd_date: 2017-04-23T15:44:00
     sort_date: 2017-01-20T16:06:00
@@ -246,41 +245,41 @@ tracks:
       func: split [,]
       observed: split [\/]
     features:
-      - name
-      - strand
-      - observed
-      - class
-      - func
-      - alleles
-      - alleleNs: number
-      - alleleFreqs: number
+    - name
+    - strand
+    - observed
+    - class
+    - func
+    - alleles
+    - alleleNs: number
+    - alleleFreqs: number
     fetch_date: 2017-09-27T02:12:00
     local_files:
-      - hg19.snp150.chr1.gz
-      - hg19.snp150.chr2.gz
-      - hg19.snp150.chr3.gz
-      - hg19.snp150.chr4.gz
-      - hg19.snp150.chr5.gz
-      - hg19.snp150.chr6.gz
-      - hg19.snp150.chr7.gz
-      - hg19.snp150.chr8.gz
-      - hg19.snp150.chr9.gz
-      - hg19.snp150.chr10.gz
-      - hg19.snp150.chr11.gz
-      - hg19.snp150.chr12.gz
-      - hg19.snp150.chr13.gz
-      - hg19.snp150.chr14.gz
-      - hg19.snp150.chr15.gz
-      - hg19.snp150.chr16.gz
-      - hg19.snp150.chr17.gz
-      - hg19.snp150.chr18.gz
-      - hg19.snp150.chr19.gz
-      - hg19.snp150.chr20.gz
-      - hg19.snp150.chr21.gz
-      - hg19.snp150.chr22.gz
-      - hg19.snp150.chrM.gz
-      - hg19.snp150.chrX.gz
-      - hg19.snp150.chrY.gz
+    - hg19.snp150.chr1.gz
+    - hg19.snp150.chr2.gz
+    - hg19.snp150.chr3.gz
+    - hg19.snp150.chr4.gz
+    - hg19.snp150.chr5.gz
+    - hg19.snp150.chr6.gz
+    - hg19.snp150.chr7.gz
+    - hg19.snp150.chr8.gz
+    - hg19.snp150.chr9.gz
+    - hg19.snp150.chr10.gz
+    - hg19.snp150.chr11.gz
+    - hg19.snp150.chr12.gz
+    - hg19.snp150.chr13.gz
+    - hg19.snp150.chr14.gz
+    - hg19.snp150.chr15.gz
+    - hg19.snp150.chr16.gz
+    - hg19.snp150.chr17.gz
+    - hg19.snp150.chr18.gz
+    - hg19.snp150.chr19.gz
+    - hg19.snp150.chr20.gz
+    - hg19.snp150.chr21.gz
+    - hg19.snp150.chr22.gz
+    - hg19.snp150.chrM.gz
+    - hg19.snp150.chrX.gz
+    - hg19.snp150.chrY.gz
     name: dbSNP
     sql_statement: SELECT * FROM hg19.snp150
     type: sparse
@@ -298,18 +297,18 @@ tracks:
     build_row_filters:
       Assembly: == GRCh37
     features:
-      - alleleID: number
-      - phenotypeList
-      - clinicalSignificance
-      - type
-      - origin
-      - numberSubmitters: number
-      - reviewStatus
-      - referenceAllele
-      - alternateAllele
+    - alleleID: number
+    - phenotypeList
+    - clinicalSignificance
+    - type
+    - origin
+    - numberSubmitters: number
+    - reviewStatus
+    - referenceAllele
+    - alternateAllele
     fetch_date: 2017-10-07T16:57:00
     fieldMap:
-      "#AlleleID": alleleID
+      '#AlleleID': alleleID
       AlternateAllele: alternateAllele
       Chromosome: chrom
       ClinicalSignificance: clinicalSignificance
@@ -323,10 +322,10 @@ tracks:
       Stop: chromEnd
       Type: type
     local_files:
-      - variant_summary.txt.gz
+    - variant_summary.txt.gz
     name: clinvar
     remote_files:
-      - ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz
+    - ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz
     type: sparse
     version: 1
   - build_author: ec2-user
@@ -334,28 +333,28 @@ tracks:
     build_row_filters:
       AS_FilterStatus: == PASS
     features:
-      - alt
-      - id
-      - af: number
-      - an: number
-      - an_afr: number
-      - an_amr: number
-      - an_asj: number
-      - an_eas: number
-      - an_fin: number
-      - an_nfe: number
-      - an_oth: number
-      - an_male: number
-      - an_female: number
-      - af_afr: number
-      - af_amr: number
-      - af_asj: number
-      - af_eas: number
-      - af_fin: number
-      - af_nfe: number
-      - af_oth: number
-      - af_male: number
-      - af_female: number
+    - alt
+    - id
+    - af: number
+    - an: number
+    - an_afr: number
+    - an_amr: number
+    - an_asj: number
+    - an_eas: number
+    - an_fin: number
+    - an_nfe: number
+    - an_oth: number
+    - an_male: number
+    - an_female: number
+    - af_afr: number
+    - af_amr: number
+    - af_asj: number
+    - af_eas: number
+    - af_fin: number
+    - af_nfe: number
+    - af_oth: number
+    - af_male: number
+    - af_female: number
     fieldMap:
       AF: af
       AF_AFR: af_afr
@@ -378,7 +377,7 @@ tracks:
       AN_NFE: an_nfe
       AN_OTH: an_oth
     local_files:
-      - gnomad.genomes.r2.0.1.sites.*.vcf.gz
+    - gnomad.genomes.r2.0.1.sites.*.vcf.gz
     name: gnomad.genomes
     type: vcf
     version: 1
@@ -387,28 +386,28 @@ tracks:
     build_row_filters:
       AS_FilterStatus: == PASS
     features:
-      - alt
-      - id
-      - af: number
-      - an: number
-      - an_afr: number
-      - an_amr: number
-      - an_asj: number
-      - an_eas: number
-      - an_fin: number
-      - an_nfe: number
-      - an_oth: number
-      - an_male: number
-      - an_female: number
-      - af_afr: number
-      - af_amr: number
-      - af_asj: number
-      - af_eas: number
-      - af_fin: number
-      - af_nfe: number
-      - af_oth: number
-      - af_male: number
-      - af_female: number
+    - alt
+    - id
+    - af: number
+    - an: number
+    - an_afr: number
+    - an_amr: number
+    - an_asj: number
+    - an_eas: number
+    - an_fin: number
+    - an_nfe: number
+    - an_oth: number
+    - an_male: number
+    - an_female: number
+    - af_afr: number
+    - af_amr: number
+    - af_asj: number
+    - af_eas: number
+    - af_fin: number
+    - af_nfe: number
+    - af_oth: number
+    - af_male: number
+    - af_female: number
     fieldMap:
       AF: af
       AF_AFR: af_afr
@@ -431,9 +430,10 @@ tracks:
       AN_NFE: an_nfe
       AN_OTH: an_oth
     local_files:
-      - gnomad.exomes.r2.0.1.sites.vcf.gz
+    - gnomad.exomes.r2.0.1.sites.vcf.gz
     name: gnomad.exomes
     type: vcf
     version: 1
-vcfProcessor: bystro-vcf
-version: 2
+  vcfProcessor: bystro-vcf
+  version: 2
+  
