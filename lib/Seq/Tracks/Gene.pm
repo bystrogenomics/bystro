@@ -17,8 +17,6 @@ our $VERSION = '0.001';
 
 =cut
 
-## TODO: remove the if(nearestGeneNumber) check. Right now needed because
-## we have no chrM refSeq stuff
 use Mouse 2;
 
 use namespace::autoclean;
@@ -159,8 +157,6 @@ sub BUILD {
     $self->{_flatJoinFeatures} =
     [ map { "$joinTrackName.$_" } @{ $self->joinTrackFeatures } ];
 
-    # TODO: Could theoretically be overwritten by line 114
-    #the features specified in the region database which we want for nearest gene records
     my $i = 0;
     for my $fName ( @{ $self->joinTrackFeatures } ) {
       $self->{_allCachedDbNames}{ $self->{_flatJoinFeatures}[$i] } =
@@ -209,7 +205,7 @@ sub setHeaders {
   # Get the output index of each feature we added to the header
   # This is the index in this tracks output array
   # and includes features added to header, using addFeatureToHeader
-  # such as the modified nearest feature names ($nTrackPrefix.$_) and join track names
+  # such as the join track feature names
   # and siteType, strand, codonNumber, etc.
   for my $i ( 0 .. $#allGeneTrackFeatures ) {
     $self->{_featureIdxMap}{ $allGeneTrackFeatures[$i] } = $i;
@@ -392,8 +388,6 @@ sub get {
       $i++;
     }
   } else {
-    # my $newAA;
-    # my $refAA;
     my $altCodonSequence;
 
     SNP_LOOP: for my $site ( $multiple ? @$siteData : $siteData ) {
@@ -466,7 +460,6 @@ sub get {
     return $outAccum;
   }
 
-  # All values should be scalars if possible and if there's only 1
   $outAccum->[ $self->{_codonPosFidx} ][$posIdx]   = $codonPos[0];
   $outAccum->[ $self->{_codonNumFidx} ][$posIdx]   = $codonNum[0];
   $outAccum->[ $self->{_alleleFuncFidx} ][$posIdx] = $funcAccum[0];

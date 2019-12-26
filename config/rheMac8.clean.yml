@@ -62,9 +62,6 @@ tracks:
   - name
   - name2
   name: refSeq
-  nearest:
-  - name
-  - name2
   sql_statement: SELECT * FROM rheMac8.refGene
   type: gene
 

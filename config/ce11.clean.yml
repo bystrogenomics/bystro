@@ -45,9 +45,6 @@ tracks:
   - name
   - name2
   name: refSeq
-  nearest:
-  - name
-  - name2
   sql_statement: SELECT * FROM ce11.refGene
   type: gene
 - name: phastCons

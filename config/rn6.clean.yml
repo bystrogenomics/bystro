@@ -54,9 +54,6 @@ tracks:
   - name
   - name2
   name: refSeq
-  nearest:
-  - name
-  - name2
   sql_statement: SELECT * FROM rn6.refGene
   type: gene
 - local_files:
