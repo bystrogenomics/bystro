@@ -56,9 +56,6 @@ tracks:
       - dm6.refGene.chrX.gz
       - dm6.refGene.chrY.gz
     name: refSeq
-    nearest:
-      - name
-      - name2
     sql_statement: SELECT * FROM dm6.refGene
     type: gene
     version: 1
@@ -77,9 +74,6 @@ tracks:
       - dm6.ensGene.chrX.gz
       - dm6.ensGene.chrY.gz
     name: ensGene
-    nearest:
-      - name
-      - name2
     sql_statement: SELECT * FROM dm6.ensGene
     type: gene
     version: 1
@@ -99,9 +93,6 @@ tracks:
       - dm6.ncbiRefSeq.chrX.gz
       - dm6.ncbiRefSeq.chrY.gz
     name: ncbiRefSeq
-    nearest:
-      - name
-      - name2
     sql_statement: SELECT * FROM dm6.ncbiRefSeq
     type: gene
     version: 1

@@ -306,7 +306,6 @@ mappings:
         siteType:
           type: text
           analyzer: autocomplete_english
-          #dbSNP func fields are similar to out siteType and exonicAlleleFunction fields
           search_analyzer: search_english_func
           fields:
             exact:

@@ -83,9 +83,6 @@ tracks:
   - name
   - name2
   name: refSeq
-  nearest:
-  - name
-  - name2
   sql_statement: SELECT * FROM mm10.refGene LEFT JOIN mm10.kgXref ON mm10.kgXref.refseq
     = mm10.refGene.name
   type: gene

@@ -67,9 +67,6 @@ tracks:
   - description
   - proteinID
   name: sgd
-  nearest:
-  - name
-  - proteinID
   sql_statement: SELECT sgdGene.name,chrom,strand,txStart,txEnd,cdsStart,cdsEnd,exonCount,exonStarts,exonEnds,proteinID,type,description
     FROM sacCer3.sgdGene LEFT JOIN sgdDescription ON sgdGene.name = sgdDescription.name
   type: gene

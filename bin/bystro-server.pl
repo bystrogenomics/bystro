@@ -370,4 +370,3 @@ sub getConfigFilePath {
     #should log here
   }
 }
-1;
