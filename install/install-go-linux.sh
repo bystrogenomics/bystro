@@ -16,13 +16,12 @@ fi
 echo -e "\n\nInstalling Go in /usr/local\n"
 
 # Clean in case somethign left over from old installation
-rm -rf go
-rm go1.12.9.linux-amd64.tar.gz;
-wget https://dl.google.com/go/go1.12.9.linux-amd64.tar.gz;
-tar -xf go1.12.9.linux-amd64.tar.gz;
+GOFILE=go1.13.5.linux-amd64.tar.gz
+wget https://dl.google.com/go/$GOFILE;
+tar -xf $GOFILE;
 echo "Deleting go in /usr/local"
 sudo rm -rf /usr/local/go
 sudo mv go /usr/local;
-rm go1.12.9.linux-amd64.tar.gz;
+rm $GOFILE;
 
 . install/export-go-path-linux.sh $DIR $PROFILE
