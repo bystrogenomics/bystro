@@ -69,7 +69,7 @@ sub go {
   $self->_wantedTrack->{name} = $self->renameTo;
 
   #TODO: support renaming for the other fields
-  if(defined $self->_decodedConfig->{statistics} && defined $self->_decodedConfig->{statistics}{dbSNPnameField}) {
+  if(defined $self->_decodedConfig->{statistics} && $self->_decodedConfig->{statistics}{dbSNPnameField}) {
     if($self->_decodedConfig->{statistics}{dbSNPnameField} eq $self->name) {
       $self->_decodedConfig->{statistics}{dbSNPnameField} = $self->renameTo;
     }
