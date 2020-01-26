@@ -16,7 +16,7 @@ fi
 . ~/.bash_profile;
 
 # Perlbrew simplifies version management
-. ./install/install-perlbrew-linux.sh $INSTALL_DIR perl-5.28.0;
+. ./install/install-perlbrew-linux.sh $INSTALL_DIR perl-5.30.1;
 . ./install/install-perl-libs.sh;
 
 . ~/.bash_profile;
