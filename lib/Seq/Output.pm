@@ -18,12 +18,14 @@ has delimiters => (is => 'ro', isa => 'Seq::Output::Delimiters', default => sub 
   return Seq::Output::Delimiters->new();
 });
 
-has header => (is => 'ro', isa => 'Seq::Headers', required => 1);
+has header => (is => 'ro', isa => 'Seq::Headers');
 
 sub BUILD {
   my $self = shift;
 
-  $self->{_orderedHeader} = $self->header->getOrderedHeaderNoMap();
+  if($self->header) {
+    $self->{_orderedHeader} = $self->header->getOrderedHeaderNoMap();
+  }
 }
 
 # TODO: will be singleton, configured once for all consumers
