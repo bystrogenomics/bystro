@@ -1107,6 +1107,10 @@
       features:
         - alt
         - id
+        - variant_type
+        - dp: number
+        - qd: number
+        - sor: number
         - AC: number
         - AN: number
         - AF: number
