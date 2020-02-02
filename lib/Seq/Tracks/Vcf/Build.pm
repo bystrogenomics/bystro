@@ -260,6 +260,12 @@ sub buildTrack {
         }
 
         if(!$wantedChr) {
+          if($self->chrPerFile) {
+            $self->log('info', $self->name . ": chrs in file $file not wanted or previously completed. Skipping");
+
+            last FH_LOOP;
+          }
+
           next FH_LOOP;
         }
 
