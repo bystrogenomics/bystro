@@ -527,8 +527,6 @@
           - dp: number
           - qd: number
           - sor: number
-          - pax_max: number
-          - read_pos_rank_sum: number
           - ac: number
           - ac_raw: number
           - ac_female: number
@@ -873,6 +871,7 @@
           - non_neuro_AN_nfe: number
           - non_neuro_AF_nfe: number
           - non_neuro_nhomalt_nfe: number
+          - non_neuro_AC_oth_male: number
           - non_neuro_AN_oth_male: number
           - non_neuro_AF_oth_male: number
           - non_neuro_nhomalt_oth_male: number
@@ -894,7 +893,7 @@
           - non_neuro_nhomalt_asj: number
           - non_neuro_AC_amr: number
           - non_neuro_AN_amr: number
-          - non_neuro_AC_amr: number
+          - non_neuro_AF_amr: number
           - non_neuro_nhomalt_amr: number
           - non_neuro_AC_amr_female: number
           - non_neuro_AN_amr_female: number
@@ -902,7 +901,7 @@
           - non_neuro_nhomalt_amr_female: number
           - non_neuro_AC_oth: number
           - non_neuro_AN_oth: number
-          - non_neuro_AN_oth: number
+          - non_neuro_AF_oth: number
           - non_neuro_nhomalt_oth: number
           - non_neuro_AC_oth_male: number
           - non_neuro_AC_oth_female: number
@@ -933,9 +932,9 @@
           - non_neuro_AN_eas_female: number
           - non_neuro_AF_eas_female: number
           - non_neuro_nhomalt_eas_female: number
-          - non_neuro_af_nfe_est: number
           - non_neuro_ac_nfe_est: number
           - non_neuro_an_nfe_est: number
+          - non_neuro_af_nfe_est: number
           - non_neuro_nhomalt_nfe_est: number
           - non_neuro_ac_nfe_nwe: number
           - non_neuro_an_nfe_nwe: number
@@ -1108,51 +1107,848 @@
       features:
         - alt
         - id
-        - af: number
-        - an: number
-        - an_afr: number
-        - an_amr: number
-        - an_asj: number
-        - an_eas: number
-        - an_fin: number
-        - an_nfe: number
-        - an_oth: number
-        - an_sas: number
-        - an_male: number
+        - AC: number
+        - AN: number
+        - AF: number
+        - nhomalt: number
+        - AC_nfe_female: number
+        - AN_nfe_female: number
+        - AF_nfe_female: number
+        - nhomalt_nfe_female: number
+        - AC_asj_male: number
+        - AN_asj_male: number
+        - AF_asj_male: number
+        - nhomalt_asj_male: number
+        - AC_nfe_seu: number
+        - AN_nfe_seu: number
+        - AF_nfe_seu: number
+        - nhomalt_nfe_seu: number
+        - AC_nfe: number
+        - AN_nfe: number
+        - AF_nfe: number
+        - nhomalt_nfe: number
+        - AC_nfe_swe: number
+        - AN_nfe_swe: number
+        - AF_nfe_swe: number
+        - nhomalt_nfe_swe: number
+        - AC_oth_male: number
+        - AN_oth_male: number
+        - AF_oth_male: number
+        - nhomalt_oth_male: number
+        - AC_afr: number
+        - AN_afr: number
+        - AF_afr: number
+        - nhomalt_afr: number
+        - AC_afr_female: number
+        - AN_afr_female: number
+        - AF_afr_female: number
+        - nhomalt_afr_female: number
+        - AC_afr_male: number
+        - AN_afr_male: number
+        - AF_afr_male: number
+        - nhomalt_afr_male: number
+        - AC_asj: number
+        - AN_asj: number
+        - AF_asj: number
+        - nhomalt_asj: number
+        - AC_amr: number
+        - AN_amr: number
+        - AF_amr: number
+        - nhomalt_amr: number
+        - AC_amr_female: number
+        - AN_amr_female: number
+        - AF_amr_female: number
+        - nhomalt_amr_female: number
+        - AC_oth: number
+        - AN_oth: number
+        - AN_oth: number
+        - nhomalt_oth: number
+        - AC_oth_male: number
+        - AC_oth_female: number
+        - AN_oth_female: number
+        - AF_oth_female: number
+        - nhomalt_oth_female: number
+        - AC_nfe_male: number
+        - AN_nfe_male: number
+        - AF_nfe_male: number
+        - nhomalt_nfe_male: number
+        - AC_male: number
+        - AN_female: number
+        - AF_male: number
+        - nhomalt_male: number
+        - AC_eas: number
+        - AN_eas: number
+        - AF_eas: number
+        - nhomalt_eas: number
+        - AC_eas_male: number
+        - AN_eas_male: number
+        - AF_eas_male: number
+        - nhomalt_eas_male: number
+        - ac_female: number
         - an_female: number
-        - af_afr: number
-        - af_amr: number
-        - af_asj: number
-        - af_eas: number
-        - af_fin: number
-        - af_nfe: number
-        - af_oth: number
-        - af_sas: number
-        - af_male: number
         - af_female: number
+        - nhomalt_female: number
+        - AC_sas: number
+        - AN_sas: number
+        - AF_sas: number
+        - nhomalt_sas: number
+        - AC_sas_male: number
+        - AN_sas_male: number
+        - AF_sas_male: number
+        - nhomalt_sas_male: number
+        - AC_sas_female: number
+        - AN_sas_female: number
+        - AF_sas_female: number
+        - nhomalt_sas_female: number
+        - nhomalt_eas_oea: number
+        - nhomalt_female: number
+        - AC_eas_female: number
+        - AN_eas_female: number
+        - AF_eas_female: number
+        - nhomalt_eas_female: number
+        - AC_eas_oea: number
+        - AN_eas_oea: number
+        - AF_eas_oea: number
+        - nhomalt_eas_oea: number
+        - AC_eas_jpn: number
+        - AN_eas_jpn: number
+        - AF_eas_jpn: number
+        - nhomalt_eas_jpn: number
+        - AC_eas_kor: number
+        - AN_eas_kor: number
+        - AF_eas_kor: number
+        - nhomalt_eas_kor: number
+        - af_nfe_est: number
+        - ac_nfe_est: number
+        - an_nfe_est: number
+        - nhomalt_nfe_est: number
+        - ac_nfe_bgr: number
+        - an_nfe_bgr: number
+        - af_nfe_bgr: number
+        - nhomalt_nfe_bgr: number
+        - ac_nfe_nwe: number
+        - an_nfe_nwe: number
+        - af_nfe_nwe: number
+        - nhomalt_nfe_nwe: number
+        - ac_amr_male: number
+        - an_amr_male: number
+        - af_amr_male: number
+        - nhomalt_amr_male: number
+        - ac_nfe_onf: number
+        - an_nfe_onf: number
+        - af_nfe_onf: number
+        - nhomalt_nfe_onf: number
+        - AC_fin: number
+        - AN_fin: number
+        - AF_fin: number
+        - nhomalt_fin: number
+        - AC_fin_male: number
+        - AN_fin_male: number
+        - AF_fin_male: number
+        - nhomalt_fin_male: number
+        - AC_fin_female: number
+        - AN_fin_female: number
+        - AF_fin_female: number
+        - nhomalt_fin_female: number
+        - AC_asj_female: number
+        - AN_asj_female: number
+        - AF_asj_female: number
+        - nhomalt_asj_female: number
+        - non_neuro_AC: number
+        - non_neuro_AN: number
+        - non_neuro_AF: number
+        - non_neuro_nhomalt: number
+        - non_neuro_AC_nfe_female: number
+        - non_neuro_AN_nfe_female: number
+        - non_neuro_AF_nfe_female: number
+        - non_neuro_nhomalt_nfe_female: number
+        - non_neuro_AC_asj_male: number
+        - non_neuro_AN_asj_male: number
+        - non_neuro_AF_asj_male: number
+        - non_neuro_nhomalt_asj_male: number
+        - non_neuro_AC_nfe_seu: number
+        - non_neuro_AN_nfe_seu: number
+        - non_neuro_AF_nfe_seu: number
+        - non_neuro_nhomalt_nfe_seu: number
+        - non_neuro_AC_nfe: number
+        - non_neuro_AN_nfe: number
+        - non_neuro_AF_nfe: number
+        - non_neuro_nhomalt_nfe: number
+        - non_neuro_AC_nfe_swe: number
+        - non_neuro_AN_nfe_swe: number
+        - non_neuro_AF_nfe_swe: number
+        - non_neuro_nhomalt_nfe_swe: number
+        - non_neuro_AC_oth_male: number
+        - non_neuro_AN_oth_male: number
+        - non_neuro_AF_oth_male: number
+        - non_neuro_nhomalt_oth_male: number
+        - non_neuro_AC_afr: number
+        - non_neuro_AN_afr: number
+        - non_neuro_AF_afr: number
+        - non_neuro_nhomalt_afr: number
+        - non_neuro_AC_afr_female: number
+        - non_neuro_AN_afr_female: number
+        - non_neuro_AF_afr_female: number
+        - non_neuro_nhomalt_afr_female: number
+        - non_neuro_AC_afr_male: number
+        - non_neuro_AN_afr_male: number
+        - non_neuro_AF_afr_male: number
+        - non_neuro_nhomalt_afr_male: number
+        - non_neuro_AC_asj: number
+        - non_neuro_AN_asj: number
+        - non_neuro_AF_asj: number
+        - non_neuro_nhomalt_asj: number
+        - non_neuro_AC_amr: number
+        - non_neuro_AN_amr: number
+        - non_neuro_AF_amr: number
+        - non_neuro_nhomalt_amr: number
+        - non_neuro_AC_amr_female: number
+        - non_neuro_AN_amr_female: number
+        - non_neuro_AF_amr_female: number
+        - non_neuro_nhomalt_amr_female: number
+        - non_neuro_AC_oth: number
+        - non_neuro_AN_oth: number
+        - non_neuro_AN_oth: number
+        - non_neuro_nhomalt_oth: number
+        - non_neuro_AC_oth_male: number
+        - non_neuro_AC_oth_female: number
+        - non_neuro_AN_oth_female: number
+        - non_neuro_AF_oth_female: number
+        - non_neuro_nhomalt_oth_female: number
+        - non_neuro_AC_nfe_male: number
+        - non_neuro_AN_nfe_male: number
+        - non_neuro_AF_nfe_male: number
+        - non_neuro_nhomalt_nfe_male: number
+        - non_neuro_AC_male: number
+        - non_neuro_AN_female: number
+        - non_neuro_AF_male: number
+        - non_neuro_nhomalt_male: number
+        - non_neuro_AC_eas: number
+        - non_neuro_AN_eas: number
+        - non_neuro_AF_eas: number
+        - non_neuro_nhomalt_eas: number
+        - non_neuro_AC_eas_male: number
+        - non_neuro_AN_eas_male: number
+        - non_neuro_AF_eas_male: number
+        - non_neuro_nhomalt_eas_male: number
+        - non_neuro_ac_female: number
+        - non_neuro_an_female: number
+        - non_neuro_af_female: number
+        - non_neuro_nhomalt_female: number
+        - non_neuro_AC_sas: number
+        - non_neuro_AN_sas: number
+        - non_neuro_AF_sas: number
+        - non_neuro_nhomalt_sas: number
+        - non_neuro_AC_sas_male: number
+        - non_neuro_AN_sas_male: number
+        - non_neuro_AF_sas_male: number
+        - non_neuro_nhomalt_sas_male: number
+        - non_neuro_AC_sas_female: number
+        - non_neuro_AN_sas_female: number
+        - non_neuro_AF_sas_female: number
+        - non_neuro_nhomalt_sas_female: number
+        - non_neuro_nhomalt_eas_oea: number
+        - non_neuro_nhomalt_female: number
+        - non_neuro_AC_eas_female: number
+        - non_neuro_AN_eas_female: number
+        - non_neuro_AF_eas_female: number
+        - non_neuro_nhomalt_eas_female: number
+        - non_neuro_AC_eas_oea: number
+        - non_neuro_AN_eas_oea: number
+        - non_neuro_AF_eas_oea: number
+        - non_neuro_nhomalt_eas_oea: number
+        - non_neuro_AC_eas_jpn: number
+        - non_neuro_AN_eas_jpn: number
+        - non_neuro_AF_eas_jpn: number
+        - non_neuro_nhomalt_eas_jpn: number
+        - non_neuro_AC_eas_kor: number
+        - non_neuro_AN_eas_kor: number
+        - non_neuro_AF_eas_kor: number
+        - non_neuro_nhomalt_eas_kor: number
+        - non_neuro_af_nfe_est: number
+        - non_neuro_ac_nfe_est: number
+        - non_neuro_an_nfe_est: number
+        - non_neuro_nhomalt_nfe_est: number
+        - non_neuro_ac_nfe_bgr: number
+        - non_neuro_an_nfe_bgr: number
+        - non_neuro_af_nfe_bgr: number
+        - non_neuro_nhomalt_nfe_bgr: number
+        - non_neuro_ac_nfe_nwe: number
+        - non_neuro_an_nfe_nwe: number
+        - non_neuro_af_nfe_nwe: number
+        - non_neuro_nhomalt_nfe_nwe: number
+        - non_neuro_ac_amr_male: number
+        - non_neuro_an_amr_male: number
+        - non_neuro_af_amr_male: number
+        - non_neuro_nhomalt_amr_male: number
+        - non_neuro_ac_nfe_onf: number
+        - non_neuro_an_nfe_onf: number
+        - non_neuro_af_nfe_onf: number
+        - non_neuro_nhomalt_nfe_onf: number
+        - non_neuro_AC_fin: number
+        - non_neuro_AN_fin: number
+        - non_neuro_AF_fin: number
+        - non_neuro_nhomalt_fin: number
+        - non_neuro_AC_fin_male: number
+        - non_neuro_AN_fin_male: number
+        - non_neuro_AF_fin_male: number
+        - non_neuro_nhomalt_fin_male: number
+        - non_neuro_AC_fin_female: number
+        - non_neuro_AN_fin_female: number
+        - non_neuro_AF_fin_female: number
+        - non_neuro_nhomalt_fin_female: number
+        - non_neuro_AC_asj_female: number
+        - non_neuro_AN_asj_female: number
+        - non_neuro_AF_asj_female: number
+        - non_neuro_nhomalt_asj_female: number
+        - AC: number
+        - controls_AN: number
+        - controls_AF: number
+        - controls_nhomalt: number
+        - controls_AC_nfe_female: number
+        - controls_AN_nfe_female: number
+        - controls_AF_nfe_female: number
+        - controls_nhomalt_nfe_female: number
+        - controls_AC_asj_male: number
+        - controls_AN_asj_male: number
+        - controls_AF_asj_male: number
+        - controls_nhomalt_asj_male: number
+        - controls_AC_nfe_seu: number
+        - controls_AN_nfe_seu: number
+        - controls_AF_nfe_seu: number
+        - controls_nhomalt_nfe_seu: number
+        - controls_AC_nfe: number
+        - controls_AN_nfe: number
+        - controls_AF_nfe: number
+        - controls_nhomalt_nfe: number
+        - controls_AC_nfe_swe: number
+        - controls_AN_nfe_swe: number
+        - controls_AF_nfe_swe: number
+        - controls_nhomalt_nfe_swe: number
+        - controls_AC_oth_male: number
+        - controls_AN_oth_male: number
+        - controls_AF_oth_male: number
+        - controls_nhomalt_oth_male: number
+        - controls_AC_afr: number
+        - controls_AN_afr: number
+        - controls_AF_afr: number
+        - controls_nhomalt_afr: number
+        - controls_AC_afr_female: number
+        - controls_AN_afr_female: number
+        - controls_AF_afr_female: number
+        - controls_nhomalt_afr_female: number
+        - controls_AC_afr_male: number
+        - controls_AN_afr_male: number
+        - controls_AF_afr_male: number
+        - controls_nhomalt_afr_male: number
+        - controls_AC_asj: number
+        - controls_AN_asj: number
+        - controls_AF_asj: number
+        - controls_nhomalt_asj: number
+        - controls_AC_amr: number
+        - controls_AN_amr: number
+        - controls_AF_amr: number
+        - controls_nhomalt_amr: number
+        - controls_AC_amr_female: number
+        - controls_AN_amr_female: number
+        - controls_AF_amr_female: number
+        - controls_nhomalt_amr_female: number
+        - controls_AC_oth: number
+        - controls_AN_oth: number
+        - controls_AN_oth: number
+        - controls_nhomalt_oth: number
+        - controls_AC_oth_male: number
+        - controls_AC_oth_female: number
+        - controls_AN_oth_female: number
+        - controls_AF_oth_female: number
+        - controls_nhomalt_oth_female: number
+        - controls_AC_nfe_male: number
+        - controls_AN_nfe_male: number
+        - controls_AF_nfe_male: number
+        - controls_nhomalt_nfe_male: number
+        - controls_AC_male: number
+        - controls_AN_female: number
+        - controls_AF_male: number
+        - controls_nhomalt_male: number
+        - controls_AC_eas: number
+        - controls_AN_eas: number
+        - controls_AF_eas: number
+        - controls_nhomalt_eas: number
+        - controls_AC_eas_male: number
+        - controls_AN_eas_male: number
+        - controls_AF_eas_male: number
+        - controls_nhomalt_eas_male: number
+        - controls_ac_female: number
+        - controls_an_female: number
+        - controls_af_female: number
+        - controls_nhomalt_female: number
+        - controls_AC_sas: number
+        - controls_AN_sas: number
+        - controls_AF_sas: number
+        - controls_nhomalt_sas: number
+        - controls_AC_sas_male: number
+        - controls_AN_sas_male: number
+        - controls_AF_sas_male: number
+        - controls_nhomalt_sas_male: number
+        - controls_AC_sas_female: number
+        - controls_AN_sas_female: number
+        - controls_AF_sas_female: number
+        - controls_nhomalt_sas_female: number
+        - controls_nhomalt_eas_oea: number
+        - controls_nhomalt_female: number
+        - controls_AC_eas_female: number
+        - controls_AN_eas_female: number
+        - controls_AF_eas_female: number
+        - controls_nhomalt_eas_female: number
+        - controls_AC_eas_oea: number
+        - controls_AN_eas_oea: number
+        - controls_AF_eas_oea: number
+        - controls_nhomalt_eas_oea: number
+        - controls_AC_eas_jpn: number
+        - controls_AN_eas_jpn: number
+        - controls_AF_eas_jpn: number
+        - controls_nhomalt_eas_jpn: number
+        - controls_AC_eas_kor: number
+        - controls_AN_eas_kor: number
+        - controls_AF_eas_kor: number
+        - controls_nhomalt_eas_kor: number
+        - controls_af_nfe_est: number
+        - controls_ac_nfe_est: number
+        - controls_an_nfe_est: number
+        - controls_nhomalt_nfe_est: number
+        - controls_ac_nfe_bgr: number
+        - controls_an_nfe_bgr: number
+        - controls_af_nfe_bgr: number
+        - controls_nhomalt_nfe_bgr: number
+        - controls_ac_nfe_nwe: number
+        - controls_an_nfe_nwe: number
+        - controls_af_nfe_nwe: number
+        - controls_nhomalt_nfe_nwe: number
+        - controls_ac_amr_male: number
+        - controls_an_amr_male: number
+        - controls_af_amr_male: number
+        - controls_nhomalt_amr_male: number
+        - controls_ac_nfe_onf: number
+        - controls_an_nfe_onf: number
+        - controls_af_nfe_onf: number
+        - controls_nhomalt_nfe_onf: number
+        - controls_AC_fin: number
+        - controls_AN_fin: number
+        - controls_AF_fin: number
+        - controls_nhomalt_fin: number
+        - controls_AC_fin_male: number
+        - controls_AN_fin_male: number
+        - controls_AF_fin_male: number
+        - controls_nhomalt_fin_male: number
+        - controls_AC_fin_female: number
+        - controls_AN_fin_female: number
+        - controls_AF_fin_female: number
+        - controls_nhomalt_fin_female: number
+        - controls_AC_asj_female: number
+        - controls_AN_asj_female: number
+        - controls_AF_asj_female: number
+        - controls_nhomalt_asj_female: number
+        - AC: number
+        - non_topmed_AN: number
+        - non_topmed_AF: number
+        - non_topmed_nhomalt: number
+        - non_topmed_AC_nfe_female: number
+        - non_topmed_AN_nfe_female: number
+        - non_topmed_AF_nfe_female: number
+        - non_topmed_nhomalt_nfe_female: number
+        - non_topmed_AC_asj_male: number
+        - non_topmed_AN_asj_male: number
+        - non_topmed_AF_asj_male: number
+        - non_topmed_nhomalt_asj_male: number
+        - non_topmed_AC_nfe_seu: number
+        - non_topmed_AN_nfe_seu: number
+        - non_topmed_AF_nfe_seu: number
+        - non_topmed_nhomalt_nfe_seu: number
+        - non_topmed_AC_nfe: number
+        - non_topmed_AN_nfe: number
+        - non_topmed_AF_nfe: number
+        - non_topmed_nhomalt_nfe: number
+        - non_topmed_AC_nfe_swe: number
+        - non_topmed_AN_nfe_swe: number
+        - non_topmed_AF_nfe_swe: number
+        - non_topmed_nhomalt_nfe_swe: number
+        - non_topmed_AC_oth_male: number
+        - non_topmed_AN_oth_male: number
+        - non_topmed_AF_oth_male: number
+        - non_topmed_nhomalt_oth_male: number
+        - non_topmed_AC_afr: number
+        - non_topmed_AN_afr: number
+        - non_topmed_AF_afr: number
+        - non_topmed_nhomalt_afr: number
+        - non_topmed_AC_afr_female: number
+        - non_topmed_AN_afr_female: number
+        - non_topmed_AF_afr_female: number
+        - non_topmed_nhomalt_afr_female: number
+        - non_topmed_AC_afr_male: number
+        - non_topmed_AN_afr_male: number
+        - non_topmed_AF_afr_male: number
+        - non_topmed_nhomalt_afr_male: number
+        - non_topmed_AC_asj: number
+        - non_topmed_AN_asj: number
+        - non_topmed_AF_asj: number
+        - non_topmed_nhomalt_asj: number
+        - non_topmed_AC_amr: number
+        - non_topmed_AN_amr: number
+        - non_topmed_AF_amr: number
+        - non_topmed_nhomalt_amr: number
+        - non_topmed_AC_amr_female: number
+        - non_topmed_AN_amr_female: number
+        - non_topmed_AF_amr_female: number
+        - non_topmed_nhomalt_amr_female: number
+        - non_topmed_AC_oth: number
+        - non_topmed_AN_oth: number
+        - non_topmed_AN_oth: number
+        - non_topmed_nhomalt_oth: number
+        - non_topmed_AC_oth_male: number
+        - non_topmed_AC_oth_female: number
+        - non_topmed_AN_oth_female: number
+        - non_topmed_AF_oth_female: number
+        - non_topmed_nhomalt_oth_female: number
+        - non_topmed_AC_nfe_male: number
+        - non_topmed_AN_nfe_male: number
+        - non_topmed_AF_nfe_male: number
+        - non_topmed_nhomalt_nfe_male: number
+        - non_topmed_AC_male: number
+        - non_topmed_AN_female: number
+        - non_topmed_AF_male: number
+        - non_topmed_nhomalt_male: number
+        - non_topmed_AC_eas: number
+        - non_topmed_AN_eas: number
+        - non_topmed_AF_eas: number
+        - non_topmed_nhomalt_eas: number
+        - non_topmed_AC_eas_male: number
+        - non_topmed_AN_eas_male: number
+        - non_topmed_AF_eas_male: number
+        - non_topmed_nhomalt_eas_male: number
+        - non_topmed_ac_female: number
+        - non_topmed_an_female: number
+        - non_topmed_af_female: number
+        - non_topmed_nhomalt_female: number
+        - non_topmed_AC_sas: number
+        - non_topmed_AN_sas: number
+        - non_topmed_AF_sas: number
+        - non_topmed_nhomalt_sas: number
+        - non_topmed_AC_sas_male: number
+        - non_topmed_AN_sas_male: number
+        - non_topmed_AF_sas_male: number
+        - non_topmed_nhomalt_sas_male: number
+        - non_topmed_AC_sas_female: number
+        - non_topmed_AN_sas_female: number
+        - non_topmed_AF_sas_female: number
+        - non_topmed_nhomalt_sas_female: number
+        - non_topmed_nhomalt_eas_oea: number
+        - non_topmed_nhomalt_female: number
+        - non_topmed_AC_eas_female: number
+        - non_topmed_AN_eas_female: number
+        - non_topmed_AF_eas_female: number
+        - non_topmed_nhomalt_eas_female: number
+        - non_topmed_AC_eas_oea: number
+        - non_topmed_AN_eas_oea: number
+        - non_topmed_AF_eas_oea: number
+        - non_topmed_nhomalt_eas_oea: number
+        - non_topmed_AC_eas_jpn: number
+        - non_topmed_AN_eas_jpn: number
+        - non_topmed_AF_eas_jpn: number
+        - non_topmed_nhomalt_eas_jpn: number
+        - non_topmed_AC_eas_kor: number
+        - non_topmed_AN_eas_kor: number
+        - non_topmed_AF_eas_kor: number
+        - non_topmed_nhomalt_eas_kor: number
+        - non_topmed_af_nfe_est: number
+        - non_topmed_ac_nfe_est: number
+        - non_topmed_an_nfe_est: number
+        - non_topmed_nhomalt_nfe_est: number
+        - non_topmed_ac_nfe_bgr: number
+        - non_topmed_an_nfe_bgr: number
+        - non_topmed_af_nfe_bgr: number
+        - non_topmed_nhomalt_nfe_bgr: number
+        - non_topmed_ac_nfe_nwe: number
+        - non_topmed_an_nfe_nwe: number
+        - non_topmed_af_nfe_nwe: number
+        - non_topmed_nhomalt_nfe_nwe: number
+        - non_topmed_ac_amr_male: number
+        - non_topmed_an_amr_male: number
+        - non_topmed_af_amr_male: number
+        - non_topmed_nhomalt_amr_male: number
+        - non_topmed_ac_nfe_onf: number
+        - non_topmed_an_nfe_onf: number
+        - non_topmed_af_nfe_onf: number
+        - non_topmed_nhomalt_nfe_onf: number
+        - non_topmed_AC_fin: number
+        - non_topmed_AN_fin: number
+        - non_topmed_AF_fin: number
+        - non_topmed_nhomalt_fin: number
+        - non_topmed_AC_fin_male: number
+        - non_topmed_AN_fin_male: number
+        - non_topmed_AF_fin_male: number
+        - non_topmed_nhomalt_fin_male: number
+        - non_topmed_AC_fin_female: number
+        - non_topmed_AN_fin_female: number
+        - non_topmed_AF_fin_female: number
+        - non_topmed_nhomalt_fin_female: number
+        - non_topmed_AC_asj_female: number
+        - non_topmed_AN_asj_female: number
+        - non_topmed_AF_asj_female: number
+        - non_topmed_nhomalt_asj_female: number
+        - AC: number
+        - non_cancer_AN: number
+        - non_cancer_AF: number
+        - non_cancer_nhomalt: number
+        - non_cancer_AC_nfe_female: number
+        - non_cancer_AN_nfe_female: number
+        - non_cancer_AF_nfe_female: number
+        - non_cancer_nhomalt_nfe_female: number
+        - non_cancer_AC_asj_male: number
+        - non_cancer_AN_asj_male: number
+        - non_cancer_AF_asj_male: number
+        - non_cancer_nhomalt_asj_male: number
+        - non_cancer_AC_nfe_seu: number
+        - non_cancer_AN_nfe_seu: number
+        - non_cancer_AF_nfe_seu: number
+        - non_cancer_nhomalt_nfe_seu: number
+        - non_cancer_AC_nfe: number
+        - non_cancer_AN_nfe: number
+        - non_cancer_AF_nfe: number
+        - non_cancer_nhomalt_nfe: number
+        - non_cancer_AC_nfe_swe: number
+        - non_cancer_AN_nfe_swe: number
+        - non_cancer_AF_nfe_swe: number
+        - non_cancer_nhomalt_nfe_swe: number
+        - non_cancer_AC_oth_male: number
+        - non_cancer_AN_oth_male: number
+        - non_cancer_AF_oth_male: number
+        - non_cancer_nhomalt_oth_male: number
+        - non_cancer_AC_afr: number
+        - non_cancer_AN_afr: number
+        - non_cancer_AF_afr: number
+        - non_cancer_nhomalt_afr: number
+        - non_cancer_AC_afr_female: number
+        - non_cancer_AN_afr_female: number
+        - non_cancer_AF_afr_female: number
+        - non_cancer_nhomalt_afr_female: number
+        - non_cancer_AC_afr_male: number
+        - non_cancer_AN_afr_male: number
+        - non_cancer_AF_afr_male: number
+        - non_cancer_nhomalt_afr_male: number
+        - non_cancer_AC_asj: number
+        - non_cancer_AN_asj: number
+        - non_cancer_AF_asj: number
+        - non_cancer_nhomalt_asj: number
+        - non_cancer_AC_amr: number
+        - non_cancer_AN_amr: number
+        - non_cancer_AF_amr: number
+        - non_cancer_nhomalt_amr: number
+        - non_cancer_AC_amr_female: number
+        - non_cancer_AN_amr_female: number
+        - non_cancer_AF_amr_female: number
+        - non_cancer_nhomalt_amr_female: number
+        - non_cancer_AC_oth: number
+        - non_cancer_AN_oth: number
+        - non_cancer_AN_oth: number
+        - non_cancer_nhomalt_oth: number
+        - non_cancer_AC_oth_male: number
+        - non_cancer_AC_oth_female: number
+        - non_cancer_AN_oth_female: number
+        - non_cancer_AF_oth_female: number
+        - non_cancer_nhomalt_oth_female: number
+        - non_cancer_AC_nfe_male: number
+        - non_cancer_AN_nfe_male: number
+        - non_cancer_AF_nfe_male: number
+        - non_cancer_nhomalt_nfe_male: number
+        - non_cancer_AC_male: number
+        - non_cancer_AN_female: number
+        - non_cancer_AF_male: number
+        - non_cancer_nhomalt_male: number
+        - non_cancer_AC_eas: number
+        - non_cancer_AN_eas: number
+        - non_cancer_AF_eas: number
+        - non_cancer_nhomalt_eas: number
+        - non_cancer_AC_eas_male: number
+        - non_cancer_AN_eas_male: number
+        - non_cancer_AF_eas_male: number
+        - non_cancer_nhomalt_eas_male: number
+        - non_cancer_ac_female: number
+        - non_cancer_an_female: number
+        - non_cancer_af_female: number
+        - non_cancer_nhomalt_female: number
+        - non_cancer_AC_sas: number
+        - non_cancer_AN_sas: number
+        - non_cancer_AF_sas: number
+        - non_cancer_nhomalt_sas: number
+        - non_cancer_AC_sas_male: number
+        - non_cancer_AN_sas_male: number
+        - non_cancer_AF_sas_male: number
+        - non_cancer_nhomalt_sas_male: number
+        - non_cancer_AC_sas_female: number
+        - non_cancer_AN_sas_female: number
+        - non_cancer_AF_sas_female: number
+        - non_cancer_nhomalt_sas_female: number
+        - non_cancer_nhomalt_eas_oea: number
+        - non_cancer_nhomalt_female: number
+        - non_cancer_AC_eas_female: number
+        - non_cancer_AN_eas_female: number
+        - non_cancer_AF_eas_female: number
+        - non_cancer_nhomalt_eas_female: number
+        - non_cancer_AC_eas_oea: number
+        - non_cancer_AN_eas_oea: number
+        - non_cancer_AF_eas_oea: number
+        - non_cancer_nhomalt_eas_oea: number
+        - non_cancer_AC_eas_jpn: number
+        - non_cancer_AN_eas_jpn: number
+        - non_cancer_AF_eas_jpn: number
+        - non_cancer_nhomalt_eas_jpn: number
+        - non_cancer_AC_eas_kor: number
+        - non_cancer_AN_eas_kor: number
+        - non_cancer_AF_eas_kor: number
+        - non_cancer_nhomalt_eas_kor: number
+        - non_cancer_af_nfe_est: number
+        - non_cancer_ac_nfe_est: number
+        - non_cancer_an_nfe_est: number
+        - non_cancer_nhomalt_nfe_est: number
+        - non_cancer_ac_nfe_bgr: number
+        - non_cancer_an_nfe_bgr: number
+        - non_cancer_af_nfe_bgr: number
+        - non_cancer_nhomalt_nfe_bgr: number
+        - non_cancer_ac_nfe_nwe: number
+        - non_cancer_an_nfe_nwe: number
+        - non_cancer_af_nfe_nwe: number
+        - non_cancer_nhomalt_nfe_nwe: number
+        - non_cancer_ac_amr_male: number
+        - non_cancer_an_amr_male: number
+        - non_cancer_af_amr_male: number
+        - non_cancer_nhomalt_amr_male: number
+        - non_cancer_ac_nfe_onf: number
+        - non_cancer_an_nfe_onf: number
+        - non_cancer_af_nfe_onf: number
+        - non_cancer_nhomalt_nfe_onf: number
+        - non_cancer_AC_fin: number
+        - non_cancer_AN_fin: number
+        - non_cancer_AF_fin: number
+        - non_cancer_nhomalt_fin: number
+        - non_cancer_AC_fin_male: number
+        - non_cancer_AN_fin_male: number
+        - non_cancer_AF_fin_male: number
+        - non_cancer_nhomalt_fin_male: number
+        - non_cancer_AC_fin_female: number
+        - non_cancer_AN_fin_female: number
+        - non_cancer_AF_fin_female: number
+        - non_cancer_nhomalt_fin_female: number
+        - non_cancer_AC_asj_female: number
+        - non_cancer_AN_asj_female: number
+        - non_cancer_AF_asj_female: number
+        - non_cancer_nhomalt_asj_female: number
       fieldMap:
+        controls_AF_oth_male: controls_af_oth_male
+        controls_AN_oth_male: controls_an_oth_male
+        controls_AC_oth_male: controls_ac_oth_male
+        controls_AF_eas_male: controls_af_eas_male
+        controls_AN_eas_male: controls_an_eas_male
+        controls_AC_eas_male: controls_ac_eas_male
+        non_topmed_AF_nfe_onf: non_topmed_af_nfe_onf
+        non_topmed_AN_nfe_onf: non_topmed_an_nfe_onf
+        non_topmed_AC_nfe_onf: non_topmed_ac_nfe_onf
+        non_topmed_AF_amr_male: non_topmed_af_amr_male
+        non_topmed_AN_amr_male: non_topmed_an_amr_male
+        non_topmed_AC_amr_male: non_topmed_ac_amr_male
+        non_topmed_AF_nfe_nwe: non_topmed_af_nfe_nwe
+        non_topmed_AN_nfe_nwe: non_topmed_an_nfe_nwe
+        non_topmed_AC_nfe_nwe: non_topmed_ac_nfe_nwe
+        non_topmed_AF_nfe_est: non_topmed_af_nfe_est
+        non_topmed_AN_nfe_est: non_topmed_an_nfe_est
+        non_topmed_AC_nfe_est: non_topmed_ac_nfe_est
+        non_topmed_AC_female: non_topmed_ac_female
+        non_topmed_AN_female: non_topmed_an_female
+        non_topmed_AF_female: non_topmed_af_female
+        non_neuro_AN_asj: non_neuro_an_asj
+        non_neuro_AC_asj: non_neuro_ac_asj
+        non_neuro_AF_asj: non_neuro_af_asj
+        ReadPosRankSum: read_pos_rank_sum
+        MQRankSum: mq_rank_sum
+        RAW_MQ: raw_mq
+        QD: qd
+        MQ: mq
+        SOR: sor
+        DP: dp
+        AC: ac
+        AC_raw: ac_raw
         AF: af
-        AF_AFR: af_afr
-        AF_AMR: af_amr
-        AF_ASJ: af_asj
-        AF_EAS: af_eas
-        AF_FIN: af_fin
-        AF_Female: af_female
-        AF_Male: af_male
-        AF_NFE: af_nfe
-        AF_OTH: af_oth
-        AF_SAS: af_sas
+        AF_raw: af_raw
+        AC_male: ac_male
+        AC_female: ac_female
+        AC_afr: ac_afr
+        AC_afr_female: ac_afr_female
+        AC_afr_male: ac_afr_male
+        AC_asj: ac_asj
+        AC_asj_female: ac_asj_female
+        AC_asj_male: ac_asj_male
+        AC_eas: ac_eas
+        AC_eas_female: ac_eas_female
+        AC_eas_male: ac_eas_male
+        AC_fin: ac_fin
+        AC_fin_male: ac_fin_male
+        AC_fin_female: ac_fin_female
+        AC_oth: ac_oth
+        AC_oth_female: ac_oth_female
+        AC_oth_male: ac_oth_male
+        AC_nfe: ac_nfe
+        AC_nfe_female: ac_nfe_female
+        AC_nfe_male: ac_nfe_male
+        AC_amr: ac_amr
+        AC_amr_male: ac_amr_male
+        AC_amr_female: ac_amr_female
+        AF_afr: af_afr
+        AF_afr_female: af_afr_female
+        AF_afr_male: af_afr_male
+        AF_asj: af_asj
+        AF_asj_female: af_asj_female
+        AF_asj_male: af_asj_male
+        AF_amr: af_amr
+        AF_amr_female: af_amr_female
+        AF_amr_male: af_amr_male
+        AF_female: af_female
+        AF_eas: af_eas
+        AF_eas_female: af_eas_female
+        AF_eas_male: af_eas_male
+        AF_fin: af_fin
+        AF_fin_male: af_fin_male
+        AF_fin_female: af_fin_female
+        AF_oth: af_oth
+        AF_oth_female: af_oth_female
+        AF_oth_male: af_oth_male
+        AF_nfe: af_nfe
+        AF_nfe_female: af_nfe_female
+        AF_nfe_male: af_nfe_male
+        AF_male: af_male
         AN: an
-        AN_AFR: an_afr
-        AN_AMR: an_amr
-        AN_ASJ: an_asj
-        AN_EAS: an_eas
-        AN_FIN: an_fin
-        AN_Female: an_female
-        AN_Male: an_male
-        AN_NFE: an_nfe
-        AN_OTH: an_oth
-        AN_SAS: an_sas
+        AN_raw: an_raw
+        AN_afr: an_afr
+        AN_afr_female: an_afr_female
+        AN_afr_male: an_afr_male
+        AN_female: an_female
+        AN_asj: an_asj
+        AN_asj_female: an_asj_female
+        AN_asj_male: an_asj_male
+        AN_eas: an_eas
+        AN_eas_female: an_eas_female
+        AN_eas_male: an_eas_male
+        AN_fin: an_fin
+        AN_fin_female: an_fin_female
+        AN_fin_male: an_fin_male
+        AN_oth: an_oth
+        AN_oth_female: an_oth_female
+        AN_oth_male: an_oth_male
+        AN_nfe: an_nfe
+        AN_nfe_male: an_nfe_male
+        AN_nfe_female: an_nfe_female
+        AN_amr: an_amr
+        AN_amr_male: an_amr_male
+        AN_amr_female: an_amr_female
+        AN_male: an_male
       local_files:
         - gnomad.exomes.r2.1.1.sites.*.vcf.bgz
       remote_files:
