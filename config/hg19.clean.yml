@@ -248,70 +248,84 @@ tracks:
     version: 6
   - build_author: ec2-user
     build_date: 2018-01-17T20:32:00
-    build_field_transformations:
-      alleleFreqs: split [,]
-      alleleNs: split [,]
-      alleles: split [,]
-      func: split [,]
-      observed: split [\/]
-    features:
-      - name
-      - strand
-      - observed
-      - class
-      - func
-      - alleles
-      - alleleNs: number
-      - alleleFreqs: number
-    fetch_date: 2017-02-04T21:35:00
-    name: dbSNP
-    sql_statement: SELECT * FROM hg19.snp151
-    type: sparse
-    version: 6
-  - based: 1
-    build_author: ec2-user
-    build_date: 2018-01-17T20:32:00
-    build_field_transformations:
-      chrom: chr .
-      clinicalSignificance: split [;]
-      origin: split [;]
-      phenotypeList: split [;]
-      reviewStatus: split [;]
-      type: split [;]
     build_row_filters:
-      Assembly: == GRCh37
+      AS_FilterStatus: == PASS
     features:
-      - alleleID: number
-      - phenotypeList
-      - clinicalSignificance
-      - type
-      - origin
-      - numberSubmitters: number
-      - reviewStatus
-      - referenceAllele
-      - alternateAllele
-    fetch_date: 2018-02-26T21:56:00
+      - alt
+      - id
+      - af: number
+      - an: number
+      - an_afr: number
+      - an_amr: number
+      - an_asj: number
+      - an_eas: number
+      - an_fin: number
+      - an_nfe: number
+      - an_oth: number
+      - an_male: number
+      - an_female: number
+      - af_afr: number
+      - af_amr: number
+      - af_asj: number
+      - af_eas: number
+      - af_fin: number
+      - af_nfe: number
+      - af_oth: number
+      - af_male: number
+      - af_female: number
     fieldMap:
-      "#AlleleID": alleleID
-      AlternateAllele: alternateAllele
-      Chromosome: chrom
-      ClinicalSignificance: clinicalSignificance
-      NumberSubmitters: numberSubmitters
-      Origin: origin
-      PhenotypeIDS: phenotypeIDs
-      PhenotypeList: phenotypeList
-      ReferenceAllele: referenceAllele
-      ReviewStatus: reviewStatus
-      Start: chromStart
-      Stop: chromEnd
-      Type: type
+      AF: af
+      AF_AFR: af_afr
+      AF_AMR: af_amr
+      AF_ASJ: af_asj
+      AF_EAS: af_eas
+      AF_FIN: af_fin
+      AF_Female: af_female
+      AF_Male: af_male
+      AF_NFE: af_nfe
+      AF_OTH: af_oth
+      AF_SAS: af_sas
+      AN: an
+      AN_AFR: an_afr
+      AN_AMR: an_amr
+      AN_ASJ: an_asj
+      AN_EAS: an_eas
+      AN_FIN: an_fin
+      AN_Female: an_female
+      AN_Male: an_male
+      AN_NFE: an_nfe
+      AN_OTH: an_oth
+      AN_SAS: an_sas
     local_files:
-      - variant_summary.txt.gz
-    name: clinvar
+      - gnomad.genomes.r3.0.sites.chr*.vcf.bgz
     remote_files:
-      - ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz
-    type: sparse
-    version: 6
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr1.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr2.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr3.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr4.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr5.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr6.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr7.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr8.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr9.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr10.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr11.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr12.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr13.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr14.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr15.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr16.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr17.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr18.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr19.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr20.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr21.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr22.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chrX.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chrY.vcf.bgz
+    name: gnomadV3.genomes
+    type: vcf
+    version: 0
   - build_author: ec2-user
     build_date: 2018-01-17T20:32:00
     build_row_filters:
@@ -362,6 +376,8 @@ tracks:
       AN_NFE: an_nfe
       AN_OTH: an_oth
       AN_SAS: an_sas
+    local_files:
+      - gnomad.genomes.r2.1.1.sites.*.vcf.bgz
     remote_files:
       - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.1.vcf.bgz
       - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.2.vcf.bgz
@@ -441,6 +457,8 @@ tracks:
       AN_NFE: an_nfe
       AN_OTH: an_oth
       AN_SAS: an_sas
+    local_files:
+      - gnomad.exomes.r2.1.1.sites.*.vcf.bgz
     remote_files:
       - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.1.vcf.bgz
       - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.2.vcf.bgz
@@ -468,5 +486,71 @@ tracks:
       - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.Y.vcf.bgz
     name: gnomad.exomes
     type: vcf
+    version: 6
+  - build_author: ec2-user
+    build_date: 2018-01-17T20:32:00
+    build_field_transformations:
+      alleleFreqs: split [,]
+      alleleNs: split [,]
+      alleles: split [,]
+      func: split [,]
+      observed: split [\/]
+    features:
+      - name
+      - strand
+      - observed
+      - class
+      - func
+      - alleles
+      - alleleNs: number
+      - alleleFreqs: number
+    fetch_date: 2017-02-04T21:35:00
+    name: dbSNP
+    sql_statement: SELECT * FROM hg19.snp151
+    type: sparse
+    version: 6
+  - based: 1
+    build_author: ec2-user
+    build_date: 2018-01-17T20:32:00
+    build_field_transformations:
+      chrom: chr .
+      clinicalSignificance: split [;]
+      origin: split [;]
+      phenotypeList: split [;]
+      reviewStatus: split [;]
+      type: split [;]
+    build_row_filters:
+      Assembly: == GRCh37
+    features:
+      - alleleID: number
+      - phenotypeList
+      - clinicalSignificance
+      - type
+      - origin
+      - numberSubmitters: number
+      - reviewStatus
+      - referenceAllele
+      - alternateAllele
+    fetch_date: 2018-02-26T21:56:00
+    fieldMap:
+      "#AlleleID": alleleID
+      AlternateAllele: alternateAllele
+      Chromosome: chrom
+      ClinicalSignificance: clinicalSignificance
+      NumberSubmitters: numberSubmitters
+      Origin: origin
+      PhenotypeIDS: phenotypeIDs
+      PhenotypeList: phenotypeList
+      ReferenceAllele: referenceAllele
+      ReviewStatus: reviewStatus
+      Start: chromStart
+      Stop: chromEnd
+      Type: type
+    local_files:
+      - variant_summary.txt.gz
+    name: clinvar
+    remote_files:
+      - ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz
+    type: sparse
     version: 6
 version: 11
