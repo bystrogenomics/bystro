@@ -1992,15 +1992,41 @@
         func: split [,]
         observed: split [\/]
       features:
-        - name
-        - strand
-        - observed
-        - class
-        - func
-        - alleles
-        - alleleNs: number
-        - alleleFreqs: number
-      fetch_date: 2017-02-04T21:35:00
+      - name
+      - strand
+      - observed
+      - class
+      - func
+      - alleles
+      - alleleNs: number
+      - alleleFreqs: number
+      fetch_date: 2020-02-02T15:15:00
+      local_files:
+      - hg19.snp151.chr1.gz
+      - hg19.snp151.chr2.gz
+      - hg19.snp151.chr3.gz
+      - hg19.snp151.chr4.gz
+      - hg19.snp151.chr5.gz
+      - hg19.snp151.chr6.gz
+      - hg19.snp151.chr7.gz
+      - hg19.snp151.chr8.gz
+      - hg19.snp151.chr9.gz
+      - hg19.snp151.chr10.gz
+      - hg19.snp151.chr11.gz
+      - hg19.snp151.chr12.gz
+      - hg19.snp151.chr13.gz
+      - hg19.snp151.chr14.gz
+      - hg19.snp151.chr15.gz
+      - hg19.snp151.chr16.gz
+      - hg19.snp151.chr17.gz
+      - hg19.snp151.chr18.gz
+      - hg19.snp151.chr19.gz
+      - hg19.snp151.chr20.gz
+      - hg19.snp151.chr21.gz
+      - hg19.snp151.chr22.gz
+      - hg19.snp151.chrM.gz
+      - hg19.snp151.chrX.gz
+      - hg19.snp151.chrY.gz
       name: dbSNP
       sql_statement: SELECT * FROM hg19.snp151
       type: sparse
