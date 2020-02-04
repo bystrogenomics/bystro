@@ -194,6 +194,10 @@ sub BUILD {
     }
   }
 
+  if($self->name eq "gnomad.exomes") {
+    p $self->fieldNames;
+  }
+
   # Commit, sync, and remove any databases opened
   # This is useful because locking may occur if there is an open transaction
   # before fork(), and to make sure that any database meta data is properly

@@ -217,7 +217,7 @@ sub dbPatchHash {
 
   my $db = $self->_getDbi($chr);
   my $dbi = $db->{dbi};
-
+  say "GETTING DB $chr";
   if(!$db->{db}->Alive) {
     $db->{db}->Txn = $db->{env}->BeginTxn();
     # not strictly necessary, but I am concerned about hard to trace abort bugs related to scope
