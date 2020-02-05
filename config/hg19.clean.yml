@@ -1,7 +1,7 @@
 ---
 assembly: hg19
 build_author: ec2-user
-build_date: 2020-02-04T04:11:00
+build_date: 2020-02-05T02:18:00
 chromosomes:
 - chr1
 - chr2
@@ -34,7 +34,7 @@ fileProcessors:
     args: --emptyField ! --minGq .95
     program: bystro-snp
   vcf:
-    args: --emptyField ! --sample %sampleList% --keepPos
+    args: --emptyField ! --sample %sampleList% --keepPos --keepId
     program: bystro-vcf
 files_dir: '~'
 statistics:
@@ -50,7 +50,7 @@ statistics:
 temp_dir: '~'
 tracks:
 - build_author: ec2-user
-  build_date: 2020-02-04T04:11:00
+  build_date: 2020-02-05T02:18:00
   fetch_date: 2017-02-04T22:36:00
   local_files:
   - chr*.fa.gz
@@ -83,9 +83,9 @@ tracks:
   - chrX.fa.gz
   - chrY.fa.gz
   type: reference
-  version: 10
+  version: 11
 - build_author: ec2-user
-  build_date: 2020-02-04T04:11:00
+  build_date: 2020-02-05T02:18:00
   features:
   - kgID
   - mRNA
@@ -142,9 +142,9 @@ tracks:
   sql_statement: SELECT * FROM hg19.refGene LEFT JOIN hg19.kgXref ON hg19.kgXref.refseq
     = hg19.refGene.name
   type: gene
-  version: 9
+  version: 10
 - build_author: ec2-user
-  build_date: 2020-02-04T04:11:00
+  build_date: 2020-02-05T02:18:00
   fetch_date: 2017-02-04T16:52:00
   local_files:
   - chr*.phastCons100way.wigFix.gz
@@ -177,9 +177,9 @@ tracks:
   - chrY.phastCons100way.wigFix.gz
   - chrM.phastCons100way.wigFix.gz
   type: score
-  version: 9
+  version: 10
 - build_author: ec2-user
-  build_date: 2020-02-04T04:11:00
+  build_date: 2020-02-05T02:18:00
   fetch_date: 2017-02-03T20:57:00
   local_files:
   - chr*.phyloP100way.wigFix.gz
@@ -212,9 +212,9 @@ tracks:
   - chrY.phyloP100way.wigFix.gz
   - chrM.phyloP100way.wigFix.gz
   type: score
-  version: 9
+  version: 10
 - build_author: ec2-user
-  build_date: 2020-02-04T04:11:00
+  build_date: 2020-02-05T02:18:00
   caddToBed_date: 2018-09-07T00:00:00
   name: cadd
   remote_files:
@@ -245,9 +245,9 @@ tracks:
   sortCadd_date: 2018-09-07T00:00:00
   sorted_guaranteed: 1
   type: cadd
-  version: 9
+  version: 10
 - build_author: ec2-user
-  build_date: 2020-02-04T04:11:00
+  build_date: 2020-02-05T02:18:00
   build_row_filters:
     AS_FilterStatus: == PASS
   features:
@@ -612,9 +612,9 @@ tracks:
   - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.22.vcf.bgz
   - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.X.vcf.bgz
   type: vcf
-  version: 10
+  version: 11
 - build_author: ec2-user
-  build_date: 2020-02-04T04:11:00
+  build_date: 2020-02-05T02:18:00
   build_row_filters:
     AS_FilterStatus: == PASS
   features:
@@ -1193,9 +1193,9 @@ tracks:
   - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.X.vcf.bgz
   - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.Y.vcf.bgz
   type: vcf
-  version: 11
+  version: 12
 - build_author: ec2-user
-  build_date: 2020-02-04T04:11:00
+  build_date: 2020-02-05T02:18:00
   build_field_transformations:
     alleleFreqs: split [,]
     alleleNs: split [,]
@@ -1241,10 +1241,10 @@ tracks:
   name: dbSNP
   sql_statement: SELECT * FROM hg19.snp151
   type: sparse
-  version: 9
+  version: 10
 - based: 1
   build_author: ec2-user
-  build_date: 2020-02-04T04:11:00
+  build_date: 2020-02-05T02:18:00
   build_field_transformations:
     chrom: chr .
     clinicalSignificance: split [;]
@@ -1285,6 +1285,6 @@ tracks:
   remote_files:
   - ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz
   type: sparse
-  version: 9
-version: 17
+  version: 10
+version: 18
 
