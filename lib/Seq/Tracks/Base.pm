@@ -148,9 +148,6 @@ has debug => ( is => 'ro', isa => 'Bool', lazy => 1, default => 0 );
 #### Initialize / make dbnames for features and tracks before forking occurs ###
 sub BUILD {
   my $self = shift;
-
-  # say "index is";
-  # p $self->index;
   # getFieldDbNames is not a pure function; sideEffect of setting auto-generated dbNames in the
   # database the first time (ever) that it is run for a track
   # We could change this effect; for now, initialize here so that each thread
@@ -192,10 +189,6 @@ sub BUILD {
         $self->getFieldDbName($feature);
       }
     }
-  }
-
-  if($self->name eq "gnomad.exomes") {
-    p $self->fieldNames;
   }
 
   # Commit, sync, and remove any databases opened
