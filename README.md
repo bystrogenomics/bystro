@@ -1,5 +1,8 @@
 # Bystro [![DOI](https://zenodo.org/badge/98203430.svg)](https://zenodo.org/badge/latestdoi/98203430) [![Codacy Badge](https://api.codacy.com/project/badge/Grade/0859a24d422a4d80a2ad6721e294aa35)](https://app.codacy.com/app/akotlar/bystro?utm_source=github.com&utm_medium=referral&utm_content=akotlar/bystro&utm_campaign=badger)
 
+TLDR; 1,000x+ faster than VEP, more complete annotation + online search (https://bystro.io) for datasets of up to 47TB (compressed) online, or petabytes offline.
+
+![Bystro Performance](https://i.imgur.com/ve8hUF8.png)
 ## Bystro Publication
 
 For datasets and scripts used, please visit [github.com/bystro-paper](https://github.com/akotlar/bystro-paper)

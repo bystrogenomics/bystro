@@ -29,9 +29,7 @@
   - chrX
   - chrY
   database_dir: '~'
-  files: '~'
-  files_dir: /mnt/annotator/hg19_ensembl/raw/
-  snpProcessor: bystro-snp
+  files_dir: '~'
   statistics:
     dbSNPnameField: dbSNP.name
     exonicAlleleFunctionField: refSeq.exonicAlleleFunction
@@ -42,6 +40,13 @@
     programPath: bystro-stats
     refTrackField: ref
     siteTypeField: refSeq.siteType
+  fileProcessors:
+    snp:
+      args: --emptyField ! --minGq .95
+      program: bystro-snp
+    vcf:
+      args: --emptyField ! --sample %sampleList%
+      program: bystro-vcf
   temp_dir: '~'
   tracks:
   - build_author: ec2-user
@@ -434,6 +439,5 @@
     name: gnomad.exomes
     type: vcf
     version: 1
-  vcfProcessor: bystro-vcf
   version: 2
   
