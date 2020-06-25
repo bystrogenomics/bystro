@@ -4,11 +4,11 @@ echo -e "\n\nInstalling go packages (bystro-vcf, stats, snp)\n"
 
 mkdir -p $GOPATH/src/github.com;
 
-go get github.com/akotlar/bystro-stats;
+GO111MODULE=on go get github.com/akotlar/bystro-stats@1.0.0;
 
-go get github.com/akotlar/bystro-vcf;
+GO111MODULE=on go get github.com/akotlar/bystro-vcf@1.0.0;
 
-go get github.com/akotlar/bystro-snp;
+GO111MODULE=on go get github.com/akotlar/bystro-snp@1.0.0;
 
 # allows us to modify our config files in place
-go get github.com/mikefarah/yq;
+GO111MODULE=on go get github.com/mikefarah/yq@2.4.1;

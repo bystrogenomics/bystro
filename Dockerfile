@@ -1,15 +1,14 @@
 FROM perl:5.28.0-slim
 
-ENV PATH="/root/bystro/bin:/usr/local/go/bin:/root/go/bin/:${PATH}" \
-    PERL5LIB="/root/perl5/lib/perl5:/root/bystro/lib:${PERL5LIB}" \
-    GOPATH="/root/go"
+ENV PATH="/bystro/bin:/usr/local/go/bin:/go/bin/:${PATH}" \
+    PERL5LIB="/bystro/lib:${PERL5LIB}" \
+    GOPATH="/go"
 
-ADD ./ /root/bystro/
+COPY . /bystro
 
-WORKDIR /root/bystro
+WORKDIR /bystro
 
-RUN cpanm --local-lib=/root/perl5 local::lib && eval $(perl -I /root/perl5/lib -Mlocal::lib) \
-    && apt-get update \
+RUN apt-get update \
     && apt-get install -y wget sudo gnupg \
     && wget -qO- https://deb.nodesource.com/setup_8.x | bash \
     && apt-get install -y \
@@ -24,13 +23,12 @@ RUN cpanm --local-lib=/root/perl5 local::lib && eval $(perl -I /root/perl5/lib -
     patch \
     nodejs \
     npm \
-    &&  npm install -g pm2 \
-    && . install/install-lmdb-linux.sh \
-    && wget https://dl.google.com/go/go1.11.linux-amd64.tar.gz \
-    && tar -xf go1.11.linux-amd64.tar.gz \
-    && rm go1.11.linux-amd64.tar.gz \
-    && mv go /usr/local \
-    && . install/install-go-packages.sh \
-    && . install/install-perl-libs.sh
+    &&  npm install -g pm2
 
-WORKDIR /root/bystro/bin
+RUN bash install/install-perl-libs.sh
+RUN bash install/install-lmdb-linux.sh
+RUN bash install/install-go-linux.sh
+RUN bash install/install-go-packages.sh
+
+
+WORKDIR /bystro/bin
