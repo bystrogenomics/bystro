@@ -37,8 +37,13 @@ statistics:
   siteTypeField: refSeq.siteType
   programPath: bystro-stats
 temp_dir: '~'
-snpProcessor: bystro-snp
-vcfProcessor: bystro-vcf
+fileProcessors:
+  snp:
+    args: --emptyField ! --minGq .95
+    program: bystro-snp
+  vcf:
+    args: --emptyField ! --keepId --keepPos
+    program: bystro-vcf
 tracks:
 - name: ref
   remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/rn6/bigZips/
@@ -49,9 +54,6 @@ tracks:
   - name
   - name2
   name: refSeq
-  nearest:
-  - name
-  - name2
   sql_statement: SELECT * FROM rn6.refGene
   type: gene
 - local_files:

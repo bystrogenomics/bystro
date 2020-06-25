@@ -37,8 +37,13 @@ statistics:
   siteTypeField: refSeq.siteType
   programPath: bystro-stats
 temp_dir: '~'
-snpProcessor: bystro-snp
-vcfProcessor: bystro-vcf
+fileProcessors:
+  snp:
+    args: --emptyField ! --minGq .95
+    program: bystro-snp
+  vcf:
+    args: --emptyField ! --keepId --keepPos
+    program: bystro-vcf
 tracks:
 - name: ref
   remote_dir: http://hgdownload.soe.ucsc.edu/goldenPath/mm9/chromosomes/
@@ -77,9 +82,6 @@ tracks:
   - name
   - name2
   name: refSeq
-  nearest:
-  - name
-  - name2
   sql_statement: SELECT * FROM mm9.refGene LEFT JOIN mm9.kgXref ON mm9.kgXref.refseq
     = mm9.refGene.name
   type: gene

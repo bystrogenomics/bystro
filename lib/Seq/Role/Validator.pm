@@ -54,5 +54,4 @@ sub validateInputFile {
 
   return ("Couldn't identify format of $inputFilePath", "");
 }
-
 1;

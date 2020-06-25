@@ -20,9 +20,11 @@ The web app gives full access to all of Bystro's capabilities, provides a conven
 ## Installing Bystro
 
 ### Current release branch
+
 The most up-to-date release branch is [found here](https://github.com/akotlar/bystro/tree/b10). You may also download a [release archive](https://github.com/akotlar/bystro/releases) and install from there.
 
 ### Master branch instruction
+
 This branch is under active development, but should be stable enough to build and annotate from.
 
 Please read: [INSTALL.md](INSTALL.md)

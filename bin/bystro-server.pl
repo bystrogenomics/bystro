@@ -1,3 +1,4 @@
+
 #!/usr/bin/env perl
 # Name:           snpfile_annotate_mongo_redis_queue.pl
 # Description:
@@ -369,4 +370,3 @@ sub getConfigFilePath {
     #should log here
   }
 }
-1;

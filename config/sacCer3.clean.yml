@@ -32,8 +32,13 @@ statistics:
   siteTypeField: refSeq.siteType
   programPath: bystro-stats
 temp_dir: '~'
-snpProcessor: bystro-snp
-vcfProcessor: bystro-vcf
+fileProcessors:
+  snp:
+    args: --emptyField ! --minGq .95
+    program: bystro-snp
+  vcf:
+    args: --emptyField ! --keepId --keepPos
+    program: bystro-vcf
 tracks:
 - name: ref
   remote_dir: http://hgdownload.soe.ucsc.edu/goldenPath/sacCer3/chromosomes/
@@ -62,9 +67,6 @@ tracks:
   - description
   - proteinID
   name: sgd
-  nearest:
-  - name
-  - proteinID
   sql_statement: SELECT sgdGene.name,chrom,strand,txStart,txEnd,cdsStart,cdsEnd,exonCount,exonStarts,exonEnds,proteinID,type,description
     FROM sacCer3.sgdGene LEFT JOIN sgdDescription ON sgdGene.name = sgdDescription.name
   type: gene

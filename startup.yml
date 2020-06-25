@@ -1,13 +1,13 @@
 apps:
-- name: BystroAnnotationServer
-  script: bin/bystro-server.pl
-  interpreter: "perl"
-  args: --type annotation -q beanstalk-workers/beanstalk1.yaml --debug
-- name: BystroSaveServer
-  script: bin/bystro-server.pl
-  interpreter: "perl"
-  args: --type saveFromQuery -q beanstalk-workers/beanstalk1.yaml -c elastic-config/config.yml --debug
-- name: BystroIndexServer
-  script: bin/bystro-index-server.pl
-  interpreter: "perl"
-  args: -q beanstalk-workers/beanstalk1.yaml -c elastic-config/config.yml --debug
+  - name: BystroAnnotationServer
+    script: bin/bystro-server.pl
+    interpreter: "perl"
+    args: --type annotation -q beanstalk-workers/beanstalk1.yaml --debug
+  - name: BystroSaveServer
+    script: bin/bystro-server.pl
+    interpreter: "perl"
+    args: --type saveFromQuery -q beanstalk-workers/beanstalk1.yaml -c elastic-config/config.yml --debug
+  - name: BystroIndexServer
+    script: bin/bystro-index-server.pl
+    interpreter: "perl"
+    args: -q beanstalk-workers/beanstalk1.yaml -c elastic-config/config.yml --debug

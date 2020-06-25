@@ -32,15 +32,10 @@ has tracks => (is => 'ro', required => 1);
 ############ Public Exports ###################
 has readOnly => (is => 'ro', default => 0);
 
-has trackGetterOrder => (is => 'ro');
-
 has tracksObj => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
   my $self = shift;
-
-  # While gettersOnly could be configured in YAML, it may be more convenient
-  # to provide this option separately, to allow for a single config file
-  # to be used for building and getting
-  my %config = (%{$self->tracks}, (gettersOnly => $self->readOnly));
+	
+  my %config = (%{$self->tracks}, (gettersOnly => $self->readOnly));		
   return Seq::Tracks->new(%config);
 });
 

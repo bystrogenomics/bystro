@@ -11,8 +11,7 @@ use List::MoreUtils qw/first_index/;
 use Mouse::Util::TypeConstraints;
 use Sys::CpuAffinity;
 
-# TODO: Explore portability on windows-based systems w/File Copy
-# use File::Copy;
+# TODO: Explore portability on windows-based systems w/File::Copy
 
 use Seq::Statistics;
 

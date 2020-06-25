@@ -282,20 +282,6 @@ sub getWriteFh {
   return ($err, $fh);
 }
 
-# Allows user to return an error, dies with loggin by default
-sub safeSystem {
-  my ($self, $cmd, $errCode) = @_;
-
-  my $return = system($cmd);
-
-  if($return > 0) {
-    $self->log($errCode || 'debug', "Failed to execute $cmd. Return: $return, due to: $! ($?)");
-    return $!;
-  }
-
-  return;
-}
-
 # Allows user to return an error; dies with logging by default
 sub safeOpen {
   #my ($self, $fh, $operator, $operand, $errCode) = @_;
@@ -379,6 +365,19 @@ sub checkDelimiter {
   }
 
   return 0;
+}
+
+sub safeSystem {
+  my ($self, $cmd, $errCode) = @_;
+
+  my $return = system($cmd);
+
+  if($return > 0) {
+    $self->log($errCode || 'debug', "Failed to execute $cmd. Return: $return, due to: $! ($?)");
+    return $!;
+  }
+
+  return;
 }
 
 sub setDelimiter {

@@ -28,7 +28,7 @@ RUN cpanm --local-lib=/root/perl5 local::lib && eval $(perl -I /root/perl5/lib -
     && . install/install-lmdb-linux.sh \
     && wget https://dl.google.com/go/go1.11.linux-amd64.tar.gz \
     && tar -xf go1.11.linux-amd64.tar.gz \
-    && rm go1.11.linux-amd64.tar.gz
+    && rm go1.11.linux-amd64.tar.gz \
     && mv go /usr/local \
     && . install/install-go-packages.sh \
     && . install/install-perl-libs.sh
