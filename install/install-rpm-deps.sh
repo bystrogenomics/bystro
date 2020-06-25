@@ -22,7 +22,7 @@ sudo yum install patch -y;
 
 sudo yum install cpan -y;
 
-curl --silent --location https://rpm.nodesource.com/setup_8.x | sudo bash -
+curl --silent --location https://rpm.nodesource.com/setup_12.x | sudo bash -
 
 sudo yum install nodejs -y;
 

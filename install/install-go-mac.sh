@@ -8,13 +8,12 @@ fi
 
 echo -e "\n\nInstalling Go\n"
 
-rm -rf go;
-echo "Deleting /usr/local/go"
-sudo rm -rf /usr/local/go;
-rm -f go1.10.3.darwin-amd64.tar.gz;
-wget https://dl.google.com/go/go1.10.3.darwin-amd64.tar.gz;
-tar -xf go1.10.3.darwin-amd64.tar.gz;
+GOVERSION="go1.13.6.darwin-amd64.pkg"
+wget https://dl.google.com/go/$GOVERSION;
+tar -xf $GOVERSION;
+echo "Deleting go in /usr/local"
+sudo rm -rf /usr/local/go
 sudo mv go /usr/local;
-rm go1.10.3.darwin-amd64.tar.gz;
+rm $GOVERSION;
 
 ./install/export-go-path-linux.sh $DIR
