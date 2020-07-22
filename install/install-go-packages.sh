@@ -11,4 +11,4 @@ GO111MODULE=on go get github.com/akotlar/bystro-vcf@1.0.0;
 GO111MODULE=on go get github.com/akotlar/bystro-snp@1.0.0;
 
 # allows us to modify our config files in place
-GO111MODULE=on go get github.com/mikefarah/yq@2.4.1;
+GO111MODULE=on go get github.com/mikefarah/yq/v3;

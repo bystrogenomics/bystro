@@ -24,3 +24,4 @@ sudo mv go /usr/local;
 rm $GOVERSION;
 
 . install/export-go-path-linux.sh $DIR $PROFILE
+GO111MODULE=on go get github.com/mikefarah/yq/v3

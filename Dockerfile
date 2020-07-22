@@ -10,8 +10,8 @@ RUN apt-get update && apt-get install sudo
 
 WORKDIR /root/bystro
 RUN . install/install-lmdb-linux.sh
-RUN wget https://dl.google.com/go/go1.11.linux-amd64.tar.gz \
-    && tar -xf go1.11.linux-amd64.tar.gz \
+RUN wget https://dl.google.com/go/go1.13.6.linux-amd64.tar.gz \
+    && tar -xf go1.13.6.linux-amd64.tar.gz \
     && mv go /usr/local
 
 RUN . install/install-go-packages.sh
