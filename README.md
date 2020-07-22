@@ -15,7 +15,9 @@ The web app gives full access to all of Bystro's capabilities, provides a conven
 ## Installing Bystro
 *Check out the master branch for the upcoming release*
 
-Please read: [INSTALL.md](INSTALL.md)
+The easiest way is to run from Docker: `docker pull akotlar/bystro:latest && docker run bystro:latest bystro-annotate.pl`
+
+Please read: [INSTALL.md](INSTALL.md) for instructions on how to download and use Bystro hg19/hg38/etc databases.
 
 Bystro relies on pluggable (via Bystro's YAML config) pre-processors to normalize variant inputs (**dealing with VCF issues such as padding**), calculate whether a site is a transition or transversion, calculate sample maf, identify hets/homozygotes/missing samples, calculate heterozygosity, homozygosity, missingness, and more.
 1. VCF format: [Bystro-Vcf](https://github.com/akotlar/bystro-vcf)
