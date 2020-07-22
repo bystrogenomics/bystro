@@ -19,13 +19,11 @@ The web app gives full access to all of Bystro's capabilities, provides a conven
 
 ## Installing Bystro
 
-### Current release branch
-
 The easiest way is to run from Docker: `docker pull akotlar/bystro:latest && docker run bystro:latest bystro-annotate.pl`
 
 Please read: [INSTALL.md](INSTALL.md) for instructions on how to download and use Bystro hg19/hg38/etc databases.
 
-The most up-to-date release branch is [found here](https://github.com/akotlar/bystro/tree/b10). You may also download a [release archive](https://github.com/akotlar/bystro/releases) and install from there.
+The most up-to-date release branch is [found here](https://github.com/akotlar/bystro/tree/b10). You may also download a [release archive](https://github.com/akotlar/bystro/releases) and install from there. The `master` branch is under active development and may require building a database (though we try to maintain master-compatible databases here: `https://bystro-db.s3.amazonaws.com/next/` (e.g: `https://bystro-db.s3.amazonaws.com/next/hg38.tar.gz`).
 
 Bystro relies on pluggable (via Bystro's YAML config) pre-processors to normalize variant inputs (**dealing with VCF issues such as padding**), calculate whether a site is a transition or transversion, calculate sample maf, identify hets/homozygotes/missing samples, calculate heterozygosity, homozygosity, missingness, and more.
 
