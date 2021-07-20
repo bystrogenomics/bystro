@@ -1,0 +1,1316 @@
+---
+assembly: hg19
+build_author: ec2-user
+build_date: 2020-02-11T15:04:00
+chromosomes:
+- chr1
+- chr2
+- chr3
+- chr4
+- chr5
+- chr6
+- chr7
+- chr8
+- chr9
+- chr10
+- chr11
+- chr12
+- chr13
+- chr14
+- chr15
+- chr16
+- chr17
+- chr18
+- chr19
+- chr20
+- chr21
+- chr22
+- chrM
+- chrX
+- chrY
+database_dir: '~'
+fileProcessors:
+  snp:
+    args: --emptyField ! --minGq .95
+    program: bystro-snp
+  vcf:
+    args: --emptyField ! --sample %sampleList% --keepPos --keepId
+    program: bystro-vcf
+files_dir: '~'
+statistics:
+  dbSNPnameField: dbSNP.name
+  exonicAlleleFunctionField: refSeq.exonicAlleleFunction
+  outputExtensions:
+    json: .statistics.json
+    qc: .statistics.qc.tsv
+    tab: .statistics.tsv
+  programPath: bystro-stats
+  refTrackField: ref
+  siteTypeField: refSeq.siteType
+temp_dir: '~'
+tracks:
+- build_author: ec2-user
+  build_date: 2020-02-05T14:22:00
+  fetch_date: 2017-02-04T22:36:00
+  local_files:
+  - chr*.fa.gz
+  name: ref
+  remote_dir: http://hgdownload.soe.ucsc.edu/goldenPath/hg19/chromosomes/
+  remote_files:
+  - chr1.fa.gz
+  - chr2.fa.gz
+  - chr3.fa.gz
+  - chr4.fa.gz
+  - chr5.fa.gz
+  - chr6.fa.gz
+  - chr7.fa.gz
+  - chr8.fa.gz
+  - chr9.fa.gz
+  - chr10.fa.gz
+  - chr11.fa.gz
+  - chr12.fa.gz
+  - chr13.fa.gz
+  - chr14.fa.gz
+  - chr15.fa.gz
+  - chr16.fa.gz
+  - chr17.fa.gz
+  - chr18.fa.gz
+  - chr19.fa.gz
+  - chr20.fa.gz
+  - chr21.fa.gz
+  - chr22.fa.gz
+  - chrM.fa.gz
+  - chrX.fa.gz
+  - chrY.fa.gz
+  type: reference
+  version: 12
+- build_author: ec2-user
+  build_date: 2020-02-05T14:22:00
+  features:
+  - kgID
+  - mRNA
+  - spID
+  - spDisplayID
+  - protAcc
+  - description
+  - rfamAcc
+  - name
+  - name2
+  fetch_date: 2018-02-26T21:53:00
+  join:
+    features:
+    - alleleID
+    - phenotypeList
+    - clinicalSignificance
+    - type
+    - origin
+    - numberSubmitters
+    - reviewStatus
+    - chromStart
+    - chromEnd
+    track: clinvar
+  local_files:
+  - hg19.refGene.chr1.gz
+  - hg19.refGene.chr2.gz
+  - hg19.refGene.chr3.gz
+  - hg19.refGene.chr4.gz
+  - hg19.refGene.chr5.gz
+  - hg19.refGene.chr6.gz
+  - hg19.refGene.chr7.gz
+  - hg19.refGene.chr8.gz
+  - hg19.refGene.chr9.gz
+  - hg19.refGene.chr10.gz
+  - hg19.refGene.chr11.gz
+  - hg19.refGene.chr12.gz
+  - hg19.refGene.chr13.gz
+  - hg19.refGene.chr14.gz
+  - hg19.refGene.chr15.gz
+  - hg19.refGene.chr16.gz
+  - hg19.refGene.chr17.gz
+  - hg19.refGene.chr18.gz
+  - hg19.refGene.chr19.gz
+  - hg19.refGene.chr20.gz
+  - hg19.refGene.chr21.gz
+  - hg19.refGene.chr22.gz
+  - hg19.refGene.chrM.gz
+  - hg19.refGene.chrX.gz
+  - hg19.refGene.chrY.gz
+  name: refSeq
+  nearest:
+  - name
+  - name2
+  sql_statement: SELECT * FROM hg19.refGene LEFT JOIN hg19.kgXref ON hg19.kgXref.refseq
+    = hg19.refGene.name
+  type: gene
+  version: 11
+- build_author: ec2-user
+  build_date: 2020-02-05T14:22:00
+  fetch_date: 2017-02-04T16:52:00
+  local_files:
+  - chr*.phastCons100way.wigFix.gz
+  name: phastCons
+  remote_dir: http://hgdownload.soe.ucsc.edu/goldenPath/hg19/phastCons100way/hg19.100way.phastCons/
+  remote_files:
+  - chr1.phastCons100way.wigFix.gz
+  - chr2.phastCons100way.wigFix.gz
+  - chr3.phastCons100way.wigFix.gz
+  - chr4.phastCons100way.wigFix.gz
+  - chr5.phastCons100way.wigFix.gz
+  - chr6.phastCons100way.wigFix.gz
+  - chr7.phastCons100way.wigFix.gz
+  - chr8.phastCons100way.wigFix.gz
+  - chr9.phastCons100way.wigFix.gz
+  - chr10.phastCons100way.wigFix.gz
+  - chr11.phastCons100way.wigFix.gz
+  - chr12.phastCons100way.wigFix.gz
+  - chr13.phastCons100way.wigFix.gz
+  - chr14.phastCons100way.wigFix.gz
+  - chr15.phastCons100way.wigFix.gz
+  - chr16.phastCons100way.wigFix.gz
+  - chr17.phastCons100way.wigFix.gz
+  - chr18.phastCons100way.wigFix.gz
+  - chr19.phastCons100way.wigFix.gz
+  - chr20.phastCons100way.wigFix.gz
+  - chr21.phastCons100way.wigFix.gz
+  - chr22.phastCons100way.wigFix.gz
+  - chrX.phastCons100way.wigFix.gz
+  - chrY.phastCons100way.wigFix.gz
+  - chrM.phastCons100way.wigFix.gz
+  type: score
+  version: 11
+- build_author: ec2-user
+  build_date: 2020-02-05T14:22:00
+  fetch_date: 2017-02-03T20:57:00
+  local_files:
+  - chr*.phyloP100way.wigFix.gz
+  name: phyloP
+  remote_dir: http://hgdownload.soe.ucsc.edu/goldenPath/hg19/phyloP100way/hg19.100way.phyloP100way/
+  remote_files:
+  - chr1.phyloP100way.wigFix.gz
+  - chr2.phyloP100way.wigFix.gz
+  - chr3.phyloP100way.wigFix.gz
+  - chr4.phyloP100way.wigFix.gz
+  - chr5.phyloP100way.wigFix.gz
+  - chr6.phyloP100way.wigFix.gz
+  - chr7.phyloP100way.wigFix.gz
+  - chr8.phyloP100way.wigFix.gz
+  - chr9.phyloP100way.wigFix.gz
+  - chr10.phyloP100way.wigFix.gz
+  - chr11.phyloP100way.wigFix.gz
+  - chr12.phyloP100way.wigFix.gz
+  - chr13.phyloP100way.wigFix.gz
+  - chr14.phyloP100way.wigFix.gz
+  - chr15.phyloP100way.wigFix.gz
+  - chr16.phyloP100way.wigFix.gz
+  - chr17.phyloP100way.wigFix.gz
+  - chr18.phyloP100way.wigFix.gz
+  - chr19.phyloP100way.wigFix.gz
+  - chr20.phyloP100way.wigFix.gz
+  - chr21.phyloP100way.wigFix.gz
+  - chr22.phyloP100way.wigFix.gz
+  - chrX.phyloP100way.wigFix.gz
+  - chrY.phyloP100way.wigFix.gz
+  - chrM.phyloP100way.wigFix.gz
+  type: score
+  version: 11
+- build_author: ec2-user
+  build_date: 2020-02-11T15:04:00
+  caddToBed_date: 2018-09-07T00:00:00
+  fetch_date: 2020-02-11T02:24:00
+  local_files:
+  - whole_genome_SNVs.tsv.chr1.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.chr2.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.chr3.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.chr4.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.chr5.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.chr6.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.chr7.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.chr8.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.chr9.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.chr10.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.chr11.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.chr12.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.chr13.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.chr14.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.chr15.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.chr16.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.chr17.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.chr18.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.chr19.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.chr20.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.chr21.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.chr22.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.chrX.organized-by-chr.txt.sorted.txt.gz
+  - whole_genome_SNVs.tsv.chrY.organized-by-chr.txt.sorted.txt.gz
+  name: cadd
+  remote_files:
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chr1.organized-by-chr.txt.sorted.txt.gz
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chr2.organized-by-chr.txt.sorted.txt.gz
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chr3.organized-by-chr.txt.sorted.txt.gz
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chr4.organized-by-chr.txt.sorted.txt.gz
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chr5.organized-by-chr.txt.sorted.txt.gz
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chr6.organized-by-chr.txt.sorted.txt.gz
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chr7.organized-by-chr.txt.sorted.txt.gz
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chr8.organized-by-chr.txt.sorted.txt.gz
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chr9.organized-by-chr.txt.sorted.txt.gz
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chr10.organized-by-chr.txt.sorted.txt.gz
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chr11.organized-by-chr.txt.sorted.txt.gz
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chr12.organized-by-chr.txt.sorted.txt.gz
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chr13.organized-by-chr.txt.sorted.txt.gz
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chr14.organized-by-chr.txt.sorted.txt.gz
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chr15.organized-by-chr.txt.sorted.txt.gz
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chr16.organized-by-chr.txt.sorted.txt.gz
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chr17.organized-by-chr.txt.sorted.txt.gz
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chr18.organized-by-chr.txt.sorted.txt.gz
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chr19.organized-by-chr.txt.sorted.txt.gz
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chr20.organized-by-chr.txt.sorted.txt.gz
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chr21.organized-by-chr.txt.sorted.txt.gz
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chr22.organized-by-chr.txt.sorted.txt.gz
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chrX.organized-by-chr.txt.sorted.txt.gz
+  - s3://bystro-db/src/cadd1.4/hg19/cadd/whole_genome_SNVs.tsv.chrY.organized-by-chr.txt.sorted.txt.gz
+  sortCadd_date: 2018-09-07T00:00:00
+  sorted_guaranteed: 1
+  type: cadd
+  version: 12
+- build_author: ec2-user
+  build_date: 2020-02-05T14:22:00
+  build_row_filters:
+    AS_FilterStatus: == PASS
+  features:
+  - alt
+  - id
+  - variant_type
+  - DP: number
+  - QD: number
+  - SOR: number
+  - AN: number
+  - AF: number
+  - nhomalt: number
+  - AN_raw: number
+  - AF_raw: number
+  - nhomalt_raw: number
+  - AN_female: number
+  - AF_female: number
+  - nhomalt_female: number
+  - AN_male: number
+  - AF_male: number
+  - nhomalt_male: number
+  - AN_amr: number
+  - AF_amr: number
+  - nhomalt_amr: number
+  - AN_amr_female: number
+  - AF_amr_female: number
+  - nhomalt_amr_female: number
+  - AN_amr_male: number
+  - AF_amr_male: number
+  - nhomalt_amr_male: number
+  - AN_oth: number
+  - AF_oth: number
+  - nhomalt_oth: number
+  - AN_oth_female: number
+  - AF_oth_female: number
+  - nhomalt_oth_female: number
+  - AN_oth_male: number
+  - AF_oth_male: number
+  - nhomalt_oth_male: number
+  - AN_asj: number
+  - AF_asj: number
+  - nhomalt_asj: number
+  - AN_asj_female: number
+  - AF_asj_female: number
+  - nhomalt_asj_female: number
+  - AN_asj_male: number
+  - AF_asj_male: number
+  - nhomalt_asj_male: number
+  - AN_eas: number
+  - AF_eas: number
+  - nhomalt_eas: number
+  - AN_eas_female: number
+  - AF_eas_female: number
+  - nhomalt_eas_female: number
+  - AN_eas_male: number
+  - AF_eas_male: number
+  - nhomalt_eas_male: number
+  - AN_afr: number
+  - AF_afr: number
+  - nhomalt_afr: number
+  - AN_afr_female: number
+  - AF_afr_female: number
+  - nhomalt_afr_female: number
+  - AN_afr_male: number
+  - AF_afr_male: number
+  - nhomalt_afr_male: number
+  - AN_fin: number
+  - AF_fin: number
+  - nhomalt_fin: number
+  - AN_fin_female: number
+  - AF_fin_female: number
+  - nhomalt_fin_female: number
+  - AN_fin_male: number
+  - AF_fin_male: number
+  - nhomalt_fin_male: number
+  - AN_nfe: number
+  - AF_nfe: number
+  - nhomalt_nfe: number
+  - AN_nfe_female: number
+  - AF_nfe_female: number
+  - nhomalt_nfe_female: number
+  - AN_nfe_male: number
+  - AF_nfe_male: number
+  - nhomalt_nfe_male: number
+  - non_topmed_AN: number
+  - non_topmed_AF: number
+  - non_topmed_nhomalt: number
+  - non_topmed_AN_nfe: number
+  - non_topmed_AF_nfe: number
+  - non_topmed_nhomalt_nfe: number
+  - non_topmed_AN_nfe_female: number
+  - non_topmed_AF_nfe_female: number
+  - non_topmed_nhomalt_nfe_female: number
+  - non_topmed_AN_nfe_male: number
+  - non_topmed_AF_nfe_male: number
+  - non_topmed_nhomalt_nfe_male: number
+  - non_topmed_AN_asj: number
+  - non_topmed_AF_asj: number
+  - non_topmed_nhomalt_asj: number
+  - non_topmed_AN_asj_female: number
+  - non_topmed_AF_asj_female: number
+  - non_topmed_nhomalt_asj_female: number
+  - non_topmed_AN_asj_male: number
+  - non_topmed_AF_asj_male: number
+  - non_topmed_nhomalt_asj_male: number
+  - non_topmed_AN_nfe_seu: number
+  - non_topmed_AF_nfe_seu: number
+  - non_topmed_nhomalt_nfe_seu: number
+  - non_topmed_AN_afr: number
+  - non_topmed_AF_afr: number
+  - non_topmed_nhomalt_afr: number
+  - non_topmed_AN_afr_female: number
+  - non_topmed_AF_afr_female: number
+  - non_topmed_nhomalt_afr_female: number
+  - non_topmed_AN_afr_male: number
+  - non_topmed_AF_afr_male: number
+  - non_topmed_nhomalt_afr_male: number
+  - non_topmed_AN_amr: number
+  - non_topmed_AF_amr: number
+  - non_topmed_nhomalt_amr: number
+  - non_topmed_AN_amr_female: number
+  - non_topmed_AF_amr_female: number
+  - non_topmed_nhomalt_amr_female: number
+  - non_topmed_AN_amr_male: number
+  - non_topmed_AF_amr_male: number
+  - non_topmed_nhomalt_amr_male: number
+  - non_topmed_AN_oth: number
+  - non_topmed_AF_oth: number
+  - non_topmed_nhomalt_oth: number
+  - non_topmed_AN_oth_female: number
+  - non_topmed_AF_oth_female: number
+  - non_topmed_nhomalt_oth_female: number
+  - non_topmed_AN_oth_male: number
+  - non_topmed_AF_oth_male: number
+  - non_topmed_nhomalt_oth_male: number
+  - non_topmed_AN_male: number
+  - non_topmed_AF_male: number
+  - non_topmed_nhomalt_male: number
+  - non_topmed_AN_female: number
+  - non_topmed_AF_female: number
+  - non_topmed_nhomalt_female: number
+  - non_topmed_AN_eas: number
+  - non_topmed_AF_eas: number
+  - non_topmed_nhomalt_eas: number
+  - non_topmed_AN_eas_male: number
+  - non_topmed_AF_eas_male: number
+  - non_topmed_nhomalt_eas_male: number
+  - non_topmed_AN_eas_female: number
+  - non_topmed_AF_eas_female: number
+  - non_topmed_nhomalt_eas_female: number
+  - non_topmed_AN_nfe_est: number
+  - non_topmed_AF_nfe_est: number
+  - non_topmed_nhomalt_nfe_est: number
+  - non_topmed_AN_nfe_nwe: number
+  - non_topmed_AF_nfe_nwe: number
+  - non_topmed_nhomalt_nfe_nwe: number
+  - non_topmed_AN_nfe_onf: number
+  - non_topmed_AF_nfe_onf: number
+  - non_topmed_nhomalt_nfe_onf: number
+  - non_topmed_AN_fin: number
+  - non_topmed_AF_fin: number
+  - non_topmed_nhomalt_fin: number
+  - non_topmed_AN_fin_female: number
+  - non_topmed_AF_fin_female: number
+  - non_topmed_nhomalt_fin_female: number
+  - non_topmed_AN_fin_male: number
+  - non_topmed_AF_fin_male: number
+  - non_topmed_nhomalt_fin_male: number
+  - controls_AN: number
+  - controls_AF: number
+  - controls_nhomalt: number
+  - controls_AN_female: number
+  - controls_AF_female: number
+  - controls_nhomalt_female: number
+  - controls_AN_male: number
+  - controls_AF_male: number
+  - controls_nhomalt_male: number
+  - controls_AN_nfe: number
+  - controls_AF_nfe: number
+  - controls_nhomalt_nfe: number
+  - controls_AN_nfe_female: number
+  - controls_AF_nfe_female: number
+  - controls_nhomalt_nfe_female: number
+  - controls_AN_nfe_male: number
+  - controls_AF_nfe_male: number
+  - controls_nhomalt_nfe_male: number
+  - controls_AN_nfe_seu: number
+  - controls_AF_nfe_seu: number
+  - controls_nhomalt_nfe_seu: number
+  - controls_AN_nfe_est: number
+  - controls_AF_nfe_est: number
+  - controls_nhomalt_nfe_est: number
+  - controls_AN_nfe_nwe: number
+  - controls_AF_nfe_nwe: number
+  - controls_nhomalt_nfe_nwe: number
+  - controls_AN_nfe_onf: number
+  - controls_AF_nfe_onf: number
+  - controls_nhomalt_nfe_onf: number
+  - controls_AN_afr: number
+  - controls_AF_afr: number
+  - controls_nhomalt_afr: number
+  - controls_AN_afr_female: number
+  - controls_AF_afr_female: number
+  - controls_nhomalt_afr_female: number
+  - controls_AN_afr_male: number
+  - controls_AF_afr_male: number
+  - controls_nhomalt_afr_male: number
+  - controls_AN_asj: number
+  - controls_AF_asj: number
+  - controls_nhomalt_asj: number
+  - controls_AN_asj_female: number
+  - controls_AF_asj_female: number
+  - controls_nhomalt_asj_female: number
+  - controls_AN_asj_male: number
+  - controls_AF_asj_male: number
+  - controls_nhomalt_asj_male: number
+  - controls_AN_amr: number
+  - controls_AF_amr: number
+  - controls_nhomalt_amr: number
+  - controls_AN_amr_female: number
+  - controls_AF_amr_female: number
+  - controls_nhomalt_amr_female: number
+  - controls_AN_amr_male: number
+  - controls_AF_amr_male: number
+  - controls_nhomalt_amr_male: number
+  - controls_AN_oth: number
+  - controls_AF_oth: number
+  - controls_nhomalt_oth: number
+  - controls_AN_oth_female: number
+  - controls_AF_oth_female: number
+  - controls_nhomalt_oth_female: number
+  - controls_AN_oth_male: number
+  - controls_AF_oth_male: number
+  - controls_nhomalt_oth_male: number
+  - controls_AN_eas: number
+  - controls_AF_eas: number
+  - controls_nhomalt_eas: number
+  - controls_AN_eas_male: number
+  - controls_AF_eas_male: number
+  - controls_nhomalt_eas_male: number
+  - controls_AN_eas_female: number
+  - controls_AF_eas_female: number
+  - controls_nhomalt_eas_female: number
+  - controls_AN_fin: number
+  - controls_AF_fin: number
+  - controls_nhomalt_fin: number
+  - controls_AN_fin_female: number
+  - controls_AF_fin_female: number
+  - controls_nhomalt_fin_female: number
+  - controls_AN_fin_male: number
+  - controls_AF_fin_male: number
+  - controls_nhomalt_fin_male: number
+  - non_neuro_AN: number
+  - non_neuro_AF: number
+  - non_neuro_nhomalt: number
+  - non_neuro_AN_female: number
+  - non_neuro_AF_female: number
+  - non_neuro_nhomalt_female: number
+  - non_neuro_AN_male: number
+  - non_neuro_AF_male: number
+  - non_neuro_nhomalt_male: number
+  - non_neuro_AN_nfe: number
+  - non_neuro_AF_nfe: number
+  - non_neuro_nhomalt_nfe: number
+  - non_neuro_AN_nfe_female: number
+  - non_neuro_AF_nfe_female: number
+  - non_neuro_nhomalt_nfe_female: number
+  - non_neuro_AN_nfe_male: number
+  - non_neuro_AF_nfe_male: number
+  - non_neuro_nhomalt_nfe_male: number
+  - non_neuro_AN_nfe_seu: number
+  - non_neuro_AF_nfe_seu: number
+  - non_neuro_nhomalt_nfe_seu: number
+  - non_neuro_AN_nfe_est: number
+  - non_neuro_AF_nfe_est: number
+  - non_neuro_nhomalt_nfe_est: number
+  - non_neuro_AN_nfe_nwe: number
+  - non_neuro_AF_nfe_nwe: number
+  - non_neuro_nhomalt_nfe_nwe: number
+  - non_neuro_AN_nfe_onf: number
+  - non_neuro_AF_nfe_onf: number
+  - non_neuro_nhomalt_nfe_onf: number
+  - non_neuro_AN_asj: number
+  - non_neuro_AF_asj: number
+  - non_neuro_nhomalt_asj: number
+  - non_neuro_AN_asj_female: number
+  - non_neuro_AF_asj_female: number
+  - non_neuro_nhomalt_asj_female: number
+  - non_neuro_AN_asj_male: number
+  - non_neuro_AF_asj_male: number
+  - non_neuro_nhomalt_asj_male: number
+  - non_neuro_AN_oth_male: number
+  - non_neuro_AF_oth_male: number
+  - non_neuro_nhomalt_oth_male: number
+  - non_neuro_AN_afr: number
+  - non_neuro_AF_afr: number
+  - non_neuro_nhomalt_afr: number
+  - non_neuro_AN_afr_female: number
+  - non_neuro_AF_afr_female: number
+  - non_neuro_nhomalt_afr_female: number
+  - non_neuro_AN_afr_male: number
+  - non_neuro_AF_afr_male: number
+  - non_neuro_nhomalt_afr_male: number
+  - non_neuro_AN_amr: number
+  - non_neuro_AF_amr: number
+  - non_neuro_nhomalt_amr: number
+  - non_neuro_AN_amr_female: number
+  - non_neuro_AF_amr_female: number
+  - non_neuro_nhomalt_amr_female: number
+  - non_neuro_AN_amr_male: number
+  - non_neuro_AF_amr_male: number
+  - non_neuro_nhomalt_amr_male: number
+  - non_neuro_AN_oth: number
+  - non_neuro_AF_oth: number
+  - non_neuro_nhomalt_oth: number
+  - non_neuro_AN_oth_female: number
+  - non_neuro_AF_oth_female: number
+  - non_neuro_nhomalt_oth_female: number
+  - non_neuro_AN_eas: number
+  - non_neuro_AF_eas: number
+  - non_neuro_nhomalt_eas: number
+  - non_neuro_AN_eas_female: number
+  - non_neuro_AF_eas_female: number
+  - non_neuro_nhomalt_eas_female: number
+  - non_neuro_AN_eas_male: number
+  - non_neuro_AF_eas_male: number
+  - non_neuro_nhomalt_eas_male: number
+  - non_neuro_AN_fin: number
+  - non_neuro_AF_fin: number
+  - non_neuro_nhomalt_fin: number
+  - non_neuro_AN_fin_female: number
+  - non_neuro_AF_fin_female: number
+  - non_neuro_nhomalt_fin_female: number
+  - non_neuro_AN_fin_male: number
+  - non_neuro_AF_fin_male: number
+  - non_neuro_nhomalt_fin_male: number
+  local_files:
+  - gnomad.genomes.r2.1.1.sites.*.vcf.bgz
+  name: gnomad.genomes
+  remote_files:
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.1.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.2.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.3.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.4.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.5.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.6.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.7.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.8.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.9.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.10.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.11.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.12.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.13.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.14.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.15.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.16.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.17.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.18.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.19.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.20.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.21.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.22.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/genomes/gnomad.genomes.r2.1.1.sites.X.vcf.bgz
+  type: vcf
+  version: 12
+- build_author: ec2-user
+  build_date: 2020-02-05T14:22:00
+  build_row_filters:
+    AS_FilterStatus: == PASS
+  features:
+  - alt
+  - id
+  - variant_type
+  - DP: number
+  - QD: number
+  - SOR: number
+  - AN: number
+  - AF: number
+  - nhomalt: number
+  - AN_female: number
+  - AF_female: number
+  - nhomalt_female: number
+  - AN_male: number
+  - AF_male: number
+  - nhomalt_male: number
+  - AN_nfe: number
+  - AF_nfe: number
+  - nhomalt_nfe: number
+  - AN_nfe_female: number
+  - AF_nfe_female: number
+  - nhomalt_nfe_female: number
+  - AN_nfe_male: number
+  - AF_nfe_male: number
+  - nhomalt_nfe_male: number
+  - AN_nfe_seu: number
+  - AF_nfe_seu: number
+  - nhomalt_nfe_seu: number
+  - AN_nfe_swe: number
+  - AF_nfe_swe: number
+  - nhomalt_nfe_swe: number
+  - AN_afr: number
+  - AF_afr: number
+  - nhomalt_afr: number
+  - AN_afr_female: number
+  - AF_afr_female: number
+  - nhomalt_afr_female: number
+  - AN_afr_male: number
+  - AF_afr_male: number
+  - nhomalt_afr_male: number
+  - AN_asj: number
+  - AF_asj: number
+  - nhomalt_asj: number
+  - AN_asj_female: number
+  - AF_asj_female: number
+  - nhomalt_asj_female: number
+  - AN_asj_male: number
+  - AF_asj_male: number
+  - nhomalt_asj_male: number
+  - AN_amr: number
+  - AF_amr: number
+  - nhomalt_amr: number
+  - AN_amr_female: number
+  - AF_amr_female: number
+  - nhomalt_amr_female: number
+  - AN_amr_male: number
+  - AF_amr_male: number
+  - nhomalt_amr_male: number
+  - AN_oth: number
+  - AF_oth: number
+  - nhomalt_oth: number
+  - AN_oth_female: number
+  - AF_oth_female: number
+  - nhomalt_oth_female: number
+  - AN_oth_male: number
+  - AF_oth_male: number
+  - nhomalt_oth_male: number
+  - AN_eas: number
+  - AF_eas: number
+  - nhomalt_eas: number
+  - AN_eas_male: number
+  - AF_eas_male: number
+  - nhomalt_eas_male: number
+  - AN_sas: number
+  - AF_sas: number
+  - nhomalt_sas: number
+  - AN_sas_male: number
+  - AF_sas_male: number
+  - nhomalt_sas_male: number
+  - AN_sas_female: number
+  - AF_sas_female: number
+  - nhomalt_sas_female: number
+  - AN_eas_female: number
+  - AF_eas_female: number
+  - nhomalt_eas_female: number
+  - AN_eas_oea: number
+  - AF_eas_oea: number
+  - nhomalt_eas_oea: number
+  - AN_eas_jpn: number
+  - AF_eas_jpn: number
+  - nhomalt_eas_jpn: number
+  - AN_eas_kor: number
+  - AF_eas_kor: number
+  - nhomalt_eas_kor: number
+  - AN_nfe_est: number
+  - AF_nfe_est: number
+  - nhomalt_nfe_est: number
+  - AN_nfe_bgr: number
+  - AF_nfe_bgr: number
+  - nhomalt_nfe_bgr: number
+  - AN_nfe_nwe: number
+  - AF_nfe_nwe: number
+  - nhomalt_nfe_nwe: number
+  - AN_nfe_onf: number
+  - AF_nfe_onf: number
+  - nhomalt_nfe_onf: number
+  - AN_fin: number
+  - AF_fin: number
+  - nhomalt_fin: number
+  - AN_fin_female: number
+  - AF_fin_female: number
+  - nhomalt_fin_female: number
+  - AN_fin_male: number
+  - AF_fin_male: number
+  - nhomalt_fin_male: number
+  - non_neuro_AN: number
+  - non_neuro_AF: number
+  - non_neuro_nhomalt: number
+  - non_neuro_AN_female: number
+  - non_neuro_AF_female: number
+  - non_neuro_nhomalt_female: number
+  - non_neuro_AN_male: number
+  - non_neuro_AF_male: number
+  - non_neuro_nhomalt_male: number
+  - non_neuro_AN_nfe: number
+  - non_neuro_AF_nfe: number
+  - non_neuro_nhomalt_nfe: number
+  - non_neuro_AN_nfe_female: number
+  - non_neuro_AF_nfe_female: number
+  - non_neuro_nhomalt_nfe_female: number
+  - non_neuro_AN_nfe_male: number
+  - non_neuro_AF_nfe_male: number
+  - non_neuro_nhomalt_nfe_male: number
+  - non_neuro_AN_nfe_seu: number
+  - non_neuro_AF_nfe_seu: number
+  - non_neuro_nhomalt_nfe_seu: number
+  - non_neuro_AN_nfe_swe: number
+  - non_neuro_AF_nfe_swe: number
+  - non_neuro_nhomalt_nfe_swe: number
+  - non_neuro_AN_nfe_est: number
+  - non_neuro_AF_nfe_est: number
+  - non_neuro_nhomalt_nfe_est: number
+  - non_neuro_AN_nfe_bgr: number
+  - non_neuro_AF_nfe_bgr: number
+  - non_neuro_nhomalt_nfe_bgr: number
+  - non_neuro_AN_nfe_nwe: number
+  - non_neuro_AF_nfe_nwe: number
+  - non_neuro_nhomalt_nfe_nwe: number
+  - non_neuro_AN_nfe_onf: number
+  - non_neuro_AF_nfe_onf: number
+  - non_neuro_nhomalt_nfe_onf: number
+  - non_neuro_AN_asj: number
+  - non_neuro_AF_asj: number
+  - non_neuro_nhomalt_asj: number
+  - non_neuro_AN_asj_female: number
+  - non_neuro_AF_asj_female: number
+  - non_neuro_nhomalt_asj_female: number
+  - non_neuro_AN_asj_male: number
+  - non_neuro_AF_asj_male: number
+  - non_neuro_nhomalt_asj_male: number
+  - non_neuro_AN_oth_male: number
+  - non_neuro_AF_oth_male: number
+  - non_neuro_nhomalt_oth_male: number
+  - non_neuro_AN_afr: number
+  - non_neuro_AF_afr: number
+  - non_neuro_nhomalt_afr: number
+  - non_neuro_AN_afr_female: number
+  - non_neuro_AF_afr_female: number
+  - non_neuro_nhomalt_afr_female: number
+  - non_neuro_AN_afr_male: number
+  - non_neuro_AF_afr_male: number
+  - non_neuro_nhomalt_afr_male: number
+  - non_neuro_AN_amr: number
+  - non_neuro_AF_amr: number
+  - non_neuro_nhomalt_amr: number
+  - non_neuro_AN_amr_female: number
+  - non_neuro_AF_amr_female: number
+  - non_neuro_nhomalt_amr_female: number
+  - non_neuro_AN_amr_male: number
+  - non_neuro_AF_amr_male: number
+  - non_neuro_nhomalt_amr_male: number
+  - non_neuro_AN_oth: number
+  - non_neuro_AF_oth: number
+  - non_neuro_nhomalt_oth: number
+  - non_neuro_AN_oth_female: number
+  - non_neuro_AF_oth_female: number
+  - non_neuro_nhomalt_oth_female: number
+  - non_neuro_AN_eas: number
+  - non_neuro_AF_eas: number
+  - non_neuro_nhomalt_eas: number
+  - non_neuro_AN_eas_female: number
+  - non_neuro_AF_eas_female: number
+  - non_neuro_nhomalt_eas_female: number
+  - non_neuro_AN_eas_male: number
+  - non_neuro_AF_eas_male: number
+  - non_neuro_nhomalt_eas_male: number
+  - non_neuro_AN_sas: number
+  - non_neuro_AF_sas: number
+  - non_neuro_nhomalt_sas: number
+  - non_neuro_AN_sas_female: number
+  - non_neuro_AF_sas_female: number
+  - non_neuro_nhomalt_sas_female: number
+  - non_neuro_AN_sas_male: number
+  - non_neuro_AF_sas_male: number
+  - non_neuro_nhomalt_sas_male: number
+  - non_neuro_AN_eas_oea: number
+  - non_neuro_AF_eas_oea: number
+  - non_neuro_nhomalt_eas_oea: number
+  - non_neuro_AN_eas_jpn: number
+  - non_neuro_AF_eas_jpn: number
+  - non_neuro_nhomalt_eas_jpn: number
+  - non_neuro_AN_eas_kor: number
+  - non_neuro_AF_eas_kor: number
+  - non_neuro_nhomalt_eas_kor: number
+  - non_neuro_AN_fin: number
+  - non_neuro_AF_fin: number
+  - non_neuro_nhomalt_fin: number
+  - non_neuro_AN_fin_female: number
+  - non_neuro_AF_fin_female: number
+  - non_neuro_nhomalt_fin_female: number
+  - non_neuro_AN_fin_male: number
+  - non_neuro_AF_fin_male: number
+  - non_neuro_nhomalt_fin_male: number
+  - controls_AN: number
+  - controls_AF: number
+  - controls_nhomalt: number
+  - controls_AN_female: number
+  - controls_AF_female: number
+  - controls_nhomalt_female: number
+  - controls_AN_male: number
+  - controls_AF_male: number
+  - controls_nhomalt_male: number
+  - controls_AN_nfe: number
+  - controls_AF_nfe: number
+  - controls_nhomalt_nfe: number
+  - controls_AN_nfe_female: number
+  - controls_AF_nfe_female: number
+  - controls_nhomalt_nfe_female: number
+  - controls_AN_nfe_male: number
+  - controls_AF_nfe_male: number
+  - controls_nhomalt_nfe_male: number
+  - controls_AN_nfe_seu: number
+  - controls_AF_nfe_seu: number
+  - controls_nhomalt_nfe_seu: number
+  - controls_AN_nfe_swe: number
+  - controls_AF_nfe_swe: number
+  - controls_nhomalt_nfe_swe: number
+  - controls_AN_nfe_est: number
+  - controls_AF_nfe_est: number
+  - controls_nhomalt_nfe_est: number
+  - controls_AN_nfe_bgr: number
+  - controls_AF_nfe_bgr: number
+  - controls_nhomalt_nfe_bgr: number
+  - controls_AN_nfe_nwe: number
+  - controls_AF_nfe_nwe: number
+  - controls_nhomalt_nfe_nwe: number
+  - controls_AN_nfe_onf: number
+  - controls_AF_nfe_onf: number
+  - controls_nhomalt_nfe_onf: number
+  - controls_AN_asj: number
+  - controls_AF_asj: number
+  - controls_nhomalt_asj: number
+  - controls_AN_asj_female: number
+  - controls_AF_asj_female: number
+  - controls_nhomalt_asj_female: number
+  - controls_AN_asj_male: number
+  - controls_AF_asj_male: number
+  - controls_nhomalt_asj_male: number
+  - controls_AN_oth: number
+  - controls_AF_oth: number
+  - controls_nhomalt_oth: number
+  - controls_AN_oth_female: number
+  - controls_AF_oth_female: number
+  - controls_nhomalt_oth_female: number
+  - controls_AN_oth_male: number
+  - controls_AF_oth_male: number
+  - controls_nhomalt_oth_male: number
+  - controls_AN_afr: number
+  - controls_AF_afr: number
+  - controls_nhomalt_afr: number
+  - controls_AN_afr_female: number
+  - controls_AF_afr_female: number
+  - controls_nhomalt_afr_female: number
+  - controls_AN_afr_male: number
+  - controls_AF_afr_male: number
+  - controls_nhomalt_afr_male: number
+  - controls_AN_amr: number
+  - controls_AF_amr: number
+  - controls_nhomalt_amr: number
+  - controls_AN_amr_female: number
+  - controls_AF_amr_female: number
+  - controls_nhomalt_amr_female: number
+  - controls_AN_amr_male: number
+  - controls_AF_amr_male: number
+  - controls_nhomalt_amr_male: number
+  - controls_AN_eas: number
+  - controls_AF_eas: number
+  - controls_nhomalt_eas: number
+  - controls_AN_eas_female: number
+  - controls_AF_eas_female: number
+  - controls_nhomalt_eas_female: number
+  - controls_AN_eas_male: number
+  - controls_AF_eas_male: number
+  - controls_nhomalt_eas_male: number
+  - controls_AN_sas: number
+  - controls_AF_sas: number
+  - controls_nhomalt_sas: number
+  - controls_AN_sas_female: number
+  - controls_AF_sas_female: number
+  - controls_nhomalt_sas_female: number
+  - controls_AN_sas_male: number
+  - controls_AF_sas_male: number
+  - controls_nhomalt_sas_male: number
+  - controls_AN_eas_oea: number
+  - controls_AF_eas_oea: number
+  - controls_nhomalt_eas_oea: number
+  - controls_AN_eas_jpn: number
+  - controls_AF_eas_jpn: number
+  - controls_nhomalt_eas_jpn: number
+  - controls_AN_eas_kor: number
+  - controls_AF_eas_kor: number
+  - controls_nhomalt_eas_kor: number
+  - controls_AN_fin: number
+  - controls_AF_fin: number
+  - controls_nhomalt_fin: number
+  - controls_AN_fin_female: number
+  - controls_AF_fin_female: number
+  - controls_nhomalt_fin_female: number
+  - controls_AN_fin_male: number
+  - controls_AF_fin_male: number
+  - controls_nhomalt_fin_male: number
+  - non_topmed_AN: number
+  - non_topmed_AF: number
+  - non_topmed_nhomalt: number
+  - non_topmed_AN_female: number
+  - non_topmed_AF_female: number
+  - non_topmed_nhomalt_female: number
+  - non_topmed_AN_male: number
+  - non_topmed_AF_male: number
+  - non_topmed_nhomalt_male: number
+  - non_topmed_AN_nfe_seu: number
+  - non_topmed_AF_nfe_seu: number
+  - non_topmed_nhomalt_nfe_seu: number
+  - non_topmed_AN_nfe: number
+  - non_topmed_AF_nfe: number
+  - non_topmed_nhomalt_nfe: number
+  - non_topmed_AN_nfe_female: number
+  - non_topmed_AF_nfe_female: number
+  - non_topmed_nhomalt_nfe_female: number
+  - non_topmed_AN_nfe_male: number
+  - non_topmed_AF_nfe_male: number
+  - non_topmed_nhomalt_nfe_male: number
+  - non_topmed_AN_nfe_swe: number
+  - non_topmed_AF_nfe_swe: number
+  - non_topmed_nhomalt_nfe_swe: number
+  - non_topmed_AN_afr: number
+  - non_topmed_AF_afr: number
+  - non_topmed_nhomalt_afr: number
+  - non_topmed_AN_afr_female: number
+  - non_topmed_AF_afr_female: number
+  - non_topmed_nhomalt_afr_female: number
+  - non_topmed_AN_afr_male: number
+  - non_topmed_AF_afr_male: number
+  - non_topmed_nhomalt_afr_male: number
+  - non_topmed_AN_asj: number
+  - non_topmed_AF_asj: number
+  - non_topmed_nhomalt_asj: number
+  - non_topmed_AN_asj_female: number
+  - non_topmed_AF_asj_female: number
+  - non_topmed_nhomalt_asj_female: number
+  - non_topmed_AN_asj_male: number
+  - non_topmed_AF_asj_male: number
+  - non_topmed_nhomalt_asj_male: number
+  - non_topmed_AN_amr: number
+  - non_topmed_AF_amr: number
+  - non_topmed_nhomalt_amr: number
+  - non_topmed_AN_amr_female: number
+  - non_topmed_AF_amr_female: number
+  - non_topmed_nhomalt_amr_female: number
+  - non_topmed_AN_amr_male: number
+  - non_topmed_AF_amr_male: number
+  - non_topmed_nhomalt_amr_male: number
+  - non_topmed_AN_oth: number
+  - non_topmed_AF_oth: number
+  - non_topmed_nhomalt_oth: number
+  - non_topmed_AN_oth_female: number
+  - non_topmed_AF_oth_female: number
+  - non_topmed_nhomalt_oth_female: number
+  - non_topmed_AN_oth_male: number
+  - non_topmed_AF_oth_male: number
+  - non_topmed_nhomalt_oth_male: number
+  - non_topmed_AN_eas: number
+  - non_topmed_AF_eas: number
+  - non_topmed_nhomalt_eas: number
+  - non_topmed_AN_eas_male: number
+  - non_topmed_AF_eas_male: number
+  - non_topmed_nhomalt_eas_male: number
+  - non_topmed_AN_sas: number
+  - non_topmed_AF_sas: number
+  - non_topmed_nhomalt_sas: number
+  - non_topmed_AN_sas_male: number
+  - non_topmed_AF_sas_male: number
+  - non_topmed_nhomalt_sas_male: number
+  - non_topmed_AN_sas_female: number
+  - non_topmed_AF_sas_female: number
+  - non_topmed_nhomalt_sas_female: number
+  - non_topmed_AN_eas_female: number
+  - non_topmed_AF_eas_female: number
+  - non_topmed_nhomalt_eas_female: number
+  - non_topmed_AN_eas_oea: number
+  - non_topmed_AF_eas_oea: number
+  - non_topmed_nhomalt_eas_oea: number
+  - non_topmed_AN_eas_jpn: number
+  - non_topmed_AF_eas_jpn: number
+  - non_topmed_nhomalt_eas_jpn: number
+  - non_topmed_AN_eas_kor: number
+  - non_topmed_AF_eas_kor: number
+  - non_topmed_nhomalt_eas_kor: number
+  - non_topmed_AN_nfe_est: number
+  - non_topmed_AF_nfe_est: number
+  - non_topmed_nhomalt_nfe_est: number
+  - non_topmed_AN_nfe_bgr: number
+  - non_topmed_AF_nfe_bgr: number
+  - non_topmed_nhomalt_nfe_bgr: number
+  - non_topmed_AN_nfe_nwe: number
+  - non_topmed_AF_nfe_nwe: number
+  - non_topmed_nhomalt_nfe_nwe: number
+  - non_topmed_AN_nfe_onf: number
+  - non_topmed_AF_nfe_onf: number
+  - non_topmed_nhomalt_nfe_onf: number
+  - non_topmed_AN_fin: number
+  - non_topmed_AF_fin: number
+  - non_topmed_nhomalt_fin: number
+  - non_topmed_AN_fin_male: number
+  - non_topmed_AF_fin_male: number
+  - non_topmed_nhomalt_fin_male: number
+  - non_topmed_AN_fin_female: number
+  - non_topmed_AF_fin_female: number
+  - non_topmed_nhomalt_fin_female: number
+  - non_cancer_AN: number
+  - non_cancer_AF: number
+  - non_cancer_nhomalt: number
+  - non_cancer_AN_female: number
+  - non_cancer_AF_female: number
+  - non_cancer_nhomalt_female: number
+  - non_cancer_AN_male: number
+  - non_cancer_AF_male: number
+  - non_cancer_nhomalt_male: number
+  - non_cancer_AN_nfe: number
+  - non_cancer_AF_nfe: number
+  - non_cancer_nhomalt_nfe: number
+  - non_cancer_AN_nfe_female: number
+  - non_cancer_AF_nfe_female: number
+  - non_cancer_nhomalt_nfe_female: number
+  - non_cancer_AN_nfe_male: number
+  - non_cancer_AF_nfe_male: number
+  - non_cancer_nhomalt_nfe_male: number
+  - non_cancer_AN_nfe_seu: number
+  - non_cancer_AF_nfe_seu: number
+  - non_cancer_nhomalt_nfe_seu: number
+  - non_cancer_AN_nfe_swe: number
+  - non_cancer_AF_nfe_swe: number
+  - non_cancer_nhomalt_nfe_swe: number
+  - non_cancer_AN_afr: number
+  - non_cancer_AF_afr: number
+  - non_cancer_nhomalt_afr: number
+  - non_cancer_AN_afr_female: number
+  - non_cancer_AF_afr_female: number
+  - non_cancer_nhomalt_afr_female: number
+  - non_cancer_AN_afr_male: number
+  - non_cancer_AF_afr_male: number
+  - non_cancer_nhomalt_afr_male: number
+  - non_cancer_AN_asj: number
+  - non_cancer_AF_asj: number
+  - non_cancer_nhomalt_asj: number
+  - non_cancer_AN_asj_female: number
+  - non_cancer_AF_asj_female: number
+  - non_cancer_nhomalt_asj_female: number
+  - non_cancer_AN_asj_male: number
+  - non_cancer_AF_asj_male: number
+  - non_cancer_nhomalt_asj_male: number
+  - non_cancer_AN_amr: number
+  - non_cancer_AF_amr: number
+  - non_cancer_nhomalt_amr: number
+  - non_cancer_AN_amr_female: number
+  - non_cancer_AF_amr_female: number
+  - non_cancer_nhomalt_amr_female: number
+  - non_cancer_AN_amr_male: number
+  - non_cancer_AF_amr_male: number
+  - non_cancer_nhomalt_amr_male: number
+  - non_cancer_AN_oth: number
+  - non_cancer_AF_oth: number
+  - non_cancer_nhomalt_oth: number
+  - non_cancer_AN_oth_female: number
+  - non_cancer_AF_oth_female: number
+  - non_cancer_nhomalt_oth_female: number
+  - non_cancer_AN_oth_male: number
+  - non_cancer_AF_oth_male: number
+  - non_cancer_nhomalt_oth_male: number
+  - non_cancer_AN_eas: number
+  - non_cancer_AF_eas: number
+  - non_cancer_nhomalt_eas: number
+  - non_cancer_AN_eas_female: number
+  - non_cancer_AF_eas_female: number
+  - non_cancer_nhomalt_eas_female: number
+  - non_cancer_AN_eas_male: number
+  - non_cancer_AF_eas_male: number
+  - non_cancer_nhomalt_eas_male: number
+  - non_cancer_AN_sas: number
+  - non_cancer_AF_sas: number
+  - non_cancer_nhomalt_sas: number
+  - non_cancer_AN_sas_female: number
+  - non_cancer_AF_sas_female: number
+  - non_cancer_nhomalt_sas_female: number
+  - non_cancer_AN_sas_male: number
+  - non_cancer_AF_sas_male: number
+  - non_cancer_nhomalt_sas_male: number
+  - non_cancer_AN_eas_oea: number
+  - non_cancer_AF_eas_oea: number
+  - non_cancer_nhomalt_eas_oea: number
+  - non_cancer_AN_eas_jpn: number
+  - non_cancer_AF_eas_jpn: number
+  - non_cancer_nhomalt_eas_jpn: number
+  - non_cancer_AN_eas_kor: number
+  - non_cancer_AF_eas_kor: number
+  - non_cancer_nhomalt_eas_kor: number
+  - non_cancer_AN_nfe_est: number
+  - non_cancer_AF_nfe_est: number
+  - non_cancer_nhomalt_nfe_est: number
+  - non_cancer_AN_nfe_bgr: number
+  - non_cancer_AF_nfe_bgr: number
+  - non_cancer_nhomalt_nfe_bgr: number
+  - non_cancer_AN_nfe_nwe: number
+  - non_cancer_AF_nfe_nwe: number
+  - non_cancer_nhomalt_nfe_nwe: number
+  - non_cancer_AN_nfe_onf: number
+  - non_cancer_AF_nfe_onf: number
+  - non_cancer_nhomalt_nfe_onf: number
+  - non_cancer_AN_fin: number
+  - non_cancer_AF_fin: number
+  - non_cancer_nhomalt_fin: number
+  - non_cancer_AN_fin_female: number
+  - non_cancer_AF_fin_female: number
+  - non_cancer_nhomalt_fin_female: number
+  - non_cancer_AN_fin_male: number
+  - non_cancer_AF_fin_male: number
+  - non_cancer_nhomalt_fin_male: number
+  local_files:
+  - gnomad.exomes.r2.1.1.sites.*.vcf.bgz
+  name: gnomad.exomes
+  remote_files:
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.1.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.2.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.3.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.4.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.5.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.6.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.7.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.8.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.9.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.10.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.11.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.12.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.13.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.14.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.15.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.16.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.17.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.18.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.19.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.20.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.21.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.22.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.X.vcf.bgz
+  - https://storage.googleapis.com/gnomad-public/release/2.1.1/vcf/exomes/gnomad.exomes.r2.1.1.sites.Y.vcf.bgz
+  type: vcf
+  version: 13
+- build_author: ec2-user
+  build_date: 2020-02-05T14:22:00
+  build_field_transformations:
+    alleleFreqs: split [,]
+    alleleNs: split [,]
+    alleles: split [,]
+    func: split [,]
+    observed: split [\/]
+  features:
+  - name
+  - strand
+  - observed
+  - class
+  - func
+  - alleles
+  - alleleNs: number
+  - alleleFreqs: number
+  fetch_date: 2020-02-02T15:15:00
+  local_files:
+  - hg19.snp151.chr1.gz
+  - hg19.snp151.chr2.gz
+  - hg19.snp151.chr3.gz
+  - hg19.snp151.chr4.gz
+  - hg19.snp151.chr5.gz
+  - hg19.snp151.chr6.gz
+  - hg19.snp151.chr7.gz
+  - hg19.snp151.chr8.gz
+  - hg19.snp151.chr9.gz
+  - hg19.snp151.chr10.gz
+  - hg19.snp151.chr11.gz
+  - hg19.snp151.chr12.gz
+  - hg19.snp151.chr13.gz
+  - hg19.snp151.chr14.gz
+  - hg19.snp151.chr15.gz
+  - hg19.snp151.chr16.gz
+  - hg19.snp151.chr17.gz
+  - hg19.snp151.chr18.gz
+  - hg19.snp151.chr19.gz
+  - hg19.snp151.chr20.gz
+  - hg19.snp151.chr21.gz
+  - hg19.snp151.chr22.gz
+  - hg19.snp151.chrM.gz
+  - hg19.snp151.chrX.gz
+  - hg19.snp151.chrY.gz
+  name: dbSNP
+  sql_statement: SELECT * FROM hg19.snp151
+  type: sparse
+  version: 11
+- based: 1
+  build_author: ec2-user
+  build_date: 2020-02-05T14:22:00
+  build_field_transformations:
+    chrom: chr .
+    clinicalSignificance: split [;]
+    origin: split [;]
+    phenotypeList: split [;]
+    reviewStatus: split [;]
+    type: split [;]
+  build_row_filters:
+    Assembly: == GRCh37
+  features:
+  - alleleID: number
+  - phenotypeList
+  - clinicalSignificance
+  - type
+  - origin
+  - numberSubmitters: number
+  - reviewStatus
+  - referenceAllele
+  - alternateAllele
+  fetch_date: 2018-02-26T21:56:00
+  fieldMap:
+    '#AlleleID': alleleID
+    AlternateAllele: alternateAllele
+    Chromosome: chrom
+    ClinicalSignificance: clinicalSignificance
+    NumberSubmitters: numberSubmitters
+    Origin: origin
+    PhenotypeIDS: phenotypeIDs
+    PhenotypeList: phenotypeList
+    ReferenceAllele: referenceAllele
+    ReviewStatus: reviewStatus
+    Start: chromStart
+    Stop: chromEnd
+    Type: type
+  local_files:
+  - variant_summary.txt.gz
+  name: clinvar
+  remote_files:
+  - ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz
+  type: sparse
+  version: 11
+version: 20
+
