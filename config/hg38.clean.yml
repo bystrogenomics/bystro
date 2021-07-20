@@ -237,7 +237,7 @@ tracks:
     build_date: 2018-01-17T20:32:00
     build_row_filters:
       AS_FilterStatus: == PASS
-      eatures:
+      features:
         - alt
         - id
         - variant_type
