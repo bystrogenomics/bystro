@@ -377,14 +377,6 @@ sub makeMergeFunc {
       }
     }
 
-    # if($self->name eq 'snp146') {
-    #   say "oldVal is";
-    #   p $oldTrackVal;
-    #   say "newTrackVal is";
-    #   p $newTrackVal;
-    #   say "updated is";
-    #   p @updated;
-    # }
     return (undef, \@updated);
   }
 }

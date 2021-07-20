@@ -168,8 +168,6 @@ sub BUILD {
 
   my $txAnnotationHref = $self->_buildTranscriptAnnotation();
 
-  # say "txAnnotationHref";
-  # p $txAnnotationHref;
   my $errorsAref = $self->_buildTranscriptErrors($seq, $seqPosMapAref, $txAnnotationHref);
   #if errors warn; some transcripts will be malformed
   #we could pass an array reference to log, but let's give some additional 

@@ -152,13 +152,8 @@ tracks:
       - chrM.phastCons100way.wigFix.gz
     type: score
     version: 2
-  - build_author: ec2-user
-    build_date: "2018-02-07T03:22:00"
-    local_files:
-      - chr*.phyloP100way.wigFix.gz
-    name: phyloP
-    remote_dir: >-
-      http://hgdownload.cse.ucsc.edu/goldenPath/hg38/phyloP100way/hg38.100way.phyloP100way/
+  - name: phyloP
+    remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/hg38/phyloP100way/hg38.100way.phyloP100way/
     remote_files:
       - chr1.phyloP100way.wigFix.gz
       - chr2.phyloP100way.wigFix.gz
@@ -187,68 +182,39 @@ tracks:
       - chrM.phyloP100way.wigFix.gz
     type: score
     version: 2
-  - build_author: ec2-user
-    build_date: "2018-02-07T03:22:00"
-    caddToBed_date: "2017-01-19T04:37:00"
-    filterCadd_date: "2017-08-28T18:28:00"
-    local_files:
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chr19.organized-by-chr.txt.sorted.chr19.filtered.txt.gz
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chr18.organized-by-chr.txt.sorted.chr18.filtered.txt.gz
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chr17.organized-by-chr.txt.sorted.chr17.filtered.txt.gz
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chr16.organized-by-chr.txt.sorted.chr16.filtered.txt.gz
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chr15.organized-by-chr.txt.sorted.chr15.filtered.txt.gz
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chr14.organized-by-chr.txt.sorted.chr14.filtered.txt.gz
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chr13.organized-by-chr.txt.sorted.chr13.filtered.txt.gz
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chr21.organized-by-chr.txt.sorted.chr21.filtered.txt.gz
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chr22.organized-by-chr.txt.sorted.chr22.filtered.txt.gz
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chr20.organized-by-chr.txt.sorted.chr20.filtered.txt.gz
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chr10.organized-by-chr.txt.sorted.chr10.filtered.txt.gz
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chr12.organized-by-chr.txt.sorted.chr12.filtered.txt.gz
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chr11.organized-by-chr.txt.sorted.chr11.filtered.txt.gz
-      - whole_genome_SNVs.tsv.bed.chrM.organized-by-chr.chrM.filtered.txt.gz
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chrY.organized-by-chr.txt.sorted.chrY.filtered.txt.gz
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chr1.organized-by-chr.txt.sorted.chr1.filtered.txt.gz
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chr9.organized-by-chr.txt.sorted.chr9.filtered.txt.gz
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chr2.organized-by-chr.txt.sorted.chr2.filtered.txt.gz
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chr8.organized-by-chr.txt.sorted.chr8.filtered.txt.gz
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chr6.organized-by-chr.txt.sorted.chr6.filtered.txt.gz
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chr7.organized-by-chr.txt.sorted.chr7.filtered.txt.gz
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chr5.organized-by-chr.txt.sorted.chr5.filtered.txt.gz
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chr4.organized-by-chr.txt.sorted.chr4.filtered.txt.gz
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chr3.organized-by-chr.txt.sorted.chr3.filtered.txt.gz
-      - >-
-        whole_genome_SNVs.tsv.bed.mapped.chrX.organized-by-chr.txt.sorted.chrX.filtered.txt.gz
+  - caddToBed_date: "2018-09-07T00:00:00"
+    filterCadd_date: "2018-09-07T00:00:00"
+    remote_files:
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chr1.organized-by-chr.txt.sorted.txt.gz
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chr2.organized-by-chr.txt.sorted.txt.gz
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chr3.organized-by-chr.txt.sorted.txt.gz
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chr4.organized-by-chr.txt.sorted.txt.gz
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chr5.organized-by-chr.txt.sorted.txt.gz
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chr6.organized-by-chr.txt.sorted.txt.gz
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chr7.organized-by-chr.txt.sorted.txt.gz
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chr8.organized-by-chr.txt.sorted.txt.gz
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chr9.organized-by-chr.txt.sorted.txt.gz
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chr10.organized-by-chr.txt.sorted.txt.gz
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chr11.organized-by-chr.txt.sorted.txt.gz
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chr12.organized-by-chr.txt.sorted.txt.gz
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chr13.organized-by-chr.txt.sorted.txt.gz
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chr14.organized-by-chr.txt.sorted.txt.gz
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chr15.organized-by-chr.txt.sorted.txt.gz
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chr16.organized-by-chr.txt.sorted.txt.gz
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chr17.organized-by-chr.txt.sorted.txt.gz
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chr18.organized-by-chr.txt.sorted.txt.gz
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chr19.organized-by-chr.txt.sorted.txt.gz
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chr20.organized-by-chr.txt.sorted.txt.gz
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chr21.organized-by-chr.txt.sorted.txt.gz
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chr22.organized-by-chr.txt.sorted.txt.gz
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chrX.organized-by-chr.txt.sorted.txt.gz
+      - s3://bystro-db/src/cadd1.4/hg38/cadd/whole_genome_SNVs.tsv.chrY.organized-by-chr.txt.sorted.txt.gz
     name: cadd
-    sortCadd_date: "2017-01-20T23:53:00"
+    sortCadd_date: "2018-09-07T00:00:00"
     sorted_guaranteed: 1
     type: cadd
     version: 2
-  - build_author: ec2-user
-    build_date: "2018-02-07T03:22:00"
-    build_field_transformations:
+  - build_field_transformations:
       alleleFreqs: "split [,]"
       alleleNs: "split [,]"
       alleles: "split [,]"
@@ -263,55 +229,280 @@ tracks:
       - alleles
       - alleleNs: number
       - alleleFreqs: number
-    local_files:
-      - hg38.snp150.chr*.gz
     name: dbSNP
-    sql_statement: SELECT * FROM hg38.snp150
+    sql_statement: SELECT * FROM hg38.snp151
     type: sparse
     version: 2
-  - based: 1
-    build_author: ec2-user
-    build_date: "2018-02-07T03:22:00"
-    build_field_transformations:
-      chrom: chr .
-      clinicalSignificance: "split [;]"
-      origin: "split [;]"
-      phenotypeList: "split [;]"
-      reviewStatus: "split [;]"
-      type: "split [;]"
+  - build_author: ec2-user
+    build_date: 2018-01-17T20:32:00
     build_row_filters:
-      Assembly: == GRCh38
-    features:
-      - alleleID: number
-      - phenotypeList
-      - clinicalSignificance
-      - type
-      - origin
-      - numberSubmitters: number
-      - reviewStatus
-      - referenceAllele
-      - alternateAllele
-    fieldMap:
-      "#AlleleID": alleleID
-      AlternateAllele: alternateAllele
-      Chromosome: chrom
-      ClinicalSignificance: clinicalSignificance
-      NumberSubmitters: numberSubmitters
-      Origin: origin
-      PhenotypeList: phenotypeList
-      ReferenceAllele: referenceAllele
-      ReviewStatus: reviewStatus
-      Start: chromStart
-      Stop: chromEnd
-      Type: type
+      AS_FilterStatus: == PASS
+      eatures:
+        - alt
+        - id
+        - variant_type
+        - dp: number
+        - qd: number
+        - sor: number
+        - pax_max: number
+        - as_vqslod: number
+        - read_pos_rank_sum: number
+        - ac: number
+        - ac_raw: number
+        - ac_female: number
+        - ac_male: number
+        - ac_oth: number
+        - ac_oth_female: number
+        - ac_oth_male: number
+        - ac_sas: number
+        - ac_sas_female: number
+        - ac_sas_male: number
+        - ac_asj: number
+        - ac_asj_female: number
+        - ac_asj_male: number
+        - ac_eas: number
+        - ac_eas_female: number
+        - ac_eas_male: number
+        - ac_afr: number
+        - ac_afr_female: number
+        - ac_afr_male: number
+        - ac_fin: number
+        - ac_fin_female: number
+        - ac_fin_male: number
+        - ac_ami: number
+        - ac_ami_female: number
+        - ac_ami_male: number
+        - ac_nfe: number
+        - ac_nfe_female: number
+        - ac_nfe_male: number
+        - ac_amr: number
+        - ac_amr_female: number
+        - ac_amr_male: number
+        - an: number
+        - an_raw: number
+        - an_female: number
+        - an_male: number
+        - an_afr: number
+        - an_afr_female: number
+        - an_afr_male: number
+        - an_amr: number
+        - an_amr_female: number
+        - an_amr_male: number
+        - an_eas: number
+        - an_eas_female: number
+        - an_eas_male: number
+        - an_fin: number
+        - an_fin_female: number
+        - an_fin_male: number
+        - an_nfe: number
+        - an_nfe_female: number
+        - an_nfe_male: number
+        - an_oth: number
+        - an_oth_female: number
+        - an_oth_male: number
+        - an_sas: number
+        - an_sas_female: number
+        - an_sas_male: number
+        - an_asj: number
+        - an_asj_female: number
+        - an_asj_male: number
+        - an_ami: number
+        - an_ami_female: number
+        - an_ami_male: number
+        - af: number
+        - af_raw: number
+        - af_female: number
+        - af_male: number
+        - af_amr: number
+        - af_amr_female: number
+        - af_amr_male: number
+        - af_oth: number
+        - af_oth_female: number
+        - af_oth_male: number
+        - af_sas: number
+        - af_sas_female: number
+        - af_sas_male: number
+        - af_asj: number
+        - af_asj_female: number
+        - af_asj_male: number
+        - af_eas: number
+        - af_eas_female: number
+        - af_eas_male: number
+        - af_afr: number
+        - af_afr_female: number
+        - af_afr_male: number
+        - af_fin: number
+        - af_fin_female: number
+        - af_fin_male: number
+        - af_ami: number
+        - af_ami_female: number
+        - af_ami_male: number
+        - af_nfe: number
+        - af_nfe_female: number
+        - af_nfe_male: number
+        - nhomalt: number
+        - nhomalt_raw: number
+        - nhomalt_female: number
+        - nhomalt_male: number
+        - nhomalt_asj: number
+        - nhomalt_asj_female: number
+        - nhomalt_asj_male: number
+        - nhomalt_eas: number
+        - nhomalt_eas_female: number
+        - nhomalt_eas_male: number
+        - nhomalt_afr: number
+        - nhomalt_afr_female: number
+        - nhomalt_afr_male: number
+        - nhomalt_fin: number
+        - nhomalt_fin_female: number
+        - nhomalt_fin_male: number
+        - nhomalt_oth: number
+        - nhomalt_oth_female: number
+        - nhomalt_oth_male: number
+        - nhomalt_ami: number
+        - nhomalt_ami_female: number
+        - nhomalt_ami_male: number
+        - nhomalt_sas: number
+        - nhomalt_sas_female: number
+        - nhomalt_sas_male: number
+        - nhomalt_nfe: number
+        - nhomalt_nfe_female: number
+        - nhomalt_nfe_male: number
+        - nhomalt_amr: number
+        - nhomalt_amr_female: number
+        - nhomalt_amr_male: number
+      fieldMap:
+        ReadPosRankSum: read_pos_rank_sum
+        MQRankSum: mq_rank_sum
+        RAW_MQ: raw_mq
+        QD: qd
+        MQ: mq
+        AS_VQSLOD: as_vqslod
+        SOR: sor
+        DP: dp
+        AC: ac
+        AC_raw: ac_raw
+        AF: af
+        AF_raw: af_raw
+        AC_sas: ac_sas
+        AC_sas_female: ac_sas_female
+        AC_sas_male: ac_sas_male
+        AC_male: ac_male
+        AC_female: ac_female
+        AC_afr: ac_afr
+        AC_afr_female: ac_afr_female
+        AC_afr_male: ac_afr_male
+        AC_asj: ac_asj
+        AC_asj_female: ac_asj_female
+        AC_asj_male: ac_asj_male
+        AC_eas: ac_eas
+        AC_eas_female: ac_eas_female
+        AC_eas_male: ac_eas_male
+        AC_fin: ac_fin
+        AC_fin_male: ac_fin_male
+        AC_fin_female: ac_fin_female
+        AC_oth: ac_oth
+        AC_oth_female: ac_oth_female
+        AC_oth_male: ac_oth_male
+        AC_ami: ac_ami
+        AC_ami_female: ac_ami_female
+        AC_ami_male: ac_ami_male
+        AC_nfe: ac_nfe
+        AC_nfe_female: ac_nfe_female
+        AC_nfe_male: ac_nfe_male
+        AC_amr: ac_amr
+        AC_amr_male: ac_amr_male
+        AC_amr_female: ac_amr_female
+        AF_afr: af_afr
+        AF_afr_female: af_afr_female
+        AF_afr_male: af_afr_male
+        AF_asj: af_asj
+        AF_asj_female: af_asj_female
+        AF_asj_male: af_asj_male
+        AF_amr: af_amr
+        AF_amr_female: af_amr_female
+        AF_amr_male: af_amr_male
+        AF_female: af_female
+        AF_eas: af_eas
+        AF_eas_female: af_eas_female
+        AF_eas_male: af_eas_male
+        AF_fin: af_fin
+        AF_fin_male: af_fin_male
+        AF_fin_female: af_fin_female
+        AF_oth: af_oth
+        AF_oth_female: af_oth_female
+        AF_oth_male: af_oth_male
+        AF_nfe: af_nfe
+        AF_nfe_female: af_nfe_female
+        AF_nfe_male: af_nfe_male
+        AF_male: af_male
+        AF_sas: af_sas
+        AF_sas_female: af_sas_female
+        AF_sas_male: af_sas_male
+        AF_ami: af_ami
+        AF_ami_female: af_ami_female
+        AF_ami_male: af_ami_male
+        AN: an
+        AN_raw: an_raw
+        AN_afr: an_afr
+        AN_afr_female: an_afr_female
+        AN_afr_male: an_afr_male
+        AN_sas: an_sas
+        AN_sas_female: an_sas_female
+        AN_sas_male: an_sas_male
+        AN_female: an_female
+        AN_asj: an_asj
+        AN_asj_female: an_asj_female
+        AN_asj_male: an_asj_male
+        AN_eas: an_eas
+        AN_eas_female: an_eas_female
+        AN_eas_male: an_eas_male
+        AN_fin: an_fin
+        AN_fin_female: an_fin_female
+        AN_fin_male: an_fin_male
+        AN_oth: an_oth
+        AN_oth_female: an_oth_female
+        AN_oth_male: an_oth_male
+        AN_nfe: an_nfe
+        AN_nfe_male: an_nfe_male
+        AN_nfe_female: an_nfe_female
+        AN_ami: an_ami
+        AN_ami_female: an_ami_female
+        AN_ami_male: an_ami_male
+        AN_amr: an_amr
+        AN_amr_male: an_amr_male
+        AN_amr_female: an_amr_female
+        AN_male: an_male
     local_files:
-      - variant_summary.txt.gz
-    name: clinvar
+      - gnomad.genomes.r3.0.sites.chr*.vcf.bgz
     remote_files:
-      - >-
-        ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz
-    type: sparse
-    version: 2
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr1.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr2.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr3.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr4.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr5.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr6.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr7.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr8.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr9.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr10.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr11.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr12.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr13.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr14.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr15.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr16.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr17.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr18.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr19.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr20.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr21.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chr22.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chrX.vcf.bgz
+      - https://storage.googleapis.com/gnomad-public/release/3.0/vcf/genomes/gnomad.genomes.r3.0.sites.chrY.vcf.bgz
+    name: gnomadV3.genomes
+    type: vcf
+    version: 0
   - build_author: ec2-user
     build_date: "2018-02-07T03:22:00"
     build_row_filters:
@@ -424,4 +615,44 @@ tracks:
     name: gnomad.exomes
     type: vcf
     version: 4
+    - based: 1
+    build_author: ec2-user
+    build_date: "2018-02-07T03:22:00"
+    build_field_transformations:
+      chrom: chr .
+      clinicalSignificance: "split [;]"
+      origin: "split [;]"
+      phenotypeList: "split [;]"
+      reviewStatus: "split [;]"
+      type: "split [;]"
+    build_row_filters:
+      Assembly: == GRCh38
+    features:
+      - alleleID: number
+      - phenotypeList
+      - clinicalSignificance
+      - type
+      - origin
+      - numberSubmitters: number
+      - reviewStatus
+      - referenceAllele
+      - alternateAllele
+    fieldMap:
+      "#AlleleID": alleleID
+      AlternateAllele: alternateAllele
+      Chromosome: chrom
+      ClinicalSignificance: clinicalSignificance
+      NumberSubmitters: numberSubmitters
+      Origin: origin
+      PhenotypeList: phenotypeList
+      ReferenceAllele: referenceAllele
+      ReviewStatus: reviewStatus
+      Start: chromStart
+      Stop: chromEnd
+      Type: type
+    name: clinvar
+    remote_files:
+      - ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz
+    type: sparse
+    version: 2
 version: 77

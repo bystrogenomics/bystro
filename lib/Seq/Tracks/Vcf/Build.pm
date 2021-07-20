@@ -44,12 +44,13 @@ has vcfProcessor => (is => 'ro', isa => 'Str', required => 1, default => 'bystro
 
 state $converter = Seq::Tracks::Base::Types->new();
 
+# TODO: Get these from the actual header output
 # name followed by index in the intermediate snp file
 # QUAL and FILTER not yet implemented
 # We also allow any fields output by the vcf professor (except info and the related alleleIdx)
 state $vcfFeatures = {
   chrom => 0, pos => 1, type => 2, ref => 3, alt => 4, trTv => 5,
-  heterozygotes => 6, homozygotes => 8, missingGenos => 10, id => 13,
+  heterozygotes => 6, homozygotes => 8, missingGenos => 10, id => 15,
   qual => undef, filter => undef};
 
 # We can use before BUILD to make any needed modifications to $self->features
@@ -260,6 +261,12 @@ sub buildTrack {
         }
 
         if(!$wantedChr) {
+          if($self->chrPerFile) {
+            $self->log('info', $self->name . ": chrs in file $file not wanted or previously completed. Skipping");
+
+            last FH_LOOP;
+          }
+
           next FH_LOOP;
         }
 
@@ -445,6 +452,7 @@ sub _extractFeatures {
     $returnData[$arr->[2]] = $self->coerceFeatureType($arr->[0], $fieldsAref->[$arr->[1]]);
   }
 
+  # FIXME: get this from vcf pre-processor header
   my $alleleIdx = $fieldsAref->[-2];
 
   for my $info (split ';', $fieldsAref->[-1]) {
@@ -457,7 +465,6 @@ sub _extractFeatures {
 
     $entry = $vcfNameMap->{$name} || $vcfFilterMap->{$name};
     
-    # p $entry;
     if(!$entry) {
       next;
     }
