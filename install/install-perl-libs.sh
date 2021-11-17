@@ -50,6 +50,7 @@ cpanm install Module::Install::AuthorTests
 
 # A dependency of Data::MessagePack installation
 cpanm install File::Copy::Recursive
+cpanm install File::Which
 
 cpanm --uninstall -f Data::MessagePack
 rm -rf msgpack-perl
