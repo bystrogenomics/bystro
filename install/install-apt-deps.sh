@@ -16,6 +16,8 @@ sudo apt install -y unzip
 sudo apt install -y wget
 # For tests involving querying ucsc directly
 sudo apt install -y libmysqlclient-dev libmysqld-dev
+# For Search::Elasticsearch::Client::5_0::Direct
+sudo apt install -y libcurl4-openssl-dev libssl-dev
 
 # for perlbrew, in case you want to install a different perl version
 #https://www.digitalocean.com/community/tutorials/how-to-install-perlbrew-and-manage-multiple-versions-of-perl-5-on-centos-7

@@ -1,0 +1,8 @@
+connection:
+  # 2000MB max content size
+  max_content_length: 2097152000
+  request_timeout: 300000
+  gzip: 1
+  client: 5_0::Direct
+  nodes:
+    - <ip>:<port>
