@@ -7,9 +7,9 @@ apps:
     script: bin/beanstalk_queue_server.pl
     interpreter: 'perl'
     args:
-      --type saveFromQuery -q seq-beanstalk-workers/queue-dev.yaml -c elastic-config/config.yml --debug
+      --type saveFromQuery -q seq-beanstalk-workers/queue-dev.yaml -c config/elastic-config.yml --debug
   - name: BystroDevIndexServer
     script: bin/beanstalk_queue_index_server.pl
     interpreter: 'perl'
     args:
-      -q seq-beanstalk-workers/queue-dev.yaml -c elastic-config/config.yml --debug
+      -q seq-beanstalk-workers/queue-dev.yaml -c config/elastic-config.yml --debug

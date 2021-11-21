@@ -13,6 +13,8 @@ sudo yum install unzip -y;
 sudo yum install wget -y;
 # For tests involving querying ucsc directly
 sudo yum install mysql-devel -y;
+# For Search::Elasticsearch::Client::5_0::Direct
+sudo yum install libcurl-devel -y
 
 # for perlbrew, in case you want to install a different perl version
 #https://www.digitalocean.com/community/tutorials/how-to-install-perlbrew-and-manage-multiple-versions-of-perl-5-on-centos-7

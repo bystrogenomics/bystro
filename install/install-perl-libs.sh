@@ -20,6 +20,7 @@ cpanm install Cpanel::JSON::XS
 cpanm install Mouse::Meta::Attribute::Custom::Trait::Array
 cpanm install Net::HTTP
 cpanm install Search::Elasticsearch
+cpanm install Search::Elasticsearch::Client::5_0::Direct
 cpanm install Math::SigFigs
 cpanm install LMDB_File
 cpanm install PerlIO::utf8_strict
