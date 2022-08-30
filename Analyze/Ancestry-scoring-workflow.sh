@@ -4,6 +4,9 @@
 export PATH=$PATH:/Applications/GenomicsTools
 admixture hapmap3.bed 3
 
+#Using 1kgenomes as ref - http://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/
+#Before using ref, converted vcf to plink2 files and merge
+
 #common snps only for PCA using downloaded bystro file (maf>.05)
 cut -f1,2,5,65,66 Annotation/SamplePopcommonsnps.annotation.tsv > Annotation/PartialCommon.txt
 python ConvertChrPosToRsCommonsnps.py Annotation/PartialCommon.txt Annotation/CommonWchrRs.txt
