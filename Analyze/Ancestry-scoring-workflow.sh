@@ -4,6 +4,15 @@
 export PATH=$PATH:/Applications/GenomicsTools
 admixture hapmap3.bed 3
 
+# Verify the two datasets have the same set of SNPs
+diff -s reference.bim study.bim
+# Run unsupervised ADMIXTURE with K=2
+admixture reference.bed 2
+# Use learned allele frequencies as (fixed) input to next step
+cp reference.2.P study.2.P.in
+# Run projection ADMIXTURE with K=2
+admixture -P study.bed 2
+
 #Using 1kgenomes as ref - http://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/
 #Before using ref, converted vcf to plink2 files and merge
 

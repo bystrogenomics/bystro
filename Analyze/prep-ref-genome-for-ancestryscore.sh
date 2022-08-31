@@ -33,23 +33,24 @@ plink2 --vcf Volumes/Seagate/1kGenomesFullVCF/1kGP_high_coverage_Illumina.chr20.
 plink2 --vcf Volumes/Seagate/1kGenomesFullVCF/1kGP_high_coverage_Illumina.chr21.filtered.SNV_INDEL_SV_phased_panel.vcf --snps-only --maf 0.05 --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr21
 plink2 --vcf Volumes/Seagate/1kGenomesFullVCF/1kGP_high_coverage_Illumina.chr22.filtered.SNV_INDEL_SV_phased_panel.vcf --maf 0.05 --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr22
 
-#Only need snps - started doing this for 7,8,9,21 while re-running it
-plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1snps
-plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1snps
-plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1snps
-plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1snps
-plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1snps
-plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1snps
-plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1snps
-plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1snps
-plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1snps
-plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1snps
-plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1snps
-plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1snps
-plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1snps
-plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1snps
-plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1snps
-plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1snps
-plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1snps
-plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1snps
+#Only need snps - started doing this for 7,8,9,17,21 while re-running it
+plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr1 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/filteredchrs/1kGPoldplinkchr1snps
+plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr2 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/filteredchrs/1kGPoldplinkchr2snps
+plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr3 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/filteredchrs/1kGPoldplinkchr3snps
+plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr4 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/filteredchrs/1kGPoldplinkchr4snps
+plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr5 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/filteredchrs/1kGPoldplinkchr5snps
+plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr6 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/filteredchrs/1kGPoldplinkchr6snps
+plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr10 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/filteredchrs/1kGPoldplinkchr10snps
+plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr11 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/filteredchrs/1kGPoldplinkchr11snps
+plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr12 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/filteredchrs/1kGPoldplinkchr12snps
+plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr13 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/filteredchrs/1kGPoldplinkchr13snps
+plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr14 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/filteredchrs/1kGPoldplinkchr14snps
+plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr15 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/filteredchrs/1kGPoldplinkchr15snps
+plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr16 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/filteredchrs/1kGPoldplinkchr16snps
+plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr18 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/filteredchrs/1kGPoldplinkchr18snps
+plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr19 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/filteredchrs/1kGPoldplinkchr19snps
+plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr20 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/filteredchrs/1kGPoldplinkchr20snps
+plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr22 --snps-only --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/filteredchrs/1kGPoldplinkchr22snps
 
+# Merge binary files across chromosomes and quartiles
+plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/filteredchrs/1kGPoldplinkchr1snps --pmerge-list Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/merge_file_list2.txt bfile --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPallcommsnps
