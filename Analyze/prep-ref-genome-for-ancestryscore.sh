@@ -54,3 +54,4 @@ plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kG
 
 # Merge binary files across chromosomes and quartiles
 plink2 --bfile Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/filteredchrs/1kGPoldplinkchr1snps --pmerge-list Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/merge_file_list2.txt bfile --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPallcommsnps
+
