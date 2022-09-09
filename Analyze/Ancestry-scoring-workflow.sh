@@ -5,11 +5,11 @@ export PATH=$PATH:/Applications/GenomicsTools
 admixture hapmap3.bed 3
 
 # Verify the two datasets have the same set of SNPs
-diff -s reference.bim study.bim
+diff -s 1kGPreference.bim study.bim
 # Run unsupervised ADMIXTURE with K=2
-admixture reference.bed 2
+admixture 1kGPreference.bed 2
 # Use learned allele frequencies as (fixed) input to next step
-cp reference.2.P study.2.P.in
+cp 1kGPreference.2.P study.2.P.in
 # Run projection ADMIXTURE with K=2
 admixture -P study.bed 2
 
