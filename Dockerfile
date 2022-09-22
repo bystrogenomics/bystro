@@ -7,6 +7,7 @@ ENV GOPATH="/root/go"
 RUN cpanm --local-lib=/root/perl5 local::lib && eval $(perl -I /root/perl5/lib -Mlocal::lib)
 ADD ./ /root/bystro/
 RUN apt-get update && apt-get install sudo
+RUN git config --global url."https://".insteadOf git://
 
 WORKDIR /root/bystro
 RUN . install/install-lmdb-linux.sh
