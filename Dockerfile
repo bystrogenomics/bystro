@@ -25,6 +25,7 @@ RUN apt-get update \
     npm \
     &&  npm install -g pm2
 
+RUN git config --global url."https://".insteadOf git://
 RUN bash install/install-perl-libs.sh
 RUN bash install/install-lmdb-linux.sh
 RUN bash install/install-go-linux.sh
