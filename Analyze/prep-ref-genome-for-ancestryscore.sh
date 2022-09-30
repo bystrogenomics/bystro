@@ -1,12 +1,19 @@
-#Convert vcf to plink for reference 1000genomes data
+#Download the 1000 genomes data using wget instead
+wget ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/1kGP_high_coverage_Illumina.chr*
+wget ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/20220804_manifest.txt
 
+#Using bcftools, merge chromosomes into one dataset
+export PATH=$PATH:bcftools/
+bcftools concat -n -f AutosomeUnmergedManifest.txt -o 1kGPmergedAutosomes
+bcftools -c 
+
+#Convert vcf to plink for reference 1000genomes data
 #Starting with not the biggest one in case this isn't the result we're looking for
 plink2 --vcf Volumes/Seagate/1kGenomesFullVCF/1kGP_high_coverage_Illumina.chr13.filtered.SNV_INDEL_SV_phased_panel.vcf --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPchr13
 #This made new plink file types: psam, pgen, pvar but we need bed/bim/fam for admixture
 plink2 --pfile 1kGPchr13 --make-bed --out 1kGPchr13oldplink
 #Only need common variants
 plink2 --bfile 1kGPchr13oldplink --maf 0.05 --make-bed --out 1kGPoldplinkchr13
-
 #For the rest of the chromosomes:
 #I ran this one first to test that this worked, the rest are below
 plink2 --vcf Volumes/Seagate/1kGenomesFullVCF/1kGP_high_coverage_Illumina.chr15.filtered.SNV_INDEL_SV_phased_panel.vcf --maf 0.05 --make-bed --out Volumes/Main/Users/cristinat/Desktop/repos/1kreference-genome/1kGPoldplinkchr15
