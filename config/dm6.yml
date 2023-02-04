@@ -1,0 +1,130 @@
+assembly: dm6
+build_author: ec2-user
+build_date: 2018-05-28T02:46:00
+chromosomes:
+  - chr2L
+  - chr2R
+  - chr3L
+  - chr3R
+  - chr4
+  - chrM
+  - chrX
+  - chrY
+database_dir: /mnt/annotator/dm6/index
+files_dir: "~"
+statistics:
+  dbSNPnameField: ""
+  exonicAlleleFunctionField: refSeq.exonicAlleleFunction
+  outputExtensions:
+    json: .statistics.json
+    qc: .statistics.qc.tsv
+    tab: .statistics.tsv
+  refTrackField: ref
+  siteTypeField: refSeq.siteType
+temp_dir: /mnt/annotator/tmp/
+fileProcessors:
+  snp:
+    args: --emptyField ! --minGq .95
+    program: bystro-snp
+  vcf:
+    args: --emptyField ! --keepId --keepPos
+    program: bystro-vcf
+tracks:
+  - build_author: ec2-user
+    build_date: 2017-04-23T20:40:00
+    fetch_date: 2017-04-23T20:17:00
+    local_files:
+      - dm6.fa.gz
+    name: ref
+    remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/dm6/bigZips/
+    remote_files:
+      - dm6.fa.gz
+    type: reference
+    version: 1
+  - build_author: ec2-user
+    build_date: 2017-04-23T20:40:00
+    features:
+      - name
+      - name2
+    fetch_date: 2017-04-23T20:39:00
+    local_files:
+      - dm6.refGene.chr2L.gz
+      - dm6.refGene.chr2R.gz
+      - dm6.refGene.chr3L.gz
+      - dm6.refGene.chr3R.gz
+      - dm6.refGene.chr4.gz
+      - dm6.refGene.chrX.gz
+      - dm6.refGene.chrY.gz
+    name: refSeq
+    nearest:
+      - name
+      - name2
+    sql_statement: SELECT * FROM dm6.refGene
+    type: gene
+    version: 1
+  - build_author: ec2-user
+    build_date: 2018-05-28T02:46:00
+    features:
+      - name
+      - name2
+    fetch_date: 2018-05-28T02:42:00
+    local_files:
+      - dm6.ensGene.chr2L.gz
+      - dm6.ensGene.chr2R.gz
+      - dm6.ensGene.chr3L.gz
+      - dm6.ensGene.chr3R.gz
+      - dm6.ensGene.chr4.gz
+      - dm6.ensGene.chrX.gz
+      - dm6.ensGene.chrY.gz
+    name: ensGene
+    nearest:
+      - name
+      - name2
+    sql_statement: SELECT * FROM dm6.ensGene
+    type: gene
+    version: 1
+  - build_author: ec2-user
+    build_date: 2018-05-28T02:46:00
+    features:
+      - name
+      - name2
+    fetch_date: 2018-05-28T02:43:00
+    local_files:
+      - dm6.ncbiRefSeq.chr2L.gz
+      - dm6.ncbiRefSeq.chr2R.gz
+      - dm6.ncbiRefSeq.chr3L.gz
+      - dm6.ncbiRefSeq.chr3R.gz
+      - dm6.ncbiRefSeq.chr4.gz
+      - dm6.ncbiRefSeq.chrM.gz
+      - dm6.ncbiRefSeq.chrX.gz
+      - dm6.ncbiRefSeq.chrY.gz
+    name: ncbiRefSeq
+    nearest:
+      - name
+      - name2
+    sql_statement: SELECT * FROM dm6.ncbiRefSeq
+    type: gene
+    version: 1
+  - build_author: ec2-user
+    build_date: 2017-04-23T20:40:00
+    fetch_date: 2017-04-23T20:16:00
+    local_files:
+      - dm6.27way.phastCons.wigFix.gz
+    name: phastCons
+    remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/dm6/phastCons27way/
+    remote_files:
+      - dm6.27way.phastCons.wigFix.gz
+    type: score
+    version: 1
+  - build_author: ec2-user
+    build_date: 2017-04-23T20:40:00
+    fetch_date: 2017-04-23T20:16:00
+    local_files:
+      - dm6.phyloP27way.wigFix.gz
+    name: phyloP
+    remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/dm6/phyloP27way/
+    remote_files:
+      - dm6.phyloP27way.wigFix.gz
+    type: score
+    version: 1
+version: 2

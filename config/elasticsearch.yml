@@ -1,0 +1,11 @@
+connection:
+  # 200MB max content size
+  max_content_length: 209715200
+  request_timeout: 300
+  gzip: 1
+  nodes:
+    - https://10.98.135.70:9200
+  username: admin
+  password: admin
+database_dir: /mnt/annotator/elasticsearch/index
+temp_dir: /mnt/annotator/tmp/

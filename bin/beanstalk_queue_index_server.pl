@@ -180,10 +180,16 @@ sub handleJob {
     say "writing beanstalk index queue log file here: $logPath";
   }
 
-  # create the annotator
-  my $indexer = SeqElastic->new($inputHref);
 
-  return $indexer->go;
+
+  my $assemblyMap = ($configPathBaseDir . $submittedJob->{assembly} . '.mapping.yml');
+  my $inputFileName = ($submittedJob->{inputDir} . "/"  . $submittedJob->{inputFileNames}->{archived});
+  my $indexName = $inputHref->{indexName};
+
+  # create the annotator
+  #say "go run bystro-go/simple_parser.go -in $inputFileName -index $assemblyMap -connection  $connectionConfigPath  -name  $indexName  -http";
+  return system("go run bystro-go/simple_parser.go -in " . $inputFileName . " -index " . $assemblyMap . " -connection " . $connectionConfigPath . " -name " . $inputHref->{indexName} . " -http");
+
 }
 
 #Here we may wish to read a json or yaml file containing argument mappings

@@ -1,0 +1,60 @@
+assembly: danRer10
+chromosomes:
+  - chr1
+  - chr2
+  - chr3
+  - chr4
+  - chr5
+  - chr6
+  - chr7
+  - chr8
+  - chr9
+  - chr10
+  - chr11
+  - chr12
+  - chr13
+  - chr14
+  - chr15
+  - chr16
+  - chr17
+  - chr18
+  - chr19
+  - chr20
+  - chr21
+  - chr22
+  - chr23
+  - chr24
+  - chr25
+  - chrM
+database_dir: /mnt/annotator/danRer10/index
+files: "~"
+files_dir: ~
+statistics:
+  exonicAlleleFunctionField: refSeq.exonicAlleleFunction
+  outputExtensions:
+    json: .statistics.json
+    qc: .statistics.qc.tab
+    tab: .statistics.tab
+  refTrackField: ref
+  siteTypeField: refSeq.siteType
+  programPath: bystro-stats
+temp_dir: /mnt/annotator/tmp/
+snpProcessor: bystro-snp
+vcfProcessor: bystro-vcf
+tracks:
+  - local_files:
+      - danRer10.fa.gz
+    name: ref
+    remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/danRer10/bigZips/
+    remote_files:
+      - danRer10.fa.gz
+    type: reference
+  - features:
+      - name
+      - name2
+    name: refSeq
+    nearest:
+      - name
+      - name2
+    sql_statement: SELECT * FROM danRer10.refGene
+    type: gene

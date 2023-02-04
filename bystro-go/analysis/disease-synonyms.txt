@@ -1,0 +1,65 @@
+cmt => cmt,charcotmarietooth
+eds => eds,ehlersandlo,ehlersdanlo
+cancer => cancer,carcinoma,sarcoma,melanoma,lymphoma,leukemia,neuroblastoma,adenocarcinoma,glioblastoma,glioma,medulloblastoma,carcinosarcoma
+colorectal,colon
+syndrome,disease,disorder,sequence
+human,homo_sapiens
+aaa => aaa,abdominal aortic aneurysm
+aas => aas,aarskogscott,aarskog scott
+ad => ad,alzheimer
+add => add,attention deficit disorder
+adhd => adhd,attention deficit hyperactive disorder
+ags => ags,aicardigoutiere
+ahc => ahc,alternate hemiplegia of childhood
+aids => aids,acquire immune deficiency syndrome
+aip => aip,acute intermittent porphyria
+all => all,acute lymphoblastic lymphoma
+als => als,amyotrophic lateral sclerosis
+amd => amd,agerelate macular degeneration,age related macular degeneration
+apa => apa,aldosteroneproduce adenoma,aldosterone produce adenoma
+as => as,asperger syndrome,ankylose spondyliti
+asd => asd,autism spectrum disorder,atrial septal defect
+at => at,ataxia telangiectasia syndrome,ataxia telangiectasia disorder,ataxia telangiectasia disease
+avm => avm,arteriovenous malformation
+bmd => bmd,becker muscular dystrophy
+cf => cf,cyst fibrosi
+cjd => cjd,creutzfeldtjakob disease,creutzfeldt jakob disease,jakobcreutzfeldt disease,jakob creutzfeldt disease
+chd => chd,congenital heart disease,congenital hip dysplasia,congenital hip dislocation,coronary heart disease
+congenital hip dysplasia,congenital hip dislocation
+chf => chf,congest heart failure
+#TODO: protect this from being stemmed
+cof => cof,cofs,cerebrooculofacioskeletal,cerebro oculo facio skeletal
+cp => cp,cerebral palsy
+dmd => dmd,duchenne muscular dystrophy
+22q11,22q112,22q11d,22q112d,del22q11,del22q112,22q11del,22q112del,22q11ds,22q112ds,d821,q9381,cayler,digeorge,sedlackova,takao,velocardiofacial
+dm => dm,diabetes mellitu
+ds => ds,down syndrome
+ellisvan creveld => ellis van creveld
+evc => evc,ellisvan creveld,ellis van creveld
+fxs => fxs,fragile x syndrome
+rd => rd,renal dysplasia,kidney dysplasia,dysplastic kidney
+rp => rp,retiniti pigmentosa
+id => id,intellectual disability
+ibd => ibd,inflammatory bowel disease
+ibs => ibs,ichthyosi bullosa of siemen,irritable bowel syndrome
+ks => ks,kawasaki
+lns => lns,leschnyhan syndrome,lesch nyhan syndrome
+pd => pd,parkinson
+#diacritics currently stored oddly, so chop off e to match Muir-TorrÃ©
+mts => mts,muirtorr,muir torr
+hd => hd,huntington disease,huntington chorea
+hpp => hpp,hypophosphatasia
+hps => hps,hermanskypudlak,hermansky pudlak
+hsp => hsp,hereditary spastic paraplegia
+jra => jra,juvenile rheumatoid arthritis
+lds => lds,loeysdietz,loeys dietz
+pcc => pcc,pheochromocytoma
+zellweger,cerebrohepatorenal
+lgmd => lgmd,limbgirdle muscular dystrophy
+fa => fa,fanconi anemia
+js => js,joubert
+edmd => edmd,emerydreifuss muscular dystrophy
+pkd => pkd,polycystic kidney
+lca => lca,leber congenital amaurosi
+hnpcc => hnpcc,lynch,hereditary nonpolyposi colorectal cancer
+velo cardio facial => velocardiofacia
