@@ -99,12 +99,12 @@ type OpensearchConnectionConfig struct {
 }
 
 type OpensearchMappingConfig struct {
-	NumericalFields   []string                          `yaml:"numericalFields"`
-	Sort              map[string]string                 `yaml:"sort"`
-	BooleanFields     []string                          `yaml:"booleanFields"`
-	PostIndexSettings map[string]map[string]interface{} `yaml:"post_index_settings"`
-	IndexSettings     map[string]map[string]interface{} `yaml:"index_settings"`
-	Mappings          map[string]map[string]interface{} `yaml:"mappings"`
+	NumericalFields   []string                          `json:"numericalFields"`
+	Sort              map[string]string                 `json:"sort"`
+	BooleanFields     []string                          `json:"booleanFields"`
+	PostIndexSettings map[string]map[string]interface{} `yaml:"post_index_settings" json:"post_index_settings"`
+	IndexSettings     map[string]map[string]interface{} `yaml:"index_settings" json:"index_settings"`
+	Mappings          map[string]map[string]interface{} `json:"mappings"`
 }
 
 func setup(args []string) *CLIArgs {
@@ -139,12 +139,12 @@ func main() {
 		log.Fatalf("Unmarshal failed: %v", err)
 	}
 
-	res, err = ioutil.ReadFile(cliargs.osIndexConfigPath)
+	index_config, err := ioutil.ReadFile(cliargs.osIndexConfigPath)
 	if err != nil {
 		log.Fatalf("Coudln't read: %s due to: %s", cliargs.osConnectionConfigPath, err)
 	}
 
-	err = yaml.Unmarshal(res, &osearchMapConfig)
+	err = yaml.Unmarshal(index_config, &osearchMapConfig)
 	if err != nil {
 		log.Fatalf("Unmarshal failed: %v", err)
 	}
@@ -256,7 +256,8 @@ func main() {
 	}
 
 	var paths [][]string
-	for _, field := range strings.Split(headerRow, fieldSeparator) {
+	headerFields := strings.Split(headerRow, fieldSeparator)
+	for _, field := range headerFields {
 		paths = append(paths, strings.Split(field, "."))
 	}
 
@@ -402,4 +403,17 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	ret := map[string]interface{}{
+		"fieldNames":  headerFields,
+		"indexConfig": osearchMapConfig,
+	}
+
+	res, err = json.Marshal(ret)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	os.Stdout.Write(res)
 }

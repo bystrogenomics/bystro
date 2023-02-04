@@ -1,4 +1,3 @@
-#Our own, special field, tells an interface which fields to run prefix queries on
 numericalFields:
   - cadd
   - phastCons
@@ -21,12 +20,6 @@ sort:
   refSeq.codonPosition: avg
 booleanFields:
   - discordant
-# These only refer to searchable exact fields
-# These should be case sensitive, they are, by definition, exact
-# hasExactFields:
-#     - refSeq.name2
-#     - refSeq.spDisplayID
-#     - refSeq.nearest.name2
 post_index_settings:
   index:
     refresh_interval: 15s
@@ -188,8 +181,6 @@ mappings:
     chrom:
       type: keyword
       normalizer: lowercase_normalizer
-      # chr's are very short, and the "prefix" is a completely valid value
-      # so, don't include in all, because many false positivies with ngrams
     pos:
       type: integer
     trTv:
@@ -238,7 +229,6 @@ mappings:
         siteType:
           type: text
           analyzer: autocomplete_english
-          #dbSNP func fields are similar to out siteType and exonicAlleleFunction fields
           search_analyzer: search_english_func
           fields:
             exact:
@@ -280,7 +270,6 @@ mappings:
           type: integer
         strand:
           type: keyword
-        # kgID is in the form uc001uub.1 , seems to always be lowercase
         kgID:
           type: keyword
           normalizer: lowercase_normalizer
@@ -321,9 +310,6 @@ mappings:
           properties:
             alleleID:
               type: integer
-            #phenotypeList and clinicalSignificance are more like traditional unstructured text fields
-            #I want them to be very easy to search
-            #TODO: remove high-frequency words, stopwords without screwing up all other field search
             phenotypeList:
               type: text
               analyzer: autocomplete_english_split
@@ -392,10 +378,6 @@ mappings:
         alleles:
           type: keyword
           normalizer: uppercase_normalizer
-        # Sometimes given to us as floats
-        # Alternative is to use scaled_float wiht scaling_factor 10
-        # but very few cases will be affected by using integer
-        # and by very small amount
         alleleNs:
           type: integer
           coerce: true
@@ -405,9 +387,6 @@ mappings:
       properties:
         alleleID:
           type: integer
-        #phenotypeList and clinicalSignificance are more like traditional unstructured text fields
-        #I want them to be very easy to search
-        #TODO: remove high-frequency words, stopwords without screwing up all other field search
         phenotypeList:
           type: text
           analyzer: autocomplete_english_split
@@ -462,8 +441,6 @@ mappings:
               type: byte
             af:
               type: half_float
-            # gnomad genomes has a max of 30,992 alleles (15,496 samples), fits short
-
             ac:
               type: short
             ac_afr:
