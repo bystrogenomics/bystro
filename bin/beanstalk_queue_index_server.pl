@@ -199,6 +199,7 @@ sub handleJob {
   }
 
   my $output_json = decode_json($stdout);
+  p $stderr;
 
   return (undef, $output_json->{'fieldNames'}, $output_json->{'indexConfig'});
 }

@@ -213,7 +213,15 @@ func main() {
 			log.Fatalf("failed to create index %v", err)
 		}
 
-		log.Println(createIndexResponse)
+		if createIndexResponse.StatusCode != 200 {
+			deleteIndex := opensearchapi.IndicesDeleteRequest{
+				Index: []string{cliargs.indexName},
+			}
+			log.Printf("Deleted index %s: %v", cliargs.indexName, deleteIndex)
+			log.Fatalf("failed to create index %v", err)
+		}
+
+		log.Println(createIndexResponse, err)
 	}
 
 	indexer, err := opensearchutil.NewBulkIndexer(opensearchutil.BulkIndexerConfig{
@@ -327,26 +335,27 @@ func main() {
 						}
 					}
 
-					if len(values) > 1 {
-						positionValues = append(positionValues, values...)
-					} else {
-						positionValues = append(positionValues, values[0])
-					}
+					// if len(values) > 1 {
+					positionValues = append(positionValues, values)
+					// } else {
+					// 	positionValues = append(positionValues, values[0])
+					// }
 				}
+				alleleValues = append(alleleValues, positionValues)
+				// if len(positionValues) > 1 {
 
-				if len(positionValues) > 1 {
-					alleleValues = append(alleleValues, positionValues...)
-				} else {
-					alleleValues = append(alleleValues, positionValues[0])
-				}
+				// } else {
+				// 	alleleValues = append(alleleValues, positionValues[0])
+				// }
 
 			}
 
-			if len(alleleValues) > 1 {
-				rowDocument = populateHashPath2(rowDocument, paths[i], alleleValues)
-			} else {
-				rowDocument = populateHashPath2(rowDocument, paths[i], alleleValues[0])
-			}
+			rowDocument = populateHashPath2(rowDocument, paths[i], alleleValues)
+			// if len(alleleValues) > 1 {
+
+			// } else {
+			// 	rowDocument = populateHashPath2(rowDocument, paths[i], alleleValues[0])
+			// }
 		}
 
 		rowDocumentJson, err = json.Marshal(rowDocument)
