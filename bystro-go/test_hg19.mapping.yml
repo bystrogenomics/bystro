@@ -194,7 +194,7 @@ mappings:
           type: keyword
           normalizer: lowercase_normalizer
     discordant:
-      type: bool
+      type: boolean
     heterozygotes:
       type: keyword
     heterozygosity:
@@ -437,8 +437,6 @@ mappings:
             id:
               type: keyword
               normalizer: lowercase_normalizer
-            trTv:
-              type: byte
             af:
               type: half_float
             ac:
@@ -513,8 +511,6 @@ mappings:
             id:
               type: keyword
               normalizer: lowercase_normalizer
-            trTv:
-              type: byte
             ac:
                 type: integer
             af:

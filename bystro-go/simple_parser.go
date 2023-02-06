@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+
 	"math"
 	"net/http"
 	"os"
@@ -20,10 +21,11 @@ import (
 
 	"encoding/json"
 
-	"github.com/opensearch-project/opensearch-go"
-	"github.com/opensearch-project/opensearch-go/opensearchapi"
-	"github.com/opensearch-project/opensearch-go/opensearchutil"
+	opensearch "github.com/opensearch-project/opensearch-go/v2"
+	opensearchapi "github.com/opensearch-project/opensearch-go/v2/opensearchapi"
+	opensearchutil "github.com/opensearch-project/opensearch-go/v2/opensearchutil"
 	"gopkg.in/yaml.v3"
+	// "unicode"
 )
 
 func FindEndOfLine(r *bufio.Reader, s string) (byte, int, string, error) {
@@ -99,12 +101,12 @@ type OpensearchConnectionConfig struct {
 }
 
 type OpensearchMappingConfig struct {
-	NumericalFields   []string                          `json:"numericalFields"`
-	Sort              map[string]string                 `json:"sort"`
-	BooleanFields     []string                          `json:"booleanFields"`
+	NumericalFields   []string                          `yaml:"numericalFields" json:"numericalFields"`
+	Sort              map[string]string                 `yaml:"sort" json:"sort"`
+	BooleanFields     []string                          `yaml:"booleanFields" json:"booleanFields"`
 	PostIndexSettings map[string]map[string]interface{} `yaml:"post_index_settings" json:"post_index_settings"`
-	IndexSettings     map[string]map[string]interface{} `yaml:"index_settings" json:"index_settings"`
-	Mappings          map[string]map[string]interface{} `json:"mappings"`
+	Settings          map[string]map[string]interface{} `yaml:"index_settings" json:"index_settings"`
+	Mappings          map[string]map[string]interface{} `yaml:"mappings" json:"mappings"`
 }
 
 func setup(args []string) *CLIArgs {
@@ -179,13 +181,13 @@ func main() {
 			log.Fatal(err)
 		}
 
-		_, ok := osearchMapConfig.IndexSettings["index"]["number_of_shards"]
+		_, ok := osearchMapConfig.Settings["index"]["number_of_shards"]
 
 		if !ok {
-			osearchMapConfig.IndexSettings["index"]["number_of_shards"] = math.Ceil(float64(fileStats.Size()) / float64(1e10))
+			osearchMapConfig.Settings["index"]["number_of_shards"] = math.Ceil(float64(fileStats.Size()) / float64(1e10))
 		}
 
-		indexDefinition, err := json.Marshal(osearchMapConfig.IndexSettings)
+		indexSettings, err := json.Marshal(osearchMapConfig.Settings)
 		if err != nil {
 			log.Fatalf("JSON Marshalling failed: %v", err)
 		}
@@ -195,19 +197,23 @@ func main() {
 			log.Fatalf("JSON Marshalling failed: %v", err)
 		}
 
-		requestBody := fmt.Sprintf(`{"settings": %s, "mappings": %s}`, string(indexDefinition), string(indexMapping))
-		mapping := strings.NewReader(requestBody)
+		requestBody := fmt.Sprintf(`{
+			"settings": %s,
+			"mappings": %s
+		}`, string(indexSettings), string(indexMapping))
 
 		createIndex := opensearchapi.IndicesCreateRequest{
 			Index: cliargs.indexName,
-			Body:  mapping,
+			Body:  strings.NewReader(requestBody),
 		}
 
-		_, err = createIndex.Do(context.Background(), client)
+		createIndexResponse, err := createIndex.Do(context.Background(), client)
 
 		if err != nil {
 			log.Fatalf("failed to create index %v", err)
 		}
+
+		log.Println(createIndexResponse)
 	}
 
 	indexer, err := opensearchutil.NewBulkIndexer(opensearchutil.BulkIndexerConfig{
@@ -308,7 +314,7 @@ func main() {
 							continue
 						}
 
-						if _, ok := booleanMap[field]; ok {
+						if _, ok := booleanMap[headerFields[i]]; ok {
 							if value == "1" {
 								values = append(values, true)
 							} else if value == "0" {
