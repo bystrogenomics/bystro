@@ -19,6 +19,19 @@ fi
 . ./install/install-perlbrew-linux.sh $INSTALL_DIR perl-5.30.1;
 . ./install/install-perl-libs.sh;
 
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh;
+bash ~/miniconda.sh -b -p $HOME/miniconda;
+conda bash init;
+conda install -c conda-forge python -y;
+conda create --name bystro python=3.10.9 -y;
+echo "conda activate bystro;" >> ~/.bashrc;
+pip install ray==2.2.0;
+pip install numpyro==0.11.0;
+pip install torch --extra-index-url https://download.pytorch.org/whl/cpu;
+pip install jax;
+pip install pyarrow;
+pip install opensearch-py;
+
 . ~/.bash_profile;
 
 # # Bystro is increasingly a golang progrma. Perl currently handles db fetching,

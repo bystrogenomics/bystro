@@ -3,6 +3,4 @@ connection:
   request_timeout: 300
   gzip: true
   nodes:
-    - https://10.98.135.70:9200
-  username: admin
-  password: admin
+    - http://localhost:9200

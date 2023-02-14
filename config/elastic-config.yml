@@ -1,9 +1,0 @@
-connection:
-  # 2000MB max content size
-  max_content_length: 209715200
-  request_timeout: 300
-  gzip: true
-  nodes:
-    - https://10.98.135.70:9200
-  username: admin
-  password: admin

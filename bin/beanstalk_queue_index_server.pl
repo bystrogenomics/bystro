@@ -176,7 +176,7 @@ sub handleJob {
   my $inputFileName = ($submittedJob->{inputDir} . "/"  . $submittedJob->{inputFileNames}->{archived});
   my $indexName = $inputHref->{indexName};
 
-  my $cmd = "go run bystro-go/simple_parser.go -in \"$inputFileName\" -index \"$assemblyMap\" -connection \"$connectionConfigPath\" -name \"$indexName\" -http";
+  my $cmd = "go run index/go/simple_parser.go -in \"$inputFileName\" -index \"$assemblyMap\" -connection \"$connectionConfigPath\" -name \"$indexName\" -http";
 
   if(defined $verbose || defined $debug) {
     say "\nin handle job, jobData is";

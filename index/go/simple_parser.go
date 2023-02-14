@@ -229,6 +229,9 @@ func main() {
 		Index:      cliargs.indexName,
 		NumWorkers: runtime.NumCPU(),
 		FlushBytes: 5e+7,
+		OnError: func(ctx context.Context, err error) {
+			log.Printf("Indexing error: %v", err)
+		},
 	})
 
 	if err != nil {
