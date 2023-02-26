@@ -254,7 +254,7 @@ def go(
         num_slices = _clamp(math.ceil(n_docs / max_query_size), 2, max_slices)
 
         # TODO: concatenate chunks in a different ray worker
-        written_chunks = [f"{input_body['indexName']}_header"]
+        written_chunks = [os.path.join(output_dir, f"{input_body['indexName']}_header")]
 
         header_output = "\t".join(input_body['fieldNames']) + "\n"
         with mgzip.open(written_chunks[-1], "wt", thread=8, blocksize=2*10**8) as fw:
@@ -264,12 +264,12 @@ def go(
         if num_slices == 1:
             written_chunks.append(f"{input_body['indexName']}_{0}.gz")
             results_processed = ray.get(
-                [_process_query_chunk.remote({"body": query}, search_client_args, input_body["fieldNames"], written_chunks[-1])]
+                [_process_query_chunk.remote({"body": query}, search_client_args, input_body["fieldNames"], os.path.join(output_dir, written_chunks[-1]))]
             )
         else:
             save_requests = []
             for slice_id in range(num_slices):
-                written_chunks.append(f"{input_body['indexName']}_{slice_id}")
+                written_chunks.append(os.path.join(output_dir, f"{input_body['indexName']}_{slice_id}"))
                 query_submit = query.copy()
 
                 query_submit["slice"] = {"id": slice_id, "max": num_slices}
@@ -289,7 +289,8 @@ def go(
 
         total = sum(results_processed)
 
-        cmd = 'cat ' + " ".join(written_chunks) + f'> {annotation_path}'
+        all_chunks = " ".join(written_chunks)
+        cmd = 'cat ' + all_chunks + f'> {annotation_path}; rm {all_chunks}'
         ret = subprocess.call(cmd, shell=True)
         if ret != 0:
             raise Exception(f"Failed to write {annotation_path}")
