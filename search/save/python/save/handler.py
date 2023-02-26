@@ -296,7 +296,9 @@ def go(
         
         if input_body['archive']:
             tarball_path = f"{input_body['outputBasePath']}.tar"
-            cmd = 'tar -cf {tarball_path} -C {output_dir} .'
+            tarball_name = os.path.basename(f"{input_body['outputBasePath']}.tar")
+
+            cmd = f'cd {output_dir}; tar --exclude ".*" --exclude={tarball_name} -cf {tarball_name} * --remove-files'
             ret = subprocess.call(cmd, shell=True)
             if ret != 0:
                 raise Exception(f"Failed to write {tarball_path}")
