@@ -1,168 +1,103 @@
-
 import ray
-import time
 import math
-import multiprocessing
-from ray.util.multiprocessing import Pool
-import json
-import pyarrow
-import gzip
-from ray.cluster_utils import Cluster
-import time
-# from save import json_to_arrow
-import pickle
-import json
-from collections.abc import Iterable
-from pystalk import BeanstalkClient, BeanstalkError
-
-# Start Ray.
-ray.init()
+import cloudpickle as pickle
+import pprint
+import ray
+from opensearchpy import OpenSearch
 
 def _get_slices(shards: int, max_threads: int):
-    divisor = max(2, math.ceil(max_threads/shards))
+    divisor = max(2, math.ceil(max_threads / shards))
 
     return shards * divisor
 
-def _cleanQuery(input_query_body: dict):
-  # TODO: Support sort
-  input_query_body['sort'] = ['_doc']
 
-  if 'aggs' in input_query_body:
-    del input_query_body['aggs']
+def _clean_query(input_query_body: dict, default_size: int = 1_000):
+    # TODO: Support sort
+    input_query_body["sort"] = ["_doc"]
 
-  return input_query_body
+    if "aggs" in input_query_body:
+        del input_query_body["aggs"]
+
+    if "slice" in input_query_body:
+        del input_query_body["slice"]
+
+    if not "size" in input_query_body:
+        input_query_body["size"] = default_size
+
+    print("input_query_body", input_query_body)
+    return input_query_body
 
 
 @ray.remote
-def save_slice(slice_id: int, search_url: str, search_port: str, index_name: str, max: int):
-    import requests
-    elastic_url = f'{search_url}:{search_port}/{index_name}/_search?scroll=10m'
-    scroll_api_url = f'{search_url}:{search_port}/_search/scroll'
-    headers = {'Content-Type': 'application/json'}
+def _process_query_chunk(query_args: dict, search_client_args: dict):
+    client = OpenSearch(**search_client_args)
 
-    payload = {
-        "size": 1_000,
-        "sort": ["_doc"],
-        "slice":{
-            "id":slice_id,
-            "max":max,
-        },
-        "query": {
-            "match_all" : {}
+    resp = client.search(**query_args)
+    print(resp['hits']['total'])
+    # TODO: handle 1) the munging of the data, 2) distributed pipeline/transform , 3) write as arrow table (arrow ipc format), csv
+    # variant_records = resp['hits']['hits']
+
+    return resp['hits']['total']['value']
+
+
+def go(input_body: dict, search_conf: dict, max_slices: int = 2, keep_alive="1d"):
+    pp = pprint.PrettyPrinter(indent=4)
+    print("\n\ngot input")
+    pp.pprint(input_body)
+    print("\n\ngot search_conf")
+    pp.pprint(search_conf)
+
+    # TODO: get from number of records, shards
+    num_slices = max_slices
+
+    search_client_args = dict(
+        hosts = list(search_conf["connection"]["nodes"]),
+        http_compress=True,  # enables gzip compression for request bodies
+        http_auth = search_conf["auth"].get('auth'),
+        client_cert = search_conf["auth"].get('client_cert_path'),
+        client_key = search_conf["auth"].get('client_key_path'),
+        ca_certs = search_conf["auth"].get('ca_certs_path'),
+        verify_certs = True,
+        ssl_assert_hostname = True,
+        ssl_show_warn = True
+    )
+
+    client = OpenSearch(**search_client_args)
+    response = client.create_point_in_time(index=input_body['indexName'], params= dict(keep_alive=keep_alive))
+
+    pit_id = response["pit_id"]
+
+    try:
+        query = _clean_query(input_body["queryBody"])
+        query['pit'] = {
+            "id": pit_id
         }
-    }
 
-    def on_error(scroll_id):
-        return f"http://10.98.135.70:9200/_search/scroll/{scroll_id}"
-
-    def initial_search_fn(payload):
-        i = 0
-
-        r1 = requests.request(
-            "POST",
-            elastic_url,
-            data=json.dumps(payload),
-            headers=headers,
-            timeout = 120,
-        )
-
-        try:
-            res_json = r1.json()
-            data = res_json['hits']['hits']
-            with open(f'{slice_id}.p', 'wb') as f:
-                pickle.dump(data, f)
-            _scroll_id = res_json['_scroll_id']
-
-            payload2 = {
-                "scroll_id" : _scroll_id,
-                "scroll": "10m",
+        save_requests = []
+        for slice_id in range(num_slices):
+            query_submit = query.copy()
+            query_submit['slice'] = {
+                "id": slice_id,
+                "max": num_slices
             }
-        except KeyError:
-            data = []
-            _scroll_id = None
-            payload2 = {}
 
-        def scroll_fn(scroll_payload):
-            nonlocal i
-
-            r2 = requests.request("GET",
-                scroll_api_url,
-                data=json.dumps(scroll_payload),
-                headers=headers,
-                timeout = 120,
+            query_args = dict(
+                body=query_submit,
+                # To use sliced scrolling instead, uncomment this and remove 'pit' from query
+                # index=input_body["indexName"],
+                # params={
+                #     "scroll": "10m",
+                # }
             )
 
-            res_json = r2.json()
-            # read error as well
-            if res_json.get('error'):
-                on_error(scroll_payload['scroll_id'])
-                return []
+            save_requests.append(_process_query_chunk.remote(query_args, search_client_args))
+        results_processed = ray.get(save_requests)
 
-            i += 1
-            return res_json
-
-        return data, _scroll_id, scroll_fn, payload2
-
-    entries, scoll_id, scroll_fn, scroll_payload = initial_search_fn(payload)
-
-    if len(entries) == 0:
-        return 0
-
-    total = 0
-    last_seen = 0
-    while len(entries) > 0:
-        total += len(entries)
-        entries = scroll_fn(scroll_payload)
-
-        if last_seen >= 100_000:
-            print(f"Have now seen: {total}")
-            last_seen = 0
-        last_seen += len(entries)
-
-    r1 = requests.request(
-            "DELETE",
-            delete_api_baseurl,
-            data=json.dumps({"scroll_id": scroll_id}),
-            headers=headers
-        )
-
-    print("r1.json()", r1.json())
-
-    return total
-
-# total = sum(ray.get([read_stuff.remote(x, 8) for x in range(8)]))
-# end = time.time()
-# print('total', total)
-# print("took", (end-start))
-
-# import json
-
-def deserialize_arguments(inputQueryBody, indexName, assembly, fieldNames, indexConfig, connection):
-    """
-    This function takes the required arguments and deserializes them to the specified types.
-
-    Parameters:
-    inputQueryBody (json): JSON string representing the input query body.
-    indexName (string): A string representing the index name.
-    assembly (string): A string representing the assembly.
-    fieldNames (json array): JSON string representing an array of field names.
-    indexConfig (json): JSON string representing the index configuration.
-    connection (json): JSON string representing the connection configuration.
-
-    Returns:
-    A tuple of deserialized arguments in the order they were passed.
-    """
-    inputQueryBody = json.loads(inputQueryBody)
-    fieldNames = json.loads(fieldNames)
-    indexConfig = json.loads(indexConfig)
-    connection = json.loads(connection)
-
-    return inputQueryBody, indexName, assembly, fieldNames, indexConfig, connection
-
-def go():
-    # total = sum(ray.get([read_stuff.remote(x, 8) for x in range(8)]))
-    # end = time.time()
-    # print('total', total)
-    # print("took", (end-start))
-
-    pass
+        total = sum(results_processed)
+        print("total", total)
+    except Exception as err:
+        response = client.delete_point_in_time(body={
+            "pit_id": pit_id
+        })
+        print(response)
+        raise Exception(err) from err
