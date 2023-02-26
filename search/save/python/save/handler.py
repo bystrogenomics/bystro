@@ -9,25 +9,36 @@ import pyarrow
 import gzip
 from ray.cluster_utils import Cluster
 import time
-from save import json_to_arrow
-import pickle 
+# from save import json_to_arrow
+import pickle
+import json
+from collections.abc import Iterable
+from pystalk import BeanstalkClient, BeanstalkError
+
 # Start Ray.
 ray.init()
 
-start = time.time()
 def _get_slices(shards: int, max_threads: int):
     divisor = max(2, math.ceil(max_threads/shards))
 
     return shards * divisor
 
+def _cleanQuery(input_query_body: dict):
+  # TODO: Support sort
+  input_query_body['sort'] = ['_doc']
+
+  if 'aggs' in input_query_body:
+    del input_query_body['aggs']
+
+  return input_query_body
+
+
 @ray.remote
-def read_stuff(slice_id: int, max: int):
+def save_slice(slice_id: int, search_url: str, search_port: str, index_name: str, max: int):
     import requests
-    elastic_url = 'http://10.98.135.70:9200/63e38c81dd15b9001e2dbf6f_63ddc9ce1e740e0020c39928/_search?scroll=10m'
-    scroll_api_url = 'http://10.98.135.70:9200/_search/scroll'
-    delete_api_baseurl = 'http://10.98.135.70:9200/_search/scroll'
+    elastic_url = f'{search_url}:{search_port}/{index_name}/_search?scroll=10m'
+    scroll_api_url = f'{search_url}:{search_port}/_search/scroll'
     headers = {'Content-Type': 'application/json'}
-    print("starting ", slice_id, max)
 
     payload = {
         "size": 1_000,
@@ -45,26 +56,23 @@ def read_stuff(slice_id: int, max: int):
         return f"http://10.98.135.70:9200/_search/scroll/{scroll_id}"
 
     def initial_search_fn(payload):
-
         i = 0
 
         r1 = requests.request(
             "POST",
             elastic_url,
             data=json.dumps(payload),
-            headers=headers
+            headers=headers,
+            timeout = 120,
         )
 
         try:
-            print(json_to_arrow(str(r1)))
             res_json = r1.json()
-            # print('type', type(res_json))
             data = res_json['hits']['hits']
             with open(f'{slice_id}.p', 'wb') as f:
                 pickle.dump(data, f)
-            print('tpye of data', type(data))
             _scroll_id = res_json['_scroll_id']
-            
+
             payload2 = {
                 "scroll_id" : _scroll_id,
                 "scroll": "10m",
@@ -76,26 +84,25 @@ def read_stuff(slice_id: int, max: int):
 
         def scroll_fn(scroll_payload):
             nonlocal i
-            print("I'm in ")
+
             r2 = requests.request("GET",
                 scroll_api_url,
                 data=json.dumps(scroll_payload),
-                headers=headers
+                headers=headers,
+                timeout = 120,
             )
-            print(json_to_arrow(r2))
 
             res_json = r2.json()
             # read error as well
             if res_json.get('error'):
-                print('res_json', res_json['error'])
                 on_error(scroll_payload['scroll_id'])
                 return []
 
             i += 1
             return res_json
-        
+
         return data, _scroll_id, scroll_fn, payload2
-    
+
     entries, scoll_id, scroll_fn, scroll_payload = initial_search_fn(payload)
 
     if len(entries) == 0:
@@ -123,7 +130,39 @@ def read_stuff(slice_id: int, max: int):
 
     return total
 
-total = sum(ray.get([read_stuff.remote(x, 8) for x in range(8)]))
-end = time.time()
-print('total', total)
-print("took", (end-start))
+# total = sum(ray.get([read_stuff.remote(x, 8) for x in range(8)]))
+# end = time.time()
+# print('total', total)
+# print("took", (end-start))
+
+# import json
+
+def deserialize_arguments(inputQueryBody, indexName, assembly, fieldNames, indexConfig, connection):
+    """
+    This function takes the required arguments and deserializes them to the specified types.
+
+    Parameters:
+    inputQueryBody (json): JSON string representing the input query body.
+    indexName (string): A string representing the index name.
+    assembly (string): A string representing the assembly.
+    fieldNames (json array): JSON string representing an array of field names.
+    indexConfig (json): JSON string representing the index configuration.
+    connection (json): JSON string representing the connection configuration.
+
+    Returns:
+    A tuple of deserialized arguments in the order they were passed.
+    """
+    inputQueryBody = json.loads(inputQueryBody)
+    fieldNames = json.loads(fieldNames)
+    indexConfig = json.loads(indexConfig)
+    connection = json.loads(connection)
+
+    return inputQueryBody, indexName, assembly, fieldNames, indexConfig, connection
+
+def go():
+    # total = sum(ray.get([read_stuff.remote(x, 8) for x in range(8)]))
+    # end = time.time()
+    # print('total', total)
+    # print("took", (end-start))
+
+    pass

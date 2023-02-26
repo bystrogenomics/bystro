@@ -39,17 +39,12 @@ extends 'Seq::Base';
 # Needed because there are variations of Seq.pm, ilke SeqFromQuery.pm
 with 'Seq::Definition';
 
-# An archive, containing an "annotation" file
-has inputQueryBody => (is => 'ro', isa => 'HashRef', required => 1);
-
 # Post-processing to run, before commiting the annotation
 has pipeline => (is => 'ro', isa => 'ArrayRef[HashRef]');
 
-# Probably the user id
-has indexName => (is => 'ro', required => 1);
+has inputQueryBody => (is => 'ro', isa => 'HashRef', required => 1);
 
-# The index type; probably the job id
-has indexType => (is => 'ro', required => 1);
+has indexName => (is => 'ro', required => 1);
 
 has assembly => (is => 'ro', isa => 'Str', required => 1);
 
