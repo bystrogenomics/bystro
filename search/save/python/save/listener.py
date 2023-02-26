@@ -117,7 +117,7 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
         (h, ports[i], BeanstalkClient(h, ports[i], socket_timeout=10))
         for i, h in enumerate(hosts)
     )
-    
+
     pp = pprint.PrettyPrinter(indent=4)
 
     i = 0
@@ -151,7 +151,7 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
         try:
             with open(input['config'], 'r', encoding='utf-8') as f:
                 job_config = YAML(typ="safe").load(f)
-                                                   
+
             msg = {
                 "event": events_conf["started"],
                 "jobConfig": job_config,
@@ -163,7 +163,7 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
 
             client.put_job_into(tube_conf["events"], dumps(msg))
             go(input, search_conf)
-            
+
             del msg['jobConfig']
             msg['results'] = {"outputFileNames": {"fake": "fake"}}
             msg['event'] = events_conf["completed"]
@@ -179,7 +179,7 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
                 "queueID": job.job_id,
                 "submissionID": job_data["submissionID"]
             }
-            
+
             client.put_job_into(tube_conf["events"], dumps(msg))
             traceback.print_exc()
         finally:

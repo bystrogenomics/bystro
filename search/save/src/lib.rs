@@ -256,6 +256,83 @@ fn make_log_progress2(
     }
 }
 
+fn get_header(field_names: &[String]) -> (Vec<String>, Vec<Vec<String>>) {
+    let mut parent_names: Vec<String> = Vec::with_capacity(field_names.len());
+    let mut children_or_only: Vec<Vec<String>> = Vec::with_capacity(field_names.len());
+
+    for field_name in field_names {
+        if field_name.contains('.') {
+            let path: Vec<&str> = field_name.split('.').collect();
+            parent_names.push(path[0].to_string());
+
+            if path.len() == 2 {
+                children_or_only.push(vec![path[1].to_string()]);
+            } else {
+                children_or_only.push(path[1..].iter().map(|&s| s.to_string()).collect());
+            }
+        } else {
+            parent_names.push(field_name.clone());
+            children_or_only.push(vec![field_name.clone()]);
+        }
+    }
+
+    (parent_names, children_or_only)
+}
+
+fn populate_array_path_from_hash(path: &[String], data_for_end_of_path: &HashMap<String, Value>) -> Value {
+    if path.is_empty() {
+        return serde_json::to_value(data_for_end_of_path).unwrap();
+    }
+
+    let mut current_value = data_for_end_of_path;
+    for path_element in path {
+        current_value = current_value.get(path_element).unwrap().as_object().unwrap();
+    }
+
+    serde_json::to_value(current_value).unwrap()
+}
+
+fn make_output_string(array_ref: &[Vec<Option<Vec<Vec<Option<String>>>>>], delims: &HashMap<String, String>) -> String {
+    let empty_field_char = delims.get("miss").unwrap();
+    let mut output_rows = Vec::with_capacity(array_ref.len());
+
+    for row in array_ref {
+        let mut output_columns = Vec::with_capacity(row.len());
+
+        for column in row {
+            if let Some(column_data) = column {
+                let mut position_strings = Vec::with_capacity(column_data[0].len());
+
+                for position_data in &column_data[0] {
+                    if let Some(data) = position_data {
+                        let data_string = if data.is_empty() {
+                            empty_field_char.clone()
+                        } else if data.len() == 1 {
+                            data[0].clone().unwrap_or_else(|| empty_field_char.clone())
+                        } else {
+                            data.iter().map(|opt| opt.clone().unwrap_or_else(|| empty_field_char.clone())).collect::<Vec<_>>().join(&delims["overlap"])
+                        };
+
+                        position_strings.push(data_string);
+                    } else {
+                        position_strings.push(empty_field_char.clone());
+                    }
+                }
+
+                let column_string = position_strings.join(&delims["pos"]);
+                output_columns.push(column_string);
+            } else {
+                output_columns.push(empty_field_char.clone());
+            }
+        }
+
+        let row_string = output_columns.join(&delims["fieldSep"]);
+        output_rows.push(row_string);
+    }
+
+    output_rows.join("\n")
+}
+
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::process::{Command, Stdio};

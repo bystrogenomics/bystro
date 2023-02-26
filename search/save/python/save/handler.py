@@ -6,6 +6,10 @@ import ray
 from opensearchpy import OpenSearch
 import numpy as np
 import traceback
+import mgzip
+import subprocess
+import os
+import pathlib
 
 default_delimiters = {
     'pos': "|",
@@ -74,12 +78,10 @@ def _populate_data(field_path, data_for_end_of_path):
 
 
 def _make_output_string(rows, delims):
-    print("in")
     empty_field_char = delims['miss']
     for row_idx, row in enumerate(rows):
         # Some fields may just be missing; we won't store even the alt/pos [[]] structure for those
         for i, column in enumerate(row):
-            print(i, row[i])
             if column is None:
                 row[i] = empty_field_char
                 continue
@@ -91,7 +93,6 @@ def _make_output_string(rows, delims):
                 continue
 
             for j, position_data in enumerate(column):
-                print("column[j]", column[j])
                 if position_data is None:
                     column[j] = empty_field_char
                     continue
@@ -104,19 +105,17 @@ def _make_output_string(rows, delims):
                             continue
 
                         if isinstance(sub, list):
-                            print("is list", sub)
-                            inner_values.append(delims['overlap'].join(map(str, sub)))
+                            inner_values.append(delims['value'].join(map(lambda x: str(x) if x is not None else empty_field_char, sub)))
                         else:
                             inner_values.append(str(sub))
 
-                    column[j] = delims['value'].join(inner_values)
-                print("column[j] after", column[j])
+                    column[j] = delims['pos'].join(inner_values)
 
-            row[i] = delims['pos'].join(column)
-        
+            row[i] = delims['overlap'].join(column)
+
         rows[row_idx] = delims['fieldSep'].join(row)
-        
-    return "\n".join(rows)
+
+    return "\n".join(rows) + "\n"
     # if delims is None:
     #     delims = default_delimiters
     # empty_field_char = delims["miss"]
@@ -150,9 +149,8 @@ def _make_output_string(rows, delims):
 
 
 @ray.remote
-def _process_query_chunk(query_args: dict, search_client_args: dict, field_names: list):
+def _process_query_chunk(query_args: dict, search_client_args: dict, field_names: list, chunk_output_name: str):
     client = OpenSearch(**search_client_args)
-    pp = pprint.PrettyPrinter(indent=4)
     resp = client.search(**query_args)
 
     if resp["hits"]["total"]["value"] == 0:
@@ -161,14 +159,18 @@ def _process_query_chunk(query_args: dict, search_client_args: dict, field_names
     # TODO: handle 1) the munging of the data, 2) distributed pipeline/transform , 3) write as arrow table (arrow ipc format), csv
 
     rows = []
-    skipped = 0
+    # skipped = 0
 
     parent_fields, child_fields = _get_header(field_names)
 
     discordant_idx = field_names.index("discordant")
     assert discordant_idx > -1
 
+    # Each sliced scroll chunk should get all records for that chunk
+    assert len(resp["hits"]["hits"]) == resp["hits"]["total"]["value"]
+
     for doc in resp["hits"]["hits"]:
+        # TODO: implement distributed filters
         # if filterFunctions:
         #     for f in filterFunctions:
         #         if f(doc['_source']):
@@ -179,18 +181,16 @@ def _process_query_chunk(query_args: dict, search_client_args: dict, field_names
         for y in range(len(field_names)):
             row[y] = _populate_data(child_fields[y], doc["_source"][parent_fields[y]])
 
-        if row[discordant_idx]== "false":
-            row[discordant_idx] = 0
-        elif row[discordant_idx] == "true":
-            row[discordant_idx] = 1
+        if row[discordant_idx][0][0] == False:
+            row[discordant_idx][0][0] = 0
+        elif row[discordant_idx][0][0] == True:
+            row[discordant_idx][0][0] = 1
 
         rows.append(row)
 
-    # pp.pprint(resp["hits"]["hits"])
-
     try:
-        res = _make_output_string(rows, default_delimiters)
-        print("res", res)
+        with mgzip.open(chunk_output_name, "wt", thread=8, blocksize=2*10**8) as fw:
+            fw.write(_make_output_string(rows, default_delimiters))
     except Exception:
         traceback.print_exc()
 
@@ -207,9 +207,7 @@ def go(
 ):
     pp = pprint.PrettyPrinter(indent=4)
     print("\n\ngot input")
-    pp.pprint(input_body['indexName'])
-    # print("\n\ngot search_conf")
-    # pp.pprint(search_conf)
+    pp.pprint(input_body)
 
     search_client_args = dict(
         hosts=list(search_conf["connection"]["nodes"]),
@@ -230,6 +228,14 @@ def go(
 
     pit_id = response["pit_id"]
 
+    annotation_path = f"{input_body['outputBasePath']}.annotation.tsv"
+    output_dir = os.path.dirname(annotation_path)
+
+    pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    if input_body['compress']:
+        annotation_path += '.gz'
+
     try:
         query = _clean_query(input_body["queryBody"])
         query["pit"] = {"id": pit_id}
@@ -240,25 +246,33 @@ def go(
             del query_no_sort["sort"]
         del query_no_sort["pit"]
         response = client.count(body=query_no_sort, index=input_body["indexName"])
-        print("response for count", response)
 
         n_docs = response["count"]
         assert n_docs > 0
 
         # minimum 2 required for this to be a slice query
-        num_slices = _clamp(math.ceil(n_docs / max_query_size), 1, max_slices)
+        num_slices = _clamp(math.ceil(n_docs / max_query_size), 2, max_slices)
 
+        # TODO: concatenate chunks in a different ray worker
+        written_chunks = [f"{input_body['indexName']}_header"]
+
+        header_output = "\t".join(input_body['fieldNames']) + "\n"
+        with mgzip.open(written_chunks[-1], "wt", thread=8, blocksize=2*10**8) as fw:
+            fw.write(header_output)
+
+        query["size"] = max_query_size
         if num_slices == 1:
+            written_chunks.append(f"{input_body['indexName']}_{0}.gz")
             results_processed = ray.get(
-                [_process_query_chunk.remote({"body": query}, search_client_args, input_body["fieldNames"])]
+                [_process_query_chunk.remote({"body": query}, search_client_args, input_body["fieldNames"], written_chunks[-1])]
             )
         else:
             save_requests = []
             for slice_id in range(num_slices):
+                written_chunks.append(f"{input_body['indexName']}_{slice_id}")
                 query_submit = query.copy()
 
                 query_submit["slice"] = {"id": slice_id, "max": num_slices}
-
                 query_args = dict(
                     body=query_submit,
                     # To use sliced scrolling instead, uncomment this and remove 'pit' from query
@@ -269,11 +283,16 @@ def go(
                 )
 
                 save_requests.append(
-                    _process_query_chunk.remote(query_args, search_client_args, input_body["fieldNames"])
+                    _process_query_chunk.remote(query_args, search_client_args, input_body["fieldNames"], written_chunks[-1])
                 )
             results_processed = ray.get(save_requests)
 
         total = sum(results_processed)
+
+        cmd = 'cat ' + " ".join(written_chunks) + f'> {annotation_path}'
+        ret = subprocess.call(cmd, shell=True)
+        if ret != 0:
+            raise Exception(f"Failed to write outputs for {input_body['indexName']}")
         print("total", total)
     except Exception as err:
         response = client.delete_point_in_time(body={"pit_id": pit_id})
