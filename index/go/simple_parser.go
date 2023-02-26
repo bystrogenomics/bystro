@@ -347,20 +347,10 @@ func main() {
 				}
 
 				alleleValues = append(alleleValues, positionValues)
-				// if len(positionValues) > 1 {
-				// 	alleleValues = append(alleleValues, positionValues)
-				// } else {
-				// 	alleleValues = append(alleleValues, positionValues[0])
-				// }
 
 			}
 
 			rowDocument = populateHashPath2(rowDocument, paths[i], alleleValues)
-			// if len(alleleValues) > 1 {
-			// 	rowDocument = populateHashPath2(rowDocument, paths[i], alleleValues)
-			// } else {
-			// 	rowDocument = populateHashPath2(rowDocument, paths[i], alleleValues[0])
-			// }
 		}
 
 		rowDocumentJson, err = json.Marshal(rowDocument)
