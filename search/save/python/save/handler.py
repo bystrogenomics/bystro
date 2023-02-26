@@ -292,7 +292,14 @@ def go(
         cmd = 'cat ' + " ".join(written_chunks) + f'> {annotation_path}'
         ret = subprocess.call(cmd, shell=True)
         if ret != 0:
-            raise Exception(f"Failed to write outputs for {input_body['indexName']}")
+            raise Exception(f"Failed to write {annotation_path}")
+        
+        if input_body['archive']:
+            tarball_path = f"{input_body['outputBasePath']}.tar"
+            cmd = 'tar -cf {tarball_path} -C {output_dir} .'
+            ret = subprocess.call(cmd, shell=True)
+            if ret != 0:
+                raise Exception(f"Failed to write {tarball_path}")
         print("total", total)
     except Exception as err:
         response = client.delete_point_in_time(body={"pit_id": pit_id})
