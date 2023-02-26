@@ -48,9 +48,6 @@ has pipeline => (is => 'ro', isa => 'ArrayRef[HashRef]');
 # Probably the user id
 has indexName => (is => 'ro', required => 1);
 
-# The index type; probably the job id
-has indexType => (is => 'ro', required => 1);
-
 has assembly => (is => 'ro', isa => 'Str', required => 1);
 
 has configPath => (is => 'ro', isa => 'Str', default => 'config/');
@@ -215,7 +212,6 @@ sub annotate {
       size        => $batchSize,
       body        => $self->inputQueryBody,
       index       => $self->indexName,
-      type        => $self->indexType,
     );
 
     while(my @docs = $scroll->next($batchSize)) {
