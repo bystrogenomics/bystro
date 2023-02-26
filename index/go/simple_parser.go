@@ -319,7 +319,8 @@ func main() {
 					}
 
 					var values []interface{}
-					for _, value := range strings.Split(posValue, valueDelimiter) {
+					values_raw := strings.Split(posValue, valueDelimiter)
+					for _, value := range values_raw {
 						if value == emptyFieldChar {
 							values = append(values, nil)
 							continue
@@ -338,27 +339,26 @@ func main() {
 						}
 					}
 
-					// if len(values) > 1 {
-					positionValues = append(positionValues, values)
-					// } else {
-					// 	positionValues = append(positionValues, values[0])
-					// }
+					if len(values_raw) > 1 {
+						positionValues = append(positionValues, values)
+					} else {
+						positionValues = append(positionValues, values[0])
+					}
 				}
-				alleleValues = append(alleleValues, positionValues)
-				// if len(positionValues) > 1 {
 
-				// } else {
-				// 	alleleValues = append(alleleValues, positionValues[0])
-				// }
+				if len(positionValues) > 1 {
+					alleleValues = append(alleleValues, positionValues)
+				} else {
+					alleleValues = append(alleleValues, positionValues[0])
+				}
 
 			}
 
-			rowDocument = populateHashPath2(rowDocument, paths[i], alleleValues)
-			// if len(alleleValues) > 1 {
-
-			// } else {
-			// 	rowDocument = populateHashPath2(rowDocument, paths[i], alleleValues[0])
-			// }
+			if len(alleleValues) > 1 {
+				rowDocument = populateHashPath2(rowDocument, paths[i], alleleValues)
+			} else {
+				rowDocument = populateHashPath2(rowDocument, paths[i], alleleValues[0])
+			}
 		}
 
 		rowDocumentJson, err = json.Marshal(rowDocument)

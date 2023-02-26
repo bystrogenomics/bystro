@@ -5,6 +5,7 @@ import pprint
 import ray
 from opensearchpy import OpenSearch
 import numpy as np
+import traceback
 
 default_delimiters = {
     'pos': "|",
@@ -73,35 +74,66 @@ def _populate_data(field_path, data_for_end_of_path):
 
 
 def _make_output_string(rows, delims):
-    if delims is None:
-        delims = default_delimiters
-    empty_field_char = delims["miss"]
-    ouput_rows = []
-
-    for row in rows:
-        output_columns = []
-        for column in row:
+    print("in")
+    empty_field_char = delims['miss']
+    for row_idx, row in enumerate(rows):
+        # Some fields may just be missing; we won't store even the alt/pos [[]] structure for those
+        for i, column in enumerate(row):
+            print(i, row[i])
             if column is None:
-                column = empty_field_char
-            else:
-                print("column", column)
-                for positionData in column[0]:
-                    if positionData is None:
-                        positionData = empty_field_char
-                    elif isinstance(positionData, list):
-                        positionData = delims["value"].join(
-                            [
-                                delims["overlap"].join(sublist)
-                                if isinstance(sublist, list)
-                                else sublist or empty_field_char
-                                for sublist in positionData
-                            ]
-                        )
-                # column = delims["pos"].join(column[0])
-            output_columns.append(column)
-        ouput_rows.append(delims["fieldSep"].join(output_columns))
+                row[i] = empty_field_char
+                continue
 
-    return "\n".join(ouput_rows)
+            # For now, we don't store multiallelics; top level array is placeholder only
+            # With breadth 1
+            if not isinstance(column, list):
+                continue
+            for j, position_data in enumerate(column):
+                if position_data is None:
+                    column[j] = empty_field_char
+                    continue
+
+                if isinstance(position_data, list):
+                    column[j] = delims['value'].join([
+                        delims['overlap'].join(sub) if isinstance(sub, list) else str(sub) if sub is not None else empty_field_char
+                        for sub in position_data
+                    ])
+
+            column[j] = delims['pos'].join([str(pos) if pos is not None else empty_field_char for pos in column[j]])
+        
+        rows[row_idx] = delims['fieldSep'].join([str(field) if field is not None else empty_field_char for field in row])
+        
+    return "\n".join([row for row in rows])
+    # if delims is None:
+    #     delims = default_delimiters
+    # empty_field_char = delims["miss"]
+    # ouput_rows = []
+
+    # for row in rows:
+    #     output_columns = []
+    #     for column in row:
+    #         if column is None:
+    #             column = empty_field_char
+    #         else:
+    #             if not isinstance(column, list):
+    #                 column = [column]
+    #             for position_data in column[0]:
+    #                 if position_data is None:
+    #                     position_data = empty_field_char
+    #                 elif isinstance(position_data, list):
+    #                     position_data = delims["value"].join(
+    #                         [
+    #                             delims["overlap"].join(sublist)
+    #                             if isinstance(sublist, list)
+    #                             else sublist or empty_field_char
+    #                             for sublist in position_data
+    #                         ]
+    #                     )
+    #             # column = delims["pos"].join(column[0])
+    #         output_columns.append(column)
+    #     ouput_rows.append(delims["fieldSep"].join(output_columns))
+
+    # return "\n".join(ouput_rows)
 
 
 @ray.remote
@@ -134,17 +166,21 @@ def _process_query_chunk(query_args: dict, search_client_args: dict, field_names
         for y in range(len(field_names)):
             row[y] = _populate_data(child_fields[y], doc["_source"][parent_fields[y]])
 
-        if row[discordant_idx][0][0] == "false":
-            row[discordant_idx][0][0] = 0
-        elif row[discordant_idx][0][0] == "true":
-            row[discordant_idx][0][0] = 1
+        if row[discordant_idx]== "false":
+            row[discordant_idx] = 0
+        elif row[discordant_idx] == "true":
+            row[discordant_idx] = 1
 
         rows.append(row)
 
-    # pp.pprint(rows)
+    # pp.pprint(resp["hits"]["hits"])
 
-    res = _make_output_string(rows, default_delimiters)
-    print("res", res)
+    try:
+        res = _make_output_string(rows, default_delimiters)
+        print("res", res)
+    except Exception as err:
+        traceback.print_exc()
+        pass
 
     return resp["hits"]["total"]["value"]
 
@@ -159,9 +195,9 @@ def go(
 ):
     pp = pprint.PrettyPrinter(indent=4)
     print("\n\ngot input")
-    pp.pprint(input_body)
-    print("\n\ngot search_conf")
-    pp.pprint(search_conf)
+    pp.pprint(input_body['indexName'])
+    # print("\n\ngot search_conf")
+    # pp.pprint(search_conf)
 
     search_client_args = dict(
         hosts=list(search_conf["connection"]["nodes"]),

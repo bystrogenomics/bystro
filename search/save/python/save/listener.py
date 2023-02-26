@@ -127,11 +127,9 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
         client = clients[offset][2]
 
         client.watch(tube_conf["submission"])
-
+        print('tube_conf["submission"]', tube_conf["submission"])
         try:
             job = client.reserve_job(5)
-            # print(f"stats are\n{client.stats_job(job.job_id)}")
-
             job_data: dict = loads(job.job_data)
 
             # create the annotator
@@ -144,9 +142,6 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
                 event_queue=tube_conf["events"],
                 config_path_base_dir=config_path_base_dir,
             )
-
-            # print("\n\nShowing input\n")
-            # pp.pprint(input)
         except BeanstalkError as err:
             if err.message == "TIMED_OUT":
                 continue
