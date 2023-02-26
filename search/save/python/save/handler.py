@@ -10,7 +10,7 @@ import traceback
 default_delimiters = {
     'pos': "|",
     'value': ";",
-    'overlap': "\\\\",
+    'overlap': "\\",
     'miss': "!",
     'fieldSep': "\t",
 }
@@ -87,23 +87,36 @@ def _make_output_string(rows, delims):
             # For now, we don't store multiallelics; top level array is placeholder only
             # With breadth 1
             if not isinstance(column, list):
+                row[i] = str(column)
                 continue
+
             for j, position_data in enumerate(column):
+                print("column[j]", column[j])
                 if position_data is None:
                     column[j] = empty_field_char
                     continue
 
                 if isinstance(position_data, list):
-                    column[j] = delims['value'].join([
-                        delims['overlap'].join(sub) if isinstance(sub, list) else str(sub) if sub is not None else empty_field_char
-                        for sub in position_data
-                    ])
+                    inner_values = []
+                    for sub in position_data:
+                        if sub is None:
+                            inner_values.append(empty_field_char)
+                            continue
 
-            column[j] = delims['pos'].join([str(pos) if pos is not None else empty_field_char for pos in column[j]])
+                        if isinstance(sub, list):
+                            print("is list", sub)
+                            inner_values.append(delims['overlap'].join(map(str, sub)))
+                        else:
+                            inner_values.append(str(sub))
+
+                    column[j] = delims['value'].join(inner_values)
+                print("column[j] after", column[j])
+
+            row[i] = delims['pos'].join(column)
         
-        rows[row_idx] = delims['fieldSep'].join([str(field) if field is not None else empty_field_char for field in row])
+        rows[row_idx] = delims['fieldSep'].join(row)
         
-    return "\n".join([row for row in rows])
+    return "\n".join(rows)
     # if delims is None:
     #     delims = default_delimiters
     # empty_field_char = delims["miss"]
@@ -178,9 +191,8 @@ def _process_query_chunk(query_args: dict, search_client_args: dict, field_names
     try:
         res = _make_output_string(rows, default_delimiters)
         print("res", res)
-    except Exception as err:
+    except Exception:
         traceback.print_exc()
-        pass
 
     return resp["hits"]["total"]["value"]
 

@@ -17,10 +17,12 @@ from handler import go
 from typing import ByteString
 from os import path
 import pprint
-from orjson import loads
+from orjson import loads, dumps
 from ruamel.yaml import YAML
 import argparse
 import glob
+from opensearchpy.exceptions import NotFoundError
+import traceback
 
 required_keys = ("outputBasePath", "assembly", "queryBody", "fieldNames", "indexName")
 optional_keys = ("indexConfig", "pipeline")
@@ -147,12 +149,41 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
                 continue
             raise err
         try:
+            with open(input['config'], 'r', encoding='utf-8') as f:
+                job_config = YAML(typ="safe").load(f)
+                                                   
+            msg = {
+                "event": events_conf["started"],
+                "jobConfig": job_config,
+                "queueID": job.job_id,
+                "submissionID": job_data["submissionID"]
+            }
+
+            print("msg", msg)
+
+            client.put_job_into(tube_conf["events"], dumps(msg))
             go(input, search_conf)
+            
+            del msg['jobConfig']
+            msg['results'] = {"outputFileNames": {"fake": "fake"}}
+            msg['event'] = events_conf["completed"]
+
+            client.put_job_into(tube_conf["events"], dumps(msg))
         except BeanstalkError as err:
             print(f"Received error during execution: {err}")
             client.release_job(job.job_id)
-
-        # client.delete_job(job.job_id)
+        except NotFoundError as err:
+            msg = {
+                "event": events_conf["failed"],
+                "reason": "404",
+                "queueID": job.job_id,
+                "submissionID": job_data["submissionID"]
+            }
+            
+            client.put_job_into(tube_conf["events"], dumps(msg))
+            traceback.print_exc()
+        finally:
+            client.delete_job(job.job_id)
 
 
 def main():
