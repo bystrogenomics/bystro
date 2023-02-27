@@ -8,7 +8,6 @@ import pyarrow
 import gzip
 from ray.cluster_utils import Cluster
 import time
-from save import json_to_arrow
 import pickle
 import json
 from collections.abc import Iterable
@@ -23,7 +22,7 @@ import argparse
 import glob
 from opensearchpy.exceptions import NotFoundError
 import traceback
-
+import time
 required_keys = ("outputBasePath", "assembly", "queryBody", "fieldNames", "indexName")
 optional_keys = ("indexConfig", "pipeline")
 
@@ -162,13 +161,14 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
             print("msg", msg)
 
             client.put_job_into(tube_conf["events"], dumps(msg))
-            go(input, search_conf)
-
+            output_names = go(input, search_conf)
+            print("output_names", output_names)
             del msg['jobConfig']
-            msg['results'] = {"outputFileNames": {"fake": "fake"}}
+            msg['results'] = {"outputFileNames": output_names}
             msg['event'] = events_conf["completed"]
 
             client.put_job_into(tube_conf["events"], dumps(msg))
+            client.delete_job(job.job_id)
         except BeanstalkError as err:
             print(f"Received error during execution: {err}")
             client.release_job(job.job_id)
@@ -180,10 +180,14 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
                 "submissionID": job_data["submissionID"]
             }
 
-            client.put_job_into(tube_conf["events"], dumps(msg))
             traceback.print_exc()
-        finally:
+            client.put_job_into(tube_conf["events"], dumps(msg))
             client.delete_job(job.job_id)
+        except Exception as err:
+            traceback.print_exc()
+            client.release_job(job.job_id)
+        finally:
+            time.sleep(0.5)
 
 
 def main():

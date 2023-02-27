@@ -11,6 +11,7 @@ import subprocess
 import os
 import pathlib
 
+ray.init(ignore_reinit_error='true', address='auto')
 default_delimiters = {
     'pos': "|",
     'value': ";",
@@ -18,6 +19,28 @@ default_delimiters = {
     'miss': "!",
     'fieldSep': "\t",
 }
+
+def make_output_names(output_base_path: str, statistics:bool, compress: bool, archive: bool) -> dict:
+    out = {}
+    
+    basename = os.path.basename(output_base_path)
+    out['log'] = f"{basename}.log"
+    out['annotation'] = f"{basename}.annotation.tsv"
+    if compress:
+        out['annotation'] += '.gz'
+    out['sampleList'] = f"{basename}.sample_list"
+
+    if statistics:
+        out['statistics'] = {
+            'json': f"{basename}.statistics.json",
+            'tab': f"{basename}.statistics.tab",
+            'qc': f"{basename}.statistics.qc.tab"
+        }
+
+    if archive:
+        out['archived'] = f"{basename}.tar"
+
+    return out
 
 def _clamp(n, min_num, max_num):
     if n < min_num:
@@ -116,36 +139,6 @@ def _make_output_string(rows, delims):
         rows[row_idx] = delims['fieldSep'].join(row)
 
     return "\n".join(rows) + "\n"
-    # if delims is None:
-    #     delims = default_delimiters
-    # empty_field_char = delims["miss"]
-    # ouput_rows = []
-
-    # for row in rows:
-    #     output_columns = []
-    #     for column in row:
-    #         if column is None:
-    #             column = empty_field_char
-    #         else:
-    #             if not isinstance(column, list):
-    #                 column = [column]
-    #             for position_data in column[0]:
-    #                 if position_data is None:
-    #                     position_data = empty_field_char
-    #                 elif isinstance(position_data, list):
-    #                     position_data = delims["value"].join(
-    #                         [
-    #                             delims["overlap"].join(sublist)
-    #                             if isinstance(sublist, list)
-    #                             else sublist or empty_field_char
-    #                             for sublist in position_data
-    #                         ]
-    #                     )
-    #             # column = delims["pos"].join(column[0])
-    #         output_columns.append(column)
-    #     ouput_rows.append(delims["fieldSep"].join(output_columns))
-
-    # return "\n".join(ouput_rows)
 
 
 @ray.remote
@@ -153,9 +146,10 @@ def _process_query_chunk(query_args: dict, search_client_args: dict, field_names
     client = OpenSearch(**search_client_args)
     resp = client.search(**query_args)
 
+    # print("IN process query chunk for", query_args)
     if resp["hits"]["total"]["value"] == 0:
         return 0
-    print(resp["hits"]["total"])
+    # print(resp["hits"]["total"])
     # TODO: handle 1) the munging of the data, 2) distributed pipeline/transform , 3) write as arrow table (arrow ipc format), csv
 
     rows = []
@@ -193,6 +187,7 @@ def _process_query_chunk(query_args: dict, search_client_args: dict, field_names
             fw.write(_make_output_string(rows, default_delimiters))
     except Exception:
         traceback.print_exc()
+        return -1
 
     return resp["hits"]["total"]["value"]
 
@@ -208,6 +203,9 @@ def go(
     pp = pprint.PrettyPrinter(indent=4)
     print("\n\ngot input")
     pp.pprint(input_body)
+
+    if not input_body['compress']:
+        print("\nWarning: still compressing outputs\n")
 
     search_client_args = dict(
         hosts=list(search_conf["connection"]["nodes"]),
@@ -228,13 +226,10 @@ def go(
 
     pit_id = response["pit_id"]
 
-    annotation_path = f"{input_body['outputBasePath']}.annotation.tsv"
-    output_dir = os.path.dirname(annotation_path)
+    output_names = make_output_names(input_body['outputBasePath'], input_body['run_statistics'], True, input_body['archive'])
 
+    output_dir = os.path.dirname(input_body['outputBasePath'])
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
-
-    if input_body['compress']:
-        annotation_path += '.gz'
 
     try:
         query = _clean_query(input_body["queryBody"])
@@ -251,7 +246,7 @@ def go(
         assert n_docs > 0
 
         # minimum 2 required for this to be a slice query
-        num_slices = _clamp(math.ceil(n_docs / max_query_size), 2, max_slices)
+        num_slices = _clamp(math.ceil(n_docs / max_query_size), 1, max_slices)
 
         # TODO: concatenate chunks in a different ray worker
         written_chunks = [os.path.join(output_dir, f"{input_body['indexName']}_header")]
@@ -262,9 +257,9 @@ def go(
 
         query["size"] = max_query_size
         if num_slices == 1:
-            written_chunks.append(f"{input_body['indexName']}_{0}.gz")
+            written_chunks.append(os.path.join(output_dir, f"{input_body['indexName']}_{0}.gz"))
             results_processed = ray.get(
-                [_process_query_chunk.remote({"body": query}, search_client_args, input_body["fieldNames"], os.path.join(output_dir, written_chunks[-1]))]
+                [_process_query_chunk.remote({"body": query}, search_client_args, input_body["fieldNames"], written_chunks[-1])]
             )
         else:
             save_requests = []
@@ -281,30 +276,33 @@ def go(
                     #     "scroll": "10m",
                     # }
                 )
-
                 save_requests.append(
                     _process_query_chunk.remote(query_args, search_client_args, input_body["fieldNames"], written_chunks[-1])
                 )
             results_processed = ray.get(save_requests)
 
+        if -1 in results_processed:
+            raise Exception("Failed to process chunk")
         total = sum(results_processed)
-
         all_chunks = " ".join(written_chunks)
+
+        annotation_path = os.path.join(output_dir, output_names['annotation'])
         cmd = 'cat ' + all_chunks + f'> {annotation_path}; rm {all_chunks}'
         ret = subprocess.call(cmd, shell=True)
         if ret != 0:
             raise Exception(f"Failed to write {annotation_path}")
         
         if input_body['archive']:
-            tarball_path = f"{input_body['outputBasePath']}.tar"
-            tarball_name = os.path.basename(f"{input_body['outputBasePath']}.tar")
+            tarball_path = os.path.join(output_dir, output_names['archived'])
+            tarball_name = output_names['archived']
 
             cmd = f'cd {output_dir}; tar --exclude ".*" --exclude={tarball_name} -cf {tarball_name} * --remove-files'
+
             ret = subprocess.call(cmd, shell=True)
             if ret != 0:
                 raise Exception(f"Failed to write {tarball_path}")
-        print("total", total)
     except Exception as err:
         response = client.delete_point_in_time(body={"pit_id": pit_id})
-        print("delete response", response)
         raise Exception(err) from err
+
+    return output_names
