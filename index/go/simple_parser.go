@@ -327,12 +327,12 @@ func main() {
 						}
 
 						if _, ok := booleanMap[headerFields[i]]; ok {
-							if value == "1" {
+							if value == "1" || value == "True" {
 								values = append(values, true)
-							} else if value == "0" {
+							} else if value == "0" || value == "False" {
 								values = append(values, false)
 							} else {
-								log.Fatalf("Encountered boolean value that wasn't encoded as 0/1 in field %s, row %d, value %s", field, i, value)
+								log.Fatalf("Encountered boolean value that wasn't encoded as 0/1 or True/False in field %s, row %d, value %s", field, i, value)
 							}
 						} else {
 							values = append(values, value)

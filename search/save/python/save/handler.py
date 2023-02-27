@@ -4,6 +4,8 @@ import cloudpickle as pickle
 import pprint
 import ray
 from opensearchpy import OpenSearch
+from pystalk import BeanstalkClient, BeanstalkError
+from orjson import dumps
 import numpy as np
 import traceback
 import mgzip
@@ -12,6 +14,27 @@ import os
 import pathlib
 
 ray.init(ignore_reinit_error='true', address='auto')
+
+# TODO: track skipped
+@ray.remote(num_cpus=0)
+class ProgressReporter:
+    def __init__(self, publisher: dict):
+        self.value = 0
+        self.publisher = publisher.copy()
+        self.client = BeanstalkClient(publisher['host'], publisher['port'], socket_timeout=10)
+
+    def increment(self, count: int):
+        self.value += count
+        self.publisher['messageBase']['data'] = {
+            "progress": self.value,
+            "skipped": 0
+        }
+        self.client.put_job_into(self.publisher['queue'], dumps(self.publisher['messageBase']))
+        return self.value
+
+    def get_counter(self):
+        return self.value
+
 default_delimiters = {
     'pos': "|",
     'value': ";",
@@ -22,7 +45,7 @@ default_delimiters = {
 
 def make_output_names(output_base_path: str, statistics:bool, compress: bool, archive: bool) -> dict:
     out = {}
-    
+
     basename = os.path.basename(output_base_path)
     out['log'] = f"{basename}.log"
     out['annotation'] = f"{basename}.annotation.tsv"
@@ -142,9 +165,10 @@ def _make_output_string(rows, delims):
 
 
 @ray.remote
-def _process_query_chunk(query_args: dict, search_client_args: dict, field_names: list, chunk_output_name: str):
+def _process_query_chunk(query_args: dict, search_client_args: dict, field_names: list, chunk_output_name: str, reporter):
     client = OpenSearch(**search_client_args)
     resp = client.search(**query_args)
+
 
     # print("IN process query chunk for", query_args)
     if resp["hits"]["total"]["value"] == 0:
@@ -185,6 +209,7 @@ def _process_query_chunk(query_args: dict, search_client_args: dict, field_names
     try:
         with mgzip.open(chunk_output_name, "wt", thread=8, blocksize=2*10**8) as fw:
             fw.write(_make_output_string(rows, default_delimiters))
+        reporter.increment.remote(resp["hits"]["total"]["value"])
     except Exception:
         traceback.print_exc()
         return -1
@@ -249,22 +274,23 @@ def go(
         num_slices = _clamp(math.ceil(n_docs / max_query_size), 1, max_slices)
 
         # TODO: concatenate chunks in a different ray worker
-        written_chunks = [os.path.join('/tmp', f"{input_body['indexName']}_header")]
+        written_chunks = [os.path.join(output_dir, f"{input_body['indexName']}_header")]
 
         header_output = "\t".join(input_body['fieldNames']) + "\n"
         with mgzip.open(written_chunks[-1], "wt", thread=8, blocksize=2*10**8) as fw:
             fw.write(header_output)
 
         query["size"] = max_query_size
+        reporter = ProgressReporter.remote(input_body['publisher'])
         if num_slices == 1:
             written_chunks.append(os.path.join(output_dir, f"{input_body['indexName']}_{0}.gz"))
             results_processed = ray.get(
-                [_process_query_chunk.remote({"body": query}, search_client_args, input_body["fieldNames"], written_chunks[-1])]
+                [_process_query_chunk.remote({"body": query}, search_client_args, input_body["fieldNames"], written_chunks[-1], reporter)]
             )
         else:
             save_requests = []
             for slice_id in range(num_slices):
-                written_chunks.append(os.path.join('/tmp', f"{input_body['indexName']}_{slice_id}"))
+                written_chunks.append(os.path.join(output_dir, f"{input_body['indexName']}_{slice_id}"))
                 query_submit = query.copy()
 
                 query_submit["slice"] = {"id": slice_id, "max": num_slices}
@@ -277,7 +303,7 @@ def go(
                     # }
                 )
                 save_requests.append(
-                    _process_query_chunk.remote(query_args, search_client_args, input_body["fieldNames"], written_chunks[-1])
+                    _process_query_chunk.remote(query_args, search_client_args, input_body["fieldNames"], written_chunks[-1], reporter)
                 )
             results_processed = ray.get(save_requests)
 
@@ -291,7 +317,7 @@ def go(
         ret = subprocess.call(cmd, shell=True)
         if ret != 0:
             raise Exception(f"Failed to write {annotation_path}")
-        
+
         if input_body['archive']:
             tarball_path = os.path.join(output_dir, output_names['archived'])
             tarball_name = output_names['archived']

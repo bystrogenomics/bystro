@@ -134,7 +134,7 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
             job_data: dict = loads(job.job_data)
 
             # create the annotator
-            input: dict = _coerce_inputs(
+            input_data: dict = _coerce_inputs(
                 job_data,
                 job.job_id,
                 publisher_host=host,
@@ -148,7 +148,7 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
                 continue
             raise err
         try:
-            with open(input['config'], 'r', encoding='utf-8') as f:
+            with open(input_data['config'], 'r', encoding='utf-8') as f:
                 job_config = YAML(typ="safe").load(f)
 
             msg = {
@@ -158,11 +158,9 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
                 "submissionID": job_data["submissionID"]
             }
 
-            print("msg", msg)
-
             client.put_job_into(tube_conf["events"], dumps(msg))
-            output_names = go(input, search_conf)
-            print("output_names", output_names)
+            output_names = go(input_data, search_conf)
+
             del msg['jobConfig']
             msg['results'] = {"outputFileNames": output_names}
             msg['event'] = events_conf["completed"]
