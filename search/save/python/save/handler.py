@@ -1,7 +1,6 @@
 import ray
 import math
 import cloudpickle as pickle
-import pprint
 import ray
 from opensearchpy import OpenSearch
 from pystalk import BeanstalkClient, BeanstalkError
@@ -16,6 +15,7 @@ import pathlib
 ray.init(ignore_reinit_error='true', address='auto')
 
 # TODO: track skipped
+# TODO: handle 1) the munging of the data, 2) distributed pipeline/transform , 3) write as arrow table (arrow ipc format), csv
 @ray.remote(num_cpus=0)
 class ProgressReporter:
     def __init__(self, publisher: dict):
@@ -163,18 +163,14 @@ def _make_output_string(rows, delims):
 
     return "\n".join(rows) + "\n"
 
-
 @ray.remote
 def _process_query_chunk(query_args: dict, search_client_args: dict, field_names: list, chunk_output_name: str, reporter):
     client = OpenSearch(**search_client_args)
     resp = client.search(**query_args)
 
-
-    # print("IN process query chunk for", query_args)
     if resp["hits"]["total"]["value"] == 0:
         return 0
-    # print(resp["hits"]["total"])
-    # TODO: handle 1) the munging of the data, 2) distributed pipeline/transform , 3) write as arrow table (arrow ipc format), csv
+
 
     rows = []
     # skipped = 0
@@ -225,10 +221,6 @@ def go(
     max_slices=1024,
     keep_alive="1d",
 ):
-    pp = pprint.PrettyPrinter(indent=4)
-    print("\n\ngot input")
-    pp.pprint(input_body)
-
     if not input_body['compress']:
         print("\nWarning: still compressing outputs\n")
 
