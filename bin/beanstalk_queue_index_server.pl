@@ -10,7 +10,7 @@
 #Todo: (Probably in Node.js): add failed jobs, and those stuck in processingJobs list for too long, back into job queue, for N attempts (stored in jobs:jobID)
 use 5.10.0;
 use Cpanel::JSON::XS;
-use Capture::Tiny ':all';
+
 use strict;
 use warnings;
 
@@ -50,12 +50,10 @@ my $beanstalkPort  = $conf->{beanstalk_port_1};
 
 # Required fields
 # The annotation_file_path is constructed from inputDir, inputFileNames by SeqElastic
-my @requiredJobFields = qw/indexName indexType inputDir inputFileNames assembly/;
+my @requiredJobFields = qw/indexName inputDir inputFileNames assembly/;
 
 my $configPathBaseDir = "config/";
 my $configFilePathHref = {};
-
-
 
 my $beanstalk = Beanstalk::Client->new({
   server    => $conf->{beanstalkd}{host} . ':' . $conf->{beanstalkd}{port},
@@ -95,8 +93,10 @@ while(my $job = $beanstalk->reserve) {
     }  } );
 
     ($err, $fieldNames, $searchConfigHashRef) = handleJob($jobDataHref, $job->id);
-  } catch {
-    $err = $_;
+
+  } catch {      
+    # Don't store the stack
+    $err = $_; #substr($_, 0, index($_, 'at'));
   };
 
   if ($err) {
@@ -135,7 +135,7 @@ while(my $job = $beanstalk->reserve) {
 
   $beanstalk->delete($job->id);
 
-  say "fake completed job with queue id " . $job->id;
+  say "completed job with queue id " . $job->id;
 }
 
 sub handleJob {
@@ -172,36 +172,16 @@ sub handleJob {
     }
   };
 
-  my $assemblyMap = ($configPathBaseDir . $submittedJob->{assembly} . '.mapping.yml');
-  my $inputFileName = ($submittedJob->{inputDir} . "/"  . $submittedJob->{inputFileNames}->{archived});
-  my $indexName = $inputHref->{indexName};
-
-  my $cmd = "go run index/go/simple_parser.go -in \"$inputFileName\" -index \"$assemblyMap\" -connection \"$connectionConfigPath\" -name \"$indexName\" -http";
-
   if(defined $verbose || defined $debug) {
-    say "\nin handle job, jobData is";
+    say "in handle job, jobData is";
     p $submittedJob;
-    say "writing beanstalk index queue log file here: $logPath\n";
-    say "\ncmd is `$cmd`";
+    say "writing beanstalk index queue log file here: $logPath";
   }
 
-  my $stdout;
-  my $stderr;
-  my $exit;
+  # create the annotator
+  my $indexer = SeqElastic->new($inputHref);
 
-  ($stdout, $stderr, $exit) = capture {
-    system($cmd);
-  };
-
-  if($exit != 0) {
-    say "EXIT WAS $exit";
-    return ($stderr, undef, undef);
-  }
-
-  my $output_json = decode_json($stdout);
-  p $stderr;
-
-  return (undef, $output_json->{'fieldNames'}, $output_json->{'indexConfig'});
+  return $indexer->go;
 }
 
 #Here we may wish to read a json or yaml file containing argument mappings
