@@ -1,6 +1,6 @@
 beanstalkd:
-  host: 10.98.134.148
-  port: 11300
+  host: ~
+  port: ~
   tubes:
     annotation:
       submission: annotation
