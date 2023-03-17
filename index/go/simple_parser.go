@@ -129,6 +129,12 @@ func setup(args []string) *CLIArgs {
 func main() {
 	cliargs := setup(nil)
 
+	// c, err := beanstalk.Dial("tcp", "10.98.134.148:11300")
+	// id, err := c.Put([]byte("hello"), 1, 0, 120*time.Second)
+
+	// c := NewConn(mock("", ""))
+	// tube := NewTube(c, "foo")
+
 	var osearchConnConfig OpensearchConnectionConfig
 	var osearchMapConfig OpensearchMappingConfig
 	res, err := ioutil.ReadFile(cliargs.osConnectionConfigPath)
@@ -371,8 +377,10 @@ func main() {
 				) {
 					if err != nil {
 						log.Printf("ERROR: %s", err)
+						fmt.Printf("ERROR: %s", err)
 					} else {
 						log.Printf("ERROR: %s: %s", res.Error.Type, res.Error.Reason)
+						fmt.Printf("ERROR: %s: %s", res.Error.Type, res.Error.Reason)
 					}
 				},
 			},

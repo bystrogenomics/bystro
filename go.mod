@@ -7,4 +7,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-require github.com/opensearch-project/opensearch-go/v2 v2.2.0 // indirect
+require (
+	github.com/beanstalkd/go-beanstalk v0.2.0 // indirect
+	github.com/opensearch-project/opensearch-go/v2 v2.2.0 // indirect
+)

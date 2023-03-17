@@ -1,0 +1,11 @@
+maturin==0.14.13
+ray==2.3.0
+-f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+jax[cuda]==0.4.4
+pyarrow==11.0.0
+pystalk==0.7.0
+orjson==3.8.6
+ruamel.yaml==0.17.21
+cloudpickle==2.2.1
+opensearch-py==2.1.1
+mgzip==0.2.1
