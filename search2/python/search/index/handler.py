@@ -26,7 +26,7 @@ n_threads = multiprocessing.cpu_count()
 
 @ray.remote
 class Indexer:
-    def __init__(self, search_client_args, progress_tracker, chunk_size=1_000, reporter_batch=20_000):
+    def __init__(self, search_client_args, progress_tracker, chunk_size=1_000, reporter_batch=15_000):
         self.search_client_args = search_client_args
         self.client = AsyncOpenSearch(**self.search_client_args)
         self.progress_tracker = progress_tracker
@@ -38,7 +38,7 @@ class Indexer:
         resp = await async_helpers.async_bulk(self.client, iter(data), chunk_size=self.chunk_size)
         self.counter += resp[0]
 
-        if self.counter % self.reporter_batch == 0:
+        if self.counter >= self.reporter_batch:
             await asyncio.to_thread(self.progress_tracker.increment.remote, self.counter)
             self.counter = 0
 
@@ -149,7 +149,7 @@ async def go(
                                    chunk_size=paralleleism_chunk_size)
 
     start = time.time()
-    actors = [Indexer.remote(search_client_args, chunk_size, reporter)
+    actors = [Indexer.remote(search_client_args, progress_tracker=reporter, chunk_size=chunk_size)
               for x in range(n_threads)]
     actor_idx = 0
     results = []
