@@ -49,7 +49,7 @@ class Indexer:
 class ProgressReporter:
     def __init__(self, publisher: dict):
         self.value = 0
-        self.publisher = publisher.copy()
+        self.publisher = publisher
         self.client = BeanstalkClient(
             publisher['host'], publisher['port'], socket_timeout=10)
 
