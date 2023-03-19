@@ -23,9 +23,23 @@ import glob
 from opensearchpy.exceptions import NotFoundError
 import traceback
 import time
-required_keys = ("indexName", "inputDir", "inputFileNames", "assembly")
+import os
 
 # TODO: Allow passing directory for logs
+def _get_config_file_path(config_path_base_dir: str, assembly, suffix: str):
+    paths = glob.glob(path.join(config_path_base_dir,
+                      assembly + suffix))
+
+    if not paths:
+        raise Exception(
+            f"\n\nNo config path found for the assembly {assembly}. Exiting\n\n"
+        )
+
+    if len(paths) > 1:
+        print("\n\nMore than 1 config path found, choosing first")
+
+    return paths[0]
+
 def _coerce_inputs(
     job_details,
     job_id,
@@ -34,28 +48,39 @@ def _coerce_inputs(
     progress_event,
     event_queue,
     config_path_base_dir,
+    search_config
 ):
-    job_specific_args = {}
+    mapping_config_path = _get_config_file_path(config_path_base_dir, job_details["assembly"], '.mapping.y*ml')
+    assert len(mapping_config_path) == 1
+    mapping_config_path = mapping_config_path[0]
 
-    for key in required_keys:
-        if key not in job_details:
-            raise Exception(f"Missing required key: {key} in job message")
+    annotation_config_path = _get_config_file_path(config_path_base_dir, job_details["assembly"], '.y*ml')[0]
+    assert len(annotation_config_path) == 1
+    annotation_config_path = annotation_config_path[0]
 
-        job_specific_args[key] = job_details[key]
+    with open(mapping_config_path, 'r', encoding='utf-8') as f:
+        mapping_config = YAML(typ="safe").load(f)
+    
+    with open(annotation_config_path, 'r', encoding='utf-8') as f:
+        annotation_config = YAML(typ="safe").load(f)
 
-    config_file_path = _get_config_file_path(
-        config_path_base_dir, job_specific_args["assembly"]
-    )
+    log_path = f"{job_details['indexName']}.index.log"
 
-    if not config_file_path:
-        raise Exception(
-            f"Assembly {job_specific_args['assembly']} doesn't have corresponding mapping config file"
-        )
+    tar_path = None
+    annotation_path = None
 
-    log_path = f"{job_specific_args['indexName']}.index.log"
+    if job_details.get('archived'):
+        tar_path = os.path.join(job_details['inputDir'], job_details['archived'])
+    else:
+        annotation_path = os.path.join(job_details['inputDir'], job_details['annotation'])
 
-    common_args = {
-        "config": config_file_path,
+    return {
+        "index_name": job_details["indexName"],
+        "tar_path": tar_path,
+        "annotation_path": annotation_path,
+        "annotation_conf": annotation_config,
+        "mapping_conf": mapping_config,
+        "search_conf": search_config,
         "log_path": log_path,
         "publisher": {
             "host": publisher_host,
@@ -68,28 +93,7 @@ def _coerce_inputs(
                 "data": None,
             },
         },
-        "compress": True,
-        "archive": True,
-        "run_statistics": True,
     }
-
-    combined_args = {**common_args, **job_specific_args}
-
-    return combined_args
-
-
-def _get_config_file_path(config_path_base_dir: str, assembly):
-    paths = glob.glob(path.join(config_path_base_dir, assembly + ".mapping.y*ml"))
-
-    if not paths:
-        raise Exception(
-            f"\n\nNo config path found for the assembly {assembly}. Exiting\n\n"
-        )
-
-    if len(paths) > 1:
-        print("\n\nMore than 1 config path found, choosing first")
-
-    return paths[0]
 
 
 def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
@@ -129,8 +133,7 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
             job = client.reserve_job(5)
             job_data: dict = loads(job.job_data)
 
-            # create the annotator
-            input_data: dict = _coerce_inputs(
+            hanlder_args: dict = _coerce_inputs(
                 job_data,
                 job.job_id,
                 publisher_host=host,
@@ -138,15 +141,13 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
                 progress_event=events_conf["progress"],
                 event_queue=tube_conf["events"],
                 config_path_base_dir=config_path_base_dir,
+                search_conf=search_conf
             )
         except BeanstalkError as err:
             if err.message == "TIMED_OUT":
                 continue
             raise err
         try:
-            with open(input_data['config'], 'r', encoding='utf-8') as f:
-                job_config = YAML(typ="safe").load(f)
-
             msg = {
                 "event": events_conf["started"],
                 "queueID": job.job_id,
@@ -154,7 +155,7 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
             }
 
             client.put_job_into(tube_conf["events"], dumps(msg))
-            field_names, search_config = go(input_data, search_conf)
+            field_names, search_config = go(**hanlder_args)
 
             msg['event'] = events_conf["completed"]
             msg['indexConfig'] = search_config
@@ -182,7 +183,6 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
         finally:
             time.sleep(0.5)
 
-
 def main():
     parser = argparse.ArgumentParser(description="Process some config files.")
     parser.add_argument(
@@ -206,8 +206,8 @@ def main():
 
     with open(args.search_conf, "r", encoding="utf-8") as search_config_file:
         search_conf = YAML(typ="safe").load(search_config_file)
-    listen(queue_conf, search_conf, config_path_base_dir)
 
+    listen(queue_conf, search_conf, config_path_base_dir)
 
 if __name__ == "__main__":
     main()
