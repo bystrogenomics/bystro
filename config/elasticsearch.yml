@@ -1,6 +1,0 @@
-connection:
-  max_content_length: 209715200
-  request_timeout: 300
-  gzip: 1
-  nodes:
-    - http://10.98.135.70:9200
