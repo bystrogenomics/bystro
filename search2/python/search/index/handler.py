@@ -5,7 +5,6 @@ import multiprocessing
 import os
 import time
 
-from opensearchpy import OpenSearch, helpers
 from opensearchpy._async.client import AsyncOpenSearch
 from opensearchpy._async import helpers as async_helpers
 from orjson import dumps
@@ -15,11 +14,6 @@ from ruamel.yaml import YAML
 from search.index.bystro_file import read_annotation_tarball
 
 import ray
-
-import uvloop
-
-uvloop.install()
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 
 ray.init(ignore_reinit_error='true', address='auto')
@@ -32,15 +26,16 @@ n_threads = multiprocessing.cpu_count()
 
 @ray.remote
 class Indexer:
-    def __init__(self, search_client_args, progress_tracker, reporter_batch=20_000):
+    def __init__(self, search_client_args, progress_tracker, chunk_size=1_000, reporter_batch=20_000):
         self.search_client_args = search_client_args
         self.client = AsyncOpenSearch(**self.search_client_args)
         self.progress_tracker = progress_tracker
         self.reporter_batch = reporter_batch
+        self.chunk_size = chunk_size
         self.counter = 0
 
     async def run(self, data):
-        resp = await async_helpers.async_bulk(self.client, iter(data))
+        resp = await async_helpers.async_bulk(self.client, iter(data), chunk_size=self.chunk_size)
         self.counter += resp[0]
 
         if self.counter % self.reporter_batch == 0:
@@ -48,6 +43,9 @@ class Indexer:
             self.counter = 0
 
         return resp
+
+    async def close(self):
+        await self.client.close()
 
 
 @ray.remote(num_cpus=0)
@@ -93,7 +91,8 @@ async def go(
         annotation_conf: dict,
         mapping_conf: dict,
         search_conf: dict,
-        chunk_size=1000,
+        chunk_size=500,
+        paralleleism_chunk_size=5_000,
         publisher: dict = None,
         annotation_path: str = None
 ):
@@ -117,7 +116,7 @@ async def go(
     else:
         reporter = ProgressReporterStub.remote()
 
-    client = OpenSearch(**search_client_args)
+    client = AsyncOpenSearch(**search_client_args)
 
     post_index_settings = mapping_conf['post_index_settings']
     boolean_map = {x: True for x in mapping_conf['booleanFields']}
@@ -141,16 +140,16 @@ async def go(
             float(file_size) / float(1e10))
 
     try:
-        client.indices.create(index_name, body=index_body)
+        await client.indices.create(index_name, body=index_body)
     except Exception as e:
         print(e)
 
     data = read_annotation_tarball(index_name=index_name, tar_path=tar_path,
                                    boolean_map=boolean_map, delimiters=delimiters,
-                                   chunk_size=chunk_size * 5)
+                                   chunk_size=paralleleism_chunk_size)
 
     start = time.time()
-    actors = [Indexer.remote(search_client_args, reporter)
+    actors = [Indexer.remote(search_client_args, chunk_size, reporter)
               for x in range(n_threads)]
     actor_idx = 0
     results = []
@@ -163,7 +162,6 @@ async def go(
     res = ray.get(results)
 
     print("Took", time.time() - start)
-    print(f"Processed {total} records")
 
     errors = []
     total = 0
@@ -175,10 +173,17 @@ async def go(
     if errors:
         raise Exception("\n".join(errors))
 
-    result = client.indices.put_settings(
+    print(f"Processed {total} records")
+
+    for actor in actors:
+        await actor.close.remote()
+
+    result = await client.indices.put_settings(
         index=index_name, body=post_index_settings)
 
     print(result)
+
+    await client.close()
 
     return data.get_header_fields(), index_body['mappings']
 
