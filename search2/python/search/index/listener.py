@@ -1,33 +1,20 @@
-import ray
-import time
-import math
-import multiprocessing
-from ray.util.multiprocessing import Pool
-import json
-import pyarrow
-import gzip
-from ray.cluster_utils import Cluster
-import time
-import pickle
-import json
-from collections.abc import Iterable
-from pystalk import BeanstalkClient, BeanstalkError
-from .handler import go
-from typing import ByteString
-from os import path
-import pprint
-from orjson import loads, dumps
-from ruamel.yaml import YAML
 import argparse
 import glob
-from opensearchpy.exceptions import NotFoundError
+import os
 import traceback
 import time
-import os
+from typing import Tuple
+
+from opensearchpy.exceptions import NotFoundError
+from orjson import loads, dumps
+from pystalk import BeanstalkClient, BeanstalkError
+from ruamel.yaml import YAML
+
+from .handler import go
 
 # TODO: Allow passing directory for logs
 def _get_config_file_path(config_path_base_dir: str, assembly, suffix: str):
-    paths = glob.glob(path.join(config_path_base_dir,
+    paths = glob.glob(os.path.join(config_path_base_dir,
                       assembly + suffix))
 
     if not paths:
@@ -49,7 +36,7 @@ def _coerce_inputs(
     event_queue,
     config_path_base_dir,
     search_config
-):
+) -> Tuple[dict, str]:
     mapping_config_path = _get_config_file_path(config_path_base_dir, job_details["assembly"], '.mapping.y*ml')
     assert len(mapping_config_path) == 1
     mapping_config_path = mapping_config_path[0]
@@ -81,7 +68,6 @@ def _coerce_inputs(
         "annotation_conf": annotation_config,
         "mapping_conf": mapping_config,
         "search_conf": search_config,
-        "log_path": log_path,
         "publisher": {
             "host": publisher_host,
             "port": publisher_port,
@@ -93,7 +79,7 @@ def _coerce_inputs(
                 "data": None,
             },
         },
-    }
+    }, log_path
 
 
 def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
@@ -133,7 +119,7 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
             job = client.reserve_job(5)
             job_data: dict = loads(job.job_data)
 
-            hanlder_args: dict = _coerce_inputs(
+            hanlder_args, log_path = _coerce_inputs(
                 job_data,
                 job.job_id,
                 publisher_host=host,
@@ -155,10 +141,10 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
             }
 
             client.put_job_into(tube_conf["events"], dumps(msg))
-            field_names, search_config = go(**hanlder_args)
+            field_names = go(**hanlder_args)
 
             msg['event'] = events_conf["completed"]
-            msg['indexConfig'] = search_config
+            msg['indexConfig'] = hanlder_args['search_config']
             msg['fieldNames'] = field_names
 
             client.put_job_into(tube_conf["events"], dumps(msg))

@@ -8,6 +8,7 @@ from orjson import dumps
 from search.index.bystro_file import read_annotation_tarball
 
 # TODO: allow reading directly from annotation_path or get rid of that possibility in annotator
+# TODO: read delimiters from annotation_conf
 class ProgressReporter:
     def __init__(self, publisher: dict):
         self.value = 0
@@ -20,7 +21,12 @@ class ProgressReporter:
             "progress": self.value,
             "skipped": 0
         }
-        self.client.put_job_into(self.publisher['queue'], dumps(self.publisher['messageBase']))
+
+        try:
+            self.client.put_job_into(self.publisher['queue'], dumps(self.publisher['messageBase']))
+        except BeanstalkError as err:
+            raise err
+
         return self.value
 
     def get_counter(self):
@@ -33,7 +39,6 @@ def go(
         annotation_conf: dict,
         mapping_conf: dict,
         search_conf: dict,
-        log_path: str,
         publisher: dict,
         chunk_sisze=5000,
 ):
