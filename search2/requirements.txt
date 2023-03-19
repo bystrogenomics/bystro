@@ -11,3 +11,5 @@ opensearch-py==2.2.0
 mgzip==0.2.1
 Cython==0.29.33
 patchelf==0.17.2
+aiohttp==3.8.4
+uvloop==0.17.0

@@ -136,7 +136,7 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
                 search_conf=search_conf
             )
         except BeanstalkError as err:
-            if err.message == "TIMED_OUT":
+            if err.message == 'TIMED_OUT':
                 continue
             raise err
         try:

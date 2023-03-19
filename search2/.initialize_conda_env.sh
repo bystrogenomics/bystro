@@ -5,7 +5,7 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 if { conda env list | grep 'bystro'; } >/dev/null 2>&1; then
     echo -e "\n====Environment exists (bystro)====\n"
 else
-    conda create --name bystro python=3.11 -c conda-forge
+    conda create --name bystro python=3.10.9
     conda activate bystro
     pip install -r requirements.txt
 fi
