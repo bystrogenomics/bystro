@@ -11,11 +11,14 @@ from search.index.bystro_file import read_annotation_tarball
 
 # TODO: allow reading directly from annotation_path or get rid of that possibility in annotator
 # TODO: read delimiters from annotation_conf
+
+
 class ProgressReporter:
     def __init__(self, publisher: dict):
         self.value = 0
         self.publisher = publisher.copy()
-        self.client = BeanstalkClient(publisher['host'], publisher['port'], socket_timeout=10)
+        self.client = BeanstalkClient(
+            publisher['host'], publisher['port'], socket_timeout=10)
 
     def increment(self, count: int):
         self.value += count
@@ -25,7 +28,8 @@ class ProgressReporter:
         }
 
         try:
-            self.client.put_job_into(self.publisher['queue'], dumps(self.publisher['messageBase']))
+            self.client.put_job_into(
+                self.publisher['queue'], dumps(self.publisher['messageBase']))
         except BeanstalkError as err:
             raise err
 
@@ -33,6 +37,7 @@ class ProgressReporter:
 
     def get_counter(self):
         return self.value
+
 
 class ProgressReporterStub:
     def __init__(self):
@@ -44,6 +49,7 @@ class ProgressReporterStub:
 
     def get_counter(self):
         return self.value
+
 
 def go(
         index_name: str,
@@ -85,7 +91,7 @@ def go(
         'mappings': mapping_conf['mappings'],
     }
 
-    delimiters={
+    delimiters = {
         'field': "\t",
         "allele": ",",
         "position": "|",
@@ -94,8 +100,9 @@ def go(
     }
 
     if not index_body['settings'].get('number_of_shards'):
-          file_size = os.path.getsize(tar_path)
-          index_body['settings']['number_of_shards'] = ceil(float(file_size) / float(1e10))
+        file_size = os.path.getsize(tar_path)
+        index_body['settings']['number_of_shards'] = ceil(
+            float(file_size) / float(1e10))
 
     try:
         client.indices.create(index_name, body=index_body)
@@ -111,14 +118,16 @@ def go(
     for response in helpers.parallel_bulk(client, data, chunk_size=chunk_size):
         assert response[0] is True
         count += 1
-        if count >=chunk_size:
+        if count >= chunk_size:
             reporter.increment(count)
             count = 0
 
-    result = client.indices.put_settings(index=index_name, body=post_index_settings)
+    result = client.indices.put_settings(
+        index=index_name, body=post_index_settings)
     print(result)
 
     return data.header_fields, index_body['mappings']
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process some config files.")
@@ -158,8 +167,7 @@ if __name__ == "__main__":
     with open(args.mapping_conf, "r", encoding="utf-8") as f:
         mapping_conf = YAML(typ="safe").load(f)
 
-    go(
-        index_name=args.index_name,
+    go(index_name=args.index_name,
         tar_path=args.tar,
         annotation_conf=annotation_conf,
         mapping_conf=mapping_conf,
