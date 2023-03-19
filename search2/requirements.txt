@@ -9,3 +9,5 @@ ruamel.yaml==0.17.21
 cloudpickle==2.2.1
 opensearch-py==2.2.0
 mgzip==0.2.1
+Cython==0.29.33
+patchelf==0.17.2

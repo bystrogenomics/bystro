@@ -3,6 +3,7 @@ import tarfile
 import gzip
 from typing import List
 from libc.stdint cimport uint32_t
+import time
 
 cdef inline dict populate_hash_path(dict row_document, list field_path, field_value):
     cdef dict current = row_document
@@ -35,8 +36,8 @@ cdef class ReadAnnotationTarball:
         list header_fields
         list paths
         dict boolean_map
-        dict idx_action
-        dict row_document
+        dict idx_action 
+        list row_documents
 
     def __cinit__(self, str index_name,  dict boolean_map, dict delimiters, str tar_path, str annotation_name = 'annotation.tsv.gz', int chunk_size=500):
         self.index_name = index_name
@@ -57,6 +58,7 @@ cdef class ReadAnnotationTarball:
         self.paths = [field.split(".") for field in self.header_fields]
         self.boolean_map = boolean_map
         self.idx_action = {"_index": self.index_name, "_id": 0, "_source": {}}
+        self.row_documents = []
 
     def __iter__(self):
         return self
@@ -67,56 +69,79 @@ cdef class ReadAnnotationTarball:
         cdef list allele_values
         cdef list position_values
         cdef list values
+        cdef list row_documents
+        cdef int count
 
-        line = self.decompressed_data.readline()
-        if not line:
-            raise StopIteration
+        self.row_documents = []
+        count = 0
+        for line in self.decompressed_data:
+            if not line:
+                raise StopIteration
 
-        row = line.decode('utf-8').strip("\n").split(self.field_separator)
+            count += 1
+            row = line.decode('utf-8').strip("\n").split(self.field_separator)
 
-        self.idx_action['_id'] += 1
-        self.idx_action['_source'] = {}
-        for i, field in enumerate(row):
-            allele_values = []
-            for allele_value in field.split(self.allele_delimiter):
-                if allele_value == self.empty_field_char:
-                    allele_values.append(None)
-                    continue
-
-                position_values = []
-                for pos_value in allele_value.split(self.position_delimiter):
-                    if pos_value == self.empty_field_char:
-                        position_values.append(None)
+            self.idx_action['_id'] += 1
+            self.idx_action['_source'] = {}
+            for i, field in enumerate(row):
+                allele_values = []
+                for allele_value in field.split(self.allele_delimiter):
+                    if allele_value == self.empty_field_char:
+                        allele_values.append(None)
                         continue
 
-                    values = []
-                    values_raw = pos_value.split(self.value_delimiter)
-                    for value in values_raw:
-                        if value == self.empty_field_char:
-                            values.append(None)
+                    position_values = []
+                    for pos_value in allele_value.split(self.position_delimiter):
+                        if pos_value == self.empty_field_char:
+                            position_values.append(None)
                             continue
 
-                        if self.header_fields[i] in self.boolean_map:
-                            if value == "1" or value == "True":
-                                values.append(True)
-                            elif value == "0" or value == "False":
-                                values.append(False)
+                        values = []
+                        values_raw = pos_value.split(self.value_delimiter)
+                        for value in values_raw:
+                            if value == self.empty_field_char:
+                                values.append(None)
+                                continue
+
+                            if self.header_fields[i] in self.boolean_map:
+                                if value == "1" or value == "True":
+                                    values.append(True)
+                                elif value == "0" or value == "False":
+                                    values.append(False)
+                                else:
+                                    raise ValueError(
+                                        f"Encountered boolean value that wasn't encoded as 0/1 or True/False in field {field}, row {i}, value {value}")
                             else:
-                                raise ValueError(
-                                    f"Encountered boolean value that wasn't encoded as 0/1 or True/False in field {field}, row {i}, value {value}")
+                                values.append(value)
+
+                        if len(values_raw) > 1:
+                            position_values.append(values)
                         else:
-                            values.append(value)
+                            position_values.append(values[0])
 
-                    if len(values_raw) > 1:
-                        position_values.append(values)
-                    else:
-                        position_values.append(values[0])
+                    allele_values.append(position_values)
 
-                allele_values.append(position_values)
+                self.idx_action['_source'] = populate_hash_path(self.idx_action['_source'], self.paths[i], allele_values)
+            self.row_documents.append(self.idx_action)
+            if count >= self.chunk_size:
+                return self.row_documents
 
-            self.idx_action['_source'] = populate_hash_path(self.idx_action['_source'], self.paths[i], allele_values)
+        if not self.row_documents:
+            raise StopIteration
 
-        return self.idx_action
+        return self.row_documents
 
 cpdef ReadAnnotationTarball read_annotation_tarball(str index_name,  dict boolean_map, dict delimiters, str tar_path, str annotation_name = 'annotation.tsv.gz', int chunk_size=500):
     return ReadAnnotationTarball(index_name, boolean_map, delimiters, tar_path, annotation_name, chunk_size)
+
+    # count = 0
+    # total_count = 0
+    # start = time.time()
+    # for d in data:
+    #     count += len(d)
+    #     if count >= 30000:
+    #         total_count += count
+    #         print("Processed ", total_count)
+    #         count = 0
+
+    # print("took", time.time() - start)

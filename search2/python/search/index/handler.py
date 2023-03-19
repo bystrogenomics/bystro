@@ -2,19 +2,50 @@ import argparse
 from math import ceil
 import multiprocessing
 import os
+import asyncio, aiohttp, concurrent.futures
+import uvloop
+uvloop.install()
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
-from opensearchpy import OpenSearch, helpers, exceptions
+from opensearchpy import OpenSearch, helpers
+from opensearchpy._async.client import AsyncOpenSearch
+from opensearchpy._async import helpers as async_helpers
 from orjson import dumps
 from pystalk import BeanstalkClient
 from ruamel.yaml import YAML
 
 from search.index.bystro_file import read_annotation_tarball
 
+import ray
+
+ray.init(ignore_reinit_error='true', address='auto')
+
 # TODO: allow reading directly from annotation_path or get rid of that possibility in annotator
 # TODO: read delimiters from annotation_conf
 
-n_threads = multiprocessing.cpu_count() - 1
+n_threads = multiprocessing.cpu_count()
 
+
+@ray.remote
+class Indexer:
+    def __init__(self, search_client_args, progress_tracker, reporter_batch = 20_000):
+        self.search_client_args = search_client_args
+        self.client = AsyncOpenSearch(**self.search_client_args)
+        self.progress_tracker = progress_tracker
+        self.reporter_batch = reporter_batch
+        self.counter = 0
+
+    async def run(self, data):
+        resp = await async_helpers.async_bulk(self.client, iter(data))
+        self.counter += resp[0]
+
+        if self.counter % self.reporter_batch == 0:
+            await asyncio.to_thread(self.progress_tracker.increment.remote, self.counter)
+            self.counter = 0
+
+        return resp[0]
+
+@ray.remote(num_cpus=0)
 class ProgressReporter:
     def __init__(self, publisher: dict):
         self.value = 0
@@ -37,7 +68,7 @@ class ProgressReporter:
     def get_counter(self):
         return self.value
 
-
+@ray.remote(num_cpus=0)
 class ProgressReporterStub:
     def __init__(self):
         self.value = 0
@@ -49,14 +80,13 @@ class ProgressReporterStub:
     def get_counter(self):
         return self.value
 
-
-def go(
+async def go(
         index_name: str,
         tar_path: str,
         annotation_conf: dict,
         mapping_conf: dict,
         search_conf: dict,
-        chunk_size=5000,
+        chunk_size=1000,
         publisher: dict = None,
         annotation_path: str = None
 ):
@@ -76,9 +106,9 @@ def go(
     )
 
     if publisher:
-        reporter = ProgressReporter(publisher)
+        reporter = ProgressReporter.remote(publisher)
     else:
-        reporter = ProgressReporterStub()
+        reporter = ProgressReporterStub.remote()
 
     client = OpenSearch(**search_client_args)
 
@@ -105,28 +135,31 @@ def go(
 
     try:
         client.indices.create(index_name, body=index_body)
-    except exceptions.RequestError as e:
+    except Exception as e:
         print(e)
 
     data = read_annotation_tarball(index_name=index_name, tar_path=tar_path,
                                    boolean_map=boolean_map, delimiters=delimiters,
-                                   chunk_size=chunk_size)
-    helpers.parallel_bulk(client, data)
-
-    count = 0
-    for response in helpers.parallel_bulk(client, data, chunk_size=chunk_size, thread_count=n_threads, queue_size=n_threads+1):
-        assert response[0] is True
-        count += 1
-        if count >= chunk_size:
-            reporter.increment(count)
-            count = 0
-
+                                   chunk_size=chunk_size * 5)
+    import time
+    start = time.time()
+    actors = [Indexer.remote(search_client_args, reporter) for x in range(n_threads)]
+    actor_idx = 0
+    results = []
+    for x in data:
+        actor = actors[actor_idx]
+        actor_idx += 1
+        if actor_idx == n_threads:
+            actor_idx = 0
+        results.append(actor.run.remote(x))
+    res = ray.get(results)
+    print("took", time.time() - start)
+   
     result = client.indices.put_settings(
         index=index_name, body=post_index_settings)
     print(result)
 
     return data.header_fields, index_body['mappings']
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process some config files.")
@@ -166,8 +199,8 @@ if __name__ == "__main__":
     with open(args.mapping_conf, "r", encoding="utf-8") as f:
         mapping_conf = YAML(typ="safe").load(f)
 
-    go(index_name=args.index_name,
+    asyncio.run(go(index_name=args.index_name,
         tar_path=args.tar,
         annotation_conf=annotation_conf,
         mapping_conf=mapping_conf,
-        search_conf=search_conf)
+        search_conf=search_conf))
