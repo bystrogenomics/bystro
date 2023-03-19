@@ -4,7 +4,7 @@ import os
 
 from opensearchpy import OpenSearch, helpers, exceptions
 from orjson import dumps
-from pystalk import BeanstalkClient, BeanstalkError
+from pystalk import BeanstalkClient
 from ruamel.yaml import YAML
 
 from search.index.bystro_file import read_annotation_tarball
@@ -27,11 +27,8 @@ class ProgressReporter:
             "skipped": 0
         }
 
-        try:
-            self.client.put_job_into(
-                self.publisher['queue'], dumps(self.publisher['messageBase']))
-        except BeanstalkError as err:
-            raise err
+        self.client.put_job_into(
+            self.publisher['queue'], dumps(self.publisher['messageBase']))
 
         return self.value
 

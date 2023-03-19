@@ -1,27 +1,28 @@
-import ray
 import math
-import cloudpickle as pickle
-import ray
-from opensearchpy import OpenSearch
-from pystalk import BeanstalkClient, BeanstalkError
-from orjson import dumps
-import numpy as np
-import traceback
-import mgzip
-import subprocess
 import os
 import pathlib
+import subprocess
+import traceback
+
+import mgzip
+import numpy as np
+from opensearchpy import OpenSearch
+from orjson import dumps
+from pystalk import BeanstalkClient
+import ray
 
 ray.init(ignore_reinit_error='true', address='auto')
 
 # TODO: track skipped
 # TODO: handle 1) the munging of the data, 2) distributed pipeline/transform , 3) write as arrow table (arrow ipc format), csv
+
 @ray.remote(num_cpus=0)
 class ProgressReporter:
     def __init__(self, publisher: dict):
         self.value = 0
         self.publisher = publisher.copy()
-        self.client = BeanstalkClient(publisher['host'], publisher['port'], socket_timeout=10)
+        self.client = BeanstalkClient(
+            publisher['host'], publisher['port'], socket_timeout=10)
 
     def increment(self, count: int):
         self.value += count
@@ -29,11 +30,14 @@ class ProgressReporter:
             "progress": self.value,
             "skipped": 0
         }
-        self.client.put_job_into(self.publisher['queue'], dumps(self.publisher['messageBase']))
+        self.client.put_job_into(
+            self.publisher['queue'], dumps(self.publisher['messageBase']))
+
         return self.value
 
     def get_counter(self):
         return self.value
+
 
 default_delimiters = {
     'pos': "|",
@@ -43,7 +47,7 @@ default_delimiters = {
     'fieldSep': "\t",
 }
 
-def make_output_names(output_base_path: str, statistics:bool, compress: bool, archive: bool) -> dict:
+def make_output_names(output_base_path: str, statistics: bool, compress: bool, archive: bool) -> dict:
     out = {}
 
     basename = os.path.basename(output_base_path)
@@ -65,6 +69,7 @@ def make_output_names(output_base_path: str, statistics:bool, compress: bool, ar
 
     return out
 
+
 def _clamp(n, min_num, max_num):
     if n < min_num:
         return min_num
@@ -72,13 +77,6 @@ def _clamp(n, min_num, max_num):
         return max_num
     else:
         return n
-
-
-def _get_slices(shards: int, max_threads: int):
-    divisor = max(2, math.ceil(max_threads / shards))
-
-    return shards * divisor
-
 
 def _clean_query(input_query_body: dict, default_size: int = 1_000):
     # TODO: Support sort
@@ -151,7 +149,8 @@ def _make_output_string(rows, delims):
                             continue
 
                         if isinstance(sub, list):
-                            inner_values.append(delims['value'].join(map(lambda x: str(x) if x is not None else empty_field_char, sub)))
+                            inner_values.append(delims['value'].join(
+                                map(lambda x: str(x) if x is not None else empty_field_char, sub)))
                         else:
                             inner_values.append(str(sub))
 
@@ -163,6 +162,7 @@ def _make_output_string(rows, delims):
 
     return "\n".join(rows) + "\n"
 
+
 @ray.remote
 def _process_query_chunk(query_args: dict, search_client_args: dict, field_names: list, chunk_output_name: str, reporter):
     client = OpenSearch(**search_client_args)
@@ -170,7 +170,6 @@ def _process_query_chunk(query_args: dict, search_client_args: dict, field_names
 
     if resp["hits"]["total"]["value"] == 0:
         return 0
-
 
     rows = []
     # skipped = 0
@@ -193,7 +192,8 @@ def _process_query_chunk(query_args: dict, search_client_args: dict, field_names
 
         row = np.empty(len(field_names), dtype=object)
         for y in range(len(field_names)):
-            row[y] = _populate_data(child_fields[y], doc["_source"][parent_fields[y]])
+            row[y] = _populate_data(
+                child_fields[y], doc["_source"][parent_fields[y]])
 
         if row[discordant_idx][0][0] == False:
             row[discordant_idx][0][0] = 0
@@ -243,7 +243,8 @@ def go(
 
     pit_id = response["pit_id"]
 
-    output_names = make_output_names(input_body['outputBasePath'], input_body['run_statistics'], True, input_body['archive'])
+    output_names = make_output_names(
+        input_body['outputBasePath'], input_body['run_statistics'], True, input_body['archive'])
 
     output_dir = os.path.dirname(input_body['outputBasePath'])
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -257,7 +258,8 @@ def go(
         if "sort" in query_no_sort:
             del query_no_sort["sort"]
         del query_no_sort["pit"]
-        response = client.count(body=query_no_sort, index=input_body["indexName"])
+        response = client.count(
+            body=query_no_sort, index=input_body["indexName"])
 
         n_docs = response["count"]
         assert n_docs > 0
@@ -266,7 +268,8 @@ def go(
         num_slices = _clamp(math.ceil(n_docs / max_query_size), 1, max_slices)
 
         # TODO: concatenate chunks in a different ray worker
-        written_chunks = [os.path.join(output_dir, f"{input_body['indexName']}_header")]
+        written_chunks = [os.path.join(
+            output_dir, f"{input_body['indexName']}_header")]
 
         header_output = "\t".join(input_body['fieldNames']) + "\n"
         with mgzip.open(written_chunks[-1], "wt", thread=8, blocksize=2*10**8) as fw:
@@ -275,14 +278,17 @@ def go(
         query["size"] = max_query_size
         reporter = ProgressReporter.remote(input_body['publisher'])
         if num_slices == 1:
-            written_chunks.append(os.path.join(output_dir, f"{input_body['indexName']}_{0}.gz"))
+            written_chunks.append(os.path.join(
+                output_dir, f"{input_body['indexName']}_{0}.gz"))
             results_processed = ray.get(
-                [_process_query_chunk.remote({"body": query}, search_client_args, input_body["fieldNames"], written_chunks[-1], reporter)]
+                [_process_query_chunk.remote(
+                    {"body": query}, search_client_args, input_body["fieldNames"], written_chunks[-1], reporter)]
             )
         else:
             save_requests = []
             for slice_id in range(num_slices):
-                written_chunks.append(os.path.join(output_dir, f"{input_body['indexName']}_{slice_id}"))
+                written_chunks.append(os.path.join(
+                    output_dir, f"{input_body['indexName']}_{slice_id}"))
                 query_submit = query.copy()
 
                 query_submit["slice"] = {"id": slice_id, "max": num_slices}
@@ -295,7 +301,8 @@ def go(
                     # }
                 )
                 save_requests.append(
-                    _process_query_chunk.remote(query_args, search_client_args, input_body["fieldNames"], written_chunks[-1], reporter)
+                    _process_query_chunk.remote(
+                        query_args, search_client_args, input_body["fieldNames"], written_chunks[-1], reporter)
                 )
             results_processed = ray.get(save_requests)
 
