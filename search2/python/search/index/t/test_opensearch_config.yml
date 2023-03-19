@@ -3,4 +3,8 @@ connection:
   request_timeout: 300
   gzip: true
   nodes:
-    - http://localhost:9200
+    - host: 'localhost'
+      port: '9200'
+      scheme: 'http'
+auth:
+  dummy: True

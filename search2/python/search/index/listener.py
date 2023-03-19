@@ -13,6 +13,8 @@ from ruamel.yaml import YAML
 from search.index.handler import go
 
 # TODO: Allow passing directory for logs
+
+
 def _get_config_file_path(config_path_base_dir: str, assembly, suffix: str):
     paths = glob.glob(os.path.join(config_path_base_dir,
                       assembly + suffix))
@@ -27,6 +29,7 @@ def _get_config_file_path(config_path_base_dir: str, assembly, suffix: str):
 
     return paths[0]
 
+
 def _coerce_inputs(
     job_details,
     job_id,
@@ -37,17 +40,19 @@ def _coerce_inputs(
     config_path_base_dir,
     search_config
 ) -> Tuple[dict, str]:
-    mapping_config_path = _get_config_file_path(config_path_base_dir, job_details["assembly"], '.mapping.y*ml')
+    mapping_config_path = _get_config_file_path(
+        config_path_base_dir, job_details["assembly"], '.mapping.y*ml')
     assert len(mapping_config_path) == 1
     mapping_config_path = mapping_config_path[0]
 
-    annotation_config_path = _get_config_file_path(config_path_base_dir, job_details["assembly"], '.y*ml')[0]
+    annotation_config_path = _get_config_file_path(
+        config_path_base_dir, job_details["assembly"], '.y*ml')[0]
     assert len(annotation_config_path) == 1
     annotation_config_path = annotation_config_path[0]
 
     with open(mapping_config_path, 'r', encoding='utf-8') as f:
         mapping_config = YAML(typ="safe").load(f)
-    
+
     with open(annotation_config_path, 'r', encoding='utf-8') as f:
         annotation_config = YAML(typ="safe").load(f)
 
@@ -57,9 +62,11 @@ def _coerce_inputs(
     annotation_path = None
 
     if job_details.get('archived'):
-        tar_path = os.path.join(job_details['inputDir'], job_details['archived'])
+        tar_path = os.path.join(
+            job_details['inputDir'], job_details['archived'])
     else:
-        annotation_path = os.path.join(job_details['inputDir'], job_details['annotation'])
+        annotation_path = os.path.join(
+            job_details['inputDir'], job_details['annotation'])
 
     return {
         "index_name": job_details["indexName"],
@@ -168,6 +175,7 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
         finally:
             time.sleep(0.5)
 
+
 def main():
     parser = argparse.ArgumentParser(description="Process some config files.")
     parser.add_argument(
@@ -193,6 +201,7 @@ def main():
         search_conf = YAML(typ="safe").load(search_config_file)
 
     listen(queue_conf, search_conf, config_path_base_dir)
+
 
 if __name__ == "__main__":
     main()
