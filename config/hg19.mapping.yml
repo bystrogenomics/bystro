@@ -223,8 +223,7 @@ mappings:
     an:
       type: integer
     alt:
-      type: keyword
-      normalizer: uppercase_normalizer
+      type: text
     ref:
       type: keyword
       normalizer: uppercase_normalizer

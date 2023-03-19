@@ -1,5 +1,6 @@
 import argparse
 from math import ceil
+import multiprocessing
 import os
 
 from opensearchpy import OpenSearch, helpers, exceptions
@@ -12,6 +13,7 @@ from search.index.bystro_file import read_annotation_tarball
 # TODO: allow reading directly from annotation_path or get rid of that possibility in annotator
 # TODO: read delimiters from annotation_conf
 
+n_threads = multiprocessing.cpu_count() - 1
 
 class ProgressReporter:
     def __init__(self, publisher: dict):
@@ -112,7 +114,7 @@ def go(
     helpers.parallel_bulk(client, data)
 
     count = 0
-    for response in helpers.parallel_bulk(client, data, chunk_size=chunk_size):
+    for response in helpers.parallel_bulk(client, data, chunk_size=chunk_size, thread_count=n_threads, queue_size=n_threads+1):
         assert response[0] is True
         count += 1
         if count >= chunk_size:
