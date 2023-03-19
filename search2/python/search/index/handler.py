@@ -1,11 +1,9 @@
 import argparse
+import asyncio
 from math import ceil
 import multiprocessing
 import os
-import asyncio, aiohttp, concurrent.futures
-import uvloop
-uvloop.install()
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+import time
 
 from opensearchpy import OpenSearch, helpers
 from opensearchpy._async.client import AsyncOpenSearch
@@ -18,6 +16,12 @@ from search.index.bystro_file import read_annotation_tarball
 
 import ray
 
+import uvloop
+
+uvloop.install()
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+
+
 ray.init(ignore_reinit_error='true', address='auto')
 
 # TODO: allow reading directly from annotation_path or get rid of that possibility in annotator
@@ -28,7 +32,7 @@ n_threads = multiprocessing.cpu_count()
 
 @ray.remote
 class Indexer:
-    def __init__(self, search_client_args, progress_tracker, reporter_batch = 20_000):
+    def __init__(self, search_client_args, progress_tracker, reporter_batch=20_000):
         self.search_client_args = search_client_args
         self.client = AsyncOpenSearch(**self.search_client_args)
         self.progress_tracker = progress_tracker
@@ -43,7 +47,8 @@ class Indexer:
             await asyncio.to_thread(self.progress_tracker.increment.remote, self.counter)
             self.counter = 0
 
-        return resp[0]
+        return resp
+
 
 @ray.remote(num_cpus=0)
 class ProgressReporter:
@@ -68,6 +73,7 @@ class ProgressReporter:
     def get_counter(self):
         return self.value
 
+
 @ray.remote(num_cpus=0)
 class ProgressReporterStub:
     def __init__(self):
@@ -79,6 +85,7 @@ class ProgressReporterStub:
 
     def get_counter(self):
         return self.value
+
 
 async def go(
         index_name: str,
@@ -141,9 +148,10 @@ async def go(
     data = read_annotation_tarball(index_name=index_name, tar_path=tar_path,
                                    boolean_map=boolean_map, delimiters=delimiters,
                                    chunk_size=chunk_size * 5)
-    import time
+
     start = time.time()
-    actors = [Indexer.remote(search_client_args, reporter) for x in range(n_threads)]
+    actors = [Indexer.remote(search_client_args, reporter)
+              for x in range(n_threads)]
     actor_idx = 0
     results = []
     for x in data:
@@ -154,12 +162,22 @@ async def go(
         results.append(actor.run.remote(x))
     res = ray.get(results)
     print("took", time.time() - start)
-   
+
+    errors = []
+    for x in res:
+        if x[1]:
+            errors.append(",".join(x[1]))
+
+    if errors:
+        raise Exception("\n".join(errors))
+
+    print("res", res)
+
     result = client.indices.put_settings(
         index=index_name, body=post_index_settings)
     print(result)
 
-    return data.header_fields, index_body['mappings']
+    return data.get_header_fields(), index_body['mappings']
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process some config files.")
@@ -200,7 +218,7 @@ if __name__ == "__main__":
         mapping_conf = YAML(typ="safe").load(f)
 
     asyncio.run(go(index_name=args.index_name,
-        tar_path=args.tar,
-        annotation_conf=annotation_conf,
-        mapping_conf=mapping_conf,
-        search_conf=search_conf))
+                   tar_path=args.tar,
+                   annotation_conf=annotation_conf,
+                   mapping_conf=mapping_conf,
+                   search_conf=search_conf))

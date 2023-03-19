@@ -131,17 +131,8 @@ cdef class ReadAnnotationTarball:
 
         return self.row_documents
 
+    def get_header_fields(self):
+        return self.header_fields
+
 cpdef ReadAnnotationTarball read_annotation_tarball(str index_name,  dict boolean_map, dict delimiters, str tar_path, str annotation_name = 'annotation.tsv.gz', int chunk_size=500):
     return ReadAnnotationTarball(index_name, boolean_map, delimiters, tar_path, annotation_name, chunk_size)
-
-    # count = 0
-    # total_count = 0
-    # start = time.time()
-    # for d in data:
-    #     count += len(d)
-    #     if count >= 30000:
-    #         total_count += count
-    #         print("Processed ", total_count)
-    #         count = 0
-
-    # print("took", time.time() - start)
