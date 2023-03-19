@@ -1,2 +1,8 @@
 config/*.build-bak*
 config/*.utils-bak*
+config/hg19.yml
+config/hg38.yml
+config/rheMac8.yml
+config/sacCer3.yml
+config/mm10.yml
+config/mm9.yml
