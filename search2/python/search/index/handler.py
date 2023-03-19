@@ -161,20 +161,23 @@ async def go(
             actor_idx = 0
         results.append(actor.run.remote(x))
     res = ray.get(results)
-    print("took", time.time() - start)
+
+    print("Took", time.time() - start)
+    print(f"Processed {total} records")
 
     errors = []
+    total = 0
     for x in res:
+        total += x[0]
         if x[1]:
             errors.append(",".join(x[1]))
 
     if errors:
         raise Exception("\n".join(errors))
 
-    print("res", res)
-
     result = client.indices.put_settings(
         index=index_name, body=post_index_settings)
+
     print(result)
 
     return data.get_header_fields(), index_body['mappings']
