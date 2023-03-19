@@ -98,6 +98,3 @@ def go(
     print(result)
 
     return data.header_fields, index_body['mappings']
-
-if __name__ == "__main__":
-    go()

@@ -10,7 +10,7 @@ from orjson import loads, dumps
 from pystalk import BeanstalkClient, BeanstalkError
 from ruamel.yaml import YAML
 
-from .handler import go
+from search.index.handler import go
 
 # TODO: Allow passing directory for logs
 def _get_config_file_path(config_path_base_dir: str, assembly, suffix: str):
@@ -83,7 +83,6 @@ def _coerce_inputs(
 
 
 def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
-    """TODO: Listen on beanstalkd here directly"""
     queue_conf = queue_conf["beanstalkd"]
 
     if isinstance(queue_conf["host"], str):
@@ -114,7 +113,7 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
         client = clients[offset][2]
 
         client.watch(tube_conf["submission"])
-        print('tube_conf["submission"]', tube_conf["submission"])
+
         try:
             job = client.reserve_job(5)
             job_data: dict = loads(job.job_data)
