@@ -1,0 +1,11 @@
+#e,ex,exo,exon,exoni,exonic => exonic
+#n,nc,ncr,ncrn,ncrna => ncrna
+#u,ut,utr => utr
+#s,sp,spl,spli,splic,splice => spliceacceptor,splicedonor
+#splicea,spliceac,spliceacc,spliceacce,spliceaccep,spliceaccept,spliceaccept,spliceaccepto => spliceacceptor
+#spliced,splicedo,splicedon,splicedono => splicedonor
+#c,co,cod,codi,codin,coding => exonic
+#n,no,non,nonc,nonco,noncod,noncodi,noncodin,noncoding => ncrna
+#i,in,int,int => intronic,intergenic
+#intr,intro,intron,introni => intronic
+#inte,inter,interg,interge,intergen,intergeni => intergenic

@@ -75,7 +75,6 @@ my %requiredByType = (
     inputQueryBody => 'queryBody',
     fieldNames => 'fieldNames',
     indexName => 'indexName',
-    indexType => 'indexType',
   },
   'annotation' => {
     input_file => 'inputFilePath',

@@ -1,0 +1,17 @@
+#https://sc-bro.nhlbi.nih.gov/cgi-bin/hgTables?db=hg38&hgta_group=varRep&hgta_track=snp147&hgta_table=snp147&hgta_doSchema=describe+table+schema
+synonymous,codingsynon,silent
+intronvariant,intron,intronic
+nonsynonymous,missense,replacement,missensevariant
+stopgain,nonsense,stopgained
+stoploss,stoplost
+utr,untranslated
+utr3,untranslated3,3primeutrvariant
+utr5,untranslated5,5primeutrvariant
+indel => indel,cdsindel,frameshift,inframeindel,frameshiftvariant,indelinframe,indelframeshift,indelnonframeshift,inframeindel,cdsindel
+indelnonframeshift,indelinframe,inframeindel,cdsindel
+frameshiftvariant,frameshift,indelframeshift
+spliceacceptor,splice3,spliceacceptorvariant
+splicedonor,splice5,splicedonorvariant
+intergenic => intergenic,downstreamgenevariant,neargene3,upstreamgenevariant,neargene5
+ncrna,nctranscriptvariant
+cds,coding,code,exonic

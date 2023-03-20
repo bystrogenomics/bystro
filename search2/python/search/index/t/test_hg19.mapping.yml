@@ -214,7 +214,8 @@ mappings:
     an:
       type: integer
     alt:
-      type: text
+      type: keyword
+      normalizer: uppercase_normalizer
     ref:
       type: keyword
       normalizer: uppercase_normalizer
@@ -436,8 +437,6 @@ mappings:
             id:
               type: keyword
               normalizer: lowercase_normalizer
-            trTv:
-              type: byte
             af:
               type: half_float
             ac:
@@ -512,8 +511,6 @@ mappings:
             id:
               type: keyword
               normalizer: lowercase_normalizer
-            trTv:
-              type: byte
             ac:
                 type: integer
             af:

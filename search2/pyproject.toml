@@ -1,0 +1,19 @@
+[build-system]
+requires = ["maturin>=0.14,<0.15", "setuptools", "wheel", "Cython"]
+build-backend = "maturin"
+
+[project]
+name = "search"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+version = "1.0.0"
+
+[tool.maturin]
+python-source = "python"
+
+[package.metadata.maturin]
+requires-dist = ["Cython"]
