@@ -123,7 +123,7 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
             job = client.reserve_job(5)
             job_data: dict = loads(job.job_data)
 
-            handler_args, log_path = _coerce_inputs(
+            handler_args, _ = _coerce_inputs(
                 job_data,
                 job.job_id,
                 publisher_host=host,
