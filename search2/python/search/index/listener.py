@@ -1,4 +1,6 @@
 import argparse
+import asyncio
+
 import glob
 import os
 import traceback
@@ -42,13 +44,9 @@ def _coerce_inputs(
 ) -> Tuple[dict, str]:
     mapping_config_path = _get_config_file_path(
         config_path_base_dir, job_details["assembly"], '.mapping.y*ml')
-    assert len(mapping_config_path) == 1
-    mapping_config_path = mapping_config_path[0]
 
     annotation_config_path = _get_config_file_path(
-        config_path_base_dir, job_details["assembly"], '.y*ml')[0]
-    assert len(annotation_config_path) == 1
-    annotation_config_path = annotation_config_path[0]
+        config_path_base_dir, job_details["assembly"], '.y*ml')
 
     with open(mapping_config_path, 'r', encoding='utf-8') as f:
         mapping_config = YAML(typ="safe").load(f)
@@ -61,12 +59,12 @@ def _coerce_inputs(
     tar_path = None
     annotation_path = None
 
-    if job_details.get('archived'):
+    if job_details.get('inputFileNames').get('archived'):
         tar_path = os.path.join(
-            job_details['inputDir'], job_details['archived'])
+            job_details['inputDir'], job_details['inputFileNames']['archived'])
     else:
-        annotation_path = os.path.join(
-            job_details['inputDir'], job_details['annotation'])
+        annotation_path = os.path.join(job_details['inputDir'], job_details['inputFileNames']['annotation'])
+
 
     return {
         "index_name": job_details["indexName"],
@@ -125,7 +123,7 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
             job = client.reserve_job(5)
             job_data: dict = loads(job.job_data)
 
-            hanlder_args, log_path = _coerce_inputs(
+            handler_args, _ = _coerce_inputs(
                 job_data,
                 job.job_id,
                 publisher_host=host,
@@ -133,7 +131,7 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
                 progress_event=events_conf["progress"],
                 event_queue=tube_conf["events"],
                 config_path_base_dir=config_path_base_dir,
-                search_conf=search_conf
+                search_config=search_conf
             )
         except BeanstalkError as err:
             if err.message == 'TIMED_OUT':
@@ -145,12 +143,11 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
                 "queueID": job.job_id,
                 "submissionID": job_data["submissionID"]
             }
-
             client.put_job_into(tube_conf["events"], dumps(msg))
-            field_names = go(**hanlder_args)
+            field_names = asyncio.get_event_loop().run_until_complete(go(**handler_args))
 
             msg['event'] = events_conf["completed"]
-            msg['indexConfig'] = hanlder_args['search_config']
+            msg['indexConfig'] = handler_args['mapping_conf']
             msg['fieldNames'] = field_names
 
             client.put_job_into(tube_conf["events"], dumps(msg))
