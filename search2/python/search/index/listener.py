@@ -144,11 +144,12 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
                 "submissionID": job_data["submissionID"]
             }
             client.put_job_into(tube_conf["events"], dumps(msg))
-            with asyncio.get_event_loop() as loop:
-                field_names = loop.run_until_complete(go(**handler_args))
+            loop = asyncio.get_event_loop()
+            field_names = loop.run_until_complete(go(**handler_args))
+            loop.close()
 
             msg['event'] = events_conf["completed"]
-            msg['indexConfig'] = handler_args['search_conf']
+            msg['indexConfig'] = handler_args['mapping_conf']
             msg['fieldNames'] = field_names
 
             client.put_job_into(tube_conf["events"], dumps(msg))
