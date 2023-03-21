@@ -185,7 +185,7 @@ async def go(
 
     await client.close()
 
-    return data.get_header_fields(), index_body['mappings']
+    return data.get_header_fields()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process some config files.")

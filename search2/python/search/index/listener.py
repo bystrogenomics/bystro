@@ -1,4 +1,6 @@
 import argparse
+import asyncio
+
 import glob
 import os
 import traceback
@@ -142,7 +144,8 @@ def listen(queue_conf: dict, search_conf: dict, config_path_base_dir: str):
                 "submissionID": job_data["submissionID"]
             }
             client.put_job_into(tube_conf["events"], dumps(msg))
-            field_names = go(**handler_args)
+            with asyncio.get_event_loop() as loop:
+                field_names = loop.run_until_complete(go(**handler_args))
 
             msg['event'] = events_conf["completed"]
             msg['indexConfig'] = handler_args['search_conf']
