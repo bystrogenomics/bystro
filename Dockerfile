@@ -1,4 +1,4 @@
-FROM perl:latest
+FROM perl:5.36.1
 
 ENV PATH="/root/bystro/bin:/usr/local/go/bin:/root/go/bin/:${PATH}"
 ENV PERL5LIB="/root/perl5/lib/perl5:/root/bystro/lib:${PERL5LIB}"

@@ -41,23 +41,24 @@ cpanm install Math::Round
 cpanm install Sys::CpuAffinity
 
 cpanm install Statistics::Distributions
+cpanm install File::Which
 
 # Needed for bin/annotate.pl
 cpanm install Hash::Merge::Simple
 cpanm install Sort::XS
 # Custom branch of msgpack-perl that uses latest msgpack-c and
 # allows prefer_float32 flag for 5-byte float storage
-cpanm install Module::Install::XSUtil
-cpanm install Module::Install::AuthorTests
+cpanm install Module::Build::XSUtil
+cpanm install Test::LeakTrace
+cpanm install Test::Pod
 
 # A dependency of Data::MessagePack installation
 cpanm install File::Copy::Recursive
-cpanm install File::Which
 
 cpanm --uninstall -f Data::MessagePack
 rm -rf msgpack-perl
-git clone --recursive https://github.com/akotlar/msgpack-perl.git && cd msgpack-perl
-perl Makefile.PL
-make test
-make install
+git clone --recursive https://github.com/akotlar/msgpack-perl.git && cd msgpack-perl && git checkout 6fe098dd91e705b12c68d63bcb1f31c369c81e01
+perl Build.PL
+perl Build test
+perl Build install
 cd ../ && rm -rf msgpack-perl
