@@ -55,7 +55,6 @@ cpanm install Test::Pod
 # A dependency of Data::MessagePack installation
 cpanm install File::Copy::Recursive
 
-cpanm --local-lib=~/perl5 local::lib && eval $(perl -I ~/perl5/lib/perl5/ -Mlocal::lib)
 cpanm --uninstall -f Data::MessagePack
 rm -rf msgpack-perl
 git clone --recursive https://github.com/akotlar/msgpack-perl.git && cd msgpack-perl && git checkout 6fe098dd91e705b12c68d63bcb1f31c369c81e01
