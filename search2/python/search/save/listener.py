@@ -1,30 +1,15 @@
 """TODO: Add description here"""
 
 import argparse
-from glob import glob
-from os import path
 from typing import Any
 
 from ruamel.yaml import YAML
 
 from search.save.handler import go
-from search.utils.beanstalkd import QueueConf, listen, Publisher
+from search.utils.beanstalkd import QueueConf, listen, Publisher, get_config_file_path
 
 required_keys = ("outputBasePath", "assembly", "queryBody", "fieldNames", "indexName")
 optional_keys = ("indexConfig", "pipeline")
-
-def _get_config_file_path(config_path_base_dir: str, assembly):
-    paths = glob(path.join(config_path_base_dir, assembly + ".y*ml"))
-
-    if not paths:
-        raise ValueError(
-            f"\n\nNo config path found for the assembly {assembly}. Exiting\n\n"
-        )
-
-    if len(paths) > 1:
-        print("\n\nMore than 1 config path found, choosing first")
-
-    return paths[0]
 
 def _coerce_inputs(
     job_details: dict,
@@ -73,19 +58,19 @@ def main():
     with open(args.search_conf, "r", encoding="utf-8") as search_config_file:
         search_conf = YAML(typ="safe").load(search_config_file)
 
-    def handler_fn(publisher: Publisher, job_data: dict):
-        input_body = _coerce_inputs(job_data)
+    def handler_fn(publisher: Publisher, job_details: dict):
+        input_body = _coerce_inputs(job_details)
         go(input_body=input_body, search_conf=search_conf, publisher=publisher)
 
-    def submit_msg_fn(base_msg: dict, job_data: dict):
-        config_path = _get_config_file_path(config_path_base_dir, job_data['assembly'])
+    def submit_msg_fn(base_msg: dict, job_details: dict):
+        config_path = get_config_file_path(config_path_base_dir, job_details['assembly'])
 
         with open(config_path, 'r', encoding='utf-8') as f: # pylint: disable=invalid-name
             job_config = YAML(typ="safe").load(f)
 
         return {**base_msg, "jobConfig": job_config}
 
-    def completed_msg_fn(base_msg: dict, results: Any):
+    def completed_msg_fn(base_msg: dict, job_details: dict, results: Any):
         return {**base_msg, "results": results}
 
     listen(

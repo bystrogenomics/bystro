@@ -7,6 +7,7 @@ from math import ceil
 import multiprocessing
 import os
 import time
+from typing import Optional
 
 from opensearchpy._async.client import AsyncOpenSearch
 from opensearchpy._async import helpers as async_helpers
@@ -14,9 +15,10 @@ from orjson import dumps  # pylint: disable=no-name-in-module
 from pystalk import BeanstalkClient  # type: ignore
 from ruamel.yaml import YAML
 
-from search.index.bystro_file import (
-    read_annotation_tarball,
-)  # pylint: disable=no-name-in-module,import-error
+from search.index.bystro_file import ( #type: ignore # pylint: disable=no-name-in-module,import-error
+    read_annotation_tarball, # pylint: disable=no-name-in-module
+)
+
 from search.utils.beanstalkd import Publisher
 
 import ray
@@ -45,6 +47,7 @@ class Indexer:
         self.counter = 0
 
     async def run(self, data):
+        """TODO: Add description here"""
         resp = await async_helpers.async_bulk(
             self.client, iter(data), chunk_size=self.chunk_size
         )
@@ -91,6 +94,7 @@ class ProgressReporter:
 
 @ray.remote(num_cpus=0)
 class ProgressReporterStub:
+    """A class to report progress to a beanstalk queue"""
     def __init__(self):
         self.value = 0
 
@@ -104,15 +108,16 @@ class ProgressReporterStub:
 
 async def go(
     index_name: str,
-    tar_path: str,
     mapping_conf: dict,
     search_conf: dict,
     chunk_size=500,
     paralleleism_chunk_size=5_000,
-    publisher: Publisher = None,
-    annotation_path: str = None,
+    publisher: Optional[Publisher] = None,
+    tar_path: Optional[str] = None,
+    annotation_path: Optional[str] = None,
 ):
     assert not (tar_path is not None and annotation_path is not None)
+    assert not (tar_path is None and annotation_path is None)
     assert tar_path is not None
 
     search_client_args = dict(
@@ -128,9 +133,9 @@ async def go(
     )
 
     if publisher:
-        reporter = ProgressReporter.remote(publisher)  # pylint: disable=no-member
+        reporter = ProgressReporter.remote(publisher)  # type: ignore # pylint: disable=no-member
     else:
-        reporter = ProgressReporterStub.remote()  # pylint: disable=no-member
+        reporter = ProgressReporterStub.remote()  # type: ignore # pylint: disable=no-member
 
     client = AsyncOpenSearch(**search_client_args)
 
@@ -241,16 +246,16 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     with open(args.search_conf, "r", encoding="utf-8") as f:
-        search_conf = YAML(typ="safe").load(f)
+        search_config = YAML(typ="safe").load(f)
 
     with open(args.mapping_conf, "r", encoding="utf-8") as f:
-        mapping_conf = YAML(typ="safe").load(f)
+        mapping_config = YAML(typ="safe").load(f)
 
     asyncio.run(
         go(
             index_name=args.index_name,
             tar_path=args.tar,
-            mapping_conf=mapping_conf,
-            search_conf=search_conf,
+            mapping_conf=mapping_config,
+            search_conf=search_config
         )
     )

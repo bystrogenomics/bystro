@@ -1,5 +1,6 @@
 """TODO: Add description here"""
-import copy
+from glob import glob
+from os import path
 import time
 import traceback
 from typing import Any, NamedTuple, List, Callable, Optional
@@ -34,6 +35,19 @@ class QueueConf(NamedTuple):
     tubes: dict
     beanstalkd: dict
 
+def get_config_file_path(config_path_base_dir: str, assembly: str, suffix: str = ".y*ml"):
+    """TODO: Add description here"""
+    paths = glob(path.join(config_path_base_dir, assembly + suffix))
+
+    if not paths:
+        raise ValueError(
+            f"\n\nNo config path found for the assembly {assembly}. Exiting\n\n"
+        )
+
+    if len(paths) > 1:
+        print("\n\nMore than 1 config path found, choosing first")
+
+    return paths[0]
 
 def _specify_publisher(
     submission_id, job_id, publisher_host, publisher_port, progress_event, event_queue
@@ -104,13 +118,13 @@ def listen(
                 "submissionID": job.job_data["submissionID"],
             }
 
-            msg = submit_msg_fn(copy.copy(base_msg), job.job_data)
+            msg = submit_msg_fn(base_msg, job.job_data)
 
             client.put_job_into(tube_conf["events"], dumps(msg))
             res = asyncio.get_event_loop().run_until_complete(handler_fn(publisher))
 
             base_msg["event"] = events_conf["completed"]
-            msg = completed_msg_fn(base_msg, res)
+            msg = completed_msg_fn(base_msg, job_details, res)
 
             client.put_job_into(tube_conf["events"], dumps(msg))
             client.delete_job(job.job_id)
