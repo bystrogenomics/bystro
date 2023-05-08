@@ -1,23 +1,29 @@
+"""A module to handle the saving of search results into a new annotation"""
+# TODO 2023-05-08: Track number of skipped entries
+# TODO 2023-05-08: Write to Arrow IPC or Parquet, alongside tsv.
+# TODO 2023-05-08: Implement distributed pipeline/filters/transforms
+# TODO 2023-05-08: Support sort queries
+# TODO 2023-05-08: get max_slices from opensearch index settings
+# TODO 2023-05-08: concatenate chunks in a different ray worker
+
 import math
 import os
 import pathlib
 import subprocess
 import traceback
 
-import mgzip
+import mgzip # type: ignore
 import numpy as np
 from opensearchpy import OpenSearch
-from orjson import dumps
-from pystalk import BeanstalkClient
+from orjson import dumps # pylint: disable=no-name-in-module
+from pystalk import BeanstalkClient # type: ignore
 import ray
 
 ray.init(ignore_reinit_error='true', address='auto')
 
-# TODO: track skipped
-# TODO: handle 1) the munging of the data, 2) distributed pipeline/transform , 3) write as arrow table (arrow ipc format), csv
-
 @ray.remote(num_cpus=0)
 class ProgressReporter:
+    """A class to report progress to a beanstalk queue"""
     def __init__(self, publisher: dict):
         self.value = 0
         self.publisher = publisher
@@ -25,6 +31,7 @@ class ProgressReporter:
             publisher['host'], publisher['port'], socket_timeout=10)
 
     def increment(self, count: int):
+        """Increment the counter by processed variant count and report to the beanstalk queue"""
         self.value += count
         self.publisher['messageBase']['data'] = {
             "progress": self.value,
@@ -36,6 +43,7 @@ class ProgressReporter:
         return self.value
 
     def get_counter(self):
+        """Get the current value of the counter"""
         return self.value
 
 
@@ -48,6 +56,7 @@ default_delimiters = {
 }
 
 def make_output_names(output_base_path: str, statistics: bool, compress: bool, archive: bool) -> dict:
+    """Make a dictionary of output file names based on the output base path and the output options"""
     out = {}
 
     basename = os.path.basename(output_base_path)
@@ -73,13 +82,13 @@ def make_output_names(output_base_path: str, statistics: bool, compress: bool, a
 def _clamp(n, min_num, max_num):
     if n < min_num:
         return min_num
-    elif n > max_num:
-        return max_num
-    else:
-        return n
 
-def _clean_query(input_query_body: dict, default_size: int = 1_000):
-    # TODO: Support sort
+    if n > max_num:
+        return max_num
+
+    return n
+
+def _clean_query(input_query_body: dict):
     input_query_body["sort"] = ["_doc"]
 
     if "aggs" in input_query_body:
@@ -91,7 +100,6 @@ def _clean_query(input_query_body: dict, default_size: int = 1_000):
     if "size" in input_query_body:
         del input_query_body["size"]
 
-    print("input_query_body", input_query_body)
     return input_query_body
 
 
@@ -123,7 +131,7 @@ def _populate_data(field_path, data_for_end_of_path):
 
 def _make_output_string(rows, delims):
     empty_field_char = delims['miss']
-    for row_idx, row in enumerate(rows):
+    for row_idx, row in enumerate(rows): # pylint:disable=too-many-nested-blocks
         # Some fields may just be missing; we won't store even the alt/pos [[]] structure for those
         for i, column in enumerate(row):
             if column is None:
@@ -164,7 +172,8 @@ def _make_output_string(rows, delims):
 
 
 @ray.remote
-def _process_query_chunk(query_args: dict, search_client_args: dict, field_names: list, chunk_output_name: str, reporter):
+def _process_query_chunk(query_args: dict, search_client_args: dict, field_names: list,
+                         chunk_output_name: str, reporter):
     client = OpenSearch(**search_client_args)
     resp = client.search(**query_args)
 
@@ -172,7 +181,6 @@ def _process_query_chunk(query_args: dict, search_client_args: dict, field_names
         return 0
 
     rows = []
-    # skipped = 0
 
     parent_fields, child_fields = _get_header(field_names)
 
@@ -183,7 +191,7 @@ def _process_query_chunk(query_args: dict, search_client_args: dict, field_names
     assert len(resp["hits"]["hits"]) == resp["hits"]["total"]["value"]
 
     for doc in resp["hits"]["hits"]:
-        # TODO: implement distributed filters
+        # TODO: Complete this code for filtering
         # if filterFunctions:
         #     for f in filterFunctions:
         #         if f(doc['_source']):
@@ -195,9 +203,9 @@ def _process_query_chunk(query_args: dict, search_client_args: dict, field_names
             row[y] = _populate_data(
                 child_fields[y], doc["_source"][parent_fields[y]])
 
-        if row[discordant_idx][0][0] == False:
+        if row[discordant_idx][0][0] is False:
             row[discordant_idx][0][0] = 0
-        elif row[discordant_idx][0][0] == True:
+        elif row[discordant_idx][0][0] is True:
             row[discordant_idx][0][0] = 1
 
         rows.append(row)
@@ -212,21 +220,20 @@ def _process_query_chunk(query_args: dict, search_client_args: dict, field_names
 
     return resp["hits"]["total"]["value"]
 
-
-# TODO: get max_slices from opensearch index settings
-def go(
+def go( # pylint:disable=invalid-name
     input_body: dict,
     search_conf: dict,
     max_query_size: int = 10_000,
     max_slices=1024,
     keep_alive="1d",
 ):
+    """ Main function for running the query and writing the output """
     if not input_body['compress']:
         print("\nWarning: still compressing outputs\n")
 
     search_client_args = dict(
         hosts=list(search_conf["connection"]["nodes"]),
-        http_compress=True,  # enables gzip compression for request bodies
+        http_compress=True,
         http_auth=search_conf["auth"].get("auth"),
         client_cert=search_conf["auth"].get("client_cert_path"),
         client_key=search_conf["auth"].get("client_key_path"),
@@ -237,7 +244,7 @@ def go(
     )
 
     client = OpenSearch(**search_client_args)
-    response = client.create_point_in_time(
+    response = client.create_point_in_time( # type: ignore
         index=input_body["indexName"], params={"keep_alive": keep_alive}
     )
 
@@ -267,7 +274,6 @@ def go(
         # minimum 2 required for this to be a slice query
         num_slices = _clamp(math.ceil(n_docs / max_query_size), 1, max_slices)
 
-        # TODO: concatenate chunks in a different ray worker
         written_chunks = [os.path.join(
             output_dir, f"{input_body['indexName']}_header")]
 
@@ -276,13 +282,14 @@ def go(
             fw.write(header_output)
 
         query["size"] = max_query_size
-        reporter = ProgressReporter.remote(input_body['publisher'])
+        reporter = ProgressReporter.remote(input_body['publisher']) # type: ignore # pylint:disable=no-member
         if num_slices == 1:
             written_chunks.append(os.path.join(
                 output_dir, f"{input_body['indexName']}_{0}.gz"))
             results_processed = ray.get(
                 [_process_query_chunk.remote(
-                    {"body": query}, search_client_args, input_body["fieldNames"], written_chunks[-1], reporter)]
+                    {"body": query}, search_client_args,
+                    input_body["fieldNames"], written_chunks[-1], reporter)]
             )
         else:
             save_requests = []
@@ -302,20 +309,21 @@ def go(
                 )
                 save_requests.append(
                     _process_query_chunk.remote(
-                        query_args, search_client_args, input_body["fieldNames"], written_chunks[-1], reporter)
+                        query_args, search_client_args,
+                        input_body["fieldNames"], written_chunks[-1], reporter)
                 )
             results_processed = ray.get(save_requests)
 
         if -1 in results_processed:
-            raise Exception("Failed to process chunk")
-        total = sum(results_processed)
+            raise IOError("Failed to process chunk")
+
         all_chunks = " ".join(written_chunks)
 
         annotation_path = os.path.join(output_dir, output_names['annotation'])
         cmd = 'cat ' + all_chunks + f'> {annotation_path}; rm {all_chunks}'
         ret = subprocess.call(cmd, shell=True)
         if ret != 0:
-            raise Exception(f"Failed to write {annotation_path}")
+            raise IOError(f"Failed to write {annotation_path}")
 
         if input_body['archive']:
             tarball_path = os.path.join(output_dir, output_names['archived'])
@@ -325,9 +333,9 @@ def go(
 
             ret = subprocess.call(cmd, shell=True)
             if ret != 0:
-                raise Exception(f"Failed to write {tarball_path}")
+                raise IOError(f"Failed to write {tarball_path}")
     except Exception as err:
-        response = client.delete_point_in_time(body={"pit_id": pit_id})
-        raise Exception(err) from err
+        response = client.delete_point_in_time(body={"pit_id": pit_id}) # type: ignore
+        raise IOError(err) from err
 
     return output_names
