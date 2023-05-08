@@ -58,7 +58,7 @@ def main():
                   search_conf=search_conf,
                   publisher=publisher)
 
-    def submit_msg_fn(base_msg: dict, **_):
+    def submit_msg_fn(base_msg: dict, *_, **_):
         return base_msg
 
     def completed_msg_fn(base_msg: dict, job_details: dict, results: Any):

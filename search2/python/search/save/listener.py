@@ -70,7 +70,7 @@ def main():
 
         return {**base_msg, "jobConfig": job_config}
 
-    def completed_msg_fn(base_msg: dict, job_details: dict, results: Any):
+    def completed_msg_fn(base_msg: dict, job_details: dict, results: Any): # pylint: disable=unused-argument
         return {**base_msg, "results": results}
 
     listen(
