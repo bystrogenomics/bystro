@@ -1,15 +1,52 @@
 """TODO: Add description here"""
 
 import argparse
+from glob import glob
+from os import path
+from typing import Any
 
 from ruamel.yaml import YAML
 
 from search.save.handler import go
-from search.utils.beanstalkd import QueueConf, listen
+from search.utils.beanstalkd import QueueConf, listen, Publisher
 
 required_keys = ("outputBasePath", "assembly", "queryBody", "fieldNames", "indexName")
 optional_keys = ("indexConfig", "pipeline")
 
+def _get_config_file_path(config_path_base_dir: str, assembly):
+    paths = glob(path.join(config_path_base_dir, assembly + ".y*ml"))
+
+    if not paths:
+        raise ValueError(
+            f"\n\nNo config path found for the assembly {assembly}. Exiting\n\n"
+        )
+
+    if len(paths) > 1:
+        print("\n\nMore than 1 config path found, choosing first")
+
+    return paths[0]
+
+def _coerce_inputs(
+    job_details: dict,
+):
+    job_specific_args = {}
+
+    for key in required_keys:
+        if key not in job_details:
+            raise ValueError(f"Missing required key: {key} in job message")
+
+        job_specific_args[key] = job_details[key]
+
+    for key in optional_keys:
+        if key in job_details:
+            job_specific_args[key] = job_details[key]
+
+    return {
+        "compress": True,
+        "archive": True,
+        "run_statistics": True,
+        **job_specific_args
+    }
 
 def main():
     """TODO: Docstring for main."""
@@ -36,16 +73,28 @@ def main():
     with open(args.search_conf, "r", encoding="utf-8") as search_config_file:
         search_conf = YAML(typ="safe").load(search_config_file)
 
+    def handler_fn(publisher: Publisher, job_data: dict):
+        input_body = _coerce_inputs(job_data)
+        go(input_body=input_body, search_conf=search_conf, publisher=publisher)
+
+    def submit_msg_fn(base_msg: dict, job_data: dict):
+        config_path = _get_config_file_path(config_path_base_dir, job_data['assembly'])
+
+        with open(config_path, 'r', encoding='utf-8') as f: # pylint: disable=invalid-name
+            job_config = YAML(typ="safe").load(f)
+
+        return {**base_msg, "jobConfig": job_config}
+
+    def completed_msg_fn(base_msg: dict, results: Any):
+        return {**base_msg, "results": results}
+
     listen(
-        fn=go,
+        handler_fn=handler_fn,
+        submit_msg_fn=submit_msg_fn,
+        completed_msg_fn=completed_msg_fn,
         queue_conf=QueueConf(**queue_conf["beanstalkd"]),
-        search_conf=search_conf,
-        config_path_base_dir=config_path_base_dir,
-        required_keys=required_keys,
-        optional_keys=optional_keys,
         tube="saveFromQuery",
     )
-
 
 if __name__ == "__main__":
     main()

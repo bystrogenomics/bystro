@@ -1,17 +1,18 @@
 """TODO: Add description here"""
+import copy
 import time
 import traceback
 from typing import Any, NamedTuple, List, Callable, Optional
 
+import asyncio
 from orjson import loads, dumps  # pylint: disable=no-name-in-module
 from pystalk import BeanstalkClient, BeanstalkError  # type: ignore
-from ruamel.yaml import YAML
 from opensearchpy.exceptions import NotFoundError
 
 class Message(NamedTuple):
     """TODO: Add description here"""
     event: str
-    ququeID: str
+    queueID: str
     submissionID: str
     data: Optional[Any]
 
@@ -35,7 +36,7 @@ class QueueConf(NamedTuple):
 
 
 def _specify_publisher(
-    job_details, job_id, publisher_host, publisher_port, progress_event, event_queue
+    submission_id, job_id, publisher_host, publisher_port, progress_event, event_queue
 ):
     Publisher(
             host = publisher_host,
@@ -44,15 +45,15 @@ def _specify_publisher(
             message = Message(
                 event = progress_event,
                 queueID = job_id,
-                submissionID = job_details["submissionID"],
+                submissionID = submission_id,
                 data = None,
             ))
 
 def listen(
     handler_fn: Callable,
-    msg_fn: Callable,
+    submit_msg_fn: Callable,
+    completed_msg_fn: Callable,
     queue_conf: QueueConf,
-    search_conf: dict,
     tube: str,
 ):
     """TODO: Listen on beanstalkd here directly"""
@@ -81,35 +82,35 @@ def listen(
 
         try:
             job = client.reserve_job(5)
-            job_data: dict = loads(job.job_data)
+        except BeanstalkError as err:
+            if err.message == "TIMED_OUT":
+                continue
+            raise err
+        try:
+            job.job_data = loads(job.job_data)
 
             publisher: Publisher = _specify_publisher(
-                job_data,
+                job.job_data,
                 job.job_id,
                 publisher_host=host,
                 publisher_port=port,
                 progress_event=events_conf["progress"],
                 event_queue=tube_conf["events"]
             )
-        except BeanstalkError as err:
-            if err.message == "TIMED_OUT":
-                continue
-            raise err
-        try:
-            msg = {
+
+            base_msg = {
                 "event": events_conf["started"],
-                "jobConfig": job_config,
                 "queueID": job.job_id,
-                "submissionID": job_data["submissionID"],
+                "submissionID": job.job_data["submissionID"],
             }
+
+            msg = submit_msg_fn(copy.copy(base_msg), job.job_data)
 
             client.put_job_into(tube_conf["events"], dumps(msg))
             res = asyncio.get_event_loop().run_until_complete(handler_fn(publisher))
-            output_names = fn(input_data, search_conf)
 
-            del msg["jobConfig"]
-            msg["results"] = {"outputFileNames": output_names}
-            msg["event"] = events_conf["completed"]
+            base_msg["event"] = events_conf["completed"]
+            msg = completed_msg_fn(base_msg, res)
 
             client.put_job_into(tube_conf["events"], dumps(msg))
             client.delete_job(job.job_id)
@@ -121,7 +122,7 @@ def listen(
                 "event": events_conf["failed"],
                 "reason": "404",
                 "queueID": job.job_id,
-                "submissionID": job_data["submissionID"],
+                "submissionID": job.job_data["submissionID"],
             }
 
             traceback.print_exc()
