@@ -1,15 +1,28 @@
 """TODO: Add description here"""
-import glob
-from os import path
 import time
 import traceback
-from typing import NamedTuple, List, Callable
+from typing import Any, NamedTuple, List, Callable, Optional
 
 from orjson import loads, dumps  # pylint: disable=no-name-in-module
 from pystalk import BeanstalkClient, BeanstalkError  # type: ignore
 from ruamel.yaml import YAML
 from opensearchpy.exceptions import NotFoundError
 
+class Message(NamedTuple):
+    """TODO: Add description here"""
+    event: str
+    ququeID: str
+    submissionID: str
+    data: Optional[Any]
+
+class Publisher(NamedTuple):
+    """TODO: Add description here"""
+
+    host: str
+    port: str
+    queue: str
+    tubes: dict
+    message: Message
 
 class QueueConf(NamedTuple):
     """TODO: Add description here"""
@@ -21,82 +34,25 @@ class QueueConf(NamedTuple):
     beanstalkd: dict
 
 
-def _coerce_inputs(
-    job_details,
-    job_id,
-    publisher_host,
-    publisher_port,
-    progress_event,
-    event_queue,
-    config_path_base_dir,
-    required_keys,
-    optional_keys,
+def _specify_publisher(
+    job_details, job_id, publisher_host, publisher_port, progress_event, event_queue
 ):
-    job_specific_args = {}
-
-    for key in required_keys:
-        if key not in job_details:
-            raise ValueError(f"Missing required key: {key} in job message")
-
-        job_specific_args[key] = job_details[key]
-
-    for key in optional_keys:
-        if key in job_details:
-            job_specific_args[key] = job_details[key]
-
-    config_file_path = _get_config_file_path(
-        config_path_base_dir, job_specific_args["assembly"]
-    )
-
-    if not config_file_path:
-        raise ValueError(
-            f"Assembly {job_specific_args['assembly']} doesn't have corresponding config file"
-        )
-
-    common_args = {
-        "config": config_file_path,
-        "publisher": {
-            "host": publisher_host,
-            "port": publisher_port,
-            "queue": event_queue,
-            "messageBase": {
-                "event": progress_event,
-                "queueID": job_id,
-                "submissionID": job_details["submissionID"],
-                "data": None,
-            },
-        },
-        "compress": True,
-        "archive": True,
-        "run_statistics": True,
-    }
-
-    combined_args = {**common_args, **job_specific_args}
-
-    return combined_args
-
-
-def _get_config_file_path(config_path_base_dir: str, assembly):
-    paths = glob.glob(path.join(config_path_base_dir, assembly + ".y*ml"))
-
-    if not paths:
-        raise ValueError(
-            f"\n\nNo config path found for the assembly {assembly}. Exiting\n\n"
-        )
-
-    if len(paths) > 1:
-        print("\n\nMore than 1 config path found, choosing first")
-
-    return paths[0]
-
+    Publisher(
+            host = publisher_host,
+            port = publisher_port,
+            queue = event_queue,
+            message = Message(
+                event = progress_event,
+                queueID = job_id,
+                submissionID = job_details["submissionID"],
+                data = None,
+            ))
 
 def listen(
-    fn: Callable,  # pylint: disable=invalid-name
+    handler_fn: Callable,
+    msg_fn: Callable,
     queue_conf: QueueConf,
     search_conf: dict,
-    config_path_base_dir: str,
-    required_keys: tuple,
-    optional_keys: tuple,
     tube: str,
 ):
     """TODO: Listen on beanstalkd here directly"""
@@ -127,26 +83,19 @@ def listen(
             job = client.reserve_job(5)
             job_data: dict = loads(job.job_data)
 
-            # create the annotator
-            input_data: dict = _coerce_inputs(
+            publisher: Publisher = _specify_publisher(
                 job_data,
                 job.job_id,
                 publisher_host=host,
                 publisher_port=port,
                 progress_event=events_conf["progress"],
-                event_queue=tube_conf["events"],
-                config_path_base_dir=config_path_base_dir,
-                required_keys=required_keys,
-                optional_keys=optional_keys,
+                event_queue=tube_conf["events"]
             )
         except BeanstalkError as err:
             if err.message == "TIMED_OUT":
                 continue
             raise err
         try:
-            with open(input_data["config"], "r", encoding="utf-8") as f:
-                job_config = YAML(typ="safe").load(f)
-
             msg = {
                 "event": events_conf["started"],
                 "jobConfig": job_config,
@@ -155,6 +104,7 @@ def listen(
             }
 
             client.put_job_into(tube_conf["events"], dumps(msg))
+            res = asyncio.get_event_loop().run_until_complete(handler_fn(publisher))
             output_names = fn(input_data, search_conf)
 
             del msg["jobConfig"]

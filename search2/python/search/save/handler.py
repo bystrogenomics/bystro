@@ -15,37 +15,12 @@ import traceback
 import mgzip # type: ignore
 import numpy as np
 from opensearchpy import OpenSearch
-from orjson import dumps # pylint: disable=no-name-in-module
-from pystalk import BeanstalkClient # type: ignore
 import ray
 
+from search.utils.beanstalkd import Publisher
+from search.index.handler import ProgressReporter
+
 ray.init(ignore_reinit_error='true', address='auto')
-
-@ray.remote(num_cpus=0)
-class ProgressReporter:
-    """A class to report progress to a beanstalk queue"""
-    def __init__(self, publisher: dict):
-        self.value = 0
-        self.publisher = publisher
-        self.client = BeanstalkClient(
-            publisher['host'], publisher['port'], socket_timeout=10)
-
-    def increment(self, count: int):
-        """Increment the counter by processed variant count and report to the beanstalk queue"""
-        self.value += count
-        self.publisher['messageBase']['data'] = {
-            "progress": self.value,
-            "skipped": 0
-        }
-        self.client.put_job_into(
-            self.publisher['queue'], dumps(self.publisher['messageBase']))
-
-        return self.value
-
-    def get_counter(self):
-        """Get the current value of the counter"""
-        return self.value
-
 
 default_delimiters = {
     'pos': "|",
@@ -223,6 +198,7 @@ def _process_query_chunk(query_args: dict, search_client_args: dict, field_names
 def go( # pylint:disable=invalid-name
     input_body: dict,
     search_conf: dict,
+    publisher: Publisher,
     max_query_size: int = 10_000,
     max_slices=1024,
     keep_alive="1d",
@@ -282,7 +258,7 @@ def go( # pylint:disable=invalid-name
             fw.write(header_output)
 
         query["size"] = max_query_size
-        reporter = ProgressReporter.remote(input_body['publisher']) # type: ignore # pylint:disable=no-member
+        reporter = ProgressReporter.remote(publisher) # type: ignore # pylint:disable=no-member
         if num_slices == 1:
             written_chunks.append(os.path.join(
                 output_dir, f"{input_body['indexName']}_{0}.gz"))

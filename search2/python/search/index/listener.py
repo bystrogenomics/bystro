@@ -22,7 +22,7 @@ def _get_config_file_path(config_path_base_dir: str, assembly, suffix: str):
                       assembly + suffix))
 
     if not paths:
-        raise Exception(
+        raise ValueError(
             f"\n\nNo config path found for the assembly {assembly}. Exiting\n\n"
         )
 
