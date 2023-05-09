@@ -13,7 +13,7 @@ beanstalkd:
       events: index_events
     filters:
       submission: filters
-      events: filters_eventsf
+      events: filters_events
   events:
     started : started
     completed : completed
