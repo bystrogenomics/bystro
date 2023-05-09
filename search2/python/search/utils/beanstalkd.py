@@ -29,11 +29,19 @@ class Publisher(NamedTuple):
 class QueueConf(NamedTuple):
     """TODO: Add description here"""
 
-    host: List[str]
-    port: List[str]
+    address: List[str]
     events: dict
     tubes: dict
-    beanstalkd: dict
+
+    def split_host_port(self):
+        """TODO: Add description here"""
+        hosts = []
+        ports = []
+        for host in self.address:
+            host, port = host.split(":")
+            hosts.append(host)
+            ports.append(port)
+        return hosts, ports
 
 def get_config_file_path(config_path_base_dir: str, assembly: str, suffix: str = ".y*ml"):
     """TODO: Add description here"""
@@ -71,8 +79,7 @@ def listen(
     tube: str,
 ):
     """TODO: Listen on beanstalkd here directly"""
-    hosts = queue_conf.host
-    ports = queue_conf.port
+    hosts, ports = queue_conf.split_host_port()
 
     for event in ("progress", "failed", "started", "completed"):
         assert event in queue_conf.events
@@ -124,7 +131,7 @@ def listen(
             res = asyncio.get_event_loop().run_until_complete(handler_fn(publisher))
 
             base_msg["event"] = events_conf["completed"]
-            msg = completed_msg_fn(base_msg, job_details, res)
+            msg = completed_msg_fn(base_msg, job.job_data, res)
 
             client.put_job_into(tube_conf["events"], dumps(msg))
             client.delete_job(job.job_id)

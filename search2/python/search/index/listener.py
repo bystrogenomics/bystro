@@ -6,7 +6,7 @@ from typing import Optional, Any
 from ruamel.yaml import YAML
 
 from search.index.handler import go
-from search.utils.beanstalkd import Publisher, get_config_file_path, listen
+from search.utils.beanstalkd import Publisher, QueueConf, get_config_file_path, listen
 
 def main():
     """TODO: Add description here"""
@@ -50,15 +50,14 @@ def main():
             annotation_path = os.path.join(job_details['inputDir'],
                                            job_details['inputFileNames']['annotation'])
 
-        return go(
-                  index_name=job_details["indexName"],
+        return go(index_name=job_details["indexName"],
                   tar_path=tar_path,
                   annotation_path=annotation_path,
                   mapping_conf=mapping_conf,
                   search_conf=search_conf,
                   publisher=publisher)
 
-    def submit_msg_fn(base_msg: dict, *_, **_):
+    def submit_msg_fn(base_msg: dict, job_details: dict): # pylint: disable=unused-argument
         return base_msg
 
     def completed_msg_fn(base_msg: dict, job_details: dict, results: Any):
@@ -72,8 +71,8 @@ def main():
     listen(handler_fn=handler_fn,
            submit_msg_fn=submit_msg_fn,
            completed_msg_fn=completed_msg_fn,
-           queue_conf=queue_conf,
-           tube='submission')
+           queue_conf=QueueConf(**queue_conf["beanstalkd"]),
+           tube='index')
 
 if __name__ == "__main__":
     main()

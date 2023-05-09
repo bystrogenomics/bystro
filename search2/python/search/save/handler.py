@@ -30,7 +30,8 @@ default_delimiters = {
     'fieldSep': "\t",
 }
 
-def make_output_names(output_base_path: str, statistics: bool, compress: bool, archive: bool) -> dict:
+def make_output_names(output_base_path: str, statistics: bool,
+                      compress: bool, archive: bool) -> dict:
     """Make a dictionary of output file names based on the output base path and the output options"""
     out = {}
 

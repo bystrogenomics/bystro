@@ -15,13 +15,12 @@ from orjson import dumps  # pylint: disable=no-name-in-module
 from pystalk import BeanstalkClient  # type: ignore
 from ruamel.yaml import YAML
 
+import ray
+
 from search.index.bystro_file import ( #type: ignore # pylint: disable=no-name-in-module,import-error
     read_annotation_tarball, # pylint: disable=no-name-in-module
 )
-
 from search.utils.beanstalkd import Publisher
-
-import ray
 
 ray.init(ignore_reinit_error="true", address="auto")
 

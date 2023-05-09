@@ -1,6 +1,6 @@
 beanstalkd:
-  host: ~
-  port: ~
+  address:
+    - <host1>:<port1>
   tubes:
     annotation:
       submission: annotation
@@ -13,7 +13,7 @@ beanstalkd:
       events: index_events
     filters:
       submission: filters
-      events: filters_events
+      events: filters_eventsf
   events:
     started : started
     completed : completed
