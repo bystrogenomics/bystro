@@ -2,7 +2,7 @@ apps:
   - name: BystroAnnotationServer
     script: bin/beanstalk_queue_server.pl
     interpreter: 'perl'
-    args: --type annotation -q config/beanstalk.yml --debug
+    args: -q config/beanstalk.yml --debug
   - name: BystroSaveServer
     script: search2/python/search/save/listener.py
     interpreter: 'python'
