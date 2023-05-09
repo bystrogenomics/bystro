@@ -60,7 +60,7 @@ def main():
 
     def handler_fn(publisher: Publisher, job_details: dict):
         input_body = _coerce_inputs(job_details)
-        go(input_body=input_body, search_conf=search_conf, publisher=publisher)
+        return go(input_body=input_body, search_conf=search_conf, publisher=publisher)
 
     def submit_msg_fn(base_msg: dict, job_details: dict):
         config_path = get_config_file_path(config_path_base_dir, job_details['assembly'])
@@ -71,7 +71,7 @@ def main():
         return {**base_msg, "jobConfig": job_config}
 
     def completed_msg_fn(base_msg: dict, job_details: dict, results: Any): # pylint: disable=unused-argument
-        return {**base_msg, "results": results}
+        return {**base_msg, "results": {"outputFileNames": results}}
 
     listen(
         handler_fn=handler_fn,

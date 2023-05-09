@@ -196,7 +196,7 @@ def _process_query_chunk(query_args: dict, search_client_args: dict, field_names
 
     return resp["hits"]["total"]["value"]
 
-def go( # pylint:disable=invalid-name
+async def go( # pylint:disable=invalid-name
     input_body: dict,
     search_conf: dict,
     publisher: Publisher,
@@ -241,6 +241,8 @@ def go( # pylint:disable=invalid-name
 
         if "sort" in query_no_sort:
             del query_no_sort["sort"]
+        if "track_total_hits" in query_no_sort:
+            del query_no_sort["track_total_hits"]
         del query_no_sort["pit"]
         response = client.count(
             body=query_no_sort, index=input_body["indexName"])
@@ -251,8 +253,7 @@ def go( # pylint:disable=invalid-name
         # minimum 2 required for this to be a slice query
         num_slices = _clamp(math.ceil(n_docs / max_query_size), 1, max_slices)
 
-        written_chunks = [os.path.join(
-            output_dir, f"{input_body['indexName']}_header")]
+        written_chunks = [os.path.join(output_dir, f"{input_body['indexName']}_header")]
 
         header_output = "\t".join(input_body['fieldNames']) + "\n"
         with mgzip.open(written_chunks[-1], "wt", thread=8, blocksize=2*10**8) as fw:
