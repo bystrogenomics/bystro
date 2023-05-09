@@ -56,10 +56,6 @@ GetOptions(
 
 my $conf = LoadFile($queueConfigPath);
 
-# Beanstalk servers will be sharded
-my $beanstalkHost  = $conf->{beanstalk_host_1};
-my $beanstalkPort  = $conf->{beanstalk_port_1};
-
 # for jobID specific pings
 # my $annotationStatusChannelBase  = 'annotationStatus:';
 
@@ -100,7 +96,7 @@ if(!$queueConfig) {
 }
 
 my $beanstalk = Beanstalk::Client->new({
-  server    => $conf->{beanstalkd}{host} . ':' . $conf->{beanstalkd}{port},
+  server    => $conf->{beanstalkd}{address}[0],
   default_tube => $queueConfig->{submission},
   connect_timeout => 1,
   encoder => sub { encode_json(\@_) },
@@ -108,7 +104,7 @@ my $beanstalk = Beanstalk::Client->new({
 });
 
 my $beanstalkEvents = Beanstalk::Client->new({
-  server    => $conf->{beanstalkd}{host} . ':' . $conf->{beanstalkd}{port},
+  server    => $conf->{beanstalkd}{address}[0],
   default_tube => $queueConfig->{events},
   connect_timeout => 1,
   encoder => sub { encode_json(\@_) },
@@ -313,7 +309,7 @@ sub coerceInputs {
   my %commmonArgs = (
     config             => $configFilePath,
     publisher => {
-      server => $conf->{beanstalkd}{host} . ':' . $conf->{beanstalkd}{port},
+      server => $conf->{beanstalkd}{address}[0],
       queue  => $queueConfig->{events},
       messageBase => {
         event => $events->{progress},
