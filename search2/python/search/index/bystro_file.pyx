@@ -31,7 +31,7 @@ cdef class ReadAnnotationTarball:
         list header_fields
         list paths
         dict boolean_map
-        dict idx_action 
+        int id
         list row_documents
 
     def __cinit__(self, str index_name,  dict boolean_map, dict delimiters, str tar_path, str annotation_name = 'annotation.tsv.gz', int chunk_size=500):
@@ -52,7 +52,7 @@ cdef class ReadAnnotationTarball:
         self.header_fields = self.decompressed_data.readline().rstrip(b"\n").decode('utf-8').split(self.field_separator)
         self.paths = [field.split(".") for field in self.header_fields]
         self.boolean_map = boolean_map
-        self.idx_action = {"_index": self.index_name, "_id": 0, "_source": {}}
+        self.id = 0
         self.row_documents = []
 
     def __iter__(self):
@@ -74,11 +74,10 @@ cdef class ReadAnnotationTarball:
                 raise StopIteration
 
             count += 1
-            row = line.decode('utf-8').strip("\n").split(self.field_separator)
-
-            self.idx_action['_id'] += 1
+            self.id += 1
             _source ={}
 
+            row = line.decode('utf-8').strip("\n").split(self.field_separator)
             for i, field in enumerate(row):
                 allele_values = []
                 for allele_value in field.split(self.allele_delimiter):
@@ -119,9 +118,9 @@ cdef class ReadAnnotationTarball:
 
                 populate_hash_path(_source, self.paths[i], allele_values)
 
-            self.idx_action['_source'] = _source
-            self.row_documents.append(self.idx_action)
+            self.row_documents.append({"_index": self.index_name, "_id": self.id, "_source": _source})
             if count >= self.chunk_size:
+                print("len", len(self.row_documents))
                 return self.row_documents
 
         if not self.row_documents:

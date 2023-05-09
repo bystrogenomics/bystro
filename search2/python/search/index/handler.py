@@ -178,7 +178,7 @@ async def go(
         Indexer.remote( # pylint: disable=no-member
             search_client_args, progress_tracker=reporter, chunk_size=chunk_size
         )
-        for x in range(n_threads)
+        for _ in range(n_threads)
     ]
     actor_idx = 0
     results = []
@@ -192,6 +192,8 @@ async def go(
 
     print("Took", time.time() - start)
 
+    reported_count = ray.get(reporter.get_counter.remote())
+
     errors = []
     total = 0
     for x in res: # pylint: disable=invalid-name
@@ -202,16 +204,18 @@ async def go(
     if errors:
         raise ValueError("\n".join(errors))
 
+    to_report_count = total - reported_count
+    if to_report_count > 0:
+        await asyncio.to_thread(reporter.increment.remote, to_report_count)
+
     print(f"Processed {total} records")
 
     for actor in actors:
         await actor.close.remote()
 
-    result = await client.indices.put_settings(
+    await client.indices.put_settings(
         index=index_name, body=post_index_settings
     )
-
-    print(result)
 
     await client.close()
 

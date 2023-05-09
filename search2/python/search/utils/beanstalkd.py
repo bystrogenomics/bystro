@@ -59,7 +59,7 @@ def get_config_file_path(config_path_base_dir: str, assembly: str, suffix: str =
 def _specify_publisher(
     submission_id, job_id, publisher_host, publisher_port, progress_event, event_queue
 ):
-    Publisher(
+    return Publisher(
             host = publisher_host,
             port = publisher_port,
             queue = event_queue,
@@ -110,7 +110,7 @@ def listen(
             job_data = loads(job.job_data)
 
             publisher: Publisher = _specify_publisher(
-                job_data,
+                job_data['submissionID'],
                 job.job_id,
                 publisher_host=host,
                 publisher_port=port,
