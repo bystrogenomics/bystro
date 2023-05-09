@@ -23,7 +23,6 @@ class Publisher(NamedTuple):
     host: str
     port: str
     queue: str
-    tubes: dict
     message: Message
 
 class QueueConf(NamedTuple):
@@ -108,10 +107,10 @@ def listen(
                 continue
             raise err
         try:
-            job.job_data = loads(job.job_data)
+            job_data = loads(job.job_data)
 
             publisher: Publisher = _specify_publisher(
-                job.job_data,
+                job_data,
                 job.job_id,
                 publisher_host=host,
                 publisher_port=port,
@@ -122,16 +121,16 @@ def listen(
             base_msg = {
                 "event": events_conf["started"],
                 "queueID": job.job_id,
-                "submissionID": job.job_data["submissionID"],
+                "submissionID": job_data["submissionID"],
             }
 
-            msg = submit_msg_fn(base_msg, job.job_data)
+            msg = submit_msg_fn(base_msg, job_data)
 
             client.put_job_into(tube_conf["events"], dumps(msg))
-            res = asyncio.get_event_loop().run_until_complete(handler_fn(publisher))
+            res = asyncio.get_event_loop().run_until_complete(handler_fn(publisher, job_data))
 
             base_msg["event"] = events_conf["completed"]
-            msg = completed_msg_fn(base_msg, job.job_data, res)
+            msg = completed_msg_fn(base_msg, job_data, res)
 
             client.put_job_into(tube_conf["events"], dumps(msg))
             client.delete_job(job.job_id)
@@ -143,7 +142,7 @@ def listen(
                 "event": events_conf["failed"],
                 "reason": "404",
                 "queueID": job.job_id,
-                "submissionID": job.job_data["submissionID"],
+                "submissionID": job_data["submissionID"],
             }
 
             traceback.print_exc()

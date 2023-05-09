@@ -66,7 +66,7 @@ def main():
         with open(m_path, 'r', encoding='utf-8') as f:
             mapping_conf = YAML(typ="safe").load(f)
 
-        return {**base_msg, "indexConfig": mapping_conf, "results": results}
+        return {**base_msg, "indexConfig": mapping_conf, "fieldNames": results}
 
     listen(handler_fn=handler_fn,
            submit_msg_fn=submit_msg_fn,

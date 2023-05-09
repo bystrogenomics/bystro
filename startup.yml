@@ -4,12 +4,12 @@ apps:
     interpreter: 'perl'
     args: --type annotation -q config/beanstalk.yml --debug
   - name: BystroSaveServer
-    script: bin/beanstalk_queue_server.pl
-    interpreter: 'perl'
+    script: search2/python/search/save/listener.py
+    interpreter: 'python'
     args:
-      --type saveFromQuery -q config/beanstalk.yml -c config/elastic-config.yml --debug
+      --conf_dir config --queue_conf config/beanstalk.yml --search_conf config/elastic-config2.yml
   - name: BystroIndexServer
-    script: search2/python/search/index/listener.py 
+    script: search2/python/search/index/listener.py
     interpreter: 'python'
     args:
       --conf_dir config --queue_conf config/beanstalk.yml --search_conf config/elastic-config2.yml
