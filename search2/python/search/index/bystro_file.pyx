@@ -5,23 +5,18 @@ from typing import List
 from libc.stdint cimport uint32_t
 import time
 
-cdef inline dict populate_hash_path(dict row_document, list field_path, field_value):
-    cdef dict current = row_document
-    cdef uint32_t path_len = len(field_path)
-    cdef uint32_t k
+cdef inline populate_hash_path(dict row_document, list field_path, list field_value):
+    cdef dict current_dict = row_document
+    cdef uint32_t i = 0
+    for key in field_path:
+        i += 1
 
-    for k in range(path_len):
-        key = field_path[k]
-
-        if key not in row_document:
-            current[key] = {}
-
-        if k < path_len - 1:
-            current = current[key]
+        if key not in current_dict:
+            current_dict[key] = {}
+        if i == len(field_path):
+            current_dict[key] = field_value
         else:
-            current[key] = field_value
-
-    return row_document
+            current_dict = current_dict[key]
 
 cdef class ReadAnnotationTarball:
     cdef:
@@ -82,7 +77,8 @@ cdef class ReadAnnotationTarball:
             row = line.decode('utf-8').strip("\n").split(self.field_separator)
 
             self.idx_action['_id'] += 1
-            self.idx_action['_source'] = {}
+            _source ={}
+
             for i, field in enumerate(row):
                 allele_values = []
                 for allele_value in field.split(self.allele_delimiter):
@@ -121,7 +117,9 @@ cdef class ReadAnnotationTarball:
 
                     allele_values.append(position_values)
 
-                self.idx_action['_source'] = populate_hash_path(self.idx_action['_source'], self.paths[i], allele_values)
+                populate_hash_path(_source, self.paths[i], allele_values)
+
+            self.idx_action['_source'] = _source
             self.row_documents.append(self.idx_action)
             if count >= self.chunk_size:
                 return self.row_documents
