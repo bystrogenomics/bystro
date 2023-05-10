@@ -111,7 +111,7 @@ async def go(
 
     errors = []
     total = 0
-    for (indexed_count, errors) in res: # pylint: disable=invalid-name
+    for (indexed_count, errors) in res:
         total += indexed_count
         if errors:
             errors.append(",".join(errors))
