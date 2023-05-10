@@ -1,4 +1,3 @@
-# TODO: allow reading directly from annotation_path or get rid of that possibility in annotator
 # TODO: read delimiters from annotation_conf
 
 import argparse
@@ -62,11 +61,7 @@ async def go(
     chunk_size=500,
     paralleleism_chunk_size=5_000,
     publisher: Optional[Publisher] = None,
-    annotation_path: Optional[str] = None,
 ):
-    if annotation_path is not None:
-        raise ValueError("annotation_path is not yet supported")
-
     reporter = get_progress_reporter(publisher)
 
     search_client_args = gather_opensearch_args(search_conf)

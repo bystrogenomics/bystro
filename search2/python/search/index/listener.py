@@ -46,19 +46,15 @@ def main():
             mapping_conf = YAML(typ="safe").load(f)
 
         tar_path: Optional[str] = None
-        annotation_path: Optional[str] = None
         input_file_names = job_details['inputFileNames']
 
-        if input_file_names.get('archived'):
-            tar_path = os.path.join(
-                job_details['inputDir'], job_details['inputFileNames']['archived'])
-        else:
-            annotation_path = os.path.join(job_details['inputDir'],
-                                           job_details['inputFileNames']['annotation'])
+        if not input_file_names.get('archived'):
+            raise ValueError('Missing required key: "archived" in job inputFileNames')
+
+        tar_path = os.path.join(job_details['inputDir'], job_details['inputFileNames']['archived'])
 
         return go(index_name=job_details["indexName"],
                   tar_path=tar_path,
-                  annotation_path=annotation_path,
                   mapping_conf=mapping_conf,
                   search_conf=search_conf,
                   publisher=publisher)
