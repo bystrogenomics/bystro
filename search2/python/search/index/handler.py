@@ -117,7 +117,7 @@ async def go(
             errors.append(",".join(errors))
 
     if errors:
-        raise ValueError("\n".join(errors))
+        raise RuntimeError("\n".join(errors))
 
     to_report_count = total - reported_count
     if to_report_count > 0:
