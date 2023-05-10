@@ -12,6 +12,8 @@ from opensearchpy.exceptions import NotFoundError
 
 import ray
 
+BEANSTALK_ERR_TIMEOUT = "TIMED_OUT"
+
 class Message(NamedTuple):
     """Beanstalkd Message"""
     event: str
@@ -102,7 +104,7 @@ def listen(
         try:
             job = client.reserve_job(5)
         except BeanstalkError as err:
-            if err.message == "TIMED_OUT":
+            if err.message == BEANSTALK_ERR_TIMEOUT:
                 continue
             raise err
         try:
