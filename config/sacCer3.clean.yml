@@ -1,37 +1,36 @@
 ---
 assembly: sacCer3
 chromosomes:
-- chrI
-- chrII
-- chrIII
-- chrIV
-- chrIX
-- chrM
-- chrV
-- chrVI
-- chrVII
-- chrVIII
-- chrX
-- chrXI
-- chrXII
-- chrXIII
-- chrXIV
-- chrXV
-- chrXVI
-database_dir: '~'
-files: '~'
+  - chrI
+  - chrII
+  - chrIII
+  - chrIV
+  - chrIX
+  - chrM
+  - chrV
+  - chrVI
+  - chrVII
+  - chrVIII
+  - chrX
+  - chrXI
+  - chrXII
+  - chrXIII
+  - chrXIV
+  - chrXV
+  - chrXVI
+database_dir: "~"
+files: "~"
 files_dir: ~
 statistics:
-  dbSNPnameField: ~
-  exonicAlleleFunctionField: refSeq.exonicAlleleFunction
+  exonicAlleleFunctionField: sgd.exonicAlleleFunction
   outputExtensions:
     json: .statistics.json
     qc: .statistics.qc.tab
     tab: .statistics.tab
   refTrackField: ref
-  siteTypeField: refSeq.siteType
+  siteTypeField: sgd.siteType
   programPath: bystro-stats
-temp_dir: '~'
+temp_dir: "~"
 fileProcessors:
   snp:
     args: --emptyField ! --minGq .95

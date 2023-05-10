@@ -4,3 +4,14 @@ t/tracks/nearest/db/hg19/index
 t/utils/filterCadd.yml
 t/utils/index/
 *lock.mdb
+config/hg19.yml
+config/hg38.yml
+config/rheMac8.yml
+config/sacCer3.yml
+config/mm10.yml
+config/mm9.yml
+config/dm6.yml
+config/dm3.yml
+config/danRer10.yml
+config/ce11.yml
+config/ensembl.yml

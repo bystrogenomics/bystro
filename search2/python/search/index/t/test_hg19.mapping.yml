@@ -1,0 +1,609 @@
+numericalFields:
+  - cadd
+  - phastCons
+  - phyloP
+  - pos
+  - dbSNP.alleleNs
+  - dbSNP.alleleFreqs
+  - refSeq.codonNumber
+  - refSeq.codonPosition
+  - clinvar.alleleID
+  - refSeq.clinvar.alleleID
+  - refSeq.clinvar.chromStart
+  - refSeq.clinvar.numberSubmitters
+  - clinvar.numberSubmitters
+sort:
+  cadd: avg
+  dbSNP.alleleNs: avg
+  dbSNP.alleleFreqs: min
+  refSeq.codonNumber: avg
+  refSeq.codonPosition: avg
+booleanFields:
+  - discordant
+post_index_settings:
+  index:
+    refresh_interval: 15s
+    number_of_replicas: 1
+index_settings:
+  index:
+    refresh_interval: -1
+    number_of_replicas: 0
+    codec: best_compression
+  analysis:
+    normalizer:
+      lowercase_normalizer:
+        type: custom
+        filter:
+          - lowercase
+          - asciifolding
+      uppercase_normalizer:
+        type: custom
+        filter:
+          - uppercase
+          - asciifolding
+    filter:
+      english_stemmer:
+        type: stemmer
+        language: light_english
+      english_possessive_stemmer:
+        type: stemmer
+        language: possessive_english
+      english_minimal_stemmer:
+        type: stemmer
+        language: minimal_english
+      search_synonym_filter:
+        type: synonym
+        synonyms_path: "analysis/search-synonyms.txt"
+      amino_synonym_filter:
+        type: synonym
+        synonyms_path: "analysis/amino-synonyms.txt"
+      type_synonym_filter:
+        type: synonym
+        synonyms_path: "analysis/type-synonyms.txt"
+      dbSNP_func_synonyms:
+        type: synonym
+        synonyms_path: "analysis/dbsnp-func-synonyms.txt"
+      dbSNP_class_synonyms:
+        type: synonym
+        synonyms_path: "analysis/dbsnp-class-synonyms.txt"
+      exonic_allele_function_search_synonyms:
+        type: synonym
+        synonyms_path: "analysis/exonic-allele-function-search-synonyms.txt"
+      site_type_synonym_filter:
+        type: synonym
+        synonyms_path: "analysis/site-type-synonyms.txt"
+      codon_map_synonym_filter:
+        type: synonym
+        synonyms_path: "analysis/codon-map-synonyms.txt"
+      description_synonyms:
+        type: synonym
+        synonyms_path: "analysis/refseq-description-synonyms.txt"
+      disease_synonyms:
+        type: synonym
+        synonyms_path: "analysis/disease-synonyms.txt"
+      autocomplete_filter:
+        type: edge_ngram
+        min_gram: 1
+        max_gram: 30
+        token_chars:
+          - letter
+          - digit
+    analyzer:
+      autocomplete_english:
+        type: custom
+        tokenizer: whitespace
+        filter:
+          - lowercase
+          - asciifolding
+          - english_stemmer
+          - autocomplete_filter
+      autocomplete_english_split:
+        type: custom
+        tokenizer: whitespace
+        filter:
+          - lowercase
+          - asciifolding
+          - english_stemmer
+          - autocomplete_filter
+      search_english:
+        type: custom
+        tokenizer: whitespace
+        filter:
+          - lowercase
+          - asciifolding
+          - english_stemmer
+          - search_synonym_filter
+      search_english_split:
+        type: custom
+        tokenizer: whitespace
+        filter:
+          - lowercase
+          - asciifolding
+          - english_stemmer
+          - search_synonym_filter
+      search_english_type:
+        type: custom
+        tokenizer: whitespace
+        filter:
+          - lowercase
+          - asciifolding
+          - english_stemmer
+          - type_synonym_filter
+          - dbSNP_class_synonyms
+      search_english_description_synonyms:
+        type: custom
+        tokenizer: whitespace
+        filter:
+          - lowercase
+          - asciifolding
+          - english_stemmer
+          - description_synonyms
+          - disease_synonyms
+      search_english_class:
+        type: custom
+        tokenizer: whitespace
+        filter:
+          - lowercase
+          - asciifolding
+          - english_stemmer
+          - dbSNP_class_synonyms
+      search_english_func:
+        type: custom
+        tokenizer: whitespace
+        filter:
+          - lowercase
+          - asciifolding
+          - english_stemmer
+          - dbSNP_func_synonyms
+      uppercase_keyword_text:
+        type: custom
+        tokenizer: keyword
+        filter:
+          - uppercase
+          - asciifolding
+      uppercase_keyword_text_codon:
+        type: custom
+        tokenizer: keyword
+        filter:
+          - uppercase
+          - asciifolding
+          - codon_map_synonym_filter
+          - amino_synonym_filter
+      uppercase_keyword_text_amino:
+        type: custom
+        tokenizer: keyword
+        filter:
+          - uppercase
+          - asciifolding
+          - amino_synonym_filter
+mappings:
+  properties:
+    chrom:
+      type: keyword
+      normalizer: lowercase_normalizer
+    pos:
+      type: integer
+    trTv:
+      type: byte
+    type:
+      type: text
+      analyzer: autocomplete_english
+      search_analyzer: search_english_type
+      fields:
+        exact:
+          type: keyword
+          normalizer: lowercase_normalizer
+    discordant:
+      type: boolean
+    heterozygotes:
+      type: keyword
+    heterozygosity:
+      type: half_float
+    homozygotes:
+      type: keyword
+    homozygosity:
+      type: half_float
+    missingGenos:
+      type: keyword
+    missingness:
+      type: half_float
+    sampleMaf:
+      type: half_float
+    ac:
+      type: integer
+    an:
+      type: integer
+    alt:
+      type: keyword
+      normalizer: uppercase_normalizer
+    ref:
+      type: keyword
+      normalizer: uppercase_normalizer
+    vcfPos:
+      type: integer
+    id:
+      type: keyword
+      normalizer: lowercase_normalizer
+    refSeq:
+      properties:
+        siteType:
+          type: text
+          analyzer: autocomplete_english
+          search_analyzer: search_english_func
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
+        exonicAlleleFunction:
+          type: text
+          analyzer: autocomplete_english
+          search_analyzer: search_english_func
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
+        refCodon:
+          type: keyword
+          normalizer: uppercase_normalizer
+        altCodon:
+          type: keyword
+          normalizer: uppercase_normalizer
+        refAminoAcid:
+          type: text
+          analyzer: uppercase_keyword_text
+          search_analyzer: uppercase_keyword_text_amino
+          fields:
+            exact:
+              type: keyword
+              normalizer: uppercase_normalizer
+        altAminoAcid:
+          type: text
+          analyzer: uppercase_keyword_text
+          search_analyzer: uppercase_keyword_text_amino
+          fields:
+            exact:
+              type: keyword
+              normalizer: uppercase_normalizer
+        codonPosition:
+          type: byte
+        codonNumber:
+          type: integer
+        strand:
+          type: keyword
+        kgID:
+          type: keyword
+          normalizer: lowercase_normalizer
+        mRNA:
+          type: keyword
+          normalizer: uppercase_normalizer
+        spID:
+          type: keyword
+          normalizer: uppercase_normalizer
+        spDisplayID:
+          type: keyword
+          normalizer: uppercase_normalizer
+        name2:
+          type: keyword
+          normalizer: uppercase_normalizer
+        protAcc:
+          type: keyword
+          normalizer: uppercase_normalizer
+        description:
+          type: text
+          analyzer: autocomplete_english_split
+          search_analyzer: search_english_description_synonyms
+        rfamAcc:
+          type: keyword
+          normalizer: uppercase_normalizer
+        name:
+          type: keyword
+          normalizer: uppercase_normalizer
+        nearest:
+          properties:
+            name:
+              type: keyword
+              normalizer: uppercase_normalizer
+            name2:
+              type: keyword
+              normalizer: uppercase_normalizer
+        clinvar:
+          properties:
+            alleleID:
+              type: integer
+            phenotypeList:
+              type: text
+              analyzer: autocomplete_english_split
+              search_analyzer: search_english_description_synonyms
+            clinicalSignificance:
+              type: text
+              analyzer: autocomplete_english_split
+              search_analyzer: search_english_split
+            type:
+              type: text
+              analyzer: autocomplete_english
+              search_analyzer: search_english_class
+              fields:
+                exact:
+                  type: keyword
+                  normalizer: lowercase_normalizer
+            origin:
+              type: text
+              analyzer: autocomplete_english_split
+              search_analyzer: search_english_split
+            numberSubmitters:
+              type: short
+            reviewStatus:
+              type: text
+              analyzer: autocomplete_english_split
+              search_analyzer: search_english_split
+            chromStart:
+              type: integer
+            chromEnd:
+              type: integer
+    phastCons:
+      type: scaled_float
+      scaling_factor: 100
+    phyloP:
+      type: scaled_float
+      scaling_factor: 100
+    cadd:
+      type: scaled_float
+      scaling_factor: 10
+    dbSNP:
+      properties:
+        name:
+          type: keyword
+          normalizer: lowercase_normalizer
+        strand:
+          type: keyword
+        observed:
+          type: keyword
+          normalizer: uppercase_normalizer
+        class:
+          type: text
+          analyzer: autocomplete_english
+          search_analyzer: search_english_class
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
+        func:
+          type: text
+          analyzer: autocomplete_english
+          search_analyzer: search_english_func
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
+        alleles:
+          type: keyword
+          normalizer: uppercase_normalizer
+        alleleNs:
+          type: integer
+          coerce: true
+        alleleFreqs:
+          type: half_float
+    clinvar:
+      properties:
+        alleleID:
+          type: integer
+        phenotypeList:
+          type: text
+          analyzer: autocomplete_english_split
+          search_analyzer: search_english_description_synonyms
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
+        clinicalSignificance:
+          type: text
+          analyzer: autocomplete_english_split
+          search_analyzer: search_english_split
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
+        type:
+          type: text
+          analyzer: autocomplete_english
+          search_analyzer: search_english_class
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
+        origin:
+          type: text
+          analyzer: autocomplete_english_split
+          search_analyzer: search_english_split
+        numberSubmitters:
+          type: short
+        reviewStatus:
+          type: text
+          analyzer: autocomplete_english_split
+          search_analyzer: search_english_split
+        referenceAllele:
+          type: keyword
+          normalizer: uppercase_normalizer
+        alternateAllele:
+          type: keyword
+          normalizer: uppercase_normalizer
+    gnomad:
+      properties:
+        genomes:
+          properties:
+            alt:
+              type: keyword
+              normalizer: uppercase_normalizer
+            id:
+              type: keyword
+              normalizer: lowercase_normalizer
+            af:
+              type: half_float
+            ac:
+              type: short
+            ac_afr:
+              type: short
+            ac_amr:
+              type: short
+            ac_asj:
+              type: short
+            ac_eas:
+              type: short
+            ac_fin:
+              type: short
+            ac_nfe:
+              type: short
+            ac_oth:
+              type: short
+            ac_sas:
+              type: short
+            ac_male:
+              type: short
+            ac_female:
+              type: short
+            an:
+              type: short
+            an_afr:
+              type: short
+            an_amr:
+              type: short
+            an_asj:
+              type: short
+            an_eas:
+              type: short
+            an_fin:
+              type: short
+            an_nfe:
+              type: short
+            an_oth:
+              type: short
+            an_sas:
+              type: short
+            an_male:
+              type: short
+            an_female:
+              type: short
+            af_afr:
+              type: half_float
+            af_amr:
+              type: half_float
+            af_asj:
+              type: half_float
+            af_eas:
+              type: half_float
+            af_fin:
+              type: half_float
+            af_nfe:
+              type: half_float
+            af_oth:
+              type: half_float
+            af_sas:
+              type: half_float
+            af_male:
+              type: half_float
+            af_female:
+              type: half_float
+        exomes:
+          properties:
+            alt:
+              type: keyword
+              normalizer: uppercase_normalizer
+            id:
+              type: keyword
+              normalizer: lowercase_normalizer
+            ac:
+                type: integer
+            af:
+              type: half_float
+            an:
+              type: integer
+            ac_afr:
+                type: integer
+            ac_amr:
+                type: integer
+            ac_asj:
+                type: integer
+            ac_eas:
+                type: integer
+            ac_fin:
+                type: integer
+            ac_nfe:
+                type: integer
+            ac_oth:
+                type: integer
+            ac_male:
+                type: integer
+            ac_female:
+                type: integer
+            an_afr:
+              type: integer
+            an_amr:
+              type: integer
+            an_asj:
+              type: integer
+            an_eas:
+              type: integer
+            an_fin:
+              type: integer
+            an_nfe:
+              type: integer
+            an_oth:
+              type: integer
+            an_sas:
+              type: integer
+            an_male:
+              type: integer
+            an_female:
+              type: integer
+            af_afr:
+              type: half_float
+            af_amr:
+              type: half_float
+            af_asj:
+              type: half_float
+            af_eas:
+              type: half_float
+            af_fin:
+              type: half_float
+            af_nfe:
+              type: half_float
+            af_oth:
+              type: half_float
+            af_sas:
+              type: half_float
+            af_male:
+              type: half_float
+            af_female:
+              type: half_float
+    cosmic:
+      properties:
+        coding:
+          properties:
+            id:
+              type: keyword
+              normalizer: uppercase_normalizer
+            cnt:
+              type: integer
+            cds:
+              type: keyword
+              normalizer: uppercase_normalizer
+            gene:
+              type: keyword
+              normalizer: uppercase_normalizer
+            strand:
+              type: keyword
+        nonCoding:
+          properties:
+            id:
+              type: keyword
+              normalizer: uppercase_normalizer
+            cnt:
+              type: integer
+            cds:
+              type: keyword
+              normalizer: uppercase_normalizer
+            gene:
+              type: keyword
+              normalizer: uppercase_normalizer
+            strand:
+              type: keyword

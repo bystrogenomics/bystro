@@ -16,7 +16,7 @@ fi
 . ~/.bash_profile;
 
 # Perlbrew simplifies version management
-. ./install/install-perlbrew-linux.sh $INSTALL_DIR perl-5.28.0;
+. ./install/install-perlbrew-linux.sh $INSTALL_DIR perl-5.30.1;
 . ./install/install-perl-libs.sh;
 
 . ~/.bash_profile;
@@ -36,4 +36,4 @@ fi
 mkdir -p logs;
 
 
-printf "\n\nREMEMBER TO INCREASE ULIMIT ABOVE 1024 IF RUNNING MANY FORKS\n\n";
+printf "\n\nREMEMBER TO INCREASE ULIMIT ABOVE 1024 IF RUNNING MANY FORKS\n\nF RUNNING 1st TIME RUN: `source $PERLBREW_ROOT/etc/bashrc";

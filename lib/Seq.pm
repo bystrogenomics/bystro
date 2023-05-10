@@ -33,10 +33,10 @@ extends 'Seq::Base';
 has input_file => (is => 'rw', isa => 'Str', required => 1);
 
 # Maximum (signed) size of del allele
-has maxDel => (is => 'ro', isa => 'Int', default => -32, writer => 'setMaxDel');
+has maxDel => ( is => 'ro', isa => 'Int', default => -32, writer => 'setMaxDel' );
 
 # TODO: formalize: check that they have name and args properties
-has fileProcessors => (is => 'ro', isa => 'HashRef', default => 'bystro-vcf');
+has fileProcessors => ( is => 'ro', isa => 'HashRef', default => 'bystro-vcf' );
 
 # Defines most of the properties that can be configured at run time
 # Needed because there are variations of Seq.pm, ilke SeqFromQuery.pm
@@ -50,13 +50,13 @@ has '+readOnly' => (init_arg => undef, default => 1);
 sub BUILD {
   my $self = shift;
 
-  if($self->maxDel > 0) {
-    $self->setMaxDel(-$self->maxDel);
+  if ( $self->maxDel > 0 ) {
+    $self->setMaxDel( -$self->maxDel );
   }
 
   ################## Make the full output path ######################
   # The output path always respects the $self->output_file_base attribute path;
-  $self->{_outPath} = $self->_workingDir->child($self->outputFilesInfo->{annotation});
+  $self->{_outPath} = $self->_workingDir->child( $self->outputFilesInfo->{annotation} );
 
   $self->{_headerPath} = $self->_workingDir->child($self->outputFilesInfo->{header});
 
@@ -78,7 +78,7 @@ sub annotate {
 
   if($err) {
     $self->_errorWithCleanup($err);
-    return ($err, undef);
+    return ( $err, undef );
   }
 
   $self->log( 'info', 'Beginning annotation' );
@@ -92,9 +92,9 @@ sub annotateFile {
 
   my ($err, $fh, $outFh, $statsFh, $headerFh) = $self->_getFileHandles($type);
 
-  if($err) {
+  if ($err) {
     $self->_errorWithCleanup($err);
-    return ($err, undef);
+    return ( $err, undef );
   }
 
   ########################## Write the header ##################################
@@ -121,9 +121,10 @@ sub annotateFile {
   my $messageFreq = (2e4 / 4) * $self->maxThreads;
 
   # Report every 1e4 lines, to avoid thrashing receiver
-  my $progressFunc = $self->makeLogProgressAndPrint(\$abortErr, $outFh, $statsFh, $messageFreq);
+  my $progressFunc =
+  $self->makeLogProgressAndPrint( \$abortErr, $outFh, $statsFh, $messageFreq );
   MCE::Loop::init {
-    max_workers => $self->maxThreads,
+    max_workers => $self->max_threads || 8,
     use_slurpio => 1,
     chunk_size => 'auto',
     gather => $progressFunc,
@@ -163,7 +164,7 @@ sub annotateFile {
   my $refTrackOutIdx = $outIndicesMap->{$refTrackGetter->name};
 
   my %wantedChromosomes = %{ $refTrackGetter->chromosomes };
-  my $maxDel = $self->maxDel;
+  my $maxDel            = $self->maxDel;
 
   #Accessors are amazingly slow; it takes as long to call ->name as track->get
   #after accounting for the nubmer of calls to ->name
@@ -179,7 +180,8 @@ sub annotateFile {
     #my ($mce, $slurp_ref, $chunk_id) = @_;
     #    $_[0], $_[1],     $_[2]
     #open my $MEM_FH, '<', $slurp_ref; binmode $MEM_FH, ':raw';
-    open my $MEM_FH, '<', $_[1]; binmode $MEM_FH, ':raw';
+    open my $MEM_FH, '<', $_[1];
+    binmode $MEM_FH, ':raw';
 
     my $total = 0;
 
@@ -206,7 +208,7 @@ sub annotateFile {
 
       $total++;
 
-      if(!$wantedChromosomes{$fields[0]}) {
+      if ( !$wantedChromosomes{ $fields[0] } ) {
         next;
       }
 
@@ -220,26 +222,26 @@ sub annotateFile {
 
       $dataFromDbAref = $db->dbReadOneCursorUnsafe($cursors{$fields[0]}, $zeroPos);
 
-      if(!defined $dataFromDbAref) {
+      if ( !defined $dataFromDbAref ) {
         $self->_errorWithCleanup("Wrong assembly? $fields[0]\: $fields[1] not found.");
         # Store a reference to the error, allowing us to exit with a useful fail message
-        MCE->gather(0, 0, "Wrong assembly? $fields[0]\: $fields[1] not found.");
+        MCE->gather( 0, 0, "Wrong assembly? $fields[0]\: $fields[1] not found." );
         $_[0]->abort();
         return;
       }
 
-      if(length($fields[4]) > 1) {
+      if ( length( $fields[4] ) > 1 ) {
         # INS or DEL
-        if(looks_like_number($fields[4])) {
+        if ( looks_like_number( $fields[4] ) ) {
           # We ignore -1 alleles, treat them just like SNPs
-          if($fields[4] < -1)  {
+          if ( $fields[4] < -1 ) {
             # Grab everything from + 1 the already fetched position to the $pos + number of deleted bases - 1
             # Note that position_1_based - (negativeDelLength + 2) == position_0_based + (delLength - 1)
-            if($fields[4] < $maxDel) {
-              @indelDbData = ($fields[1] .. $fields[1] - ($maxDel + 2));
+            if ( $fields[4] < $maxDel ) {
+              @indelDbData = ( $fields[1] .. $fields[1] - ( $maxDel + 2 ) );
               # $self->log('info', "$fields[0]:$fields[1]: long deletion. Annotating up to $maxDel");
             } else {
-              @indelDbData = ($fields[1] .. $fields[1] - ($fields[4] + 2));
+              @indelDbData = ( $fields[1] .. $fields[1] - ( $fields[4] + 2 ) );
             }
 
             #last argument: skip commit
@@ -249,7 +251,7 @@ sub annotateFile {
             #This means in the (rare) discordant multiallelic situation, the reference
             #Will be identical between the SNP and DEL alleles
             #faster than perl-style loop (much faster than c-style)
-            @indelRef = ($fields[3], map { $refTrackGetter->get($_) } @indelDbData);
+            @indelRef = ( $fields[3], map { $refTrackGetter->get($_) } @indelDbData );
 
             #Add the db data that we already have for this position
             unshift @indelDbData, $dataFromDbAref;
@@ -263,11 +265,11 @@ sub annotateFile {
           #Note that the first position keeps the same $inputRef
           #This means in the (rare) discordant multiallelic situation, the reference
           #Will be identical between the SNP and DEL alleles
-          @indelRef = ($fields[3], $refTrackGetter->get($indelDbData[1]));
+          @indelRef = ( $fields[3], $refTrackGetter->get( $indelDbData[1] ) );
         }
       }
 
-      if(@indelDbData) {
+      if (@indelDbData) {
         ############### Gather all track data (besides reference) #################
         for my $posIdx (0 .. $#indelDbData) {
           for my $trackIndex (@trackIndicesExceptReference) {
@@ -284,7 +286,7 @@ sub annotateFile {
 
         # If we have multiple indel alleles at one position, need to clear stored values
         @indelDbData = ();
-        @indelRef = ();
+        @indelRef    = ();
       } else {
          for my $trackIndex (@trackIndicesExceptReference) {
           $fields[$outIndicesExceptReference[$trackIndex]] //= [];
@@ -298,7 +300,7 @@ sub annotateFile {
         $fields[$refTrackOutIdx][0] = $refTrackGetter->get($dataFromDbAref);
       }
 
-       # 3 holds the input reference, we'll replace this with the discordant status
+      # 3 holds the input reference, we'll replace this with the discordant status
       $fields[3] = $refTrackGetter->get($dataFromDbAref) ne $fields[3] ? 1 : 0;
 
       push @lines, \@fields;
@@ -313,7 +315,7 @@ sub annotateFile {
         MCE->gather(scalar @lines, $total - @lines, undef, $outputter->makeOutputString(\@lines));
       }
     } else {
-      MCE->gather(0, $total);
+      MCE->gather( 0, $total );
     }
 
   } $fh;
@@ -327,13 +329,13 @@ sub annotateFile {
   # according to documentation, and I did not see mention of a way
   # to copy the data from a scalar, and don't want to use a hash for this alone
   # So, using a scalar ref to abortErr in the gather function.
-  if($abortErr) {
+  if ($abortErr) {
     say "Aborted job due to $abortErr";
 
     # Database & tx need to be closed
     $db->cleanUp();
 
-    return ('Job aborted due to error', undef);
+    return ( 'Job aborted due to error', undef );
   }
 
   ################ Finished writing file. If statistics, print those ##########
@@ -359,44 +361,44 @@ sub annotateFile {
 }
 
 sub makeLogProgressAndPrint {
-  my ($self, $abortErrRef, $outFh, $statsFh, $throttleThreshold) = @_;
+  my ( $self, $abortErrRef, $outFh, $statsFh, $throttleThreshold ) = @_;
 
   my $totalAnnotated = 0;
-  my $totalSkipped = 0;
+  my $totalSkipped   = 0;
 
   my $publish = $self->hasPublisher;
 
-  my $thresholdAnn = 0;
+  my $thresholdAnn     = 0;
   my $thresholdSkipped = 0;
 
-  if(!$throttleThreshold) {
+  if ( !$throttleThreshold ) {
     $throttleThreshold = 1e4;
   }
   return sub {
     #<Int>$annotatedCount, <Int>$skipCount, <Str>$err, <Str>$outputLines, <Bool> $forcePublish = @_;
     ##    $_[0],          $_[1]           , $_[2],     $_[3].           , $_[4]
-    if($_[2]) {
+    if ( $_[2] ) {
       $$abortErrRef = $_[2];
       return;
     }
 
-    if($publish) {
-      $thresholdAnn += $_[0];
+    if ($publish) {
+      $thresholdAnn     += $_[0];
       $thresholdSkipped += $_[1];
 
-      if($_[4] || $thresholdAnn + $thresholdSkipped >= $throttleThreshold) {
+      if ( $_[4] || $thresholdAnn + $thresholdSkipped >= $throttleThreshold ) {
         $totalAnnotated += $thresholdAnn;
-        $totalSkipped += $thresholdSkipped;
+        $totalSkipped   += $thresholdSkipped;
 
-        $self->publishProgress($totalAnnotated, $totalSkipped);
+        $self->publishProgress( $totalAnnotated, $totalSkipped );
 
-        $thresholdAnn = 0;
+        $thresholdAnn     = 0;
         $thresholdSkipped = 0;
       }
     }
 
-    if($_[3]) {
-      if($statsFh) {
+    if ( $_[3] ) {
+      if ($statsFh) {
         print $statsFh $_[3];
       }
 
@@ -406,26 +408,26 @@ sub makeLogProgressAndPrint {
 }
 
 sub _getFileHandles {
-  my ($self, $type) = @_;
+  my ( $self, $type ) = @_;
 
   my ($outFh, $statsFh, $inFh, $headerFh);
   my $err;
 
-  ($err, $inFh) = $self->_openAnnotationPipe($type);
+  ( $err, $inFh ) = $self->_openAnnotationPipe($type);
 
-  if($err) {
-    return ($err,  undef, undef, undef);
+  if ($err) {
+    return ( $err, undef, undef, undef );
   }
 
-  if($self->run_statistics) {
+  if ( $self->run_statistics ) {
     ########################## Tell stats program about our annotation ##############
     # TODO: error handling if fh fails to open
     my $statArgs = $self->_statisticsRunner->getStatsArguments();
 
-    $err = $self->safeOpen($statsFh, "|-", $statArgs);
+    $err = $self->safeOpen( $statsFh, "|-", $statArgs );
 
-    if($err) {
-      return ($err,  undef, undef, undef);
+    if ($err) {
+      return ( $err, undef, undef, undef );
     }
   }
 
@@ -484,7 +486,7 @@ sub _openAnnotationPipe {
   my $fh;
   my $err = $self->safeOpen($fh, '-|', "$finalProgram 2> $errPath");
 
-  return ($err, $fh);
+  return ( $err, $fh );
 }
 
 sub _getFinalHeader {
@@ -523,15 +525,15 @@ sub _getFinalHeader {
   $headerFields[3] = $self->discordantField;
 
   # Prepend all of the headers created by the pre-processor
-  $finalHeader->addFeaturesToHeader(\@headerFields, undef, 1);
+  $finalHeader->addFeaturesToHeader( \@headerFields, undef, 1 );
 
   return ($finalHeader, $numberSplitFields);
 }
 
 sub _errorWithCleanup {
-  my ($self, $msg) = @_;
+  my ( $self, $msg ) = @_;
 
-  $self->log('error', $msg);
+  $self->log( 'error', $msg );
 
   $self->{_db}->cleanUp();
 

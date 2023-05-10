@@ -1,0 +1,7 @@
+# because we can't currently index multiword synonyms, this is the best we can do to match
+# "single nulceotide polymorphism" or "single nucleotide variant" as clinvar calls it
+single nucleotide variant,single nucleotide allele,single nucleotide polymorph,single,snp,snv => single,snp,snv
+del,deletion
+ins,insertion
+cnv => cnv,copy number gain,copy number loss
+copynumber => copynumber,copy number

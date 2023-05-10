@@ -1,0 +1,13 @@
+#i,in,inse,inser,insert,inserti,insertio,insertion => ins
+#del,dele,delet,deleti,deletio,deletion => del
+#ind,inde,indel,indels,in-d,in-de,in-del,in-dels => ins,del
+#s,sn,snps,si,sin,sing,singl,single,p,po,pol,poly,polym,polymo,polymor,polymorp,polymorph,polymorphi,polymorphis,polymorphism,polymorphisms,n,nu,nuc,nucle,nucleo,nucleot,nucleoti,nucleotid,nucleotide,nucleotides,v,va,var,vari,varia,varian,variant,variants => snp
+#Because right now we can't use multiword synonyms, this is the best we can do
+#m,mu,mul,multi,multia,multial,multiall,multialle,multiallel,multialleli,multiallelic,multiallelics => multiallelic
+#den,deno,denov,denovo,denovo_ => denovo_multiallelic,denovo_snp,denovo_ins,denovo_del,denovomultiallelic,denovoins,denovodel,denovosnp
+#d,de => denovo_multiallelic,denovo_snp,denovo_ins,denovo_del,denovomultiallelic,denovoins,denovodel,denovosnp,del
+#variant,allele,nucleotide,polymorphism,polymorph,snp,single
+#deletion => del
+#insertion => ins
+indel => ins,del
+

@@ -1,0 +1,54 @@
+f,phe,phenylalanine,ttt,uuu,ttc,uuc,tta,uua,ttg,uug
+l,leu,leucine,tta,uua,ttg,uug,ctt,cuu,ctc,cuc,cta,cua,ctg,cug
+i,ile,isoleucine,att,auu,atc,auc,ata,aua
+m,met,methionine,atg,aug
+v,val,valine,gtt,guu,gtc,guc,gta,gua,gtg,gug
+s,ser,serine,tct,ucu,tcc,ucc,tca,uca,tcg,ucg,agt,agu,agc
+p,pro,proline,cct,ccu,ccc,cca,ccg
+t,thr,threonine,act,acu,acc,aca,acg
+a,ala,alanine,gct,gcu,gcc,gca,gcg
+y,tyr,tyrosine,tat,uau,tac,uac
+h,his,histidine,cat,cau,cac
+q,gln,glutamin,glutamine,caa,cag
+#glutamic acid won't work; unfortunately I don't know how to get phrase synonyms to work..
+e,glu,glutamic,glutamate,gaa,gag
+n,asn,asparagine,aat,aau,aac
+l,lys,lysine,aaa,aag
+#same with aspartic acid
+d,asp,aspartic,aspartate,gat,gau,gac
+c,cys,cyst,cyste,cystei,cystein,cysteine,tgt,ugu,tgc,ugc
+stop,tga,uga,uaa,taa,tag,uag
+ochre,uaa,taa
+amber,uag,tag
+opal,uga,tga
+w,trp,tryptophan,tgg,ugg
+r,arg,arginine,cgt,cgu,cgc,cga,cgg
+g,gly,glycine,ggt,ggu,ggc,gga
+acid => d,e,gaa,gag,gat,gau,gac
+F,PHE,PHENYLALANINE,TTT,UUU,TTC,UUC,TTA,UUA,TTG,UUG
+L,LEU,LEUCINE,TTA,UUA,TTG,UUG,CTT,CUU,CTC,CUC,CTA,CUA,CTG,CUG
+I,ILE,ISOLEUCINE,ATT,AUU,ATC,AUC,ATA,AUA
+M,MET,METHIONINE,ATG,AUG
+V,VAL,VALINE,GTT,GUU,GTC,GUC,GTA,GUA,GTG,GUG
+S,SER,SERINE,TCT,UCU,TCC,UCC,TCA,UCA,TCG,UCG,AGT,AGU,AGC
+P,PRO,PROLINE,CCT,CCU,CCC,CCA,CCG
+T,THR,THREONINE,ACT,ACU,ACC,ACA,ACG
+A,ALA,ALANINE,GCT,GCU,GCC,GCA,GCG
+Y,TYR,TYROSINE,TAT,UAU,TAC,UAC
+H,HIS,HISTIDINE,CAT,CAU,CAC
+Q,GLN,GLUTAMIN,GLUTAMINE,CAA,CAG
+#GLUTAMIC ACID WON'T WORK; UNFORTUNATELY I DON'T KNOW HOW TO GET PHRASE SYNONYMS TO WORK..
+E,GLU,GLUTAMIC,GLUTAMATE,GAA,GAG
+N,ASN,ASPARAGINE,AAT,AAU,AAC
+L,LYS,LYSINE,AAA,AAG
+#SAME WITH ASPARTIC ACID
+D,ASP,ASPARTIC,ASPARTATE,GAT,GAU,GAC
+C,CYS,CYST,CYSTE,CYSTEI,CYSTEIN,CYSTEINE,TGT,UGU,TGC,UGC
+STOP,TGA,UGA,UAA,TAA,TAG,UAG
+OCHRE,UAA,TAA
+AMBER,UAG,TAG
+OPAL,UGA,TGA
+W,TRP,TRYPTOPHAN,TGG,UGG
+R,ARG,ARGININE,CGT,CGU,CGC,CGA,CGG
+G,GLY,GLYCINE,GGT,GGU,GGC,GGA
+ACID => D,E,GAA,GAG,GAT,GAU,GAC

@@ -31,8 +31,6 @@ use Statistics::Distributions qw(chisqrdistr udistr);
 
 use Math::Round qw/nhimult round/;
 
-use POSIX qw/lround/;
-
 # Defines basic things needed in builder and annotator, like logPath,
 # Also initializes the database with database_dir unnecessarily
 extends 'Seq::Base';
@@ -41,17 +39,12 @@ extends 'Seq::Base';
 # Needed because there are variations of Seq.pm, ilke SeqFromQuery.pm
 with 'Seq::Definition';
 
-# An archive, containing an "annotation" file
-has inputQueryBody => (is => 'ro', isa => 'HashRef', required => 1);
-
 # Post-processing to run, before commiting the annotation
 has pipeline => (is => 'ro', isa => 'ArrayRef[HashRef]');
 
-# Probably the user id
-has indexName => (is => 'ro', required => 1);
+has inputQueryBody => (is => 'ro', isa => 'HashRef', required => 1);
 
-# The index type; probably the job id
-has indexType => (is => 'ro', required => 1);
+has indexName => (is => 'ro', required => 1);
 
 has assembly => (is => 'ro', isa => 'Str', required => 1);
 
@@ -217,7 +210,6 @@ sub annotate {
       size        => $batchSize,
       body        => $self->inputQueryBody,
       index       => $self->indexName,
-      type        => $self->indexType,
     );
 
     while(my @docs = $scroll->next($batchSize)) {
@@ -326,15 +318,19 @@ sub _getSearchParams {
 
   # -1 simply means we can't approximate the size
   my $nSlices;
-  if($numTerms < 0 || $numTerms > 200) {
+  if($numTerms < 0 || $numTerms > 10000) {
     $nSlices = $self->shards;
   } else {
     $nSlices = $self->_getSlices();
   }
 
+  if($nSlices < 2) {
+    $nSlices = 2;
+  }
+
   my $batchSize = $self->batchSize;
 
-  my $timeout = '2m';
+  my $timeout = '200m';
 
   return ($nSlices, $batchSize, $timeout);
 }
@@ -406,6 +402,7 @@ sub _getNumTerms {
   return $mustQLen;
 }
 
+# TODO: better handle huge numbers of terms
 sub _getSlices {
   my $self = shift;
 
@@ -853,143 +850,6 @@ sub makeBinomFilter {
 
     return 1;
 }
-
-
-  # Returns 1 if we want to skip this site, 0 otherwise
-  # return sub {
-  #    #my ($doc) = @_;
-  #    #    $_[0]
-
-  #                         #$doc
-  #    if($snpOnly && length($_[0]->{'alt'}[0][0]) > 1) {
-  #      #0 means don't skip
-  #      return 0;
-  #    }
-  #      #$doc
-  #    if($_[0]->{'sampleMaf'}[0][0] <= $privateMaf) {
-  #      return 0;
-  #    }
-  #                     #$doc
-  #    my $n = $N * (1 - $_[0]->{'missingness'}[0][0]);
-  #                 #$doc
-  #    my $ac = $n * $_[0]->{'sampleMaf'}[0][0];
-
-  #   for my $field (@{$afFieldsAref}) {
-  #     my $f = $_[0]->{$field->[0]};
-
-  #     if(@$field == 2) {
-  #       $f = $f->{$field->[1]};
-  #     } elsif(@$field == 3) {
-  #       $f = $f->{$field->[1]}{$field->[2]};
-  #     } else {
-  #       for(my $i = 1; $i < @$field; $i++) {
-  #         $f = $f->{$field->[$i]}
-  #       }
-  #     }
-
-  #     if(!defined $f) {
-  #       next;
-  #     }
-
-  #                   #$doc
-  #     if(_binomProb($f->[0][0], $n, $ac) >= $alpha) {
-  #       return 0;
-  #     }
-  #   }
-
-  #    # 1 means skip
-  #    return 1;
-  # }
-}
-
-# sub _binomProb {
-#   # N is likely the number of chromosomes
-#   #my ($popAf, $N, $ac) = @_;
-#   #    $_[0]  $_[1], $_[2]
-
-#   #  $popAf       $popAf
-#   if($_[0] < 0 || $_[0] > 1) {
-#     return 0;
-#   }
-
-#   #  $N           $N
-#   if($_[1] < 2 || $_[1] > 10_000_000) {
-#     return 0;
-#   }
-
-#   #           $popAf
-#   my $q = 1 - $_[0];
-#   #                $N    * $popAf
-#   my $cent = round($_[1] * $_[0]);
-
-#   if($cent == 0) {
-#     return 0;
-#   }
-
-#   p $cent;
-
-#   my @L;
-#   #     $N
-#   $#L = $_[1];
-
-#   $L[$cent] = 1;
-
-#   my $eps = 1e-8 / $_[1];
-#   my $tot = 1;
-
-#   my $k;
-#   for(my $i = $cent - 1; $i >= 0; $i--) {
-#     $k = $L[$i + 1] * $q * ($i + 1);
-#     #     $popAf   $N
-#     $k /= $_[0] * ($_[1] - $i);
-#     p $k;
-#     if($k < $eps) {
-#       $L[$i] = 0;
-#       $i = 0;
-#     } else {
-#       $L[$i] = $k;
-#     }
-
-#     $tot += $L[$i];
-#   }
-#   say STDERR "TOT IS $tot";
-#   sleep(1000);
-
-#   for(my $i = $cent + 1; $i <= $_[1]; $i++) {
-#     #               $popAf   $N
-# 	  $k = $L[$i-1] * $_[0] * ($_[1]-($i-1));
-# 	  $k /= $q * $i;
-
-# 	  if($k < $eps) {
-# 		  $L[$i] = 0;
-#       #    $N
-# 		  $i = $_[1];
-# 	  } else {
-# 		  $L[$i] = $k;
-# 	  }
-
-# 	  $tot += $L[$i];
-#   }
-# p @L;
-#   #                    $N
-#   for(my $i = 0; $i <= $_[1]; $i++) {
-#     if(!defined $L[$i]) {
-#       say STDERR "NOT DEF WHY";
-#       sleep(1000);
-#     }
-#     $L[$i] /= $tot;
-#     #	print "$i $L[$i]\n";
-#   }
-
-#   my $rightTail = 0;
-
-#   #           $ac         $N
-#   for(my $i = $_[2]; $i<= $_[1]; $i++) {
-#     $rightTail += $L[$i];
-#   }
-
-#   return $rightTail;
-# }
 
 __PACKAGE__->meta->make_immutable;
 

@@ -42,7 +42,7 @@ fileProcessors:
     args: --emptyField ! --minGq .95
     program: bystro-snp
   vcf:
-    args: --emptyField ! --keepId --keepPos
+    args: --emptyField ! --sample %sampleList% --keepPos --keepId
     program: bystro-vcf
 tracks:
 - name: ref

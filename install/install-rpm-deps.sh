@@ -13,6 +13,8 @@ sudo yum install unzip -y;
 sudo yum install wget -y;
 # For tests involving querying ucsc directly
 sudo yum install mysql-devel -y;
+# For Search::Elasticsearch::Client::5_0::Direct
+sudo yum install libcurl-devel -y
 
 # for perlbrew, in case you want to install a different perl version
 #https://www.digitalocean.com/community/tutorials/how-to-install-perlbrew-and-manage-multiple-versions-of-perl-5-on-centos-7
@@ -22,7 +24,7 @@ sudo yum install patch -y;
 
 sudo yum install cpan -y;
 
-curl --silent --location https://rpm.nodesource.com/setup_8.x | sudo bash -
+curl --silent --location https://rpm.nodesource.com/setup_12.x | sudo bash -
 
 sudo yum install nodejs -y;
 
