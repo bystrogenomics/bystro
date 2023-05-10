@@ -58,15 +58,14 @@ async def go(
     index_name: str,
     mapping_conf: dict,
     search_conf: dict,
+    tar_path: str,
     chunk_size=500,
     paralleleism_chunk_size=5_000,
     publisher: Optional[Publisher] = None,
-    tar_path: Optional[str] = None,
     annotation_path: Optional[str] = None,
 ):
-    assert not (tar_path is not None and annotation_path is not None)
-    assert not (tar_path is None and annotation_path is None)
-    assert tar_path is not None
+    if annotation_path is not None:
+        raise ValueError("annotation_path is not yet supported")
 
     reporter = get_progress_reporter(publisher)
 
