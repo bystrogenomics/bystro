@@ -89,15 +89,13 @@ def listen(
 
     tube_conf = queue_conf.tubes[tube]
     events_conf = queue_conf.events
-    clients = tuple((host, port, BeanstalkClient(host, port, socket_timeout=10)) for (host, port) in zip(hosts, ports))
+    clients = tuple(BeanstalkClient(host, port, socket_timeout=10) for (host, port) in zip(hosts, ports))
 
     i = 0
     while True:
         i += 1
         offset = i % len(hosts)
-        host = clients[offset][0]
-        port = clients[offset][1]
-        client = clients[offset][2]
+        client  = clients[offset]
 
         client.watch(tube_conf["submission"])
 
@@ -113,8 +111,8 @@ def listen(
             publisher: Publisher = _specify_publisher(
                 job_data['submissionID'],
                 job.job_id,
-                publisher_host=host,
-                publisher_port=port,
+                publisher_host=client.host,
+                publisher_port=client.port,
                 progress_event=events_conf["progress"],
                 event_queue=tube_conf["events"]
             )
