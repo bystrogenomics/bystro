@@ -45,7 +45,6 @@ def main():
         with open(m_path, 'r', encoding='utf-8') as f:
             mapping_conf = YAML(typ="safe").load(f)
 
-        tar_path: Optional[str] = None
         input_file_names = job_details['inputFileNames']
 
         if not input_file_names.get('archived'):
