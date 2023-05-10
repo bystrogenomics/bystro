@@ -34,8 +34,7 @@ class Indexer:
         chunk_size=1_000,
         reporter_batch=15_000,
     ):
-        self.search_client_args = search_client_args
-        self.client = AsyncOpenSearch(**self.search_client_args)
+        self.client = AsyncOpenSearch(**search_client_args)
         self.progress_tracker = progress_tracker
         self.reporter_batch = reporter_batch
         self.chunk_size = chunk_size

@@ -87,10 +87,7 @@ def listen(
 
     tube_conf = queue_conf.tubes[tube]
     events_conf = queue_conf.events
-    clients = tuple(
-        (h, ports[i], BeanstalkClient(h, ports[i], socket_timeout=10))
-        for i, h in enumerate(hosts)
-    )
+    clients = tuple((host, port, BeanstalkClient(host, port, socket_timeout=10)) for (host, port) in zip(hosts, ports))
 
     i = 0
     while True:
