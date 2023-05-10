@@ -22,7 +22,7 @@ from search.utils.beanstalkd import Publisher, get_progress_reporter
 from search.utils.opensearch import gather_opensearch_args
 from search.utils.annotation import get_delimiters
 
-ray.init(ignore_reinit_error='true', addresses='auto')
+ray.init(ignore_reinit_error='true', address='auto')
 
 STATISTICS_TYPE = TypedDict("STATISTICS_TYPE", {"json": str, "tab": str, "qc": str})
 

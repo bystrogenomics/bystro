@@ -11,9 +11,7 @@ from typing import Optional
 
 from opensearchpy._async.client import AsyncOpenSearch
 from opensearchpy._async import helpers as async_helpers
-
 import ray
-
 from ruamel.yaml import YAML
 
 from search.index.bystro_file import read_annotation_tarball #type: ignore # pylint: disable=no-name-in-module,import-error
