@@ -1,4 +1,7 @@
-"""TODO: Add description here"""
+"""
+    CLI tool to start search indexing server that listens to beanstalkd queue
+    and indexes submitted data in Opensearch
+"""
 import argparse
 import os
 from typing import Optional, Any
@@ -9,7 +12,10 @@ from search.index.handler import go
 from search.utils.beanstalkd import Publisher, QueueConf, get_config_file_path, listen
 
 def main():
-    """TODO: Add description here"""
+    """
+    Start search indexing server that listens to beanstalkd queue
+    and indexes submitted data in Opensearch
+    """
     parser = argparse.ArgumentParser(description="Process some config files.")
     parser.add_argument(
         "--conf_dir", type=str, help="Path to the genome/assembly config directory"

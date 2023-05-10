@@ -7,28 +7,28 @@ from typing import Any, NamedTuple, List, Callable, Optional
 
 import asyncio
 from orjson import loads, dumps  # pylint: disable=no-name-in-module
-from pystalk import BeanstalkClient, BeanstalkError  # type: ignore
+from pystalk import BeanstalkClient, BeanstalkError
 from opensearchpy.exceptions import NotFoundError
 
+import ray
+
 class Message(NamedTuple):
-    """TODO: Add description here"""
+    """Beanstalkd Message"""
     event: str
     queueID: str
     submissionID: str
-    data: Optional[Any]
+    data: Any = None
 
 class Publisher(NamedTuple):
-    """TODO: Add description here"""
-
+    """Beanstalkd Message Published Config"""
     host: str
     port: str
     queue: str
     message: Message
 
 class QueueConf(NamedTuple):
-    """TODO: Add description here"""
-
-    address: List[str]
+    """Queue Configuration"""
+    addresses: List[str]
     events: dict
     tubes: dict
 
@@ -36,7 +36,7 @@ class QueueConf(NamedTuple):
         """TODO: Add description here"""
         hosts = []
         ports = []
-        for host in self.address:
+        for host in self.addresses:
             host, port = host.split(":")
             hosts.append(host)
             ports.append(port)
@@ -77,7 +77,9 @@ def listen(
     queue_conf: QueueConf,
     tube: str,
 ):
-    """TODO: Listen on beanstalkd here directly"""
+    """Listen on a Beanstalkd channel, waiting for work.
+       When work is available call the work handler
+    """
     hosts, ports = queue_conf.split_host_port()
 
     for event in ("progress", "failed", "started", "completed"):
@@ -153,3 +155,50 @@ def listen(
             client.release_job(job.job_id)
         finally:
             time.sleep(0.5)
+
+@ray.remote(num_cpus=0)
+class ProgressReporter:
+    """A Ray class to report progress to a beanstalk queue"""
+
+    def __init__(self, publisher: Publisher):
+        self.value = 0
+        self.publisher = publisher
+        self.message = publisher.message._asdict()
+
+        self.message["data"] = {"progress": 0, "skipped": 0}
+
+        self.client = BeanstalkClient(publisher.host, publisher.port, socket_timeout=10)
+
+    def increment(self, count: int):
+        """Increment the counter by processed variant count and report to the beanstalk queue"""
+        self.value += count
+        self.message["data"]["progress"] = self.value
+
+        self.client.put_job_into(self.publisher.queue, dumps(self.message))
+
+        return self.value
+
+    def get_counter(self):
+        """Get the current value of the counter"""
+        return self.value
+
+
+@ray.remote(num_cpus=0)
+class ProgressReporterStub:
+    """A Ray class to report progress to stdout"""
+
+    def __init__(self):
+        self.value = 0
+
+    def increment(self, count: int):
+        self.value += count
+        print(f"Processed {self.value} records")
+
+    def get_counter(self):
+        return self.value
+
+def get_progress_reporter(publisher: Optional[Publisher]):
+    if publisher:
+        return ProgressReporter.remote(publisher)  # type: ignore # pylint: disable=no-member
+
+    return ProgressReporterStub.remote()  # type: ignore # pylint: disable=no-member

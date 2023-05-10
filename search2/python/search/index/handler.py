@@ -11,25 +11,23 @@ from typing import Optional
 
 from opensearchpy._async.client import AsyncOpenSearch
 from opensearchpy._async import helpers as async_helpers
-from orjson import dumps  # pylint: disable=no-name-in-module
-from pystalk import BeanstalkClient  # type: ignore
-from ruamel.yaml import YAML
 
 import ray
 
-from search.index.bystro_file import ( #type: ignore # pylint: disable=no-name-in-module,import-error
-    read_annotation_tarball, # pylint: disable=no-name-in-module
-)
-from search.utils.beanstalkd import Publisher
+from ruamel.yaml import YAML
+
+from search.index.bystro_file import read_annotation_tarball #type: ignore # pylint: disable=no-name-in-module,import-error
+from search.utils.beanstalkd import Publisher, get_progress_reporter
+from search.utils.opensearch import gather_opensearch_args
+from search.utils.annotation import get_delimiters
 
 ray.init(ignore_reinit_error="true", address="auto")
 
 n_threads = multiprocessing.cpu_count()
 
-
 @ray.remote
 class Indexer:
-    """TODO: Add description here"""
+    """Ray Actor to handle indexing of Bystro annotation data into OpenSearch"""
 
     def __init__(
         self,
@@ -45,65 +43,19 @@ class Indexer:
         self.chunk_size = chunk_size
         self.counter = 0
 
-    async def run(self, data):
-        """TODO: Add description here"""
-        resp = await async_helpers.async_bulk(
-            self.client, iter(data), chunk_size=self.chunk_size
-        )
+    async def index(self, data):
+        """Index Bystro annotation data into Opensearch"""
+        resp = await async_helpers.async_bulk(self.client, iter(data), chunk_size=self.chunk_size)
         self.counter += resp[0]
 
         if self.counter >= self.reporter_batch:
-            await asyncio.to_thread(
-                self.progress_tracker.increment.remote, self.counter
-            )
+            await asyncio.to_thread(self.progress_tracker.increment.remote, self.counter)
             self.counter = 0
 
         return resp
 
     async def close(self):
         await self.client.close()
-
-
-@ray.remote(num_cpus=0)
-class ProgressReporter:
-    """A class to report progress to a beanstalk queue"""
-
-    def __init__(self, publisher: Publisher):
-        self.value = 0
-        self.publisher = publisher
-        self.message = publisher.message._asdict()
-
-        self.message["data"] = {"progress": 0, "skipped": 0}
-
-        self.client = BeanstalkClient(publisher.host, publisher.port, socket_timeout=10)
-
-    def increment(self, count: int):
-        """Increment the counter by processed variant count and report to the beanstalk queue"""
-        self.value += count
-        self.message["data"]["progress"] = self.value
-
-        self.client.put_job_into(self.publisher.queue, dumps(self.message))
-
-        return self.value
-
-    def get_counter(self):
-        """Get the current value of the counter"""
-        return self.value
-
-
-@ray.remote(num_cpus=0)
-class ProgressReporterStub:
-    """A class to report progress to a beanstalk queue"""
-    def __init__(self):
-        self.value = 0
-
-    def increment(self, count: int):
-        self.value += count
-        print(f"Processed {self.value} records")
-
-    def get_counter(self):
-        return self.value
-
 
 async def go(
     index_name: str,
@@ -119,23 +71,9 @@ async def go(
     assert not (tar_path is None and annotation_path is None)
     assert tar_path is not None
 
-    search_client_args = dict(
-        hosts=list(search_conf["connection"]["nodes"]),
-        http_compress=True,
-        http_auth=search_conf["auth"].get("auth"),
-        client_cert=search_conf["auth"].get("client_cert_path"),
-        client_key=search_conf["auth"].get("client_key_path"),
-        ca_certs=search_conf["auth"].get("ca_certs_path"),
-        verify_certs=True,
-        ssl_assert_hostname=True,
-        ssl_show_warn=True,
-    )
+    reporter = get_progress_reporter(publisher)
 
-    if publisher:
-        reporter = ProgressReporter.remote(publisher)  # type: ignore # pylint: disable=no-member
-    else:
-        reporter = ProgressReporterStub.remote()  # type: ignore # pylint: disable=no-member
-
+    search_client_args = gather_opensearch_args(search_conf)
     client = AsyncOpenSearch(**search_client_args)
 
     post_index_settings = mapping_conf["post_index_settings"]
@@ -144,14 +82,6 @@ async def go(
     index_body = {
         "settings": mapping_conf["index_settings"],
         "mappings": mapping_conf["mappings"],
-    }
-
-    delimiters = {
-        "field": "\t",
-        "allele": ",",
-        "position": "|",
-        "value": ";",
-        "empty_field": "!",
     }
 
     if not index_body["settings"].get("number_of_shards"):
@@ -169,28 +99,22 @@ async def go(
         index_name=index_name,
         tar_path=tar_path,
         boolean_map=boolean_map,
-        delimiters=delimiters,
+        delimiters=get_delimiters(),
         chunk_size=paralleleism_chunk_size,
     )
 
     start = time.time()
-    actors = [
-        Indexer.remote( #type: ignore # pylint: disable=no-member
-            search_client_args, progress_tracker=reporter, chunk_size=chunk_size
-        )
-        for _ in range(n_threads)
-    ]
+    indexers = [Indexer.remote(search_client_args, reporter, chunk_size) for _ in range(n_threads)] # type: ignore
     actor_idx = 0
     results = []
     for x in data:
-        actor = actors[actor_idx]
+        "Round robin work distribution"
+        indexer = indexers[actor_idx]
         actor_idx += 1
         if actor_idx == n_threads:
             actor_idx = 0
-        results.append(actor.run.remote(x))
+        results.append(indexer.index.remote(x))
     res = ray.get(results)
-
-    print("Took", time.time() - start)
 
     reported_count = ray.get(reporter.get_counter.remote())
 
@@ -208,15 +132,12 @@ async def go(
     if to_report_count > 0:
         await asyncio.to_thread(reporter.increment.remote, to_report_count)
 
-    print(f"Processed {total} records")
+    print(f"Processed {total} records in {time.time() - start}s")
 
-    for actor in actors:
-        await actor.close.remote()
+    for indexer in indexers:
+        await indexer.close.remote()
 
-    await client.indices.put_settings(
-        index=index_name, body=post_index_settings
-    )
-
+    await client.indices.put_settings(index=index_name, body=post_index_settings)
     await client.close()
 
     return data.get_header_fields()
@@ -254,11 +175,4 @@ if __name__ == "__main__":
     with open(args.mapping_conf, "r", encoding="utf-8") as f:
         mapping_config = YAML(typ="safe").load(f)
 
-    asyncio.run(
-        go(
-            index_name=args.index_name,
-            tar_path=args.tar,
-            mapping_conf=mapping_config,
-            search_conf=search_config
-        )
-    )
+    asyncio.run(go(args.index_name, mapping_config, search_config, tar_path=args.tar))
