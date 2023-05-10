@@ -175,7 +175,7 @@ async def go(
 
     start = time.time()
     actors = [
-        Indexer.remote( # pylint: disable=no-member
+        Indexer.remote( #type: ignore # pylint: disable=no-member
             search_client_args, progress_tracker=reporter, chunk_size=chunk_size
         )
         for _ in range(n_threads)

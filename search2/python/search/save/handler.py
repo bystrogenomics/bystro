@@ -11,10 +11,11 @@ import os
 import pathlib
 import subprocess
 import traceback
+from typing import Type, TypedDict
 
 import mgzip # type: ignore
 import numpy as np
-from opensearchpy import OpenSearch
+from opensearchpy import  OpenSearch
 import ray
 
 from search.utils.beanstalkd import Publisher
@@ -30,10 +31,16 @@ default_delimiters = {
     'fieldSep': "\t",
 }
 
+STATISTICS_TYPE = TypedDict("STATISTICS_TYPE", {"json": str, "tab": str, "qc": str})
+
+OUTPUT_NAMES_TYPE = TypedDict('OUTPUT_NAMES_TYPE', {"log": str, "annotation": str,
+                                                    "sampleList": str, "archived": str,
+                                                    "statistics": STATISTICS_TYPE}, total=False)
+
 def make_output_names(output_base_path: str, statistics: bool,
-                      compress: bool, archive: bool) -> dict:
+                      compress: bool, archive: bool):
     """Make a dictionary of output file names based on the output base path and the output options"""
-    out = {}
+    out: OUTPUT_NAMES_TYPE = {}
 
     basename = os.path.basename(output_base_path)
     out['log'] = f"{basename}.log"
