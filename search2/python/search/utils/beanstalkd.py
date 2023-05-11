@@ -35,7 +35,7 @@ class QueueConf(NamedTuple):
     tubes: dict
 
     def split_host_port(self):
-        """TODO: Add description here"""
+        """Split host and port"""
         hosts = []
         ports = []
         for host in self.addresses:
@@ -45,13 +45,11 @@ class QueueConf(NamedTuple):
         return hosts, ports
 
 def get_config_file_path(config_path_base_dir: str, assembly: str, suffix: str = ".y*ml"):
-    """TODO: Add description here"""
+    """Get config file path"""
     paths = glob(path.join(config_path_base_dir, assembly + suffix))
 
     if not paths:
-        raise ValueError(
-            f"\n\nNo config path found for the assembly {assembly}. Exiting\n\n"
-        )
+        raise ValueError(f"\n\nNo config path found for the assembly {assembly}. Exiting\n\n")
 
     if len(paths) > 1:
         print("\n\nMore than 1 config path found, choosing first")
