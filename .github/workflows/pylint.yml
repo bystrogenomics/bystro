@@ -21,7 +21,7 @@ jobs:
         pip install -r **/requirements.txt
     - name: Analysing the code with pylint
       run: |
-        pylint $(git ls-files '*.py') --exit-zero
+        pylint $(git ls-files '*.py') --exit-zero --max-line-length=120
     - name: Anylising the code with mypy
       run: |
         mypy $(git ls-files '*.py')
