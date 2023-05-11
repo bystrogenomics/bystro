@@ -1,6 +1,6 @@
 beanstalkd:
-  host: ~
-  port: ~
+  addresses:
+    - <host1>:<port1>
   tubes:
     annotation:
       submission: annotation
