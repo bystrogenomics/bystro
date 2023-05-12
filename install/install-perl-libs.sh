@@ -21,8 +21,6 @@ cpanm install Parallel::ForkManager
 cpanm install Cpanel::JSON::XS
 cpanm install Mouse::Meta::Attribute::Custom::Trait::Array
 cpanm install Net::HTTP
-cpanm install Search::Elasticsearch
-cpanm install Search::Elasticsearch::Client::5_0::Direct
 cpanm install Math::SigFigs
 # For now we use our own library
 # Avoid issues with system liblmdb
@@ -42,27 +40,16 @@ cpanm install DBD::mysql
 cpanm install IO/FDPass.pm
 cpanm install Beanstalk::Client
 
-cpanm install Math::Round
-cpanm install Sys::CpuAffinity
-
-cpanm install Statistics::Distributions
 cpanm install File::Which
 
 # Needed for bin/annotate.pl
 cpanm install Hash::Merge::Simple
-cpanm install Math::Round;
-cpanm install Sys::CpuAffinity;
-# cpanm install Math::Gauss;
-cpanm install Statistics::Distributions;
 
 # Custom branch of msgpack-perl that uses latest msgpack-c and
 # allows prefer_float32 flag for 5-byte float storage
 cpanm install Module::Build::XSUtil
 cpanm install Test::LeakTrace
 cpanm install Test::Pod
-
-# For filters
-cpanm install Math::CDF
 
 # A dependency of Data::MessagePack installation
 cpanm install File::Copy::Recursive
