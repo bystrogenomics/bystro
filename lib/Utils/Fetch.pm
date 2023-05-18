@@ -30,6 +30,7 @@ has remoteDir => (is => 'ro', isa => 'Maybe[Str]');
 has connection => (is => 'ro', isa => 'Maybe[HashRef]');
 
 # Choose whether to use wget or rsync program to fetch
+has aws => (is => 'ro', init_arg => undef, writer => '_setAws');
 has wget => (is => 'ro', init_arg => undef, writer => '_setWget');
 has rsync => (is => 'ro', init_arg => undef, writer => '_setRsync');
 
