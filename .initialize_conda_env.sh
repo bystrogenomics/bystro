@@ -1,6 +1,7 @@
 # Follow https://docs.conda.io/en/latest/miniconda.html to install miniconda
 # Call this using "source .initialize_conda_env.sh"
-version="3.11.3"
+# Ray 2.4.0 on Mac OS (arm64) does not have stable 3.11 support, see https://docs.ray.io/en/latest/ray-overview/installation.html
+version="3.10.11"
 if { conda env list | grep 'bystro'; } >/dev/null 2>&1; then
     echo -e "\n====Bystro environment exists, activating and ensuring up to date with Python $version====\n"
     conda activate bystro

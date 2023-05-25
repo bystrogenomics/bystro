@@ -1,5 +1,5 @@
 beanstalkd:
-  address:
+  addresses:
     - <host1>:<port1>
   tubes:
     annotation:

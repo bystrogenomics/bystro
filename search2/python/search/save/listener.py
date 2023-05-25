@@ -1,5 +1,7 @@
-"""TODO: Add description here"""
-
+"""
+    CLI tool to start search saving server that listens to beanstalkd queue
+    and write submitted queries to disk as valid Bystro annotations
+"""
 import argparse
 from typing import Any
 
@@ -34,7 +36,10 @@ def _coerce_inputs(
     }
 
 def main():
-    """TODO: Docstring for main."""
+    """
+        Start search saving server that listens to beanstalkd queue
+        and write submitted queries to disk as valid Bystro annotations
+    """
     parser = argparse.ArgumentParser(description="Process some config files.")
     parser.add_argument(
         "--conf_dir", type=str, help="Path to the genome/assembly config directory"

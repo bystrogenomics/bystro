@@ -1,4 +1,7 @@
-"""TODO: Add description here"""
+"""
+    CLI tool to start search indexing server that listens to beanstalkd queue
+    and indexes submitted data in Opensearch
+"""
 import argparse
 import os
 from typing import Optional, Any
@@ -9,7 +12,10 @@ from search.index.handler import go
 from search.utils.beanstalkd import Publisher, QueueConf, get_config_file_path, listen
 
 def main():
-    """TODO: Add description here"""
+    """
+    Start search indexing server that listens to beanstalkd queue
+    and indexes submitted data in Opensearch
+    """
     parser = argparse.ArgumentParser(description="Process some config files.")
     parser.add_argument(
         "--conf_dir", type=str, help="Path to the genome/assembly config directory"
@@ -39,20 +45,15 @@ def main():
         with open(m_path, 'r', encoding='utf-8') as f:
             mapping_conf = YAML(typ="safe").load(f)
 
-        tar_path: Optional[str] = None
-        annotation_path: Optional[str] = None
         input_file_names = job_details['inputFileNames']
 
-        if input_file_names.get('archived'):
-            tar_path = os.path.join(
-                job_details['inputDir'], job_details['inputFileNames']['archived'])
-        else:
-            annotation_path = os.path.join(job_details['inputDir'],
-                                           job_details['inputFileNames']['annotation'])
+        if not input_file_names.get('archived'):
+            raise ValueError('Missing required key: "archived" in job inputFileNames')
+
+        tar_path = os.path.join(job_details['inputDir'], job_details['inputFileNames']['archived'])
 
         return go(index_name=job_details["indexName"],
                   tar_path=tar_path,
-                  annotation_path=annotation_path,
                   mapping_conf=mapping_conf,
                   search_conf=search_conf,
                   publisher=publisher)

@@ -64,7 +64,7 @@ if(!$queueConfig) {
 }
 
 my $beanstalk = Beanstalk::Client->new({
-  server    => $conf->{beanstalkd}{address}[0],
+  server    => $conf->{beanstalkd}{addresses}[0],
   default_tube => $queueConfig->{submission},
   connect_timeout => 1,
   encoder => sub { encode_json(\@_) },
@@ -72,7 +72,7 @@ my $beanstalk = Beanstalk::Client->new({
 });
 
 my $beanstalkEvents = Beanstalk::Client->new({
-  server    => $conf->{beanstalkd}{address}[0],
+  server    => $conf->{beanstalkd}{addresses}[0],
   default_tube => $queueConfig->{events},
   connect_timeout => 1,
   encoder => sub { encode_json(\@_) },
@@ -246,7 +246,7 @@ sub coerceInputs {
   my %commmonArgs = (
     config             => $configFilePath,
     publisher => {
-      server => $conf->{beanstalkd}{address}[0],
+      server => $conf->{beanstalkd}{addresses}[0],
       queue  => $queueConfig->{events},
       messageBase => {
         event => $events->{progress},
