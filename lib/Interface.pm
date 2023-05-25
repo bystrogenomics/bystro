@@ -23,6 +23,8 @@ use Getopt::Long::Descriptive;
 use Seq;
 with 'MouseX::Getopt';
 
+GetOptions('pass_through' => 1);
+
 ##########Parameters accepted from command line#################
 has input_file => (
   is        => 'ro',

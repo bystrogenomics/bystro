@@ -23,6 +23,7 @@ sudo apt install -y libmysqlclient-dev
 #https://www.digitalocean.com/community/tutorials/how-to-install-perlbrew-and-manage-multiple-versions-of-perl-5-on-centos-7
 # centos 7 doesn't include bzip2
 sudo apt install -y bzip2 
+sudo apt install -y lz4
 sudo apt install -y patch
 
 sudo apt install -y cpan

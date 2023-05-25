@@ -39,6 +39,7 @@ cpanm install String::Strip
 cpanm install DBD::mysql
 cpanm install IO/FDPass.pm
 cpanm install Beanstalk::Client
+cpanm install Sys::CpuAffinity
 
 cpanm install File::Which
 
