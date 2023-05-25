@@ -1,5 +1,4 @@
 maturin==0.15.1
-patchelf==0.17.2
 ray==2.4.0
 pyarrow==12.0.0
 pystalk==0.7.0
