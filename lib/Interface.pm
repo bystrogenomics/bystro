@@ -23,8 +23,6 @@ use Getopt::Long::Descriptive;
 use Seq;
 with 'MouseX::Getopt';
 
-GetOptions('pass_through' => 1);
-
 ##########Parameters accepted from command line#################
 has input_file => (
   is        => 'ro',
@@ -57,7 +55,7 @@ has config => (
   coerce      => 1,
   required    => 1,
   metaclass => 'Getopt',
-  cmd_aliases   => [qw/c config/],
+  cmd_aliases   => [qw/c configuration/],
   documentation => qq{Yaml config file path.},
 );
 
