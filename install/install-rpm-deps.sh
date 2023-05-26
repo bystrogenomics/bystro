@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-echo -e "\n\nInstalling Debian (rpm) dependencies\n"
+echo -e "\n\nInstalling Debian (rpm) dependencies\n";
 
 sudo yum install gcc -y;
 sudo yum install openssl -y;
@@ -25,8 +25,10 @@ sudo yum install patch -y;
 
 sudo yum install cpan -y;
 
-curl --silent --location https://rpm.nodesource.com/setup_12.x | sudo bash -
+curl --silent --location https://rpm.nodesource.com/setup_12.x | sudo bash -;
 
 sudo yum install nodejs -y;
 
 sudo npm install -g pm2;
+
+sudo yum install awscli -y;

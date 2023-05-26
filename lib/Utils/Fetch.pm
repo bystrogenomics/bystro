@@ -41,13 +41,17 @@ sub BUILD {
     return;
   }
 
-  if(!which('rsync') || !which('wget')) {
+  my $aws = which('aws');
+  my $wget = which('wget');
+  my $rsync = which('rsync');
+
+  if(!$rsync || !$wget) {
     $self->log('fatal', 'Fetch.pm requires rsync and wget when fetching remoteFiles');
   }
 
-  $self->_setAws(which('aws'));
-  $self->_setRsync(which('rsync'));
-  $self->_setWget(which('wget'));
+  $self->_setAws($aws);
+  $self->_setRsync($rsync);
+  $self->_setWget($wget);
 }
 
 ########################## The only public export  ######################
@@ -144,7 +148,7 @@ sub _fetchFiles {
 
     if($1) {
       $remoteProtocol = $1;
-    } elsif($self->_wantedTrack->{remote_dir} =~ 's3://') {
+    } elsif($self->remoteDir =~ 's3://') {
       $isS3 = 1;
       $remoteProtocol = 's3://';
     } else {
@@ -171,8 +175,8 @@ sub _fetchFiles {
       if($1) {
         $remoteUrl = $file;
       } elsif($file =~ 's3://') {
-        $isS3 = 1;
         $remoteUrl = $file;
+        $isS3 = 1;
       } else {
         $remoteUrl = "rsync://" . $2;
         $isRsync = 1;
