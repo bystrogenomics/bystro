@@ -6,7 +6,6 @@ sudo apt update;
 # Installs gcc, and more; may be too much
 sudo apt install -y build-essential;
 
-sudo apt install -y openssl libssl-dev;
 # Not strictly necessary, useful however for much of what we do
 sudo apt install -y git-all;
 # pigz for Bystro, used to speed up decompression primarily
@@ -15,7 +14,7 @@ sudo apt install -y pigz;
 sudo apt install -y unzip;
 sudo apt install -y wget;
 # For Search::Elasticsearch::Client::5_0::Direct
-sudo apt install -y libcurl4-openssl-dev libssl-dev;
+sudo apt install -y openssl libcurl4-openssl-dev libssl-dev;
 # For tests involving querying ucsc directly
 sudo apt install -y libmysqlclient-dev;
 

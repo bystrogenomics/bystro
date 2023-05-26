@@ -52,6 +52,8 @@ cpanm install Module::Build::XSUtil
 cpanm install Test::LeakTrace
 cpanm install Test::Pod
 
+cpanm install Log::Any::Adapter
+
 # A dependency of Data::MessagePack installation
 cpanm install File::Copy::Recursive
 
