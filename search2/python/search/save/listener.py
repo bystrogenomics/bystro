@@ -9,12 +9,12 @@ from msgspec import Struct
 from ruamel.yaml import YAML
 
 from search.save.handler import go
-from search.utils.beanstalkd import BaseMessage, QueueConf, listen, ProgressPublisher, get_config_file_path
+from search.utils.beanstalkd import BaseMessage, FailedMessage, QueueConf, listen, ProgressPublisher, get_config_file_path
 
 required_keys = ("outputBasePath", "assembly", "queryBody", "fieldNames", "indexName")
 optional_keys = ("indexConfig", "pipeline")
 
-class SaveJobData(BaseMessage, frozen=True):
+class SaveJobData(BaseMessage):
     """Beanstalkd Job data"""
     submissionID: str
     assembly: str
@@ -68,24 +68,26 @@ def main():
     def handler_fn(publisher: ProgressPublisher, beanstalkd_job_data: SaveJobData):
         return go(job_data=beanstalkd_job_data, search_conf=search_conf, publisher=publisher)
 
-    def submit_msg_fn(submission_id, beanstalkd_job_data: SaveJobData):
+    def submit_msg_fn(beanstalkd_job_data: SaveJobData):
         config_path = get_config_file_path(config_path_base_dir, beanstalkd_job_data.assembly)
 
         with open(config_path, 'r', encoding='utf-8') as f: # pylint: disable=invalid-name
             job_config = YAML(typ="safe").load(f)
 
-        return SubmitJobMessage(submission_id, job_config)
+        return SubmitJobMessage(beanstalkd_job_data.submissionID, job_config)
 
-    def completed_msg_fn(submission_id: str, beanstalkd_job_data: SaveJobData, results: list[str]):
-        return CompleteJobMessage(submission_id, SavedJobResults(results))
+    def completed_msg_fn(beanstalkd_job_data: SaveJobData, results: list[str]):
+        return CompleteJobMessage(beanstalkd_job_data.submissionID, SavedJobResults(results))
 
-    def failed_msg_fn(submission_id: str, beanstalkd_job_data: SaveJobData, exception: Exception):
-        return CompleteJobMessage(submission_id, SavedJobResults(results))
+    def failed_msg_fn(beanstalkd_job_data: SaveJobData, exception: Exception):
+        return FailedMessage(beanstalkd_job_data.submissionID, str(exception))
 
     listen(
+        job_data_type=SaveJobData,
         handler_fn=handler_fn,
         submit_msg_fn=submit_msg_fn,
         completed_msg_fn=completed_msg_fn,
+        failed_msg_fn=failed_msg_fn,
         queue_conf=QueueConf(**queue_conf["beanstalkd"]),
         tube="saveFromQuery",
     )
