@@ -11,58 +11,18 @@ import os
 import pathlib
 import subprocess
 import traceback
-from typing import TypedDict
 
-import mgzip # type: ignore
+from isal import igzip
 import numpy as np
 from opensearchpy import  OpenSearch
 import ray
 
-from search.utils.beanstalkd import Publisher, get_progress_reporter
+from search.save.listener import SaveJobData
+from search.utils.beanstalkd import ProgressPublisher, get_progress_reporter
 from search.utils.opensearch import gather_opensearch_args
 from search.utils.annotation import get_delimiters
 
-ray.init(ignore_reinit_error='true', address='auto')
-
-STATISTICS_TYPE = TypedDict("STATISTICS_TYPE", {"json": str, "tab": str, "qc": str})
-
-OUTPUT_NAMES_TYPE = TypedDict('OUTPUT_NAMES_TYPE', {"log": str, "annotation": str,
-                                                    "sampleList": str, "archived": str,
-                                                    "statistics": STATISTICS_TYPE}, total=False)
-
-def make_output_names(output_base_path: str, statistics: bool,
-                      compress: bool, archive: bool):
-    """Make a dictionary of output file names based on the output base path and the output options"""
-    out: OUTPUT_NAMES_TYPE = {}
-
-    basename = os.path.basename(output_base_path)
-    out['log'] = f"{basename}.log"
-    out['annotation'] = f"{basename}.annotation.tsv"
-    if compress:
-        out['annotation'] += '.gz'
-    out['sampleList'] = f"{basename}.sample_list"
-
-    if statistics:
-        out['statistics'] = {
-            'json': f"{basename}.statistics.json",
-            'tab': f"{basename}.statistics.tab",
-            'qc': f"{basename}.statistics.qc.tab"
-        }
-
-    if archive:
-        out['archived'] = f"{basename}.tar"
-
-    return out
-
-
-def _clamp(n, min_num, max_num):
-    if n < min_num:
-        return min_num
-
-    if n > max_num:
-        return max_num
-
-    return n
+ray.init(ignore_reinit_error=True, address='auto')
 
 def _clean_query(input_query_body: dict):
     input_query_body["sort"] = ["_doc"]
@@ -77,7 +37,6 @@ def _clean_query(input_query_body: dict):
         del input_query_body["size"]
 
     return input_query_body
-
 
 def _get_header(field_names):
     children = [None] * len(field_names)
@@ -105,7 +64,7 @@ def _populate_data(field_path, data_for_end_of_path):
     return data_for_end_of_path
 
 
-def _make_output_string(rows, delims):
+def _make_output_string(rows: list, delims: dict):
     empty_field_char = delims['empty_field']
     for row_idx, row in enumerate(rows): # pylint:disable=too-many-nested-blocks
         # Some fields may just be missing; we won't store even the alt/pos [[]] structure for those
@@ -144,7 +103,7 @@ def _make_output_string(rows, delims):
 
         rows[row_idx] = delims['field'].join(row)
 
-    return "\n".join(rows) + "\n"
+    return bytes("\n".join(rows) + "\n", encoding="utf-8")
 
 
 @ray.remote
@@ -180,7 +139,7 @@ def _process_query(query_args: dict, search_client_args: dict, field_names: list
         rows.append(row)
 
     try:
-        with mgzip.open(chunk_output_name, "wt", thread=8, blocksize=2*10**8) as fw:
+        with igzip.open(chunk_output_name, 'wb') as fw:
             fw.write(_make_output_string(rows, delimiters))
         reporter.increment.remote(resp["hits"]["total"]["value"])
     except Exception:
@@ -189,7 +148,7 @@ def _process_query(query_args: dict, search_client_args: dict, field_names: list
 
     return resp["hits"]["total"]["value"]
 
-def _get_num_slices(client, input_body, max_query_size, max_slices, query):
+def _get_num_slices(client, index_name, max_query_size, max_slices, query):
     """Count number of hits for the index"""
     query_no_sort = query.copy()
     if "sort" in query_no_sort:
@@ -197,43 +156,39 @@ def _get_num_slices(client, input_body, max_query_size, max_slices, query):
     if "track_total_hits" in query_no_sort:
         del query_no_sort["track_total_hits"]
 
-    response = client.count( body=query_no_sort, index=input_body["indexName"])
+    response = client.count( body=query_no_sort, index=index_name)
 
     n_docs = response["count"]
     assert n_docs > 0
 
-    return _clamp(math.ceil(n_docs / max_query_size), 1, max_slices)
+    return max(min(math.ceil(n_docs / max_query_size), max_slices), 1)
 
 async def go( # pylint:disable=invalid-name
-    input_body: dict,
+    job_data: SaveJobData,
     search_conf: dict,
-    publisher: Publisher,
+    publisher: ProgressPublisher,
     max_query_size: int = 10_000,
     max_slices=1024,
     keep_alive="1d",
 ):
     """Main function for running the query and writing the output"""
-    if not input_body['compress']:
-        print("\nWarning: still compressing outputs\n")
+    output_names = make_output_names(job_data.outputBasePath, False, True, True)
 
-    output_names = make_output_names(
-        input_body['outputBasePath'], input_body['run_statistics'], True, input_body['archive'])
-
-    output_dir = os.path.dirname(input_body['outputBasePath'])
+    output_dir = os.path.dirname(job_data.outputBasePath)
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    written_chunks = [os.path.join(output_dir, f"{input_body['indexName']}_header")]
+    written_chunks = [os.path.join(output_dir, f"{job_data.indexName}_header")]
 
-    header = "\t".join(input_body['fieldNames']) + "\n"
-    with mgzip.open(written_chunks[-1], "wt", thread=8, blocksize=2*10**8) as fw:
+    header = bytes("\t".join(job_data.fieldNames) + "\n", encoding="utf-8")
+    with igzip.open(written_chunks[-1], "wb") as fw:
         fw.write(header)
 
     search_client_args = gather_opensearch_args(search_conf)
     client = OpenSearch(**search_client_args)
 
-    query = _clean_query(input_body["queryBody"])
-    num_slices = _get_num_slices(client, input_body, max_query_size, max_slices, query)
-    pit_id = client.create_point_in_time(index=input_body["indexName"], params={"keep_alive": keep_alive})['pit_id'] # type: ignore
+    query = _clean_query(job_data.queryBody)
+    num_slices = _get_num_slices(client, job_data.indexName, max_query_size, max_slices, query)
+    pit_id = client.create_point_in_time(index=job_data.indexName, params={"keep_alive": keep_alive})['pit_id'] # type: ignore
     try:
         reporter = get_progress_reporter(publisher)
         query['pit'] = {'id': pit_id}
@@ -241,13 +196,13 @@ async def go( # pylint:disable=invalid-name
 
         reqs = []
         for slice_id in range(num_slices):
-            written_chunks.append(os.path.join(output_dir, f"{input_body['indexName']}_{slice_id}"))
+            written_chunks.append(os.path.join(output_dir, f"{jobData.indexName}_{slice_id}"))
             body = query.copy()
             if num_slices > 1:
                 # Slice queries require max > 1
                 body['slice'] = {"id": slice_id, "max": num_slices}
             res = _process_query.remote({'body': body}, search_client_args,
-                                        input_body["fieldNames"], written_chunks[-1],
+                                        jobData.fieldNames, written_chunks[-1],
                                         reporter, get_delimiters())
             reqs.append(res)
         results_processed = ray.get(reqs)
@@ -262,13 +217,12 @@ async def go( # pylint:disable=invalid-name
         if ret != 0:
             raise IOError(f"Failed to write {annotation_path}")
 
-        if input_body['archive']:
-            tarball_path = os.path.join(output_dir, output_names['archived'])
-            tarball_name = output_names['archived']
+        tarball_path = os.path.join(output_dir, output_names['archived'])
+        tarball_name = output_names['archived']
 
-            ret = subprocess.call(f'cd {output_dir}; tar --exclude ".*" --exclude={tarball_name} -cf {tarball_name} * --remove-files', shell=True)
-            if ret != 0:
-                raise IOError(f"Failed to write {tarball_path}")
+        ret = subprocess.call(f'cd {output_dir}; tar --exclude ".*" --exclude={tarball_name} -cf {tarball_name} * --remove-files', shell=True)
+        if ret != 0:
+            raise IOError(f"Failed to write {tarball_path}")
     except Exception as err:
         client.delete_point_in_time(body={"pit_id": pit_id}) # type: ignore
         raise IOError(err) from err

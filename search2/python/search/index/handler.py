@@ -14,11 +14,11 @@ import ray
 from ruamel.yaml import YAML
 
 from search.index.bystro_file import read_annotation_tarball #type: ignore # pylint: disable=no-name-in-module,import-error
-from search.utils.beanstalkd import Publisher, get_progress_reporter
+from search.utils.beanstalkd import ProgressPublisher, get_progress_reporter
 from search.utils.opensearch import gather_opensearch_args
 from search.utils.annotation import get_delimiters
 
-ray.init(ignore_reinit_error="true", address="auto")
+ray.init(ignore_reinit_error=True, address="auto")
 
 n_threads = multiprocessing.cpu_count()
 
@@ -60,17 +60,34 @@ async def go(
     tar_path: str,
     chunk_size=500,
     paralleleism_chunk_size=5_000,
-    publisher: Optional[Publisher] = None,
+    publisher: ProgressPublisher | None = None,
 ):
+    """Main handler for indexing Bystro annotation data into OpenSearch
+
+    Args:
+        index_name (str): _description_
+        mapping_conf (dict): _description_
+        search_conf (dict): _description_
+        tar_path (str): _description_
+        chunk_size (int, optional): _description_. Defaults to 500.
+        paralleleism_chunk_size (_type_, optional): _description_. Defaults to 5_000.
+        publisher (Optional[Publisher], optional): _description_. Defaults to None.
+
+    Raises:
+        RuntimeError: _description_
+
+    Returns:
+        _type_: _description_
+    """
     reporter = get_progress_reporter(publisher)
 
     search_client_args = gather_opensearch_args(search_conf)
     client = AsyncOpenSearch(**search_client_args)
 
     post_index_settings = mapping_conf["post_index_settings"]
-    boolean_map = {x: True for x in mapping_conf["booleanFields"]}
+    boolean_map: dict[str, bool] = {x: True for x in mapping_conf["booleanFields"]}
 
-    index_body = {
+    index_body: dict[str, dict] = {
         "settings": mapping_conf["index_settings"],
         "mappings": mapping_conf["mappings"],
     }
@@ -107,7 +124,7 @@ async def go(
         results.append(indexer.index.remote(x))
     res = ray.get(results)
 
-    reported_count = ray.get(reporter.get_counter.remote())
+    reported_count: int = ray.get(reporter.get_counter.remote())
 
     errors = []
     total = 0

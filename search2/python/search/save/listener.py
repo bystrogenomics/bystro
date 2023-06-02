@@ -5,35 +5,37 @@
 import argparse
 from typing import Any
 
+from msgspec import Struct
 from ruamel.yaml import YAML
 
 from search.save.handler import go
-from search.utils.beanstalkd import QueueConf, listen, Publisher, get_config_file_path
+from search.utils.beanstalkd import BaseMessage, QueueConf, listen, ProgressPublisher, get_config_file_path
 
 required_keys = ("outputBasePath", "assembly", "queryBody", "fieldNames", "indexName")
 optional_keys = ("indexConfig", "pipeline")
 
-def _coerce_inputs(
-    job_details: dict,
-):
-    job_specific_args = {}
+class SaveJobData(BaseMessage, frozen=True):
+    """Beanstalkd Job data"""
+    submissionID: str
+    assembly: str
+    queryBody: dict
+    indexName: str
+    inputQuery: str
+    outputBasePath: str
+    fieldNames: list[str]
+    pipeline: dict | None = None
+    indexConfig: dict | None = None
 
-    for key in required_keys:
-        if key not in job_details:
-            raise ValueError(f"Missing required key: {key} in job message")
+class SubmitJobMessage(BaseMessage, frozen=True):
+    """Beanstalkd Job data"""
+    jobConfig: dict
 
-        job_specific_args[key] = job_details[key]
+class SavedJobResults(Struct):
+    outputFileNames: list[str]
 
-    for key in optional_keys:
-        if key in job_details:
-            job_specific_args[key] = job_details[key]
-
-    return {
-        "compress": True,
-        "archive": True,
-        "run_statistics": True,
-        **job_specific_args
-    }
+class CompleteJobMessage(BaseMessage, frozen=True):
+    """Beanstalkd Job data"""
+    results: SavedJobResults
 
 def main():
     """
@@ -63,20 +65,22 @@ def main():
     with open(args.search_conf, "r", encoding="utf-8") as search_config_file:
         search_conf = YAML(typ="safe").load(search_config_file)
 
-    def handler_fn(publisher: Publisher, job_details: dict):
-        input_body = _coerce_inputs(job_details)
-        return go(input_body=input_body, search_conf=search_conf, publisher=publisher)
+    def handler_fn(publisher: ProgressPublisher, beanstalkd_job_data: SaveJobData):
+        return go(job_data=beanstalkd_job_data, search_conf=search_conf, publisher=publisher)
 
-    def submit_msg_fn(base_msg: dict, job_details: dict):
-        config_path = get_config_file_path(config_path_base_dir, job_details['assembly'])
+    def submit_msg_fn(submission_id, beanstalkd_job_data: SaveJobData):
+        config_path = get_config_file_path(config_path_base_dir, beanstalkd_job_data.assembly)
 
         with open(config_path, 'r', encoding='utf-8') as f: # pylint: disable=invalid-name
             job_config = YAML(typ="safe").load(f)
 
-        return {**base_msg, "jobConfig": job_config}
+        return SubmitJobMessage(submission_id, job_config)
 
-    def completed_msg_fn(base_msg: dict, job_details: dict, results: Any): # pylint: disable=unused-argument
-        return {**base_msg, "results": {"outputFileNames": results}}
+    def completed_msg_fn(submission_id: str, beanstalkd_job_data: SaveJobData, results: list[str]):
+        return CompleteJobMessage(submission_id, SavedJobResults(results))
+
+    def failed_msg_fn(submission_id: str, beanstalkd_job_data: SaveJobData, exception: Exception):
+        return CompleteJobMessage(submission_id, SavedJobResults(results))
 
     listen(
         handler_fn=handler_fn,

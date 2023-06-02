@@ -1,37 +1,56 @@
 """TODO: Add description here"""
+import abc
+from copy import deepcopy
+from enum import Enum
 from glob import glob
 from os import path
 import time
 import traceback
-from typing import Any, NamedTuple, List, Callable, Optional
+from typing import Any, NamedTuple, List, Callable, Union
 
 import asyncio
-from orjson import loads, dumps  # pylint: disable=no-name-in-module
+from msgspec import Struct, json
 from pystalk import BeanstalkClient, BeanstalkError
 from opensearchpy.exceptions import NotFoundError
 
 import ray
+from ray.types import ObjectRef
 
 BEANSTALK_ERR_TIMEOUT = "TIMED_OUT"
 
-class Message(NamedTuple):
-    """Beanstalkd Message"""
-    event: str
-    queueID: str
+class BaseMessage(Struct):
     submissionID: str
-    data: Any = None
 
-class Publisher(NamedTuple):
+class FailedMessage(BaseMessage):
+    reason: str
+
+class Event(str, Enum):
+    """Beanstalkd Event"""
+    PROGRESS = "progress"
+    FAILED = "failed"
+    STARTED = "started"
+    COMPLETED = "completed"
+
+class ProgressData(Struct):
+    progress: int = 0
+    skipped: int = 0
+
+class ProgressMessage(BaseMessage):
+    """Beanstalkd Message"""
+    event: str = Event.PROGRESS
+    data: ProgressData | str | None = None
+
+class ProgressPublisher(NamedTuple):
     """Beanstalkd Message Published Config"""
     host: str
-    port: str
+    port: int
     queue: str
-    message: Message
+    message: ProgressMessage
 
-class QueueConf(NamedTuple):
+class QueueConf(Struct):
     """Queue Configuration"""
     addresses: List[str]
-    events: dict
+    events: Event
     tubes: dict
 
     def split_host_port(self):
@@ -56,24 +75,12 @@ def get_config_file_path(config_path_base_dir: str, assembly: str, suffix: str =
 
     return paths[0]
 
-def _specify_publisher(
-    submission_id, job_id, publisher_host, publisher_port, progress_event, event_queue
-):
-    return Publisher(
-            host = publisher_host,
-            port = publisher_port,
-            queue = event_queue,
-            message = Message(
-                event = progress_event,
-                queueID = job_id,
-                submissionID = submission_id,
-                data = None,
-            ))
-
 def listen(
-    handler_fn: Callable,
-    submit_msg_fn: Callable,
-    completed_msg_fn: Callable,
+    job_data_type: BaseMessage,
+    handler_fn: Callable[[ProgressPublisher, BaseMessage], Any],
+    submit_msg_fn: Callable[[BaseMessage], BaseMessage],
+    completed_msg_fn: Callable[[BaseMessage, Any], BaseMessage],
+    failed_msg_fn: Callable[[BaseMessage, Exception], FailedMessage],
     queue_conf: QueueConf,
     tube: str,
 ):
@@ -96,6 +103,7 @@ def listen(
         client  = clients[offset]
 
         client.watch(tube_conf["submission"])
+        client.use(tube_conf["events"])
 
         try:
             job = client.reserve_job(5)
@@ -103,97 +111,96 @@ def listen(
             if err.message == BEANSTALK_ERR_TIMEOUT:
                 continue
             raise err
+
         try:
-            job_data = loads(job.job_data)
+            job_data: BaseMessage = json.decode(job.body, type=job_data_type)
+        except Exception as err:
+            print(f"Received invalid JSON: {err}")
+            client.delete_job(job.job_id)
+            continue
 
-            publisher: Publisher = _specify_publisher(
-                job_data['submissionID'],
-                job.job_id,
-                publisher_host=client.host,
-                publisher_port=client.port,
-                progress_event=events_conf["progress"],
-                event_queue=tube_conf["events"]
-            )
+        try:
+            publisher = ProgressPublisher(
+                        host = client.host,
+                        port = client.port,
+                        queue = tube_conf["events"],
+                        message = ProgressMessage(
+                            submissionID = job_data.submissionID
+                        ))
 
-            base_msg = {
-                "event": events_conf["started"],
-                "queueID": job.job_id,
-                "submissionID": job_data["submissionID"],
-            }
+            msg = submit_msg_fn(job_data)
 
-            msg = submit_msg_fn(base_msg, job_data)
-
-            client.put_job_into(tube_conf["events"], dumps(msg))
+            client.put_job(json.encode(msg))
             res = asyncio.get_event_loop().run_until_complete(handler_fn(publisher, job_data))
 
-            base_msg["event"] = events_conf["completed"]
-            msg = completed_msg_fn(base_msg, job_data, res)
+            msg = completed_msg_fn(job_data, res)
 
-            client.put_job_into(tube_conf["events"], dumps(msg))
+            client.put_job(json.encode(msg))
             client.delete_job(job.job_id)
         except BeanstalkError as err:
             print(f"Received error during execution: {err}")
             client.release_job(job.job_id)
         except NotFoundError as err:
-            msg = {
-                "event": events_conf["failed"],
-                "reason": "404",
-                "queueID": job.job_id,
-                "submissionID": job_data["submissionID"],
-            }
+            msg = failed_msg_fn(job_data, err)
 
             traceback.print_exc()
-            client.put_job_into(tube_conf["events"], dumps(msg))
+            client.put_job(json.encode(msg))
             client.delete_job(job.job_id)
         except Exception as err:
+            # Unhandled Exception
             traceback.print_exc()
             client.release_job(job.job_id)
         finally:
             time.sleep(0.5)
 
+class ProgressReporter(abc.ABC):
+    def increment(self, count: int):
+        """Increment the counter by processed variant count and report to the beanstalk queue"""
+        pass
+    def get_counter(self) -> int:
+        """Get the current value of the counter"""
+        pass
+
 @ray.remote(num_cpus=0)
-class ProgressReporter:
+class BeanstalkdProgressReporter(ProgressReporter):
     """A Ray class to report progress to a beanstalk queue"""
 
-    def __init__(self, publisher: Publisher):
-        self.value = 0
-        self.publisher = publisher
-        self.message = publisher.message._asdict()
+    def __init__(self, publisher: ProgressPublisher):
+        self._value = 0
+        self._message = deepcopy(publisher.message)
+        self._message.data = ProgressData()
 
-        self.message["data"] = {"progress": 0, "skipped": 0}
-
-        self.client = BeanstalkClient(publisher.host, publisher.port, socket_timeout=10)
+        self._client = BeanstalkClient(publisher.host, publisher.port, socket_timeout=10)
+        self._client.use(publisher.queue)
 
     def increment(self, count: int):
         """Increment the counter by processed variant count and report to the beanstalk queue"""
-        self.value += count
-        self.message["data"]["progress"] = self.value
+        self._value += count
+        self._message.data.progress = self._value # type: ignore
 
-        self.client.put_job_into(self.publisher.queue, dumps(self.message))
-
-        return self.value
+        self._client.put_job(json.encode(self._message))
 
     def get_counter(self):
         """Get the current value of the counter"""
-        return self.value
+        return self._value
 
 
 @ray.remote(num_cpus=0)
-class ProgressReporterStub:
+class DebugProgressReporter(ProgressReporter):
     """A Ray class to report progress to stdout"""
 
     def __init__(self):
-        self.value = 0
+        self._value = 0
 
     def increment(self, count: int):
-        self.value += count
-        print(f"Processed {self.value} records")
+        self._value += count
+        print(f"Processed {self._value} records")
 
     def get_counter(self):
-        return self.value
+        return self._value
 
-def get_progress_reporter(publisher: Optional[Publisher]):
+def get_progress_reporter(publisher: ProgressPublisher | None) -> ObjectRef:
     if publisher:
-        return ProgressReporter.remote(publisher)  # type: ignore # pylint: disable=no-member
+        return BeanstalkdProgressReporter.remote(ProgressPublisher)  # type: ignore # pylint: disable=no-member
 
-    return ProgressReporterStub.remote()  # type: ignore # pylint: disable=no-member
+    return DebugProgressReporter.remote()  # type: ignore # pylint: disable=no-member
