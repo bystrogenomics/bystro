@@ -10,51 +10,30 @@ from ruamel.yaml import YAML
 
 from search.save.handler import go
 from search.utils.beanstalkd import BaseMessage, FailedMessage, QueueConf, listen, ProgressPublisher, get_config_file_path
+from search.utils.messages import SaveJobData, SaveJobSubmitMessage, SaveJobCompleteMessage
 
-required_keys = ("outputBasePath", "assembly", "queryBody", "fieldNames", "indexName")
-optional_keys = ("indexConfig", "pipeline")
-
-class SaveJobData(BaseMessage):
-    """Beanstalkd Job data"""
-    submissionID: str
-    assembly: str
-    queryBody: dict
-    indexName: str
-    inputQuery: str
-    outputBasePath: str
-    fieldNames: list[str]
-    pipeline: dict | None = None
-    indexConfig: dict | None = None
-
-class SubmitJobMessage(BaseMessage, frozen=True):
-    """Beanstalkd Job data"""
-    jobConfig: dict
-
-class SavedJobResults(Struct):
-    outputFileNames: list[str]
-
-class CompleteJobMessage(BaseMessage, frozen=True):
-    """Beanstalkd Job data"""
-    results: SavedJobResults
+JOB_TYPE="saveFromQuery"
 
 def main():
     """
         Start search saving server that listens to beanstalkd queue
         and write submitted queries to disk as valid Bystro annotations
     """
-    parser = argparse.ArgumentParser(description="Process some config files.")
+    parser = argparse.ArgumentParser(description=f"Start a listener for {JOB_TYPE} Bystro jobs")
     parser.add_argument(
-        "--conf_dir", type=str, help="Path to the genome/assembly config directory"
+        "--conf_dir", type=str, help="Path to the genome/assembly config directory", required=True
     )
     parser.add_argument(
         "--queue_conf",
         type=str,
         help="Path to the beanstalkd queue config yaml file (e.g beanstalk1.yml)",
+        required=True,
     )
     parser.add_argument(
         "--search_conf",
         type=str,
         help="Path to the opensearch config yaml file (e.g. elasticsearch.yml)",
+        required=True
     )
     args = parser.parse_args()
 
@@ -74,16 +53,16 @@ def main():
         with open(config_path, 'r', encoding='utf-8') as f: # pylint: disable=invalid-name
             job_config = YAML(typ="safe").load(f)
 
-        return SubmitJobMessage(beanstalkd_job_data.submissionID, job_config)
+        return SaveJobSubmitMessage(beanstalkd_job_data.submissionID, job_config)
 
     def completed_msg_fn(beanstalkd_job_data: SaveJobData, results: list[str]):
-        return CompleteJobMessage(beanstalkd_job_data.submissionID, SavedJobResults(results))
+        return SaveJobCompleteMessage()(beanstalkd_job_data.submissionID, SaveJobCompleteMessage(results))
 
     def failed_msg_fn(beanstalkd_job_data: SaveJobData, exception: Exception):
         return FailedMessage(beanstalkd_job_data.submissionID, str(exception))
 
     listen(
-        job_data_type=SaveJobData,
+        job_data_type=SaveJobCompleteMessage,
         handler_fn=handler_fn,
         submit_msg_fn=submit_msg_fn,
         completed_msg_fn=completed_msg_fn,

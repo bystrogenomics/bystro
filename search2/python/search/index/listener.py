@@ -10,7 +10,7 @@ from msgspec import Struct
 from ruamel.yaml import YAML
 
 from search.index.handler import go
-from search.utils.beanstalkd import BaseMessage, ProgressPublisher, QueueConf, get_config_file_path, listen
+from search.utils.messages import BaseMessage, ProgressPublisher, QueueConf, get_config_file_path, listen
 from search.utils.annotation import AnnotationOutputs
 
 class IndexJobData(BaseMessage, frozen=True):

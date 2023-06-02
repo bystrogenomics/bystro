@@ -17,7 +17,7 @@ import numpy as np
 from opensearchpy import  OpenSearch
 import ray
 
-from search.save.listener import SaveJobData
+from search.utils.messages import SaveJobData
 from search.utils.beanstalkd import ProgressPublisher, get_progress_reporter
 from search.utils.opensearch import gather_opensearch_args
 from search.utils.annotation import get_delimiters

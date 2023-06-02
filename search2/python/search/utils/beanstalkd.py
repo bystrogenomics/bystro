@@ -16,29 +16,9 @@ from opensearchpy.exceptions import NotFoundError
 import ray
 from ray.types import ObjectRef
 
+from search.utils.messages import BaseMessage, FailedMessage, ProgressMessage, ProgressData, Event
+
 BEANSTALK_ERR_TIMEOUT = "TIMED_OUT"
-
-class BaseMessage(Struct):
-    submissionID: str
-
-class FailedMessage(BaseMessage):
-    reason: str
-
-class Event(str, Enum):
-    """Beanstalkd Event"""
-    PROGRESS = "progress"
-    FAILED = "failed"
-    STARTED = "started"
-    COMPLETED = "completed"
-
-class ProgressData(Struct):
-    progress: int = 0
-    skipped: int = 0
-
-class ProgressMessage(BaseMessage):
-    """Beanstalkd Message"""
-    event: str = Event.PROGRESS
-    data: ProgressData | str | None = None
 
 class ProgressPublisher(NamedTuple):
     """Beanstalkd Message Published Config"""
