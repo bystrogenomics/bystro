@@ -68,7 +68,7 @@ def main():
         completed_msg_fn=completed_msg_fn,
         failed_msg_fn=failed_msg_fn,
         queue_conf=QueueConf(**queue_conf["beanstalkd"]),
-        tube="saveFromQuery",
+        tube=JOB_TYPE,
     )
 
 if __name__ == "__main__":

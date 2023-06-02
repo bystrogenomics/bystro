@@ -4,12 +4,12 @@ from copy import deepcopy
 from enum import Enum
 from glob import glob
 from os import path
+from textwrap import dedent
 import time
 import traceback
 from typing import Any, NamedTuple, List, Callable, Union
-
 import asyncio
-from msgspec import Struct, json
+from msgspec import Struct, json, DecodeError, ValidationError
 from pystalk import BeanstalkClient, BeanstalkError
 from opensearchpy.exceptions import NotFoundError
 
@@ -73,7 +73,6 @@ def listen(
         assert event in queue_conf.events
 
     tube_conf = queue_conf.tubes[tube]
-    events_conf = queue_conf.events
     clients = tuple(BeanstalkClient(host, port, socket_timeout=10) for (host, port) in zip(hosts, ports))
 
     i = 0
@@ -94,8 +93,18 @@ def listen(
 
         try:
             job_data: BaseMessage = json.decode(job.body, type=job_data_type)
-        except Exception as err:
-            print(f"Received invalid JSON: {err}")
+        except DecodeError as err:
+            print(dedent(f"""
+                        Job {job.job_id} JSON is invalid.
+                        Decoding `{str(job.body)}`, failed with: `{err}`"""
+                        ))
+            client.delete_job(job.job_id)
+            continue
+        except ValidationError as err:
+            print(dedent(f"""
+                        Job {job.job_id} JSON does not have the data expected.
+                        Expected {job_data_type.keys_with_types()}.
+                        Decoding `{str(job.body)}`, failed with: `{err}`"""))
             client.delete_job(job.job_id)
             continue
 

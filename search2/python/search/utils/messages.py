@@ -1,3 +1,5 @@
+from typing import Any, get_type_hints
+
 from enum import Enum
 
 from msgspec import Struct
@@ -6,6 +8,10 @@ from search.utils.annotation import AnnotationOutputs
 
 class BaseMessage(Struct, frozen=True):
     submissionID: str
+
+    @classmethod
+    def keys_with_types(cls) -> dict:
+        return get_type_hints(cls)
 
 class FailedMessage(BaseMessage, frozen=True):
     reason: str
@@ -21,7 +27,7 @@ class ProgressData(Struct):
     progress: int = 0
     skipped: int = 0
 
-class ProgressMessage(BaseMessage):
+class ProgressMessage(BaseMessage, frozen=True):
     """Beanstalkd Message"""
     event: str = Event.PROGRESS
     data: ProgressData | str | None = None
