@@ -185,7 +185,6 @@ def listen(
                 client.put_job(json.encode(failed_msg))
                 client.delete_job(job.job_id)
 
-                time.sleep(1)
                 continue
 
         except BeanstalkError as err:
@@ -203,9 +202,6 @@ def listen(
             client.release_job(job.job_id)
             time.sleep(1)
             continue
-
-        finally:
-            time.sleep(0.5)
 
 
 class ProgressReporter(abc.ABC):
