@@ -12,7 +12,7 @@ from opensearchpy._async import helpers as async_helpers
 import ray
 from ruamel.yaml import YAML
 
-from bystro.search.index.bystro_file import read_annotation_tarball #type: ignore # pylint: disable=no-name-in-module,import-error
+from bystro.search.index.bystro_file import read_annotation_tarball  # type: ignore # pylint: disable=no-name-in-module,import-error
 from bystro.search.utils.beanstalkd import ProgressPublisher, get_progress_reporter
 from bystro.search.utils.opensearch import gather_opensearch_args
 from bystro.search.utils.annotation import get_delimiters
@@ -20,6 +20,7 @@ from bystro.search.utils.annotation import get_delimiters
 ray.init(ignore_reinit_error=True, address="auto")
 
 n_threads = multiprocessing.cpu_count()
+
 
 @ray.remote
 class Indexer:
@@ -51,6 +52,7 @@ class Indexer:
 
     async def close(self):
         await self.client.close()
+
 
 async def go(
     index_name: str,
@@ -93,9 +95,7 @@ async def go(
 
     if not index_body["settings"].get("number_of_shards"):
         file_size = os.path.getsize(tar_path)
-        index_body["settings"]["number_of_shards"] = ceil(
-            float(file_size) / float(1e10)
-        )
+        index_body["settings"]["number_of_shards"] = ceil(float(file_size) / float(1e10))
 
     try:
         await client.indices.create(index_name, body=index_body)
@@ -111,7 +111,7 @@ async def go(
     )
 
     start = time.time()
-    indexers = [Indexer.remote(search_client_args, reporter, chunk_size) for _ in range(n_threads)] # type: ignore  # noqa: E501
+    indexers = [Indexer.remote(search_client_args, reporter, chunk_size) for _ in range(n_threads)]  # type: ignore  # noqa: E501
     actor_idx = 0
     results = []
     for x in data:
@@ -123,11 +123,11 @@ async def go(
         results.append(indexer.index.remote(x))
     res = ray.get(results)
 
-    reported_count: int = ray.get(reporter.get_counter.remote()) # type: ignore
+    reported_count: int = ray.get(reporter.get_counter.remote())  # type: ignore
 
     errors = []
     total = 0
-    for (indexed_count, errors) in res:
+    for indexed_count, errors in res:
         total += indexed_count
         if errors:
             errors.append(",".join(errors))
@@ -137,7 +137,7 @@ async def go(
 
     to_report_count = total - reported_count
     if to_report_count > 0:
-        await asyncio.to_thread(reporter.increment.remote, to_report_count) # type: ignore
+        await asyncio.to_thread(reporter.increment.remote, to_report_count)  # type: ignore
 
     print(f"Processed {total} records in {time.time() - start}s")
 
@@ -152,9 +152,7 @@ async def go(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process some config files.")
-    parser.add_argument(
-        "--tar", type=str, help="Path to the tarball containing the annotation"
-    )
+    parser.add_argument("--tar", type=str, help="Path to the tarball containing the annotation")
 
     parser.add_argument(
         "--search_conf",

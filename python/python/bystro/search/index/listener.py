@@ -8,11 +8,7 @@ import os
 from ruamel.yaml import YAML
 
 from bystro.search.index.handler import go
-from bystro.search.utils.messages import (
-    IndexJobData,
-    IndexJobResults,
-    IndexJobCompleteMessage
-)
+from bystro.search.utils.messages import IndexJobData, IndexJobResults, IndexJobCompleteMessage
 from bystro.search.utils.beanstalkd import ProgressPublisher, QueueConf, get_config_file_path, listen
 
 TUBE = "index"
@@ -24,9 +20,7 @@ def main():
     and indexes submitted data in Opensearch
     """
     parser = argparse.ArgumentParser(description="Process some config files.")
-    parser.add_argument(
-        "--conf_dir", type=str, help="Path to the genome/assembly config directory"
-    )
+    parser.add_argument("--conf_dir", type=str, help="Path to the genome/assembly config directory")
     parser.add_argument(
         "--queue_conf",
         type=str,
@@ -55,9 +49,7 @@ def main():
         inputs = beanstalkd_job_data.inputFileNames
 
         if not inputs.archived:
-            raise ValueError(
-                "Indexing currently only works for indexing archived (tarballed) results"
-            )
+            raise ValueError("Indexing currently only works for indexing archived (tarballed) results")
 
         tar_path = os.path.join(beanstalkd_job_data.inputDir, inputs.archived)
 

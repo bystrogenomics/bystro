@@ -85,7 +85,10 @@ def try_beanstalk(func):
 
     return wrapper
 
-def default_failed_msg_fn(job_data: T | None, job_id: BEANSTALK_JOB_ID, err: Exception) -> FailedJobMessage | InvalideJobMessage:  # noqa: E501
+
+def default_failed_msg_fn(
+    job_data: T | None, job_id: BEANSTALK_JOB_ID, err: Exception
+) -> FailedJobMessage | InvalideJobMessage:  # noqa: E501
     """Default failed message function"""
     if job_data is None:
         return InvalideJobMessage(queueID=job_id, reason=str(err))
@@ -99,7 +102,9 @@ def listen(
     completed_msg_fn: Callable[[T, Any], T3],
     queue_conf: QueueConf,
     tube: str,
-    failed_msg_fn: Callable[[T | None, BEANSTALK_JOB_ID, Exception], FailedJobMessage | InvalideJobMessage] = default_failed_msg_fn,  # noqa: E501
+    failed_msg_fn: Callable[
+        [T | None, BEANSTALK_JOB_ID, Exception], FailedJobMessage | InvalideJobMessage
+    ] = default_failed_msg_fn,  # noqa: E501
 ):
     """Listen on a Beanstalkd channel, waiting for work.
     When work is available call the work handler

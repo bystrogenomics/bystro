@@ -1,5 +1,5 @@
 import unittest
-from search.index.bystro_file import read_annotation_tarball
+from bystro.search.index.bystro_file import read_annotation_tarball
 
 # TODO: add tests
 class TestBystroFile(unittest.TestCase):
