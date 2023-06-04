@@ -20,7 +20,7 @@ import ray
 from bystro.search.utils.messages import SaveJobData
 from bystro.search.utils.beanstalkd import ProgressPublisher, get_progress_reporter
 from bystro.search.utils.opensearch import gather_opensearch_args
-from bystro.search.utils.annotation import get_delimiters
+from bystro.search.utils.annotation import get_delimiters, AnnotationOutputs
 
 ray.init(ignore_reinit_error=True, address='auto')
 
@@ -140,7 +140,7 @@ def _process_query(query_args: dict, search_client_args: dict, field_names: list
 
     try:
         with igzip.open(chunk_output_name, 'wb') as fw:
-            fw.write(_make_output_string(rows, delimiters))
+            fw.write(_make_output_string(rows, delimiters)) # type: ignore
         reporter.increment.remote(resp["hits"]["total"]["value"])
     except Exception:
         traceback.print_exc()
@@ -170,25 +170,26 @@ async def go( # pylint:disable=invalid-name
     max_query_size: int = 10_000,
     max_slices=1024,
     keep_alive="1d",
-):
+) -> AnnotationOutputs:
     """Main function for running the query and writing the output"""
-    output_names = make_output_names(job_data.outputBasePath, False, True, True)
 
     output_dir = os.path.dirname(job_data.outputBasePath)
+    basename = os.path.basename(job_data.outputBasePath)
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
+    outputs = AnnotationOutputs.from_path(output_dir, basename, False, True)
 
     written_chunks = [os.path.join(output_dir, f"{job_data.indexName}_header")]
 
     header = bytes("\t".join(job_data.fieldNames) + "\n", encoding="utf-8")
     with igzip.open(written_chunks[-1], "wb") as fw:
-        fw.write(header)
+        fw.write(header) # type: ignore
 
     search_client_args = gather_opensearch_args(search_conf)
     client = OpenSearch(**search_client_args)
 
     query = _clean_query(job_data.queryBody)
     num_slices = _get_num_slices(client, job_data.indexName, max_query_size, max_slices, query)
-    pit_id = client.create_point_in_time(index=job_data.indexName, params={"keep_alive": keep_alive})['pit_id'] # type: ignore
+    pit_id = client.create_point_in_time(index=job_data.indexName, params={"keep_alive": keep_alive})['pit_id'] # type: ignore   # noqa: E501
     try:
         reporter = get_progress_reporter(publisher)
         query['pit'] = {'id': pit_id}
@@ -196,13 +197,13 @@ async def go( # pylint:disable=invalid-name
 
         reqs = []
         for slice_id in range(num_slices):
-            written_chunks.append(os.path.join(output_dir, f"{jobData.indexName}_{slice_id}"))
+            written_chunks.append(os.path.join(output_dir, f"{job_data.indexName}_{slice_id}"))
             body = query.copy()
             if num_slices > 1:
                 # Slice queries require max > 1
                 body['slice'] = {"id": slice_id, "max": num_slices}
             res = _process_query.remote({'body': body}, search_client_args,
-                                        jobData.fieldNames, written_chunks[-1],
+                                        job_data.fieldNames, written_chunks[-1],
                                         reporter, get_delimiters())
             reqs.append(res)
         results_processed = ray.get(reqs)
@@ -212,21 +213,20 @@ async def go( # pylint:disable=invalid-name
 
         all_chunks = " ".join(written_chunks)
 
-        annotation_path = os.path.join(output_dir, output_names['annotation'])
+        annotation_path = os.path.join(output_dir, outputs.annotation)
         ret = subprocess.call(f'cat {all_chunks} > {annotation_path}; rm {all_chunks}', shell=True)
         if ret != 0:
             raise IOError(f"Failed to write {annotation_path}")
 
-        tarball_path = os.path.join(output_dir, output_names['archived'])
-        tarball_name = output_names['archived']
+        tarball_name = os.path.basename(outputs.archived)
 
-        ret = subprocess.call(f'cd {output_dir}; tar --exclude ".*" --exclude={tarball_name} -cf {tarball_name} * --remove-files', shell=True)
+        ret = subprocess.call(f'cd {output_dir}; tar --exclude ".*" --exclude={tarball_name} -cf {tarball_name} * --remove-files', shell=True)  # noqa: E501
         if ret != 0:
-            raise IOError(f"Failed to write {tarball_path}")
+            raise IOError(f"Failed to write {outputs.archived}")
     except Exception as err:
         client.delete_point_in_time(body={"pit_id": pit_id}) # type: ignore
         raise IOError(err) from err
 
     client.delete_point_in_time(body={"pit_id": pit_id}) # type: ignore
 
-    return output_names
+    return outputs

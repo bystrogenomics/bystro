@@ -4,26 +4,19 @@
 """
 import argparse
 import os
-from typing import Optional, Any
 
-from msgspec import Struct
 from ruamel.yaml import YAML
 
 from bystro.search.index.handler import go
-from bystro.search.utils.messages import BaseMessage, ProgressPublisher, QueueConf, get_config_file_path, listen
-from bystro.search.utils.annotation import AnnotationOutputs
+from bystro.search.utils.messages import (
+    IndexJobData,
+    IndexJobResults,
+    IndexJobCompleteMessage
+)
+from bystro.search.utils.beanstalkd import ProgressPublisher, QueueConf, get_config_file_path, listen
 
-class IndexJobData(BaseMessage, frozen=True):
-    inputDir: str
-    inputFileNames: AnnotationOutputs
-    indexName: str
-    assembly: str
-    fieldNames: list[str] | None = None
-    indexConfig: dict | None = None
+TUBE = "index"
 
-class IndexResultData(BaseMessage):
-    indexConfig: dict
-    fieldNames: list
 
 def main():
     """
@@ -54,40 +47,48 @@ def main():
         search_conf = YAML(typ="safe").load(search_config_file)
 
     def handler_fn(publisher: ProgressPublisher, beanstalkd_job_data: IndexJobData):
-        m_path = get_config_file_path(conf_dir, beanstalkd_job_data.assembly, '.mapping.y*ml')
+        m_path = get_config_file_path(conf_dir, beanstalkd_job_data.assembly, ".mapping.y*ml")
 
-        with open(m_path, 'r', encoding='utf-8') as f:
+        with open(m_path, "r", encoding="utf-8") as f:
             mapping_conf = YAML(typ="safe").load(f)
 
         inputs = beanstalkd_job_data.inputFileNames
 
         if not inputs.archived:
-            raise ValueError('Indexing currently only works for indexing archived (tarballed) results')
+            raise ValueError(
+                "Indexing currently only works for indexing archived (tarballed) results"
+            )
 
         tar_path = os.path.join(beanstalkd_job_data.inputDir, inputs.archived)
 
-        return go(index_name=beanstalkd_job_data.indexName,
-                  tar_path=tar_path,
-                  mapping_conf=mapping_conf,
-                  search_conf=search_conf,
-                  publisher=publisher)
+        return go(
+            index_name=beanstalkd_job_data.indexName,
+            tar_path=tar_path,
+            mapping_conf=mapping_conf,
+            search_conf=search_conf,
+            publisher=publisher,
+        )
 
-    def submit_msg_fn(base_msg: dict, input_job_details: IndexJobData): # pylint: disable=unused-argument
-        return base_msg
+    def submit_msg_fn(job_data: IndexJobData):
+        return job_data
 
-    def completed_msg_fn(base_msg: dict, input_job_details: IndexJobData, results: Any):
-        m_path = get_config_file_path(conf_dir, input_job_details.assembly, '.mapping.y*ml')
+    def completed_msg_fn(job_data: IndexJobData, fieldNames: list[str]):
+        m_path = get_config_file_path(conf_dir, job_data.assembly, ".mapping.y*ml")
 
-        with open(m_path, 'r', encoding='utf-8') as f:
+        with open(m_path, "r", encoding="utf-8") as f:
             mapping_conf = YAML(typ="safe").load(f)
 
-        return IndexJobData({**base_msg, "indexConfig": mapping_conf, "fieldNames": results}
+        return IndexJobCompleteMessage(job_data.submissionID, IndexJobResults(mapping_conf, fieldNames))
 
-    listen(handler_fn=handler_fn,
-           submit_msg_fn=submit_msg_fn,
-           completed_msg_fn=completed_msg_fn,
-           queue_conf=QueueConf(**queue_conf["beanstalkd"]),
-           tube='index')
+    listen(
+        job_data_type=IndexJobData,
+        handler_fn=handler_fn,
+        submit_msg_fn=submit_msg_fn,
+        completed_msg_fn=completed_msg_fn,
+        queue_conf=QueueConf(**queue_conf["beanstalkd"]),
+        tube=TUBE,
+    )
+
 
 if __name__ == "__main__":
     main()

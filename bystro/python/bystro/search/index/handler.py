@@ -60,7 +60,7 @@ async def go(
     chunk_size=500,
     paralleleism_chunk_size=5_000,
     publisher: ProgressPublisher | None = None,
-):
+) -> list[str]:
     """Main handler for indexing Bystro annotation data into OpenSearch
 
     Args:
@@ -111,7 +111,7 @@ async def go(
     )
 
     start = time.time()
-    indexers = [Indexer.remote(search_client_args, reporter, chunk_size) for _ in range(n_threads)] # type: ignore
+    indexers = [Indexer.remote(search_client_args, reporter, chunk_size) for _ in range(n_threads)] # type: ignore  # noqa: E501
     actor_idx = 0
     results = []
     for x in data:
@@ -123,7 +123,7 @@ async def go(
         results.append(indexer.index.remote(x))
     res = ray.get(results)
 
-    reported_count: int = ray.get(reporter.get_counter.remote())
+    reported_count: int = ray.get(reporter.get_counter.remote()) # type: ignore
 
     errors = []
     total = 0
@@ -137,7 +137,7 @@ async def go(
 
     to_report_count = total - reported_count
     if to_report_count > 0:
-        await asyncio.to_thread(reporter.increment.remote, to_report_count)
+        await asyncio.to_thread(reporter.increment.remote, to_report_count) # type: ignore
 
     print(f"Processed {total} records in {time.time() - start}s")
 

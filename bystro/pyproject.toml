@@ -17,3 +17,9 @@ python-source = "python"
 
 [package.metadata.maturin]
 requires-dist = ["Cython"]
+
+[tool.black]
+line-length = 105
+
+[tool.ruff]
+line-length = 105

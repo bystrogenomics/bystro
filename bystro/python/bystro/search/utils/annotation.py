@@ -3,60 +3,101 @@ from typing import Optional
 
 from msgspec import Struct
 
+
 class StatisticsOutputs(Struct, frozen=True):
-        json: str
-        tab: str
-        qc: str
+    """
+        Paths to all possible Bystro statistics outputs
+
+        Attributes:
+            json: str
+                Basename of the JSON statistics file
+            tab: str
+                Basename of the TSV statistics file
+            qc: str
+                Basename of the QC statistics file
+    """
+    json: str
+    tab: str
+    qc: str
+
 
 class AnnotationOutputs(Struct, frozen=True):
-    """Annotation Outputs"""
+    """
+        Paths to all possible Bystro annotation outputs
+        
+        Attributes:
+            output_dir: str
+                Output directory
+            archived: str
+                Basename of the archive
+            annotation: str
+                Basename of the annotation TSV file, inside the archive
+            sampleList: Optional[str]
+                Basename of the sample list file, inside the archive
+            log: Basename of the log file, inside the archive
+            statistics: Optional[StatisticsOutputs]
+                Basenames of the statistics files, inside the archive
+    """
+    output_dir: str
+    archived: str
     annotation: str
     sampleList: str
     log: str
     statistics: StatisticsOutputs | None = None
-    archived: str  | None = None
 
     @staticmethod
-    def new_from_base_path(output_base_path: str, generate_statistics: bool, compress: bool, archive: bool):
+    def from_path(
+        output_dir: str,
+        basename: str,
+        generate_statistics: bool,
+        compress: bool,
+        make_dir: bool = True,
+        make_dir_mode: int = 511,
+    ):
         """Make AnnotationOutputs based on the output base path and the output options"""
+        if make_dir:
+            os.makedirs(output_dir, mode=make_dir_mode, exist_ok=True)
 
-        basename = os.path.basename(output_base_path)
+        if not os.path.isdir(output_dir):
+            raise IOError(f"Output directory {output_dir} does not exist")
+
         log = f"{basename}.log"
         annotation = f"{basename}.annotation.tsv"
 
         if compress:
-            annotation += '.gz'
+            annotation += ".gz"
 
         sampleList = f"{basename}.sample_list"
 
-        archived = None
-        if archive:
-            archived = f"{basename}.tar"
+        archived = f"{basename}.tar"
 
         statistics = None
         if generate_statistics:
             statistics = StatisticsOutputs(
                 json=f"{basename}.statistics.json",
                 tab=f"{basename}.statistics.tsv",
-                qc=f"{basename}.statistics.qc.tsv"
+                qc=f"{basename}.statistics.qc.tsv",
             )
 
         return AnnotationOutputs(
+            output_dir=output_dir,
             annotation=annotation,
             sampleList=sampleList,
             statistics=statistics,
+            archived=archived,
             log=log,
-            archived=archived
         )
+
 
 _default_delimiters = {
     "field": "\t",
     "allele": "/",
     "position": "|",
-    'overlap': "\\",
+    "overlap": "\\",
     "value": ";",
     "empty_field": "!",
 }
+
 
 def get_delimiters(annotation_conf: Optional[dict] = None):
     if annotation_conf:
