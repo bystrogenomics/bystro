@@ -1,10 +1,10 @@
-from typing import Any, get_type_hints
+from typing import get_type_hints
 
 from enum import Enum
 
 from msgspec import Struct
 
-from search.utils.annotation import AnnotationOutputs
+from bystro.search.utils.annotation import AnnotationOutputs
 
 class BaseMessage(Struct, frozen=True):
     submissionID: str

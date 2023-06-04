@@ -2,10 +2,10 @@ from setuptools import setup
 from Cython.Build import cythonize
 
 setup(
-    name="search",
-    package_dir={"search": "python/search/"},
+    name="bystro",
+    package_dir={"bystro": "python/bystro"},
     ext_modules=cythonize(
-        "python/search/**/*.pyx",
+        "python/bystro/search/**/*.pyx",
         build_dir="build",
         compiler_directives={"language_level": "3"},
     ),

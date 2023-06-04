@@ -16,7 +16,7 @@ from opensearchpy.exceptions import NotFoundError
 import ray
 from ray.types import ObjectRef
 
-from search.utils.messages import BaseMessage, FailedMessage, ProgressMessage, ProgressData, Event
+from bystro.search.utils.messages import BaseMessage, FailedMessage, ProgressMessage, ProgressData, Event
 
 BEANSTALK_ERR_TIMEOUT = "TIMED_OUT"
 

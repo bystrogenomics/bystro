@@ -3,14 +3,12 @@
     and write submitted queries to disk as valid Bystro annotations
 """
 import argparse
-from typing import Any
 
-from msgspec import Struct
 from ruamel.yaml import YAML
 
-from search.save.handler import go
-from search.utils.beanstalkd import BaseMessage, FailedMessage, QueueConf, listen, ProgressPublisher, get_config_file_path
-from search.utils.messages import SaveJobData, SaveJobSubmitMessage, SaveJobCompleteMessage
+from bystro.search.save.handler import go
+from bystro.search.utils.beanstalkd import FailedMessage, QueueConf, listen, ProgressPublisher, get_config_file_path
+from bystro.search.utils.messages import SaveJobData, SaveJobSubmitMessage, SaveJobCompleteMessage
 
 JOB_TYPE="saveFromQuery"
 

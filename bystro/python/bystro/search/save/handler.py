@@ -17,10 +17,10 @@ import numpy as np
 from opensearchpy import  OpenSearch
 import ray
 
-from search.utils.messages import SaveJobData
-from search.utils.beanstalkd import ProgressPublisher, get_progress_reporter
-from search.utils.opensearch import gather_opensearch_args
-from search.utils.annotation import get_delimiters
+from bystro.search.utils.messages import SaveJobData
+from bystro.search.utils.beanstalkd import ProgressPublisher, get_progress_reporter
+from bystro.search.utils.opensearch import gather_opensearch_args
+from bystro.search.utils.annotation import get_delimiters
 
 ray.init(ignore_reinit_error=True, address='auto')
 
