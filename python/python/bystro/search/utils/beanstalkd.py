@@ -3,7 +3,6 @@ import abc
 import asyncio
 import sys
 import time
-import trace
 import traceback
 from collections.abc import Callable
 from glob import glob
