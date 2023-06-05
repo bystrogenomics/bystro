@@ -20,16 +20,20 @@ def main():
     and indexes submitted data in Opensearch
     """
     parser = argparse.ArgumentParser(description="Process some config files.")
-    parser.add_argument("--conf_dir", type=str, help="Path to the genome/assembly config directory")
+    parser.add_argument(
+        "--conf_dir", type=str, help="Path to the genome/assembly config directory", required=True
+    )
     parser.add_argument(
         "--queue_conf",
         type=str,
         help="Path to the beanstalkd queue config yaml file (e.g beanstalk1.yml)",
+        required=True,
     )
     parser.add_argument(
         "--search_conf",
         type=str,
         help="Path to the opensearch config yaml file (e.g. elasticsearch.yml)",
+        required=True,
     )
     args = parser.parse_args()
 
