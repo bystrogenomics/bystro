@@ -23,8 +23,8 @@ class FailedJobMessage(Struct, frozen=True):
 
 
 class InvalideJobMessage(Struct, frozen=True):
-    # Invalid jobs that are invalid because the submission breaks serialization invariants will not have a submissionID
-    # as that ID is held in the serialized data
+    # Invalid jobs that are invalid because the submission breaks serialization invariants
+    # will not have a submissionID as that ID is held in the serialized data
     queueID: BEANSTALK_JOB_ID
     reason: str
 
