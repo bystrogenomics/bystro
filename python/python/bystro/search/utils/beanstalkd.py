@@ -44,7 +44,6 @@ class QueueConf(Struct):
     """Queue Configuration"""
 
     addresses: list[str]
-    events: Event
     tubes: dict
 
     def split_host_port(self):
@@ -71,21 +70,6 @@ def get_config_file_path(config_path_base_dir: str, assembly: str, suffix: str =
     return paths[0]
 
 
-def try_beanstalk(func):
-    """Try beanstalk"""
-
-    def wrapper(*args, **kwargs):
-        """Wrapper"""
-        try:
-            return func(*args, **kwargs)
-        except BeanstalkError as err:
-            if err.message == BEANSTALK_ERR_TIMEOUT:
-                return None
-            raise err
-
-    return wrapper
-
-
 def default_failed_msg_fn(
     job_data: T | None, job_id: BEANSTALK_JOB_ID, err: Exception
 ) -> FailedJobMessage | InvalideJobMessage:  # noqa: E501
@@ -110,9 +94,6 @@ def listen(
     When work is available call the work handler
     """
     hosts, ports = queue_conf.split_host_port()
-
-    for event in ("progress", "failed", "started", "completed"):
-        assert event in queue_conf.events
 
     tube_conf = queue_conf.tubes[tube]
     clients = tuple(BeanstalkClient(host, port, socket_timeout=10) for (host, port) in zip(hosts, ports))
@@ -193,7 +174,10 @@ def listen(
                 continue
 
         except BeanstalkError as err:
-            print(f"BeanstalkError raised: {err}", file=sys.stderr)
+            print(f"BeanstalkError raised: {err.message}", file=sys.stderr)
+            if err.message == BEANSTALK_ERR_TIMEOUT:
+                continue
+
             if client is None:
                 print("Couldn't connect to Beanstalkd server, sleeping for 10s", file=sys.stderr)
                 time.sleep(10)

@@ -19,7 +19,7 @@ from bystro.search.utils.messages import (
     SaveJobResults,
     SaveJobSubmitMessage,
 )
-from python.bystro.search.utils.annotation import AnnotationOutputs
+from bystro.search.utils.annotation import AnnotationOutputs
 
 TUBE = "saveFromQuery"
 
