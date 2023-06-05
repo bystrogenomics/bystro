@@ -14,12 +14,14 @@ version = "1.0.0"
 
 [tool.maturin]
 python-source = "python"
-
-[package.metadata.maturin]
-requires-dist = ["Cython"]
+include = ["bystro/**/**/*.so"]
 
 [tool.black]
 line-length = 105
 
 [tool.ruff]
 line-length = 105
+
+[project.scripts]
+bystro-save-worker = "bystro.search.save.listener:main"
+bystro-index-worker = "bystro.search.index.listener:main"
