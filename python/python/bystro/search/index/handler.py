@@ -2,20 +2,20 @@
 
 import argparse
 import asyncio
-from math import ceil
 import multiprocessing
 import os
 import time
+from math import ceil
 
-from opensearchpy._async.client import AsyncOpenSearch
-from opensearchpy._async import helpers as async_helpers
 import ray
+from opensearchpy._async import helpers as async_helpers
+from opensearchpy._async.client import AsyncOpenSearch
 from ruamel.yaml import YAML
 
-from bystro.search.index.bystro_file import read_annotation_tarball  # type: ignore # pylint: disable=no-name-in-module,import-error
+from bystro.search.index.bystro_file import read_annotation_tarball  # type: ignore # pylint: disable=no-name-in-module,import-error  # noqa: E501
+from bystro.search.utils.annotation import get_delimiters
 from bystro.search.utils.beanstalkd import ProgressPublisher, get_progress_reporter
 from bystro.search.utils.opensearch import gather_opensearch_args
-from bystro.search.utils.annotation import get_delimiters
 
 ray.init(ignore_reinit_error=True, address="auto")
 

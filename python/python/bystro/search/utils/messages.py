@@ -1,6 +1,5 @@
-from typing import get_type_hints
-
 from enum import Enum
+from typing import get_type_hints
 
 from msgspec import Struct, field
 

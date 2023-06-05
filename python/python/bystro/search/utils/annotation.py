@@ -1,5 +1,6 @@
 import os
-from typing import Optional
+from glob import glob
+from os import path
 
 from msgspec import Struct
 
@@ -99,7 +100,20 @@ _default_delimiters = {
 }
 
 
-def get_delimiters(annotation_conf: Optional[dict] = None):
+def get_delimiters(annotation_conf: dict | None = None):
     if annotation_conf:
         return annotation_conf.get("delimiters", _default_delimiters)
     return _default_delimiters
+
+
+def get_config_file_path(config_path_base_dir: str, assembly: str, suffix: str = ".y*ml"):
+    """Get config file path"""
+    paths = glob(path.join(config_path_base_dir, assembly + suffix))
+
+    if not paths:
+        raise ValueError(f"\n\nNo config path found for the assembly {assembly}. Exiting\n\n")
+
+    if len(paths) > 1:
+        print("\n\nMore than 1 config path found, choosing first")
+
+    return paths[0]

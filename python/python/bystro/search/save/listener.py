@@ -7,10 +7,10 @@ import argparse
 from ruamel.yaml import YAML
 
 from bystro.search.save.handler import go
+from bystro.search.utils.annotation import AnnotationOutputs, get_config_file_path
 from bystro.search.utils.beanstalkd import (
     ProgressPublisher,
     QueueConf,
-    get_config_file_path,
     listen,
 )
 from bystro.search.utils.messages import (
@@ -19,7 +19,6 @@ from bystro.search.utils.messages import (
     SaveJobResults,
     SaveJobSubmitMessage,
 )
-from bystro.search.utils.annotation import AnnotationOutputs
 
 TUBE = "saveFromQuery"
 
