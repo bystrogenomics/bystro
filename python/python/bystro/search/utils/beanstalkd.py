@@ -127,8 +127,8 @@ def listen(
                             Expected {job_data_type.keys_with_types()}.
                             Decoding `{str(job.job_data)}`, failed with: `{err}`"""
                 )
-                print(msg, file=sys.stderr)
-                client.put_job(json.encode(failed_msg_fn(job_data, job_id, Exception(msg))))
+                traceback.print_exc()
+                client.put_job(json.encode(failed_msg_fn(job_data, job_id, ValueError(msg))))
                 client.delete_job(job.job_id)
                 continue
             except DecodeError as err:
@@ -137,8 +137,8 @@ def listen(
                             Job {job.job_id} JSON is invalid.
                             Decoding `{str(job.job_data)}`, failed with: `{err}`"""
                 )
-                print(msg, file=sys.stderr)
-                client.put_job(json.encode(failed_msg_fn(job_data, job_id, Exception(msg))))
+                traceback.print_exc()
+                client.put_job(json.encode(failed_msg_fn(job_data, job_id, ValueError(msg))))
                 client.delete_job(job_id)
                 continue
             except Exception:
