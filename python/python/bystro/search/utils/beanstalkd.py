@@ -3,6 +3,7 @@ import abc
 import asyncio
 import sys
 import time
+import trace
 import traceback
 from collections.abc import Callable
 from glob import glob
@@ -18,13 +19,14 @@ from pystalk.client import Job  # type: ignore
 from bystro.search.utils.messages import (
     BEANSTALK_JOB_ID,
     BaseMessage,
-    Event,
     FailedJobMessage,
     InvalideJobMessage,
     ProgressMessage,
 )
 
 BEANSTALK_ERR_TIMEOUT = "TIMED_OUT"
+SOCKET_TIMEOUT_TIME = 10
+JOB_TIMEOUT_TIME = 5
 
 T = TypeVar("T", bound=BaseMessage, contravariant=True)
 T2 = TypeVar("T2", bound=BaseMessage, contravariant=True)
@@ -96,7 +98,7 @@ def listen(
     hosts, ports = queue_conf.split_host_port()
 
     tube_conf = queue_conf.tubes[tube]
-    clients = tuple(BeanstalkClient(host, port, socket_timeout=10) for (host, port) in zip(hosts, ports))
+    clients = tuple(BeanstalkClient(host, port, socket_timeout=SOCKET_TIMEOUT_TIME) for (host, port) in zip(hosts, ports))
 
     i = 0
     while True:
@@ -113,7 +115,7 @@ def listen(
             client.watch(tube_conf["submission"])
             client.use(tube_conf["events"])
 
-            job = client.reserve_job(5)
+            job = client.reserve_job(JOB_TIMEOUT_TIME)
             job_id = int(job.job_id)  # type: ignore
 
             try:
@@ -174,9 +176,11 @@ def listen(
                 continue
 
         except BeanstalkError as err:
-            print(f"BeanstalkError raised: {err.message}", file=sys.stderr)
             if err.message == BEANSTALK_ERR_TIMEOUT:
+                # This is completely expected, will happen every 5s
                 continue
+
+            traceback.print_exc()
 
             if client is None:
                 print("Couldn't connect to Beanstalkd server, sleeping for 10s", file=sys.stderr)

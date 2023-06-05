@@ -1,5 +1,4 @@
-from .bystro import *
+from .bystro import *  # type: ignore # noqa: F403
+from .bystro import __all__
 
-__all__ = ["search"]
-if hasattr(bystro, "__all__"):
-    __all__.extend(bystro.__all__)
+__all__ = __all__ + ['search']
