@@ -1,22 +1,12 @@
 use pyo3::prelude::*;
 
 #[pyfunction]
-fn hello_world() -> String {
-    return String::from("Hello, world!");
+fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
+    Ok((a + b).to_string())
 }
 
 #[pymodule]
-fn bystro(_py: Python, m: &PyModule) -> PyResult<()> {
-    register_child_modules(_py, m)?;
-    Ok(())
-}
-
-fn register_child_modules(py: Python<'_>, parent_module: &PyModule) -> PyResult<()> {
-    let search = PyModule::new(py, "search")?;
-    let index = PyModule::new(py, "index")?;
-    search.add_function(wrap_pyfunction!(hello_world, search)?)?;
-    index.add_function(wrap_pyfunction!(hello_world, index)?)?;
-    parent_module.add_submodule(search)?;
-    parent_module.add_submodule(index)?;
+fn bystro(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(sum_as_string, m)?)?;
     Ok(())
 }
