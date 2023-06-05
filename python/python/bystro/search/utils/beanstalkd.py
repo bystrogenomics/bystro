@@ -201,12 +201,10 @@ class ProgressReporter(abc.ABC):
     @abc.abstractmethod
     def increment(self, count: int):
         """Increment the counter by processed variant count and report to the beanstalk queue"""
-        pass
 
     @abc.abstractmethod
     def get_counter(self) -> int:
         """Get the current value of the counter"""
-        pass
 
 
 @ray.remote(num_cpus=0)
