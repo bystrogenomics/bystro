@@ -90,7 +90,7 @@ class SaveJobSubmitMessage(BaseMessage, frozen=True):
     jobConfig: dict
 
 
-class SaveJobResults(Struct):
+class SaveJobResults(Struct, frozen=True):
     outputFileNames: AnnotationOutputs
 
 
