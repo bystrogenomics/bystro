@@ -1,5 +1,5 @@
-from setuptools import setup
-from Cython.Build import cythonize
+from setuptools import setup # type: ignore
+from Cython.Build import cythonize # type: ignore
 
 setup(
     name="bystro",
