@@ -65,7 +65,9 @@ def main():
         return SaveJobSubmitMessage(submissionID=job_data.submissionID, jobConfig=job_config)
 
     def completed_msg_fn(job_data: SaveJobData, results: AnnotationOutputs) -> SaveJobCompleteMessage:
-        return SaveJobCompleteMessage(submissionID=job_data.submissionID, results=SaveJobResults(results))
+        return SaveJobCompleteMessage(
+            submissionID=job_data.submissionID, results=SaveJobResults(results)
+        )
 
     listen(
         job_data_type=SaveJobData,
