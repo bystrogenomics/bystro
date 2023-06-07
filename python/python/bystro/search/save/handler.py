@@ -187,7 +187,7 @@ async def go(  # pylint:disable=invalid-name
     output_dir = os.path.dirname(job_data.outputBasePath)
     basename = os.path.basename(job_data.outputBasePath)
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
-    outputs = AnnotationOutputs.from_path(output_dir, basename, False, True)
+    outputs = AnnotationOutputs.from_path(output_dir, basename, True)
 
     written_chunks = [os.path.join(output_dir, f"{job_data.indexName}_header")]
 

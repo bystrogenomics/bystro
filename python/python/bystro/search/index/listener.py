@@ -7,6 +7,7 @@ import os
 
 from ruamel.yaml import YAML
 
+from bystro.beanstalkd.messages import SubmittedJobMessage
 from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, listen
 from bystro.search.index.handler import go
 from bystro.search.utils.annotation import get_config_file_path
@@ -67,7 +68,7 @@ def main():
         )
 
     def submit_msg_fn(job_data: IndexJobData):
-        return job_data
+        return SubmittedJobMessage(job_data.submissionID)
 
     def completed_msg_fn(job_data: IndexJobData, fieldNames: list[str]):
         m_path = get_config_file_path(conf_dir, job_data.assembly, ".mapping.y*ml")
@@ -75,7 +76,7 @@ def main():
         with open(m_path, "r", encoding="utf-8") as f:
             mapping_conf = YAML(typ="safe").load(f)
 
-        return IndexJobCompleteMessage(job_data.submissionID, IndexJobResults(mapping_conf, fieldNames))
+        return IndexJobCompleteMessage(submissionID=job_data.submissionID, results=IndexJobResults(mapping_conf, fieldNames))  # noqa: E501
 
     listen(
         job_data_type=IndexJobData,

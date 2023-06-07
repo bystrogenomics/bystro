@@ -1,8 +1,10 @@
-from bystro.beanstalkd.messages import BaseMessage, Struct
+from bystro.beanstalkd.messages import BaseMessage, SubmittedJobMessage, CompletedJobMessage, Struct
 from bystro.search.utils.annotation import AnnotationOutputs
 
 
 class IndexJobData(BaseMessage, frozen=True):
+    """Data for SaveFromQuery jobs received from beanstalkd"""
+
     inputDir: str
     inputFileNames: AnnotationOutputs
     indexName: str
@@ -16,14 +18,12 @@ class IndexJobResults(Struct, frozen=True):
     fieldNames: list
 
 
-class IndexJobCompleteMessage(BaseMessage, frozen=True):
-    """Beanstalkd Job data"""
-
+class IndexJobCompleteMessage(CompletedJobMessage, frozen=True, kw_only=True):
     results: IndexJobResults
 
 
 class SaveJobData(BaseMessage, frozen=True):
-    """Beanstalkd Job data"""
+    """Data for SaveFromQuery jobs received from beanstalkd"""
 
     assembly: str
     queryBody: dict
@@ -32,9 +32,7 @@ class SaveJobData(BaseMessage, frozen=True):
     fieldNames: list[str]
 
 
-class SaveJobSubmitMessage(BaseMessage, frozen=True):
-    """Beanstalkd Job data"""
-
+class SaveJobSubmitMessage(SubmittedJobMessage, frozen=True, kw_only=True):
     jobConfig: dict
 
 
@@ -42,7 +40,5 @@ class SaveJobResults(Struct, frozen=True):
     outputFileNames: AnnotationOutputs
 
 
-class SaveJobCompleteMessage(BaseMessage, frozen=True):
-    """Beanstalkd Job data"""
-
+class SaveJobCompleteMessage(CompletedJobMessage, frozen=True, kw_only=True):
     results: SaveJobResults

@@ -196,7 +196,6 @@ class BeanstalkdProgressReporter(ProgressReporter):
 
     def __init__(self, publisher: ProgressPublisher):
         self._message = publisher.message
-
         self._client = BeanstalkClient(publisher.host, publisher.port, socket_timeout=10)
         self._client.use(publisher.queue)
 

@@ -62,10 +62,10 @@ def main():
         with open(config_path, "r", encoding="utf-8") as file:
             job_config = YAML(typ="safe").load(file)
 
-        return SaveJobSubmitMessage(job_data.submissionID, job_config)
+        return SaveJobSubmitMessage(submissionID=job_data.submissionID, jobConfig=job_config)
 
     def completed_msg_fn(job_data: SaveJobData, results: AnnotationOutputs) -> SaveJobCompleteMessage:
-        return SaveJobCompleteMessage(job_data.submissionID, SaveJobResults(results))
+        return SaveJobCompleteMessage(submissionID=job_data.submissionID, results=SaveJobResults(results))
 
     listen(
         job_data_type=SaveJobData,

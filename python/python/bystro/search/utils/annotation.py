@@ -50,8 +50,8 @@ class AnnotationOutputs(Struct, frozen=True):
     def from_path(
         output_dir: str,
         basename: str,
-        generate_statistics: bool,
         compress: bool,
+        generate_statistics: bool = True,
         make_dir: bool = True,
         make_dir_mode: int = 511,
     ):
