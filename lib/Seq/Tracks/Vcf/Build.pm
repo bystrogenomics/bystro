@@ -596,7 +596,6 @@ sub _extractFeatures {
     $name = substr($info, 0, index($info, '='));
 
     $entry = $vcfNameMap->{$name} || $vcfFilterMap->{$name};
-
     if(!$entry) {
       next;
     }

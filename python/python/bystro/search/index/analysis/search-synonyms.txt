@@ -1,0 +1,23 @@
+indel => indel,insertion,deletion,indelframeshift,frameshift
+indelnonframeshift,indelinframe,nonframeshift,inframe,cdsindel
+polymorphism,polymorph,variant,allele
+silent,synonymous,codingsynon,cdssynon
+utr3,untranslated3
+utr5,untranslated5
+utr,untranslated
+transcript => mrna,ncrna,rna,transcript
+ncrna,noncoding,noncode
+nonsense,stopgain
+replacement,nonsynonymous,missense
+lof => indelframeshift,stopgain,stoploss,splicedonor,spliceacceptor
+intronic,intron
+coding,exonic,code
+indelframeshift,frameshift
+nonpathogenic,benign
+probable,likely
+uncertain,unknown
+untested => untested,not provided
+uncertainsignificance => uncertain significance
+notprovided => not provided
+#cancer,carcinoma
+#syndrome,disease,disorder

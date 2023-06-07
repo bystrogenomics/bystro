@@ -1,0 +1,10 @@
+connection:
+  max_content_length: 209715200
+  request_timeout: 300
+  gzip: true
+  nodes:
+    - host: 'localhost'
+      port: '9200'
+      scheme: 'http'
+auth:
+  dummy: True

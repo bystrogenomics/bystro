@@ -58,7 +58,5 @@ if [ $cnt == 0 ]; then
 fi
 
 perlbrew switch $VERSION;
-
-curl -L https://cpanmin.us | perl - App::cpanminus
-
-cpanm --local-lib=$DIR/perl5 local::lib && eval $(perl -I $LOCAL_LIB -Mlocal::lib)
+perlbrew install-cpanm;
+cpanm --local-lib=$DIR/perl5 local::lib && eval $(perl -I $LOCAL_LIB -Mlocal::lib);

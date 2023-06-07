@@ -1,0 +1,8 @@
+connection:
+  request_timeout: 300
+  nodes:
+    - host: '10.98.135.70'
+      port: '9200'
+      scheme: 'http'
+auth:
+  dummy: True

@@ -37,7 +37,6 @@ sub getOrMakeDbName {
   my $self = shift;
   my $trackName = shift;
         
-  # p $trackNamesMap;
   my $trackNumber = $self->_db->dbReadMeta($metaDb, $trackName);
 
   #if we don't find anything, just store a new hash reference

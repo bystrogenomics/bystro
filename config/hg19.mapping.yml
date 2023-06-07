@@ -1,4 +1,3 @@
-#Our own, special field, tells an interface which fields to run prefix queries on
 numericalFields:
   - cadd
   - phastCons
@@ -19,14 +18,8 @@ sort:
   dbSNP.alleleFreqs: min
   refSeq.codonNumber: avg
   refSeq.codonPosition: avg
-# booleanFields:
-#    - discordant
-# These only refer to searchable exact fields
-# These should be case sensitive, they are, by definition, exact
-# hasExactFields:
-#     - refSeq.name2
-#     - refSeq.spDisplayID
-#     - refSeq.nearest.name2
+booleanFields:
+  - discordant
 post_index_settings:
   index:
     refresh_interval: 15s
@@ -35,7 +28,6 @@ index_settings:
   index:
     refresh_interval: -1
     number_of_replicas: 0
-    number_of_shards: 6
     codec: best_compression
     mapping:
       single_type: true
@@ -52,28 +44,6 @@ index_settings:
           - uppercase
           - asciifolding
     filter:
-      catenate_filter:
-        type: word_delimiter
-        catenate_words: true
-        catenate_numbers: true
-        catenate_all: true
-        preserve_original: false
-        generate_word_parts: false
-        stem_english_possessive: true
-        generate_number_parts: false
-        split_on_numerics: false
-        split_on_case_change: false
-      catenate_filter_split:
-        type: word_delimiter
-        catenate_words: true
-        catenate_numbers: true
-        catenate_all: true
-        preserve_original: false
-        generate_word_parts: true
-        stem_english_possessive: true
-        generate_number_parts: false
-        split_on_numerics: false
-        split_on_case_change: true
       english_stemmer:
         type: stemmer
         language: light_english
@@ -114,42 +84,6 @@ index_settings:
         token_chars:
           - letter
           - digit
-      english_stop:
-        type: stop
-        stopwords:
-          - a
-          - an
-          - and
-          - are
-          - as
-          - at
-          - be
-          - but
-          - by
-          - for
-          - if
-          - in
-          - into
-          - is
-          - it
-          - of
-          - on
-          - or
-          - has
-          - such
-          - that
-          - the
-          - their
-          - then
-          - there
-          - these
-          - they
-          - this
-          - to
-          - was
-          - will
-          - with
-          - maybe
     analyzer:
       autocomplete_english:
         type: custom
@@ -157,8 +91,6 @@ index_settings:
         filter:
           - lowercase
           - asciifolding
-          # - english_stop
-          - catenate_filter
           - english_stemmer
           - autocomplete_filter
       autocomplete_english_split:
@@ -167,8 +99,6 @@ index_settings:
         filter:
           - lowercase
           - asciifolding
-          #- english_stop
-          - catenate_filter_split
           - english_stemmer
           - autocomplete_filter
       search_english:
@@ -177,8 +107,6 @@ index_settings:
         filter:
           - lowercase
           - asciifolding
-          #- english_stop
-          - catenate_filter
           - english_stemmer
           - search_synonym_filter
       search_english_split:
@@ -187,8 +115,6 @@ index_settings:
         filter:
           - lowercase
           - asciifolding
-          #- english_stop
-          - catenate_filter_split
           - english_stemmer
           - search_synonym_filter
       search_english_type:
@@ -197,8 +123,6 @@ index_settings:
         filter:
           - lowercase
           - asciifolding
-          #- english_stop
-          - catenate_filter
           - english_stemmer
           - type_synonym_filter
           - dbSNP_class_synonyms
@@ -208,8 +132,6 @@ index_settings:
         filter:
           - lowercase
           - asciifolding
-          #- english_stop
-          - catenate_filter_split
           - english_stemmer
           - description_synonyms
           - disease_synonyms
@@ -219,8 +141,6 @@ index_settings:
         filter:
           - lowercase
           - asciifolding
-          #- english_stop
-          - catenate_filter
           - english_stemmer
           - dbSNP_class_synonyms
       search_english_func:
@@ -229,8 +149,6 @@ index_settings:
         filter:
           - lowercase
           - asciifolding
-          #- english_stop
-          - catenate_filter
           - english_stemmer
           - dbSNP_func_synonyms
       uppercase_keyword_text:
@@ -255,14 +173,10 @@ index_settings:
           - asciifolding
           - amino_synonym_filter
 mappings:
-  _all:
-    enabled: false
   properties:
     chrom:
       type: keyword
       normalizer: lowercase_normalizer
-    # chr's are very short, and the "prefix" is a completely valid value
-    # so, don't include in all, because many false positivies with ngrams
     pos:
       type: integer
     trTv:
@@ -296,8 +210,7 @@ mappings:
     sampleMaf:
       type: half_float
     alt:
-      type: keyword
-      normalizer: uppercase_normalizer
+      type: text
     ref:
       type: keyword
       normalizer: uppercase_normalizer
@@ -347,7 +260,6 @@ mappings:
           type: integer
         strand:
           type: keyword
-        # kgID is in the form uc001uub.1 , seems to always be lowercase
         kgID:
           type: keyword
           normalizer: lowercase_normalizer
@@ -440,9 +352,6 @@ mappings:
           properties:
             alleleID:
               type: integer
-            #phenotypeList and clinicalSignificance are more like traditional unstructured text fields
-            #I want them to be very easy to search
-            #TODO: remove high-frequency words, stopwords without screwing up all other field search
             phenotypeList:
               type: text
               analyzer: autocomplete_english_split
@@ -545,9 +454,6 @@ mappings:
       properties:
         alleleID:
           type: integer
-        #phenotypeList and clinicalSignificance are more like traditional unstructured text fields
-        #I want them to be very easy to search
-        #TODO: remove high-frequency words, stopwords without screwing up all other field search
         phenotypeList:
           type: text
           analyzer: autocomplete_english_split
@@ -662,7 +568,28 @@ mappings:
               type: byte
             af:
               type: half_float
-            # gnomad genomes has a max of 30,992 alleles (15,496 samples), fits short
+            ac:
+              type: short
+            ac_afr:
+              type: short
+            ac_amr:
+              type: short
+            ac_asj:
+              type: short
+            ac_eas:
+              type: short
+            ac_fin:
+              type: short
+            ac_nfe:
+              type: short
+            ac_oth:
+              type: short
+            ac_sas:
+              type: short
+            ac_male:
+              type: short
+            ac_female:
+              type: short
             an:
               type: short
             an_afr:
@@ -711,30 +638,30 @@ mappings:
               normalizer: lowercase_normalizer
             trTv:
               type: byte
-            # ac:
-            #     type: integer
+            ac:
+                type: integer
             af:
               type: half_float
             an:
               type: integer
-            # ac_afr:
-            #     type: integer
-            # ac_amr:
-            #     type: integer
-            # ac_asj:
-            #     type: integer
-            # ac_eas:
-            #     type: integer
-            # ac_fin:
-            #     type: integer
-            # ac_nfe:
-            #     type: integer
-            # ac_oth:
-            #     type: integer
-            # ac_male:
-            #     type: integer
-            # ac_female:
-            #     type: integer
+            ac_afr:
+                type: integer
+            ac_amr:
+                type: integer
+            ac_asj:
+                type: integer
+            ac_eas:
+                type: integer
+            ac_fin:
+                type: integer
+            ac_nfe:
+                type: integer
+            ac_oth:
+                type: integer
+            ac_male:
+                type: integer
+            ac_female:
+                type: integer
             an_afr:
               type: integer
             an_amr:

@@ -1,0 +1,4 @@
+#polymorphism may be stemmed to polmorph
+polymorph,polymorphism,variant,allele
+#carcinoma,cancer
+#syndrome,disease,disorder

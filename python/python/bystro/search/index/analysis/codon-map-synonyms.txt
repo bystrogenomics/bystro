@@ -1,0 +1,114 @@
+a => a,aa,ac,ag,at,aaa,aac,aat,aag,aca,acc,acg,act,aga,agc,agg,agt,ata,atc,atg,att
+aa => aa,aaa,aac,aag,aat
+ag => ag,aga,agc,agg,agt
+ac => ac,aca,acc,acg,act
+at => at,ata,atc,atg,att
+c => c,ca,cc,cg,ct,caa,cac,cag,cat,cca,ccc,ccg,cct,cga,cgc,cgg,cgt,cta,ctc,ctg,ctt
+ca => ca,caa,cac,cag,cat
+cc => cc,cca,ccc,ccg,cct
+cg => cg,cga,cgc,cgg,cgt
+ct => ct,cta,ctc,ctg,ctt
+g => g,ga,gc,gg,gt,gaa,gac,gag,gat,gca,gcc,gcg,gct,gga,ggc,ggg,ggt,gta,gtc,gtg,gtt
+ga => ga,gaa,gac,gag,gat
+gc => gc,gca,gcc,gcg,gct
+gg => gg,gga,ggc,ggg,ggt
+gt => gta,gtc,gtg,gtt
+t => t,ta,tc,tg,tt,taa,tac,tag,tag,tca,tcc,tcg,tct,tga,tgc,tgg,tgt,tta,ttc,ttg,ttt
+ta => ta,taa,tac,tag,tag
+tc => tc,tca,tcc,tcg,tct
+tg => tg,tga,tgc,tgg,tgt
+tt => tt,tta,ttc,ttg,ttt
+aat,aau
+act,acu
+agt,agu
+ata,aua
+atc,auc
+atg,aug
+att,auu
+cat,cau
+cct,ccu
+cgt,cgu
+ctt,cuu
+cta,cua
+ctc,cuc
+ctg,cug
+gat,gau
+gct,gcu
+ggt,ggu
+gtt,guu
+gta,gua
+gtc,guc
+gtg,gug
+taa,uaa
+tac,uac
+tag,uag
+tat,uau
+tca,uca
+tcc,ucc
+tcg,ucg
+tct,ucu
+tga,uga
+tgc,ugc
+tgg,ugg
+tgt,ugu
+tta,uua
+ttc,uuc
+ttg,uug
+ttt,uuu
+A => A,AA,AC,AG,AT,AAA,AAC,AAT,AAG,ACA,ACC,ACG,ACT,AGA,AGC,AGG,AGT,ATA,ATC,ATG,ATT
+AA => AA,AAA,AAC,AAG,AAT
+AG => AG,AGA,AGC,AGG,AGT
+AC => AC,ACA,ACC,ACG,ACT
+AT => AT,ATA,ATC,ATG,ATT
+C => C,CA,CC,CG,CT,CAA,CAC,CAG,CAT,CCA,CCC,CCG,CCT,CGA,CGC,CGG,CGT,CTA,CTC,CTG,CTT
+CA => CA,CAA,CAC,CAG,CAT
+CC => CC,CCA,CCC,CCG,CCT
+CG => CG,CGA,CGC,CGG,CGT
+CT => CT,CTA,CTC,CTG,CTT
+G => G,GA,GC,GG,GT,GAA,GAC,GAG,GAT,GCA,GCC,GCG,GCT,GGA,GGC,GGG,GGT,GTA,GTC,GTG,GTT
+GA => GA,GAA,GAC,GAG,GAT
+GC => GC,GCA,GCC,GCG,GCT
+GG => GG,GGA,GGC,GGG,GGT
+GT => GTA,GTC,GTG,GTT
+T => T,TA,TC,TG,TT,TAA,TAC,TAG,TAG,TCA,TCC,TCG,TCT,TGA,TGC,TGG,TGT,TTA,TTC,TTG,TTT
+TA => TA,TAA,TAC,TAG,TAG
+TC => TC,TCA,TCC,TCG,TCT
+TG => TG,TGA,TGC,TGG,TGT
+TT => TT,TTA,TTC,TTG,TTT
+AAT,AAU
+ACT,ACU
+AGT,AGU
+ATA,AUA
+ATC,AUC
+ATG,AUG
+ATT,AUU
+CAT,CAU
+CCT,CCU
+CGT,CGU
+CTT,CUU
+CTA,CUA
+CTC,CUC
+CTG,CUG
+GAT,GAU
+GCT,GCU
+GGT,GGU
+GTT,GUU
+GTA,GUA
+GTC,GUC
+GTG,GUG
+TAA,UAA
+TAC,UAC
+TAG,UAG
+TAT,UAU
+TCA,UCA
+TCC,UCC
+TCG,UCG
+TCT,UCU
+TGA,UGA
+TGC,UGC
+TGG,UGG
+TGT,UGU
+TTA,UUA
+TTC,UUC
+TTG,UUG
+TTT,UUU

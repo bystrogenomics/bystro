@@ -55,7 +55,7 @@ has config => (
   coerce      => 1,
   required    => 1,
   metaclass => 'Getopt',
-  cmd_aliases   => [qw/c config/],
+  cmd_aliases   => [qw/c configuration/],
   documentation => qq{Yaml config file path.},
 );
 

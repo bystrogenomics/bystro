@@ -196,7 +196,7 @@ sub _moveFilesToOutputDir {
 
   my $workDir = $self->_workingDir->stringify();
 
-  $err = $self->safeSystem("mv $workDir/* $outDir && chmod 777 $outDir/*; sync");
+  $err = $self->safeSystem("mv $workDir/* $outDir && chmod a+r $outDir/*; sync");
 
   return $err;
 }

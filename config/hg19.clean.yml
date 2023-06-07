@@ -34,7 +34,7 @@
       args: --emptyField ! --minGq .95
       program: bystro-snp
     vcf:
-      args: --emptyField ! --sample %sampleList%
+      args: --emptyField ! --sample %sampleList% --keepPos --keepId
       program: bystro-vcf
   files_dir: '~'
   statistics:

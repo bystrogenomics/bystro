@@ -30,6 +30,7 @@ has remoteDir => (is => 'ro', isa => 'Maybe[Str]');
 has connection => (is => 'ro', isa => 'Maybe[HashRef]');
 
 # Choose whether to use wget or rsync program to fetch
+has aws => (is => 'ro', init_arg => undef, writer => '_setAws');
 has wget => (is => 'ro', init_arg => undef, writer => '_setWget');
 has rsync => (is => 'ro', init_arg => undef, writer => '_setRsync');
 
@@ -40,12 +41,17 @@ sub BUILD {
     return;
   }
 
-  if(!which('rsync') || !which('wget')) {
+  my $aws = which('aws');
+  my $wget = which('wget');
+  my $rsync = which('rsync');
+
+  if(!$rsync || !$wget) {
     $self->log('fatal', 'Fetch.pm requires rsync and wget when fetching remoteFiles');
   }
 
-  $self->_setRsync(which('rsync'));
-  $self->_setWget(which('wget'));
+  $self->_setAws($aws);
+  $self->_setRsync($rsync);
+  $self->_setWget($wget);
 }
 
 ########################## The only public export  ######################
@@ -133,17 +139,20 @@ sub _fetchFiles {
 
   my $fetchProgram;
 
-  my $isRsync;
+  my $isRsync = 0;
+  my $isS3 = 0;
 
   if($self->remoteDir) {
     # remove http:// (or whatever protocol)
     $self->remoteDir =~ m/$pathRe/;
 
     if($1) {
-      $isRsync = 0;
       $remoteProtocol = $1;
+    } elsif($self->remoteDir =~ 's3://') {
+      $isS3 = 1;
+      $remoteProtocol = 's3://';
     } else {
-      $isRsync = 0;
+      $isRsync = 1;
       $remoteProtocol = 'rsync://';
     }
 
@@ -165,7 +174,9 @@ sub _fetchFiles {
       # This file is an absolute remote path
       if($1) {
         $remoteUrl = $file;
-        $isRsync = 0;
+      } elsif($file =~ 's3://') {
+        $remoteUrl = $file;
+        $isS3 = 1;
       } else {
         $remoteUrl = "rsync://" . $2;
         $isRsync = 1;
@@ -177,6 +188,12 @@ sub _fetchFiles {
 
     if($isRsync) {
       $command = $self->rsync . " -avPz $remoteUrl $outDir";
+    } elsif($isS3) {
+      if(!$self->aws) {
+        $self->log('fatal', "You requested an s3 remote file ($remoteUrl), but have no aws s3 cli installed. Please visit: https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html");
+        return;
+      }
+      $command = $self->aws . " s3 cp $remoteUrl $outDir";
     } else {
       # -N option will clobber only if remote file is newer than local copy
       # -S preserves timestamp

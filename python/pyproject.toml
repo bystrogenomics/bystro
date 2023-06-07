@@ -1,0 +1,27 @@
+[build-system]
+requires = ["maturin>=0.14,<0.15", "setuptools", "wheel", "Cython"]
+build-backend = "maturin"
+
+[project]
+name = "bystro"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+version = "1.0.0"
+
+[tool.maturin]
+python-source = "python"
+include = ["bystro/**/**/*.so"]
+
+[tool.black]
+line-length = 105
+
+[tool.ruff]
+line-length = 105
+
+[project.scripts]
+bystro-save-worker = "bystro.search.save.listener:main"
+bystro-index-worker = "bystro.search.index.listener:main"
