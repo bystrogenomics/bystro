@@ -4,7 +4,7 @@ import time
 
 from pystalk import BeanstalkClient
 
-from ancestry.ancestry_types import AncestrySubmission
+from ancestry_types import AncestrySubmission
 from ancestry.beanstalk import BeanstalkSubmissionMessage
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
@@ -16,9 +16,7 @@ client.use("ancestry")
 client.watch("ancestry_events")
 
 ancestry_request = AncestrySubmission(vcf_path="foo.vcf")
-beanstalk_msg = BeanstalkSubmissionMessage(
-    queue_id="1337", submission_id="1338", data=ancestry_request
-)
+beanstalk_msg = BeanstalkSubmissionMessage(queue_id="1337", submission_id="1338", data=ancestry_request)
 payload = beanstalk_msg.json()
 
 logging.debug("sending submission: %s", payload)

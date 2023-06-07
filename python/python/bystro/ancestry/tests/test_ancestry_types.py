@@ -2,7 +2,7 @@
 import pytest
 from pydantic import ValidationError
 
-from ancestry.ancestry_types import (
+from ..ancestry_types import (
     AncestryResponse,
     AncestryResult,
     PopulationVector,

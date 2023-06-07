@@ -10,8 +10,8 @@ from pystalk import BeanstalkClient, BeanstalkError
 from ruamel.yaml import YAML
 from sample_response import sample_ancestry_response
 
-from ancestry.ancestry_types import AncestryResponse, AncestrySubmission
-from ancestry.beanstalk import (
+from ancestry_types import AncestryResponse, AncestrySubmission
+from beanstalk import (
     Address,
     BeanstalkEvent,
     BeanstalkEventMessage,
@@ -83,9 +83,7 @@ def main() -> None:
             logger.debug("reserved job %s", job)
         except BeanstalkError as err:
             if err.message == BEANSTALK_TIMEOUT_ERROR:
-                logger.debug(
-                    "Timed out while reserving a job: this is expected if no jobs are present"
-                )
+                logger.debug("Timed out while reserving a job: this is expected if no jobs are present")
                 continue
             raise
         try:
