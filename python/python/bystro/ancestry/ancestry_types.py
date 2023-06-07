@@ -1,38 +1,63 @@
-"""Pydantic validators for common shapes of data in ancestry."""
-
+"""Classes for common shapes of data in ancestry."""
+from pydantic import BaseModel, Extra, Field, root_validator, validator
 
 from typing import Any
 
-from pydantic import BaseModel, Extra, Field, root_validator, validator
+import attr
+from attr import field
+from attr.validators import instance_of, ge, le
+import cattrs
+
+AttrValidationError = (ValueError, TypeError)
 
 
-class AncestrySubmission(BaseModel, extra=Extra.forbid):
+def vcf_validator(_self, attribute, value) -> None:
+    if not isinstance(value, str):
+        err_msg = f"vcf_path must be of type str, got: {value} instead"
+        raise TypeError(err_msg)
+    if not value.endswith(".vcf"):
+        err_msg = f"Expected vcf_path ending in '.vcf', got {value} instead"
+        raise ValueError(err_msg)
+
+
+@attr.s(frozen=True)
+class AncestrySubmission:
     """Represent an incoming submission to the ancestry worker."""
 
-    vcf_path: str
+    vcf_path: str = attr.field(validator=vcf_validator)
+
+    # @vcf_path.validator
+    # def ends_in_vcf(self, attribute, value) -> None:
+    #     if not value.endswith("vcf"):
+    #         err_msg = f"Expected vcf_path ending in '.vcf', got {value} instead"
+    #         raise ValueError(err_msg)
 
 
-class ProbabilityInterval(BaseModel, extra=Extra.forbid):
+unit_float_validator = [
+    instance_of(float),
+    ge(0.0),
+    le(1.0),
+]
+
+
+@attr.s(frozen=True)
+class ProbabilityInterval:
     """Represent an interval of probabilities."""
 
-    lower_bound: float = Field(ge=0, le=1)
-    upper_bound: float = Field(ge=0, le=1)
+    lower_bound: float = attr.field(validator=unit_float_validator)
+    upper_bound: float = attr.ib(
+        validator=[
+            instance_of(float),
+            attr.validators.ge(0.0),
+            attr.validators.le(1.0),
+        ]
+    )
 
-    @validator("upper_bound")
-    def _interval_is_valid(
-        cls: "ProbabilityInterval",  # noqa: N805 (false positive on cls name)
-        upper_bound: float,
-        values: dict[str, Any],
-    ) -> float:
-        """Ensure interval is non-empty."""
-        lower_bound = values["lower_bound"]
-        if not lower_bound <= upper_bound:
-            err_msg = (
-                f"Must have lower_bound <= upper_bound:"
-                f" got (lower_bound={lower_bound}, upper_bound={upper_bound}) instead."
-            )
+    def __attrs_post_init__(self):
+        if not self.lower_bound <= self.upper_bound:
+            err_msg = f"""Lower bound must be less than or equal to upper bound.
+            Got: lower_bound={self.lower_bound}, upper_bound={self.upper_bound} instead."""
             raise ValueError(err_msg)
-        return upper_bound
 
 
 # NB: We might consider that a vector of ProbabilityIntervals should
@@ -47,67 +72,85 @@ class ProbabilityInterval(BaseModel, extra=Extra.forbid):
 
 # this definition is mildly ugly but the alternative is to
 # generate it dynamically, which would be even worse...
-class PopulationVector(BaseModel, extra=Extra.forbid):
+
+ProbIntValidator = attr.validators.instance_of(ProbabilityInterval)
+
+
+@attr.s(kw_only=True, frozen=True)
+class PopulationVector:
     """A vector of probability intervals for populations."""
 
-    ACB: ProbabilityInterval
-    ASW: ProbabilityInterval
-    BEB: ProbabilityInterval
-    CDX: ProbabilityInterval
-    CEU: ProbabilityInterval
-    CHB: ProbabilityInterval
-    CHS: ProbabilityInterval
-    CLM: ProbabilityInterval
-    ESN: ProbabilityInterval
-    FIN: ProbabilityInterval
-    GBR: ProbabilityInterval
-    GIH: ProbabilityInterval
-    GWD: ProbabilityInterval
-    IBS: ProbabilityInterval
-    ITU: ProbabilityInterval
-    JPT: ProbabilityInterval
-    KHV: ProbabilityInterval
-    LWK: ProbabilityInterval
-    MAG: ProbabilityInterval
-    MSL: ProbabilityInterval
-    MXL: ProbabilityInterval
-    PEL: ProbabilityInterval
-    PJL: ProbabilityInterval
-    PUR: ProbabilityInterval
-    STU: ProbabilityInterval
-    TSI: ProbabilityInterval
-    YRI: ProbabilityInterval
+    ACB: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    ASW: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    BEB: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    CDX: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    CEU: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    CHB: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    CHS: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    CLM: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    ESN: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    FIN: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    GBR: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    GIH: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    GWD: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    IBS: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    ITU: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    JPT: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    KHV: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    LWK: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    MAG: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    MSL: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    MXL: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    PEL: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    PJL: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    PUR: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    STU: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    TSI: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    YRI: ProbabilityInterval = attr.field(validator=ProbIntValidator)
 
 
-class SuperpopVector(BaseModel, extra=Extra.forbid):
+@attr.s(kw_only=True, frozen=True)
+class SuperpopVector:
     """A vector of probability intervals for superpopulations."""
 
-    AFR: ProbabilityInterval
-    AMR: ProbabilityInterval
-    EAS: ProbabilityInterval
-    EUR: ProbabilityInterval
-    SAS: ProbabilityInterval
+    AFR: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    AMR: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    EAS: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    EUR: ProbabilityInterval = attr.field(validator=ProbIntValidator)
+    SAS: ProbabilityInterval = attr.field(validator=ProbIntValidator)
 
 
-class AncestryResult(BaseModel, extra=Extra.forbid):
+@attr.s(kw_only=True, frozen=True)
+class AncestryResult:
     """An ancestry result from a sample."""
 
-    sample_id: str
-    populations: PopulationVector
-    superpops: SuperpopVector
-    missingness: float = Field(ge=0, le=1)
+    sample_id: str = field(validator=instance_of(str))
+    populations: PopulationVector = field(validator=instance_of(PopulationVector))
+    superpops: SuperpopVector = field(validator=instance_of(SuperpopVector))
+    missingness: float = field(validator=unit_float_validator)
 
 
-class AncestryResponse(BaseModel, extra=Extra.forbid):
+def list_of(*args, **kwargs):
+    print(args)
+    print(kwargs)
+
+
+@attr.s(kw_only=True, frozen=True)
+class AncestryResponse:
     """An outgoing response from the ancestry worker."""
 
-    vcf_path: str
-    results: list[AncestryResult]
+    vcf_path: str = attr.field(validator=vcf_validator)
+    results: list[AncestryResult] = field(validator=instance_of(list))
 
-    @root_validator
-    def _ensure_sample_ids_unique(cls, values: dict[str, Any]) -> dict[str, Any]:  # noqa: N805
-        results = values["results"]
-        sample_ids = [result.sample_id for result in results]
+    @results.validator
+    def is_list_of_ancestry_results(self, attribute, values):
+        for i, value in enumerate(values):
+            if not isinstance(value, AncestryResult):
+                err_msg = f"Expecting list of AncestryResults, at position {i} got {value} instead"
+                raise TypeError(err_msg)
+
+    def __attr_post_init__(self):
+        sample_ids = [result.sample_id for result in self.results]
         unique_sample_ids = set(sample_ids)
         if len(unique_sample_ids) < len(sample_ids):
             duplicates = [sid for sid in unique_sample_ids if sample_ids.count(sid) > 1]

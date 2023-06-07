@@ -3,6 +3,8 @@ import pytest
 from pydantic import ValidationError
 
 from ..ancestry_types import (
+    AncestrySubmission,
+    AttrValidationError,
     AncestryResponse,
     AncestryResult,
     PopulationVector,
@@ -49,21 +51,30 @@ SUPERPOPS = [
 ]
 
 
+def test_AncestrySubmission():
+    AncestrySubmission("foo.vcf")
+
+
+def test_AncestrySubmission_bad_filepath():
+    with pytest.raises(AttrValidationError):
+        AncestrySubmission("foo.txt")
+
+
 def test_ProbabilityInterval() -> None:
     """Ensure we can instantiate, validate ProbabilityInterval correctly."""
     ProbabilityInterval(lower_bound=0.1, upper_bound=0.9)
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(AttrValidationError):
         ProbabilityInterval(lower_bound=0.1, upper_bound=1.1)
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(AttrValidationError):
         ProbabilityInterval(lower_bound=-2, upper_bound=1.1)
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(AttrValidationError):
         ProbabilityInterval(lower_bound=1, upper_bound=0)
 
 
-prob_int = ProbabilityInterval(lower_bound=0, upper_bound=1)
+prob_int = ProbabilityInterval(lower_bound=0.0, upper_bound=1.0)
 pop_kwargs = {pop: prob_int for pop in POPULATIONS}
 superpop_kwargs = {pop: prob_int for pop in SUPERPOPS}
 
@@ -76,19 +87,19 @@ def test_PopulationVector() -> None:
 def test_PopulationVector_with_missing_key() -> None:
     pop_kwargs_with_missing_key = pop_kwargs.copy()
     del pop_kwargs_with_missing_key["ACB"]
-    with pytest.raises(ValidationError):
+    with pytest.raises(AttrValidationError):
         PopulationVector(**pop_kwargs_with_missing_key)
 
 
 def test_PopulationVector_with_extra_key() -> None:
     pop_kwargs_with_extra_key = pop_kwargs.copy()
     pop_kwargs_with_extra_key["FOO"] = prob_int
-    with pytest.raises(ValidationError):
+    with pytest.raises(AttrValidationError):
         PopulationVector(**pop_kwargs_with_extra_key)
 
 
 def test_SuperpopVector() -> None:
-    prob_int = ProbabilityInterval(lower_bound=0, upper_bound=1)
+    prob_int = ProbabilityInterval(lower_bound=0.0, upper_bound=1.0)
     SuperpopVector(
         AFR=prob_int,
         AMR=prob_int,
@@ -99,7 +110,7 @@ def test_SuperpopVector() -> None:
 
 
 def test_SuperpopVector_missing_key() -> None:
-    with pytest.raises(ValidationError):
+    with pytest.raises(AttrValidationError):
         SuperpopVector(  # type: ignore [call-arg]
             AFR=prob_int,
             AMR=prob_int,
@@ -109,7 +120,7 @@ def test_SuperpopVector_missing_key() -> None:
 
 
 def test_SuperpopVector_extra_key() -> None:
-    with pytest.raises(ValidationError):
+    with pytest.raises(AttrValidationError):
         SuperpopVector(  # type: ignore [call-arg]
             AFR=prob_int,
             AMR=prob_int,
@@ -130,7 +141,7 @@ def test_AncestryResult() -> None:
 
 
 def test_AncestryResult_invalid_missingness() -> None:
-    with pytest.raises(ValidationError):
+    with pytest.raises(AttrValidationError):
         AncestryResult(
             sample_id="my_sample_id",
             populations=PopulationVector(**pop_kwargs),
