@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from ancestry.beanstalk import Address
+from ..beanstalk import Address
 
 
 def test_Address() -> None:
