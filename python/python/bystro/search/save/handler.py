@@ -17,8 +17,8 @@ import ray
 from isal import igzip
 from opensearchpy import OpenSearch
 
+from bystro.beanstalkd.worker import ProgressPublisher, get_progress_reporter
 from bystro.search.utils.annotation import AnnotationOutputs, get_delimiters
-from bystro.search.utils.beanstalkd import ProgressPublisher, get_progress_reporter
 from bystro.search.utils.messages import SaveJobData
 from bystro.search.utils.opensearch import gather_opensearch_args
 

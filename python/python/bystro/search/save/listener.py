@@ -6,13 +6,13 @@ import argparse
 
 from ruamel.yaml import YAML
 
-from bystro.search.save.handler import go
-from bystro.search.utils.annotation import AnnotationOutputs, get_config_file_path
-from bystro.search.utils.beanstalkd import (
+from bystro.beanstalkd.worker import (
     ProgressPublisher,
     QueueConf,
     listen,
 )
+from bystro.search.save.handler import go
+from bystro.search.utils.annotation import AnnotationOutputs, get_config_file_path
 from bystro.search.utils.messages import (
     SaveJobCompleteMessage,
     SaveJobData,

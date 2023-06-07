@@ -12,9 +12,11 @@ from opensearchpy._async import helpers as async_helpers
 from opensearchpy._async.client import AsyncOpenSearch
 from ruamel.yaml import YAML
 
-from bystro.search.index.bystro_file import read_annotation_tarball  # type: ignore # pylint: disable=no-name-in-module,import-error  # noqa: E501
+from bystro.beanstalkd.worker import ProgressPublisher, get_progress_reporter
+from bystro.search.index.bystro_file import (  # type: ignore # pylint: disable=no-name-in-module,import-error  # noqa: E501
+    read_annotation_tarball, 
+)
 from bystro.search.utils.annotation import get_delimiters
-from bystro.search.utils.beanstalkd import ProgressPublisher, get_progress_reporter
 from bystro.search.utils.opensearch import gather_opensearch_args
 
 ray.init(ignore_reinit_error=True, address="auto")

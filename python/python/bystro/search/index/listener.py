@@ -7,9 +7,9 @@ import os
 
 from ruamel.yaml import YAML
 
+from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, listen
 from bystro.search.index.handler import go
 from bystro.search.utils.annotation import get_config_file_path
-from bystro.search.utils.beanstalkd import ProgressPublisher, QueueConf, listen
 from bystro.search.utils.messages import IndexJobCompleteMessage, IndexJobData, IndexJobResults
 
 TUBE = "index"
