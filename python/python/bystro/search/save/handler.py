@@ -184,7 +184,6 @@ async def go(  # pylint:disable=invalid-name
     keep_alive="1d",
 ) -> AnnotationOutputs:
     """Main function for running the query and writing the output"""
-
     output_dir = os.path.dirname(job_data.outputBasePath)
     basename = os.path.basename(job_data.outputBasePath)
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)

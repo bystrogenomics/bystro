@@ -6,7 +6,7 @@ import time
 import traceback
 from collections.abc import Callable
 from textwrap import dedent
-from typing import Any, NamedTuple, TypeVar
+from typing import Any, TypeVar
 
 import ray
 from msgspec import DecodeError, Struct, ValidationError, json
@@ -25,12 +25,12 @@ BEANSTALK_ERR_TIMEOUT = "TIMED_OUT"
 SOCKET_TIMEOUT_TIME = 10
 JOB_TIMEOUT_TIME = 5
 
-T = TypeVar("T", bound=BaseMessage, contravariant=True)
-T2 = TypeVar("T2", bound=BaseMessage, contravariant=True)
-T3 = TypeVar("T3", bound=BaseMessage, contravariant=True)
+T = TypeVar("T", bound=BaseMessage)
+T2 = TypeVar("T2", bound=BaseMessage)
+T3 = TypeVar("T3", bound=BaseMessage)
 
 
-class ProgressPublisher(NamedTuple):
+class ProgressPublisher(Struct):
     """Beanstalkd Message Published Config"""
 
     host: str
@@ -203,7 +203,6 @@ class BeanstalkdProgressReporter(ProgressReporter):
     def increment(self, count: int):
         """Increment the counter by processed variant count and report to the beanstalk queue"""
         self._message.data.progress += count
-
         self._client.put_job(json.encode(self._message))
 
     def get_counter(self):
@@ -228,6 +227,6 @@ class DebugProgressReporter(ProgressReporter):
 
 def get_progress_reporter(publisher: ProgressPublisher | None) -> ProgressReporter:
     if publisher:
-        return BeanstalkdProgressReporter.remote(ProgressPublisher)  # type: ignore
+        return BeanstalkdProgressReporter.remote(publisher)  # type: ignore
 
     return DebugProgressReporter.remote()  # type: ignore

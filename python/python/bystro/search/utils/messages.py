@@ -28,11 +28,8 @@ class SaveJobData(BaseMessage, frozen=True):
     assembly: str
     queryBody: dict
     indexName: str
-    inputQuery: str
     outputBasePath: str
     fieldNames: list[str]
-    pipeline: dict | None = None
-    indexConfig: dict | None = None
 
 
 class SaveJobSubmitMessage(BaseMessage, frozen=True):
