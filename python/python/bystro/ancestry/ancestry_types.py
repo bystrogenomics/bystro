@@ -6,7 +6,6 @@ from typing import Any
 import attr
 from attr import field
 from attr.validators import instance_of, ge, le
-import cattrs
 
 AttrValidationError = (ValueError, TypeError)
 
