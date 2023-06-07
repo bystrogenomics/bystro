@@ -8,10 +8,10 @@ from typing import Any
 
 from pystalk import BeanstalkClient, BeanstalkError
 from ruamel.yaml import YAML
-from sample_response import sample_ancestry_response
+from bystro.ancestry.sample_response import sample_ancestry_response
 
-from ancestry_types import AncestryResponse, AncestrySubmission
-from beanstalk import (
+from bystro.ancestry.ancestry_types import AncestryResponse, AncestrySubmission
+from bystro.ancestry.beanstalk import (
     Address,
     BeanstalkEvent,
     BeanstalkEventMessage,

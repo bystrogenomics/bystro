@@ -4,8 +4,8 @@ import time
 
 from pystalk import BeanstalkClient
 
-from ancestry_types import AncestrySubmission
-from ancestry.beanstalk import BeanstalkSubmissionMessage
+from bystro.ancestry.ancestry_types import AncestrySubmission
+from bystro.ancestry.beanstalk import BeanstalkSubmissionMessage
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 logger = logging.getLogger(__name__)
