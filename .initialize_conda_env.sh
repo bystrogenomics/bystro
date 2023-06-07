@@ -18,4 +18,5 @@ fi
 
 echo -e "\n====                         Installing Python requirements                             ====\n"
 find . -name 'requirements.txt' -exec pip install -q -r {} \;
+find . -name 'requirements-dev.txt' -exec pip install -q -r {} \;
 echo -e "\n====                                       Done                                         ====\n"
