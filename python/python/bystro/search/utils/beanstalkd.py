@@ -14,10 +14,10 @@ from pystalk import BeanstalkClient, BeanstalkError  # type: ignore
 from pystalk.client import Job  # type: ignore
 
 from bystro.search.utils.messages import (
-    BEANSTALK_JOB_ID,
+    BeanstalkJobID,
     BaseMessage,
     FailedJobMessage,
-    InvalideJobMessage,
+    InvalidJobMessage,
     ProgressMessage,
 )
 
@@ -56,11 +56,11 @@ class QueueConf(Struct):
         return hosts, ports
 
 def default_failed_msg_fn(
-    job_data: T | None, job_id: BEANSTALK_JOB_ID, err: Exception
-) -> FailedJobMessage | InvalideJobMessage:  # noqa: E501
+    job_data: T | None, job_id: BeanstalkJobID, err: Exception
+) -> FailedJobMessage | InvalidJobMessage:  # noqa: E501
     """Default failed message function"""
     if job_data is None:
-        return InvalideJobMessage(queueID=job_id, reason=str(err))
+        return InvalidJobMessage(queueID=job_id, reason=str(err))
     return FailedJobMessage(submissionID=job_data.submissionID, reason=str(err))
 
 
@@ -72,7 +72,7 @@ def listen(
     queue_conf: QueueConf,
     tube: str,
     failed_msg_fn: Callable[
-        [T | None, BEANSTALK_JOB_ID, Exception], FailedJobMessage | InvalideJobMessage
+        [T | None, BeanstalkJobID, Exception], FailedJobMessage | InvalidJobMessage
     ] = default_failed_msg_fn,  # noqa: E501
 ):
     """Listen on a Beanstalkd channel, waiting for work.
@@ -88,7 +88,7 @@ def listen(
         i += 1
 
         job: Job | None = None
-        job_id: BEANSTALK_JOB_ID | None = None
+        job_id: BeanstalkJobID | None = None
         job_data: T | None = None
         client: BeanstalkClient | None = None
         try:

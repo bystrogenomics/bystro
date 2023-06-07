@@ -39,7 +39,6 @@ has maxDel => ( is => 'ro', isa => 'Int', default => -32, writer => 'setMaxDel' 
 has fileProcessors => ( is => 'ro', isa => 'HashRef', default => 'bystro-vcf' );
 
 # Defines most of the properties that can be configured at run time
-# Needed because there are variations of Seq.pm, ilke SeqFromQuery.pm
 # Requires logPath to be provided (currently found in Seq::Base)
 with 'Seq::Definition', 'Seq::Role::Validator';
 

@@ -5,12 +5,12 @@ from msgspec import Struct, field
 
 from bystro.search.utils.annotation import AnnotationOutputs
 
-SUBMISSION_ID = str | int
-BEANSTALK_JOB_ID = int
+SubmissionID = str | int
+BeanstalkJobID = int
 
 
 class BaseMessage(Struct, frozen=True):
-    submissionID: SUBMISSION_ID
+    submissionID: SubmissionID
 
     @classmethod
     def keys_with_types(cls) -> dict:
@@ -18,14 +18,14 @@ class BaseMessage(Struct, frozen=True):
 
 
 class FailedJobMessage(Struct, frozen=True):
-    submissionID: SUBMISSION_ID
+    submissionID: SubmissionID
     reason: str
 
 
-class InvalideJobMessage(Struct, frozen=True):
+class InvalidJobMessage(Struct, frozen=True):
     # Invalid jobs that are invalid because the submission breaks serialization invariants
     # will not have a submissionID as that ID is held in the serialized data
-    queueID: BEANSTALK_JOB_ID
+    queueID: BeanstalkJobID
     reason: str
 
 

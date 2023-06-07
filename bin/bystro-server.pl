@@ -27,7 +27,6 @@ use Beanstalk::Client;
 use YAML::XS qw/LoadFile/;
 
 use Seq;
-use SeqFromQuery;
 use Path::Tiny qw/path/;
 
 my ($verbose, $queueConfigPath, $connectionConfigPath, $maxThreads, $debug);
@@ -94,7 +93,7 @@ while(my $job = $beanstalk->reserve) {
   try {
     $jobDataHref = decode_json( $job->data );
 
-    if(defined $verbose || defined $debug) {
+    if(defined $debug) {
       say "Reserved job with id " . $job->id . " which contains:";
       p $jobDataHref;
 
@@ -144,24 +143,22 @@ while(my $job = $beanstalk->reserve) {
     my $annotate_instance = Seq->new_with_config($inputHref);
 
     ($err, $outputFileNamesHashRef) = $annotate_instance->annotate();
+
+    if(defined $debug) {
+      p $err;
+    }
   } catch {
-    # Don't store the stack
     $err = $_;
   };
 
+  if(defined $debug) {
+    p $err;
+  }
+
+  $err =~ s/\sat\s\w+\/\w+.*\sline\s\d+.*//;
+
   if ($err) {
     say "job ". $job->id . " failed";
-
-    if(defined $verbose || defined $debug) {
-      p $err;
-    }
-
-    if(ref $err) {
-      say STDERR "Elasticsearch error:";
-      p $err;
-    }
-
-    $err = "There was an issue, sorry!";
 
     my $data = {
       event => $events->{failed},
@@ -174,7 +171,7 @@ while(my $job = $beanstalk->reserve) {
 
     $job->delete();
 
-    if($beanstalkEvents->error) {
+    if($beanstalkEvents->error && defined $debug) {
       say STDERR "Beanstalkd last error:";
       p $beanstalkEvents->error;
     }
@@ -202,7 +199,7 @@ while(my $job = $beanstalk->reserve) {
 
   $job->delete();
 
-  if($beanstalkEvents->error) {
+  if($beanstalkEvents->error && defined $debug) {
     say "Beanstalkd last error:";
     p $beanstalkEvents->error;
   }
