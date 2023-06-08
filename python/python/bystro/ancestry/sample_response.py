@@ -1,3 +1,7 @@
+import json
+
+import cattrs
+
 from bystro.ancestry.ancestry_types import AncestryResponse
 
 json_payload = """{"vcf_path": "myfile.vcf", "results": [{"sample_id":
@@ -77,4 +81,5 @@ json_payload = """{"vcf_path": "myfile.vcf", "results": [{"sample_id":
 "EUR": {"lower_bound": 0.0, "upper_bound": 1.0}, "SAS":
 {"lower_bound": 0.0, "upper_bound": 1.0}}, "missingness": 0.5}]}"""
 
-sample_ancestry_response = AncestryResponse.parse_raw(json_payload)
+json_dict = json.loads(json_payload)
+sample_ancestry_response = cattrs.structure(json_dict, AncestryResponse)

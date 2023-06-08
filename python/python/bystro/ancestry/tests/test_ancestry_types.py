@@ -177,14 +177,14 @@ def test_AncestryResponse() -> None:
 
 def test_AncestryResponse_bad_filename() -> None:
     with pytest.raises(AttrValidationError):
-        AncestryResponse("foo.txt", results=[])
+        AncestryResponse(vcf_path="foo.txt", results=[])
 
 
 def test_AncestryResponse_bad_results_type() -> None:
     with pytest.raises(AttrValidationError):
         AncestryResponse(
             vcf_path="myfile.vcf",
-            results=[3, 4, 5],
+            results=[3, 4, 5],  # type: ignore [list-item]
         )
 
 

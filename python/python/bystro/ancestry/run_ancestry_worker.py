@@ -37,8 +37,10 @@ def _load_yaml(path: Path) -> dict[str, Any]:
 def _ancestry_response_from_ancestry_submission(
     ancestry_submission: AncestrySubmission,
 ) -> AncestryResponse:
-    response = sample_ancestry_response.copy()
-    response.vcf_path = ancestry_submission.vcf_path
+    # return sample_ancestry_response results, but update vcf_path to match ancestry_submission
+    response = AncestryResponse(
+        vcf_path=ancestry_submission.vcf_path, results=sample_ancestry_response.results
+    )
     return response
 
 
