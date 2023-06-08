@@ -55,6 +55,7 @@ class QueueConf(Struct):
             ports.append(port)
         return hosts, ports
 
+
 def default_failed_msg_fn(
     job_data: T | None, job_id: BeanstalkJobID, err: Exception
 ) -> FailedJobMessage | InvalidJobMessage:  # noqa: E501
@@ -81,7 +82,10 @@ def listen(
     hosts, ports = queue_conf.split_host_port()
 
     tube_conf = queue_conf.tubes[tube]
-    clients = tuple(BeanstalkClient(host, port, socket_timeout=SOCKET_TIMEOUT_TIME) for (host, port) in zip(hosts, ports))
+    clients = tuple(
+        BeanstalkClient(host, port, socket_timeout=SOCKET_TIMEOUT_TIME)
+        for (host, port) in zip(hosts, ports)
+    )
 
     i = 0
     while True:

@@ -1,4 +1,4 @@
-name: Pylint
+name: lint
 
 on: [push]
 
@@ -21,7 +21,7 @@ jobs:
         pip install -r **/requirements-dev.txt
     - name: Analysing the code with pylint
       run: |
-        pylint $(git ls-files '*.py') --exit-zero --max-line-length=120
-    - name: Anylising the code with mypy
+        ruff $(git ls-files '*.py')
+    - name: Static analysis with mypy
       run: |
         mypy --config-file python/mypy.ini $(git ls-files '*.py')

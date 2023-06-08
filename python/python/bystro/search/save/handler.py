@@ -237,9 +237,9 @@ async def go(  # pylint:disable=invalid-name
         tarball_name = os.path.basename(outputs.archived)
 
         ret = subprocess.call(
-            f'cd {output_dir}; tar --exclude ".*" --exclude={tarball_name} -cf {tarball_name} * --remove-files',
+            f'cd {output_dir}; tar --exclude ".*" --exclude={tarball_name} -cf {tarball_name} * --remove-files',  # noqa: E501
             shell=True,
-        )  # noqa: E501
+        )
         if ret != 0:
             raise IOError(f"Failed to write {outputs.archived}")
     except Exception as err:
