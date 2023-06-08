@@ -6,6 +6,7 @@
 # TODO 2023-05-08: get max_slices from opensearch index settings
 # TODO 2023-05-08: concatenate chunks in a different ray worker
 
+import gzip
 import math
 import os
 import pathlib
@@ -14,7 +15,7 @@ import traceback
 
 import numpy as np
 import ray
-from isal import igzip
+
 from opensearchpy import OpenSearch
 
 from bystro.beanstalkd.worker import ProgressPublisher, get_progress_reporter
@@ -149,7 +150,7 @@ def _process_query(
         rows.append(row)
 
     try:
-        with igzip.open(chunk_output_name, "wb") as fw:
+        with gzip.open(chunk_output_name, "wb") as fw:
             fw.write(_make_output_string(rows, delimiters))  # type: ignore
         reporter.increment.remote(resp["hits"]["total"]["value"])
     except Exception:
@@ -192,7 +193,7 @@ async def go(  # pylint:disable=invalid-name
     written_chunks = [os.path.join(output_dir, f"{job_data.indexName}_header")]
 
     header = bytes("\t".join(job_data.fieldNames) + "\n", encoding="utf-8")
-    with igzip.open(written_chunks[-1], "wb") as fw:
+    with gzip.open(written_chunks[-1], "wb") as fw:
         fw.write(header)  # type: ignore
 
     search_client_args = gather_opensearch_args(search_conf)
@@ -237,7 +238,7 @@ async def go(  # pylint:disable=invalid-name
         tarball_name = os.path.basename(outputs.archived)
 
         ret = subprocess.call(
-            f'cd {output_dir}; tar --exclude ".*" --exclude={tarball_name} -cf {tarball_name} * --remove-files',  # noqa: E501
+            f'cd {output_dir}; tar --exclude ".*" --exclude={tarball_name} -cf {tarball_name} * --remove-files', # noqa: E501
             shell=True,
         )
         if ret != 0:
