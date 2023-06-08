@@ -1,6 +1,5 @@
 """Test ancestry_types.py."""
 import pytest
-from pydantic import ValidationError
 
 from ..ancestry_types import (
     AncestrySubmission,

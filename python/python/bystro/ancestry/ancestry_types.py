@@ -1,5 +1,4 @@
 """Classes for common shapes of data in ancestry."""
-from typing import Any
 
 import attr
 from attr import field
