@@ -26,10 +26,6 @@ class AncestrySubmission:
 
     vcf_path: str = attr.field(validator=_vcf_validator)
 
-    # @vcf_path.validator
-    # def ends_in_vcf(self, attribute, value) -> None:
-    #     if not value.endswith("vcf"):
-
 
 unit_float_validator = [
     instance_of(float),
