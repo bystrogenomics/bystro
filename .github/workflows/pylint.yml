@@ -19,7 +19,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r **/requirements.txt
         pip install -r **/requirements-dev.txt
-    - name: Analysing the code with pylint
+    - name: Linting with ruff
       run: |
         ruff $(git ls-files '*.py')
     - name: Static analysis with mypy
