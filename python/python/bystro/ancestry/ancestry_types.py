@@ -1,4 +1,7 @@
 """Classes for common shapes of data in ancestry."""
+from collections import Counter
+from collections.abc import Sequence
+from typing import TypeVar
 
 import attrs
 from attrs import field
@@ -140,19 +143,23 @@ class AncestryResponse:
     results: list[AncestryResult] = field(validator=instance_of(list))
 
     @results.validator
-    def _is_list_of_ancestry_results(
-        self, _attribute: attrs.Attribute, values: list[AncestryResult]
+    def _is_list_of_unique_ancestry_results(
+        self, _attribute: attrs.Attribute, results: list[AncestryResult]
     ) -> None:
-        for i, value in enumerate(values):
+        for i, value in enumerate(results):
             if not isinstance(value, AncestryResult):
                 err_msg = f"Expecting list of AncestryResults, at position {i} got {value} instead"
                 raise TypeError(err_msg)
-
-    def __attrs_post_init__(self) -> None:
-        """Ensure sample_ids are unique."""
-        sample_ids = [result.sample_id for result in self.results]
+        sample_ids = [result.sample_id for result in results]
         unique_sample_ids = set(sample_ids)
-        if len(unique_sample_ids) < len(sample_ids):
-            duplicates = [sid for sid in unique_sample_ids if sample_ids.count(sid) > 1]
+        if len(unique_sample_ids) < len(results):
+            duplicates = _get_duplicates(sample_ids)
             err_msg = f"Expected unique sample ids but found duplicated samples {duplicates}"
             raise ValueError(err_msg)
+
+
+T = TypeVar("T")
+
+
+def _get_duplicates(xs: Sequence[T]) -> set[T]:
+    return {x for x, count in Counter(xs).items() if count > 1}

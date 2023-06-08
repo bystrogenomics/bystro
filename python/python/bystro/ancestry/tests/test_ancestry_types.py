@@ -236,7 +236,9 @@ def test_AncestryResponse_frozen() -> None:
 
 
 def test_AncestryResponse_non_unique_sample_ids() -> None:
-    with pytest.raises(AttrValidationError):
+    with pytest.raises(
+        AttrValidationError, match=r"Expected unique sample ids but found duplicated samples {'foo'}"
+    ):
         AncestryResponse(
             vcf_path="myfile.vcf",
             results=[
