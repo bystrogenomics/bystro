@@ -11,6 +11,12 @@ from attr.validators import ge, instance_of, le
 AttrValidationError = (ValueError, TypeError)
 
 
+#  It seems a bit overkill to have an attr class just for vcfs, but
+#  the validator needs to be shared between classes. So it just lives
+#  here as a pure python function with a weird type signature in order
+#  to support what attr expects from its validators.
+
+
 def _vcf_validator(_self: object, _attribute: attr.Attribute, value: str) -> None:
     if not isinstance(value, str):
         err_msg = f"vcf_path must be of type str, got: {value} instead"
