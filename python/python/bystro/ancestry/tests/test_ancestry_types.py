@@ -53,11 +53,24 @@ SUPERPOPS = [
 
 def test_AncestrySubmission():
     AncestrySubmission("foo.vcf")
+    AncestrySubmission("foo.vcf.gz")
+    AncestrySubmission("foo.vcf.gz")
+    AncestrySubmission("foo.vcf.lz4")
+    AncestrySubmission("foo.vcf.zstd")
+    AncestrySubmission("foo.vcf.bzip2")
 
 
-def test_AncestrySubmission_bad_filepath():
+def test_AncestrySubmission_bad_filepaths():
+    with pytest.raises(AttrValidationError):
+        AncestrySubmission(3)
     with pytest.raises(AttrValidationError):
         AncestrySubmission("foo.txt")
+    with pytest.raises(AttrValidationError):
+        AncestrySubmission("foo.gz")
+    with pytest.raises(AttrValidationError):
+        AncestrySubmission("foo.vcf.docx")
+    with pytest.raises(AttrValidationError):
+        AncestrySubmission("foo.txt.gz")
 
 
 def test_AncestrySubmission_frozen():

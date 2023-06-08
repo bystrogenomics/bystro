@@ -1,4 +1,5 @@
 """Classes for common shapes of data in ancestry."""
+import re
 from collections import Counter
 from collections.abc import Sequence
 from typing import TypeVar
@@ -20,13 +21,26 @@ AttrValidationError = (ValueError, TypeError)
 #  here as a pure python function with a weird type signature in order
 #  to support what attr expects from its validators.
 
+_VCF_REGEX = re.compile(
+    r"""
+    .*                        # anything
+    \.vcf                     # .vcf extension
+    (\.(gz|lz4|zstd|bzip2))?  # optional compression extension
+    $                         # and nothing else afterwards
+    """,
+    re.VERBOSE,
+)
 
-def _vcf_validator(_self: object, _attribute: attrs.Attribute, value: str) -> None:
-    if not isinstance(value, str):
-        err_msg = f"vcf_path must be of type str, got: {value} instead"
+
+def _vcf_validator(_self: object, _attribute: attrs.Attribute, vcf_path: str) -> None:
+    if not isinstance(vcf_path, str):
+        err_msg = f"vcf_path must be of type str, got: {vcf_path} instead"
         raise TypeError(err_msg)
-    if "vcf" not in value:
-        err_msg = f"Expected vcf_path ending in '.vcf', got {value} instead"
+    if not _VCF_REGEX.fullmatch(vcf_path):
+        err_msg = (
+            "vcf_path must be of extension .vcf, .vcf.gz, .vcf.lz4 .vcf.zstd or .vcf.bzip2, "
+            f"got {vcf_path} instead"
+        )
         raise ValueError(err_msg)
 
 
