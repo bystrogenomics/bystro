@@ -1,6 +1,4 @@
 """Classes for common shapes of data in ancestry."""
-from pydantic import BaseModel, Extra, Field, root_validator, validator
-
 from typing import Any
 
 import attr
@@ -148,11 +146,10 @@ class AncestryResponse:
                 err_msg = f"Expecting list of AncestryResults, at position {i} got {value} instead"
                 raise TypeError(err_msg)
 
-    def __attr_post_init__(self):
+    def __attrs_post_init__(self):
         sample_ids = [result.sample_id for result in self.results]
         unique_sample_ids = set(sample_ids)
         if len(unique_sample_ids) < len(sample_ids):
             duplicates = [sid for sid in unique_sample_ids if sample_ids.count(sid) > 1]
             err_msg = f"Expected unique sample ids but found duplicated samples {duplicates}"
             raise ValueError(err_msg)
-        return values

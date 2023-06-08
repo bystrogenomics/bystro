@@ -176,11 +176,41 @@ def test_AncestryResponse() -> None:
     )
 
 
-def test_AncestryResponse_bad_inputs() -> None:
+def test_AncestryResponse_bad_filename() -> None:
     with pytest.raises(AttrValidationError):
         AncestryResponse("foo.txt", results=[])
+
+
+def test_AncestryResponse_bad_results_type() -> None:
     with pytest.raises(AttrValidationError):
         AncestryResponse(
             vcf_path="myfile.vcf",
             results=[3, 4, 5],
+        )
+
+
+def test_AncestryResponse_non_unique_sample_ids() -> None:
+    with pytest.raises(AttrValidationError):
+        AncestryResponse(
+            vcf_path="myfile.vcf",
+            results=[
+                AncestryResult(
+                    sample_id="foo",
+                    populations=PopulationVector(**pop_kwargs),
+                    superpops=SuperpopVector(**superpop_kwargs),
+                    missingness=0.5,
+                ),
+                AncestryResult(
+                    sample_id="foo",
+                    populations=PopulationVector(**pop_kwargs),
+                    superpops=SuperpopVector(**superpop_kwargs),
+                    missingness=0.5,
+                ),
+                AncestryResult(
+                    sample_id="bar",
+                    populations=PopulationVector(**pop_kwargs),
+                    superpops=SuperpopVector(**superpop_kwargs),
+                    missingness=0.5,
+                ),
+            ],
         )
