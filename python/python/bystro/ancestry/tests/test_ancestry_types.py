@@ -81,7 +81,7 @@ def test_ProbabilityInterval() -> None:
 
     prob_int = ProbabilityInterval(lower_bound=0.0, upper_bound=1.0)
     with pytest.raises(FrozenInstanceError):
-        prob_int.lower_bound = 0.5
+        prob_int.lower_bound = 0.5  # type: ignore [misc]
 
 
 prob_int = ProbabilityInterval(lower_bound=0.0, upper_bound=1.0)
@@ -111,7 +111,7 @@ def test_PopulationVector_with_extra_key() -> None:
 def test_PopulationVector_frozen() -> None:
     population_vector = PopulationVector(**pop_kwargs)
     with pytest.raises(FrozenInstanceError):
-        population_vector.ACB = prob_int
+        population_vector.ACB = prob_int  # type: ignore [misc]
 
 
 def test_SuperpopVector() -> None:
@@ -157,7 +157,7 @@ def test_SuperpopVector_frozen() -> None:
     )
 
     with pytest.raises(FrozenInstanceError):
-        superpop_vector.AFR = prob_int
+        superpop_vector.AFR = prob_int  # type: ignore [misc]
 
 
 def test_AncestryResult() -> None:
@@ -187,7 +187,7 @@ def test_AncestryResult_frozen() -> None:
         missingness=0.1,
     )
     with pytest.raises(FrozenInstanceError):
-        ancestry_result.missingness = 0.2
+        ancestry_result.missingness = 0.2  # type: ignore [misc]
 
 
 def test_AncestryResponse() -> None:
@@ -232,7 +232,7 @@ def test_AncestryResponse_bad_results_type() -> None:
 def test_AncestryResponse_frozen() -> None:
     ancestry_response = AncestryResponse(vcf_path="foo.vcf", results=[])
     with pytest.raises(FrozenInstanceError):
-        ancestry_response.vcf_filepath = "bar.vcf"
+        ancestry_response.vcf_path = "bar.vcf"  # type: ignore [misc]
 
 
 def test_AncestryResponse_non_unique_sample_ids() -> None:
