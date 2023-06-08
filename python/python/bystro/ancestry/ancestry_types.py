@@ -6,7 +6,8 @@ from attr.validators import ge, instance_of, le
 
 # Attr classes can throw either TypeError or ValueError upon receipt
 # of bad data.  Generally we won't care which, so define the union of
-# the two exceptions to catch all validation errors.
+# the two exceptions to catch all validation errors.  Because we'll be
+# using it in try blocks, this wants to be a tuple rather than a union.
 
 AttrValidationError = (ValueError, TypeError)
 
