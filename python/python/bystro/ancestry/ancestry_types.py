@@ -56,7 +56,7 @@ class ProbabilityInterval:
 
     def __attrs_post_init__(self) -> None:
         """Ensure interval is well-formed."""
-        if not self.lower_bound <= self.upper_bound:
+        if self.lower_bound > self.upper_bound:
             err_msg = f"""Lower bound must be less than or equal to upper bound.
             Got: lower_bound={self.lower_bound}, upper_bound={self.upper_bound} instead."""
             raise ValueError(err_msg)
