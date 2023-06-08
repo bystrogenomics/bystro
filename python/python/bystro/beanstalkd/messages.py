@@ -38,6 +38,10 @@ class InvalidJobMessage(Struct, frozen=True):
     reason: str
     event: Event = Event.FAILED
 
+    @classmethod
+    def keys_with_types(cls) -> dict:
+        return get_type_hints(cls)
+
 class ProgressData(Struct):
     progress: int = 0
     skipped: int = 0
