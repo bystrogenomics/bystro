@@ -1,5 +1,6 @@
 """Test ancestry_types.py."""
 import pytest
+from attrs.exceptions import FrozenInstanceError
 
 from ..ancestry_types import (
     AncestryResponse,
@@ -59,6 +60,12 @@ def test_AncestrySubmission_bad_filepath():
         AncestrySubmission("foo.txt")
 
 
+def test_AncestrySubmission_frozen():
+    ancestry_submission = AncestrySubmission("foo.vcf")
+    with pytest.raises(FrozenInstanceError):
+        ancestry_submission.vcf_path = "bar.vcf"
+
+
 def test_ProbabilityInterval() -> None:
     """Ensure we can instantiate, validate ProbabilityInterval correctly."""
     ProbabilityInterval(lower_bound=0.1, upper_bound=0.9)
@@ -71,6 +78,10 @@ def test_ProbabilityInterval() -> None:
 
     with pytest.raises(AttrValidationError):
         ProbabilityInterval(lower_bound=1, upper_bound=0)
+
+    prob_int = ProbabilityInterval(lower_bound=0.0, upper_bound=1.0)
+    with pytest.raises(FrozenInstanceError):
+        prob_int.lower_bound = 0.5
 
 
 prob_int = ProbabilityInterval(lower_bound=0.0, upper_bound=1.0)
@@ -95,6 +106,12 @@ def test_PopulationVector_with_extra_key() -> None:
     pop_kwargs_with_extra_key["FOO"] = prob_int
     with pytest.raises(AttrValidationError):
         PopulationVector(**pop_kwargs_with_extra_key)
+
+
+def test_PopulationVector_frozen() -> None:
+    population_vector = PopulationVector(**pop_kwargs)
+    with pytest.raises(FrozenInstanceError):
+        population_vector.ACB = prob_int
 
 
 def test_SuperpopVector() -> None:
@@ -130,6 +147,19 @@ def test_SuperpopVector_extra_key() -> None:
         )
 
 
+def test_SuperpopVector_frozen() -> None:
+    superpop_vector = SuperpopVector(
+        AFR=prob_int,
+        AMR=prob_int,
+        EAS=prob_int,
+        EUR=prob_int,
+        SAS=prob_int,
+    )
+
+    with pytest.raises(FrozenInstanceError):
+        superpop_vector.AFR = prob_int
+
+
 def test_AncestryResult() -> None:
     AncestryResult(
         sample_id="my_sample_id",
@@ -147,6 +177,17 @@ def test_AncestryResult_invalid_missingness() -> None:
             superpops=SuperpopVector(**superpop_kwargs),
             missingness=1.1,
         )
+
+
+def test_AncestryResult_frozen() -> None:
+    ancestry_result = AncestryResult(
+        sample_id="my_sample_id",
+        populations=PopulationVector(**pop_kwargs),
+        superpops=SuperpopVector(**superpop_kwargs),
+        missingness=0.1,
+    )
+    with pytest.raises(FrozenInstanceError):
+        ancestry_result.missingness = 0.2
 
 
 def test_AncestryResponse() -> None:
@@ -186,6 +227,12 @@ def test_AncestryResponse_bad_results_type() -> None:
             vcf_path="myfile.vcf",
             results=[3, 4, 5],  # type: ignore [list-item]
         )
+
+
+def test_AncestryResponse_frozen() -> None:
+    ancestry_response = AncestryResponse(vcf_path="foo.vcf", results=[])
+    with pytest.raises(FrozenInstanceError):
+        ancestry_response.vcf_filepath = "bar.vcf"
 
 
 def test_AncestryResponse_non_unique_sample_ids() -> None:
