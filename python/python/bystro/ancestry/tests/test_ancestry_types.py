@@ -2,10 +2,10 @@
 import pytest
 
 from ..ancestry_types import (
-    AncestrySubmission,
-    AttrValidationError,
     AncestryResponse,
     AncestryResult,
+    AncestrySubmission,
+    AttrValidationError,
     PopulationVector,
     ProbabilityInterval,
     SuperpopVector,

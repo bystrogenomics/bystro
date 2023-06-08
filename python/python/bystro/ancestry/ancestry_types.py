@@ -2,8 +2,7 @@
 
 import attr
 from attr import field
-from attr.validators import instance_of, ge, le
-
+from attr.validators import ge, instance_of, le
 
 # Attr classes can throw either TypeError or ValueError upon receipt
 # of bad data.  Generally we won't care which, so define the union of
@@ -12,7 +11,7 @@ from attr.validators import instance_of, ge, le
 AttrValidationError = (ValueError, TypeError)
 
 
-def vcf_validator(_self, attribute, value) -> None:
+def _vcf_validator(_self: object, _attribute: attr.Attribute, value: str) -> None:
     if not isinstance(value, str):
         err_msg = f"vcf_path must be of type str, got: {value} instead"
         raise TypeError(err_msg)
@@ -25,13 +24,11 @@ def vcf_validator(_self, attribute, value) -> None:
 class AncestrySubmission:
     """Represent an incoming submission to the ancestry worker."""
 
-    vcf_path: str = attr.field(validator=vcf_validator)
+    vcf_path: str = attr.field(validator=_vcf_validator)
 
     # @vcf_path.validator
     # def ends_in_vcf(self, attribute, value) -> None:
     #     if not value.endswith("vcf"):
-    #         err_msg = f"Expected vcf_path ending in '.vcf', got {value} instead"
-    #         raise ValueError(err_msg)
 
 
 unit_float_validator = [
@@ -54,7 +51,8 @@ class ProbabilityInterval:
         ]
     )
 
-    def __attrs_post_init__(self):
+    def __attrs_post_init__(self) -> None:
+        """Ensure interval is well-formed."""
         if not self.lower_bound <= self.upper_bound:
             err_msg = f"""Lower bound must be less than or equal to upper bound.
             Got: lower_bound={self.lower_bound}, upper_bound={self.upper_bound} instead."""
@@ -131,26 +129,24 @@ class AncestryResult:
     missingness: float = field(validator=unit_float_validator)
 
 
-def list_of(*args, **kwargs):
-    print(args)
-    print(kwargs)
-
-
 @attr.s(kw_only=True, frozen=True)
 class AncestryResponse:
     """An outgoing response from the ancestry worker."""
 
-    vcf_path: str = attr.field(validator=vcf_validator)
+    vcf_path: str = attr.field(validator=_vcf_validator)
     results: list[AncestryResult] = field(validator=instance_of(list))
 
     @results.validator
-    def is_list_of_ancestry_results(self, attribute, values):
+    def _is_list_of_ancestry_results(
+        self, _attribute: attr.Attribute, values: list[AncestryResult]
+    ) -> None:
         for i, value in enumerate(values):
             if not isinstance(value, AncestryResult):
                 err_msg = f"Expecting list of AncestryResults, at position {i} got {value} instead"
                 raise TypeError(err_msg)
 
-    def __attrs_post_init__(self):
+    def __attrs_post_init__(self) -> None:
+        """Ensure sample_ids are unique."""
         sample_ids = [result.sample_id for result in self.results]
         unique_sample_ids = set(sample_ids)
         if len(unique_sample_ids) < len(sample_ids):
