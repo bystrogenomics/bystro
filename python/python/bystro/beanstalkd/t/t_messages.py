@@ -17,20 +17,25 @@ from bystro.beanstalkd.messages import (
     ProgressMessage,
 )
 
+
 class T(Struct):
     a: int
     b: str
+
 
 class ImmutableT(Struct, frozen=True):
     a: int
     b: str
 
+
 class DefaultT(Struct, frozen=True):
     a: int
     b: str = "test"
 
+
 class InheritedT(T):
     c: str
+
 
 class TestYourModule(unittest.TestCase):
     def test_struct(self):
@@ -107,8 +112,8 @@ class TestYourModule(unittest.TestCase):
 
         with self.assertRaisesRegex(TypeError, "Missing required argument 'reason'"):
             t = FailedJobMessage(submissionID="test")
-        
-        t = FailedJobMessage(submissionID="test", reason='foo')
+
+        t = FailedJobMessage(submissionID="test", reason="foo")
         types = FailedJobMessage.keys_with_types()
 
         self.assertEqual(t.event, Event.FAILED)
@@ -126,8 +131,8 @@ class TestYourModule(unittest.TestCase):
 
         with self.assertRaisesRegex(TypeError, "Missing required argument 'reason'"):
             t = InvalidJobMessage(queueID="test")
-        
-        t = InvalidJobMessage(queueID="test", reason='foo')
+
+        t = InvalidJobMessage(queueID="test", reason="foo")
         types = InvalidJobMessage.keys_with_types()
 
         self.assertEqual(t.event, Event.FAILED)
@@ -144,8 +149,24 @@ class TestYourModule(unittest.TestCase):
 
         types = list(type_info(ProgressData).fields)
 
-        expected_types = [Field(name='progress', encode_name='progress', type=IntType(gt=None, ge=None, lt=None, le=None, multiple_of=None), required=False, default=0, default_factory=NODEFAULT),
-                          Field(name='skipped', encode_name='skipped', type=IntType(gt=None, ge=None, lt=None, le=None, multiple_of=None), required=False, default=0, default_factory=NODEFAULT)]
+        expected_types = [
+            Field(
+                name="progress",
+                encode_name="progress",
+                type=IntType(gt=None, ge=None, lt=None, le=None, multiple_of=None),
+                required=False,
+                default=0,
+                default_factory=NODEFAULT,
+            ),
+            Field(
+                name="skipped",
+                encode_name="skipped",
+                type=IntType(gt=None, ge=None, lt=None, le=None, multiple_of=None),
+                required=False,
+                default=0,
+                default_factory=NODEFAULT,
+            ),
+        ]
         self.assertListEqual(types, expected_types)
 
         t = ProgressData()
@@ -160,7 +181,7 @@ class TestYourModule(unittest.TestCase):
 
         with self.assertRaisesRegex(TypeError, "Missing required argument 'submissionID'"):
             t = ProgressMessage()
-        
+
         t = ProgressMessage(submissionID="test")
         types = ProgressMessage.keys_with_types()
 
