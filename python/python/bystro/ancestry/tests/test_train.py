@@ -2,7 +2,6 @@
 
 from bystro.ancestry import train
 
-
 ## this is not a very useful test, really just testing that train
 ## loaded successfully, didn't fail on import
 
