@@ -19,8 +19,8 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r **/requirements.txt
         pip install -r **/requirements-dev.txt
-	echo "Final dependency list:"
-	pip freeze
+        echo "Final dependency list:"
+        pip freeze
     - name: Linting with ruff
       run: |
         ruff $(git ls-files '*.py')
