@@ -54,7 +54,6 @@ SUPERPOPS = [
 def test_AncestrySubmission():
     AncestrySubmission("foo.vcf")
     AncestrySubmission("foo.vcf.gz")
-    AncestrySubmission("foo.vcf.gz")
     AncestrySubmission("foo.vcf.lz4")
     AncestrySubmission("foo.vcf.zstd")
     AncestrySubmission("foo.vcf.bzip2")

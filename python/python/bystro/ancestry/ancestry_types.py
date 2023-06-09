@@ -48,7 +48,7 @@ def _vcf_validator(_self: object, _attribute: attrs.Attribute, vcf_path: str) ->
 class AncestrySubmission:
     """Represent an incoming submission to the ancestry worker."""
 
-    vcf_path: str = attrs.field(validator=_vcf_validator)
+    vcf_path: str = field(validator=_vcf_validator)
 
 
 unit_float_validator = [
@@ -99,44 +99,44 @@ ProbIntValidator = attrs.validators.instance_of(ProbabilityInterval)
 class PopulationVector:
     """A vector of probability intervals for populations."""
 
-    ACB: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    ASW: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    BEB: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    CDX: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    CEU: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    CHB: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    CHS: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    CLM: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    ESN: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    FIN: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    GBR: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    GIH: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    GWD: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    IBS: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    ITU: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    JPT: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    KHV: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    LWK: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    MAG: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    MSL: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    MXL: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    PEL: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    PJL: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    PUR: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    STU: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    TSI: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    YRI: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
+    ACB: ProbabilityInterval = field(validator=ProbIntValidator)
+    ASW: ProbabilityInterval = field(validator=ProbIntValidator)
+    BEB: ProbabilityInterval = field(validator=ProbIntValidator)
+    CDX: ProbabilityInterval = field(validator=ProbIntValidator)
+    CEU: ProbabilityInterval = field(validator=ProbIntValidator)
+    CHB: ProbabilityInterval = field(validator=ProbIntValidator)
+    CHS: ProbabilityInterval = field(validator=ProbIntValidator)
+    CLM: ProbabilityInterval = field(validator=ProbIntValidator)
+    ESN: ProbabilityInterval = field(validator=ProbIntValidator)
+    FIN: ProbabilityInterval = field(validator=ProbIntValidator)
+    GBR: ProbabilityInterval = field(validator=ProbIntValidator)
+    GIH: ProbabilityInterval = field(validator=ProbIntValidator)
+    GWD: ProbabilityInterval = field(validator=ProbIntValidator)
+    IBS: ProbabilityInterval = field(validator=ProbIntValidator)
+    ITU: ProbabilityInterval = field(validator=ProbIntValidator)
+    JPT: ProbabilityInterval = field(validator=ProbIntValidator)
+    KHV: ProbabilityInterval = field(validator=ProbIntValidator)
+    LWK: ProbabilityInterval = field(validator=ProbIntValidator)
+    MAG: ProbabilityInterval = field(validator=ProbIntValidator)
+    MSL: ProbabilityInterval = field(validator=ProbIntValidator)
+    MXL: ProbabilityInterval = field(validator=ProbIntValidator)
+    PEL: ProbabilityInterval = field(validator=ProbIntValidator)
+    PJL: ProbabilityInterval = field(validator=ProbIntValidator)
+    PUR: ProbabilityInterval = field(validator=ProbIntValidator)
+    STU: ProbabilityInterval = field(validator=ProbIntValidator)
+    TSI: ProbabilityInterval = field(validator=ProbIntValidator)
+    YRI: ProbabilityInterval = field(validator=ProbIntValidator)
 
 
 @attrs.frozen(kw_only=True)
 class SuperpopVector:
     """A vector of probability intervals for superpopulations."""
 
-    AFR: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    AMR: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    EAS: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    EUR: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
-    SAS: ProbabilityInterval = attrs.field(validator=ProbIntValidator)
+    AFR: ProbabilityInterval = field(validator=ProbIntValidator)
+    AMR: ProbabilityInterval = field(validator=ProbIntValidator)
+    EAS: ProbabilityInterval = field(validator=ProbIntValidator)
+    EUR: ProbabilityInterval = field(validator=ProbIntValidator)
+    SAS: ProbabilityInterval = field(validator=ProbIntValidator)
 
 
 @attrs.frozen(kw_only=True)
@@ -153,7 +153,7 @@ class AncestryResult:
 class AncestryResponse:
     """An outgoing response from the ancestry worker."""
 
-    vcf_path: str = attrs.field(validator=_vcf_validator)
+    vcf_path: str = field(validator=_vcf_validator)
     results: list[AncestryResult] = field(validator=instance_of(list))
 
     @results.validator
