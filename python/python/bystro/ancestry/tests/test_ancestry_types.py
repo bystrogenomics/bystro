@@ -78,6 +78,9 @@ def test_AncestrySubmission_frozen():
         ancestry_submission.vcf_path = "bar.vcf"
 
 
+prob_int = ProbabilityInterval(lower_bound=0.0, upper_bound=1.0)
+
+
 def test_ProbabilityInterval() -> None:
     """Ensure we can instantiate, validate ProbabilityInterval correctly."""
     ProbabilityInterval(lower_bound=0.1, upper_bound=0.9)
@@ -91,12 +94,10 @@ def test_ProbabilityInterval() -> None:
     with pytest.raises(AttrValidationError):
         ProbabilityInterval(lower_bound=1, upper_bound=0)
 
-    prob_int = ProbabilityInterval(lower_bound=0.0, upper_bound=1.0)
     with pytest.raises(FrozenInstanceError):
         prob_int.lower_bound = 0.5  # type: ignore [misc]
 
 
-prob_int = ProbabilityInterval(lower_bound=0.0, upper_bound=1.0)
 pop_kwargs = {pop: prob_int for pop in POPULATIONS}
 superpop_kwargs = {pop: prob_int for pop in SUPERPOPS}
 
@@ -249,7 +250,7 @@ def test_AncestryResponse_frozen() -> None:
 
 def test_AncestryResponse_non_unique_sample_ids() -> None:
     with pytest.raises(
-        AttrValidationError, match=r"Expected unique sample ids but found duplicated samples {'foo'}"
+        AttrValidationError, match=r"Expected unique sample_ids but found duplicated samples {'foo'}"
     ):
         AncestryResponse(
             vcf_path="myfile.vcf",

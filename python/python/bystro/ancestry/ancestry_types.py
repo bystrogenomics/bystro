@@ -97,7 +97,12 @@ ProbIntValidator = attrs.validators.instance_of(ProbabilityInterval)
 
 @attrs.frozen(kw_only=True)
 class PopulationVector:
-    """A vector of probability intervals for populations."""
+    """A vector of probability intervals over populations.
+
+    Represents model estimates of an individual's similarity to
+    reference HapMap populations, with upper and lower bounds for each
+    population.
+    """
 
     ACB: ProbabilityInterval = field(validator=ProbIntValidator)
     ASW: ProbabilityInterval = field(validator=ProbIntValidator)
@@ -130,7 +135,13 @@ class PopulationVector:
 
 @attrs.frozen(kw_only=True)
 class SuperpopVector:
-    """A vector of probability intervals for superpopulations."""
+    """A vector of probability intervals for superpopulations.
+
+    Represents model estimates of an individual's similarity to
+    reference HapMap superpopulations, with upper and lower bounds for
+    each population.
+
+    """
 
     AFR: ProbabilityInterval = field(validator=ProbIntValidator)
     AMR: ProbabilityInterval = field(validator=ProbIntValidator)
@@ -141,7 +152,13 @@ class SuperpopVector:
 
 @attrs.frozen(kw_only=True)
 class AncestryResult:
-    """An ancestry result from a sample."""
+    """An ancestry result from a sample.
+
+    Represents ancestry model output for an individual study
+    participant (identified by sample_id) with estimates for
+    populations and superpopulations, and the overall fraction of
+    expected variants found missing in the sample.
+    """
 
     sample_id: str = field(validator=instance_of(str))
     populations: PopulationVector = field(validator=instance_of(PopulationVector))
@@ -151,7 +168,12 @@ class AncestryResult:
 
 @attrs.frozen(kw_only=True)
 class AncestryResponse:
-    """An outgoing response from the ancestry worker."""
+    """An outgoing response from the ancestry worker.
+
+    Represents ancestry model output for an entire study as a list of
+    individual AncestryResults.
+
+    """
 
     vcf_path: str = field(validator=_vcf_validator)
     results: list[AncestryResult] = field(validator=instance_of(list))
