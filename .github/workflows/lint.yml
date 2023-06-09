@@ -19,9 +19,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r **/requirements.txt
         pip install -r **/requirements-dev.txt
+	echo "Final dependency list:"
+	pip freeze
     - name: Linting with ruff
       run: |
         ruff $(git ls-files '*.py')
     - name: Static analysis with mypy
       run: |
-        mypy $(git ls-files '*.py')
+        mypy --config-file python/mypy.ini $(git ls-files '*.py')
