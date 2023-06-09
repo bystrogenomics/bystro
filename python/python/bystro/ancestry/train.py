@@ -9,13 +9,13 @@ This script takes a vcf of preprocessed variants (see preprocess_vcfs.sh) and ge
 3.  Classifiers mapping PC space to the 26 HapMap populations as well as 5 continent-level
 superpopulations.
 """
-
+import dataclasses
 import logging
 import random
 import sys
 from collections import Counter
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, TypeVar, get_args
 
 import allel
 import numpy as np
@@ -308,10 +308,10 @@ def _calc_fst(variant_counts: pd.Series, samples: pd.DataFrame) -> float:
     return (p * (1 - p) - total) / (p * (1 - p))
 
 
-def _perform_pca(train_X: np.ndarray, test_X: np.ndarray) -> tuple[np.ndarray, np.ndarray, PCA]:
+def _perform_pca(train_X: pd.DataFrame, test_X: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, PCA]:
     """Perform PCA, checking for good compression."""
     logger.info("Beginning PCA")
-    minimum_variant_std = train_X.std(axis=ROWS).min()
+    minimum_variant_std = train_X.std(axis="index").min()
     assert_true(
         "minimum variant standard deviation greater than zero",
         minimum_variant_std > 0,
@@ -356,6 +356,26 @@ def _make_train_test_split(
     return train_X, test_X, train_y, test_y
 
 
+@dataclasses.dataclass(frozen=True)
+class RFCParamChoices:
+    """Param Choices for RFC Randomized Hyperparameter Tuning."""
+
+    n_estimators: Literal[1000]
+    max_depth: Literal[5, 10, 20, None]
+    min_samples_leaf: Literal[1, 2, 5, 10]
+    criterion: Literal["gini", "entropy", "log_loss"]
+    max_features: Literal["sqrt", "log2", None]
+
+    @classmethod
+    def sample(cls) -> "RFCParamChoices":
+        """Construct a randomized ParamChoice from values of Literal type annotations."""
+        kwargs = {}
+        for param_name, typ in cls.__annotations__.items():
+            values = get_args(typ)
+            kwargs[param_name] = random.choice(values)
+        return cls(**kwargs)
+
+
 def _make_rfc(
     train_Xpc: np.ndarray,
     test_Xpc: np.ndarray,
@@ -363,19 +383,11 @@ def _make_rfc(
     test_y: pd.Series,
 ) -> RandomForestClassifier:
     trials = 10
-    tuning_results = {}
-
-    param_choices = {
-        "n_estimators": [1000],
-        "max_depth": [5, 10, 20, None],
-        "min_samples_leaf": [1, 2, 5, 10],
-        "criterion": ["gini", "entropy", "log_loss"],
-        "max_features": ["sqrt", "log2", None],
-    }
+    tuning_results: dict[RFCParamChoices, tuple[float, float]] = {}
 
     for _trial in range(trials):
-        params: dict[str, str | int | None] = {k: random.choice(vs) for (k, vs) in param_choices.items()}
-        rfc = RandomForestClassifier(**params.items(), random_state=1337)
+        param_choices = RFCParamChoices.sample()
+        rfc = RandomForestClassifier(**dataclasses.asdict(param_choices), random_state=1337)
         rfc.fit(train_Xpc, train_y.population)
         train_yhat = rfc.predict(train_Xpc)
         test_yhat = rfc.predict(test_Xpc)
@@ -383,12 +395,11 @@ def _make_rfc(
             accuracy_score(train_y.population, train_yhat),
             accuracy_score(test_y.population, test_yhat),
         )
-        param_tuple = tuple(sorted(params.items()))
-        tuning_results[param_tuple] = (train_acc, test_acc)
+        tuning_results[param_choices] = (train_acc, test_acc)
 
-    values, test_accuracy = 1, 1
-    best_params = max(tuning_results.items(), key=lambda kv: kv[values][test_accuracy])
-    rfc = RandomForestClassifier(**{k: v for (k, v) in best_params.items() if k != "pca_dim"})
+    test_accuracy_idx = 1
+    best_params = max(tuning_results, key=lambda params: tuning_results[params][test_accuracy_idx])
+    rfc = RandomForestClassifier(**dataclasses.asdict(best_params))
     rfc.fit(train_Xpc, train_y.population)
     train_yhat = rfc.predict(train_Xpc)
     test_yhat = rfc.predict(test_Xpc)
@@ -402,22 +413,25 @@ def _make_rfc(
 
 def _filter_variants_for_mi(
     train_X: pd.DataFrame, test_X: pd.DataFrame, train_y_pop: pd.Series
-) -> np.ndarray:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     mi_df = _get_mi_df(train_X, train_y_pop)
     mi_keep_cols = mi_df[mi_df.mutual_info > MI_THRESHOLD].index
 
     return train_X[mi_keep_cols], test_X[mi_keep_cols]
 
 
-def _calc_mi(xs: list, ys: list) -> float:
+T = TypeVar("T")
+
+
+def _calc_mi(xs: list[T], ys: list[T]) -> float:
     """Calculate mutual information between xs and ys."""
     if len(xs) != len(ys):
         msg = "xs and ys must have same length."
         raise ValueError(msg)
     N = len(xs)
-    x_counts = Counter()
-    y_counts = Counter()
-    xy_counts = Counter()
+    x_counts: dict[T, int] = Counter()
+    y_counts: dict[T, int] = Counter()
+    xy_counts: dict[tuple[T, T], int] = Counter()
     for x, y in zip(xs, ys):  # noqa: B905
         x_counts[x] += 1
         y_counts[y] += 1
@@ -431,7 +445,7 @@ def _calc_mi(xs: list, ys: list) -> float:
     return (x_entropy + y_entropy) - xy_entropy
 
 
-def _get_mi_df(train_X: np.ndarray, train_y_pop: pd.Series) -> np.ndarray:
+def _get_mi_df(train_X: pd.DataFrame, train_y_pop: pd.Series) -> pd.DataFrame:
     mis = mis = np.array(
         [_calc_mi(col, train_y_pop.population) for col in tqdm.tqdm(train_X.to_numpy().T)]
     )
@@ -461,4 +475,4 @@ def main() -> None:
     train_X_filtered, test_X_filtered = _filter_variants_for_mi(train_X, test_X, train_y.population)
     train_Xpc, test_Xpc, pca = _perform_pca(train_X_filtered, test_X_filtered)
     rfc = _make_rfc(train_Xpc, test_Xpc, train_y.population, test_y.population)
-    _serialize_data(train_X_filtered.columns, pca, rfc)
+    _serialize_data(list(train_X_filtered.columns), pca, rfc)
