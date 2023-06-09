@@ -190,7 +190,7 @@ class AncestryResponse:
         unique_sample_ids = set(sample_ids)
         if len(unique_sample_ids) < len(results):
             duplicates = _get_duplicates(sample_ids)
-            err_msg = f"Expected unique sample ids but found duplicated samples {duplicates}"
+            err_msg = f"Expected unique sample_ids but found duplicated samples {duplicates}"
             raise ValueError(err_msg)
 
 
