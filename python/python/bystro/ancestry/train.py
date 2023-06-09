@@ -467,6 +467,8 @@ def _serialize_data(variants: list[str], pca: PCA, rfc: RandomForestClassifier) 
 
 def main() -> None:
     """Train global ancestry model."""
+    err_msg = "This module isn't production-ready yet!"
+    raise NotImplementedError(err_msg)
     genotypes, labels = _load_dataset()
     train_X, test_X, train_y, test_y = _make_train_test_split(
         genotypes,
