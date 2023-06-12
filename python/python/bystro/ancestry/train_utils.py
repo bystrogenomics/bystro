@@ -4,7 +4,6 @@ from typing import Any
 
 import numpy as np
 
-
 # TODO: consider implementing callset with something more solid than a dict?
 
 
