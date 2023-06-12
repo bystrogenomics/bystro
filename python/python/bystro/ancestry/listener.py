@@ -50,7 +50,6 @@ def _infer_ancestry(
     return AncestryResponse(vcf_path=vcf_path, results=[])
 
 
-# nec
 async def _handler_fn(
     publisher: ProgressPublisher, ancestry_submission: AncestryJobData
 ) -> AncestryResponse:
