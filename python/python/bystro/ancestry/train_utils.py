@@ -5,6 +5,9 @@ from typing import Any
 import numpy as np
 
 
+# TODO: consider implementing callset with something more solid than a dict?
+
+
 def get_variant_ids_from_callset(callset: dict[str, Any]) -> np.ndarray:
     """Given a callset generated from scikit.allel, return variant ids in Broad notation."""
     # see https://illumina.github.io/NirvanaDocumentation/core-functionality/variant-ids/
