@@ -51,6 +51,8 @@ async def _handler_fn(
     publisher: ProgressPublisher, ancestry_job_data: AncestryJobData
 ) -> AncestryResponse:
     """Wrap _infer_ancestry for beanstalk."""
+    # Separating _handler_fn from _infer_ancestry in order to separate ML from infra concerns,
+    # and especially to keep _infer_ancestry eager.
     return _infer_ancestry(ancestry_job_data.ancestry_submission, publisher)
 
 
