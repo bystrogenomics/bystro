@@ -9,19 +9,15 @@ from bystro.ancestry.ancestry_types import AncestryResponse, AncestrySubmission
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
 from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, get_progress_reporter, listen
 
-# handler_fn
-
-# submit_msg_fn
 logger = logging.getLogger()
+
+ANCESTRY_TUBE = "ancestry"
 
 
 class AncestryJobData(BaseMessage, frozen=True):
-    """Data for SaveFromQuery jobs received from beanstalkd."""
+    """Wrap an AncestrySubmission in a BaseMessage for beanstalk."""
 
     ancestry_submission: AncestrySubmission
-
-
-ANCESTRY_TUBE = "ancestry"
 
 
 class AncestryJobCompleteMessage(CompletedJobMessage, frozen=True, kw_only=True):
@@ -38,22 +34,24 @@ def _load_queue_conf(queue_conf_path: str) -> QueueConf:
 
 
 def _infer_ancestry(
-    ancestry_job_data: AncestryJobData, _publisher: ProgressPublisher
+    ancestry_submission: AncestrySubmission, _publisher: ProgressPublisher
 ) -> AncestryResponse:
     """Run an ancestry job."""
-    logger.debug("Inferring ancestry for: %s", ancestry_job_data)
-    # TODO: main ancestry model logic goes here.  Just stubbing out for now
+    # TODO: main ancestry model logic goes here.  Just stubbing out for now.
+    logger.debug("Inferring ancestry for: %s", ancestry_submission)
 
-    # not doing anything with this reporter at the moment but may want to later.
+    # not doing anything with this reporter at the moment, we're
+    # simply threading it through for later.
     _reporter = get_progress_reporter(_publisher)
-    vcf_path = ancestry_job_data.ancestry_submission.vcf_path
+    vcf_path = ancestry_submission.vcf_path
     return AncestryResponse(vcf_path=vcf_path, results=[])
 
 
 async def _handler_fn(
-    publisher: ProgressPublisher, ancestry_submission: AncestryJobData
+    publisher: ProgressPublisher, ancestry_job_data: AncestryJobData
 ) -> AncestryResponse:
-    return _infer_ancestry(ancestry_submission, publisher)
+    """Wrap _infer_ancestry for beanstalk."""
+    return _infer_ancestry(ancestry_job_data.ancestry_submission, publisher)
 
 
 def _submit_msg_fn(ancestry_job_data: AncestryJobData) -> SubmittedJobMessage:
