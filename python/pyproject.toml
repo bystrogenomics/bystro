@@ -25,3 +25,6 @@ line-length = 105
 [project.scripts]
 bystro-save-worker = "bystro.search.save.listener:main"
 bystro-index-worker = "bystro.search.index.listener:main"
+
+[tool.pytest.ini_options]
+addopts = "--cov --cov-report term-missing"  # add detailed coverage report by default
