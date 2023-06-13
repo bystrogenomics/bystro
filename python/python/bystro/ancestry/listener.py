@@ -47,22 +47,24 @@ def _infer_ancestry(
     return AncestryResponse(vcf_path=vcf_path, results=[])
 
 
-async def _handler_fn(
+async def handler_fn(
     publisher: ProgressPublisher, ancestry_job_data: AncestryJobData
 ) -> AncestryResponse:
-    """Wrap _infer_ancestry for beanstalk."""
+    """Do ancestry job, wraping _infer_ancestry for beanstalk."""
     # Separating _handler_fn from _infer_ancestry in order to separate ML from infra concerns,
     # and especially to keep _infer_ancestry eager.
     return _infer_ancestry(ancestry_job_data.ancestry_submission, publisher)
 
 
-def _submit_msg_fn(ancestry_job_data: AncestryJobData) -> SubmittedJobMessage:
+def submit_msg_fn(ancestry_job_data: AncestryJobData) -> SubmittedJobMessage:
+    """Acknowledge receipt of AncestryJobData."""
     return SubmittedJobMessage(ancestry_job_data.submissionID)
 
 
-def _completed_msg_fn(
+def completed_msg_fn(
     ancestry_job_data: AncestryJobData, ancestry_response: AncestryResponse
 ) -> AncestryJobCompleteMessage:
+    """Send job complete message."""
     ancestry_submission = ancestry_job_data.ancestry_submission
     if ancestry_submission.vcf_path != ancestry_response.vcf_path:
         err_msg = (
@@ -73,6 +75,18 @@ def _completed_msg_fn(
     logger.debug("completed ancestry inference for: %s", ancestry_response)
     return AncestryJobCompleteMessage(
         submissionID=ancestry_job_data.submissionID, results=ancestry_response
+    )
+
+
+def main(queue_conf: QueueConf, ancestry_tube: str) -> None:
+    """Run ancestry listener."""
+    listen(
+        AncestryJobData,
+        handler_fn,
+        submit_msg_fn,
+        completed_msg_fn,
+        queue_conf,
+        ancestry_tube,
     )
 
 
@@ -88,11 +102,4 @@ if __name__ == "__main__":
 
     queue_conf = _load_queue_conf(args.queue_conf)
 
-    listen(
-        AncestryJobData,
-        _handler_fn,
-        _submit_msg_fn,
-        _completed_msg_fn,
-        queue_conf,
-        ANCESTRY_TUBE,
-    )
+    main(queue_conf, ancestry_tube=ANCESTRY_TUBE)
