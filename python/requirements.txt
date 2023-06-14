@@ -1,4 +1,5 @@
 Cython==0.29.35
+attrs==23.1.0
 maturin[zig]==1.0.1
 msgspec==0.15.1
 opensearch-py[async]==2.2.0
