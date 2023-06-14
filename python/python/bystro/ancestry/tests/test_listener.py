@@ -81,5 +81,7 @@ async def test_completed_msg_fn_rejects_nonmatching_vcf_paths():
     wrong_ancestry_response = await handler_fn(publisher, wrong_ancestry_job_data)
     # end instantiating another ancestry response with the wrong vcf...
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(
+        ValueError, match="Ancestry submission filename .* doesn't match response filename"
+    ):
         _ancestry_job_complete_message = completed_msg_fn(ancestry_job_data, wrong_ancestry_response)

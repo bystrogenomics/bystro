@@ -33,6 +33,7 @@ def _load_queue_conf(queue_conf_path: str) -> QueueConf:
     return QueueConf(addresses=beanstalk_conf["addresses"], tubes=beanstalk_conf["tubes"])
 
 
+# TODO: implement with ray
 def _infer_ancestry(
     ancestry_submission: AncestrySubmission, _publisher: ProgressPublisher
 ) -> AncestryResponse:
@@ -71,7 +72,7 @@ def completed_msg_fn(
             f"Ancestry submission filename {ancestry_submission.vcf_path} "
             "doesn't match response filename {ancestry_response.vcf_path}: this is a bug."
         )
-        raise AssertionError(err_msg)
+        raise ValueError(err_msg)
     logger.debug("completed ancestry inference for: %s", ancestry_response)
     return AncestryJobCompleteMessage(
         submissionID=ancestry_job_data.submissionID, results=ancestry_response
