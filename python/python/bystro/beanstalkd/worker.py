@@ -1,6 +1,5 @@
 """TODO: Add description here"""
 import abc
-import asyncio
 import sys
 import time
 import traceback
@@ -150,7 +149,7 @@ def listen(
                 )
 
                 client.put_job(json.encode(submit_msg_fn(job_data)))
-                res = asyncio.get_event_loop().run_until_complete(handler_fn(publisher, job_data))
+                res = handler_fn(publisher, job_data)
                 client.put_job(json.encode(completed_msg_fn(job_data, res)))
                 client.delete_job(job.job_id)
             except Exception as err:
