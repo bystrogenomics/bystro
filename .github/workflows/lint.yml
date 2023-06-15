@@ -29,4 +29,5 @@ jobs:
         mypy --config-file python/mypy.ini $(git ls-files '*.py')
     - name: Tests
       run: |
+        echo `pwd`
         pytest -c python/pyproject.toml $(git ls-files 'test*.py')
