@@ -27,3 +27,6 @@ jobs:
     - name: Static analysis with mypy
       run: |
         mypy --config-file python/mypy.ini $(git ls-files '*.py')
+    - name: Tests
+      run: |
+        pytest -c python/pyproject.toml .
