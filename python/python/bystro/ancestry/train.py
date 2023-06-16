@@ -37,6 +37,11 @@ DATA_ROOT_DIR = Path.home() / "emory/human_ancestry_project/data/1000_genome_VCF
 VCF_PATH = DATA_ROOT_DIR / "1KGP_final_variants_1percent.vcf.gz"
 ANCESTRY_MODEL_PRODUCTS_DIR = Path("ancestry_model_products")
 
+#Loads in gnomad PC loadings
+loadings=pd.read_csv('gnomadloadings.tsv',sep='\t')
+#Temporary placeholder to mark file used for testing, will load internally in future
+TKGP_VCF = DATA_ROOT_DIR / '1kgpGnomadList.vcf'
+
 ANCESTRY_INFO_PATH = DATA_ROOT_DIR / "20130606_sample_info.txt"
 ROWS, COLS = 0, 1
 QUALITY_CUTOFF = 100  # for variant quality filtering
@@ -306,6 +311,64 @@ def _calc_fst(variant_counts: pd.Series, samples: pd.DataFrame) -> float:
         pi = np.mean(gs) / PLOIDY
         total += ci * pi * (1 - pi)
     return (p * (1 - p) - total) / (p * (1 - p))
+
+
+def load_1kgp_vcf(TKGP_VCF):
+    """This is a temporary placeholder method to load in 1kgp vcf 
+    filtered down to the same variants as the gnomad loadings for testing
+    using plink2"""
+    headervcf=pd.read_csv(TKGP_VCF,delimiter='\t',comment='#')
+    dosagevcf = headervcf.replace('0|0', 0)
+    dosagevcf = dosagevcf.replace('0|1', 1)
+    dosagevcf = dosagevcf.replace('1|0', 1)
+    dosagevcf = dosagevcf.replace('1|1', 2)
+    dosagevcf=dosagevcf.rename(columns={"#CHROM": "Chromosome", "POS": "Position"}, errors="raise")
+    return dosagevcf
+    
+
+def load_pca_loadings(loadings, dosage_vcf):
+    """This loads in the gnomad PCs, reformats, and filters them to match
+    the format and variant list of the 1kgp vcf"""
+    loadings[['Chromosome', 'Position']] = loadings['locus'].str.split(':', expand=True)
+    #Match variant format with vcf
+    loadings['variant']=loadings.apply(lambda x: ':'.join([x['locus'][3:],x['alleles'][2],x['alleles'][6]]),axis=1)
+    #Remove variants that are missing from IGSR version of 1kgp
+    missing_variants = set(loadings.variant) - set(dosagevcf.ID)
+    loadings=loadings[~loadings['variant'].isin(missing_variants)]
+    #Remove brackets
+    loadings['loadings'] = loadings['loadings'].str[1:]
+    loadings['loadings'] = loadings['loadings'].str[:-1]
+    #Split PCs and join back
+    gnomadPCs = loadings['loadings'].str.split(',', expand=True)
+    loadings=loadings.join(gnomadPCs)
+    loadings=loadings.reset_index()
+    return loadings
+
+
+def apply_pca_transform(loadings, dosagevcf):
+    """Transforms vcf with genotypes in dosage format with PCs loadings from gnomad PCA"""
+    #Both files need to be np arrays for pca transformation
+    pc_loadings = loadings.iloc[:, 8:28]
+    genos = dosagevcf.iloc[:, 9:]
+    scaler = StandardScaler()
+    TGP_scaled = scaler.fit_transform(genos).T
+    TGP_scaled = np.array(TGP_scaled)
+    pc_loadings_array = pc_loadings.values.astype(float)
+    #Ensure the number of features matches the original dataset
+    if TGP_scaled.shape[1] != pc_loadings.shape[0]:
+        raise ValueError("Number of features in the new data doesn't match the number of features in the PCA loadings.")
+    #Scale 1kgp vcf
+    scaler = StandardScaler()
+    TGP_scaled = scaler.fit_transform(Genos).T
+    #Apply the loadings to the scaled 1kGP data
+    transformed_data = np.dot(TGP_scaled, pc_loadings_array)
+    #Add the IDs back on to PCs
+    IDs = genos.iloc[1]
+    IDs = IDs.T.reset_index()
+    IDsascol = IDs.iloc[:,0]
+    px = pd.DataFrame(transformed_data)
+    ids_with_pcs = pd.concat([IDs, px], axis = 1)
+    return ids_with_pcs
 
 
 def _perform_pca(train_X: pd.DataFrame, test_X: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, PCA]:
