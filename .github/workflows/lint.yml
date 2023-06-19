@@ -19,8 +19,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r **/requirements.txt
         pip install -r **/requirements-dev.txt
-        echo "Final dependency list:"
-        pip freeze
     # - name: Linting with ruff
     #   run: |
     #     ruff $(git ls-files '*.py')
@@ -30,6 +28,8 @@ jobs:
     - name: Tests
       run: |
         echo `pwd`
+        echo "pwd:"
         ls
+        echo "parent dir:"
         ls ..
         pytest
