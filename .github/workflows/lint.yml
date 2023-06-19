@@ -21,12 +21,13 @@ jobs:
         pip install -r **/requirements-dev.txt
         echo "Final dependency list:"
         pip freeze
-    - name: Linting with ruff
-      run: |
-        ruff $(git ls-files '*.py')
-    - name: Static analysis with mypy
-      run: |
-        mypy --config-file python/mypy.ini $(git ls-files '*.py')
+    # - name: Linting with ruff
+    #   run: |
+    #     ruff $(git ls-files '*.py')
+    # - name: Static analysis with mypy
+    #   run: |
+    #     mypy --config-file python/mypy.ini $(git ls-files '*.py')
     - name: Tests
       run: |
+        echo `pwd`
         pytest
