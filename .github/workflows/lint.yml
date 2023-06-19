@@ -30,4 +30,6 @@ jobs:
     - name: Tests
       run: |
         echo `pwd`
+        ls
+        ls ..
         pytest
