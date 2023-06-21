@@ -330,25 +330,29 @@ def load_pca_loadings(loadings, dosage_vcf):
     """This loads in the gnomad PCs, reformats, and filters them to match
     the format and variant list of the 1kgp vcf"""
     loadings[['Chromosome', 'Position']] = loadings['locus'].str.split(':', expand=True)
-    #Match variant format with vcf
-    loadings['variant']=loadings.apply(lambda x: ':'.join([x['locus'][3:],x['alleles'][2],x['alleles'][6]]),axis=1)
+    #Match variant format of gnomad loadings with 1kgp vcf
+    get_chr_pos= lambda x: x['locus'][3:]
+    get_allele1=  lambda x: x['alleles'][2]
+    get_allele2= lambda x: x['alleles'][6]
+    loadings['variant'] = loadings.apply(lambda x: ':'.join([get_chr_pos(x), get_allele1(x), get_allele2(x)]), axis=1)
     #Remove variants that are missing from IGSR version of 1kgp
     missing_variants = set(loadings.variant) - set(dosage_vcf.ID)
     loadings=loadings[~loadings['variant'].isin(missing_variants)]
     #Remove brackets
-    loadings['loadings'] = loadings['loadings'].str[1:]
-    loadings['loadings'] = loadings['loadings'].str[:-1]
+    loadings['loadings'] = loadings['loadings'].str[1:-1]
     #Split PCs and join back
     gnomadPCs = loadings['loadings'].str.split(',', expand=True)
     loadings=loadings.join(gnomadPCs)
     loadings=loadings.reset_index()
-    return loadings
+    pc_range = range(8, 28)
+    pc_loadings = loadings.iloc[:, pc_range]
+    return pc_loadings
 
 
-def apply_pca_transform(loadings, dosage_vcf):
+def apply_pca_transform(pc_loadings, dosage_vcf):
     """Transforms vcf with genotypes in dosage format with PCs loadings from gnomad PCA"""
     #Both files need to be np arrays for pca transformation
-    pc_loadings = loadings.iloc[:, 8:28]
+    
     genos = dosage_vcf.iloc[:, 9:]
     scaler = StandardScaler()
     TGP_scaled = scaler.fit_transform(genos).T
