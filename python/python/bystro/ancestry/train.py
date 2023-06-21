@@ -313,7 +313,7 @@ def _calc_fst(variant_counts: pd.Series, samples: pd.DataFrame) -> float:
     return (p * (1 - p) - total) / (p * (1 - p))
 
 
-def load_1kgp_vcf(vcf_filepath):
+def load_1kgp_vcf(vcf_filepath: str) -> pd.DataFrame:
     """This is a temporary placeholder method to load in 1kgp vcf 
     filtered down to the same variants as the gnomad loadings for testing
     using plink2"""
@@ -326,7 +326,7 @@ def load_1kgp_vcf(vcf_filepath):
     return dosage_vcf
     
 
-def load_pca_loadings(loadings, dosage_vcf):
+def load_pca_loadings(loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) -> pd.DataFrame:
     """This loads in the gnomad PCs, reformats, and filters them to match
     the format and variant list of the 1kgp vcf"""
     loadings[['Chromosome', 'Position']] = loadings['locus'].str.split(':', expand=True)
@@ -349,7 +349,7 @@ def load_pca_loadings(loadings, dosage_vcf):
     return pc_loadings
 
 
-def apply_pca_transform(pc_loadings, dosage_vcf):
+def apply_pca_transform(pc_loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) -> pd.DataFrame:
     """Transforms vcf with genotypes in dosage format with PCs loadings from gnomad PCA"""
     #Both files need to be np arrays for pca transformation
     
