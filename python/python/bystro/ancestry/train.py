@@ -40,7 +40,7 @@ ANCESTRY_MODEL_PRODUCTS_DIR = Path("ancestry_model_products")
 #Loads in gnomad PC loadings
 loadings=pd.read_csv('gnomadloadings.tsv',sep='\t')
 #Temporary placeholder to mark file used for testing, will load internally in future
-TKGP_VCF = DATA_ROOT_DIR / '1kgpGnomadList.vcf'
+vcf_filepath=KGP_VCF
 
 ANCESTRY_INFO_PATH = DATA_ROOT_DIR / "20130606_sample_info.txt"
 ROWS, COLS = 0, 1
@@ -313,17 +313,17 @@ def _calc_fst(variant_counts: pd.Series, samples: pd.DataFrame) -> float:
     return (p * (1 - p) - total) / (p * (1 - p))
 
 
-def load_1kgp_vcf(TKGP_VCF):
+def load_1kgp_vcf(vcf_filepath):
     """This is a temporary placeholder method to load in 1kgp vcf 
     filtered down to the same variants as the gnomad loadings for testing
     using plink2"""
-    headervcf=pd.read_csv(TKGP_VCF,delimiter='\t',comment='#')
-    dosagevcf = headervcf.replace('0|0', 0)
-    dosagevcf = dosagevcf.replace('0|1', 1)
-    dosagevcf = dosagevcf.replace('1|0', 1)
-    dosagevcf = dosagevcf.replace('1|1', 2)
-    dosagevcf=dosagevcf.rename(columns={"#CHROM": "Chromosome", "POS": "Position"}, errors="raise")
-    return dosagevcf
+    header_vcf=pd.read_csv(vcf_filepath,delimiter='\t',comment='#')
+    dosage_vcf = header_vcf.replace('0|0', 0)
+    dosage_vcf = dosage_vcf.replace('0|1', 1)
+    dosage_vcf = dosage_vcf.replace('1|0', 1)
+    dosage_vcf = dosage_vcf.replace('1|1', 2)
+    dosage_vcf=dosage_vcf.rename(columns={"#CHROM": "Chromosome", "POS": "Position"}, errors="raise")
+    return dosage_vcf
     
 
 def load_pca_loadings(loadings, dosage_vcf):
@@ -333,7 +333,7 @@ def load_pca_loadings(loadings, dosage_vcf):
     #Match variant format with vcf
     loadings['variant']=loadings.apply(lambda x: ':'.join([x['locus'][3:],x['alleles'][2],x['alleles'][6]]),axis=1)
     #Remove variants that are missing from IGSR version of 1kgp
-    missing_variants = set(loadings.variant) - set(dosagevcf.ID)
+    missing_variants = set(loadings.variant) - set(dosage_vcf.ID)
     loadings=loadings[~loadings['variant'].isin(missing_variants)]
     #Remove brackets
     loadings['loadings'] = loadings['loadings'].str[1:]
@@ -345,11 +345,11 @@ def load_pca_loadings(loadings, dosage_vcf):
     return loadings
 
 
-def apply_pca_transform(loadings, dosagevcf):
+def apply_pca_transform(loadings, dosage_vcf):
     """Transforms vcf with genotypes in dosage format with PCs loadings from gnomad PCA"""
     #Both files need to be np arrays for pca transformation
     pc_loadings = loadings.iloc[:, 8:28]
-    genos = dosagevcf.iloc[:, 9:]
+    genos = dosage_vcf.iloc[:, 9:]
     scaler = StandardScaler()
     TGP_scaled = scaler.fit_transform(genos).T
     TGP_scaled = np.array(TGP_scaled)
