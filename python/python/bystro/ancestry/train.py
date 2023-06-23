@@ -313,7 +313,7 @@ def _calc_fst(variant_counts: pd.Series, samples: pd.DataFrame) -> float:
     return (p * (1 - p) - total) / (p * (1 - p))
 
 
-def load_1kgp_vcf(vcf_filepath: str) -> pd.DataFrame:
+def load_1kgp_vcf(vcf_filepath: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     """This is a temporary placeholder method to load in 1kgp vcf 
     filtered down to the same variants as the gnomad loadings for testing
     using plink2"""
@@ -323,7 +323,11 @@ def load_1kgp_vcf(vcf_filepath: str) -> pd.DataFrame:
     dosage_vcf = dosage_vcf.replace('1|0', 1)
     dosage_vcf = dosage_vcf.replace('1|1', 2)
     dosage_vcf=dosage_vcf.rename(columns={"#CHROM": "Chromosome", "POS": "Position"}, errors="raise")
-    return dosage_vcf
+    genos = dosagevcf.iloc[:, 9:]
+    genos['variant'] = dosagevcf['ID']
+    genos.set_index('variant', inplace=True)
+    genos.sort_index(inplace=True)
+    return dosage_vcf, genos
     
 
 def load_pca_loadings(loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) -> pd.DataFrame:
@@ -352,13 +356,9 @@ def load_pca_loadings(loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) -> pd.Da
     return pc_loadings
 
 
-def apply_pca_transform(pc_loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) -> pd.DataFrame:
+def apply_pca_transform(pc_loadings: pd.DataFrame, genos: pd.DataFrame) -> pd.DataFrame:
     """Transforms vcf with genotypes in dosage format with PCs loadings from gnomad PCA"""
-    #Both files need to match variants for pca transformation
-    genos = dosagevcf.iloc[:, 9:]
-    genos['variant'] = dosagevcf['ID']
-    genos.set_index('variant', inplace=True)
-    genos.sort_index(inplace=True)
+    #Transpose genos so it is in the correct configuration for dot product
     genos_transpose=genos.T
     #Ensure that genos_transpose and pc_loadings have the same variants in same order before transformation
     assert (genos_transpose.columns == pc_loadings.index).all()
