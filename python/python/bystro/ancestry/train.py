@@ -345,34 +345,39 @@ def load_pca_loadings(loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) -> pd.Da
     loadings=loadings.join(gnomadPCs)
     loadings=loadings.reset_index()
     pc_range = range(8, 28)
-    pc_loadings = loadings.iloc[:, pc_range]
+    pc_loadings = loadings.iloc[:, pc_range].copy()
+    pc_loadings['variant'] = loadings['variant']
+    pc_loadings.set_index('variant', inplace=True)
+    pc_loadings.sort_index(inplace=True)
     return pc_loadings
 
 
 def apply_pca_transform(pc_loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) -> pd.DataFrame:
     """Transforms vcf with genotypes in dosage format with PCs loadings from gnomad PCA"""
-    #Both files need to be np arrays for pca transformation
-    
-    genos = dosage_vcf.iloc[:, 9:]
+    #Both files need to match variants for pca transformation
+    genos = dosagevcf.iloc[:, 9:]
+    genos['variant'] = dosagevcf['ID']
+    genos.set_index('variant', inplace=True)
+    genos.sort_index(inplace=True)
+    genos_transpose=genos.T
+    #Ensure that genos_transpose and pc_loadings have the same variants in same order before transformation
+    assert (genos_transpose.columns == pc_loadings.index).all()
+    assert genos_transpose.shape[1] == pc_loadings.shape[0]
+    #Convert to np for faster dot product
+    genos_np = np.array(genos_transpose)
+    pc_loadings_array = pc_loadings.values.astype(float)
+    #Scale 1kgp vcf
     scaler = StandardScaler()
     TGP_scaled = scaler.fit_transform(genos).T
     TGP_scaled = np.array(TGP_scaled)
-    pc_loadings_array = pc_loadings.values.astype(float)
-    #Ensure the number of features matches the original dataset
-    if TGP_scaled.shape[1] != pc_loadings.shape[0]:
-        raise ValueError("Number of features in the new data doesn't match the number of features in the PCA loadings.")
-    #Scale 1kgp vcf
-    scaler = StandardScaler()
-    TGP_scaled = scaler.fit_transform(Genos).T
-    #Apply the loadings to the scaled 1kGP data
-    transformed_data = np.dot(TGP_scaled, pc_loadings_array)
+    #Apply the loadings to the transposed 1kGP data
+    transformed_data = np.dot(genos_np, pc_loadings_array)
     #Add the IDs back on to PCs
-    IDs = genos.iloc[1]
-    IDs = IDs.T.reset_index()
-    IDsascol = IDs.iloc[:,0]
-    px = pd.DataFrame(transformed_data)
-    ids_with_pcs = pd.concat([IDs, px], axis = 1)
-    return ids_with_pcs
+    KGP_index = genos_transpose.index
+    transformed_data_with_ids = pd.DataFrame(transformed_data, index=KGP_index)
+    #Add PC labels
+    transformed_data_with_ids.columns = ['PC' + str(i) for i in range(1, 21)]
+    return transformed_data_with_ids
 
 
 def _perform_pca(train_X: pd.DataFrame, test_X: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, PCA]:
