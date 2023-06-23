@@ -366,10 +366,6 @@ def apply_pca_transform(pc_loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) -> 
     #Convert to np for faster dot product
     genos_np = np.array(genos_transpose)
     pc_loadings_array = pc_loadings.values.astype(float)
-    #Scale 1kgp vcf
-    scaler = StandardScaler()
-    TGP_scaled = scaler.fit_transform(genos).T
-    TGP_scaled = np.array(TGP_scaled)
     #Apply the loadings to the transposed 1kGP data
     transformed_data = np.dot(genos_np, pc_loadings_array)
     #Add the IDs back on to PCs
