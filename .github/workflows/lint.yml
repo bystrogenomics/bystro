@@ -29,10 +29,7 @@ jobs:
         mypy --config-file python/mypy.ini $(git ls-files '*.py')
     - name: Tests
       run: |
-        echo `pwd`
-        echo `which python`
         source ~/.venv/ci-venv/bin/activate
-        echo `which python`
         cd python
         maturin develop        
         pytest
