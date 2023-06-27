@@ -28,8 +28,6 @@ jobs:
     - name: Tests
       run: |
         echo `pwd`
-        echo "pwd:"
-        ls
-        echo "parent dir:"
-        ls ..
+        cd python
+        maturin develop        
         pytest
