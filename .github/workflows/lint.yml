@@ -23,9 +23,11 @@ jobs:
         pip install -r **/requirements-dev.txt
     - name: Linting with ruff
       run: |
+        source ~/.venv/ci-venv/bin/activate
         ruff $(git ls-files '*.py')
     - name: Static analysis with mypy
       run: |
+        source ~/.venv/ci-venv/bin/activate
         mypy --config-file python/mypy.ini $(git ls-files '*.py')
     - name: Tests
       run: |
