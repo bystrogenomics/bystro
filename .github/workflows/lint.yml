@@ -30,6 +30,9 @@ jobs:
     - name: Tests
       run: |
         echo `pwd`
+        echo `which python`
+        source ~/.venv/ci-venv/bin/activate
+        echo `which python`
         cd python
         maturin develop        
         pytest
