@@ -9,6 +9,7 @@ from bystro.ancestry.ancestry_types import AncestryResponse, AncestrySubmission
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
 from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, get_progress_reporter, listen
 
+logging.basicConfig(filename="ancestry_listener.log", level=logging.DEBUG)
 logger = logging.getLogger()
 
 ANCESTRY_TUBE = "ancestry"
@@ -54,6 +55,7 @@ async def handler_fn(
     """Do ancestry job, wraping _infer_ancestry for beanstalk."""
     # Separating _handler_fn from _infer_ancestry in order to separate ML from infra concerns,
     # and especially to keep _infer_ancestry eager.
+    logger.debug("entering handler_fn with: {}", ancestry_job_data)
     return _infer_ancestry(ancestry_job_data.ancestry_submission, publisher)
 
 
@@ -81,6 +83,7 @@ def completed_msg_fn(
 
 def main(queue_conf: QueueConf, ancestry_tube: str) -> None:
     """Run ancestry listener."""
+    logger.debug("Entering main")
     listen(
         AncestryJobData,
         handler_fn,
