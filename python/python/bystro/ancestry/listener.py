@@ -61,6 +61,7 @@ async def handler_fn(
 
 def submit_msg_fn(ancestry_job_data: AncestryJobData) -> SubmittedJobMessage:
     """Acknowledge receipt of AncestryJobData."""
+    logger.debug("entering submit_msg_fn: {}", ancestry_job_data)
     return SubmittedJobMessage(ancestry_job_data.submissionID)
 
 
@@ -68,6 +69,7 @@ def completed_msg_fn(
     ancestry_job_data: AncestryJobData, ancestry_response: AncestryResponse
 ) -> AncestryJobCompleteMessage:
     """Send job complete message."""
+    logger.debug("entering completed_msg_fn: {}", ancestry_job_data)
     ancestry_submission = ancestry_job_data.ancestry_submission
     if ancestry_submission.vcf_path != ancestry_response.vcf_path:
         err_msg = (
