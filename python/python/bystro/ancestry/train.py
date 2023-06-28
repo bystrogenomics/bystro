@@ -314,65 +314,74 @@ def _calc_fst(variant_counts: pd.Series, samples: pd.DataFrame) -> float:
 
 
 def load_1kgp_vcf(vcf_filepath: str) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """This is a temporary placeholder method to load in 1kgp vcf 
+    """Temporary placeholder method to load in 1kgp vcf
     filtered down to the same variants as the gnomad loadings for testing
-    using plink2"""
-    header_vcf=pd.read_csv(vcf_filepath,delimiter='\t',comment='#')
-    dosage_vcf = header_vcf.replace('0|0', 0)
-    dosage_vcf = dosage_vcf.replace('0|1', 1)
-    dosage_vcf = dosage_vcf.replace('1|0', 1)
-    dosage_vcf = dosage_vcf.replace('1|1', 2)
-    dosage_vcf=dosage_vcf.rename(columns={"#CHROM": "Chromosome", "POS": "Position"}, errors="raise")
-    genos = dosagevcf.iloc[:, 9:]
-    genos['variant'] = dosagevcf['ID']
-    genos.set_index('variant', inplace=True)
-    genos.sort_index(inplace=True)
+    using plink2.
+    """
+    #This line will have to be altered if testing other vcfs
+    header_vcf=pd.read_csv(vcf_filepath,delimiter='\t',skiprows=107)
+    dosage_vcf = header_vcf.replace("0|0", 0)
+    dosage_vcf = dosage_vcf.replace("0|1", 1)
+    dosage_vcf = dosage_vcf.replace("1|0", 1)
+    dosage_vcf = dosage_vcf.replace("1|1", 2)
+    #If testing other vcfs this line will also need to be altered
+    dosage_vcf=dosage_vcf.rename(
+        columns={"#CHROM": "Chromosome", "POS": "Position"}, 
+        errors="raise"
+    )
+    genos = dosage_vcf.iloc[:, 9:]
+    genos["variant"] = dosage_vcf["ID"]
+    genos=genos.set_index("variant")
+    genos=genos.sort_index()
     return dosage_vcf, genos
     
 
 def load_pca_loadings(loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) -> pd.DataFrame:
-    """This loads in the gnomad PCs, reformats, and filters them to match
-    the format and variant list of the 1kgp vcf"""
-    loadings[['Chromosome', 'Position']] = loadings['locus'].str.split(':', expand=True)
+    """Load in the gnomad PCs, reformats, and filters them to match
+    the format and variant list of the 1kgp vcf.
+    """
+    loadings[["Chromosome", "Position"]] = loadings["locus"].str.split(":", expand=True)
     #Match variant format of gnomad loadings with 1kgp vcf
-    get_chr_pos= lambda x: x['locus'][3:]
-    get_allele1=  lambda x: x['alleles'][2]
-    get_allele2= lambda x: x['alleles'][6]
-    loadings['variant'] = loadings.apply(lambda x: ':'.join([get_chr_pos(x), get_allele1(x), get_allele2(x)]), axis=1)
+    get_chr_pos= lambda x: x["locus"][3:]
+    get_allele1=  lambda x: x["alleles"][2]
+    get_allele2= lambda x: x["alleles"][6]
+    loadings["variant"] = loadings.apply(
+        lambda x: ":".join([get_chr_pos(x), get_allele1(x), get_allele2(x)]), axis=1
+    )
     #Remove variants that are missing from IGSR version of 1kgp
     missing_variants = set(loadings.variant) - set(dosage_vcf.ID)
-    loadings=loadings[~loadings['variant'].isin(missing_variants)]
+    loadings=loadings[~loadings["variant"].isin(missing_variants)]
     #Remove brackets
-    loadings['loadings'] = loadings['loadings'].str[1:-1]
+    loadings["loadings"] = loadings["loadings"].str[1:-1]
     #Split PCs and join back
-    gnomadPCs = loadings['loadings'].str.split(',', expand=True)
+    gnomadPCs = loadings["loadings"].str.split(",", expand=True)
     loadings=loadings.join(gnomadPCs)
     loadings=loadings.reset_index()
     pc_range = range(8, 28)
     pc_loadings = loadings.iloc[:, pc_range].copy()
-    pc_loadings['variant'] = loadings['variant']
-    pc_loadings.set_index('variant', inplace=True)
-    pc_loadings.sort_index(inplace=True)
+    pc_loadings["variant"] = loadings["variant"]
+    pc_loadings=pc_loadings.set_index("variant")
+    pc_loadings=pc_loadings.sort_index()
     return pc_loadings
 
 
 def apply_pca_transform(pc_loadings: pd.DataFrame, genos: pd.DataFrame) -> pd.DataFrame:
-    """Transforms vcf with genotypes in dosage format with PCs loadings from gnomad PCA"""
+    """Transform vcf with genotypes in dosage format with PCs loadings from gnomad PCA."""
     #Transpose genos so it is in the correct configuration for dot product
     genos_transpose=genos.T
-    #Ensure that genos_transpose and pc_loadings have the same variants in same order before transformation
+    #Ensure that genos_transpose and pc_loadings have the same variants in same order
     assert (genos_transpose.columns == pc_loadings.index).all()
     assert genos_transpose.shape[1] == pc_loadings.shape[0]
     #Convert to np for faster dot product
     genos_np = np.array(genos_transpose)
-    pc_loadings_array = pc_loadings.values.astype(float)
+    pc_loadings_array = pc_loadings.to_numpy.astype(float)
     #Apply the loadings to the transposed 1kGP data
     transformed_data = np.dot(genos_np, pc_loadings_array)
     #Add the IDs back on to PCs
     KGP_index = genos_transpose.index
     transformed_data_with_ids = pd.DataFrame(transformed_data, index=KGP_index)
     #Add PC labels
-    transformed_data_with_ids.columns = ['PC' + str(i) for i in range(1, 21)]
+    transformed_data_with_ids.columns = ["PC" + str(i) for i in range(1, 21)]
     return transformed_data_with_ids
 
 
