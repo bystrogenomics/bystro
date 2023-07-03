@@ -546,7 +546,6 @@ sub _accumulateScores {
     $phredScores[$index] = $aref->[1];
   }
 
-  # There is no way to get here and not have accumulated 3 scores
   return \@phredScores;
 }
 

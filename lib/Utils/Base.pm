@@ -21,6 +21,8 @@ use Time::localtime;
 # The track name that they want to use
 has name => (is => 'ro', isa => 'Str', required => 1);
 
+has use_absolute_path => (is => 'ro', isa => 'Bool', default => 0);
+
 # The YAML config file path
 has config => ( is => 'ro',isa => AbsFile, coerce => 1, required => 1, handles => {
     configPath => 'stringify'});
@@ -49,6 +51,9 @@ has logPath => ( is => 'ro', lazy => 1, default => sub {
 #     something: 1
 #    completed: Date()
 has utilIdx => (is => 'ro', isa => 'Int');
+
+has utilName => (is => 'ro', isa => 'Str', required => 1);
+
 # Debug log level?
 has debug => (is => 'ro');
 
@@ -142,12 +147,12 @@ sub BUILD {
 }
 
 sub _writeCompletedDate {
-  my ($self, $prop) = @_;
+  my $self = shift;
 
   if(defined $self->utilIdx) {
     $self->_wantedTrack->{utils}[$self->utilIdx]{completed} = $self->_dateOfRun;
   } else {
-    $self->_wantedTrack->{$prop . '_completed'} = $self->_dateOfRun;
+    $self->_wantedTrack->{$self->utilName . '_completed'} = $self->_dateOfRun;
   }
 
   return;
@@ -155,9 +160,8 @@ sub _writeCompletedDate {
 
 sub _backupAndWriteConfig {
   my $self = shift;
-  my $utilName = shift;
 
-  $self->_writeCompletedDate($utilName);
+  $self->_writeCompletedDate();
 
   my $backPath =  $self->configPath . ".utils-bak." . $self->_dateOfRun;
 
@@ -182,6 +186,8 @@ sub _backupAndWriteConfig {
   if( system ("ln -f " . $self->_newConfigPath . " " . $self->configPath) != 0 ) {
     $self->log('fatal', "Failed to hard link " . $self->configPath . " to " . $self->_newConfigPath);
   }
+
+  $self->log('info', 'Finished ' . $self->utilName);
 }
 
 sub getDate {
