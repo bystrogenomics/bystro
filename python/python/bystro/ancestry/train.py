@@ -313,7 +313,7 @@ def _calc_fst(variant_counts: pd.Series, samples: pd.DataFrame) -> float:
     return (p * (1 - p) - total) / (p * (1 - p))
 
 
-def load_1kgp_vcf(vcf_filepath: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+def load_1kgp_vcf(vcf_filepath: str) -> pd.DataFrame:
     """Temporary placeholder method to load in 1kgp vcf
     filtered down to the same variants as the gnomad loadings for testing
     using plink2.
@@ -329,11 +329,7 @@ def load_1kgp_vcf(vcf_filepath: str) -> tuple[pd.DataFrame, pd.DataFrame]:
         columns={"#CHROM": "Chromosome", "POS": "Position"}, 
         errors="raise"
     )
-    genos = dosage_vcf.iloc[:, 9:]
-    genos["variant"] = dosage_vcf["ID"]
-    genos=genos.set_index("variant")
-    genos=genos.sort_index()
-    return dosage_vcf, genos
+    return dosage_vcf
     
 
 def load_pca_loadings(loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) -> pd.DataFrame:
@@ -342,11 +338,11 @@ def load_pca_loadings(loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) -> pd.Da
     """
     loadings[["Chromosome", "Position"]] = loadings["locus"].str.split(":", expand=True)
     #Match variant format of gnomad loadings with 1kgp vcf
-    get_chr_pos= lambda x: x["locus"][3:]
-    get_allele1=  lambda x: x["alleles"][2]
-    get_allele2= lambda x: x["alleles"][6]
+    get_chr_pos = lambda x: x["locus"][3:]
+    get_ref_allele = lambda x: x["alleles"][2]
+    get_alt_allele = lambda x: x["alleles"][6]
     loadings["variant"] = loadings.apply(
-        lambda x: ":".join([get_chr_pos(x), get_allele1(x), get_allele2(x)]), axis=1
+        lambda x: ":".join([get_chr_pos(x), get_ref_allele(x), get_alt_allele(x)]), axis=1
     )
     #Remove variants that are missing from IGSR version of 1kgp
     missing_variants = set(loadings.variant) - set(dosage_vcf.ID)
@@ -355,18 +351,23 @@ def load_pca_loadings(loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) -> pd.Da
     loadings["loadings"] = loadings["loadings"].str[1:-1]
     #Split PCs and join back
     gnomadPCs = loadings["loadings"].str.split(",", expand=True)
-    loadings=loadings.join(gnomadPCs)
-    loadings=loadings.reset_index()
+    loadings = loadings.join(gnomadPCs)
+    loadings = loadings.reset_index()
     pc_range = range(8, 28)
     pc_loadings = loadings.iloc[:, pc_range].copy()
     pc_loadings["variant"] = loadings["variant"]
-    pc_loadings=pc_loadings.set_index("variant")
-    pc_loadings=pc_loadings.sort_index()
+    pc_loadings = pc_loadings.set_index("variant")
+    pc_loadings = pc_loadings.sort_index()
     return pc_loadings
 
 
-def apply_pca_transform(pc_loadings: pd.DataFrame, genos: pd.DataFrame) -> pd.DataFrame:
+def apply_pca_transform(pc_loadings: pd.DataFrame, dosagevcf: pd.DataFrame) -> pd.DataFrame:
     """Transform vcf with genotypes in dosage format with PCs loadings from gnomad PCA."""
+    #Only genos are required from dosagevcf for transformation step
+    genos = dosage_vcf.iloc[:, 9:]
+    genos["variant"] = dosage_vcf["ID"]
+    genos=genos.set_index("variant")
+    genos=genos.sort_index()
     #Transpose genos so it is in the correct configuration for dot product
     genos_transpose=genos.T
     #Ensure that genos_transpose and pc_loadings have the same variants in same order
