@@ -333,9 +333,17 @@ def load_1kgp_vcf(vcf_filepath: str) -> pd.DataFrame:
     
 
 def load_pca_loadings(loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) -> pd.DataFrame:
+    #Gnomad pc file 
     """Load in the gnomad PCs, reformats, and filters them to match
     the format and variant list of the 1kgp vcf.
+
+    Args:
+        loadings (pd.DataFrame[int, str]): DataFrame containing the gnomad PCs.
+            The DataFrame is expected to have integer row indices representing variants
+            and string column names including locus, alleles, 30 PCs, and allele fq.
+        dosage_vcf (pd.DataFrame): DataFrame containing the 1kgp vcf data.
     """
+    #Gnomad pc loadings file includes additional formatting that needs to be sanitized 
     loadings[["Chromosome", "Position"]] = loadings["locus"].str.split(":", expand=True)
     #Match variant format of gnomad loadings with 1kgp vcf
     get_chr_pos = lambda x: x["locus"][3:]
