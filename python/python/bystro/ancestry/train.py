@@ -345,8 +345,11 @@ def load_pca_loadings(loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) -> pd.Da
         lambda x: ":".join([get_chr_pos(x), get_ref_allele(x), get_alt_allele(x)]), axis=1
     )
     #Remove variants that are missing from IGSR version of 1kgp
-    missing_variants = set(loadings.variant) - set(dosage_vcf.ID)
+    loadings_var_set=set(loadings.variant)
+    dosage_var_set=set(dosage_vcf.ID)
+    missing_variants = loadings_var_set - dosage_var_set
     loadings=loadings[~loadings["variant"].isin(missing_variants)]
+    var_overlap = loadings_var_set.intersection(dosage_var_set)
     #Remove brackets
     loadings["loadings"] = loadings["loadings"].str[1:-1]
     #Split PCs and join back
@@ -358,6 +361,7 @@ def load_pca_loadings(loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) -> pd.Da
     pc_loadings["variant"] = loadings["variant"]
     pc_loadings = pc_loadings.set_index("variant")
     pc_loadings = pc_loadings.sort_index()
+    assert len(pc_loadings) == len(var_overlap) 
     return pc_loadings
 
 
