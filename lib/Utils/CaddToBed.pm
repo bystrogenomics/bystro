@@ -15,7 +15,7 @@ use Path::Tiny qw/path/;
 
 use Seq::Tracks::Build::LocalFilesPaths;
 
-# # _localFilesDir, _decodedConfig, compress, _wantedTrack, _setConfig, and logPath
+# Exports: _localFilesDir, _decodedConfig, compress, _wantedTrack, _setConfig, logPath, use_absolute_path
 extends 'Utils::Base';
 
 # ########## Arguments accepted ##############
@@ -133,7 +133,7 @@ sub go {
 
   $self->_wantedTrack->{local_files} = [$outPath];
 
-  $self->_backupAndWriteConfig('caddToBed');
+  $self->_backupAndWriteConfig();
 }
 
 __PACKAGE__->meta->make_immutable;

@@ -19,7 +19,7 @@ use Seq::Tracks::Build::LocalFilesPaths;
 use Seq::Tracks::Base::MapTrackNames;
 use List::MoreUtils qw/first_index/;
 
-# _localFilesDir, _decodedConfig, compress, _wantedTrack, _setConfig, and logPath, 
+# Exports: _localFilesDir, _decodedConfig, compress, _wantedTrack, _setConfig, logPath, use_absolute_path
 extends 'Utils::Base';
 
 ########## Arguments accepted ##############
@@ -89,7 +89,7 @@ sub go {
     $metaPath->move( path( $self->_decodedConfig->{database_dir} )->child($self->renameTo . '_meta') );
   }
   
-  $self->_backupAndWriteConfig('renameTrack');
+  $self->_backupAndWriteConfig();
 }
 
 __PACKAGE__->meta->make_immutable;

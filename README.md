@@ -3,6 +3,7 @@
 TLDR; 1,000x+ faster than VEP, more complete annotation + online search (https://bystro.io) for datasets of up to 47TB (compressed) online, or petabytes offline.
 
 ![Bystro Performance](https://i.imgur.com/ve8hUF8.png)
+
 ## Bystro Publication
 
 For datasets and scripts used, please visit [github.com/bystro-paper](https://github.com/akotlar/bystro-paper)
@@ -39,17 +40,115 @@ Please read [FIELDS.md](FIELDS.md)
 - It has several keys:
 
   - `tracks`: The highest level organization for database values. Tracks have a `name` property, which must be unique, and a `type`, which must be one of:
-    - _sparse_: Any bed file, or any file that can be mapped to chrom, chromStart, and chromEnd columns.
+
+    - _sparse_: A bed file, or any file that can be mapped to `chrom`, `chromStart`, and `chromEnd` columns.
       - This is used for dbSNP, and Clinvar records, but many files can be fit this format.
       - Mapping fields can be managed by the `fieldMap` key
-    - _score_: Accepts any wigFix file.
+    - _score_: A wigFix file.
       - Used for phastCons, phyloP
     - _cadd_:
-      - Accepts any CADD file, or Bystro's custom "bed-like" CADD file, which has 2 header lines, and chrom, chromStart, chromEnd columns, followed by standard CADD fields
+      - A CADD file, or Bystro's custom "bed-like" CADD file, which has 2 header lines, and chrom, chromStart, chromEnd columns, followed by standard CADD fields
       - CADD format: http://cadd.gs.washington.edu
-    - _gene_: A UCSC gene track field (ex: knownGene, refGene, sgdGene).
-      - The `local_files` for this are created using an `sql_statement`
-      - Ex: `SELECT * FROM hg38.refGene LEFT JOIN hg38.kgXref ON hg38.kgXref.refseq = hg38.refGene.name`
+    - _gene_: A UCSC gene track table (ex: knownGene, refGene, sgdGene) stored as a tab separated output, with column names as columns. Conversion from SQL to the expected tab-delimited format is controlled by bin/bystro-utils.pl, which will automatically fetch the requested sql, and generate the tab-delimited output.
+
+      For instance: For a config file that has the following track
+
+      ```
+      chromosomes:
+        - chr1
+      tracks:
+        tracks:
+        - name: refSeq
+          type: gene
+          utils:
+          - args:
+              connection:
+                database: hg19
+              sql: SELECT r.*, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.kgID, '')) SEPARATOR
+                ';') FROM kgXref x WHERE x.refseq=r.name) AS kgID, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.description,
+                '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS description,
+                (SELECT GROUP_CONCAT(DISTINCT(NULLIF(e.value, '')) SEPARATOR ';') FROM knownToEnsembl
+                e JOIN kgXref x ON x.kgID = e.name WHERE x.refseq = r.name) AS ensemblID,
+                (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.tRnaName, '')) SEPARATOR ';') FROM
+                kgXref x WHERE x.refseq=r.name) AS tRnaName, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.spID,
+                '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS spID, (SELECT
+                GROUP_CONCAT(DISTINCT(NULLIF(x.spDisplayID, '')) SEPARATOR ';') FROM kgXref
+                x WHERE x.refseq=r.name) AS spDisplayID, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.protAcc,
+                '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS protAcc, (SELECT
+                GROUP_CONCAT(DISTINCT(NULLIF(x.mRNA, '')) SEPARATOR ';') FROM kgXref x WHERE
+                x.refseq=r.name) AS mRNA, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.rfamAcc,
+                '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS rfamAcc FROM
+                refGene r WHERE chrom=%chromosomes%;
+      ```
+
+      Running `bin/bystro-utils.pl --config <path/to/this/config> ` will results in the following config:
+
+      ```
+      chromosomes:
+        - chr1
+      tracks:
+        tracks:
+        - name: refSeq
+          type: gene
+          local_files:
+            - hg19.kgXref.chr1.gz
+            name: refSeq
+            type: gene
+            utils:
+            - args:
+                connection:
+                  database: hg19
+                sql: SELECT r.*, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.kgID, '')) SEPARATOR
+                  ';') FROM kgXref x WHERE x.refseq=r.name) AS kgID, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.description,
+                  '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS description,
+                  (SELECT GROUP_CONCAT(DISTINCT(NULLIF(e.value, '')) SEPARATOR ';') FROM knownToEnsembl
+                  e JOIN kgXref x ON x.kgID = e.name WHERE x.refseq = r.name) AS ensemblID,
+                  (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.tRnaName, '')) SEPARATOR ';') FROM
+                  kgXref x WHERE x.refseq=r.name) AS tRnaName, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.spID,
+                  '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS spID, (SELECT
+                  GROUP_CONCAT(DISTINCT(NULLIF(x.spDisplayID, '')) SEPARATOR ';') FROM kgXref
+                  x WHERE x.refseq=r.name) AS spDisplayID, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.protAcc,
+                  '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS protAcc, (SELECT
+                  GROUP_CONCAT(DISTINCT(NULLIF(x.mRNA, '')) SEPARATOR ';') FROM kgXref x WHERE
+                  x.refseq=r.name) AS mRNA, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.rfamAcc,
+                  '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS rfamAcc FROM
+                  refGene r WHERE chrom=%chromosomes%;
+              completed: <date fetched>
+              name: fetch
+      ```
+
+      `hg19.kgXref.chr1.gz` will contain:
+
+      ```sv
+      bin	name	chrom	strand	txStart	txEnd	cdsStart	cdsEnd	exonCount	exonStarts	exonEnds	score	name2	cdsStartStat	cdsEndStat	exonFrames	kgID	description	ensemblID	tRnaName	spID	spDisplayID	protAcc	mRNA	rfamAcc
+
+      0	NM_001376542	chr1	+	66999275	67216822	67000041	67208778	25	66999275,66999928,67091529,67098752,67105459,67108492,67109226,67126195,67133212,67136677,67137626,67138963,67142686,67145360,67147551,67154830,67155872,67161116,67184976,67194946,67199430,67205017,67206340,67206954,67208755,	66999620,67000051,67091593,67098777,67105516,67108547,67109402,67126207,67133224,67136702,67137678,67139049,67142779,67145435,67148052,67154958,67155999,67161176,67185088,67195102,67199563,67205220,67206405,67207119,67216822,	0	SGIP1	cmpl	cmpl	-1,0,1,2,0,0,1,0,0,0,1,2,1,1,1,1,0,1,1,2,2,0,2,1,1,	NA	NA	NA	NA	NA	NA	NA	NA	NA
+      ```
+
+    - _nearest_: A pre-calculated `gene` track that is intersected with a target `gene` track.
+
+      Example:
+
+      ```
+      - name: refSeq.gene
+        dist: false
+        storeNearest: true
+        to: txEnd
+        type: nearest
+        features:
+        - name2
+        from: txStart
+        local_files:
+        - hg19.kgXref.chr*.gz
+      ```
+
+      Options:
+
+      - `dist`: bool
+        - Calculate the distance to the nearest target gene record. If the
+
+    - _vcf_: A VCF v4.\* file
+
   - `chromosomes`: The allowable chromosomes.
 
     - Each row of every track must be identified by these chromosomes (during building)

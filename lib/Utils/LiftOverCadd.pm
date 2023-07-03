@@ -21,7 +21,7 @@ use Seq::Tracks::Build::LocalFilesPaths;
 use DDP;
 use Parallel::ForkManager;
 
-# _localFilesDir, _decodedConfig, compress, _wantedTrack, _setConfig, and logPath, 
+# Exports: _localFilesDir, _decodedConfig, compress, _wantedTrack, _setConfig, logPath, use_absolute_path
 extends 'Utils::Base';
 
 ########## Arguments accepted ##############
@@ -145,7 +145,7 @@ sub go {
 
   $self->_wantedTrack->{local_files} = \@finalOutPaths;
 
-  $self->_backupAndWriteConfig('liftOverCadd');
+  $self->_backupAndWriteConfig();
 }
 
 __PACKAGE__->meta->make_immutable;

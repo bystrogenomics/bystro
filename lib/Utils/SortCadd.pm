@@ -18,7 +18,7 @@ use DDP;
 use Seq::Tracks::Build::LocalFilesPaths;
 use Parallel::ForkManager;
 
-# _localFilesDir, _decodedConfig, compress, _wantedTrack, _setConfig, and logPath, 
+# Exports: _localFilesDir, _decodedConfig, compress, _wantedTrack, _setConfig, logPath, use_absolute_path
 extends 'Utils::Base';
 
 ########## Arguments accepted ##############
@@ -30,11 +30,16 @@ has '+compress' => (default => 1);
 
 my $localFilesHandler = Seq::Tracks::Build::LocalFilesPaths->new();
 
+my @extensions = qw/.tsv .tsv.gz/;
+
 sub BUILD {
   my $self = shift;
 
-  $self->_wantedTrack->{local_files} = $localFilesHandler->makeAbsolutePaths($self->_decodedConfig->{files_dir},
-    $self->_wantedTrack->{name}, $self->_wantedTrack->{local_files});
+  $self->_wantedTrack->{local_files} = $localFilesHandler->makeAbsolutePaths(
+    $self->_decodedConfig->{files_dir}, $self->_wantedTrack->{name}, $self->_wantedTrack->{local_files}
+  );
+
+  p $self->_wantedTrack->{local_files};
 }
 
 sub go {
@@ -48,14 +53,14 @@ sub go {
 
   $self->log('info', "Beginning organizing cadd files by chr (single threaded)");
 
-  my $outExtPart = $self->compress ? '.txt.gz' : '.txt';
-
-  my $outExt = '.organized-by-chr' . $outExtPart;
+  my $outExtPart = $self->compress ? $extensions[1] : $extensions[0];
 
   for my $inFilePath ( @{$self->_wantedTrack->{local_files} } ) {
-    my $outPathBase = substr($inFilePath, 0, rindex($inFilePath, '.') );
+    my $outPathBase = substr($inFilePath, 0, rindex($inFilePath, '.'));
 
     $outPathBase =~ s/\.(chr[\w_\-]+)//;
+    say "first";
+    p $outPathBase;
 
     # Store output handles by chromosome, so we can write even if input file
     # out of order
@@ -71,13 +76,11 @@ sub go {
     $self->log('info', "Read header line: $headerLine");
 
     while(my $l = $readFh->getline() ) {
-      #https://ideone.com/05wEAl
-      #Faster than split
+      # Faster than split: https://ideone.com/05wEAl
       my $chr = substr($l, 0, index($l, "\t") );
 
       # May be unwanted if coming from CADD directly
       if(!exists $wantedChrs{$chr}) {
-        #https://ideone.com/JDtX3z
         #CADD files don't use 'chr', but our cadd bed-like files do
         if (substr($chr, 0, 3) ne 'chr') {
           $chr = 'chr' . $chr;
@@ -88,7 +91,6 @@ sub go {
           $chr = 'chrM';
         }
 
-        # Check again that this is unwanted
         if(!exists $wantedChrs{$chr}) {
           $self->log('warn', "Skipping unwanted: $chr");
           next;
@@ -98,8 +100,10 @@ sub go {
       my $fh = $outFhs{$chr};
 
       if(!$fh) {
-        my $outPath = "$outPathBase.$chr$outExt";
-
+        say "STUFF";
+        p path($outPathBase)->basename(@inSuffixes);
+        my $outPath = path($self->_localFilesDir)->child("$outPathBase.$chr$outExt");
+        p $outPath;
         $self->log('info', "Found $chr in $inFilePath; creating $outPath");
 
         push @outPaths, $outPath;
@@ -138,11 +142,17 @@ sub go {
   # of a fork (rather than for each finish() call)
   $pm->run_on_finish(sub {
     my ($pid, $exitCode, $finalOutPath) = @_;
+    say "IN RUN ON FINISH: $pid, $exitCode, $finalOutPath";
 
     if($exitCode != 0) {
       return $self->log('fatal', "$finalOutPath failed to sort, with exit code $exitCode");
     }
-    push @finalOutPaths, path($finalOutPath)->basename;
+
+    if($self->use_absolute_path) {
+      push @finalOutPaths, path($finalOutPath)->absolute;
+    } else {
+      push @finalOutPaths, path($finalOutPath)->basename;
+    }
   });
 
   for my $outPath (@outPaths) {
@@ -184,13 +194,12 @@ sub go {
 
   $pm->wait_all_children();
 
+  p @finalOutPaths;
   $self->_wantedTrack->{local_files} = \@finalOutPaths;
 
-  # Make sure that we indicate to the user that cadd is guaranteed to be sorted
-  # This speeds up cadd building
   $self->_wantedTrack->{sorted} = 1;
 
-  $self->_backupAndWriteConfig('sortCadd');
+  $self->_backupAndWriteConfig();
 }
 
 __PACKAGE__->meta->make_immutable;
