@@ -353,7 +353,7 @@ def load_pca_loadings(loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) -> pd.Da
     gnomadPCs = loadings["loadings"].str.split(",", expand=True)
     loadings = loadings.join(gnomadPCs)
     loadings = loadings.reset_index()
-    pc_range = range(8, 28)
+    pc_range = range(8, 38)
     pc_loadings = loadings.iloc[:, pc_range].copy()
     pc_loadings["variant"] = loadings["variant"]
     pc_loadings = pc_loadings.set_index("variant")
@@ -382,7 +382,7 @@ def apply_pca_transform(pc_loadings: pd.DataFrame, dosagevcf: pd.DataFrame) -> p
     KGP_index = genos_transpose.index
     transformed_data_with_ids = pd.DataFrame(transformed_data, index=KGP_index)
     #Add PC labels
-    transformed_data_with_ids.columns = ["PC" + str(i) for i in range(1, 21)]
+    transformed_data_with_ids.columns = ["PC" + str(i) for i in range(1, 31)]
     return transformed_data_with_ids
 
 
