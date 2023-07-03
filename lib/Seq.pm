@@ -123,7 +123,7 @@ sub annotateFile {
   my $progressFunc =
   $self->makeLogProgressAndPrint( \$abortErr, $outFh, $statsFh, $messageFreq );
   MCE::Loop::init {
-    max_workers => $self->max_threads || 8,
+    max_workers => $self->maxThreads || 8,
     use_slurpio => 1,
     chunk_size => 'auto',
     gather => $progressFunc,
