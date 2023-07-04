@@ -134,15 +134,15 @@ sub annotateFile {
 
   # To avoid the Moose/Mouse accessor penalty, store reference to underlying data
   my $db = $self->{_db};
-  my $refTrackGetter = $self->tracksObj->getRefTrackGetter();
-  my @trackGettersExceptReference = @{$self->tracksObj->getTrackGettersExceptReference()};
+  my $refTrackGetter = $self->{_tracks}->getRefTrackGetter();
+  my @trackGettersExceptReference = @{$self->{_tracks}->getTrackGettersExceptReference()};
   my @trackIndicesExceptReference = 0 .. $#trackGettersExceptReference;
 
   my $outIndicesMap = $finalHeader->getParentIndices();
   my @outIndicesExceptReference = map { $outIndicesMap->{$_->name} } @trackGettersExceptReference;
 
   ######### Set Outputter #########
-  my @allOutIndices = map { $outIndicesMap->{$_->name} } @{$self->tracksObj->trackGetters};
+  my @allOutIndices = map { $outIndicesMap->{$_->name} } @{$self->{_tracks}->trackGetters};
 
   # Now that header is prepared, make the outputter
   # Note, that the only features that we need to iterate over

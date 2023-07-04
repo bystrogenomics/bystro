@@ -42,6 +42,8 @@ has temp_dir => (is => 'ro', isa => 'Maybe[Str]');
 # Do we want to compress?
 has compress => (is => 'ro', isa => 'Str', default => 1);
 
+has compressType => (is => 'ro', isa => enum([qw/lz4 gzip/]), default => 'gzip');
+
 # Do we want to tarball our results
 has archive => (is => 'ro', isa => 'Bool', default => 0);
 
@@ -80,7 +82,7 @@ has outputFilesInfo => (is => 'ro', isa => 'HashRef', init_arg => undef, lazy =>
   
   my $extension = $self->outputJson ? 'json' : 'tsv';
 
-  $out{annotation} = $outBaseName . ".annotation.$extension" . ($self->compress ? "." . $self->compress : "");
+  $out{annotation} = $outBaseName . ".annotation.$extension" . ($self->compress ? "." . $self->compressType : "");
   $out{header} = $outBaseName . ".annotation.header.json";
   $out{sampleList} = $outBaseName . '.sample_list';
 

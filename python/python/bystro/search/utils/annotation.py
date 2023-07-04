@@ -94,7 +94,7 @@ _default_delimiters = {
     "field": "\t",
     "allele": "/",
     "position": "|",
-    "overlap": "\\",
+    "overlap": chr(31),
     "value": ";",
     "empty_field": "!",
 }
