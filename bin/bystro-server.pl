@@ -41,6 +41,11 @@ GetOptions(
 
 my $type = 'annotation';
 
+my $PROGRESS = "progress";
+my $FAILED = "failed";
+my $STARTED = "started";
+my $COMPLETED = "completed";
+
 my $conf = LoadFile($queueConfigPath);
 
 # The properties that we accept from the worker caller
@@ -134,11 +139,16 @@ while(my $job = $beanstalk->reserve) {
     }
 
     $beanstalkEvents->put({ priority => 0, data => encode_json({
-      event => $events->{started},
+      event => $STARTED,
       jobConfig => $configData,
       submissionID   => $jobDataHref->{submissionID},
       queueID => $job->id,
     })  });
+
+    if ($debug) {
+      say STDERR "job ". $job->id . " starting with inputHref:";
+      p $inputHref;
+    }
 
     my $annotate_instance = Seq->new_with_config($inputHref);
 
@@ -155,13 +165,13 @@ while(my $job = $beanstalk->reserve) {
     p $err;
   }
 
-  $err =~ s/\sat\s\w+\/\w+.*\sline\s\d+.*//;
-
   if ($err) {
+    $err =~ s/\sat\s\w+\/\w+.*\sline\s\d+.*//;
+
     say "job ". $job->id . " failed";
 
     my $data = {
-      event => $events->{failed},
+      event => $FAILED,
       reason => $err,
       queueID => $job->id,
       submissionID   => $jobDataHref->{submissionID},
@@ -180,7 +190,7 @@ while(my $job = $beanstalk->reserve) {
   }
 
   my $data = {
-    event => $events->{completed},
+    event => $COMPLETED,
     queueID => $job->id,
     submissionID   => $jobDataHref->{submissionID},
     results => {
@@ -246,7 +256,7 @@ sub coerceInputs {
       server => $conf->{beanstalkd}{addresses}[0],
       queue  => $queueConfig->{events},
       messageBase => {
-        event => $events->{progress},
+        event => $PROGRESS,
         queueID => $queueId,
         submissionID => $jobDetailsHref->{submissionID},
         data => undef,
