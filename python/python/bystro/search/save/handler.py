@@ -179,7 +179,7 @@ def _get_num_slices(client, index_name, max_query_size, max_slices, query):
     return max(min(math.ceil(n_docs / max_query_size), max_slices), 1)
 
 
-async def go(  # pylint:disable=invalid-name
+def go(  # pylint:disable=invalid-name
     job_data: SaveJobData,
     search_conf: dict,
     publisher: ProgressPublisher,

@@ -54,7 +54,7 @@ def _infer_ancestry(
     return make_dummy_ancestry_response(vcf_path)
 
 
-async def handler_fn(
+def handler_fn(
     publisher: ProgressPublisher, ancestry_job_data: AncestryJobData
 ) -> AncestryResponse:
     """Do ancestry job, wraping _infer_ancestry for beanstalk."""
