@@ -384,11 +384,8 @@ def apply_pca_transform(pc_loadings_overlap: pd.DataFrame, dosagevcf: pd.DataFra
     #Ensure that genos_transpose and pc_loadings have the same variants in same order
     assert (genos_transpose.columns == pc_loadings_overlap.index).all()
     assert genos_transpose.shape[1] == pc_loadings_overlap.shape[0]
-    #Convert to np for faster dot product
-    genos_np = np.array(genos_transpose)
-    pc_loadings_array = pc_loadings.to_numpy.astype(float)
-    #Apply the loadings to the transposed 1kGP data
-    transformed_data = np.dot(genos_np, pc_loadings_array)
+    #Dot product
+    transformed_data = genos_transpose @ pc_loadings_overlap
     #Add the IDs back on to PCs
     KGP_index = genos_transpose.index
     transformed_data_with_ids = pd.DataFrame(transformed_data, index=KGP_index)
