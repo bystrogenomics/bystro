@@ -372,9 +372,9 @@ def loadings_var_overlap(pc_loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) ->
     return pc_loadings_overlap
 
 
-def apply_pca_transform(pc_loadings_overlap: pd.DataFrame, dosagevcf: pd.DataFrame) -> pd.DataFrame:
+def apply_pca_transform(pc_loadings_overlap: pd.DataFrame, dosage_vcf: pd.DataFrame) -> pd.DataFrame:
     """Transform vcf with genotypes in dosage format with PCs loadings from gnomad PCA."""
-    #Only genos are required from dosagevcf for transformation step
+    #Only genos are required from dosage_vcf for transformation step
     genos = dosage_vcf.iloc[:, 9:]
     genos["variant"] = dosage_vcf["ID"]
     genos=genos.set_index("variant")
