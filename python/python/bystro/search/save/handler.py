@@ -58,11 +58,14 @@ def _get_header(field_names):
 
 
 def _populate_data(field_path, data_for_end_of_path):
-    if not isinstance(field_path, list):
+    if not isinstance(field_path, list) or data_for_end_of_path is None:
         return data_for_end_of_path
 
     for child_field in field_path:
-        data_for_end_of_path = data_for_end_of_path[child_field]
+        data_for_end_of_path = data_for_end_of_path.get(child_field)
+
+        if data_for_end_of_path is None:
+            return data_for_end_of_path
 
     return data_for_end_of_path
 
@@ -140,7 +143,7 @@ def _process_query(
     for doc in resp["hits"]["hits"]:
         row = np.empty(len(field_names), dtype=object)
         for y in range(len(field_names)):
-            row[y] = _populate_data(child_fields[y], doc["_source"][parent_fields[y]])
+            row[y] = _populate_data(child_fields[y], doc["_source"].get(parent_fields[y]))
 
         if row[discordant_idx][0][0] is False:
             row[discordant_idx][0][0] = 0
