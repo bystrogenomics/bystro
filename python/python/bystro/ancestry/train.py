@@ -368,7 +368,8 @@ def loadings_var_overlap(pc_loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) ->
     missing_variants = loadings_var_set - dosage_var_set
     pc_loadings_overlap=pc_loadings[~pc_loadings.index.isin(missing_variants)]
     var_overlap = loadings_var_set.intersection(dosage_var_set)
-    assert len(pc_loadings_overlap) == len(var_overlap) 
+    assert len(pc_loadings_overlap) == len(var_overlap)
+    assert len(dosage_vcf) == len(var_overlap)
     return pc_loadings_overlap
 
 
