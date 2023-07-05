@@ -63,8 +63,12 @@ sub BUILD {
   #Expects DBManager to have been given a database_dir
   $self->{_db} = Seq::DBManager->new();
 
-  # Initializes the tracks
-  # This ensures that the tracks are configured, and headers set
+  # When tracksObj accessor is called, a function is executed that results in the database being set to read only
+  # when read only mode is called for (Seq::Base instantiated with readOnly => 1)
+  # Therefore it is important to call tracksObj before any other database calls
+  # to make sure that read-only semantics are enforced throughout the annotation process
+  # To ensure that we don't accidentally defer setting database mode until child proceses begin to annotate (in which case they will race to set the database mode)
+  # from hereon we will only use $self->{_tracks} to refer to tracks objects.
   $self->{_tracks} = $self->tracksObj;
 }
 
