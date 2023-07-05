@@ -92,7 +92,6 @@ class AnnotationOutputs(Struct, frozen=True):
 
 _default_delimiters = {
     "field": "\t",
-    "allele": "/",
     "position": "|",
     "overlap": chr(31),
     "value": ";",

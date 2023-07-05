@@ -37,7 +37,6 @@ has globalReplaceChar => (is => 'ro', isa => 'Str', default => ',');
 has cleanDelims => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
   my $self = shift;
 
-  # my $aD = $self->alleleDelimiter;
   my $vD = $self->valueDelimiter;
   my $pD = $self->positionDelimiter;
   my $oD = $self->overlapDelimiter;

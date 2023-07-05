@@ -30,7 +30,6 @@ cdef class ReadAnnotationTarball:
         str index_name
         int chunk_size
         str field_separator
-        str allele_delimiter
         str position_delimiter
         str overlap_delimiter
         str value_delimiter
@@ -45,7 +44,6 @@ cdef class ReadAnnotationTarball:
         self.index_name = index_name
         self.chunk_size = chunk_size
         self.field_separator = delimiters['field']
-        self.allele_delimiter = delimiters['allele']
         self.position_delimiter = delimiters['position']
         self.overlap_delimiter = delimiters['overlap']
         self.value_delimiter = delimiters['value']
