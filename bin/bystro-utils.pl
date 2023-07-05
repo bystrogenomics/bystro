@@ -114,13 +114,14 @@ for my $wantedName (split ',', $names) {
     my $utilConfig = $config->{tracks}{tracks}[$trackIdx]{utils}[$utilIdx];
 
     my $utilName = $utilConfig->{name};
+    say $utilName;
 
     # Uppercase the first letter of the utility class name
     # aka user may specify "fetch" and we grab Utils::Fetch
     my $className = 'Utils::' . uc( substr($utilName, 0, 1) ) . substr($utilName, 1, length($utilName) - 1);
     my $args = $utilConfig->{args} || {};
 
-    my %finalOpts = (%options, %$args, (utilIdx => $utilIdx));
+    my %finalOpts = (%options, %$args, (utilIdx => $utilIdx, utilName => $utilName));
 
     my $instance = $className->new(\%finalOpts);
     $instance->go();
