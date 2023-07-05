@@ -334,8 +334,7 @@ def load_1kgp_vcf(vcf_filepath: str) -> pd.DataFrame:
 
 def load_pca_loadings(GNOMAD_PC_PATH: str, dosage_vcf: pd.DataFrame) -> pd.DataFrame:
     #Gnomad pc file 
-    """Load in the gnomad PCs, reformats, and filters them to match
-    the format and variant list of the 1kgp vcf.
+    """Load in the gnomad PCs and reformat for PC transformation.
     """
     loadings = pd.read_csv(GNOMAD_PC_PATH, sep="\t")
     #Gnomad pc loadings file includes additional formatting that needs to be sanitized 
@@ -347,12 +346,6 @@ def load_pca_loadings(GNOMAD_PC_PATH: str, dosage_vcf: pd.DataFrame) -> pd.DataF
     loadings["variant"] = loadings.apply(
         lambda x: ":".join([get_chr_pos(x), get_ref_allele(x), get_alt_allele(x)]), axis=1
     )
-    #Remove variants that are missing from IGSR version of 1kgp
-    loadings_var_set=set(loadings.variant)
-    dosage_var_set=set(dosage_vcf.ID)
-    missing_variants = loadings_var_set - dosage_var_set
-    loadings=loadings[~loadings["variant"].isin(missing_variants)]
-    var_overlap = loadings_var_set.intersection(dosage_var_set)
     #Remove brackets
     loadings["loadings"] = loadings["loadings"].str[1:-1]
     #Split PCs and join back
@@ -364,11 +357,22 @@ def load_pca_loadings(GNOMAD_PC_PATH: str, dosage_vcf: pd.DataFrame) -> pd.DataF
     pc_loadings["variant"] = loadings["variant"]
     pc_loadings = pc_loadings.set_index("variant")
     pc_loadings = pc_loadings.sort_index()
-    assert len(pc_loadings) == len(var_overlap) 
     return pc_loadings
 
 
-def apply_pca_transform(pc_loadings: pd.DataFrame, dosagevcf: pd.DataFrame) -> pd.DataFrame:
+def loadings_var_overlap(pc_loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Check overlap between gnomad loadings and reference vcf"""
+    #Remove variants that are missing from IGSR version of 1kgp
+    loadings_var_set=set(pc_loadings.index)
+    dosage_var_set=set(dosage_vcf.ID)
+    missing_variants = loadings_var_set - dosage_var_set
+    pc_loadings_overlap=pc_loadings[~pc_loadings.index.isin(missing_variants)]
+    var_overlap = loadings_var_set.intersection(dosage_var_set)
+    assert len(pc_loadings_overlap) == len(var_overlap) 
+    return pc_loadings_overlap
+
+
+def apply_pca_transform(pc_loadings_overlap: pd.DataFrame, dosagevcf: pd.DataFrame) -> pd.DataFrame:
     """Transform vcf with genotypes in dosage format with PCs loadings from gnomad PCA."""
     #Only genos are required from dosagevcf for transformation step
     genos = dosage_vcf.iloc[:, 9:]
@@ -378,8 +382,8 @@ def apply_pca_transform(pc_loadings: pd.DataFrame, dosagevcf: pd.DataFrame) -> p
     #Transpose genos so it is in the correct configuration for dot product
     genos_transpose=genos.T
     #Ensure that genos_transpose and pc_loadings have the same variants in same order
-    assert (genos_transpose.columns == pc_loadings.index).all()
-    assert genos_transpose.shape[1] == pc_loadings.shape[0]
+    assert (genos_transpose.columns == pc_loadings_overlap.index).all()
+    assert genos_transpose.shape[1] == pc_loadings_overlap.shape[0]
     #Convert to np for faster dot product
     genos_np = np.array(genos_transpose)
     pc_loadings_array = pc_loadings.to_numpy.astype(float)
