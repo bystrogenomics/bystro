@@ -16,15 +16,6 @@ cdef inline populate_hash_path(dict row_document, list field_path, list field_va
         else:
             current_dict = current_dict[key]
 
-cdef inline bint convert_to_boolean(int i, str value) except *:
-    if value == "1" or value == "True" or value == "true":
-        return True
-
-    if value == "0" or value == "False" or value == "false":
-        return False
-
-    raise ValueError(f"Unexpected boolean value. Row {i}, value {value}")
-
 cdef class ReadAnnotationTarball:
     cdef:
         str index_name
@@ -37,10 +28,9 @@ cdef class ReadAnnotationTarball:
         object decompressed_data
         list header_fields
         list paths
-        dict boolean_map
         int id
 
-    def __cinit__(self, str index_name,  dict boolean_map, dict delimiters, str tar_path, str annotation_name = 'annotation.tsv.gz', int chunk_size=500):
+    def __cinit__(self, str index_name,  dict delimiters, str tar_path, str annotation_name = 'annotation.tsv.gz', int chunk_size=500):
         self.index_name = index_name
         self.chunk_size = chunk_size
         self.field_separator = delimiters['field']
@@ -57,7 +47,6 @@ cdef class ReadAnnotationTarball:
 
         self.header_fields = self.decompressed_data.readline().rstrip(b"\n").decode('utf-8').split(self.field_separator)
         self.paths = [field.split(".") for field in self.header_fields]
-        self.boolean_map = boolean_map
         self.id = 0
 
     def __iter__(self):
@@ -104,10 +93,7 @@ cdef class ReadAnnotationTarball:
                                 overlap_values.append(None)
                                 continue
 
-                            if self.boolean_map.get(self.header_fields[i]) is not None:
-                                overlap_values.append(convert_to_boolean(i, overlap_value))
-                            else:
-                                overlap_values.append(overlap_value)
+                            overlap_values.append(overlap_value)
 
                         values.append(overlap_values)
 
@@ -134,5 +120,5 @@ cdef class ReadAnnotationTarball:
     def get_header_fields(self):
         return self.header_fields
 
-cpdef ReadAnnotationTarball read_annotation_tarball(str index_name,  dict boolean_map, dict delimiters, str tar_path, str annotation_name = 'annotation.tsv.gz', int chunk_size=500):
-    return ReadAnnotationTarball(index_name, boolean_map, delimiters, tar_path, annotation_name, chunk_size)
+cpdef ReadAnnotationTarball read_annotation_tarball(str index_name,  dict delimiters, str tar_path, str annotation_name = 'annotation.tsv.gz', int chunk_size=500):
+    return ReadAnnotationTarball(index_name, delimiters, tar_path, annotation_name, chunk_size)

@@ -88,7 +88,6 @@ async def go(
     client = AsyncOpenSearch(**search_client_args)
 
     post_index_settings = mapping_conf["post_index_settings"]
-    boolean_map: dict[str, bool] = {x: True for x in mapping_conf["booleanFields"]}
 
     index_body: dict[str, dict] = {
         "settings": mapping_conf["index_settings"],
@@ -107,7 +106,6 @@ async def go(
     data = read_annotation_tarball(
         index_name=index_name,
         tar_path=tar_path,
-        boolean_map=boolean_map,
         delimiters=get_delimiters(),
         chunk_size=paralleleism_chunk_size,
     )
