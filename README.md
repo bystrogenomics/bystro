@@ -81,7 +81,7 @@ Please read [FIELDS.md](FIELDS.md)
                 refGene r WHERE chrom=%chromosomes%;
       ```
 
-      Running `bin/bystro-utils.pl --config <path/to/this/config> ` will results in the following config:
+      Running `bin/bystro-utils.pl --config <path/to/this/config> ` will result in the following config:
 
       ```
       chromosomes:
