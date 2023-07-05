@@ -39,7 +39,6 @@ class AnnotationOutputs(Struct, frozen=True):
             statistics: Optional[StatisticsOutputs]
                 Basenames of the statistics files, inside the archive
     """
-    output_dir: str
     archived: str
     annotation: str
     sampleList: str
@@ -81,7 +80,6 @@ class AnnotationOutputs(Struct, frozen=True):
             )
 
         return AnnotationOutputs(
-            output_dir=output_dir,
             annotation=annotation,
             sampleList=sampleList,
             statistics=statistics,
@@ -92,7 +90,6 @@ class AnnotationOutputs(Struct, frozen=True):
 
 _default_delimiters = {
     "field": "\t",
-    "allele": "/",
     "position": "|",
     "overlap": chr(31),
     "value": ";",

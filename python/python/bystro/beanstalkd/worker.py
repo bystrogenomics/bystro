@@ -112,7 +112,7 @@ def listen(
                     f"""
                             Job {job_id} JSON does not have the data expected.
                             Expected {job_data_type.keys_with_types()}.
-                            Decoding `{str(job.job_data)}`, failed with: `{err}`"""
+                            Decoding failed with: `{err}`"""
                 )
                 traceback.print_exc()
                 client.put_job(json.encode(failed_msg_fn(job_data, job_id, ValueError(msg))))
