@@ -42,7 +42,7 @@ has temp_dir => (is => 'ro', isa => 'Maybe[Str]');
 # Do we want to compress?
 has compress => (is => 'ro', isa => 'Str', default => 1);
 
-has compressType => (is => 'ro', isa => enum([qw/lz4 gzip/]), default => 'gzip');
+has compressType => (is => 'ro', isa => enum([qw/lz4 gz bgz zip/]), default => 'gz');
 
 # Do we want to tarball our results
 has archive => (is => 'ro', isa => 'Bool', default => 0);
