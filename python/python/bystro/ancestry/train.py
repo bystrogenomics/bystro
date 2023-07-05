@@ -38,7 +38,7 @@ VCF_PATH = DATA_ROOT_DIR / "1KGP_final_variants_1percent.vcf.gz"
 ANCESTRY_MODEL_PRODUCTS_DIR = Path("ancestry_model_products")
 
 #Loads in gnomad PC loadings
-loadings=pd.read_csv('gnomadloadings.tsv',sep='\t')
+GNOMAD_PC_PATH = "gnomadloadings.tsv"
 #Temporary placeholder to mark file used for testing, will load internally in future
 vcf_filepath=KGP_VCF
 
@@ -332,17 +332,12 @@ def load_1kgp_vcf(vcf_filepath: str) -> pd.DataFrame:
     return dosage_vcf
     
 
-def load_pca_loadings(loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) -> pd.DataFrame:
+def load_pca_loadings(GNOMAD_PC_PATH: str, dosage_vcf: pd.DataFrame) -> pd.DataFrame:
     #Gnomad pc file 
     """Load in the gnomad PCs, reformats, and filters them to match
     the format and variant list of the 1kgp vcf.
-
-    Args:
-        loadings (pd.DataFrame[int, str]): DataFrame containing the gnomad PCs.
-            The DataFrame is expected to have integer row indices representing variants
-            and string column names including locus, alleles, 30 PCs, and allele fq.
-        dosage_vcf (pd.DataFrame): DataFrame containing the 1kgp vcf data.
     """
+    loadings = pd.read_csv(GNOMAD_PC_PATH, sep="\t")
     #Gnomad pc loadings file includes additional formatting that needs to be sanitized 
     loadings[["Chromosome", "Position"]] = loadings["locus"].str.split(":", expand=True)
     #Match variant format of gnomad loadings with 1kgp vcf
