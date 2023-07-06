@@ -360,8 +360,8 @@ def load_pca_loadings(GNOMAD_PC_PATH: str) -> pd.DataFrame:
     return pc_loadings
 
 
-def loadings_var_overlap(pc_loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Check overlap between gnomad loadings and reference vcf"""
+def restrict_pc_loadings_variants_to_vcf(pc_loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Restrict variant list to overlap between gnomad loadings and reference vcf"""
     #Remove variants that are missing from IGSR version of 1kgp
     loadings_var_set=set(pc_loadings.index)
     dosage_var_set=set(dosage_vcf.ID)
