@@ -319,23 +319,23 @@ def load_1kgp_vcf(vcf_filepath: str) -> pd.DataFrame:
     using plink2.
     """
     #This line will have to be altered if testing other vcfs
-    header_vcf=pd.read_csv(vcf_filepath,delimiter='\t',skiprows=107)
+    header_vcf=pd.read_csv(vcf_filepath,delimiter="\t",skiprows=107)
     dosage_vcf = header_vcf.replace("0|0", 0)
     dosage_vcf = dosage_vcf.replace("0|1", 1)
     dosage_vcf = dosage_vcf.replace("1|0", 1)
     dosage_vcf = dosage_vcf.replace("1|1", 2)
     #If testing other vcfs this line will also need to be altered
-    dosage_vcf=dosage_vcf.rename(
-        columns={"#CHROM": "Chromosome", "POS": "Position"}, 
-        errors="raise"
+    dosage_vcf = dosage_vcf.rename(
+        columns = {"#CHROM": "Chromosome", "POS": "Position"}, 
+        errors = "raise"
     )
+    dosage_vcf=dosage_vcf.set_index("ID")
     return dosage_vcf
-    
+
 
 def load_pca_loadings(GNOMAD_PC_PATH: str) -> pd.DataFrame:
     #Gnomad pc file 
-    """Load in the gnomad PCs and reformat for PC transformation.
-    """
+    """Load in the gnomad PCs and reformat for PC transformation."""
     loadings = pd.read_csv(GNOMAD_PC_PATH, sep="\t")
     #Gnomad pc loadings file includes additional formatting that needs to be sanitized 
     loadings[["Chromosome", "Position"]] = loadings["locus"].str.split(":", expand=True)
@@ -357,42 +357,43 @@ def load_pca_loadings(GNOMAD_PC_PATH: str) -> pd.DataFrame:
     pc_loadings["variant"] = loadings["variant"]
     pc_loadings = pc_loadings.set_index("variant")
     pc_loadings = pc_loadings.sort_index()
+    pc_loadings = pc_loadings.astype(float)
+    assert all(pc_loadings.dtypes == np.float64)
     return pc_loadings
 
-
 def process_vcf_for_pc_transformation(dosage_vcf: pd.DataFrame) -> pd.DataFrame:
-    """Process dosage_vcf so that it only includes genotypes for analysis"""
+    """Process dosage_vcf so that it only includes genotypes for analysis."""
     genos = dosage_vcf.iloc[:, 9:]
-    genos["variant"] = dosage_vcf["ID"]
-    genos=genos.set_index("variant")
-    genos=genos.sort_index()
+    genos = genos.set_index(dosage_vcf.index)
+    genos = genos.sort_index()
     return genos
 
+def restrict_loadings_variants_to_vcf(
+    pc_loadings: pd.DataFrame,
+    genos: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Restrict variant list to overlap between gnomad loadings and reference vcf."""
+    #IGSR version of 1kgp is current reference vcf
+    loadings_var_set = set(pc_loadings.index)
+    genos_var_set = set(genos.index)
+    var_overlap = loadings_var_set.intersection(genos_var_set)
+    pc_loadings_overlap = pc_loadings[pc_loadings.index.isin(var_overlap)]
+    genos_overlap = genos[genos.index.isin(var_overlap)]
+    #Ensure that genos transpose and pc_loadings have corresponding shape and vars
+    assert genos_overlap.T.shape[1] == pc_loadings_overlap.shape[0]
+    assert (genos_overlap.index == pc_loadings_overlap.index).all()
+    return pc_loadings_overlap,genos_overlap
 
-def restrict_pc_loadings_variants_to_vcf(pc_loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Restrict variant list to overlap between gnomad loadings and reference vcf"""
-    #Remove variants that are missing from IGSR version of 1kgp
-    loadings_var_set=set(pc_loadings.index)
-    dosage_var_set=set(dosage_vcf.ID)
-    missing_variants = loadings_var_set - dosage_var_set
-    pc_loadings_overlap=pc_loadings[~pc_loadings.index.isin(missing_variants)]
-    var_overlap = loadings_var_set.intersection(dosage_var_set)
-    assert len(pc_loadings_overlap) == len(var_overlap)
-    assert len(dosage_vcf) == len(var_overlap)
-    return pc_loadings_overlap
 
-
-def apply_pca_transform(pc_loadings_overlap: pd.DataFrame, genos: pd.DataFrame) -> pd.DataFrame:
+def apply_pca_transform(
+    pc_loadings_overlap: pd.DataFrame,
+    genos_overlap: pd.DataFrame
+) -> pd.DataFrame:
     """Transform vcf with genotypes in dosage format with PCs loadings from gnomad PCA."""
-    #Transpose genos so it is in the correct configuration for dot product
-    genos_transpose=genos.T
-    #Ensure that genos_transpose and pc_loadings have the same variants in same order
-    assert (genos_transpose.columns == pc_loadings_overlap.index).all()
-    assert genos_transpose.shape[1] == pc_loadings_overlap.shape[0]
     #Dot product
-    transformed_data = genos_transpose @ pc_loadings_overlap
+    transformed_data = genos_overlap.T @ pc_loadings_overlap
     #Add the IDs back on to PCs
-    KGP_index = genos_transpose.index
+    KGP_index = genos_overlap.T.index
     transformed_data_with_ids = pd.DataFrame(transformed_data, index=KGP_index)
     #Add PC labels
     transformed_data_with_ids.columns = ["PC" + str(i) for i in range(1, 31)]
