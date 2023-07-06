@@ -332,7 +332,7 @@ def load_1kgp_vcf(vcf_filepath: str) -> pd.DataFrame:
     return dosage_vcf
     
 
-def load_pca_loadings(GNOMAD_PC_PATH: str, dosage_vcf: pd.DataFrame) -> pd.DataFrame:
+def load_pca_loadings(GNOMAD_PC_PATH: str) -> pd.DataFrame:
     #Gnomad pc file 
     """Load in the gnomad PCs and reformat for PC transformation.
     """
