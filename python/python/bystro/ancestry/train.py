@@ -360,6 +360,15 @@ def load_pca_loadings(GNOMAD_PC_PATH: str) -> pd.DataFrame:
     return pc_loadings
 
 
+def process_vcf_for_pc_transformation(dosage_vcf: pd.DataFrame) -> pd.DataFrame:
+    """Process dosage_vcf so that it only includes genotypes for analysis"""
+    genos = dosage_vcf.iloc[:, 9:]
+    genos["variant"] = dosage_vcf["ID"]
+    genos=genos.set_index("variant")
+    genos=genos.sort_index()
+    return genos
+
+
 def restrict_pc_loadings_variants_to_vcf(pc_loadings: pd.DataFrame, dosage_vcf: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Restrict variant list to overlap between gnomad loadings and reference vcf"""
     #Remove variants that are missing from IGSR version of 1kgp
@@ -373,13 +382,8 @@ def restrict_pc_loadings_variants_to_vcf(pc_loadings: pd.DataFrame, dosage_vcf: 
     return pc_loadings_overlap
 
 
-def apply_pca_transform(pc_loadings_overlap: pd.DataFrame, dosage_vcf: pd.DataFrame) -> pd.DataFrame:
+def apply_pca_transform(pc_loadings_overlap: pd.DataFrame, genos: pd.DataFrame) -> pd.DataFrame:
     """Transform vcf with genotypes in dosage format with PCs loadings from gnomad PCA."""
-    #Only genos are required from dosage_vcf for transformation step
-    genos = dosage_vcf.iloc[:, 9:]
-    genos["variant"] = dosage_vcf["ID"]
-    genos=genos.set_index("variant")
-    genos=genos.sort_index()
     #Transpose genos so it is in the correct configuration for dot product
     genos_transpose=genos.T
     #Ensure that genos_transpose and pc_loadings have the same variants in same order
