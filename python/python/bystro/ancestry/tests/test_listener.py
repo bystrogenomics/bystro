@@ -8,8 +8,6 @@ from bystro.ancestry.listener import AncestryJobData, completed_msg_fn, handler_
 from bystro.beanstalkd.messages import ProgressMessage
 from bystro.beanstalkd.worker import ProgressPublisher
 
-pytest_plugins = ("pytest_asyncio",)
-
 
 def test_handler_fn_happy_path():
     progress_message = ProgressMessage(submissionID="my_submission_id")
