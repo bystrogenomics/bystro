@@ -355,9 +355,9 @@ def load_pca_loadings(GNOMAD_PC_PATH: str) -> pd.DataFrame:
     gnomadPCs = loadings["loadings"].str.split(",", expand=True)
     loadings = loadings.join(gnomadPCs)
     loadings = loadings.reset_index()
-    pc_range = range(8, 38)
+    pc_range = list(range(8, 38))
     pc_loadings = loadings.iloc[:, pc_range].copy()
-    pc_loadings["variant"] = loadings["variant"]
+    pc_loadings["variant"] = loadings["variant"].astype(str)
     pc_loadings = pc_loadings.set_index("variant")
     pc_loadings = pc_loadings.sort_index()
     pc_loadings = pc_loadings.astype(float)
