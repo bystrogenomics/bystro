@@ -399,7 +399,7 @@ def apply_pca_transform(
     KGP_index = genos_overlap.T.index
     transformed_data_with_ids = pd.DataFrame(transformed_data, index=KGP_index)
     #Add PC labels
-    transformed_data_with_ids.columns = ["PC" + str(i) for i in range(1, 31)]
+    transformed_data_with_ids.columns = pd.Index(["PC" + str(i) for i in range(1, 31)])
     return transformed_data_with_ids
 
 
