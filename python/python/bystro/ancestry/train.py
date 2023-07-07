@@ -40,7 +40,7 @@ ANCESTRY_MODEL_PRODUCTS_DIR = Path("ancestry_model_products")
 #Loads in gnomad PC loadings
 GNOMAD_PC_PATH = "gnomadloadings.tsv"
 #Temporary placeholder to mark file used for testing, will load internally in future
-vcf_filepath=KGP_VCF
+vcf_filepath= "1kgpGnomadList.vcf"
 
 ANCESTRY_INFO_PATH = DATA_ROOT_DIR / "20130606_sample_info.txt"
 ROWS, COLS = 0, 1
@@ -340,12 +340,15 @@ def load_pca_loadings(GNOMAD_PC_PATH: str) -> pd.DataFrame:
     #Gnomad pc loadings file includes additional formatting that needs to be sanitized 
     loadings[["Chromosome", "Position"]] = loadings["locus"].str.split(":", expand=True)
     #Match variant format of gnomad loadings with 1kgp vcf
-    get_chr_pos = lambda x: x["locus"][3:]
-    get_ref_allele = lambda x: x["alleles"][2]
-    get_alt_allele = lambda x: x["alleles"][6]
-    loadings["variant"] = loadings.apply(
-        lambda x: ":".join([get_chr_pos(x), get_ref_allele(x), get_alt_allele(x)]), axis=1
-    )
+    def get_chr_pos(x): 
+        return x["locus"][3:]
+    def get_ref_allele (x): 
+        return x["alleles"][2]
+    def get_alt_allele(x): 
+        return x["alleles"][6]
+    def get_variant(x):
+        return ":".join([get_chr_pos(x), get_ref_allele(x), get_alt_allele(x)])
+    loadings["variant"] = loadings.apply(get_variant, axis=1)
     #Remove brackets
     loadings["loadings"] = loadings["loadings"].str[1:-1]
     #Split PCs and join back
