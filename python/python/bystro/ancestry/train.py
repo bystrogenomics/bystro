@@ -37,6 +37,11 @@ DATA_ROOT_DIR = Path.home() / "emory/human_ancestry_project/data/1000_genome_VCF
 VCF_PATH = DATA_ROOT_DIR / "1KGP_final_variants_1percent.vcf.gz"
 ANCESTRY_MODEL_PRODUCTS_DIR = Path("ancestry_model_products")
 
+#Loads in gnomad PC loadings
+GNOMAD_PC_PATH = "gnomadloadings.tsv"
+#Temporary placeholder to mark file used for testing, will load internally in future
+vcf_filepath=KGP_VCF
+
 ANCESTRY_INFO_PATH = DATA_ROOT_DIR / "20130606_sample_info.txt"
 ROWS, COLS = 0, 1
 QUALITY_CUTOFF = 100  # for variant quality filtering
@@ -306,6 +311,93 @@ def _calc_fst(variant_counts: pd.Series, samples: pd.DataFrame) -> float:
         pi = np.mean(gs) / PLOIDY
         total += ci * pi * (1 - pi)
     return (p * (1 - p) - total) / (p * (1 - p))
+
+
+def load_1kgp_vcf(vcf_filepath: str) -> pd.DataFrame:
+    """Temporary placeholder method to load in 1kgp vcf
+    filtered down to the same variants as the gnomad loadings for testing
+    using plink2.
+    """
+    #This line will have to be altered if testing other vcfs
+    header_vcf=pd.read_csv(vcf_filepath,delimiter="\t",skiprows=107)
+    dosage_vcf = header_vcf.replace("0|0", 0)
+    dosage_vcf = dosage_vcf.replace("0|1", 1)
+    dosage_vcf = dosage_vcf.replace("1|0", 1)
+    dosage_vcf = dosage_vcf.replace("1|1", 2)
+    #If testing other vcfs this line will also need to be altered
+    dosage_vcf = dosage_vcf.rename(
+        columns = {"#CHROM": "Chromosome", "POS": "Position"}, 
+        errors = "raise"
+    )
+    dosage_vcf=dosage_vcf.set_index("ID")
+    return dosage_vcf
+
+
+def load_pca_loadings(GNOMAD_PC_PATH: str) -> pd.DataFrame:
+    #Gnomad pc file 
+    """Load in the gnomad PCs and reformat for PC transformation."""
+    loadings = pd.read_csv(GNOMAD_PC_PATH, sep="\t")
+    #Gnomad pc loadings file includes additional formatting that needs to be sanitized 
+    loadings[["Chromosome", "Position"]] = loadings["locus"].str.split(":", expand=True)
+    #Match variant format of gnomad loadings with 1kgp vcf
+    get_chr_pos = lambda x: x["locus"][3:]
+    get_ref_allele = lambda x: x["alleles"][2]
+    get_alt_allele = lambda x: x["alleles"][6]
+    loadings["variant"] = loadings.apply(
+        lambda x: ":".join([get_chr_pos(x), get_ref_allele(x), get_alt_allele(x)]), axis=1
+    )
+    #Remove brackets
+    loadings["loadings"] = loadings["loadings"].str[1:-1]
+    #Split PCs and join back
+    gnomadPCs = loadings["loadings"].str.split(",", expand=True)
+    loadings = loadings.join(gnomadPCs)
+    loadings = loadings.reset_index()
+    pc_range = range(8, 38)
+    pc_loadings = loadings.iloc[:, pc_range].copy()
+    pc_loadings["variant"] = loadings["variant"]
+    pc_loadings = pc_loadings.set_index("variant")
+    pc_loadings = pc_loadings.sort_index()
+    pc_loadings = pc_loadings.astype(float)
+    assert all(pc_loadings.dtypes == np.float64)
+    return pc_loadings
+
+def process_vcf_for_pc_transformation(dosage_vcf: pd.DataFrame) -> pd.DataFrame:
+    """Process dosage_vcf so that it only includes genotypes for analysis."""
+    genos = dosage_vcf.iloc[:, 9:]
+    genos = genos.set_index(dosage_vcf.index)
+    genos = genos.sort_index()
+    return genos
+
+def restrict_loadings_variants_to_vcf(
+    pc_loadings: pd.DataFrame,
+    genos: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Restrict variant list to overlap between gnomad loadings and reference vcf."""
+    #IGSR version of 1kgp is current reference vcf
+    loadings_var_set = set(pc_loadings.index)
+    genos_var_set = set(genos.index)
+    var_overlap = loadings_var_set.intersection(genos_var_set)
+    pc_loadings_overlap = pc_loadings[pc_loadings.index.isin(var_overlap)]
+    genos_overlap = genos[genos.index.isin(var_overlap)]
+    #Ensure that genos transpose and pc_loadings have corresponding shape and vars
+    assert genos_overlap.T.shape[1] == pc_loadings_overlap.shape[0]
+    assert (genos_overlap.index == pc_loadings_overlap.index).all()
+    return pc_loadings_overlap,genos_overlap
+
+
+def apply_pca_transform(
+    pc_loadings_overlap: pd.DataFrame,
+    genos_overlap: pd.DataFrame
+) -> pd.DataFrame:
+    """Transform vcf with genotypes in dosage format with PCs loadings from gnomad PCA."""
+    #Dot product
+    transformed_data = genos_overlap.T @ pc_loadings_overlap
+    #Add the IDs back on to PCs
+    KGP_index = genos_overlap.T.index
+    transformed_data_with_ids = pd.DataFrame(transformed_data, index=KGP_index)
+    #Add PC labels
+    transformed_data_with_ids.columns = ["PC" + str(i) for i in range(1, 31)]
+    return transformed_data_with_ids
 
 
 def _perform_pca(train_X: pd.DataFrame, test_X: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, PCA]:
