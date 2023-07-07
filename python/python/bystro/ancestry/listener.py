@@ -5,10 +5,15 @@ from pathlib import Path
 
 from ruamel.yaml import YAML
 
-from bystro.ancestry.ancestry_types import AncestryResponse, AncestrySubmission
+from bystro.ancestry.ancestry_types import (
+    AncestryResponse,
+    AncestrySubmission,
+)
+from bystro.ancestry.dummy_ancestry_response import make_dummy_ancestry_response
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
 from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, get_progress_reporter, listen
 
+logging.basicConfig(filename="ancestry_listener.log", level=logging.DEBUG)
 logger = logging.getLogger()
 
 ANCESTRY_TUBE = "ancestry"
@@ -45,20 +50,23 @@ def _infer_ancestry(
     # simply threading it through for later.
     _reporter = get_progress_reporter(_publisher)
     vcf_path = ancestry_submission.vcf_path
-    return AncestryResponse(vcf_path=vcf_path, results=[])
+
+    return make_dummy_ancestry_response(vcf_path)
 
 
-async def handler_fn(
+def handler_fn(
     publisher: ProgressPublisher, ancestry_job_data: AncestryJobData
 ) -> AncestryResponse:
     """Do ancestry job, wraping _infer_ancestry for beanstalk."""
     # Separating _handler_fn from _infer_ancestry in order to separate ML from infra concerns,
     # and especially to keep _infer_ancestry eager.
+    logger.debug("entering handler_fn with: %s", ancestry_job_data)
     return _infer_ancestry(ancestry_job_data.ancestry_submission, publisher)
 
 
 def submit_msg_fn(ancestry_job_data: AncestryJobData) -> SubmittedJobMessage:
     """Acknowledge receipt of AncestryJobData."""
+    logger.debug("entering submit_msg_fn: %s", ancestry_job_data)
     return SubmittedJobMessage(ancestry_job_data.submissionID)
 
 
@@ -66,6 +74,7 @@ def completed_msg_fn(
     ancestry_job_data: AncestryJobData, ancestry_response: AncestryResponse
 ) -> AncestryJobCompleteMessage:
     """Send job complete message."""
+    logger.debug("entering completed_msg_fn: %s", ancestry_job_data)
     ancestry_submission = ancestry_job_data.ancestry_submission
     if ancestry_submission.vcf_path != ancestry_response.vcf_path:
         err_msg = (
@@ -81,6 +90,7 @@ def completed_msg_fn(
 
 def main(queue_conf: QueueConf, ancestry_tube: str) -> None:
     """Run ancestry listener."""
+    logger.debug("Entering main")
     listen(
         AncestryJobData,
         handler_fn,

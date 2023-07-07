@@ -26,7 +26,7 @@ use Seq::DBManager;
 use Seq::Tracks::Cadd;
 use Seq::Tracks::Score::Build;
 
-# _localFilesDir, _decodedConfig, compress, _wantedTrack, _setConfig, and logPath, 
+# Exports: _localFilesDir, _decodedConfig, compress, _wantedTrack, _setConfig, logPath, use_absolute_path
 extends 'Utils::Base';
 
 my $localFilesHandler = Seq::Tracks::Build::LocalFilesPaths->new();
@@ -54,7 +54,7 @@ sub go {
 
   my $gzip = $self->gzip;
 
-  my $localFilesPathsAref = $localFilesHandler->makeAbsolutePaths($self->_decodedConfig->{files_dir},
+  my ($localFilesPathsAref, $has_absolute_files) = $localFilesHandler->makeAbsolutePaths($self->_decodedConfig->{files_dir},
     $self->_wantedTrack->{name}, $self->_wantedTrack->{local_files});
 
   my $outDir = path($self->_decodedConfig->{files_dir})->child($self->_wantedTrack->{name});
@@ -312,7 +312,7 @@ sub go {
 
   $self->_wantedTrack->{local_files} = \@outPaths;
 
-  $self->_backupAndWriteConfig('filterCadd');
+  $self->_backupAndWriteConfig();
 
   return 1;
 }

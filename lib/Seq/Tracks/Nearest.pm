@@ -22,9 +22,6 @@ use Mouse 2;
 use namespace::autoclean;
 use DDP;
 
-# Doesn't extend Seq::Tracks::Get to reduce inheritance depth, since most
-# of that class is overriden anyhow (leaving only the headers property inheritance
-# which isn't necessary since Seq::Headers is a singleton class)
 extends 'Seq::Tracks::Base';
 with 'Seq::Tracks::Region::RegionTrackPath';
 
@@ -115,8 +112,6 @@ sub get {
 
   $_[0]->{_regionData}{$_[2]} //= $_[0]->{_db}->dbReadAll( $_[0]->regionTrackPath($_[2]) );
 
-  # WARNING: If $_[1]->[$_[0]->{_dbName} isn't defined, will be treated as the 0 index!!!
-  #            $self->{_regionData}{$_[2]}[$href->[$self->{_dbName}}]];
   my $geneDb = $_[0]->{_regionData}{$_[2]}[$_[1]->[$_[0]->{_dbName}]];
 
   # exit;

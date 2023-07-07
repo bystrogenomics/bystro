@@ -18,8 +18,6 @@ sort:
   dbSNP.alleleFreqs: min
   refSeq.codonNumber: avg
   refSeq.codonPosition: avg
-booleanFields:
-  - discordant
 post_index_settings:
   index:
     refresh_interval: 15s
@@ -29,8 +27,6 @@ index_settings:
     refresh_interval: -1
     number_of_replicas: 0
     codec: best_compression
-    mapping:
-      single_type: true
   analysis:
     normalizer:
       lowercase_normalizer:

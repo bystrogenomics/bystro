@@ -3,6 +3,7 @@
     and indexes submitted data in Opensearch
 """
 import argparse
+import asyncio
 import os
 
 from ruamel.yaml import YAML
@@ -59,13 +60,13 @@ def main():
 
         tar_path = os.path.join(beanstalkd_job_data.inputDir, inputs.archived)
 
-        return go(
+        return asyncio.get_event_loop().run_until_complete(go(
             index_name=beanstalkd_job_data.indexName,
             tar_path=tar_path,
             mapping_conf=mapping_conf,
             search_conf=search_conf,
             publisher=publisher,
-        )
+        ))
 
     def submit_msg_fn(job_data: IndexJobData):
         return SubmittedJobMessage(job_data.submissionID)

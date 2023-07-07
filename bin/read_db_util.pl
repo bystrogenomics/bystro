@@ -19,7 +19,7 @@ my $chrom = $ARGV[2];
 my $start = $ARGV[3];
 my $stop = $ARGV[4];
 
-if(!looks_like_number($start) && looks_like_number($stop)) {
+if(!looks_like_number($start) || !looks_like_number($stop)) {
   die 'config<path/to/yaml> trackName<str> chrom<str> start<int> stop<int>';
 }
 
@@ -41,11 +41,21 @@ if(!$trackGetter) {
 
 my $db = Seq::DBManager->new();
 
-my $data = $db->dbRead($chrom, [$start .. $stop]);
+my @positions = ($start..$stop);
+my @results = ($start..$stop);
 
+my $data = $db->dbRead($chrom, \@results);
+
+say STDERR "Read data for $chrom $start";
+p $data;
+say STDERR "Showing results for $track";
 my %alt = ('A' => 'T', 'C' => 'G', 'G' => 'C', 'T' => 'A');
 
+my $idx = 0;
 for my $d (@$data) {
+  my $pos = $positions[$idx];
+  $idx++;
+
   if($isRef) {
     say $refTrackGetter->get($d);
 
@@ -53,11 +63,19 @@ for my $d (@$data) {
   }
 
   my $ref = $refTrackGetter->get($d);
-  my $out = [];
 
-  $trackGetter->get($d, 'chr10', $ref, $alt{$ref}, 0, $out);
+  for my $alt (qw/A C G T/) {
+    if($alt eq $ref) {
+      next;
+    }
 
-  p $out;
+    my $out = [];
+    say STDERR "$chrom:$pos, ref: $ref, alt: $alt:";
+
+    $trackGetter->get($d, $chrom, $ref, $alt, 0, $out, $start - 1);
+
+    p $out;
+  }
 }
 
 # if($trackGetter->type eq 'gene') {
