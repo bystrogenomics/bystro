@@ -377,9 +377,7 @@ def restrict_loadings_variants_to_vcf(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Restrict variant list to overlap between gnomad loadings and reference vcf."""
     #IGSR version of 1kgp is current reference vcf
-    loadings_var_set = set(pc_loadings.index)
-    genos_var_set = set(genos.index)
-    var_overlap = loadings_var_set.intersection(genos_var_set)
+    var_overlap = pc_loadings.index.intersection(genos.index)
     pc_loadings_overlap = pc_loadings[pc_loadings.index.isin(var_overlap)]
     genos_overlap = genos[genos.index.isin(var_overlap)]
     #Ensure that genos transpose and pc_loadings have corresponding shape and vars
