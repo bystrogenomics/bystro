@@ -4,18 +4,15 @@ from pathlib import Path
 import pandas as pd
 import tqdm
 from liftover import get_lifter
-from train import DATA_DIR
+from train import DATA_DIR, ANCESTRY_DIR, INTERMEDIATE_DATA_DIR
 
 converter = get_lifter("hg19", "hg38")
 
 ILLUMINA_FILEPATH = DATA_DIR / "Human660W-Quad_v1_H.csv"
 import sys
 
-sys.path.append("/Users/patrickoneil/ancestry_validation_study")
-from prepare_dataset import load_chip_df as load_affy_df
 
-
-def watson_crick(b):
+def get_watson_crick_complement(b):
     wc_dict = {"A": "T", "T": "A", "G": "C", "C": "G"}
     return wc_dict[b]
 
@@ -50,8 +47,8 @@ def load_illumina_callset():
             continue
         strand = row.RefStrand
         if strand == "-":
-            allele1 = watson_crick(allele1)
-            allele2 = watson_crick(allele2)
+            allele1 = get_watson_crick_complement(allele1)
+            allele2 = get_watson_crick_complement(allele2)
 
         variants.append(":".join([chromosome38, position38, allele1, allele2]))
     liftover_failure_rate_pct = liftover_failures / liftover_attempts * 100
@@ -61,8 +58,36 @@ def load_illumina_callset():
     return variants
 
 
-def compare_illumina_affy_vriants():
+def load_affymetrix_callset():
+    chip_df = pd.read_csv(
+        DATA_DIR / "Axiom_PMRA.na35.annot.csv",
+        comment="#",
+        index_col=0,
+    )
+    assert set(chip_df.Strand) == {"+"}
+    assert set(chip_df["Physical Position"] - chip_df["Position End"]) == {0}
+    variants = []
+    for i, row in chip_df.iterrows():
+        variant = ":".join(
+            [
+                "chr" + str(row.Chromosome),
+                str(row["Physical Position"]),
+                row["Ref Allele"],
+                row["Alt Allele"],
+            ]
+        )
+
+        variants.append(variant)
+    variants38 = [get_38_from_37(v) for v in variants]
+    chip_df["variant"] = variants38
+    return chip_df.variant
+
+
+def compare_illumina_affy_variants():
     illumina_variants = load_illumina_callset()
-    affy_variants = load_affy_df().variant
+    affy_variants = load_affy_callset()
     shared_variants = pd.DataFrame(sorted(set(illumina_variants).intersection(affy_variants)))
-    shared_variants.to_csv("shared_illumina_affy_variants.csv", index=False, header=False)
+    shared_variants.to_csv(
+        INTERMEDIATE_DATA_DIR / "shared_illumina_affy_variants.csv", index=False, header=False
+    )
+    return shared_variants
