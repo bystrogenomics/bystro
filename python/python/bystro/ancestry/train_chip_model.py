@@ -36,14 +36,15 @@ def main() -> None:
     )
     PCA_DIMS = 30
     pca = PCA(n_components=PCA_DIMS).fit(train_X)
+    pc_columns = ["pc" + str(i) for i in range(1, PCA_DIMS + 1)]
     train_Xpc = pd.DataFrame(
         pca.transform(train_X),
-        columns=["pc" + str(i) for i in range(1, PCA_DIMS + 1)],
+        columns=pc_columns,
         index=train_X.index,
     )
     test_Xpc = pd.DataFrame(
         pca.transform(test_X),
-        columns=["pc" + str(i) for i in range(1, PCA_DIMS + 1)],
+        columns=pc_columns,
         index=test_X.index,
     )
     rfc = make_rfc(train_Xpc, test_Xpc, train_y, test_y)
