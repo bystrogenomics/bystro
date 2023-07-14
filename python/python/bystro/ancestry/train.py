@@ -187,6 +187,8 @@ def head(xs: Collection[T]) -> T:
 def _calculate_recovery_rate(
     found_variants: Collection[Variant], variants_to_keep: Collection[Variant]
 ) -> float:
+    if len(found_variants) == 0:
+        return 0.0
     found_chromosomes = {_get_chromosome_from_variant(v) for v in found_variants}
     if len(found_chromosomes) > 1:
         msg = "Found chromosomes contains more than one chromosome"
@@ -222,16 +224,18 @@ def _parse_vcf_from_file_stream(
             dosage_data.append(dosages)
         else:
             continue
+    if sample_ids is None:
+        raise ValueError("Couldn't find sample ids in VCF")
     found_chromosomes = {_get_chromosome_from_variant(v) for v in found_variants}
-    assert_equals(
-        "Single chromosome found in vcf", 1, "number of found chromosomes", len(found_chromosomes)
-    )
-
     assert_true("Extracted sample_ids from vcf", sample_ids is not None)
-    assert_true("Found at least one variant", len(found_variants) > 0)
-    logger.info("processed %s lines, retaining %s variants", total_lines, len(found_variants))
-
-    dosage_df = pd.DataFrame(np.array(dosage_data).T, index=sample_ids, columns=found_variants)
+    logger.info(
+        "processed %s lines, retaining %s variants from %s chromosomes",
+        total_lines,
+        len(found_variants),
+        len(found_chromosomes),
+    )
+    df_values: np.ndarray | list[list[float]] = np.array(dosage_data).T if dosage_data else []
+    dosage_df = pd.DataFrame(df_values, index=sample_ids, columns=found_variants)
     # we assume each vcf file contains variants for a single chromosome
     recovery_rate = _calculate_recovery_rate(found_variants, variants_to_keep)
     logger.info("recovery rate: %s", recovery_rate)
