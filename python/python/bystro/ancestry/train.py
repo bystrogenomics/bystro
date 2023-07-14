@@ -16,7 +16,7 @@ import random
 import re
 import sys
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Collection, Container, Iterable, Sequence
 from pathlib import Path
 from typing import Any, Literal, TypeVar, get_args
 
@@ -107,6 +107,8 @@ VARIANT_REGEX = re.compile(
 
 rng = np.random.RandomState(1337)
 
+Variant = str
+
 
 def _load_callset() -> dict[str, Any]:
     """Load callset and perform as many checks as can be done without processing it."""
@@ -145,35 +147,93 @@ def load_callset_for_variants(variants: set[str]) -> pd.DataFrame:
     return pd.concat(genotype_dfs, axis=1)
 
 
-def _parse_vcf(file_path: str, variants_to_keep: set[str]) -> pd.DataFrame:
-    lines_to_keep = []
-    found_variants = []
+# def _parse_vcf_ref(file_path: str, variants_to_keep: Container[str]) -> pd.DataFrame:
+#     with gzip.open(file_path, "rt") as f:
+#         for _i, line in tqdm.tqdm(enumerate(f)):
+#             if line.startswith("##"):
+#             if line.startswith("#CHROM"):
+#                 # will throw ValueError if "PASS" not found, which is good
+#                 if variant in variants_to_keep:
+#     for line in lines_to_keep:
+
+
+def _parse_vcf_line_for_dosages(
+    line: str, variants_to_keep: Container[Variant]
+) -> tuple[Variant, list[int]] | None:
+    # will throw ValueError if "PASS" not found, which is good
+    fields = line[: line.index("PASS")].split()
+    variant = ":".join([fields[0], fields[1], fields[3], fields[4]])
+    assert_true("variant is a valid variant string", (VARIANT_REGEX.match(variant)))
+    if variant in variants_to_keep:
+        variant_dosages = [
+            int(psa[0]) + int(psa[2]) for psa in line.split()[9:]
+        ]  #  pipe-separated annotation e.g. '0|1'
+        return variant, variant_dosages
+    return None
+
+
+def _get_chromosome_from_variant(variant: Variant) -> str:
+    return variant.split(":")[0]
+
+
+T = TypeVar("T")
+
+
+def head(xs: Collection[T]) -> T:
+    """Get first element of xs."""
+    return next(iter(xs))
+
+
+def _calculate_recovery_rate(
+    found_variants: Collection[Variant], variants_to_keep: Collection[Variant]
+) -> float:
+    found_chromosomes = {_get_chromosome_from_variant(v) for v in found_variants}
+    if len(found_chromosomes) > 1:
+        msg = "Found chromosomes contains more than one chromosome"
+        raise ValueError(msg, found_chromosomes)
+    relevant_chromosome = head(found_chromosomes)
+    relevant_variants_to_keep = {
+        v for v in variants_to_keep if _get_chromosome_from_variant(v) == relevant_chromosome
+    }
+    return len(found_variants) / len(relevant_variants_to_keep)
+
+
+def _parse_vcf(file_path: str, variants_to_keep: Collection[str]) -> pd.DataFrame:
     with gzip.open(file_path, "rt") as f:
-        for _i, line in tqdm.tqdm(enumerate(f)):
-            if line.startswith("##"):
-                continue
-            if line.startswith("#CHROM"):
-                sample_ids = line.split()[9:]
-            else:
-                # will throw ValueError if "PASS" not found, which is good
-                fields = line[: line.index("PASS")].split()
-                variant = ":".join([fields[0], fields[1], fields[3], fields[4]])
-                assert_true("variant is a valid variant string", bool(VARIANT_REGEX.match(variant)))
-                if variant in variants_to_keep:
-                    found_variants.append(variant)
-                    lines_to_keep.append(line)
-        logger.info("processed {i} lines, retaining {len(found_variants)} variants")
-        assert_true("Found at least one variant", len(found_variants) > 0)
-    dosages = []
-    for line in lines_to_keep:
-        variant_dosages = [int(s[0]) + int(s[2]) for s in line.split()[9:]]
-        dosages.append(variant_dosages)
-    dosage_df = pd.DataFrame(np.array(dosages).T, index=sample_ids, columns=found_variants)
-    example_variant = found_variants[0]
-    chromosome, _pos, _ref, _alt = example_variant.split(":")
-    chromosome = chromosome + ":"
-    relevant_variants_to_keep = {v for v in variants_to_keep if v.startswith(chromosome)}
-    recovery_rate = len(dosage_df.columns) / len(relevant_variants_to_keep)
+        return _parse_vcf_from_file_stream(f, variants_to_keep)
+
+
+def _parse_vcf_from_file_stream(
+    file_stream: Iterable[str], variants_to_keep: Collection[str]
+) -> pd.DataFrame:
+    found_variants = []
+    dosage_data = []
+    sample_ids = None
+    total_lines = 0
+    for line in tqdm.tqdm(file_stream):
+        total_lines += 1
+        if line.startswith("##"):
+            continue
+        if line.startswith("#CHROM"):
+            sample_ids = line.split()[9:]
+        elif variant_dosages := _parse_vcf_line_for_dosages(line, variants_to_keep):
+            variant, dosages = variant_dosages
+            found_variants.append(variant)
+            dosage_data.append(dosages)
+        else:
+            continue
+    found_chromosomes = {_get_chromosome_from_variant(v) for v in found_variants}
+    assert_equals(
+        "Single chromosome found in vcf", 1, "number of found chromosomes", len(found_chromosomes)
+    )
+
+    assert_true("Extracted sample_ids from vcf", sample_ids is not None)
+    assert_true("Found at least one variant", len(found_variants) > 0)
+    logger.info("processed %s lines, retaining %s variants", total_lines, len(found_variants))
+
+    dosage_df = pd.DataFrame(np.array(dosage_data).T, index=sample_ids, columns=found_variants)
+    # we assume each vcf file contains variants for a single chromosome
+    recovery_rate = _calculate_recovery_rate(found_variants, variants_to_keep)
     logger.info("recovery rate: %s", recovery_rate)
     return dosage_df
 
@@ -551,11 +611,8 @@ def _filter_variants_for_mi(
     return train_X[mi_keep_cols], test_X[mi_keep_cols]
 
 
-T = TypeVar("T")
-
-
 def _calc_mi(xs: list[T], ys: list[T]) -> float:
-    """Calculate mutual information between xs and ys."""
+    """Calculate mutual information (in bits) between xs and ys."""
     if len(xs) != len(ys):
         msg = "xs and ys must have same length."
         raise ValueError(msg)
