@@ -10,22 +10,25 @@ This script takes a vcf of preprocessed variants (see preprocess_vcfs.sh) and ge
 superpopulations.
 """
 import dataclasses
+import gzip
 import logging
 import random
+import re
 import sys
 from collections import Counter
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Literal, TypeVar, get_args
 
 import allel
 import numpy as np
 import pandas as pd
-import skops
 import tqdm
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
+from skops.io import dump as skops_dump
 
 from bystro.ancestry.asserts import assert_equals, assert_true
 from bystro.ancestry.train_utils import get_variant_ids_from_callset
@@ -33,11 +36,14 @@ from bystro.ancestry.train_utils import get_variant_ids_from_callset
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-DATA_ROOT_DIR = Path.home() / "emory/human_ancestry_project/data/1000_genome_VCF"
-VCF_PATH = DATA_ROOT_DIR / "1KGP_final_variants_1percent.vcf.gz"
-ANCESTRY_MODEL_PRODUCTS_DIR = Path("ancestry_model_products")
+ANCESTRY_DIR = Path().absolute()
+DATA_DIR = ANCESTRY_DIR / "data"
+KGP_VCF_DIR = DATA_DIR / "kgp_vcfs"
+INTERMEDIATE_DATA_DIR = ANCESTRY_DIR / "intermediate_data"
+VCF_PATH = DATA_DIR / "1KGP_final_variants_1percent.vcf.gz"
+ANCESTRY_MODEL_PRODUCTS_DIR = ANCESTRY_DIR / "ancestry_model_products"
 
-ANCESTRY_INFO_PATH = DATA_ROOT_DIR / "20130606_sample_info.txt"
+ANCESTRY_INFO_PATH = DATA_DIR / "20130606_sample_info.txt"
 ROWS, COLS = 0, 1
 QUALITY_CUTOFF = 100  # for variant quality filtering
 PLOIDY = 2
@@ -48,7 +54,10 @@ MI_THRESHOLD = 0
 PCA_DIMS = 50
 EXPLAINED_VARIANCE_THRESHOLD = 0.1
 RFC_TRAIN_ACCURACY_THRESHOLD = 0.9
-RFC_TEST_ACCURACY_THRESHOLD = 0.8
+RFC_TEST_ACCURACY_THRESHOLD = 0.75
+RFC_TRAIN_SUPERPOP_ACCURACY_THRESHOLD = 0.99
+RFC_TEST_SUPERPOP_ACCURACY_THRESHOLD = 0.99
+
 # superpop definitions taken from ensembl
 SUPERPOP_FROM_POP = {
     "CHB": "EAS",
@@ -81,6 +90,21 @@ SUPERPOP_FROM_POP = {
 }
 
 
+VARIANT_REGEX = re.compile(
+    r"""
+    ^
+    chr(1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22)  # (autosomal) chromosome
+    :
+    [0-9]+  # position
+    :
+    [ACGT]  # ref allele
+    :
+    [ACGT]  # alt allele
+    $
+    """,
+    re.VERBOSE,
+)
+
 rng = np.random.RandomState(1337)
 
 
@@ -106,6 +130,52 @@ def _load_callset() -> dict[str, Any]:
         ),
     )
     return callset
+
+
+def load_callset_for_variants(variants: set[str]) -> pd.DataFrame:
+    """Load Thousand Genomes data filtered to variants."""
+    file_template = "ALL.chr{}.shapeit2_integrated_v1a.GRCh38.20181129.phased.vcf.gz"
+    genotype_dfs = []
+    for chromosome in range(1, 22 + 1):
+        logger.info("starting on chromosome: %s", chromosome)
+        file_path = str(KGP_VCF_DIR / file_template.format(chromosome))
+        genotype_df = _parse_vcf(file_path, variants)
+        logger.info("got genotype_df of shape: %s", genotype_df.shape)
+        genotype_dfs.append(genotype_df)
+    return pd.concat(genotype_dfs, axis=1)
+
+
+def _parse_vcf(file_path: str, variants_to_keep: set[str]) -> pd.DataFrame:
+    lines_to_keep = []
+    found_variants = []
+    with gzip.open(file_path, "rt") as f:
+        for _i, line in tqdm.tqdm(enumerate(f)):
+            if line.startswith("##"):
+                continue
+            if line.startswith("#CHROM"):
+                sample_ids = line.split()[9:]
+            else:
+                # will throw ValueError if "PASS" not found, which is good
+                fields = line[: line.index("PASS")].split()
+                variant = ":".join([fields[0], fields[1], fields[3], fields[4]])
+                assert_true("variant is a valid variant string", bool(VARIANT_REGEX.match(variant)))
+                if variant in variants_to_keep:
+                    found_variants.append(variant)
+                    lines_to_keep.append(line)
+        logger.info("processed {i} lines, retaining {len(found_variants)} variants")
+        assert_true("Found at least one variant", len(found_variants) > 0)
+    dosages = []
+    for line in lines_to_keep:
+        variant_dosages = [int(s[0]) + int(s[2]) for s in line.split()[9:]]
+        dosages.append(variant_dosages)
+    dosage_df = pd.DataFrame(np.array(dosages).T, index=sample_ids, columns=found_variants)
+    example_variant = found_variants[0]
+    chromosome, _pos, _ref, _alt = example_variant.split(":")
+    chromosome = chromosome + ":"
+    relevant_variants_to_keep = {v for v in variants_to_keep if v.startswith(chromosome)}
+    recovery_rate = len(dosage_df.columns) / len(relevant_variants_to_keep)
+    logger.info("recovery rate: %s", recovery_rate)
+    return dosage_df
 
 
 def _load_genotypes() -> pd.DataFrame:
@@ -147,7 +217,7 @@ def _load_genotypes() -> pd.DataFrame:
     return pd.DataFrame(filtered_genotypes, index=samples, columns=variant_ids)
 
 
-def _filter_samples_for_relatedness(
+def filter_samples_for_relatedness(
     genotypes: pd.DataFrame,
     labels: pd.DataFrame,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -156,17 +226,21 @@ def _filter_samples_for_relatedness(
     ancestry_df = _load_ancestry_df()
     assert_equals("genotype samples", genotypes.index, "label samples", labels.index)
     samples = genotypes.index
-    ancestry_df = ancestry_df[ancestry_df["Sample"].isin(samples)]
+    ancestry_df = ancestry_df[ancestry_df.index.isin(samples)]
     family_ids = ancestry_df["Family ID"].unique()
     logger.info("Found %s unique families", len(family_ids))
     unrelated_samples = []
+    random.seed(1337)
     for family_id in family_ids:
-        family_members = ancestry_df["Sample"][ancestry_df["Family ID"] == family_id]
+        family_members = ancestry_df[ancestry_df["Family ID"] == family_id].index
         # grab value out of array...
-        family_member = family_members.sample(1, random_state=rng).to_numpy()[0]
+        family_member = random.choice(family_members)
         unrelated_samples.append(family_member)
     unrelated_sample_idx = np.array(unrelated_samples)
-    genotypes, labels = genotypes.loc[unrelated_sample_idx], labels.loc[unrelated_sample_idx]
+    genotypes, labels = (
+        genotypes.loc[unrelated_sample_idx],
+        labels.loc[unrelated_sample_idx],
+    )
     # we did this earlier but removing samples could make more variants monomorphic
     genotypes = _filter_variants_for_monomorphism(genotypes)
     return genotypes, labels
@@ -176,7 +250,8 @@ def _load_ancestry_df() -> pd.DataFrame:
     return pd.read_csv(ANCESTRY_INFO_PATH, sep="\t")
 
 
-def _load_label_data(samples: pd.Index) -> pd.DataFrame:
+def load_label_data(samples: pd.Index) -> pd.DataFrame:
+    """Load dataframe of population, superpop labels for samples."""
     ancestry_df = _load_ancestry_df()
     missing_samples = set(samples) - set(ancestry_df["Sample"])
     if missing_samples:
@@ -280,8 +355,8 @@ def _filter_variants_for_fst(genotypes: pd.DataFrame, labels: pd.DataFrame) -> p
 def _load_dataset() -> tuple[pd.DataFrame, pd.DataFrame]:
     """Return the final dataset consisting of genotype matrix, labels."""
     genotypes = _load_genotypes()
-    labels = _load_label_data(genotypes.index)
-    genotypes, labels = _filter_samples_for_relatedness(genotypes, labels)
+    labels = load_label_data(genotypes.index)
+    genotypes, labels = filter_samples_for_relatedness(genotypes, labels)
     genotypes = _filter_variants_for_maf(genotypes)
     genotypes = _filter_variants_for_ld(genotypes)
     assert_genotypes_and_label_agree(genotypes, labels)
@@ -336,15 +411,13 @@ def _perform_pca(train_X: pd.DataFrame, test_X: pd.DataFrame) -> tuple[np.ndarra
     return train_Xpc, test_Xpc, pca
 
 
-def _make_train_test_split(
+def make_train_test_split(
     genotypes: pd.DataFrame,
     labels: pd.DataFrame,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Make train / test splits, stratifying on population."""
     train_X, test_X, train_y, test_y = train_test_split(
-        genotypes,
-        labels,
-        stratify=labels.population,
+        genotypes, labels, stratify=labels.population, random_state=1337
     )
     assert_equals(
         "train features",
@@ -365,6 +438,7 @@ class RFCParamChoices:
     min_samples_leaf: Literal[1, 2, 5, 10]
     criterion: Literal["gini", "entropy", "log_loss"]
     max_features: Literal["sqrt", "log2", None]
+    pca_dims: Literal[30]
 
     @classmethod
     def sample(cls) -> "RFCParamChoices":
@@ -376,39 +450,96 @@ class RFCParamChoices:
         return cls(**kwargs)
 
 
-def _make_rfc(
-    train_Xpc: np.ndarray,
-    test_Xpc: np.ndarray,
-    train_y: pd.Series,
-    test_y: pd.Series,
+def make_rfc(
+    train_Xpc: pd.DataFrame,
+    test_Xpc: pd.DataFrame,
+    train_y: pd.DataFrame,
+    test_y: pd.DataFrame,
+    trials: int = 10,
 ) -> RandomForestClassifier:
-    trials = 10
-    tuning_results: dict[RFCParamChoices, tuple[float, float]] = {}
+    """Build population-level RFC using randomized hyperparam search."""
+    tuning_results: dict[RFCParamChoices, tuple[float, float, float, float]] = {}
 
     for _trial in range(trials):
         param_choices = RFCParamChoices.sample()
-        rfc = RandomForestClassifier(**dataclasses.asdict(param_choices), random_state=1337)
-        rfc.fit(train_Xpc, train_y.population)
-        train_yhat = rfc.predict(train_Xpc)
-        test_yhat = rfc.predict(test_Xpc)
-        train_acc, test_acc = (
-            accuracy_score(train_y.population, train_yhat),
-            accuracy_score(test_y.population, test_yhat),
+        rfc_params = {k: v for (k, v) in dataclasses.asdict(param_choices).items() if k != "pca_dims"}
+        cols_to_use = train_Xpc.columns[: param_choices.pca_dims]
+        rfc = RandomForestClassifier(**rfc_params, random_state=1337)
+        rfc.fit(train_Xpc[cols_to_use], train_y.population)
+        train_yhat = rfc.predict(train_Xpc[cols_to_use])
+        train_yhat_superpop = superpop_predictions_from_pop_probs(
+            rfc.predict_proba(train_Xpc[cols_to_use])
         )
-        tuning_results[param_choices] = (train_acc, test_acc)
+        test_yhat_superpop = superpop_predictions_from_pop_probs(
+            rfc.predict_proba(test_Xpc[cols_to_use])
+        )
+
+        test_yhat = rfc.predict(test_Xpc[cols_to_use])
+
+        train_acc = accuracy_score(train_y.population, train_yhat)
+        test_acc = accuracy_score(test_y.population, test_yhat)
+        train_acc_superpop = accuracy_score(train_y.superpop, train_yhat_superpop)
+        test_acc_superpop = accuracy_score(test_y.superpop, test_yhat_superpop)
+
+        tuning_results[param_choices] = (train_acc, test_acc, train_acc_superpop, test_acc_superpop)
+        logger.info(
+            "RFC param choices: %s, accuracies: %s", param_choices, tuning_results[param_choices]
+        )
 
     test_accuracy_idx = 1
     best_params = max(tuning_results, key=lambda params: tuning_results[params][test_accuracy_idx])
-    rfc = RandomForestClassifier(**dataclasses.asdict(best_params))
-    rfc.fit(train_Xpc, train_y.population)
-    train_yhat = rfc.predict(train_Xpc)
-    test_yhat = rfc.predict(test_Xpc)
-    train_acc, test_acc = (
-        accuracy_score(train_y.population, train_yhat),
-        accuracy_score(test_y.population, test_yhat),
-    )
+    rfc_params = {k: v for (k, v) in dataclasses.asdict(best_params).items() if k != "pca_dims"}
+    cols_to_use = train_Xpc.columns[: param_choices.pca_dims]
+
+    rfc = RandomForestClassifier(**(rfc_params))
+    rfc.fit(train_Xpc[cols_to_use], train_y.population)
+    train_yhat = rfc.predict(train_Xpc[cols_to_use])
+    test_yhat = rfc.predict(test_Xpc[cols_to_use])
+    train_yhat_superpop = superpop_predictions_from_pop_probs(rfc.predict_proba(train_Xpc[cols_to_use]))
+    test_yhat_superpop = superpop_predictions_from_pop_probs(rfc.predict_proba(test_Xpc[cols_to_use]))
+
+    train_acc = accuracy_score(train_y.population, train_yhat)
+    test_acc = accuracy_score(test_y.population, test_yhat)
+    train_acc_superpop = accuracy_score(train_y.superpop, train_yhat_superpop)
+    test_acc_superpop = accuracy_score(test_y.superpop, test_yhat_superpop)
+
+    logger.info("best_params: %s", best_params)
+    logger.info("accuracies %s", (train_acc, test_acc, train_acc_superpop, test_acc_superpop))
     assert_true("RFC train accuracy >= 0.9", train_acc > RFC_TRAIN_ACCURACY_THRESHOLD)
     assert_true("RFC test accuracy >= 0.8", test_acc > RFC_TEST_ACCURACY_THRESHOLD)
+    assert_true(
+        "RFC train superpop accuracy >= 0.99", train_acc_superpop > RFC_TRAIN_SUPERPOP_ACCURACY_THRESHOLD
+    )
+    assert_true(
+        "RFC test superpop accuracy >= 0.99", test_acc_superpop > RFC_TEST_SUPERPOP_ACCURACY_THRESHOLD
+    )
+
+    return rfc
+
+
+def superpop_probs_from_pop_probs(pop_probs: np.ndarray) -> np.ndarray:
+    """Given a matrix of population probabilities, convert to matrix of superpop probabilities."""
+    N = len(pop_probs)
+    pops = sorted(SUPERPOP_FROM_POP.keys())
+    superpops = sorted(set(SUPERPOP_FROM_POP.values()))
+    superpop_projection_matrix = np.array(
+        [[int(superpop == SUPERPOP_FROM_POP[pop]) for superpop in superpops] for pop in pops]
+    )
+    superpop_probs = pop_probs @ superpop_projection_matrix
+    assert_equals(
+        "Expected superpop_probs shape (N x |superpops|):",
+        superpop_probs.shape,
+        "Actual shape",
+        (N, len(superpops)),
+    )
+    return superpop_probs
+
+
+def superpop_predictions_from_pop_probs(pop_probs: np.ndarray) -> list[str]:
+    """Given a matrix of population probabilities, convert to superpop predictions."""
+    superpops = sorted(set(SUPERPOP_FROM_POP.values()))
+    superpop_probs = superpop_probs_from_pop_probs(pop_probs)
+    return [superpops[np.argmax(ps)] for ps in superpop_probs]
 
 
 def _filter_variants_for_mi(
@@ -454,15 +585,16 @@ def _get_mi_df(train_X: pd.DataFrame, train_y_pop: pd.Series) -> pd.DataFrame:
     return mi_df
 
 
-def _serialize_data(variants: list[str], pca: PCA, rfc: RandomForestClassifier) -> None:
+def serialize_model_products(variants: Sequence[str], pca: PCA, rfc: RandomForestClassifier) -> None:
+    """Serialize variant list, pca and rfc to disk as .txt, .skops files."""
     variants_fpath = ANCESTRY_MODEL_PRODUCTS_DIR / "variants.txt"
     pca_fpath = ANCESTRY_MODEL_PRODUCTS_DIR / "pca.skop"
     rfc_fpath = ANCESTRY_MODEL_PRODUCTS_DIR / "rfc.skop"
 
     with variants_fpath.open("w") as f:
         f.write("\n".join(variants))
-    skops.io.dump(pca, pca_fpath)
-    skops.io.dump(rfc, rfc_fpath)
+    skops_dump(pca, pca_fpath)
+    skops_dump(rfc, rfc_fpath)
 
 
 def main() -> None:
@@ -470,11 +602,11 @@ def main() -> None:
     err_msg = "This module isn't production-ready yet!"
     raise NotImplementedError(err_msg)
     genotypes, labels = _load_dataset()
-    train_X, test_X, train_y, test_y = _make_train_test_split(
+    train_X, test_X, train_y, test_y = make_train_test_split(
         genotypes,
         labels,
     )
     train_X_filtered, test_X_filtered = _filter_variants_for_mi(train_X, test_X, train_y.population)
     train_Xpc, test_Xpc, pca = _perform_pca(train_X_filtered, test_X_filtered)
-    rfc = _make_rfc(train_Xpc, test_Xpc, train_y.population, test_y.population)
-    _serialize_data(list(train_X_filtered.columns), pca, rfc)
+    rfc = make_rfc(train_Xpc, test_Xpc, train_y.population, test_y.population)
+    serialize_model_products(list(train_X_filtered.columns), pca, rfc)

@@ -2,7 +2,9 @@
 
 import pandas as pd
 from sklearn.decomposition import PCA
-from train import (
+
+from bystro.ancestry.train import (
+    INTERMEDIATE_DATA_DIR,
     filter_samples_for_relatedness,
     load_callset_for_variants,
     load_label_data,
@@ -12,9 +14,9 @@ from train import (
 )
 
 
-def load_illumina_affy_variants() -> set(str):
+def load_illumina_affy_variants() -> set[str]:
     """Get previously computed intersection of illumina and affymetrix variants."""
-    return set(pd.read_csv("shared_illumina_affy_variants.csv").variant)
+    return set(pd.read_csv(INTERMEDIATE_DATA_DIR / "shared_illumina_affy_variants.csv").variant)
 
 
 def load_kgp_genotypes_for_shared_variants() -> pd.DataFrame:
@@ -45,4 +47,8 @@ def main() -> None:
         index=test_X.index,
     )
     rfc = make_rfc(train_Xpc, test_Xpc, train_y, test_y)
-    serialize_model_products(kgp_genotypes.index, pca, rfc)
+    serialize_model_products(list(kgp_genotypes.index), pca, rfc)
+
+
+if __name__ == "__main__":
+    main()
