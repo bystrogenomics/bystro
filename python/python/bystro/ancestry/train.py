@@ -31,7 +31,7 @@ from sklearn.model_selection import train_test_split
 from skops.io import dump as skops_dump
 
 from bystro.ancestry.asserts import assert_equals, assert_true
-from bystro.ancestry.train_utils import get_variant_ids_from_callset
+from bystro.ancestry.train_utils import get_variant_ids_from_callset, head
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -147,16 +147,6 @@ def load_callset_for_variants(variants: set[str]) -> pd.DataFrame:
     return pd.concat(genotype_dfs, axis=1)
 
 
-# def _parse_vcf_ref(file_path: str, variants_to_keep: Container[str]) -> pd.DataFrame:
-#     with gzip.open(file_path, "rt") as f:
-#         for _i, line in tqdm.tqdm(enumerate(f)):
-#             if line.startswith("##"):
-#             if line.startswith("#CHROM"):
-#                 # will throw ValueError if "PASS" not found, which is good
-#                 if variant in variants_to_keep:
-#     for line in lines_to_keep:
-
-
 def _parse_vcf_line_for_dosages(
     line: str, variants_to_keep: Container[Variant]
 ) -> tuple[Variant, list[int]] | None:
@@ -177,11 +167,6 @@ def _get_chromosome_from_variant(variant: Variant) -> str:
 
 
 T = TypeVar("T")
-
-
-def head(xs: Collection[T]) -> T:
-    """Get first element of xs."""
-    return next(iter(xs))
 
 
 def _calculate_recovery_rate(
@@ -225,7 +210,8 @@ def _parse_vcf_from_file_stream(
         else:
             continue
     if sample_ids is None:
-        raise ValueError("Couldn't find sample ids in VCF")
+        msg = "Couldn't find sample ids in VCF"
+        raise ValueError(msg)
     found_chromosomes = {_get_chromosome_from_variant(v) for v in found_variants}
     assert_true("Extracted sample_ids from vcf", sample_ids is not None)
     logger.info(
