@@ -25,6 +25,12 @@ def load_kgp_genotypes_for_shared_variants() -> pd.DataFrame:
     return load_callset_for_variants(variants)
 
 
+def pca_transform_df(pca: PCA, X: pd.DataFrame) -> pd.DataFrame:
+    """PCA transform dataframe, retaining index and labeling columns appropriately."""
+    pc_columns = ["pc" + str(i) for i in range(1, pca.num_components_ + 1)]
+    return pd.DataFrame(pca.transform(X), index=X.index, columns=pc_columns)
+
+
 def main() -> None:
     """Train PCA, RF for Illumina and Affymetrix variants, save model products to disk."""
     kgp_genotypes = load_kgp_genotypes_for_shared_variants()
@@ -36,17 +42,8 @@ def main() -> None:
     )
     PCA_DIMS = 30
     pca = PCA(n_components=PCA_DIMS).fit(train_X)
-    pc_columns = ["pc" + str(i) for i in range(1, PCA_DIMS + 1)]
-    train_Xpc = pd.DataFrame(
-        pca.transform(train_X),
-        columns=pc_columns,
-        index=train_X.index,
-    )
-    test_Xpc = pd.DataFrame(
-        pca.transform(test_X),
-        columns=pc_columns,
-        index=test_X.index,
-    )
+    train_Xpc = pca_transform_df(pca, train_X)
+    test_Xpc = pca_transform_df(pca, test_X)
     rfc = make_rfc(train_Xpc, test_Xpc, train_y, test_y)
     serialize_model_products(list(kgp_genotypes.index), pca, rfc)
 
