@@ -1,11 +1,10 @@
 """Utilities for ancestry model training."""
 
-from collections.abc import Iterable
-from typing import Any, TypeVar
+from typing import Any
 
 import numpy as np
 
-T = TypeVar("T")
+# TODO: consider implementing callset with something more solid than a dict?
 
 
 def get_variant_ids_from_callset(callset: dict[str, Any]) -> np.ndarray:
@@ -25,8 +24,3 @@ def get_variant_ids_from_callset(callset: dict[str, Any]) -> np.ndarray:
             )
         ],
     )
-
-
-def head(xs: Iterable[T]) -> T:
-    """Get first element of xs."""
-    return next(iter(xs))

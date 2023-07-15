@@ -2,10 +2,12 @@
 
 from typing import Any
 
+import numpy as np
+
 
 def assert_true(
     description: str,
-    condition: Any,  # noqa: ANN401  Any is actually appropriate here
+    condition: bool | np.bool_,
     comment: str = "",
 ) -> None:
     """Check that condition holds, raising AssertionError if not."""
@@ -18,7 +20,7 @@ def assert_true(
 
 def assert_equals(
     expected_description: str,
-    expected_value: Any,  # noqa: ANN401
+    expected_value: Any,  # noqa: ANN401  Any is actually appropriate here
     actual_description: str,
     actual_value: Any,  # noqa: ANN401
     comment: str = "",
