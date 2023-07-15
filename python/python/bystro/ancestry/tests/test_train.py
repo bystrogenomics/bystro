@@ -1,20 +1,23 @@
 """Tests for ancestry model training code."""
 import pandas as pd
+import pytest
 from pandas.testing import assert_frame_equal
 
-from bystro.ancestry.train import VARIANT_REGEX, _parse_vcf_from_file_stream
+from bystro.ancestry.train import _is_autosomal_variant, _parse_vcf_from_file_stream
 
 
-def test_VARIANT_REGEX():
-    assert VARIANT_REGEX.match("chr1:123456:A:A")
-    assert VARIANT_REGEX.match("chr22:1:A:A")
-    assert not VARIANT_REGEX.match("22:1:A:A")
-    assert not VARIANT_REGEX.match("chrX:1:A:A")
-    assert not VARIANT_REGEX.match("chr23:1:A:A")
-    assert not VARIANT_REGEX.match("chr22:1:A:")
-    assert not VARIANT_REGEX.match("chr22:1:A:AT")
-    assert not VARIANT_REGEX.match("chr22:1:GC:AT")
-    assert not VARIANT_REGEX.match("chr22:1:X:Y")
+def test__is_autosomal_variant():
+    assert _is_autosomal_variant("chr1:123456:A:T")
+    assert _is_autosomal_variant("chr22:1:T:A")
+    assert not _is_autosomal_variant("22:1:A:G")
+    assert not _is_autosomal_variant("chrX:1:A:G")
+    assert not _is_autosomal_variant("chr23:1:G:C")
+    assert not _is_autosomal_variant("chr22:1:A:")
+    assert not _is_autosomal_variant("chr22:1:A:AT")
+    assert not _is_autosomal_variant("chr22:1:GC:AT")
+    assert not _is_autosomal_variant("chr22:1:X:Y")
+    with pytest.raises(ValueError, match="cannot have identical ref and alt alleles"):
+        _is_autosomal_variant("chr22:1:A:A")
 
 
 def test__parse_vcf_from_file_stream():

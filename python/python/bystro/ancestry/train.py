@@ -106,6 +106,18 @@ VARIANT_REGEX = re.compile(
     re.VERBOSE,
 )
 
+
+def _is_autosomal_variant(potential_variant: str) -> bool:
+    """Determine whether string is a syntactically valid autochromosomal variant."""
+    if not VARIANT_REGEX.match(potential_variant):
+        return False
+    chromosome, position, ref, alt = potential_variant.split(":")
+    if ref == alt:
+        err_msg = f"Variant {potential_variant} cannot have identical ref and alt alleles"
+        raise ValueError(err_msg)
+    return True
+
+
 rng = np.random.RandomState(1337)
 
 Variant = str
@@ -154,7 +166,7 @@ def _parse_vcf_line_for_dosages(
     # will throw ValueError if "PASS" not found, which is good
     fields = line[: line.index("PASS")].split()
     variant = ":".join([fields[0], fields[1], fields[3], fields[4]])
-    assert_true("variant is a valid variant string", (VARIANT_REGEX.match(variant)))
+    assert_true("variant is a valid variant string", _is_autosomal_variant(variant))
     if variant in variants_to_keep:
         variant_dosages = [
             int(psa[0]) + int(psa[2]) for psa in line.split()[9:]
@@ -268,6 +280,9 @@ def _load_genotypes() -> pd.DataFrame:
     return pd.DataFrame(filtered_genotypes, index=samples, columns=variant_ids)
 
 
+# TODO(pat) we will basically never want to consider closely related
+# individuals in an ancestry model, so consider baking this further
+# into the KGP loading code.
 def filter_samples_for_relatedness(
     genotypes: pd.DataFrame,
     labels: pd.DataFrame,
@@ -518,6 +533,7 @@ def _compute_accuracy_report(
     train_y: pd.DataFrame,
     test_y: pd.DataFrame,
 ) -> AccuracyReport:
+    """Compute accuracy scores for population and superpop classification on train and test."""
     train_yhat_pop_probs = clf.predict_proba(train_Xpc)
     test_yhat_pop_probs = clf.predict_proba(test_Xpc)
 
