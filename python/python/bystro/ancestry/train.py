@@ -32,7 +32,7 @@ from sklearn.model_selection import train_test_split
 from skops.io import dump as skops_dump
 
 from bystro.ancestry.asserts import assert_equals, assert_true
-from bystro.ancestry.train_utils import get_variant_ids_from_callset, head
+from bystro.ancestry.train_utils import get_variant_ids_from_callset, head, is_autosomal_variant
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -91,33 +91,6 @@ SUPERPOP_FROM_POP = {
 POPS = np.array(sorted(SUPERPOP_FROM_POP.keys()))
 SUPERPOPS = np.array(sorted(set(SUPERPOP_FROM_POP.values())))
 
-VARIANT_REGEX = re.compile(
-    r"""
-    ^
-    chr(1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22)  # (autosomal) chromosome
-    :
-    [0-9]+  # position
-    :
-    [ACGT]  # ref allele
-    :
-    [ACGT]  # alt allele
-    $
-    """,
-    re.VERBOSE,
-)
-
-
-def _is_autosomal_variant(potential_variant: str) -> bool:
-    """Determine whether string is a syntactically valid autochromosomal variant."""
-    if not VARIANT_REGEX.match(potential_variant):
-        return False
-    chromosome, position, ref, alt = potential_variant.split(":")
-    if ref == alt:
-        err_msg = f"Variant {potential_variant} cannot have identical ref and alt alleles"
-        raise ValueError(err_msg)
-    return True
-
-
 rng = np.random.RandomState(1337)
 
 Variant = str
@@ -166,7 +139,7 @@ def _parse_vcf_line_for_dosages(
     # will throw ValueError if "PASS" not found, which is good
     fields = line[: line.index("PASS")].split()
     variant = ":".join([fields[0], fields[1], fields[3], fields[4]])
-    assert_true("variant is a valid variant string", _is_autosomal_variant(variant))
+    assert_true("variant is a valid variant string", is_autosomal_variant(variant))
     if variant in variants_to_keep:
         variant_dosages = [
             int(psa[0]) + int(psa[2]) for psa in line.split()[9:]
