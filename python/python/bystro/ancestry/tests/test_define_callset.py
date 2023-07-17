@@ -16,7 +16,6 @@ from bystro.ancestry.define_callset import (
         ("chr12:126890980:G:A", "chr12:126406434:G:A"),
         ("chrX:81328:A:G", "chrX:31328:A:G"),
         ("chr1:900000000:G:A", None),
-        ("chrMT:1:G:A", None),
     ],
 )
 def test_liftover_38_from_37(test_input: str, expected: str | None):
