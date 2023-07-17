@@ -27,8 +27,6 @@ def get_watson_crick_complement(base: str) -> str:
 def liftover_38_from_37(variant: str) -> str | None:
     """Liftover a variant to genome build 38 from 37."""
     chrom, pos, ref, alt = variant.split(":")
-    if "MT" in chrom:
-        return None
     # liftover doesn't deal gracefully with MT variants, but we don't need them anyway
     locations = converter[chrom][int(pos)]
     if locations is None or len(locations) != 1:
