@@ -26,25 +26,43 @@ def get_watson_crick_complement(base: str) -> str:
 def liftover_38_from_37(variant: str) -> str | None:
     """Liftover a variant to genome build 38 from 37."""
     chrom, pos, ref, alt = variant.split(":")
-    locations = converter[int(chrom.lstrip("chr"))][int(pos)]
+    # liftover doesn't deal gracefully with MT variants, but we don't need them anyway
+    if "MT" in chrom:
+        return None
+    locations = converter[chrom][int(pos)]
     if locations is None or len(locations) != 1:
         logger.info("Variant %s had a non-unique location, couldn't lift over", variant)
         return None
     chrom38, pos38, _strand38 = locations[0]
-    variant38 = ":".join([chrom38, str(pos), ref, alt])
+    variant38 = ":".join([chrom38, str(pos38), ref, alt])
     assert_true("lifted-over variant starts with 'chr'", variant38.startswith("chr"))
     return variant38
 
 
-def load_illumina_callset() -> pd.Series:
-    """Load list of variants for illumina chip."""
-    illumina_df = pd.read_csv(ILLUMINA_FILEPATH, skiprows=7)
+def _load_illumina_df() -> pd.DataFrame:
+    comment_rows = 7
+    columns_to_keep = ["Chr", "MapInfo", "SNP", "RefStrand"]
+    illumina_df = pd.read_csv(ILLUMINA_FILEPATH, skiprows=comment_rows)
     assert_equals(
         "Set of genome builds",
         {37.1},
         "actual set of genome builds",
         set(illumina_df.GenomeBuild.dropna()),
     )
+    return illumina_df[columns_to_keep]
+
+
+def load_illumina_callset() -> pd.Series:
+    """Load list of variants for illumina chip."""
+    illumina_df = _load_illumina_df()
+    illumina_variants = _process_illumina_df(illumina_df)
+    assert_equals(
+        "number of illumina variants", 578822, "recovered number of variants", len(illumina_variants)
+    )
+    return illumina_variants
+
+
+def _process_illumina_df(illumina_df: pd.DataFrame) -> pd.Series:
     variants = []
     liftover_attempts = 0
     liftover_failures = 0
@@ -78,39 +96,42 @@ def load_illumina_callset() -> pd.Series:
         variants.append(":".join([chromosome38, position38, allele1, allele2]))
     liftover_failure_rate_pct = liftover_failures / liftover_attempts * 100
     logger.info("liftover failure rate: %1.2f%%", liftover_failure_rate_pct)
-    assert_equals("number of illumina variants", 578822, "recovered number of variants", len(variants))
     return pd.Series(variants)
 
 
-def load_affymetrix_callset() -> pd.Series:
-    """Load list of variants for Affymetrix chip."""
-    chip_df = pd.read_csv(
-        AFFYMETRIX_FILEPATH,
-        comment="#",
-        index_col=0,
-    )
-    assert_equals("positive strand", {"+"}, "actual set of strands", set(chip_df.Strand))
+def _load_affymetrix_df() -> pd.DataFrame:
+    affymetrix_df = pd.read_csv(AFFYMETRIX_FILEPATH, comment="#", index_col=0, dtype={"Chromosome": str})
+    columns_to_keep = ["Chromosome", "Physical Position", "Ref Allele", "Alt Allele"]
+    assert_equals("positive strand", {"+"}, "actual set of strands", set(affymetrix_df.Strand))
     assert_equals(
         "differences between Physical Position and Position End",
         {0},
         "actual differences",
-        set(chip_df["Physical Position"] - chip_df["Position End"]),
+        set(affymetrix_df["Physical Position"] - affymetrix_df["Position End"]),
     )
-    variants = []
-    for _i, row in chip_df.iterrows():
+
+    return affymetrix_df[columns_to_keep]
+
+
+def _process_affymetrix_df(affymetrix_df: pd.DataFrame) -> pd.Series:
+    """Load list of variants for Affymetrix chip."""
+    variants38 = []
+    for _i, row in affymetrix_df.iterrows():
         variant = ":".join(
             [
-                "chr" + str(row.Chromosome),
+                "chr" + (row.Chromosome),
                 str(row["Physical Position"]),
                 row["Ref Allele"],
                 row["Alt Allele"],
             ]
         )
+        variant38 = liftover_38_from_37(variant)
+        variants38.append(variant38)
+    return pd.Series(variants38, index=affymetrix_df.index).dropna()
 
-        variants.append(variant)
-    variants38 = [liftover_38_from_37(v) for v in variants]
-    chip_df["variant"] = variants38
-    return chip_df.variant
+
+def load_affymetrix_callset() -> pd.Series:
+    return _process_affymetrix_df(_load_affymetrix_df())
 
 
 def calculate_shared_illumina_affymetrix_variants() -> pd.DataFrame:
