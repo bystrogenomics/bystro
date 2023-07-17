@@ -53,7 +53,7 @@ def _load_illumina_df() -> pd.DataFrame:
     return illumina_df[columns_to_keep].dropna()
 
 
-def load_illumina_callset() -> pd.Series:
+def load_illumina_variants() -> pd.Series:
     """Load list of variants for illumina chip."""
     illumina_df = _load_illumina_df()
     illumina_variants = _get_variants_from_illumina_df(illumina_df)
@@ -122,15 +122,15 @@ def _get_variants_from_affymetrix_df(affymetrix_df: pd.DataFrame) -> pd.Series:
     return affymetrix_variants.dropna()
 
 
-def load_affymetrix_callset() -> pd.Series:
+def load_affymetrix_variants() -> pd.Series:
     """Load list of variants for Affymetrix chip."""
     return _get_variants_from_affymetrix_df(_load_affymetrix_df())
 
 
 def calculate_shared_illumina_affymetrix_variants() -> pd.DataFrame:
     """Calculate intersection of illumina, affymetrix variants and write result to disk."""
-    illumina_variants = load_illumina_callset()
-    affy_variants = load_affymetrix_callset()
+    illumina_variants = load_illumina_variants()
+    affy_variants = load_affymetrix_variants()
     shared_variants = pd.DataFrame(sorted(set(illumina_variants).intersection(affy_variants)))
     assert_equals(
         "number of shared variants", 34319, "number of shared variants obtained", len(shared_variants)
