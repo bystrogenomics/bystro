@@ -66,8 +66,6 @@ def load_illumina_callset() -> pd.Series:
 def _get_variants_from_illumina_df(illumina_df: pd.DataFrame) -> pd.Series:
     """Extract affymetrix variants and lift over."""
     variants38 = []
-    liftover_attempts = 0
-    liftover_failures = 0
     for _i, row in tqdm.tqdm(illumina_df.iterrows(), total=len(illumina_df)):
         chromosome = str(row.Chr)
         position = str(int(row.MapInfo))
@@ -82,10 +80,10 @@ def _get_variants_from_illumina_df(illumina_df: pd.DataFrame) -> pd.Series:
         if not is_autosomal_variant(variant37):
             continue
         variants38.append(liftover_38_from_37(variant37))
-    variants = pd.Series(variants38)
-    liftover_failure_rate = variants.isnull().mean()
+    illumina_variants = pd.Series(variants38)
+    liftover_failure_rate = illumina_variants.isna().mean()
     logger.info("liftover failure rate: %1.2f%%", liftover_failure_rate * 100)
-    return variants.dropna()
+    return illumina_variants.dropna()
 
 
 def _load_affymetrix_df() -> pd.DataFrame:
@@ -118,10 +116,10 @@ def _get_variants_from_affymetrix_df(affymetrix_df: pd.DataFrame) -> pd.Series:
             continue
         variant38 = liftover_38_from_37(variant)
         variants38.append(variant38)
-    variants = pd.Series(variants38)
-    liftover_failure_rate = variants.isnull().mean()
+    affymetrix_variants = pd.Series(variants38)
+    liftover_failure_rate = affymetrix_variants.isna().mean()
     logger.info("liftover failure rate: %1.2f%%", liftover_failure_rate * 100)
-    return variants.dropna()
+    return affymetrix_variants.dropna()
 
 
 def load_affymetrix_callset() -> pd.Series:

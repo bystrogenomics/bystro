@@ -1,6 +1,6 @@
 """Utilities for ancestry model training."""
-from collections.abc import Iterable
 import re
+from collections.abc import Iterable
 from typing import Any, TypeVar
 
 import numpy as np

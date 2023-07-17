@@ -13,7 +13,6 @@ import dataclasses
 import gzip
 import logging
 import random
-import re
 import sys
 from collections import Counter
 from collections.abc import Collection, Container, Iterable, Sequence
