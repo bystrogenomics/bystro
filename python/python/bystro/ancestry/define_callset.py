@@ -58,7 +58,10 @@ def load_illumina_variants() -> pd.Series:
     illumina_df = _load_illumina_df()
     illumina_variants = _get_variants_from_illumina_df(illumina_df)
     assert_equals(
-        "number of illumina variants", 578822, "recovered number of variants", len(illumina_variants)
+        "number of autosomal illumina variants after liftover",
+        578822,
+        "recovered number of variants",
+        len(illumina_variants),
     )
     return illumina_variants
 
@@ -124,14 +127,21 @@ def _get_variants_from_affymetrix_df(affymetrix_df: pd.DataFrame) -> pd.Series:
 
 def load_affymetrix_variants() -> pd.Series:
     """Load list of variants for Affymetrix Axiom PMRA chip."""
-    return _get_variants_from_affymetrix_df(_load_affymetrix_df())
+    affymetrix_variants = _get_variants_from_affymetrix_df(_load_affymetrix_df())
+    assert_equals(
+        "number of autosomal affymetrix variants after liftover",
+        820710,
+        "recovered number of variants",
+        len(affymetrix_variants),
+    )
+    return affymetrix_variants
 
 
 def calculate_shared_illumina_affymetrix_variants() -> pd.DataFrame:
     """Calculate intersection of illumina, affymetrix variants and write result to disk."""
     illumina_variants = load_illumina_variants()
-    affy_variants = load_affymetrix_variants()
-    shared_variants = pd.DataFrame(sorted(set(illumina_variants).intersection(affy_variants)))
+    affymetrix_variants = load_affymetrix_variants()
+    shared_variants = pd.DataFrame(sorted(set(illumina_variants).intersection(affymetrix_variants)))
     assert_equals(
         "number of shared variants", 34319, "number of shared variants obtained", len(shared_variants)
     )
