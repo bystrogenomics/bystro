@@ -17,6 +17,8 @@ converter = get_lifter("hg19", "hg38")
 ILLUMINA_FILEPATH = DATA_DIR / "Human660W-Quad_v1_H.csv"
 AFFYMETRIX_FILEPATH = DATA_DIR / "Axiom_PMRA.na35.annot.csv"
 
+# TODO: harmonize variant chromosomal coordinates with rsIDs.
+
 
 def get_watson_crick_complement(base: str) -> str:
     """Calculate Watson-Crick Complement."""
