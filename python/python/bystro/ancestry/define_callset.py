@@ -52,7 +52,7 @@ def _load_illumina_df() -> pd.DataFrame:
 
 
 def load_illumina_variants() -> pd.Series:
-    """Load list of variants for illumina chip."""
+    """Load list of variants for illumina Human660W-Quad_v1 chip."""
     illumina_df = _load_illumina_df()
     illumina_variants = _get_variants_from_illumina_df(illumina_df)
     assert_equals(
@@ -62,7 +62,7 @@ def load_illumina_variants() -> pd.Series:
 
 
 def _get_variants_from_illumina_df(illumina_df: pd.DataFrame) -> pd.Series:
-    """Extract affymetrix variants and lift over."""
+    """Extract illumina variants and lift over."""
     variants38 = []
     for _i, row in tqdm.tqdm(illumina_df.iterrows(), total=len(illumina_df)):
         chromosome = str(row.Chr)
@@ -121,7 +121,7 @@ def _get_variants_from_affymetrix_df(affymetrix_df: pd.DataFrame) -> pd.Series:
 
 
 def load_affymetrix_variants() -> pd.Series:
-    """Load list of variants for Affymetrix chip."""
+    """Load list of variants for Affymetrix Axiom PMRA chip."""
     return _get_variants_from_affymetrix_df(_load_affymetrix_df())
 
 
