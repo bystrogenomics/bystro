@@ -25,21 +25,21 @@ different levels, from simple syntax issues to more complex logic problems. They
 valuable as the codebase grows, providing essential checks in larger projects.
 
 
-### The Right Balance
+#### The Right Balance
 
 Finding the right balance between short-term and long-term velocity is crucial. We've curated our
 linting ruleset starting with the default settings and customizing it to suit our specific concerns
 in scientific programming, with the aim of allowing developers to write more efficient unit test
 suites and focus on higher-level concerns like correctness and performance.
 
-## Continual Improvement
+#### Continual Improvement
 
 We believe in continuous improvement. Our ruleset isn't set in stone, and we welcome feedback and
 suggestions for refinement. If you feel that certain rules frustrate rather than enhance your
 productivity, please let us know, and we'll be happy to reevaluate and make necessary adjustments.
 We want our tooling to work for developers, not the other way around.
 
-## Engage and Contribute
+#### Engage and Contribute
 
 Your input and contributions are gratefully appreciated. If you encounter any issues or have ideas
 to improve our workflow or ruleset, feel free to share your thoughts. We appreciate your dedication
