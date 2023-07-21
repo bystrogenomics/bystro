@@ -99,7 +99,7 @@ def TADA(tada_counts : dict, sample_counts : dict, mu : pd.DataFrame, hyperpar :
     BF['BF.total'] = BF_total
     return BF
 
-def TADAnull(tada_counts : list, sample_counts : list, mu : pd.Dataframe, hyperpar : pd.DataFrame, denovo_only : pd.DataFrame,
+def TADAnull(tada_counts : list, sample_counts : list, mu : pd.DataFrame, hyperpar : pd.DataFrame, denovo_only : pd.DataFrame,
             mu_frac : pd.DataFrame = 1, n_rep : int = 100, dn_max : int = 20, ca_max : int = 200, cn_max : int = 200, max_gap : int = 50):
     """
     Genome-wide application of TADA for K classes of variants
@@ -228,9 +228,9 @@ def calculate_BF(i_gene : int, counts : pd.DataFrame, n : pd.DataFrame, mu : pd.
         Bayes factor for the gene of interest
     """
 
-    if i_gene % 100 == 0 or i_gene == len(counts)-1:
+    if i_gene % 100 == 0:
         pbar = tqdm(total=len(counts))
-        pbar.update(100)
+        pbar.update(i_gene)
 
         if i_gene == len(counts)-1:
             pbar.close()
@@ -586,9 +586,9 @@ def denovo_MOM(k : int, N : int, mu : pd.DataFrame, C : int, beta : float, d : i
     """
 
     if max_kvec is not None:
-        if k % 100 == 0 or k == max_kvec:
+        if k % 100 == 0:
             pb = tqdm(total=max_kvec)
-            pb.update(100)
+            pb.update(i_gene)
 
     m = len(mu)  # Number of genes
 
