@@ -3,7 +3,11 @@ import argparse
 import logging
 from pathlib import Path
 
+import botocore
 from ruamel.yaml import YAML
+from sklearn.decomposition import PCA
+from sklearn.ensemble import RandomForestClassifier
+from skops.io import load as skops_load
 
 from bystro.ancestry.ancestry_types import (
     AncestryResponse,
@@ -17,6 +21,21 @@ logging.basicConfig(filename="ancestry_listener.log", level=logging.DEBUG)
 logger = logging.getLogger()
 
 ANCESTRY_TUBE = "ancestry"
+
+
+def _get_models_from_s3(
+    s3_client: botocore.client.BaseClient,
+) -> tuple[PCA, RandomForestClassifier]:
+    ANCESTRY_BUCKET = "bystro-ancestry"
+    PCA_FILE = "pca.skop"
+    RFC_FILE = "rfc.skop"
+
+    s3_client.download_file(ANCESTRY_BUCKET, PCA_FILE, PCA_FILE)
+    s3_client.download_file(ANCESTRY_BUCKET, RFC_FILE, RFC_FILE)
+
+    pca = skops_load(PCA_FILE)
+    rfc = skops_load(RFC_FILE)
+    return pca, rfc
 
 
 class AncestryJobData(BaseMessage, frozen=True):
@@ -54,9 +73,7 @@ def _infer_ancestry(
     return make_dummy_ancestry_response(vcf_path)
 
 
-def handler_fn(
-    publisher: ProgressPublisher, ancestry_job_data: AncestryJobData
-) -> AncestryResponse:
+def handler_fn(publisher: ProgressPublisher, ancestry_job_data: AncestryJobData) -> AncestryResponse:
     """Do ancestry job, wraping _infer_ancestry for beanstalk."""
     # Separating _handler_fn from _infer_ancestry in order to separate ML from infra concerns,
     # and especially to keep _infer_ancestry eager.
