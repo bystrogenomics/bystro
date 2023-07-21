@@ -190,7 +190,7 @@ sub go {
   # This speeds up cadd building
   $self->_wantedTrack->{sorted} = 1;
 
-  $self->_backupAndWriteConfig('sortCadd');
+  $self->_backupAndWriteConfig();
 }
 
 __PACKAGE__->meta->make_immutable;

@@ -1,6 +1,5 @@
 """TODO: Add description here"""
 import abc
-import asyncio
 import sys
 import time
 import traceback
@@ -112,7 +111,7 @@ def listen(
                     f"""
                             Job {job_id} JSON does not have the data expected.
                             Expected {job_data_type.keys_with_types()}.
-                            Decoding `{str(job.job_data)}`, failed with: `{err}`"""
+                            Decoding failed with: `{err}`"""
                 )
                 traceback.print_exc()
                 client.put_job(json.encode(failed_msg_fn(job_data, job_id, ValueError(msg))))
@@ -150,7 +149,7 @@ def listen(
                 )
 
                 client.put_job(json.encode(submit_msg_fn(job_data)))
-                res = asyncio.get_event_loop().run_until_complete(handler_fn(publisher, job_data))
+                res = handler_fn(publisher, job_data)
                 client.put_job(json.encode(completed_msg_fn(job_data, res)))
                 client.delete_job(job.job_id)
             except Exception as err:

@@ -137,7 +137,7 @@ has wantedChr => (
     qq{Annotate a single chromosome},
 );
 
-has max_threads => (
+has maxThreads => (
   is => 'ro',
   isa => 'Int',
   metaclass => 'Getopt',
@@ -194,8 +194,8 @@ sub annotate {
     $args->{verbose} = $self->verbose;
   }
 
-  if(defined $self->max_threads) {
-    $args->{maxThreads} = $self->max_threads;
+  if(defined $self->maxThreads) {
+    $args->{maxThreads} = $self->maxThreads;
   }
 
   if(defined $self->output_json) {

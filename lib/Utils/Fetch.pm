@@ -11,6 +11,7 @@ our $VERSION = '0.001';
 
 use Mouse 2;
 
+# Exports: _localFilesDir, _decodedConfig, compress, _wantedTrack, _setConfig, logPath, use_absolute_path
 extends 'Utils::Base';
 
 use namespace::autoclean;
@@ -125,7 +126,7 @@ sub _fetchFromUCSCsql {
 
   $self->_wantedTrack->{local_files} = \@writtenFileNames;
 
-  $self->_backupAndWriteConfig('fetch');
+  $self->_backupAndWriteConfig();
 
   $self->log('info', "Finished fetching data from sql");
 }
@@ -226,7 +227,7 @@ sub _fetchFiles {
     sleep 3;
   }
 
-  $self->_backupAndWriteConfig('fetch');
+  $self->_backupAndWriteConfig();
 
   $self->log('info', "Finished fetching all remote files");
 }

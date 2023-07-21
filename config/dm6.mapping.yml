@@ -16,8 +16,6 @@ sort:
       number_of_replicas: 0
       number_of_shards: 6
       codec: best_compression
-      mapping:
-        single_type: true
     analysis:
       normalizer:
         lowercase_normalizer:

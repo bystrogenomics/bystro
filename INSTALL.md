@@ -57,9 +57,9 @@ The downloaded databases are tar balls, in which the database files that Bystro 
 
    **Example:**
 
-   ````shell
-   pigz -d -c hg38.tar.gz | (cd /where/to/ && tar xvf -)```
-   ````
+   ```shell
+   pigz -d -c hg38.tar.gz | (cd /where/to/ && tar xvf -)
+   ```
 
    In this example the hg38 database would located in `/where/to/hg38/index`
 

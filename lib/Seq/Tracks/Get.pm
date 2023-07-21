@@ -63,8 +63,8 @@ sub get {
   # $_[0] == $self
   # $_[1] == <ArrayRef> $href : the database data, with each top-level index corresponding to a track
   # $_[2] == <String> $chr  : the chromosome
-  # $_[3] == <String> $refBase : ACTG
-  # $_[4] == <String> $allele  : the allele (ACTG or -N / +ACTG)
+  # $_[3] == <String> $refBase : a base, one of ACTG
+  # $_[4] == <String> $allele  : a base, the allele (ACTG or a deletion in the form of "-{number}", or insertion in the form of "+" followed by a sequence of nucleotides)
   # $_[5] == <Int> $posIdx : the position in the indel, if any
   # $_[6] == <ArrayRef> $outAccum : a reference to the output, which we mutate
 

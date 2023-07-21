@@ -63,8 +63,12 @@ sub BUILD {
   #Expects DBManager to have been given a database_dir
   $self->{_db} = Seq::DBManager->new();
 
-  # Initializes the tracks
-  # This ensures that the tracks are configured, and headers set
+  # When tracksObj accessor is called, a function is executed that results in the database being set to read only
+  # when read only mode is called for (Seq::Base instantiated with readOnly => 1)
+  # Therefore it is important to call tracksObj before any other database calls
+  # to make sure that read-only semantics are enforced throughout the annotation process
+  # To ensure that we don't accidentally defer setting database mode until child proceses begin to annotate (in which case they will race to set the database mode)
+  # from hereon we will only use $self->{_tracks} to refer to tracks objects.
   $self->{_tracks} = $self->tracksObj;
 }
 
@@ -123,7 +127,7 @@ sub annotateFile {
   my $progressFunc =
   $self->makeLogProgressAndPrint( \$abortErr, $outFh, $statsFh, $messageFreq );
   MCE::Loop::init {
-    max_workers => $self->max_threads || 8,
+    max_workers => $self->maxThreads || 8,
     use_slurpio => 1,
     chunk_size => 'auto',
     gather => $progressFunc,
@@ -134,15 +138,15 @@ sub annotateFile {
 
   # To avoid the Moose/Mouse accessor penalty, store reference to underlying data
   my $db = $self->{_db};
-  my $refTrackGetter = $self->tracksObj->getRefTrackGetter();
-  my @trackGettersExceptReference = @{$self->tracksObj->getTrackGettersExceptReference()};
+  my $refTrackGetter = $self->{_tracks}->getRefTrackGetter();
+  my @trackGettersExceptReference = @{$self->{_tracks}->getTrackGettersExceptReference()};
   my @trackIndicesExceptReference = 0 .. $#trackGettersExceptReference;
 
   my $outIndicesMap = $finalHeader->getParentIndices();
   my @outIndicesExceptReference = map { $outIndicesMap->{$_->name} } @trackGettersExceptReference;
 
   ######### Set Outputter #########
-  my @allOutIndices = map { $outIndicesMap->{$_->name} } @{$self->tracksObj->trackGetters};
+  my @allOutIndices = map { $outIndicesMap->{$_->name} } @{$self->{_tracks}->trackGetters};
 
   # Now that header is prepared, make the outputter
   # Note, that the only features that we need to iterate over
