@@ -1,9 +1,13 @@
 """Provide a worker for the ancestry model."""
 import argparse
 import logging
+from functools import partial
 from pathlib import Path
 
+import boto3
 import botocore
+import numpy as np
+import pandas as pd
 from ruamel.yaml import YAML
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
@@ -14,6 +18,7 @@ from bystro.ancestry.ancestry_types import (
     AncestrySubmission,
 )
 from bystro.ancestry.dummy_ancestry_response import make_dummy_ancestry_response
+from bystro.ancestry.train import parse_vcf
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
 from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, get_progress_reporter, listen
 
@@ -21,15 +26,14 @@ logging.basicConfig(filename="ancestry_listener.log", level=logging.DEBUG)
 logger = logging.getLogger()
 
 ANCESTRY_TUBE = "ancestry"
+ANCESTRY_BUCKET = "bystro-ancestry"
+PCA_FILE = "pca.skop"
+RFC_FILE = "rfc.skop"
 
 
 def _get_models_from_s3(
     s3_client: botocore.client.BaseClient,
 ) -> tuple[PCA, RandomForestClassifier]:
-    ANCESTRY_BUCKET = "bystro-ancestry"
-    PCA_FILE = "pca.skop"
-    RFC_FILE = "rfc.skop"
-
     s3_client.download_file(ANCESTRY_BUCKET, PCA_FILE, PCA_FILE)
     s3_client.download_file(ANCESTRY_BUCKET, RFC_FILE, RFC_FILE)
 
@@ -57,9 +61,23 @@ def _load_queue_conf(queue_conf_path: str) -> QueueConf:
     return QueueConf(addresses=beanstalk_conf["addresses"], tubes=beanstalk_conf["tubes"])
 
 
+def _fill_missing_data(genotypes: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
+    missingnesses = genotypes.isna().mean(axis="columns")
+    # todo: much better imputation strategy to come, but we're stubbing out for now.
+    imputed_genotypes = genotypes.fillna(genotypes.mean())
+    return imputed_genotypes, missingnesses
+
+
+def _package_ancestry_response(ancestry_predictions: np.ndarray):
+    raise NotImplementedError
+
+
 # TODO: implement with ray
 def _infer_ancestry(
-    ancestry_submission: AncestrySubmission, _publisher: ProgressPublisher
+    pca: PCA,
+    rfc: RandomForestClassifier,
+    ancestry_submission: AncestrySubmission,
+    _publisher: ProgressPublisher,
 ) -> AncestryResponse:
     """Run an ancestry job."""
     # TODO: main ancestry model logic goes here.  Just stubbing out for now.
@@ -69,16 +87,25 @@ def _infer_ancestry(
     # simply threading it through for later.
     _reporter = get_progress_reporter(_publisher)
     vcf_path = ancestry_submission.vcf_path
+    genotypes = parse_vcf(vcf_path, variants_to_keep=pca.index)
+    imputed_genotypes, missingnesses = _fill_missing_data(genotypes)
+    model_output = rfc.predict_proba(pca.transform(imputed_genotypes))
+    ancestry_response = _package_ancestry_response(model_output, missingnesses)
 
     return make_dummy_ancestry_response(vcf_path)
 
 
-def handler_fn(publisher: ProgressPublisher, ancestry_job_data: AncestryJobData) -> AncestryResponse:
+def handler_fn(
+    pca: PCA,
+    rfc: RandomForestClassifier,
+    publisher: ProgressPublisher,
+    ancestry_job_data: AncestryJobData,
+) -> AncestryResponse:
     """Do ancestry job, wraping _infer_ancestry for beanstalk."""
     # Separating _handler_fn from _infer_ancestry in order to separate ML from infra concerns,
     # and especially to keep _infer_ancestry eager.
     logger.debug("entering handler_fn with: %s", ancestry_job_data)
-    return _infer_ancestry(ancestry_job_data.ancestry_submission, publisher)
+    return _infer_ancestry(pca, rfc, ancestry_job_data.ancestry_submission, publisher)
 
 
 def submit_msg_fn(ancestry_job_data: AncestryJobData) -> SubmittedJobMessage:
@@ -105,12 +132,13 @@ def completed_msg_fn(
     )
 
 
-def main(queue_conf: QueueConf, ancestry_tube: str) -> None:
+def main(pca: PCA, rfc: RandomForestClassifier, queue_conf: QueueConf, ancestry_tube: str) -> None:
     """Run ancestry listener."""
     logger.debug("Entering main")
+    handler_fn_with_models = partial(handler_fn, pca, rfc)
     listen(
         AncestryJobData,
-        handler_fn,
+        handler_fn_with_models,
         submit_msg_fn,
         completed_msg_fn,
         queue_conf,
@@ -127,7 +155,8 @@ if __name__ == "__main__":
         required=True,
     )
     args = parser.parse_args()
-
+    s3_client = boto3.client("s3")
+    pca, rfc = _get_models_from_s3(s3_client)
     queue_conf = _load_queue_conf(args.queue_conf)
 
-    main(queue_conf, ancestry_tube=ANCESTRY_TUBE)
+    main(pca, rfc, queue_conf, ancestry_tube=ANCESTRY_TUBE)
