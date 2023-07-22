@@ -75,6 +75,7 @@ ignore = [
 "N803",  # upercase variable names are often ok in scientific programming 
 "N806",  # upercase function names are often ok in scientific programming(ditto)
 "N815",  # ignore camelCase for now (remove this eventually)
+"RET504",  # allow variable assignments before return values
 "S311", # it's fine to use standard pseudo-random generators
 "SIM300",  # ignore yoda conditions, too many false positives
 ]
