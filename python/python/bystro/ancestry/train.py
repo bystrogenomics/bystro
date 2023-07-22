@@ -126,7 +126,7 @@ def load_callset_for_variants(variants: set[str]) -> pd.DataFrame:
     for chromosome in range(1, 22 + 1):
         logger.info("starting on chromosome: %s", chromosome)
         file_path = str(KGP_VCF_DIR / file_template.format(chromosome))
-        genotype_df = _parse_vcf(file_path, variants)
+        genotype_df = parse_vcf(file_path, variants)
         logger.info("got genotype_df of shape: %s", genotype_df.shape)
         genotype_dfs.append(genotype_df)
     return pd.concat(genotype_dfs, axis=1)
@@ -170,7 +170,7 @@ def _calculate_recovery_rate(
     return len(found_variants) / len(relevant_variants_to_keep)
 
 
-def _parse_vcf(file_path: str, variants_to_keep: Collection[str]) -> pd.DataFrame:
+def parse_vcf(file_path: str, variants_to_keep: Collection[str]) -> pd.DataFrame:
     with gzip.open(file_path, "rt") as f:
         return _parse_vcf_from_file_stream(f, variants_to_keep)
 
