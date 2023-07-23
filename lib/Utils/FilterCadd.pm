@@ -29,6 +29,8 @@ use Seq::Tracks::Score::Build;
 # Exports: _localFilesDir, _decodedConfig, compress, _wantedTrack, _setConfig, logPath, use_absolute_path
 extends 'Utils::Base';
 
+has '+compress' => (default => 1);
+
 my $localFilesHandler = Seq::Tracks::Build::LocalFilesPaths->new();
 
 sub BUILD {

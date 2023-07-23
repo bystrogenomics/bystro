@@ -6,7 +6,7 @@ use warnings;
 
 use lib './lib';
 
-use Getopt::Long;
+use Getopt::Long 'HelpMessage';
 use Path::Tiny qw/path/;
 use Pod::Usage;
 use YAML::XS qw/LoadFile/;
@@ -37,17 +37,17 @@ my (
 GetOptions(
   'c|config=s'   => \$yaml_config,
   'n|name=s'     => \$names,
-  'h|help'       => \$help,
   'u|util=s'     => \$utilName,
+  'm|maxThreads=i' => \$maxThreads,
+  'h|help'       => \$help,
   'd|debug=i'      => \$debug,
   'o|overwrite'  => \$overwrite,
   'v|verbose=i' => \$verbose,
   'r|dryRun' => \$dryRunInsertions,
-  'm|maxThreads=i' => \$maxThreads,
 );
 
 if ($help || !$yaml_config) {
-  Pod::Usage::pod2usage();
+  HelpMessage(1);
 }
 
 if(!$names) {
@@ -112,9 +112,15 @@ for my $wantedName (split ',', $names) {
     # config may be mutated, by the last utility
     $config = LoadFile($yaml_config);
     my $utilConfig = $config->{tracks}{tracks}[$trackIdx]{utils}[$utilIdx];
+    my $trackName = $config->{tracks}{tracks}[$trackIdx]{name};
 
     my $utilName = $utilConfig->{name};
-    say $utilName;
+
+    if (!$utilName) {
+      die "The `name` property must be specified for each utility; missing for track \`$trackName\`\'s utility at index $utilIdx";
+    }
+
+    say "Processing \`$trackName\` utility \`$utilName\`";
 
     # Uppercase the first letter of the utility class name
     # aka user may specify "fetch" and we grab Utils::Fetch
@@ -132,19 +138,17 @@ __END__
 
 =head1 NAME
 
-run_utils - Runs items in lib/Utils
+bystro_utils - Runs items in lib/Utils
 
 =head1 SYNOPSIS
 
-run_utils
-  --config <yaml>
-  --name <track>
-  [--debug]
-  [--verbose]
-  [--maxThreads]
-  [--dryRun]
-  [--overwrite]
-  [--help]
+bystro_utils.pl
+
+  -c|--config         The configuration file path, e.g. "config/hg19.yml".
+  -n|--name           (Optional) The track names you wish to run the utilities of. Comma separated. Example: "ref,refSeq,cadd". Defaults to all tracks if not specified.
+  -u|--util           (Optional) A single utility name, e.g. "SortCadd". Defaults to all utils for the specified tracks if not specified.
+  -m|--maxThreads     (Optional) The maximum number of threads to use. Defaults to the number of cores on the machine.
+  --help              (Optional) Display this help message and exit.
 
 =head1 DESCRIPTION
 
