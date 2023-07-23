@@ -147,7 +147,7 @@ bystro_utils.pl
   -c|--config         The configuration file path, e.g. "config/hg19.yml".
   -n|--name           (Optional) The track names you wish to run the utilities of. Comma separated. Example: "ref,refSeq,cadd". Defaults to all tracks if not specified.
   -u|--util           (Optional) A single utility name, e.g. "SortCadd". Defaults to all utils for the specified tracks if not specified.
-  -m|--maxThreads     (Optional) The maximum number of threads to use. Defaults to the number of cores on the machine.
+  -m|--maxThreads     (Optional) The maximum number of threads to use. Defaults to the number of logical CPU cores on the machine.
   --help              (Optional) Display this help message and exit.
 
 =head1 DESCRIPTION
