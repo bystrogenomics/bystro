@@ -39,6 +39,7 @@ def _get_models_from_s3(
 
     pca = skops_load(PCA_FILE)
     rfc = skops_load(RFC_FILE)
+    logger.info("Loaded ancestry models from S3")
     return pca, rfc
 
 
