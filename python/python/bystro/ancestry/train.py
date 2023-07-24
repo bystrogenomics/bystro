@@ -15,7 +15,7 @@ import logging
 import random
 import sys
 from collections import Counter
-from collections.abc import Collection, Container, Iterable, Sequence
+from collections.abc import Collection, Container, Iterable
 from pathlib import Path
 from typing import Any, Literal, TypeVar, get_args
 
@@ -170,8 +170,9 @@ def _calculate_recovery_rate(
     return len(found_variants) / len(relevant_variants_to_keep)
 
 
-def parse_vcf(file_path: str, variants_to_keep: Collection[str]) -> pd.DataFrame:
-    with gzip.open(file_path, "rt") as f:
+def parse_vcf(vcf_fpath: str, variants_to_keep: Collection[str]) -> pd.DataFrame:
+    """Parse vcf_fpath for selected variants, returning dosage matrix as DataFrame."""
+    with gzip.open(vcf_fpath, "rt") as f:
         return _parse_vcf_from_file_stream(f, variants_to_keep)
 
 
@@ -591,13 +592,15 @@ def make_rfc(
     return rfc
 
 
-def superpop_probs_from_pop_probs(pop_probs: np.ndarray) -> np.ndarray:
+def superpop_probs_from_pop_probs(pop_probs: pd.DataFrame) -> pd.DataFrame:
     """Given a matrix of population probabilities, convert to matrix of superpop probabilities."""
     N = len(pop_probs)
     pops = sorted(SUPERPOP_FROM_POP.keys())
     superpops = sorted(set(SUPERPOP_FROM_POP.values()))
-    superpop_projection_matrix = np.array(
-        [[int(superpop == SUPERPOP_FROM_POP[pop]) for superpop in superpops] for pop in pops]
+    superpop_projection_matrix = pd.DataFrame(
+        np.array([[int(superpop == SUPERPOP_FROM_POP[pop]) for superpop in superpops] for pop in pops]),
+        index=POPS,
+        columns=SUPERPOPS,
     )
     superpop_probs = pop_probs @ superpop_projection_matrix
     assert_equals(
@@ -609,7 +612,7 @@ def superpop_probs_from_pop_probs(pop_probs: np.ndarray) -> np.ndarray:
     return superpop_probs
 
 
-def superpop_predictions_from_pop_probs(pop_probs: np.ndarray) -> list[str]:
+def superpop_predictions_from_pop_probs(pop_probs: pd.DataFrame) -> list[str]:
     """Given a matrix of population probabilities, convert to superpop predictions."""
     superpops = sorted(set(SUPERPOP_FROM_POP.values()))
     superpop_probs = superpop_probs_from_pop_probs(pop_probs)
@@ -656,15 +659,11 @@ def _get_mi_df(train_X: pd.DataFrame, train_y_pop: pd.Series) -> pd.DataFrame:
     return mi_df
 
 
-def serialize_model_products(variants: Sequence[str], pca: PCA, rfc: RandomForestClassifier) -> None:
+def serialize_model_products(pca_df: pd.DataFrame, rfc: RandomForestClassifier) -> None:
     """Serialize variant list, pca and rfc to disk as .txt, .skops files."""
-    variants_fpath = ANCESTRY_MODEL_PRODUCTS_DIR / "variants.txt"
-    pca_fpath = ANCESTRY_MODEL_PRODUCTS_DIR / "pca.skop"
+    pca_fpath = ANCESTRY_MODEL_PRODUCTS_DIR / "pca.csv"
     rfc_fpath = ANCESTRY_MODEL_PRODUCTS_DIR / "rfc.skop"
-
-    with variants_fpath.open("w") as f:
-        f.write("\n".join(variants))
-    skops_dump(pca, pca_fpath)
+    pca_df.to_csv(pca_fpath)
     skops_dump(rfc, rfc_fpath)
 
 

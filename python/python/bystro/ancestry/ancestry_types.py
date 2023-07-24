@@ -122,7 +122,6 @@ class PopulationVector:
     JPT: ProbabilityInterval = field(validator=ProbIntValidator)
     KHV: ProbabilityInterval = field(validator=ProbIntValidator)
     LWK: ProbabilityInterval = field(validator=ProbIntValidator)
-    MAG: ProbabilityInterval = field(validator=ProbIntValidator)
     MSL: ProbabilityInterval = field(validator=ProbIntValidator)
     MXL: ProbabilityInterval = field(validator=ProbIntValidator)
     PEL: ProbabilityInterval = field(validator=ProbIntValidator)
@@ -184,7 +183,10 @@ class AncestryResponse:
     ) -> None:
         for i, value in enumerate(results):
             if not isinstance(value, AncestryResult):
-                err_msg = f"Expecting list of AncestryResults, at position {i} got {value} instead"
+                err_msg = (
+                    f"Expecting list of AncestryResults,"
+                    f"at position {i} got {value} of type {type(value)} instead"
+                )
                 raise TypeError(err_msg)
         sample_ids = [result.sample_id for result in results]
         unique_sample_ids = set(sample_ids)

@@ -2,7 +2,7 @@
 import pytest
 from attrs.exceptions import FrozenInstanceError
 
-from ..ancestry_types import (
+from bystro.ancestry.ancestry_types import (
     AncestryResponse,
     AncestryResult,
     AncestrySubmission,
@@ -11,44 +11,7 @@ from ..ancestry_types import (
     ProbabilityInterval,
     SuperpopVector,
 )
-
-POPULATIONS = [
-    "ACB",
-    "ASW",
-    "BEB",
-    "CDX",
-    "CEU",
-    "CHB",
-    "CHS",
-    "CLM",
-    "ESN",
-    "FIN",
-    "GBR",
-    "GIH",
-    "GWD",
-    "IBS",
-    "ITU",
-    "JPT",
-    "KHV",
-    "LWK",
-    "MAG",
-    "MSL",
-    "MXL",
-    "PEL",
-    "PJL",
-    "PUR",
-    "STU",
-    "TSI",
-    "YRI",
-]
-
-SUPERPOPS = [
-    "AFR",
-    "AMR",
-    "EAS",
-    "EUR",
-    "SAS",
-]
+from bystro.ancestry.train import POPS, SUPERPOPS
 
 
 def test_AncestrySubmission_accepts_valid_vcf_paths():
@@ -100,7 +63,7 @@ def test_ProbabilityInterval_rejects_bad_bounds() -> None:
         prob_int.lower_bound = 0.5  # type: ignore [misc]
 
 
-pop_kwargs = {pop: prob_int for pop in POPULATIONS}
+pop_kwargs = {pop: prob_int for pop in POPS}
 superpop_kwargs = {pop: prob_int for pop in SUPERPOPS}
 
 

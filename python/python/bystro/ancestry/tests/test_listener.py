@@ -1,12 +1,42 @@
 """Test ancestry listener."""
 
 
+import numpy as np
+import pandas as pd
 import pytest
+from sklearn.ensemble import RandomForestClassifier
 
 from bystro.ancestry.ancestry_types import AncestrySubmission
-from bystro.ancestry.listener import AncestryJobData, completed_msg_fn, handler_fn, submit_msg_fn
+from bystro.ancestry.listener import (
+    AncestryJobData,
+    AncestryModel,
+    _infer_ancestry,
+    completed_msg_fn,
+    handler_fn_factory,
+    submit_msg_fn,
+)
+from bystro.ancestry.train import POPS
 from bystro.beanstalkd.messages import ProgressMessage
 from bystro.beanstalkd.worker import ProgressPublisher
+
+
+def _make_ancestry_model() -> AncestryModel:
+    samples = [f"sample{i}" for i in range(len(POPS))]  # one pop per sample
+    variants = ["variant1", "variant2", "variant3"]
+    pc_columns = ["pc1", "pc2", "pc3", "pc4"]
+    pca_loadings_df = pd.DataFrame(
+        np.random.random((len(variants), len(pc_columns))), index=variants, columns=pc_columns
+    )
+    train_X = pd.DataFrame(
+        np.random.random((len(samples), len(variants))), index=samples, columns=variants
+    )
+    train_Xpc = train_X @ pca_loadings_df
+    train_y = POPS
+    rfc = RandomForestClassifier(n_estimators=1, max_depth=1).fit(train_Xpc, train_y)
+    return AncestryModel(pca_loadings_df, rfc)
+
+
+handler_fn = handler_fn_factory(_make_ancestry_model())
 
 
 def test_handler_fn_happy_path():
@@ -80,3 +110,37 @@ def test_completed_msg_fn_rejects_nonmatching_vcf_paths():
         ValueError, match="Ancestry submission filename .* doesn't match response filename"
     ):
         _ancestry_job_complete_message = completed_msg_fn(ancestry_job_data, wrong_ancestry_response)
+
+
+def test_Ancestry_Model():
+    ancestry_model = _make_ancestry_model()
+    samples = [f"sample{i}" for i in range(len(POPS))]  # one pop per sample
+    variants = ["variant1", "variant2", "variant3"]
+
+    train_X = pd.DataFrame(
+        np.random.random((len(samples), len(variants))), index=samples, columns=variants
+    )
+
+    pop_probs = ancestry_model.predict_proba(train_X)
+    assert (pop_probs.index == samples).all()
+    assert (pop_probs.columns == POPS).all()
+
+
+def test__infer_ancestry():
+    samples = [f"sample{i}" for i in range(len(POPS))]  # one pop per sample
+    variants = ["variant1", "variant2", "variant3"]
+    pc_columns = ["pc1", "pc2", "pc3", "pc4"]
+    pca_loadings_df = pd.DataFrame(
+        np.random.random((len(variants), len(pc_columns))), index=variants, columns=pc_columns
+    )
+    train_X = pd.DataFrame(
+        np.random.random((len(samples), len(variants))), index=samples, columns=variants
+    )
+    train_Xpc = train_X @ pca_loadings_df
+    train_y = POPS
+    rfc = RandomForestClassifier(n_estimators=1, max_depth=1).fit(train_Xpc, train_y)
+    ancestry_model = AncestryModel(pca_loadings_df, rfc)
+    vcf_path = "my_vcf.vcf"
+    ancestry_response = _infer_ancestry(ancestry_model, train_X, vcf_path)
+    assert len(samples) == len(ancestry_response.results)
+    assert vcf_path == ancestry_response.vcf_path
