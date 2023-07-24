@@ -285,13 +285,19 @@ def filter_samples_for_relatedness(
 
 
 def _load_ancestry_df() -> pd.DataFrame:
-    return pd.read_csv(ANCESTRY_INFO_PATH, sep="\t")
+    ancestry_df = pd.read_csv(ANCESTRY_INFO_PATH, sep="\t", index_col=0)
+    assert_equals("number of rows", 3500, "actual number of rows", len(ancestry_df))
+    expected_samples = ["NA12865", "HG03930", "NA19171"]
+    assert_true(
+        "Index passes spot checks", all(sample in ancestry_df.index for sample in expected_samples)
+    )
+    return ancestry_df
 
 
 def load_label_data(samples: pd.Index) -> pd.DataFrame:
     """Load dataframe of population, superpop labels for samples."""
     ancestry_df = _load_ancestry_df()
-    missing_samples = set(samples) - set(ancestry_df["Sample"])
+    missing_samples = set(samples) - set(ancestry_df.index)
     if missing_samples:
         msg = f"Ancestry dataframe is missing samples: {missing_samples}"
         raise AssertionError(msg)
@@ -302,7 +308,7 @@ def load_label_data(samples: pd.Index) -> pd.DataFrame:
             f"expected {EXPECTED_NUM_POPULATIONS}"
         )
         raise ValueError(msg)
-    get_pop_from_sample = ancestry_df.set_index("Sample")["Population"].to_dict()
+    get_pop_from_sample = ancestry_df["Population"].to_dict()
     labels = pd.DataFrame(
         [get_pop_from_sample[s] for s in samples],
         index=samples,
