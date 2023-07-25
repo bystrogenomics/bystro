@@ -13,6 +13,7 @@ from bystro.ancestry.listener import (
     AncestryJobData,
     AncestryModel,
     _check_vcf_dir_access,
+    _fill_missing_data,
     _infer_ancestry,
     completed_msg_fn,
     handler_fn_factory,
@@ -174,3 +175,23 @@ def test__check_vcf_dir_access():
         FileNotFoundError, match="will not be able to read VCFs in order to report ancestry results"
     ):
         _check_vcf_dir_access(Path("my_fake_vcf_dir"))
+
+
+def test__fill_missing_data():
+    genotypes = pd.DataFrame(np.random.random((3, 3)))
+    genotypes.iloc[0, 0] = np.nan
+    genotypes.iloc[1, 2] = np.nan
+    genotypes.iloc[2, 1] = np.nan
+
+    filled_genotypes, missingnesses = _fill_missing_data(genotypes)
+    assert filled_genotypes.notna().all().all()
+    assert np.allclose(genotypes.mean(), filled_genotypes.mean())
+    assert (missingnesses == 1 / 3).all()
+
+
+def test__fill_missing_data_col_completely_nan():
+    genotypes = pd.DataFrame(np.random.random((3, 3)))
+    genotypes.iloc[:, 0] = np.nan
+
+    filled_genotypes, missingnesses = _fill_missing_data(genotypes)
+    assert not filled_genotypes.isna().any().any()
