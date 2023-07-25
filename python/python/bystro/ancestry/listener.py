@@ -32,15 +32,14 @@ ANCESTRY_TUBE = "ancestry"
 ANCESTRY_BUCKET = "bystro-ancestry"
 PCA_FILE = "pca.skop"
 RFC_FILE = "rfc.skop"
-VCF_DIR = Path("/ancestry-efs/vcf-file/")
 
 
-def _check_vcf_dir_access() -> None:
+def _check_vcf_dir_access(vcf_dir: str) -> None:
     try:
-        os.listdir(VCF_DIR)
+        os.listdir(vcf_dir)
     except FileNotFoundError as err:
         err_msg = (
-            f"Couldn't access VCF dir {VCF_DIR}, "
+            f"Couldn't access VCF dir {vcf_dir}, "
             "will not be able to read VCFs in order to report ancestry results. "
             "Check whether EFS is mounted correctly?"
         )
@@ -111,11 +110,10 @@ def _fill_missing_data(genotypes: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series
     return imputed_genotypes, missingnesses
 
 
-def _load_vcf(vcf_path: str, variants: Collection[str]) -> pd.DataFrame:
+def _load_vcf(full_vcf_path: Path, variants: Collection[str]) -> pd.DataFrame:
     """Load vcf, return dosages as df where index is sample_ids, columns are variants."""
     # Currently the implementation is trivial, but we're stubbing this
     # out now in order to encapsulate future volatility arising from EFS handling, &c.
-    full_vcf_path = VCF_DIR / vcf_path
     logger.info("loading vcf from %s", full_vcf_path)
     return parse_vcf(full_vcf_path, variants)
 
@@ -165,7 +163,7 @@ def _infer_ancestry(
 
 
 def handler_fn_factory(
-    ancestry_model: AncestryModel,
+    ancestry_model: AncestryModel, vcf_dir: Path
 ) -> Callable[[ProgressPublisher, AncestryJobData], AncestryResponse]:
     """Partial handler_fn to accept an ancestry_model."""
 
@@ -179,7 +177,8 @@ def handler_fn_factory(
         _reporter = get_progress_reporter(publisher)
         logger.debug("entering handler_fn with: %s", ancestry_job_data)
         vcf_path = ancestry_job_data.ancestry_submission.vcf_path
-        genotypes = _load_vcf(vcf_path, variants=ancestry_model.pca_loadings_df.index)
+        full_vcf_path = vcf_dir / vcf_path
+        genotypes = _load_vcf(full_vcf_path, variants=ancestry_model.pca_loadings_df.index)
         return _infer_ancestry(ancestry_model, genotypes, vcf_path)
 
     return handler_fn
@@ -209,17 +208,17 @@ def completed_msg_fn(
     )
 
 
-def main(ancestry_model: AncestryModel, queue_conf: QueueConf, ancestry_tube: str) -> None:
+def main(ancestry_model: AncestryModel, vcf_dir: Path, queue_conf: QueueConf) -> None:
     """Run ancestry listener."""
     logger.debug("Entering main")
-    handler_fn_with_models = handler_fn_factory(ancestry_model)
+    handler_fn_with_models = handler_fn_factory(ancestry_model, vcf_dir)
     listen(
         AncestryJobData,
         handler_fn_with_models,
         submit_msg_fn,
         completed_msg_fn,
         queue_conf,
-        ancestry_tube,
+        ANCESTRY_TUBE,
     )
 
 
@@ -227,15 +226,22 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process some config files.")
     parser.add_argument(
         "--queue_conf",
-        type=str,
+        type=Path,
         help="Path to the beanstalkd queue config yaml file (e.g beanstalk1.yml)",
         required=True,
     )
+    parser.add_argument(
+        "--vcf-dir",
+        type=Path,
+        help="Path to the beanstalkd queue config yaml file (e.g beanstalk1.yml)",
+        required=True,
+    )
+
     args = parser.parse_args()
 
-    _check_vcf_dir_access()
+    _check_vcf_dir_access(args.vcf_dir)
     s3_client = boto3.client("s3")
     ancestry_model = _get_model_from_s3(s3_client)
     queue_conf = _load_queue_conf(args.queue_conf)
 
-    main(ancestry_model, queue_conf, ancestry_tube=ANCESTRY_TUBE)
+    main(ancestry_model, args.vcf_dir, queue_conf)

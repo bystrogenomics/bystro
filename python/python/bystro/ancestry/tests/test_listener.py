@@ -1,5 +1,6 @@
 """Test ancestry listener."""
 
+from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
@@ -25,6 +26,7 @@ SAMPLES = [f"sample{i}" for i in range(len(POPS))]
 VARIANTS = ["variant1", "variant2", "variant3"]
 PC_COLUMNS = ["pc1", "pc2", "pc3", "pc4"]
 TRAIN_X = pd.DataFrame(np.random.random((len(SAMPLES), len(VARIANTS))), index=SAMPLES, columns=VARIANTS)
+FAKE_VCF_DIR = Path("my_fake_vcf_dir")
 
 
 def _make_ancestry_model() -> AncestryModel:
@@ -38,7 +40,7 @@ def _make_ancestry_model() -> AncestryModel:
     return AncestryModel(pca_loadings_df, rfc)
 
 
-handler_fn = handler_fn_factory(_make_ancestry_model())
+handler_fn = handler_fn_factory(_make_ancestry_model(), FAKE_VCF_DIR)
 
 
 def test_handler_fn_happy_path():
@@ -56,7 +58,7 @@ def test_handler_fn_happy_path():
         np.random.random((len(samples), len(variants))), index=samples, columns=variants
     )
     with patch("bystro.ancestry.listener._load_vcf", return_value=train_X) as _mock:
-        handler_fn = handler_fn_factory(_make_ancestry_model())
+        handler_fn = handler_fn_factory(_make_ancestry_model(), FAKE_VCF_DIR)
         ancestry_response = handler_fn(publisher, ancestry_job_data)
     assert ancestry_submission.vcf_path == ancestry_response.vcf_path
 
@@ -171,4 +173,4 @@ def test__check_vcf_dir_access():
     with pytest.raises(
         FileNotFoundError, match="will not be able to read VCFs in order to report ancestry results"
     ):
-        _check_vcf_dir_access()
+        _check_vcf_dir_access(Path("my_fake_vcf_dir"))
