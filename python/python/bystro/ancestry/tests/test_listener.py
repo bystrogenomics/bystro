@@ -26,7 +26,9 @@ from bystro.beanstalkd.worker import ProgressPublisher
 SAMPLES = [f"sample{i}" for i in range(len(POPS))]
 VARIANTS = ["variant1", "variant2", "variant3"]
 PC_COLUMNS = ["pc1", "pc2", "pc3", "pc4"]
-TRAIN_X = pd.DataFrame(np.random.random((len(SAMPLES), len(VARIANTS))), index=SAMPLES, columns=VARIANTS)
+FAKE_GENOTYPES = pd.DataFrame(
+    np.random.random((len(SAMPLES), len(VARIANTS))), index=SAMPLES, columns=VARIANTS
+)
 FAKE_VCF_DIR = Path("my_fake_vcf_dir")
 
 
@@ -35,13 +37,14 @@ def _make_ancestry_model() -> AncestryModel:
     pca_loadings_df = pd.DataFrame(
         np.random.random((len(VARIANTS), len(PC_COLUMNS))), index=VARIANTS, columns=PC_COLUMNS
     )
-    train_Xpc = TRAIN_X @ pca_loadings_df
+    train_Xpc = FAKE_GENOTYPES @ pca_loadings_df
     train_y = POPS
     rfc = RandomForestClassifier(n_estimators=1, max_depth=1).fit(train_Xpc, train_y)
     return AncestryModel(pca_loadings_df, rfc)
 
 
-handler_fn = handler_fn_factory(_make_ancestry_model(), FAKE_VCF_DIR)
+ANCESTRY_MODEL = _make_ancestry_model()
+handler_fn = handler_fn_factory(ANCESTRY_MODEL, FAKE_VCF_DIR)
 
 
 def test_handler_fn_happy_path():
@@ -53,13 +56,7 @@ def test_handler_fn_happy_path():
     ancestry_job_data = AncestryJobData(
         submissionID="my_submission_id2", ancestry_submission=ancestry_submission
     )
-    samples = [f"sample{i}" for i in range(len(POPS))]
-    variants = ["variant1", "variant2", "variant3"]
-    train_X = pd.DataFrame(
-        np.random.random((len(samples), len(variants))), index=samples, columns=variants
-    )
-    with patch("bystro.ancestry.listener._load_vcf", return_value=train_X) as _mock:
-        handler_fn = handler_fn_factory(_make_ancestry_model(), FAKE_VCF_DIR)
+    with patch("bystro.ancestry.listener._load_vcf", return_value=FAKE_GENOTYPES) as _mock:
         ancestry_response = handler_fn(publisher, ancestry_job_data)
     assert ancestry_submission.vcf_path == ancestry_response.vcf_path
 
@@ -84,7 +81,7 @@ def test_completed_msg_fn_happy_path():
         submissionID="my_submission_id", ancestry_submission=ancestry_submission
     )
 
-    with patch("bystro.ancestry.listener._load_vcf", return_value=TRAIN_X) as _mock:
+    with patch("bystro.ancestry.listener._load_vcf", return_value=FAKE_GENOTYPES) as _mock:
         ancestry_response = handler_fn(publisher, ancestry_job_data)
     ancestry_job_complete_message = completed_msg_fn(ancestry_job_data, ancestry_response)
 
@@ -103,7 +100,7 @@ def test_completed_msg_fn_rejects_nonmatching_vcf_paths():
         submissionID="my_submission_id", ancestry_submission=ancestry_submission
     )
 
-    with patch("bystro.ancestry.listener._load_vcf", return_value=TRAIN_X) as _mock:
+    with patch("bystro.ancestry.listener._load_vcf", return_value=FAKE_GENOTYPES) as _mock:
         _correct_but_unused_ancestry_response = handler_fn(publisher, ancestry_job_data)
 
     progress_message = ProgressMessage(submissionID="my_submission_id")
@@ -117,7 +114,7 @@ def test_completed_msg_fn_rejects_nonmatching_vcf_paths():
         submissionID="my_submission_id", ancestry_submission=wrong_ancestry_submission
     )
 
-    with patch("bystro.ancestry.listener._load_vcf", return_value=TRAIN_X) as _:
+    with patch("bystro.ancestry.listener._load_vcf", return_value=FAKE_GENOTYPES) as _:
         wrong_ancestry_response = handler_fn(publisher, wrong_ancestry_job_data)
     # end instantiating another ancestry response with the wrong vcf...
 
@@ -128,26 +125,17 @@ def test_completed_msg_fn_rejects_nonmatching_vcf_paths():
 
 
 def test_Ancestry_Model():
-    ancestry_model = _make_ancestry_model()
-    samples = [f"sample{i}" for i in range(len(POPS))]  # one pop per sample
-    variants = ["variant1", "variant2", "variant3"]
-
-    train_X = pd.DataFrame(
-        np.random.random((len(samples), len(variants))), index=samples, columns=variants
-    )
-
-    pop_probs = ancestry_model.predict_proba(train_X)
-    assert (pop_probs.index == samples).all()
+    pop_probs = ANCESTRY_MODEL.predict_proba(FAKE_GENOTYPES)
+    assert (pop_probs.index == SAMPLES).all()
     assert (pop_probs.columns == POPS).all()
 
 
 def test_Ancestry_Model_missing_pca_col():
-    ancestry_model = _make_ancestry_model()
-    pca_loadings_df = ancestry_model.pca_loadings_df
+    pca_loadings_df = ANCESTRY_MODEL.pca_loadings_df
     bad_pca_loadings_df = pca_loadings_df[pca_loadings_df.columns[:-1]]
 
     with pytest.raises(ValueError, match="must equal"):
-        AncestryModel(bad_pca_loadings_df, ancestry_model.rfc)
+        AncestryModel(bad_pca_loadings_df, ANCESTRY_MODEL.rfc)
 
 
 def test__infer_ancestry():
