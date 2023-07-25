@@ -139,7 +139,11 @@ def _package_ancestry_response_from_pop_probs(
         pop_probs_df.iterrows(), superpop_probs_df.iterrows(), strict=True
     ):
         if not isinstance(sample_id, str):
-            raise TypeError
+            # just spoonfeeding mypy here-- this should never raise
+            err_msg = (
+                f"Expected sample_id of type str, got {sample_id} of type({type(sample_id)}) instead"
+            )
+            raise TypeError(err_msg)
         pop_vector = PopulationVector(
             **{
                 pop: _make_trivial_probability_interval(value)
