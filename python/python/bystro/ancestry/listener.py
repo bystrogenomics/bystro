@@ -220,8 +220,8 @@ def completed_msg_fn(
 
 def main(ancestry_model: AncestryModel, vcf_dir: Path, queue_conf: QueueConf) -> None:
     """Run ancestry listener."""
-    logger.debug("Entering main")
     handler_fn_with_models = handler_fn_factory(ancestry_model, vcf_dir)
+    logger.info("Ancestry worker is listening...")
     listen(
         AncestryJobData,
         handler_fn_with_models,
