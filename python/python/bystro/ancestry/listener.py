@@ -78,7 +78,9 @@ def _get_model_from_s3(
     s3_client.download_file(Bucket=ANCESTRY_BUCKET, Key=PCA_FILE, Filename=PCA_FILE)
     s3_client.download_file(Bucket=ANCESTRY_BUCKET, Key=RFC_FILE, Filename=RFC_FILE)
 
+    logger.info("Loading PCA file %s", PCA_FILE)
     pca_loadings_df = pd.read_csv(PCA_FILE, index_col=0)
+    logger.info("Loading RFC file %s", RFC_FILE)
     rfc = skops_load(RFC_FILE)
     logger.info("Loaded ancestry models from S3")
     return AncestryModel(pca_loadings_df, rfc)
@@ -238,7 +240,7 @@ if __name__ == "__main__":
         required=True,
     )
     parser.add_argument(
-        "--vcf-dir",
+        "--vcf_dir",
         type=Path,
         help="Path to the beanstalkd queue config yaml file (e.g beanstalk1.yml)",
         required=True,
