@@ -115,7 +115,7 @@ def _load_vcf(full_vcf_path: Path, variants: Collection[str]) -> pd.DataFrame:
     # Currently the implementation is trivial, but we're stubbing this
     # out now in order to encapsulate future volatility arising from EFS handling, &c.
     logger.info("loading vcf from %s", full_vcf_path)
-    return parse_vcf(full_vcf_path, variants)
+    return parse_vcf(full_vcf_path, variants, return_exact_variants=True)
 
 
 def _make_trivial_probability_interval(x: float) -> ProbabilityInterval:

@@ -170,14 +170,18 @@ def _calculate_recovery_rate(
     return len(found_variants) / len(relevant_variants_to_keep)
 
 
-def parse_vcf(vcf_fpath: str | Path, variants_to_keep: Collection[str]) -> pd.DataFrame:
+def parse_vcf(
+    vcf_fpath: str | Path, variants_to_keep: Collection[str], *, return_exact_variants: bool = False
+) -> pd.DataFrame:
     """Parse vcf_fpath for selected variants, returning dosage matrix as DataFrame."""
     with gzip.open(vcf_fpath, "rt") as f:
-        return _parse_vcf_from_file_stream(f, variants_to_keep)
+        return _parse_vcf_from_file_stream(
+            f, variants_to_keep, return_exact_variants=return_exact_variants
+        )
 
 
 def _parse_vcf_from_file_stream(
-    file_stream: Iterable[str], variants_to_keep: Collection[str]
+    file_stream: Iterable[str], variants_to_keep: Collection[str], *, return_exact_variants: bool
 ) -> pd.DataFrame:
     found_variants = []
     dosage_data = []
@@ -211,6 +215,13 @@ def _parse_vcf_from_file_stream(
     # we assume each vcf file contains variants for a single chromosome
     recovery_rate = _calculate_recovery_rate(found_variants, variants_to_keep)
     logger.info("recovery rate: %s", recovery_rate)
+
+    if return_exact_variants:
+        missing_variants = set(variants_to_keep) - set(found_variants)
+        logger.info("adding NaNs for %s variants not found in VCF", len(missing_variants))
+        for missing_variant in missing_variants:
+            dosage_df[missing_variant] = np.nan
+
     return dosage_df
 
 
