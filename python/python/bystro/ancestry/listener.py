@@ -25,7 +25,7 @@ from bystro.ancestry.train import POPS, parse_vcf, superpop_probs_from_pop_probs
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
 from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, get_progress_reporter, listen
 
-logging.basicConfig(filename="ancestry_listener.log", level=logging.DEBUG)
+logging.basicConfig(filename="ancestry_listener.log", level=logging.INFO)
 logger = logging.getLogger()
 
 ANCESTRY_TUBE = "ancestry"
