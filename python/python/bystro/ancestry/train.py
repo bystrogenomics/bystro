@@ -170,7 +170,7 @@ def _calculate_recovery_rate(
     return len(found_variants) / len(relevant_variants_to_keep)
 
 
-def parse_vcf(vcf_fpath: str, variants_to_keep: Collection[str]) -> pd.DataFrame:
+def parse_vcf(vcf_fpath: str | Path, variants_to_keep: Collection[str]) -> pd.DataFrame:
     """Parse vcf_fpath for selected variants, returning dosage matrix as DataFrame."""
     with gzip.open(vcf_fpath, "rt") as f:
         return _parse_vcf_from_file_stream(f, variants_to_keep)

@@ -1,6 +1,7 @@
 """Provide a worker for the ancestry model."""
 import argparse
 import logging
+import os
 from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,7 +32,19 @@ ANCESTRY_TUBE = "ancestry"
 ANCESTRY_BUCKET = "bystro-ancestry"
 PCA_FILE = "pca.skop"
 RFC_FILE = "rfc.skop"
-EFS_DIR = "/ancestry-efs/vcf-file/"
+VCF_DIR = Path("/ancestry-efs/vcf-file/")
+
+
+def _check_vcf_dir_access() -> None:
+    try:
+        os.listdir(VCF_DIR)
+    except FileNotFoundError as err:
+        err_msg = (
+            f"Couldn't access VCF dir {VCF_DIR}, "
+            "will not be able to read VCFs in order to report ancestry results. "
+            "Check whether EFS is mounted correctly?"
+        )
+        raise FileNotFoundError(err_msg) from err
 
 
 @dataclass(frozen=True)
@@ -102,7 +115,7 @@ def _load_vcf(vcf_path: str, variants: Collection[str]) -> pd.DataFrame:
     """Load vcf, return dosages as df where index is sample_ids, columns are variants."""
     # Currently the implementation is trivial, but we're stubbing this
     # out now in order to encapsulate future volatility arising from EFS handling, &c.
-    full_vcf_path = EFS_DIR / vcf_path
+    full_vcf_path = VCF_DIR / vcf_path
     logger.info("loading vcf from %s", full_vcf_path)
     return parse_vcf(full_vcf_path, variants)
 
@@ -219,6 +232,8 @@ if __name__ == "__main__":
         required=True,
     )
     args = parser.parse_args()
+
+    _check_vcf_dir_access()
     s3_client = boto3.client("s3")
     ancestry_model = _get_model_from_s3(s3_client)
     queue_conf = _load_queue_conf(args.queue_conf)

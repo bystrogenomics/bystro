@@ -7,11 +7,11 @@ import pandas as pd
 import pytest
 from sklearn.ensemble import RandomForestClassifier
 
-from bystro.ancestry import listener  # noqa: F401
 from bystro.ancestry.ancestry_types import AncestrySubmission
 from bystro.ancestry.listener import (
     AncestryJobData,
     AncestryModel,
+    _check_vcf_dir_access,
     _infer_ancestry,
     completed_msg_fn,
     handler_fn_factory,
@@ -138,6 +138,15 @@ def test_Ancestry_Model():
     assert (pop_probs.columns == POPS).all()
 
 
+def test_Ancestry_Model_missing_pca_col():
+    ancestry_model = _make_ancestry_model()
+    pca_loadings_df = ancestry_model.pca_loadings_df
+    bad_pca_loadings_df = pca_loadings_df[pca_loadings_df.columns[:-1]]
+
+    with pytest.raises(ValueError, match="must equal"):
+        AncestryModel(bad_pca_loadings_df, ancestry_model.rfc)
+
+
 def test__infer_ancestry():
     samples = [f"sample{i}" for i in range(len(POPS))]  # one pop per sample
     variants = ["variant1", "variant2", "variant3"]
@@ -156,3 +165,10 @@ def test__infer_ancestry():
     ancestry_response = _infer_ancestry(ancestry_model, train_X, vcf_path)
     assert len(samples) == len(ancestry_response.results)
     assert vcf_path == ancestry_response.vcf_path
+
+
+def test__check_vcf_dir_access():
+    with pytest.raises(
+        FileNotFoundError, match="will not be able to read VCFs in order to report ancestry results"
+    ):
+        _check_vcf_dir_access()
