@@ -30,7 +30,7 @@ logger = logging.getLogger()
 
 ANCESTRY_TUBE = "ancestry"
 ANCESTRY_BUCKET = "bystro-ancestry"
-PCA_FILE = "pca.skop"
+PCA_FILE = "pca.csv"
 RFC_FILE = "rfc.skop"
 
 
