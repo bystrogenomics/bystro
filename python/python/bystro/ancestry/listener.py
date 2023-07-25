@@ -31,6 +31,7 @@ ANCESTRY_TUBE = "ancestry"
 ANCESTRY_BUCKET = "bystro-ancestry"
 PCA_FILE = "pca.skop"
 RFC_FILE = "rfc.skop"
+EFS_DIR = "/ancestry-efs/vcf-file/"
 
 
 @dataclass(frozen=True)
@@ -42,10 +43,12 @@ class AncestryModel:
 
     def __post_init__(self) -> "AncestryModel":
         """Ensure that PCA and RFC features line up correctly."""
-        if not (self.pca_loadings_df.columns == self.rfc.feature_names_in_).all():
+        pca_cols = self.pca_loadings_df.columns
+        rfc_features = self.rfc.feature_names_in_
+        if not (len(pca_cols) == len(rfc_features) and (pca_cols == rfc_features).all()):
             err_msg = (
-                f"PC Loadings columns:{self.pca_loadings_df.columns} must equal "
-                f"rfc.feature_names_in: {self.rfc.feature_names_in}"
+                f"PC loadings columns:{self.pca_loadings_df.columns} must equal "
+                f"rfc.feature_names_in: {self.rfc.feature_names_in_}"
             )
             raise ValueError(err_msg)
         return self
@@ -60,8 +63,8 @@ class AncestryModel:
 def _get_model_from_s3(
     s3_client: botocore.client.BaseClient,
 ) -> AncestryModel:
-    s3_client.download_file(ANCESTRY_BUCKET, PCA_FILE, PCA_FILE)
-    s3_client.download_file(ANCESTRY_BUCKET, RFC_FILE, RFC_FILE)
+    s3_client.download_file(Bucket=ANCESTRY_BUCKET, Key=PCA_FILE, Filename=PCA_FILE)
+    s3_client.download_file(Bucket=ANCESTRY_BUCKET, Key=RFC_FILE, Filename=RFC_FILE)
 
     pca_loadings_df = pd.read_csv(PCA_FILE, index_col=0)
     rfc = skops_load(RFC_FILE)
@@ -99,7 +102,9 @@ def _load_vcf(vcf_path: str, variants: Collection[str]) -> pd.DataFrame:
     """Load vcf, return dosages as df where index is sample_ids, columns are variants."""
     # Currently the implementation is trivial, but we're stubbing this
     # out now in order to encapsulate future volatility arising from EFS handling, &c.
-    return parse_vcf(vcf_path, variants)
+    full_vcf_path = EFS_DIR / vcf_path
+    logger.info("loading vcf from %s", full_vcf_path)
+    return parse_vcf(full_vcf_path, variants)
 
 
 def _package_ancestry_response_from_pop_probs(
