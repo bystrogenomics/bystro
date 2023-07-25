@@ -131,6 +131,7 @@ def _make_trivial_probability_interval(x: float) -> ProbabilityInterval:
 def _package_ancestry_response_from_pop_probs(
     vcf_path: str, pop_probs_df: pd.DataFrame, missingnesses: pd.Series
 ) -> AncestryResponse:
+    """Fill out AncestryResponse using filepath, numerical model output and sample-wise missingnesses."""
     superpop_probs_df = superpop_probs_from_pop_probs(pop_probs_df)
     ancestry_results = []
 
@@ -177,7 +178,7 @@ def _infer_ancestry(
 def handler_fn_factory(
     ancestry_model: AncestryModel, vcf_dir: Path
 ) -> Callable[[ProgressPublisher, AncestryJobData], AncestryResponse]:
-    """Partial handler_fn to accept an ancestry_model."""
+    """Return partialed handler_fn with ancestry_model loaded."""
 
     def handler_fn(publisher: ProgressPublisher, ancestry_job_data: AncestryJobData) -> AncestryResponse:
         """Do ancestry job, wrapping _infer_ancestry for beanstalk."""
