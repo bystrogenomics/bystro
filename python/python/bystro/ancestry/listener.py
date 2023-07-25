@@ -110,8 +110,8 @@ def _fill_missing_data(genotypes: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series
     sample_missingnesses = genotypes.isna().mean(axis="columns")  # average over columns, leaving indices
     # todo: much better imputation strategy to come, but we're stubbing out for now.
     # if col completely missing in all samples, just fill as heterozygote for now
-    fill_values = genotypes.mean(axis="index").fillna(1)
-    imputed_genotypes = genotypes.fillna(fill_values)
+    mean_column_values = genotypes.mean(axis="index").fillna(1)
+    imputed_genotypes = genotypes.fillna(mean_column_values)
     return imputed_genotypes, sample_missingnesses
 
 
