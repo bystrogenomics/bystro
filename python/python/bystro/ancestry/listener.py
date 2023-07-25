@@ -44,6 +44,7 @@ def _check_vcf_dir_access(vcf_dir: str) -> None:
             "Check whether EFS is mounted correctly?"
         )
         raise FileNotFoundError(err_msg) from err
+    logger.info("Successfully checked EFS on %s", vcf_dir)
 
 
 @dataclass(frozen=True)
