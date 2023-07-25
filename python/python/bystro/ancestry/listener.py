@@ -21,7 +21,7 @@ from bystro.ancestry.ancestry_types import (
     ProbabilityInterval,
     SuperpopVector,
 )
-from bystro.ancestry.train import POPS, SUPERPOPS, parse_vcf, superpop_probs_from_pop_probs
+from bystro.ancestry.train import POPS, parse_vcf, superpop_probs_from_pop_probs
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
 from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, get_progress_reporter, listen
 
@@ -118,25 +118,32 @@ def _load_vcf(full_vcf_path: Path, variants: Collection[str]) -> pd.DataFrame:
     return parse_vcf(full_vcf_path, variants)
 
 
+def _make_trivial_probability_interval(x: float) -> ProbabilityInterval:
+    """Promote a value to a trivial ProbabilityInterval with equal lower, upper bounds."""
+    return ProbabilityInterval(x, x)
+
+
 def _package_ancestry_response_from_pop_probs(
     vcf_path: str, pop_probs_df: pd.DataFrame, missingnesses: pd.Series
 ) -> AncestryResponse:
     superpop_probs_df = superpop_probs_from_pop_probs(pop_probs_df)
     ancestry_results = []
+
     for (sample_id, sample_pop_probs), (_sample_id2, sample_superpop_probs) in zip(
         pop_probs_df.iterrows(), superpop_probs_df.iterrows(), strict=True
     ):
         if not isinstance(sample_id, str):
             raise TypeError
         pop_vector = PopulationVector(
-            **{pop: ProbabilityInterval(sample_pop_probs[pop], sample_pop_probs[pop]) for pop in POPS}
+            **{
+                pop: _make_trivial_probability_interval(value)
+                for (pop, value) in dict(sample_pop_probs).items()
+            }
         )
         superpop_vector = SuperpopVector(
             **{
-                superpop: ProbabilityInterval(
-                    sample_superpop_probs[superpop], sample_superpop_probs[superpop]
-                )
-                for superpop in SUPERPOPS
+                superpop: _make_trivial_probability_interval(value)
+                for (superpop, value) in dict(sample_superpop_probs).items()
             }
         )
         ancestry_results.append(
