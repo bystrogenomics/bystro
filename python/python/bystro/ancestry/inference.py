@@ -55,7 +55,7 @@ def _package_ancestry_response_from_pop_probs(
     vcf_path: str, pop_probs_df: pd.DataFrame, missingnesses: pd.Series
 ) -> AncestryResponse:
     """Fill out AncestryResponse using filepath, numerical model output and sample-wise missingnesses."""
-    superpop_probs_df = superpop_probs_from_pop_probs(pop_probs_df)
+    superpop_probs_df = _superpop_probs_from_pop_probs(pop_probs_df)
     ancestry_results = []
 
     for (sample_id, sample_pop_probs), (_sample_id2, sample_superpop_probs) in zip(
@@ -102,7 +102,7 @@ def infer_ancestry(
     return _package_ancestry_response_from_pop_probs(vcf_path, pop_probs_df, missingnesses)
 
 
-def superpop_probs_from_pop_probs(pop_probs: pd.DataFrame) -> pd.DataFrame:
+def _superpop_probs_from_pop_probs(pop_probs: pd.DataFrame) -> pd.DataFrame:
     """Given a matrix of population probabilities, convert to matrix of superpop probabilities."""
     N = len(pop_probs)
     pops = sorted(SUPERPOP_FROM_POP.keys())
