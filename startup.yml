@@ -13,3 +13,8 @@ apps:
     interpreter: 'python'
     args:
       --conf_dir config --queue_conf config/beanstalk.yml --search_conf config/elastic-config2.yml
+  - name: BystroAncestryServer
+    script: python/python/bystro/ancestry/listener.py
+    interpreter: 'python'
+    args:
+      --queue_conf config/beanstalk.yml
