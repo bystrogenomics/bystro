@@ -3,25 +3,20 @@ import argparse
 import logging
 import os
 from collections.abc import Callable, Collection
-from dataclasses import dataclass
 from pathlib import Path
 
 import boto3
 import botocore
 import pandas as pd
 from ruamel.yaml import YAML
-from sklearn.ensemble import RandomForestClassifier
 from skops.io import load as skops_load
 
 from bystro.ancestry.ancestry_types import (
     AncestryResponse,
-    AncestryResult,
     AncestrySubmission,
-    PopulationVector,
-    ProbabilityInterval,
-    SuperpopVector,
 )
-from bystro.ancestry.train import POPS, parse_vcf, superpop_probs_from_pop_probs
+from bystro.ancestry.inference import AncestryModel, infer_ancestry
+from bystro.ancestry.train import parse_vcf
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
 from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, get_progress_reporter, listen
 
@@ -45,32 +40,6 @@ def _check_vcf_dir_access(vcf_dir: str) -> None:
         )
         raise FileNotFoundError(err_msg) from err
     logger.info("Successfully checked EFS on %s", vcf_dir)
-
-
-@dataclass(frozen=True)
-class AncestryModel:
-    """Bundle together PCA and RFC models for bookkeeping purposes."""
-
-    pca_loadings_df: pd.DataFrame
-    rfc: RandomForestClassifier
-
-    def __post_init__(self) -> "AncestryModel":
-        """Ensure that PCA and RFC features line up correctly."""
-        pca_cols = self.pca_loadings_df.columns
-        rfc_features = self.rfc.feature_names_in_
-        if not (len(pca_cols) == len(rfc_features) and (pca_cols == rfc_features).all()):
-            err_msg = (
-                f"PC loadings columns:{self.pca_loadings_df.columns} must equal "
-                f"rfc.feature_names_in: {self.rfc.feature_names_in_}"
-            )
-            raise ValueError(err_msg)
-        return self
-
-    def predict_proba(self, genotypes: pd.DataFrame) -> pd.DataFrame:
-        """Predict population probabilities from dosage matrix."""
-        Xpc = genotypes @ self.pca_loadings_df
-        probs = self.rfc.predict_proba(Xpc)
-        return pd.DataFrame(probs, index=genotypes.index, columns=POPS)
 
 
 def _get_model_from_s3(
@@ -106,15 +75,6 @@ def _load_queue_conf(queue_conf_path: str) -> QueueConf:
     return QueueConf(addresses=beanstalk_conf["addresses"], tubes=beanstalk_conf["tubes"])
 
 
-def _fill_missing_data(genotypes: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
-    sample_missingnesses = genotypes.isna().mean(axis="columns")  # average over columns, leaving indices
-    # todo: much better imputation strategy to come, but we're stubbing out for now.
-    # if col completely missing in all samples, just fill as heterozygote for now
-    mean_column_values = genotypes.mean(axis="index").fillna(1)
-    imputed_genotypes = genotypes.fillna(mean_column_values)
-    return imputed_genotypes, sample_missingnesses
-
-
 def _load_vcf(full_vcf_path: Path, variants: Collection[str]) -> pd.DataFrame:
     """Load vcf, return dosages as df where index is sample_ids, columns are variants."""
     # Currently the implementation is trivial, but we're stubbing this
@@ -123,71 +83,15 @@ def _load_vcf(full_vcf_path: Path, variants: Collection[str]) -> pd.DataFrame:
     return parse_vcf(full_vcf_path, variants, return_exact_variants=True)
 
 
-def _make_trivial_probability_interval(x: float) -> ProbabilityInterval:
-    """Promote a value to a trivial ProbabilityInterval with equal lower, upper bounds."""
-    return ProbabilityInterval(x, x)
-
-
-def _package_ancestry_response_from_pop_probs(
-    vcf_path: str, pop_probs_df: pd.DataFrame, missingnesses: pd.Series
-) -> AncestryResponse:
-    """Fill out AncestryResponse using filepath, numerical model output and sample-wise missingnesses."""
-    superpop_probs_df = superpop_probs_from_pop_probs(pop_probs_df)
-    ancestry_results = []
-
-    for (sample_id, sample_pop_probs), (_sample_id2, sample_superpop_probs) in zip(
-        pop_probs_df.iterrows(), superpop_probs_df.iterrows(), strict=True
-    ):
-        if not isinstance(sample_id, str):
-            # just spoonfeeding mypy here-- this should never raise
-            err_msg = (
-                f"Expected sample_id of type str, got {sample_id} of type({type(sample_id)}) instead"
-            )
-            raise TypeError(err_msg)
-        pop_vector = PopulationVector(
-            **{
-                pop: _make_trivial_probability_interval(value)
-                for (pop, value) in dict(sample_pop_probs).items()
-            }
-        )
-        superpop_vector = SuperpopVector(
-            **{
-                superpop: _make_trivial_probability_interval(value)
-                for (superpop, value) in dict(sample_superpop_probs).items()
-            }
-        )
-        ancestry_results.append(
-            AncestryResult(
-                sample_id=sample_id,
-                populations=pop_vector,
-                superpops=superpop_vector,
-                missingness=missingnesses[sample_id],
-            )
-        )
-    return AncestryResponse(vcf_path=vcf_path, results=ancestry_results)
-
-
-# TODO: implement with ray
-def _infer_ancestry(
-    ancestry_model: AncestryModel, genotypes: pd.DataFrame, vcf_path: str
-) -> AncestryResponse:
-    """Run an ancestry job."""
-    # TODO: main ancestry model logic goes here.  Just stubbing out for now.
-
-    imputed_genotypes, missingnesses = _fill_missing_data(genotypes)
-    pop_probs_df = ancestry_model.predict_proba(imputed_genotypes)
-    return _package_ancestry_response_from_pop_probs(vcf_path, pop_probs_df, missingnesses)
-
-
 def handler_fn_factory(
     ancestry_model: AncestryModel, vcf_dir: Path
 ) -> Callable[[ProgressPublisher, AncestryJobData], AncestryResponse]:
     """Return partialed handler_fn with ancestry_model loaded."""
 
     def handler_fn(publisher: ProgressPublisher, ancestry_job_data: AncestryJobData) -> AncestryResponse:
-        """Do ancestry job, wrapping _infer_ancestry for beanstalk."""
-        # Separating _handler_fn from _infer_ancestry in order to separate ML from infra concerns,
-        # and especially to keep _infer_ancestry eager.
+        """Do ancestry job, wrapping infer_ancestry for beanstalk."""
+        # Separating _handler_fn from infer_ancestry in order to separate ML from infra concerns,
+        # and especially to keep infer_ancestry eager.
 
         # not doing anything with this reporter at the moment, we're
         # simply threading it through for later.
@@ -196,7 +100,7 @@ def handler_fn_factory(
         vcf_path = ancestry_job_data.ancestry_submission.vcf_path
         full_vcf_path = vcf_dir / vcf_path
         genotypes = _load_vcf(full_vcf_path, variants=ancestry_model.pca_loadings_df.index)
-        return _infer_ancestry(ancestry_model, genotypes, vcf_path)
+        return infer_ancestry(ancestry_model, genotypes, vcf_path)
 
     return handler_fn
 
