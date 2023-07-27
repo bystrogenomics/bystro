@@ -1,4 +1,5 @@
 """Tests for ancestry model training code."""
+import numpy as np
 import pandas as pd
 from pandas.testing import assert_frame_equal
 
@@ -25,6 +26,7 @@ def test__parse_vcf_from_file_stream():
             "chr1:123:T:G",
             "chr1:123456:T:G",
         ],
+        return_exact_variants=True,
     )
     assert_frame_equal(expected_df, actual_df)
 
@@ -42,6 +44,7 @@ def test__parse_vcf_from_file_stream_wrong_chromosome():
         index=["sample1", "sample2", "sample3"],
         columns=[],
     )
+
     actual_df = _parse_vcf_from_file_stream(
         file_stream,
         [
@@ -49,5 +52,28 @@ def test__parse_vcf_from_file_stream_wrong_chromosome():
             "chr1:123:T:G",
             "chr1:123456:T:G",
         ],
+        return_exact_variants=False,
     )
     assert_frame_equal(expected_df, actual_df)
+
+    expected_df_missing_data = pd.DataFrame(
+        np.zeros((3, 3)) * np.nan,
+        index=["sample1", "sample2", "sample3"],
+        columns=[
+            "chr1:1:T:G",
+            "chr1:123:T:G",
+            "chr1:123456:T:G",
+        ],
+    )
+
+    actual_df_missing_data = _parse_vcf_from_file_stream(
+        file_stream,
+        [
+            "chr1:1:T:G",
+            "chr1:123:T:G",
+            "chr1:123456:T:G",
+        ],
+        return_exact_variants=True,
+    )
+    # check frame equality up to column ordering, which may differ if some variants were missing.
+    assert_frame_equal(expected_df_missing_data, actual_df_missing_data, check_like=True)
