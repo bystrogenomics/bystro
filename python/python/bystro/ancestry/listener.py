@@ -1,22 +1,59 @@
 """Provide a worker for the ancestry model."""
 import argparse
 import logging
+import os
+from collections.abc import Callable, Collection
 from pathlib import Path
 
+import boto3
+import botocore
+import pandas as pd
 from ruamel.yaml import YAML
+from skops.io import load as skops_load
 
 from bystro.ancestry.ancestry_types import (
     AncestryResponse,
     AncestrySubmission,
 )
-from bystro.ancestry.dummy_ancestry_response import make_dummy_ancestry_response
+from bystro.ancestry.inference import AncestryModel, infer_ancestry
+from bystro.ancestry.train import parse_vcf
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
 from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, get_progress_reporter, listen
 
-logging.basicConfig(filename="ancestry_listener.log", level=logging.DEBUG)
+logging.basicConfig(filename="ancestry_listener.log", level=logging.INFO)
 logger = logging.getLogger()
 
 ANCESTRY_TUBE = "ancestry"
+ANCESTRY_BUCKET = "bystro-ancestry"
+PCA_FILE = "pca.csv"
+RFC_FILE = "rfc.skop"
+
+
+def _check_vcf_dir_access(vcf_dir: str) -> None:
+    try:
+        os.listdir(vcf_dir)
+    except FileNotFoundError as err:
+        err_msg = (
+            f"Couldn't access VCF dir {vcf_dir}, "
+            "will not be able to read VCFs in order to report ancestry results. "
+            "Check whether EFS is mounted correctly?"
+        )
+        raise FileNotFoundError(err_msg) from err
+    logger.info("Successfully checked EFS on %s", vcf_dir)
+
+
+def _get_model_from_s3(
+    s3_client: botocore.client.BaseClient,
+) -> AncestryModel:
+    s3_client.download_file(Bucket=ANCESTRY_BUCKET, Key=PCA_FILE, Filename=PCA_FILE)
+    s3_client.download_file(Bucket=ANCESTRY_BUCKET, Key=RFC_FILE, Filename=RFC_FILE)
+
+    logger.info("Loading PCA file %s", PCA_FILE)
+    pca_loadings_df = pd.read_csv(PCA_FILE, index_col=0)
+    logger.info("Loading RFC file %s", RFC_FILE)
+    rfc = skops_load(RFC_FILE)
+    logger.info("Loaded ancestry models from S3")
+    return AncestryModel(pca_loadings_df, rfc)
 
 
 class AncestryJobData(BaseMessage, frozen=True):
@@ -38,30 +75,34 @@ def _load_queue_conf(queue_conf_path: str) -> QueueConf:
     return QueueConf(addresses=beanstalk_conf["addresses"], tubes=beanstalk_conf["tubes"])
 
 
-# TODO: implement with ray
-def _infer_ancestry(
-    ancestry_submission: AncestrySubmission, _publisher: ProgressPublisher
-) -> AncestryResponse:
-    """Run an ancestry job."""
-    # TODO: main ancestry model logic goes here.  Just stubbing out for now.
-    logger.debug("Inferring ancestry for: %s", ancestry_submission)
-
-    # not doing anything with this reporter at the moment, we're
-    # simply threading it through for later.
-    _reporter = get_progress_reporter(_publisher)
-    vcf_path = ancestry_submission.vcf_path
-
-    return make_dummy_ancestry_response(vcf_path)
+def _load_vcf(full_vcf_path: Path, variants: Collection[str]) -> pd.DataFrame:
+    """Load vcf, return dosages as df where index is sample_ids, columns are variants."""
+    # Currently the implementation is trivial, but we're stubbing this
+    # out now in order to encapsulate future volatility arising from EFS handling, &c.
+    logger.info("loading vcf from %s", full_vcf_path)
+    return parse_vcf(full_vcf_path, variants, return_exact_variants=True)
 
 
-def handler_fn(
-    publisher: ProgressPublisher, ancestry_job_data: AncestryJobData
-) -> AncestryResponse:
-    """Do ancestry job, wraping _infer_ancestry for beanstalk."""
-    # Separating _handler_fn from _infer_ancestry in order to separate ML from infra concerns,
-    # and especially to keep _infer_ancestry eager.
-    logger.debug("entering handler_fn with: %s", ancestry_job_data)
-    return _infer_ancestry(ancestry_job_data.ancestry_submission, publisher)
+def handler_fn_factory(
+    ancestry_model: AncestryModel, vcf_dir: Path
+) -> Callable[[ProgressPublisher, AncestryJobData], AncestryResponse]:
+    """Return partialed handler_fn with ancestry_model loaded."""
+
+    def handler_fn(publisher: ProgressPublisher, ancestry_job_data: AncestryJobData) -> AncestryResponse:
+        """Do ancestry job, wrapping infer_ancestry for beanstalk."""
+        # Separating _handler_fn from infer_ancestry in order to separate ML from infra concerns,
+        # and especially to keep infer_ancestry eager.
+
+        # not doing anything with this reporter at the moment, we're
+        # simply threading it through for later.
+        _reporter = get_progress_reporter(publisher)
+        logger.debug("entering handler_fn with: %s", ancestry_job_data)
+        vcf_path = ancestry_job_data.ancestry_submission.vcf_path
+        full_vcf_path = vcf_dir / vcf_path
+        genotypes = _load_vcf(full_vcf_path, variants=ancestry_model.pca_loadings_df.index)
+        return infer_ancestry(ancestry_model, genotypes, vcf_path)
+
+    return handler_fn
 
 
 def submit_msg_fn(ancestry_job_data: AncestryJobData) -> SubmittedJobMessage:
@@ -88,16 +129,19 @@ def completed_msg_fn(
     )
 
 
-def main(queue_conf: QueueConf, ancestry_tube: str) -> None:
+def main(ancestry_model: AncestryModel, vcf_dir: Path, queue_conf: QueueConf) -> None:
     """Run ancestry listener."""
-    logger.debug("Entering main")
+    handler_fn_with_models = handler_fn_factory(ancestry_model, vcf_dir)
+    logger.info(
+        "Ancestry worker is listening on addresses: %s, tube: %s...", queue_conf.addresses, ANCESTRY_TUBE
+    )
     listen(
         AncestryJobData,
-        handler_fn,
+        handler_fn_with_models,
         submit_msg_fn,
         completed_msg_fn,
         queue_conf,
-        ancestry_tube,
+        ANCESTRY_TUBE,
     )
 
 
@@ -105,12 +149,22 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process some config files.")
     parser.add_argument(
         "--queue_conf",
-        type=str,
+        type=Path,
         help="Path to the beanstalkd queue config yaml file (e.g beanstalk1.yml)",
         required=True,
     )
+    parser.add_argument(
+        "--vcf_dir",
+        type=Path,
+        help="Path to the beanstalkd queue config yaml file (e.g beanstalk1.yml)",
+        required=True,
+    )
+
     args = parser.parse_args()
 
+    _check_vcf_dir_access(args.vcf_dir)
+    s3_client = boto3.client("s3")
+    ancestry_model = _get_model_from_s3(s3_client)
     queue_conf = _load_queue_conf(args.queue_conf)
 
-    main(queue_conf, ancestry_tube=ANCESTRY_TUBE)
+    main(ancestry_model, args.vcf_dir, queue_conf)
