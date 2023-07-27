@@ -13,7 +13,6 @@ None
 """
 import numpy as np
 import numpy.linalg as la
-from datetime import datetime as dt
 from ._base import BaseReducedRankRegression
 import cloudpickle
 from sklearn.linear_model import Ridge
@@ -47,8 +46,6 @@ class ReducedRankAnalyticNP(BaseReducedRankRegression):
         mse = np.mean((y_pred-Y)**2)
         """
         self.L = L
-        self.creationDate = dt.now()
-        self.fitted = False
 
     def __repr__(self):
         out_str = "ReducedRankAnalyticNP object\n"
@@ -85,7 +82,6 @@ class ReducedRankAnalyticNP(BaseReducedRankRegression):
         SigmaXY = 1 / N * np.dot(X.T, Y)
 
         SecondHalf = la.solve(SigmaXX, SigmaXY)
-        SigmaYZY = np.dot(SigmaXY.T, SecondHalf)
         mod = Ridge()
         mod.fit(X, Y)
         SecondHalf = mod.coef_.T
@@ -105,11 +101,12 @@ class ReducedRankAnalyticNP(BaseReducedRankRegression):
         load_name : str
             The name of the file with saved parameters
         """
-        load_dictionary = cloudpickle.load(open(load_name, "rb"))
+        with open(load_name, "rb") as f:
+            load_dictionary = cloudpickle.load(f)
         self.B = load_dictionary["model"].B
         self.fitted = True
 
-    def _test_inputs(self, X, Y, loss_function):
+    def _test_inputs(self, X, Y):
         """
         This performs error checking on inputs for fit
 
@@ -120,10 +117,6 @@ class ReducedRankAnalyticNP(BaseReducedRankRegression):
 
         Y : np.array-like,shape=(N,q)
             The variables we wish to predict, should be demeaned
-
-        loss_function - function(X,X_hat)->tf.Float
-            A loss function representing the difference between X
-            and Yhat
         """
         if X.shape[0] != Y.shape[0]:
             raise ValueError("Samples X != Samples Y")

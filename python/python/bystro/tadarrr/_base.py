@@ -16,14 +16,14 @@ Methods
 -------
 None
 """
-from abc import ABCMeta, abstractmethod
 import numpy as np
 from numpy import linalg as la
-from ..utils._misc import fill_dict, pretty_string_dict
-from .._template_sgd_np import _BaseSGDModel
+from copy import deepcopy
 from datetime import datetime as dt
+from datetime import timezone
+import cloudpickle
 
-__version__ = "1.0.0"
+from bystro.tadarrr._template_sgd_np import _BaseSGDModel
 
 
 class BaseReducedRankRegression(object):
@@ -82,7 +82,7 @@ class BaseReducedRankRegression(object):
         Y_hat = np.dot(X, B_sub)
         return Y_hat
 
-    def MSE(self, X, Y):
+    def mse(self, X, Y):
         """
         Evaluates the MSE of the predictions made by reduced rank 
         regression
@@ -120,7 +120,8 @@ class BaseReducedRankRegression(object):
         None
         """
         myDict = {"model": self}
-        pickle.dump(myDict, open(fileName, "wb"))
+        with open(fileName, "wb") as f:
+            cloudpickle.dump(myDict, f)
 
     def save_coefficients_csv(self, fileName):
         """
@@ -145,8 +146,7 @@ class BaseReducedRankRegressionSGD(BaseReducedRankRegression, _BaseSGDModel):
     def __init__(self, training_options={}):
         self.training_options = self._fill_training_options(training_options)
 
-        self.creationDate = dt.now()
-        self.fitted = False
+        self.creationDate = dt.now(tz=timezone.utc)
 
     def _initialize_losses(self):
         """
@@ -187,3 +187,34 @@ class BaseReducedRankRegressionSGD(BaseReducedRankRegression, _BaseSGDModel):
             "adaptive": False,
         }
         return fill_dict(training_options, default_dict)
+
+
+def fill_dict(mydict, default_dict):
+    """
+    For any key in default_dict that does not appear in mydict add the key
+
+    Parameters
+    ----------
+    mydict :
+        Dictionary to modify
+
+    default_dict:
+        Dictionary with default answers
+
+    Returns
+    -------
+    mydict : dictionary
+        The dictionary with added keys
+    """
+    z = deepcopy(default_dict)
+    z.update(mydict)
+    return z
+
+
+def simple_batcher_xy(batchSize, X, Y):
+    N = X.shape[0]
+    rng = np.random.default_rng()
+    idx = rng.choice(N, batchSize, replace=False)
+    X_batch = X[idx]
+    Y_batch = Y[idx]
+    return X_batch, Y_batch

@@ -15,14 +15,9 @@ Methods
 -------
 None
 """
-import numpy as np
 import cvxpy as cp
-from datetime import datetime as dt
 import time
-from ..utils._misc import fill_dict, pretty_string_dict
-from ._base import BaseReducedRankRegression
-
-__version__ = "1.0.0"
+from bystro.tadarrr._base import BaseReducedRankRegression
 
 
 class RRRPrimalCvx(BaseReducedRankRegression):
@@ -91,10 +86,7 @@ class RRRPrimalCvx(BaseReducedRankRegression):
         y_pred = model.predict(X,K=10.0)
         """
         self.K = float(K)
-
-        self.creationDate = dt.now()
-        self.fitted = False
-        self.version = __version__
+        super().__init__()
 
     def __repr__(self):
         out_str = "RRRPrimalCvx object\n"
@@ -190,9 +182,7 @@ class RRRDualCvx(BaseReducedRankRegression):
         mse = np.mean((y_pred-Y)**2)
         """
         self.mu = float(mu)
-
-        self.creationDate = dt.now()
-        self.fitted = False
+        super().__init__()
 
     def __repr__(self):
         out_str = "RRR_dual_cvx object\n"

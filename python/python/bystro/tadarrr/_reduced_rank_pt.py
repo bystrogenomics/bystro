@@ -20,13 +20,12 @@ None
 """
 from tqdm import trange
 import numpy as np
-import numpy.random as rand
 import torch
+import cloudpickle
 from torch import nn
-from datetime import datetime as dt
-from ._base import BaseReducedRankRegressionSGD
-from ._reduced_rank_np import ReducedRankAnalyticNP
-from ..utils._batcher_np import simple_batcher_XY
+
+from bystro.tadarrr._base import BaseReducedRankRegressionSGD, simple_batcher_xy
+from bystro.tadarrr._reduced_rank_np import ReducedRankAnalyticNP
 
 
 class ReducedRankPT(BaseReducedRankRegressionSGD):
@@ -68,10 +67,7 @@ class ReducedRankPT(BaseReducedRankRegressionSGD):
         mse = np.mean((y_pred-Y)**2)
         """
         self.mu = float(mu)
-
-        self.training_options = self._fill_training_options(training_options)
-
-        self.creationDate = dt.now()
+        super.__int__(training_options=training_options)
 
     def __repr__(self):
         out_str = "RRRDualPT object\n"
@@ -107,15 +103,12 @@ class ReducedRankPT(BaseReducedRankRegressionSGD):
         X, Y = self._transform_training_data(X, Y)
 
         # Declare our variables
-        mod_init = ReducedRankAnalyticNP(int(np.minimum(N, 5)))
+        mod_init = ReducedRankAnalyticNP(int(np.minimum(X.shape[0], 5)))
         mod_init.fit(X, Y)
-        B_ = torch.tensor(B_init, requires_grad=True)
+        B_ = torch.tensor(mod_init.B, requires_grad=True)
         trainable_variables = [B_]
 
-        if progress_bar:
-            myrange = trange
-        else:
-            myrange = range
+        myrange = trange if progress_bar else range
 
         self._initialize_losses()
 
@@ -124,7 +117,7 @@ class ReducedRankPT(BaseReducedRankRegressionSGD):
         )
 
         for i in myrange(td["n_iterations"]):
-            X_batch, Y_batch = simple_batcher_XY(td["batch_size"], X, Y)
+            X_batch, Y_batch = simple_batcher_xy(td["batch_size"], X, Y)
 
             Y_recon = torch.matmul(X_batch, B_)
             loss_recon = loss_function(Y_batch, Y_recon)
@@ -160,7 +153,8 @@ class ReducedRankPT(BaseReducedRankRegressionSGD):
         load_name : str
             The name of the file with saved parameters
         """
-        load_dictionary = pickle.load(open(load_name, "rb"))
+        with open(load_name, "rb") as f:
+            load_dictionary = cloudpickle.load(f)
         self.B = load_dictionary["model"].B
 
     def _save_variables(self, training_variables):
@@ -201,7 +195,7 @@ class ReducedRankPT(BaseReducedRankRegressionSGD):
         self.losses_recon[i] = loss_recon.detach().numpy()
         self.losses_reg[i] = loss_reg.detach().numpy()
 
-    def _test_inputs(self, X, Y, loss_function):
+    def _test_inputs(self, X, Y):
         """
         This performs error checking on inputs for fit
 
@@ -212,10 +206,6 @@ class ReducedRankPT(BaseReducedRankRegressionSGD):
 
         Y : np.array-like,shape=(N,q)
             The variables we wish to predict, should be demeaned
-
-        loss_function - function(X,X_hat)->tf.Float
-            A loss function representing the difference between X
-            and Yhat
         """
         if X.shape[0] != Y.shape[0]:
             raise ValueError("Samples X != Samples Y")

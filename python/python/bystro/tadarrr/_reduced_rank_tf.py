@@ -21,18 +21,66 @@ None
 """
 from tqdm import trange
 import numpy as np
-import numpy.random as rand
 import tensorflow as tf
-from datetime import datetime as dt
-from ._base import BaseReducedRankRegressionSGD
-from ..utils._misc_tf import (
-    return_optimizer_tf,
-    limitGPU,
-    return_optimizer_adaptive_tf,
-)
-from ..utils._batcher_np import simple_batcher_XY
-from ..utils._misc import fill_dict, pretty_string_dict
-from ..utils._losses_tf import loss_norm_nuclear_tf, loss_norm_Lq_tf
+from bystro.tadarrr._base import BaseReducedRankRegressionSGD, simple_batcher_xy
+from tensorflow import keras
+import cloudpickle
+
+
+def loss_norm_lq_tf(X, Xhat=None, q=2, weights=None, safe=True):
+    """
+    Computes the Lq loss (omitting 1/q)
+
+    Parameters
+    ----------
+    X : tf.array-like(p,r)
+        Matrix of data
+
+    Xhat : tf.array-like(p,r)
+        Optional matrix of predictions (default=0)
+
+    q : float>0
+        The power
+
+    weights : array,default=None
+        The weights to place on each observation
+
+    safe : bool,default=True
+        Should typecasting occur?
+
+    Returns
+    -------
+    loss : tf.Float
+        The loss
+    """
+    if safe:
+        X = X.astype(np.float32)
+
+    if Xhat is None:
+        Xhat = 0
+
+    if len(X.shape) > 1:
+        if q == 1:
+            loss_un = tf.reduce_mean(tf.abs(X - Xhat), axis=1)
+        elif q == 2:
+            loss_un = tf.reduce_mean(tf.square(X - Xhat), axis=1)
+        else:
+            loss_un = tf.reduce_mean(tf.math.pow(tf.abs(X - Xhat), q), axis=1)
+    else:
+        if q == 1:
+            loss_un = tf.abs(X - Xhat)
+        elif q == 2:
+            loss_un = tf.square(X - Xhat)
+        else:
+            loss_un = tf.math.pow(tf.abs(X - Xhat), q)
+
+    loss = (
+        tf.reduce_mean(loss_un)
+        if weights is None
+        else tf.reduce_mean(weights * loss_un)
+    )
+
+    return loss
 
 
 class RRRDualTf(BaseReducedRankRegressionSGD):
@@ -74,22 +122,13 @@ class RRRDualTf(BaseReducedRankRegressionSGD):
         mse = np.mean((y_pred-Y)**2)
         """
         self.mu = float(mu)
-
-        self.training_options = self._fill_training_options(training_options)
-
-        self.creationDate = dt.now()
-        self.fitted = False
+        super().__init__(training_options=training_options)
 
     def __repr__(self):
         out_str = "RRRDualTf object\n"
-        out_str += "mu=%0.3f\n" % self.mu
-        out_str += "Fitted=%s\n" % self.fitted
-        out_str += ">>>>>>>>>>>>>>>>>>>>>\n"
-        out_str += "Training Parameters :\n"
-        out_str += pretty_string_dict(self.training_options)
         return out_str
 
-    def fit(self, X, Y, loss_function=loss_norm_Lq_tf, progress_bar=True):
+    def fit(self, X, Y, loss_function=loss_norm_lq_tf, progress_bar=True):
         """
         Given X and Y, this fits the model
 
@@ -115,30 +154,24 @@ class RRRDualTf(BaseReducedRankRegressionSGD):
         self
         """
         td = self.training_options
-        limitGPU(td["gpu_memory"])
+        limit_gpu(td["gpu_memory"])
         self._test_inputs(X, Y, loss_function)
         X, Y = self._transform_training_data(X, Y)
 
         # Declare our variables
-        B_ = tf.Variable(rand.randn(self.p, self.q).astype(np.float32))
+        rng = np.random.default_rng()
+        p, q = X.shape[1], Y.shape[1]
+        B_ = tf.Variable(rng.normal(size=(p, q)).astype(np.float32))
         trainable_variables = [B_]
 
         self._initialize_losses()
 
-        if progress_bar:
-            myrange = trange
-        else:
-            myrange = range
+        myrange = trange if progress_bar else range
 
-        if td["adaptive"]:
-            optimizer = return_optimizer_adaptive_tf(
-                td["method"], td["learning_rate"], td["decay_options"]
-            )
-        else:
-            optimizer = return_optimizer_tf(td["method"], td["learning_rate"])
+        optimizer = return_optimizer_tf(td["method"], td["learning_rate"])
 
         for i in myrange(td["n_iterations"]):
-            X_batch, Y_batch = simple_batcher_XY(td["batch_size"], X, Y)
+            X_batch, Y_batch = simple_batcher_xy(td["batch_size"], X, Y)
 
             with tf.GradientTape() as tape:
                 Y_recon = tf.matmul(X_batch, B_)
@@ -163,7 +196,6 @@ class RRRDualTf(BaseReducedRankRegressionSGD):
         self.optimal_loss = loss_recon.numpy()
 
         self._save_variables(trainable_variables)
-        self.fitted = True
         return self
 
     def unpickle(self, load_name):
@@ -176,9 +208,9 @@ class RRRDualTf(BaseReducedRankRegressionSGD):
         load_name : str
             The name of the file with saved parameters
         """
-        load_dictionary = pickle.load(open(load_name, "rb"))
+        with open(load_name, "rb") as f:
+            load_dictionary = cloudpickle.load(f)
         self.B = load_dictionary["model"].B
-        self.fitted = True
 
     def _save_variables(self, training_variables):
         """
@@ -218,7 +250,7 @@ class RRRDualTf(BaseReducedRankRegressionSGD):
         self.losses_recon[i] = loss_recon.numpy()
         self.losses_reg[i] = loss_reg.numpy()
 
-    def _test_inputs(self, X, Y, loss_function):
+    def _test_inputs(self, X, Y):
         """
         This performs error checking on inputs for fit
 
@@ -282,23 +314,13 @@ class SparseLowRankRegressionTF(BaseReducedRankRegressionSGD):
         """
         self.mul = float(mul)
         self.mus = float(mus)
-
-        self.training_options = self._fill_training_options(training_options)
-
-        self.creationDate = dt.now()
-        self.fitted = False
+        super().__init__(training_options=training_options)
 
     def __repr__(self):
         out_str = "SparseLowRankRegressionTF object\n"
-        out_str += "mul=%0.3f\n" % self.mul
-        out_str += "mus=%0.3f\n" % self.mus
-        out_str += "Fitted=%s\n" % self.fitted
-        out_str += ">>>>>>>>>>>>>>>>>>>>>\n"
-        out_str += "Training Parameters :\n"
-        out_str += pretty_string_dict(self.training_options)
         return out_str
 
-    def fit(self, X, Y, loss_function=loss_norm_Lq_tf, progress_bar=True):
+    def fit(self, X, Y, loss_function=loss_norm_lq_tf, progress_bar=True):
         """
         Given X and Y, this fits the model
 
@@ -324,31 +346,25 @@ class SparseLowRankRegressionTF(BaseReducedRankRegressionSGD):
         self
         """
         td = self.training_options
-        limitGPU(td["gpu_memory"])
+        limit_gpu(td["gpu_memory"])
         self._test_inputs(X, Y, loss_function)
         X, Y = self._transform_training_data(X, Y)
+        p, q = X.shape[1], Y.shape[1]
+        rng = np.random.default_rng()
 
         # Declare our variables
-        S_ = tf.Variable(rand.randn(self.p, self.q).astype(np.float32))
-        L_ = tf.Variable(rand.randn(self.p, self.q).astype(np.float32))
+        S_ = tf.Variable(rng.normal(shape=(p, q)).astype(np.float32))
+        L_ = tf.Variable(rng.normal(shape=(p, q)).astype(np.float32))
         trainable_variables = [S_, L_]
 
         self._initialize_losses()
 
-        if progress_bar:
-            myrange = trange
-        else:
-            myrange = range
+        myrange = trange if progress_bar else range
 
-        if td["adaptive"]:
-            optimizer = return_optimizer_adaptive_tf(
-                td["method"], td["learning_rate"], td["decay_options"]
-            )
-        else:
-            optimizer = return_optimizer_tf(td["method"], td["learning_rate"])
+        optimizer = return_optimizer_tf(td["method"], td["learning_rate"])
 
-        for i in trange(td["n_iterations"]):
-            X_batch, Y_batch = simple_batcher_XY(td["batch_size"], X, Y)
+        for i in myrange(td["n_iterations"]):
+            X_batch, Y_batch = simple_batcher_xy(td["batch_size"], X, Y)
 
             with tf.GradientTape() as tape:
                 B_ = S_ + L_
@@ -372,13 +388,12 @@ class SparseLowRankRegressionTF(BaseReducedRankRegressionSGD):
         loss_reg = loss_norm_nuclear_tf(B_)
         Y_recon = tf.matmul(X, B_)
         loss_recon = loss_function(Y, Y_recon)
-        loss = loss_recon + self.mul * reg_L + self.mus * reg_S
+        loss = loss_recon + self.mul * reg_L + self.mus * loss_reg
 
         self.optimal_value = loss.numpy()
         self.optimal_loss = loss_recon.numpy()
 
         self._save_variables(trainable_variables)
-        self.fitted = True
         return self
 
     def unpickle(self, load_name):
@@ -391,11 +406,11 @@ class SparseLowRankRegressionTF(BaseReducedRankRegressionSGD):
         load_name : str
             The name of the file with saved parameters
         """
-        load_dictionary = pickle.load(open(load_name, "rb"))
+        with open(load_name, "rb") as f:
+            load_dictionary = cloudpickle.load(f)
         self.B = load_dictionary["model"].B
         self.L_ = load_dictionary["model"].L_
         self.S_ = load_dictionary["model"].S_
-        self.fitted = True
 
     def _initialize_losses(self):
         """
@@ -462,7 +477,7 @@ class SparseLowRankRegressionTF(BaseReducedRankRegressionSGD):
         self.losses_reg_nuc[i] = loss_nuc.numpy()
         self.losses_reg_sparsity[i] = loss_sparse.numpy()
 
-    def _test_inputs(self, X, Y, loss_function):
+    def _test_inputs(self, X, Y):
         """
         This performs error checking on inputs for fit
 
@@ -473,10 +488,6 @@ class SparseLowRankRegressionTF(BaseReducedRankRegressionSGD):
 
         Y : np.array-like,shape=(N,q)
             The variables we wish to predict, should be demeaned
-
-        loss_function - function(X,X_hat)->tf.Float
-            A loss function representing the difference between X 
-            and Yhat
         """
         if X.shape[0] != Y.shape[0]:
             raise ValueError("Samples X != Samples Y")
@@ -498,11 +509,93 @@ class SparseLowRankRegressionTF(BaseReducedRankRegressionSGD):
         X : np.array-like,shape=(N,p)
             The predictor variables, should be demeaned
 
-        Y : np.array-like,shape=(N,q)
-            The variables we wish to predict, should be demeaned
-        """
+        Y : np.array-like,shape=(N,q) The variables we wish to predict, should be demeaned """
         self.n_samples, self.p = X.shape
         self.q = Y.shape[1]
         X = X.astype(np.float32)
         Y = Y.astype(np.float32)
         return X, Y
+
+
+def loss_norm_nuclear_tf(X, safe=True):
+    """ 
+    This computes the nuclear norm via an SVD. This is the convex relaxation
+    of rank(X).
+
+    Paramters
+    ---------
+    X : tf.matrix,shape=(m,n)
+        The input matrix
+
+    safe : bool,default=True
+        Should typecasting occur?
+
+    Returns
+    -------
+    norm : tf.Float
+        The estimated norm
+    """
+    if safe:
+        X = tf.cast(X, tf.float32)
+    s = tf.linalg.svd(X, compute_uv=False)
+    norm = tf.reduce_sum(s)
+    return norm
+
+
+def limit_gpu(gpuMem):
+    """
+    Limits the GPU memory to a certain amount
+
+    Parameters
+    ----------
+    gpuMem : int
+        MB of memory to allocate
+    """
+    gpuMem = int(gpuMem)
+    gpus = tf.config.experimental.list_physical_devices("GPU")
+    if gpus:
+        try:
+            tf.config.experimental.set_virtual_device_configuration(
+                gpus[0],
+                [
+                    tf.config.experimental.VirtualDeviceConfiguration(
+                        memory_limit=gpuMem
+                    )
+                ],
+            )
+            logical_gpus = tf.config.experimental.list_logical_devices("GPU")
+            print(
+                len(gpus),
+                " Physical GPUs, ",
+                len(logical_gpus),
+                " Logical GPUs",
+            )
+        except RuntimeError as e:
+            print(e)
+
+
+def return_optimizer_tf(trainingMethod, learningRate):
+    """
+    Creates a Keras optimizer with specific parameters
+
+    Parameters
+    ----------
+    trainingMethod : str \in {'Nadam','Adam', 'SGD'}
+        The SGD method
+
+    learningRate : float
+        The learning rate of optimization
+
+    Returns
+    -------
+    optimizer : keras optimizer
+    """
+    if trainingMethod == "Nadam":
+        optimizer = keras.optimizers.Nadam(learning_rate=learningRate)
+    elif trainingMethod == "Adam":
+        optimizer = keras.optimizers.Adam(learning_rate=learningRate)
+    elif trainingMethod == "SGD":
+        optimizer = keras.optimizers.SGD(learning_rate=learningRate)
+    else:
+        raise ValueError("Unrecognized learning strategy %s", trainingMethod)
+    return optimizer
