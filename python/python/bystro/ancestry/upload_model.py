@@ -13,7 +13,7 @@ logger.setLevel(logging.INFO)
 
 ANCESTRY_BUCKET = "bystro-ancestry"
 ANCESTRY_MODEL_PRODUCTS_DIR = Path("ancestry_model_products")
-PCA_FILE = "pca.skop"
+PCA_FILE = "pca.csv"
 RFC_FILE = "rfc.skop"
 
 try:
