@@ -42,10 +42,12 @@ def main() -> None:
     )
     PCA_DIMS = 30
     pca = PCA(n_components=PCA_DIMS).fit(train_X)
-    train_Xpc = pca_transform_df(pca, train_X)
-    test_Xpc = pca_transform_df(pca, test_X)
+    pc_columns = [f"pc{i}" for i in range(1, PCA_DIMS + 1)]
+    loadings_df = pd.DataFrame(pca.components_.T, index=train_X.columns, columns=pc_columns)
+    train_Xpc = train_X @ loadings_df
+    test_Xpc = test_X @ loadings_df
     rfc = make_rfc(train_Xpc, test_Xpc, train_y, test_y)
-    serialize_model_products(list(kgp_genotypes.index), pca, rfc)
+    serialize_model_products(loadings_df, rfc)
 
 
 if __name__ == "__main__":

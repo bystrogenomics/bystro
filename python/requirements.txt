@@ -1,5 +1,6 @@
 Cython==0.29.35
 attrs==23.1.0
+boto3==1.28.9
 liftover==1.1.16
 maturin[zig]==1.0.1
 msgspec==0.15.1
