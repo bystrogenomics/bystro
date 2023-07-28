@@ -2,9 +2,18 @@
 
 #TODO convert this process to one using our own vcf parser
 
-#Download plink2 - can be downloaded with example below or at https://www.cog-genomics.org/plink/2.0/
-#wget https://s3.amazonaws.com/plink2-assets/plink2_linux_avx2_20230707.zip
-#unzip plink2_linux_avx2_20230707.zip 
+# Plink2 is needed for this pre-process
+# If installed in current directory, add to path
+export PATH=$PATH:./
+#Check if plink2 is installed or not in path
+program_name="plink2"
+if ! command -v "$program_name" &> /dev/null; then
+    echo "Error: '$program_name' is not installed or not present on system PATH."
+    echo "Please install '$program_name' or make sure it is added to the PATH.  You can install from: https://www.cog-genomics.org/plink/2.0/"
+    exit 1
+fi
+
+echo "'$program_name' is installed and present on the system's PATH."
 
 #Download 1kgp genomes - make sure this is the most recent version
 wget 'ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/1kGP_high_coverage_Illumina.chr'*
