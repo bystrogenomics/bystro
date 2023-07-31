@@ -12,7 +12,6 @@ if ! command -v "$program_name" &> /dev/null; then
     echo "Please install '$program_name' or make sure it is added to the PATH.  You can install from: https://www.cog-genomics.org/plink/2.0/"
     exit 1
 fi
-
 echo "'$program_name' is installed and present on the system's PATH."
 
 #Download 1kgp manifest that has list of vcf files with checksums - make sure this is the most recent version of 1kgp
@@ -60,7 +59,6 @@ do
     if [ "$chr" -ne 1 ]; then
         echo "$output_base" >> chr_merge_list.txt
     fi
-
 done
 
 #Merge the files together using list of output file names
