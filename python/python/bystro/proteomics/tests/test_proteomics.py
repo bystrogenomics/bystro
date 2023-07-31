@@ -1,27 +1,30 @@
 """Tests for proteomics module."""
-from bystro.proteomics.proteomics import load_fragpipe_dataset, _load_fragpipe_tsv
+import pytest
+from bystro.proteomics.proteomics import load_fragpipe_dataset
 import io
 import pandas as pd
 
-test_csv_type1_contents = """"Index"\t"NumberPSM"\t"Proteins"\t"ReferenceIntensity"\t"Sample1"\t"Sample2"
+test_csv_contents_type1 = """"Index"\t"NumberPSM"\t"Proteins"\t"ReferenceIntensity"\t"Sample1"\t"Sample2"
 "A1CF"\t28\t"NP_001185747.1;"\t1.1\t1.2\t1.3
 "AAAS"\t69\t"NP_001166937.1;"\t2.1\t2.2\t2.3
 "AAED1"\t29\t"NP_714542.1;"\t3.1\t3.2\t3.3
 """
 
-test_csv_type2_contents = """"Index"\t"Gene"\t"Peptide"\t"ReferenceIntensity"\t"Sample1"\t"Sample2"
+test_csv_contents_type2 = """"Index"\t"Gene"\t"Peptide"\t"ReferenceIntensity"\t"Sample1"\t"Sample2"
+"NP_000009.1_52_61"\t"ACADVL"\t"SDSHPSDALTR"\t1.1\t1.2\t1.3
+"NP_000010.1_195_200"\t"ACAT1"\t"IHMGSCAENTAK"\t2.1\t2.2\t2.3
+"NP_000013.2_155_161"\t"ACVRL1"\t"GLHSELGESSLILK"\t3.1\t3.2\t3.3
+"""
+
+test_csv_contents_bad_format = """"Index"\t"Gene"\t"Peptide"\t"BAD_COL_NAME"\t"Sample1"\t"Sample2"
 "NP_000009.1_52_61"\t"ACADVL"\t"SDSHPSDALTR"\t1.1\t1.2\t1.3
 "NP_000010.1_195_200"\t"ACAT1"\t"IHMGSCAENTAK"\t2.1\t2.2\t2.3
 "NP_000013.2_155_161"\t"ACVRL1"\t"GLHSELGESSLILK"\t3.1\t3.2\t3.3
 """
 
 
-def test__load_fragpipe_tsv():
-    actual = _load_fragpipe_tsv(io.StringIO(test_csv_contents))
-
-
-def test_load_type1_fragpipe_dataset():
-    stream = io.StringIO(test_csv_type1_contents)
+def test_load_fragpipe_dataset_type1():
+    stream = io.StringIO(test_csv_contents_type1)
     fragpipe_df = load_fragpipe_dataset(stream)
     expected_df = pd.DataFrame(
         {
@@ -34,8 +37,8 @@ def test_load_type1_fragpipe_dataset():
     pd.testing.assert_frame_equal(expected_df, fragpipe_df)
 
 
-def test_load_type2_fragpipe_dataset():
-    stream = io.StringIO(test_csv_type2_contents)
+def test_load_fragpipe_dataset_type2():
+    stream = io.StringIO(test_csv_contents_type2)
     fragpipe_df = load_fragpipe_dataset(stream)
     expected_df = pd.DataFrame(
         {
@@ -46,3 +49,9 @@ def test_load_type2_fragpipe_dataset():
     ).rename_axis(index="sample", columns="gene")
 
     pd.testing.assert_frame_equal(expected_df, fragpipe_df)
+
+
+def test_load_fragpipe_dataset_bad_format():
+    stream = io.StringIO(test_csv_contents_bad_format)
+    with pytest.raises(ValueError, match="Dataset format not recognized"):
+        load_fragpipe_dataset(stream)
