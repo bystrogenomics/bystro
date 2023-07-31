@@ -58,17 +58,3 @@ def _transform_fragpipe_dataset_type2(fragpipe_df: pd.DataFrame) -> pd.DataFrame
     fragpipe_df = fragpipe_df.drop(["NumberPSM", "Proteins", "ReferenceIntensity"], axis="columns")
     fragpipe_df = fragpipe_df.T  # convert to (samples X genes)
     return fragpipe_df
-
-
-fragpipe_directory = Path("/Users/patrickoneil/wingolab-bystro-matrixData-opensearch/data/fragpipe")
-
-filenames = [
-    fragpipe_directory / f
-    for f in [
-        "Supplementary_Data_Proteome_DIA/6_CPTAC3_CCRCC_Whole_abundance_gene_protNorm=2_CB.tsv",
-        "Supplementary_Data_Phosphoproteome_DIA/6_CPTAC3_CCRCC_Phospho_abundance_phosphosite_protNorm=2_CB_imputed.tsv",
-        "Supplementary_Data_Phosphoproteome_DIA/6_CPTAC3_CCRCC_Phospho_abundance_gene_protNorm=2_CB_imputed.tsv",
-        "Supplementary_Data_Phosphoproteome_DIA/6_CPTAC3_CCRCC_Phospho_abundance_phosphopeptide_protNorm=2_CB_1211.tsv",
-        "Supplementary_Data_Phosphoproteome_DIA/6_CPTAC3_CCRCC_Phospho_abundance_phosphopeptide_protNorm=2_CB_imputed_1211.tsv",
-    ]
-]
