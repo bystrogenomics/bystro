@@ -8,9 +8,13 @@ from typing import TypeVar
 import pandas as pd
 
 
+def _load_fragpipe_tsv(fname: str | Path) -> pd.DataFrame:
+    return pd.read_csv(fname, sep="\t", index_col="Index")
+
+
 def load_fragpipe_dataset(fname: str | Path) -> pd.DataFrame:
     """Load a fragpipe dataset and transform it according to columns present."""
-    fragpipe_dataset = pd.read_csv(fname, sep="\t", index_col="Index")
+    fragpipe_dataset = _load_fragpipe_tsv(fname)
     return _transform_fragpipe_dataset(fragpipe_dataset)
 
 
@@ -27,10 +31,18 @@ def _transform_fragpipe_dataset(fragpipe_dataset: pd.DataFrame) -> pd.DataFrame:
     type2_columns = ["NumberPSM", "Proteins", "ReferenceIntensity"]
     actual_columns = list(fragpipe_dataset.columns)
     if _list_startswith(actual_columns, type1_columns):
-        return _transform_fragpipe_dataset_type1(fragpipe_dataset)
-    if _list_startswith(actual_columns, type2_columns):
-        return _transform_fragpipe_dataset_type2(fragpipe_dataset)
-    raise ValueError
+        fragpipe_df = _transform_fragpipe_dataset_type1(fragpipe_dataset)
+    elif _list_startswith(actual_columns, type2_columns):
+        fragpipe_df = _transform_fragpipe_dataset_type2(fragpipe_dataset)
+    else:
+        err_msg = (
+            f"Dataset format not recognized: "
+            f"expected columns to begin with {type1_columns} or {type2_columns}"
+        )
+        raise ValueError(err_msg)
+    fragpipe_df.columns.name = "gene"
+    fragpipe_df.index.name = "sample"
+    return fragpipe_df
 
 
 def _transform_fragpipe_dataset_type1(fragpipe_df: pd.DataFrame) -> pd.DataFrame:
