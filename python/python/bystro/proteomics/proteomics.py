@@ -7,10 +7,7 @@ from typing import TypeVar
 
 import pandas as pd
 
-
-def _load_fragpipe_tsv(fname: str | Path) -> pd.DataFrame:
-    """Read a fragpipe dataset from disk."""
-    return pd.read_csv(fname, sep="\t", index_col="Index")
+T = TypeVar("T")
 
 
 def load_fragpipe_dataset(fname: str | Path) -> pd.DataFrame:
@@ -19,7 +16,12 @@ def load_fragpipe_dataset(fname: str | Path) -> pd.DataFrame:
     return _prep_fragpipe_dataset(fragpipe_dataset)
 
 
-T = TypeVar("T")
+# ------------------------------- END PUBLIC API -------------------------------
+
+
+def _load_fragpipe_tsv(fname: str | Path) -> pd.DataFrame:
+    """Read a fragpipe dataset from disk."""
+    return pd.read_csv(fname, sep="\t", index_col="Index")
 
 
 def _list_startswith(xs: Sequence[T], ys: Sequence[T]) -> bool:
