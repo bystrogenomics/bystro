@@ -4,6 +4,10 @@ from bystro.proteomics.proteomics import load_fragpipe_dataset
 import io
 import pandas as pd
 
+# file contents adapted from Supplementary_Data_Phosphoproteome_DIA,
+# Supplementary_Data_Proteome_DIA folders of
+# wingolab-bystro-matrixData-opensearch repo
+
 test_csv_contents_type1 = """"Index"\t"NumberPSM"\t"Proteins"\t"ReferenceIntensity"\t"Sample1"\t"Sample2"
 "A1CF"\t28\t"NP_001185747.1;"\t1.1\t1.2\t1.3
 "AAAS"\t69\t"NP_001166937.1;"\t2.1\t2.2\t2.3
