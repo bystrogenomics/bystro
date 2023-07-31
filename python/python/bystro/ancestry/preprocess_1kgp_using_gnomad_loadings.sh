@@ -20,6 +20,28 @@ wget 'ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_covera
 #Download 1kgp genomes 
 wget 'ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/1kGP_high_coverage_Illumina.chr'*
 
+#Check if downloaded files were properly downloaded using md5 checksums
+MANIFEST_FILE="20220804_manifest.txt"
+# Variable to keep track of the checksum verification status
+verification_status="PASSED"
+# Verify checksums for each file in the manifest and print pass/fail
+while read -r file_name expected_checksum; do
+    # Calculate md5sum checksum of the downloaded file
+    actual_checksum=$(md5sum "$file_name" | awk '{print $1}')
+
+    # Compare the calculated checksum with the expected checksum and mark if failure
+    if [ "$actual_checksum" != "$expected_checksum" ]; then
+        verification_status="FAILED"
+        echo "Checksum verification FAILED for $file_name"
+    fi
+done < "$MANIFEST_FILE"
+
+if [ "$verification_status" = "PASSED" ]; then
+    echo "All checksum verifications PASSED"
+else
+    echo "One or more checksum verifications FAILED"
+fi
+
 #Gnomad loadings have been preprocessed to extract the variant list only as gnomadvariantlist.txt
 
 #Extract from each autosomal chromosome for ancestry
