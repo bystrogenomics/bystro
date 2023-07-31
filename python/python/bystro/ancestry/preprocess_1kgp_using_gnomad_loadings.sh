@@ -15,7 +15,9 @@ fi
 
 echo "'$program_name' is installed and present on the system's PATH."
 
-#Download 1kgp genomes - make sure this is the most recent version
+#Download 1kgp manifest that has list of vcf files with checksums - make sure this is the most recent version of 1kgp
+wget 'ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/20220804_manifest.txt'
+#Download 1kgp genomes 
 wget 'ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/1kGP_high_coverage_Illumina.chr'*
 
 #Gnomad loadings have been preprocessed to extract the variant list only as gnomadvariantlist.txt
