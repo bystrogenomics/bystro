@@ -49,18 +49,28 @@ def _prep_fragpipe_dataset(fragpipe_dataset: pd.DataFrame) -> pd.DataFrame:
     return fragpipe_df
 
 
+def _subtract_reference_intensities(fragpipe_df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize dataframe by reference intensities."""
+    reference_intensities = fragpipe_df["ReferenceIntensity"]
+    fragpipe_df = fragpipe_df.subtract(reference_intensities, axis=0)
+    fragpipe_df = fragpipe_df.drop(["ReferenceIntensity"], axis=1)
+    return fragpipe_df
+
+
 def _prep_fragpipe_dataset_type1(fragpipe_df: pd.DataFrame) -> pd.DataFrame:
     """Prep fragpipe dataset where multiple peptides map into gene."""
-    fragpipe_df = fragpipe_df.drop(["ReferenceIntensity", "Peptide"], axis="columns")
+    fragpipe_df = fragpipe_df.drop(["Peptide"], axis="columns")
     fragpipe_df = fragpipe_df.groupby("Gene").apply(
         lambda g: g.mean(axis="index")
     )  # average over all peptides belonging to gene
+    fragpipe_df = _subtract_reference_intensities(fragpipe_df)
     fragpipe_df = fragpipe_df.T  # convert to (samples X genes)
     return fragpipe_df
 
 
 def _prep_fragpipe_dataset_type2(fragpipe_df: pd.DataFrame) -> pd.DataFrame:
     """Prep fragpipe dataset where peptide aggregation has already been performed."""
-    fragpipe_df = fragpipe_df.drop(["NumberPSM", "Proteins", "ReferenceIntensity"], axis="columns")
+    fragpipe_df = fragpipe_df.drop(["NumberPSM", "Proteins"], axis="columns")
+    fragpipe_df = _subtract_reference_intensities(fragpipe_df)
     fragpipe_df = fragpipe_df.T  # convert to (samples X genes)
     return fragpipe_df
