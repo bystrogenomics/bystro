@@ -1,4 +1,4 @@
-"""Load and postprocess Fragpipe output files."""
+"""Load and postprocess fragpipe output files."""
 
 
 from collections.abc import Sequence
