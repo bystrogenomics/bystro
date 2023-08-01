@@ -10,16 +10,14 @@ HEADER_COLS = ["#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "F
 
 def generate_random_vcf_index() -> tuple[int, int, str, str]:
     """Generate autosomal chr vcf variant IDs to use for testing."""
-    random_chr = random.randint(1, 22+1)
+    random_chr = random.randint(1, 22 + 1)
     random_pos = random.randint(1, 1000000)
     random_ref = random.choice(["A", "T", "C", "G"])
     random_alt = random.choice([letter for letter in ["A", "T", "C", "G"] if letter != random_ref])
-    return random_chr,random_pos,random_ref,random_alt
+    return random_chr, random_pos, random_ref, random_alt
 
 
-def generate_simulated_vcf(
-    num_samples:int, num_vars:int
-) -> tuple[str,list[str]]:
+def generate_simulated_vcf(num_samples: int, num_vars: int) -> tuple[str, list[str]]:
     """VCF simulator for testing analysis modules."""
     # This is a first pass - could include more sophisticated choices for possible values in future
     sample_ids = [f"SampleID{i+1}" for i in range(num_samples)]
@@ -28,8 +26,8 @@ def generate_simulated_vcf(
     simulated_indices = []
     vcf_data.append("\t".join(header))
     for variant in range(num_vars):
-        #Use index simulator to generate random chrom,pos,ref,alt
-        random_chr,random_pos,random_ref,random_alt = generate_random_vcf_index()
+        # Use index simulator to generate random chrom,pos,ref,alt
+        random_chr, random_pos, random_ref, random_alt = generate_random_vcf_index()
         variant_id = f"{random_chr}:{random_pos}:{random_ref}:{random_alt}"
         chrom = random_chr
         pos = random_pos
@@ -50,10 +48,10 @@ def generate_simulated_vcf(
     return vcf_data, simulated_indices
 
 
-def convert_sim_vcf_to_pd(vcf_data:str) -> pd.DataFrame:
-    #Convert to pandas DataFrame for further processing
+def convert_sim_vcf_to_pd(vcf_data: str) -> pd.DataFrame:
+    # Convert to pandas DataFrame for further processing
     vcf_str = "\n".join(vcf_data)
-    vcf_df = pd.read_csv(StringIO(vcf_str), delimiter='\t')
+    vcf_df = pd.read_csv(StringIO(vcf_str), delimiter="\t")
     return vcf_df
 
 
