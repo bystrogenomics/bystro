@@ -3,7 +3,8 @@
 import pandas as pd
 from bystro.vcf_utils.sim_data_generator import (
     generate_random_vcf_index, 
-    generate_simulated_vcf
+    generate_simulated_vcf,
+    convert_sim_vcf_to_pd
 )
 
 HEADER_COLS = ["#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"]
@@ -11,17 +12,12 @@ HEADER_COLS = ["#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "F
 
 def test_generate_random_vcf_index():
     """Test expected index components have correct parameters."""
-    random_vcf_index = generate_random_vcf_index()
-    assert isinstance(random_vcf_index, str)
-    parts = random_vcf_index.split(":")
-    assert len(parts) == 4
-    assert parts[0].isdigit()
-    assert 1 <= int(parts[0]) <= 22
-    assert parts[1].isdigit()
-    assert 1 <= int(parts[1]) <= 1000000
-    assert parts[2] in ["A", "T", "C", "G"]
-    assert parts[3] in ["A", "T", "C", "G"]
-    assert parts[2] != parts[3]
+    random_chr,random_pos,random_ref,random_alt = generate_random_vcf_index()
+    assert 1 <= int(random_chr) <= 22
+    assert 1 <= int(random_pos) <= 1000000
+    assert random_ref in ["A", "T", "C", "G"]
+    assert random_alt in ["A", "T", "C", "G"]
+    assert random_ref != random_alt
 
 
 def test_generate_simulated_vcf():
@@ -29,7 +25,8 @@ def test_generate_simulated_vcf():
     num_samples = 10
     num_vars = 10
     simulated_vcf, simulated_indices = generate_simulated_vcf(num_samples, num_vars)
-    assert isinstance(simulated_vcf, pd.DataFrame)
+    sim_vcf_pd = convert_sim_vcf_to_pd(simulated_vcf)
+    assert isinstance(sim_vcf_pd, pd.DataFrame)
     assert isinstance(simulated_indices, list)
     assert len(simulated_indices) == num_vars
     assert len(simulated_vcf.columns) == num_samples + len(HEADER_COLS)
