@@ -35,7 +35,17 @@ def generate_simulated_vcf(num_samples: int, num_vars: int) -> tuple[str, list[s
         info = "."
         format_ = "GT"
         samples = []
-        record = [str(random_chr), str(random_pos), variant_id, random_ref, random_alt, str(qual), filter_, info, format_]
+        record = [
+            str(random_chr), 
+            str(random_pos), 
+            variant_id, 
+            random_ref, 
+            random_alt, 
+            str(qual), 
+            filter_, 
+            info, 
+            format_
+        ]
         for _ in range(num_samples):
             genotype = random.choice(["0|0", "0|1", "1|0", "1|1"])
             samples.append(genotype)
