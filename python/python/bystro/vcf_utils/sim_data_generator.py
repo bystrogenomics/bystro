@@ -19,7 +19,7 @@ def generate_random_vcf_index() -> tuple[int, int, str, str]:
 
 def generate_simulated_vcf(
     num_samples:int, num_vars:int
-) -> tuple[pd.DataFrame, str]:
+) -> tuple[str,list[str]]:
     """VCF simulator for testing analysis modules."""
     # This is a first pass - could include more sophisticated choices for possible values in future
     sample_ids = [f"SampleID{i+1}" for i in range(num_samples)]
@@ -47,10 +47,14 @@ def generate_simulated_vcf(
         record = [str(chrom), str(pos), variant_id, ref, alt, str(qual), filter_, info, format_]
         record.extend(samples)
         vcf_data.append("\t".join(record))
-    # Convert to pandas DataFrame for further processing
+    return vcf_data, simulated_indices
+
+
+def convert_sim_vcf_to_pd(vcf_data:str) -> pd.DataFrame:
+    #Convert to pandas DataFrame for further processing
     vcf_str = "\n".join(vcf_data)
-    vcf_df = pd.read_csv(StringIO(vcf_str), delimiter="\t")
-    return vcf_df, simulated_indices
+    vcf_df = pd.read_csv(StringIO(vcf_str), delimiter='\t')
+    return vcf_df
 
 
 def write_sim_vcf_with_comments(vcf_data: pd.DataFrame):
