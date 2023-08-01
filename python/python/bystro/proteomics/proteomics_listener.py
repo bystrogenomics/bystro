@@ -9,7 +9,7 @@ from bystro.proteomics.proteomics import load_fragpipe_dataset
 from bystro.proteomics.proteomics_types import (
     ProteomicsResponse,
     ProteomicsSubmission,
-    JsonDataFrame,
+    DataFrameJson,
 )
 from ruamel.yaml import YAML
 
@@ -44,7 +44,7 @@ def handler_fn(
     _reporter = get_progress_reporter(progress_publisher)
     tsv_filename = proteomics_job_data.proteomics_submission.tsv_filename
     fragpipe_df = load_fragpipe_dataset(tsv_filename)
-    return ProteomicsResponse(tsv_filename, JsonDataFrame.from_df(fragpipe_df))
+    return ProteomicsResponse(tsv_filename, DataFrameJson.from_df(fragpipe_df))
 
 
 def completed_msg_fn(

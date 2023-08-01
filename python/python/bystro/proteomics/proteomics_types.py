@@ -4,11 +4,11 @@ import attrs
 from attrs import field
 
 
-class JsonDataFrame(str):
+class DataFrameJson(str):
     """Represent a DataFrame as a JSON string."""
 
     @classmethod
-    def from_df(cls, dataframe: pd.DataFrame) -> "JsonDataFrame":
+    def from_df(cls, dataframe: pd.DataFrame) -> "DataFrameJson":
         """Convert a pd.DataFrame to JsonDataFrame"""
         return cls(dataframe.to_json(orient="table"))
 
@@ -41,4 +41,4 @@ class ProteomicsResponse:
     """Represent a proteomics dataframe, converted to json."""
 
     tsv_filename: str = field(validator=_tsv_validator)
-    dataframe_json: JsonDataFrame = field(validator=attrs.validators.instance_of(JsonDataFrame))
+    dataframe_json: DataFrameJson = field(validator=attrs.validators.instance_of(DataFrameJson))
