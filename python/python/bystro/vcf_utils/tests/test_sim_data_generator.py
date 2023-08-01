@@ -4,10 +4,9 @@ import pandas as pd
 from bystro.vcf_utils.sim_data_generator import (
     generate_random_vcf_index, 
     generate_simulated_vcf,
-    convert_sim_vcf_to_pd
+    convert_sim_vcf_to_pd,
+    HEADER_COLS
 )
-
-HEADER_COLS = ["#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"]
 
 
 def test_generate_random_vcf_index():
