@@ -41,10 +41,10 @@ def generate_simulated_vcf(
         info = "."
         format_ = "GT"
         samples = []
+        record = [str(chrom), str(pos), variant_id, ref, alt, str(qual), filter_, info, format_]
         for _ in range(num_samples):
             genotype = random.choice(["0|0", "0|1", "1|0", "1|1"])
             samples.append(genotype)
-        record = [str(chrom), str(pos), variant_id, ref, alt, str(qual), filter_, info, format_]
         record.extend(samples)
         vcf_data.append("\t".join(record))
     return vcf_data, simulated_indices
