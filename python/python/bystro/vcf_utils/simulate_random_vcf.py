@@ -17,7 +17,7 @@ def generate_random_vcf_index() -> tuple[int, int, str, str]:
     return random_chr, random_pos, random_ref, random_alt
 
 
-def generate_simulated_vcf(num_samples: int, num_vars: int) -> tuple[str, list[str]]:
+def generate_simulated_vcf(num_samples: int, num_vars: int) -> tuple[list[str], list[str]]:
     """VCF simulator for testing analysis modules."""
     # This is a first pass - could include more sophisticated choices for possible values in future
     sample_ids = [f"SampleID{i+1}" for i in range(num_samples)]
@@ -55,7 +55,7 @@ def convert_sim_vcf_to_pd(vcf_data: str) -> pd.DataFrame:
     return vcf_df
 
 
-def write_sim_vcf_with_comments(vcf_data: pd.DataFrame):
+def write_sim_vcf_with_comments(vcf_data: list[str]):
     """Add a specific number of comment lines to test header is removed properly."""
     num_comment_lines = 107
     comment_lines = [f"# Comment line {i}" for i in range(1, num_comment_lines + 1)]
