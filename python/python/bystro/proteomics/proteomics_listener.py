@@ -6,7 +6,11 @@ from pathlib import Path
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
 from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, get_progress_reporter, listen
 from bystro.proteomics.proteomics import load_fragpipe_dataset
-from bystro.proteomics.proteomics_types import ProteomicsResponse, ProteomicsSubmission
+from bystro.proteomics.proteomics_types import (
+    ProteomicsResponse,
+    ProteomicsSubmission,
+    JsonDataFrame,
+)
 from ruamel.yaml import YAML
 
 logging.basicConfig(filename="proteomics_listener.log", level=logging.INFO)
@@ -40,7 +44,7 @@ def handler_fn(
     _reporter = get_progress_reporter(progress_publisher)
     tsv_filename = proteomics_job_data.proteomics_submission.tsv_filename
     fragpipe_df = load_fragpipe_dataset(tsv_filename)
-    return ProteomicsResponse(tsv_filename, fragpipe_df.to_json())
+    return ProteomicsResponse(tsv_filename, JsonDataFrame.from_df(fragpipe_df))
 
 
 def completed_msg_fn(

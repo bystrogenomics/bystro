@@ -1,7 +1,20 @@
 """Record classes for proteomics module."""
-
+import pandas as pd
 import attrs
 from attrs import field
+
+
+class JsonDataFrame(str):
+    """Represent a DataFrame as a JSON string."""
+
+    @classmethod
+    def from_df(cls, dataframe: pd.DataFrame) -> "JsonDataFrame":
+        """Convert a pd.DataFrame to JsonDataFrame"""
+        return cls(dataframe.to_json(orient="table"))
+
+    def to_df(self) -> pd.DataFrame:
+        """Read out JsonDataFrame to pd.DataFrame"""
+        return pd.read_json(self, orient="table")
 
 
 def _tsv_validator(_self: object, _attribute: attrs.Attribute, tsv_filename: str) -> None:
@@ -27,5 +40,5 @@ class ProteomicsSubmission:
 class ProteomicsResponse:
     """Represent a proteomics dataframe, converted to json."""
 
-    tsv_filename: str
-    dataframe_json: str
+    tsv_filename: str = field(validator=_tsv_validator)
+    dataframe_json: JsonDataFrame = field(validator=attrs.validators.instance_of(JsonDataFrame))
