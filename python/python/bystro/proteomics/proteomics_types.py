@@ -4,17 +4,29 @@ import attrs
 from attrs import field
 
 
-class DataFrameJson(str):
+# The motivation for this class is that we only want to instantiate by creating from a correctly
+# json-serialized pd.DataFrame, ensuring we have a string-like class that can't represent anything
+# but a json-ified df.
+
+
+class DataFrameJson:
     """Represent a DataFrame as a JSON string."""
+
+    __constructor_token = object()
+
+    def __init__(self, json_payload: str, constructor_token: object = None) -> None:
+        if constructor_token != self.__constructor_token:
+            raise ValueError("Can't initialize directly; use DataFrameJson.from_df instead.")
+        self.json_payload = json_payload
 
     @classmethod
     def from_df(cls, dataframe: pd.DataFrame) -> "DataFrameJson":
         """Convert a pd.DataFrame to JsonDataFrame"""
-        return cls(dataframe.to_json(orient="table"))
+        return cls(dataframe.to_json(orient="table"), constructor_token=cls.__constructor_token)
 
     def to_df(self) -> pd.DataFrame:
         """Read out JsonDataFrame to pd.DataFrame"""
-        return pd.read_json(self, orient="table")
+        return pd.read_json(self.json_payload, orient="table")
 
 
 def _tsv_validator(_self: object, _attribute: attrs.Attribute, tsv_filename: str) -> None:

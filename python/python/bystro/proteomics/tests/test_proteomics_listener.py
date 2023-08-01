@@ -19,6 +19,8 @@ FAKE_FRAGPIPE_DF = pd.DataFrame(
     }
 )
 
+#  The namespace of load_fragpipe_dataset may be surprising here, but we need to patch this
+#  according to its (imported) location in the module under test, not where it's originally defined.
 LOAD_FRAGPIPE_DATASET_PATCH_TARGET = "bystro.proteomics.proteomics_listener.load_fragpipe_dataset"
 
 
@@ -83,6 +85,6 @@ def test_completed_msg_fn_filenames_dont_match():
         proteomics_response = handler_fn(publisher, proteomics_job_data)
 
     with pytest.raises(ValueError, match=r".*\.tsv doesn't match response filename .*\.tsv"):
-        proteomics_job_complete_message = completed_msg_fn(
+        _proteomics_job_complete_message = completed_msg_fn(
             wrong_proteomics_job_data, proteomics_response
         )
