@@ -56,7 +56,7 @@ def completed_msg_fn(
     if proteomics_submission.tsv_filename != proteomics_response.tsv_filename:
         err_msg = (
             f"Proteomics submission filename {proteomics_submission.tsv_filename} "
-            "doesn't match response filename {proteomics_response.tsv_filename}: this is a bug."
+            f"doesn't match response filename {proteomics_response.tsv_filename}: this is a bug."
         )
         raise ValueError(err_msg)
     logger.debug("completed proteomics inference for: %s", proteomics_response)
