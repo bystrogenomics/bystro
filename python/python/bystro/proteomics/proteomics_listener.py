@@ -59,12 +59,12 @@ def completed_msg_fn(
             f"doesn't match response filename {proteomics_response.tsv_filename}: this is a bug."
         )
         raise ValueError(err_msg)
-    logger.debug("completed proteomics inference for: %s", proteomics_response)
     return ProteomicsJobCompleteMessage(
         submissionID=proteomics_job_data.submissionID, results=proteomics_response
     )
 
 
+# todo(pat): refactor this into bystro.beanstalkd
 def _load_queue_conf(queue_conf_path: str) -> QueueConf:
     with Path(queue_conf_path).open(encoding="utf-8") as queue_config_file:
         raw_queue_conf = YAML(typ="safe").load(queue_config_file)
