@@ -27,13 +27,15 @@ def generate_simulated_vcf(
     vcf_data = []
     simulated_indices = []
     vcf_data.append("\t".join(header))
-    for position in range(num_vars):
-        chrom = "chr1"
-        pos = position
-        variant_id = generate_random_vcf_index()  # Using simulated index as variant ID
-        simulated_indices.append(variant_id)  # Store the simulated index
-        ref = random.choice(["A", "T", "C", "G"])
-        alt = random.choice([letter for letter in ["A", "T", "C", "G"] if letter != ref])
+    for variant in range(num_vars):
+        #Use index simulator to generate random chrom,pos,ref,alt
+        random_chr,random_pos,random_ref,random_alt = generate_random_vcf_index()
+        variant_id = f"{random_chr}:{random_pos}:{random_ref}:{random_alt}"
+        chrom = random_chr
+        pos = random_pos
+        simulated_indices.append(variant_id)
+        ref = random_ref
+        alt = random_alt
         qual = random.randint(0, 100)
         filter_ = "PASS"
         info = "."
@@ -42,7 +44,7 @@ def generate_simulated_vcf(
         for _ in range(num_samples):
             genotype = random.choice(["0|0", "0|1", "1|0", "1|1"])
             samples.append(genotype)
-        record = [chrom, str(pos), variant_id, ref, alt, str(qual), filter_, info, format_]
+        record = [str(chrom), str(pos), variant_id, ref, alt, str(qual), filter_, info, format_]
         record.extend(samples)
         vcf_data.append("\t".join(record))
     # Convert to pandas DataFrame for further processing
