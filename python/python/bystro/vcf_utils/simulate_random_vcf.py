@@ -56,16 +56,21 @@ def generate_simulated_vcf(num_samples: int, num_vars: int) -> tuple[str, list[s
 
 
 def convert_sim_vcf_to_pd(vcf_str: str) -> pd.DataFrame:
-    # Convert to pandas DataFrame for further processing
+    """Convert to vcf to pandas DataFrame for further processing"""
     vcf_df = pd.read_csv(StringIO(vcf_str), delimiter="\t")
     return vcf_df
 
 
-def write_sim_vcf_with_comments(vcf_data: list[str]):
+def add_comment_lines_to_sim_vcf(vcf_str: str) -> str:
     """Add a specific number of comment lines to test header is removed properly."""
     num_comment_lines = 107
     comment_lines = [f"# Comment line {i}" for i in range(1, num_comment_lines + 1)]
     sim_vcf_with_comments = "\n".join(comment_lines) + "\n" + "\n".join(vcf_data)
+    return sim_vcf_with_comments
+    
+            
+def write_out_sim_vcf(sim_vcf_with_comments: str):
     # Save the simulated VCF as a TSV file
-    with open("simulated.vcf", "w") as file:
+    sim_vcf_name = "simulated.vcf"
+    with open(sim_vcf_name, "w") as file:
         file.write(sim_vcf_with_comments)
