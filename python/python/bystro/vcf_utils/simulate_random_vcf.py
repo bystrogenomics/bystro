@@ -65,7 +65,7 @@ def add_comment_lines_to_sim_vcf(vcf_str: str) -> str:
     """Add a specific number of comment lines to test header is removed properly."""
     num_comment_lines = 107
     comment_lines = [f"# Comment line {i}" for i in range(1, num_comment_lines + 1)]
-    sim_vcf_with_comments = "\n".join(comment_lines) + "\n" + "\n".join(vcf_data)
+    sim_vcf_with_comments = "\n".join(comment_lines) + "\n" + "\n".join(vcf_str)
     return sim_vcf_with_comments
     
             
