@@ -75,16 +75,16 @@ def _load_queue_conf(queue_conf_path: str) -> QueueConf:
     return QueueConf(addresses=beanstalk_conf["addresses"], tubes=beanstalk_conf["tubes"])
 
 
-def _load_vcf(full_vcf_path: Path, variants: Collection[str]) -> pd.DataFrame:
+def _load_vcf(vcf_path: Path, variants: Collection[str]) -> pd.DataFrame:
     """Load vcf, return dosages as df where index is sample_ids, columns are variants."""
     # Currently the implementation is trivial, but we're stubbing this
     # out now in order to encapsulate future volatility arising from EFS handling, &c.
-    logger.info("loading vcf from %s", full_vcf_path)
-    return parse_vcf(full_vcf_path, variants, return_exact_variants=True)
+    logger.info("loading vcf from %s", vcf_path)
+    return parse_vcf(vcf_path, variants, return_exact_variants=True)
 
 
 def handler_fn_factory(
-    ancestry_model: AncestryModel, vcf_dir: Path
+    ancestry_model: AncestryModel,
 ) -> Callable[[ProgressPublisher, AncestryJobData], AncestryResponse]:
     """Return partialed handler_fn with ancestry_model loaded."""
 
@@ -97,9 +97,8 @@ def handler_fn_factory(
         # simply threading it through for later.
         _reporter = get_progress_reporter(publisher)
         logger.debug("entering handler_fn with: %s", ancestry_job_data)
-        vcf_path = ancestry_job_data.ancestry_submission.vcf_path
-        full_vcf_path = vcf_dir / vcf_path
-        genotypes = _load_vcf(full_vcf_path, variants=ancestry_model.pca_loadings_df.index)
+        vcf_path = Path(ancestry_job_data.ancestry_submission.vcf_path)
+        genotypes = _load_vcf(vcf_path, variants=ancestry_model.pca_loadings_df.index)
         return infer_ancestry(ancestry_model, genotypes, vcf_path)
 
     return handler_fn
@@ -129,9 +128,9 @@ def completed_msg_fn(
     )
 
 
-def main(ancestry_model: AncestryModel, vcf_dir: Path, queue_conf: QueueConf) -> None:
+def main(ancestry_model: AncestryModel, queue_conf: QueueConf) -> None:
     """Run ancestry listener."""
-    handler_fn_with_models = handler_fn_factory(ancestry_model, vcf_dir)
+    handler_fn_with_models = handler_fn_factory(ancestry_model)
     logger.info(
         "Ancestry worker is listening on addresses: %s, tube: %s...", queue_conf.addresses, ANCESTRY_TUBE
     )
@@ -167,4 +166,4 @@ if __name__ == "__main__":
     ancestry_model = _get_model_from_s3(s3_client)
     queue_conf = _load_queue_conf(args.queue_conf)
 
-    main(ancestry_model, args.vcf_dir, queue_conf)
+    main(ancestry_model, queue_conf)
