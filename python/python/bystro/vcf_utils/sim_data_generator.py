@@ -8,13 +8,13 @@ import pandas as pd
 HEADER_COLS = ["#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"]
 
 
-def generate_random_vcf_index():
+def generate_random_vcf_index() -> tuple[int, int, str, str]:
     """Generate autosomal chr vcf variant IDs to use for testing."""
-    random_chr = random.randint(1, 22 + 1)
+    random_chr = random.randint(1, 22+1)
     random_pos = random.randint(1, 1000000)
     random_ref = random.choice(["A", "T", "C", "G"])
     random_alt = random.choice([letter for letter in ["A", "T", "C", "G"] if letter != random_ref])
-    return f"{random_chr}:{random_pos}:{random_ref}:{random_alt}"
+    return random_chr,random_pos,random_ref,random_alt
 
 
 def generate_simulated_vcf(
