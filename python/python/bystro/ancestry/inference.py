@@ -1,6 +1,6 @@
 """Classify genotypes at inference time."""
 from dataclasses import dataclass
-
+from pathlib import Path
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
@@ -52,7 +52,7 @@ def _fill_missing_data(genotypes: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series
 
 
 def _package_ancestry_response_from_pop_probs(
-    vcf_path: str, pop_probs_df: pd.DataFrame, missingnesses: pd.Series
+    vcf_path: Path, pop_probs_df: pd.DataFrame, missingnesses: pd.Series
 ) -> AncestryResponse:
     """Fill out AncestryResponse using filepath, numerical model output and sample-wise missingnesses."""
     superpop_probs_df = _superpop_probs_from_pop_probs(pop_probs_df)
@@ -87,12 +87,12 @@ def _package_ancestry_response_from_pop_probs(
                 missingness=missingnesses[sample_id],
             )
         )
-    return AncestryResponse(vcf_path=vcf_path, results=ancestry_results)
+    return AncestryResponse(vcf_path=str(vcf_path), results=ancestry_results)
 
 
 # TODO: implement with ray
 def infer_ancestry(
-    ancestry_model: AncestryModel, genotypes: pd.DataFrame, vcf_path: str
+    ancestry_model: AncestryModel, genotypes: pd.DataFrame, vcf_path: Path
 ) -> AncestryResponse:
     """Run an ancestry job."""
     # TODO: main ancestry model logic goes here.  Just stubbing out for now.

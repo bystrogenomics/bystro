@@ -20,7 +20,7 @@ from bystro.beanstalkd.worker import ProgressPublisher
 FAKE_VCF_DIR = Path("my_fake_vcf_dir")
 
 
-handler_fn = handler_fn_factory(ANCESTRY_MODEL, FAKE_VCF_DIR)
+handler_fn = handler_fn_factory(ANCESTRY_MODEL)
 
 
 def test_handler_fn_happy_path():
