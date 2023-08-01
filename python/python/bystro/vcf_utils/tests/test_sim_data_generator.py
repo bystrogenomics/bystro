@@ -1,7 +1,7 @@
 """Test simulated vcf data."""
 
 import pandas as pd
-from bystro.vcf_utils.sim_data_generator import (
+from bystro.vcf_utils.simulate_random_vcf import (
     generate_random_vcf_index,
     generate_simulated_vcf,
     convert_sim_vcf_to_pd,
