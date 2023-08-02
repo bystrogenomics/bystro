@@ -236,8 +236,12 @@ def _parse_vcf_from_file_stream(
     if return_exact_variants:
         missing_variants = set(variants_to_keep) - set(found_variants)
         logger.info("adding NaNs for %s variants not found in VCF", len(missing_variants))
-        for missing_variant in missing_variants:
-            dosage_df[missing_variant] = np.nan
+        missing_dosages = pd.DataFrame(
+            np.nan * np.ones((len(dosage_df), len(missing_variants))),
+            index=dosage_df.index,
+            columns=list(missing_variants),
+        )
+        dosage_df = pd.concat([dosage_df, missing_dosages], axis="columns")
 
     return dosage_df
 
