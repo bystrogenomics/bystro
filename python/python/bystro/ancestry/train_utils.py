@@ -52,7 +52,9 @@ def is_autosomal_variant(potential_variant: str) -> bool:
     """Determine whether string is a syntactically valid autochromosomal variant."""
     if not VARIANT_REGEX.match(potential_variant):
         return False
-    chromosome, position, ref, alt = potential_variant.split(":")
+
+    _, _, ref, alt = potential_variant.split(":")
+
     if ref == alt:
         err_msg = f"Variant {potential_variant} cannot have identical ref and alt alleles"
         raise ValueError(err_msg)

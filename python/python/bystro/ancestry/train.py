@@ -17,7 +17,7 @@ import sys
 from collections import Counter
 from collections.abc import Collection, Container, Iterable
 from pathlib import Path
-from typing import Any, Literal, TypeVar, get_args
+from typing import Any, Literal, Tuple, TypeVar, get_args
 
 import allel
 import numpy as np
@@ -36,6 +36,7 @@ from bystro.ancestry.train_utils import get_variant_ids_from_callset, head, is_a
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+FILTER_FIELD_IDX = 6 # index of FILTER field in vcf, 0-based
 ANCESTRY_DIR = Path().absolute()
 DATA_DIR = ANCESTRY_DIR / "data"
 KGP_VCF_DIR = DATA_DIR / "kgp_vcfs"
@@ -131,28 +132,29 @@ def load_callset_for_variants(variants: set[str]) -> pd.DataFrame:
         genotype_dfs.append(genotype_df)
     return pd.concat(genotype_dfs, axis=1)
 
-
 def _parse_vcf_line_for_dosages(
     line: str, variants_to_keep: Container[Variant]
 ) -> tuple[Variant, list[int]] | None:
-    # will throw ValueError if "PASS" not found, which is good
-    fields = line[: line.index("PASS")].split()
-    variant = ":".join([fields[0], fields[1], fields[3], fields[4]])
-    assert_true("variant is a valid variant string", is_autosomal_variant(variant))
-    if variant in variants_to_keep:
-        variant_dosages = [
-            int(psa[0]) + int(psa[2]) for psa in line.split()[9:]
-        ]  #  pipe-separated annotation e.g. '0|1'
-        return variant, variant_dosages
-    return None
+    try:
+        fields = line.split()
 
+        if fields[FILTER_FIELD_IDX] != "PASS" and fields[FILTER_FIELD_IDX] != ".":
+            return None
+
+        variant = ":".join([fields[0], fields[1], fields[3], fields[4]])
+
+        if is_autosomal_variant(variant) and variant in variants_to_keep:
+            return variant, [int(psa[0]) + int(psa[2]) for psa in fields[9:]]
+
+    except ValueError as e:
+        logger.info("Skipping VCF line: %s", str(e))
+
+    return None
 
 def _get_chromosome_from_variant(variant: Variant) -> str:
     return variant.split(":")[0]
 
-
 T = TypeVar("T")
-
 
 def _calculate_recovery_rate(
     found_variants: Collection[Variant], variants_to_keep: Collection[Variant]
@@ -189,19 +191,21 @@ def _parse_vcf_from_file_stream(
     total_lines = 0
     for line in tqdm.tqdm(file_stream):
         total_lines += 1
+
         if line.startswith("##"):
             continue
+
         if line.startswith("#CHROM"):
             sample_ids = line.split()[9:]
         elif variant_dosages := _parse_vcf_line_for_dosages(line, variants_to_keep):
             variant, dosages = variant_dosages
             found_variants.append(variant)
             dosage_data.append(dosages)
-        else:
-            continue
-    if sample_ids is None:
+
+    if not sample_ids:
         msg = "Couldn't find sample ids in VCF"
         raise ValueError(msg)
+
     found_chromosomes = {_get_chromosome_from_variant(v) for v in found_variants}
     assert_true("Extracted sample_ids from vcf", sample_ids is not None)
     logger.info(
@@ -210,6 +214,7 @@ def _parse_vcf_from_file_stream(
         len(found_variants),
         len(found_chromosomes),
     )
+
     df_values: np.ndarray | list[list[float]] = np.array(dosage_data).T if dosage_data else []
     dosage_df = pd.DataFrame(df_values, index=sample_ids, columns=found_variants)
     # we assume each vcf file contains variants for a single chromosome

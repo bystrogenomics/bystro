@@ -63,7 +63,6 @@ def default_failed_msg_fn(
         return InvalidJobMessage(queueID=job_id, reason=str(err))
     return FailedJobMessage(submissionID=job_data.submissionID, reason=str(err))
 
-
 def listen(
     job_data_type: type[T],
     handler_fn: Callable[[ProgressPublisher, T], Any],
