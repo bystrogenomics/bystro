@@ -17,7 +17,7 @@ import sys
 from collections import Counter
 from collections.abc import Collection, Container, Iterable
 from pathlib import Path
-from typing import Any, Literal, Tuple, TypeVar, get_args
+from typing import Any, Literal, TypeVar, get_args
 
 import allel
 import numpy as np
