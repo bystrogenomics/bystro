@@ -119,7 +119,7 @@ def completed_msg_fn(
     if ancestry_submission.vcf_path != ancestry_response.vcf_path:
         err_msg = (
             f"Ancestry submission filename {ancestry_submission.vcf_path} "
-            "doesn't match response filename {ancestry_response.vcf_path}: this is a bug."
+            f"doesn't match response filename {ancestry_response.vcf_path}: this is a bug."
         )
         raise ValueError(err_msg)
     logger.debug("completed ancestry inference for: %s", ancestry_response)
