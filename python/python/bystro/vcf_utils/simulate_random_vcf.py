@@ -55,7 +55,7 @@ def generate_simulated_vcf(num_samples: int, num_vars: int) -> tuple[str, list[s
         record.extend(samples)
         vcf_data.append("\t".join(record))
         vcf_str = "\n".join(vcf_data)
-    return vcf_str, simulated_indices
+    return vcf_str
 
 
 def convert_sim_vcf_to_df(vcf_str: str) -> pd.DataFrame:
