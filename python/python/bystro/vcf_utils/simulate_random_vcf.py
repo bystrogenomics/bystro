@@ -58,7 +58,7 @@ def generate_simulated_vcf(num_samples: int, num_vars: int) -> tuple[str, list[s
     return vcf_str, simulated_indices
 
 
-def convert_sim_vcf_to_pd(vcf_str: str) -> pd.DataFrame:
+def convert_sim_vcf_to_df(vcf_str: str) -> pd.DataFrame:
     """Convert to vcf to pandas DataFrame for further processing"""
     vcf_df = pd.read_csv(StringIO(vcf_str), delimiter="\t")
     return vcf_df
