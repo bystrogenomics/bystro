@@ -183,12 +183,6 @@ def parse_vcf(
         )
 
 
-def _longest_common_prefix(xs: list[T], ys: list[T]) -> list[T]:
-    if xs == [] or ys == [] or xs[0] != ys[0]:
-        return []
-    return [xs[0], *_longest_common_prefix(xs[1:], ys[1:])]
-
-
 def _check_fields_for_metadata_columns(fields: list[str]) -> None:
     """Assert that VCF contains expected metadata columns."""
     metadata_fields = fields[:NUM_VCF_METADATA_COLUMNS]
