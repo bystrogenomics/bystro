@@ -17,4 +17,4 @@ apps:
     script: python/python/bystro/ancestry/listener.py
     interpreter: 'python'
     args:
-      --queue_conf config/beanstalk.yml
+      --queue_conf config/beanstalk.yml --vcf_dir ./
