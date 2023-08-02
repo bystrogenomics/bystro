@@ -17,14 +17,13 @@ def generate_random_vcf_index() -> tuple[int, int, str, str]:
     return random_chr, random_pos, random_ref, random_alt
 
 
-def generate_simulated_vcf(num_samples: int, num_vars: int) -> tuple[str, list[str]]:
+def generate_simulated_vcf(num_samples: int, num_vars: int) -> str:
     """VCF simulator for testing analysis modules."""
     # This is a first pass - could include more sophisticated choices for possible values in future
     sample_ids = [f"SampleID{i+1}" for i in range(num_samples)]
     header = HEADER_COLS + sample_ids
     #Add comment marker expected for header
-    header[0] = '#' + header[0]
-    print(header)
+    header[0] = "#" + header[0]
     vcf_data = []
     simulated_indices = []
     vcf_data.append("\t".join(header))
