@@ -5,7 +5,7 @@ from io import StringIO
 
 import pandas as pd
 
-HEADER_COLS = ["#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"]
+HEADER_COLS = ["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"]
 
 
 def generate_random_vcf_index() -> tuple[int, int, str, str]:
@@ -22,6 +22,9 @@ def generate_simulated_vcf(num_samples: int, num_vars: int) -> tuple[str, list[s
     # This is a first pass - could include more sophisticated choices for possible values in future
     sample_ids = [f"SampleID{i+1}" for i in range(num_samples)]
     header = HEADER_COLS + sample_ids
+    #Add comment marker expected for header
+    header[0] = '#' + header[0]
+    print(header)
     vcf_data = []
     simulated_indices = []
     vcf_data.append("\t".join(header))
