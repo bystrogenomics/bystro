@@ -1,10 +1,12 @@
 """Tests for ancestry model training code."""
+import re
+
 import numpy as np
 import pandas as pd
+import pytest
 from pandas.testing import assert_frame_equal
 
 from bystro.ancestry.train import _parse_vcf_from_file_stream
-import pytest
 
 
 def test__parse_vcf_from_file_stream():
@@ -32,31 +34,6 @@ def test__parse_vcf_from_file_stream():
     assert_frame_equal(expected_df, actual_df)
 
 
-def test__parse_vcf_from_file_stream_no_format_field():
-    file_stream = [
-        "##Some comment",
-        "#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	sample1 sample2 sample3",
-        "chr1	1	.	T	G	.	PASS	i;n;f;o	0|1	1|0	0|0",
-        "chr1	123	.	T	G	.	PASS	i;n;f;o	0|0	1|1	1|1",
-        "chr1	123456	.	T	G	.	PASS	i;n;f;o	0|1	1|0	0|0",
-    ]
-    expected_df = pd.DataFrame(
-        [[1, 0, 1], [1, 2, 1], [0, 2, 0]],
-        index=["sample1", "sample2", "sample3"],
-        columns=["chr1:1:T:G", "chr1:123:T:G", "chr1:123456:T:G"],
-    )
-    actual_df = _parse_vcf_from_file_stream(
-        file_stream,
-        [
-            "chr1:1:T:G",
-            "chr1:123:T:G",
-            "chr1:123456:T:G",
-        ],
-        return_exact_variants=True,
-    )
-    assert_frame_equal(expected_df, actual_df)
-
-
 def test__parse_vcf_from_file_stream_bad_metadata_fields():
     file_stream = [
         "##Some comment",
@@ -66,7 +43,12 @@ def test__parse_vcf_from_file_stream_bad_metadata_fields():
         "chr1	123456	.	T	G	PASS	i;n;f;o	0|1	1|0	0|0",
     ]
 
-    with pytest.raises(ValueError, match="got 5 instead"):
+    expected_err_msg = re.escape(
+        "vcf does not contain expected metadata columns.  "
+        "Expected: ['CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT'], "
+        "got: ['CHROM', 'POS', 'ID', 'REF', 'ALT', 'FILTER', 'INFO', 'sample1', 'sample2'] instead."
+    )
+    with pytest.raises(ValueError, match=expected_err_msg):
         _parse_vcf_from_file_stream(
             file_stream,
             [

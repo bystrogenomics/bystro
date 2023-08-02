@@ -1,6 +1,7 @@
 """Classify genotypes at inference time."""
 from dataclasses import dataclass
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
