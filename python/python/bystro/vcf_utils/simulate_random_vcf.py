@@ -22,11 +22,9 @@ def generate_simulated_vcf(num_samples: int, num_vars: int) -> str:
     # This is a first pass - could include more sophisticated choices for possible values in future
     sample_ids = [f"SampleID{i+1}" for i in range(num_samples)]
     header = HEADER_COLS + sample_ids
-    #Add comment marker expected for header
-    header[0] = "#" + header[0]
     vcf_data = []
     simulated_indices = []
-    vcf_data.append("\t".join(header))
+    vcf_data.append("#"+"\t".join(header))
     for variant in range(num_vars):
         # Use index simulator to generate random chrom,pos,ref,alt
         random_chr, random_pos, random_ref, random_alt = generate_random_vcf_index()
@@ -71,8 +69,7 @@ def add_comment_lines_to_sim_vcf(vcf_str: str) -> str:
     return sim_vcf_with_comments
     
             
-def write_out_sim_vcf(sim_vcf_with_comments: str):
-    # Save the simulated VCF as a TSV file
-    sim_vcf_name = "simulated.vcf"
+def write_out_sim_vcf(sim_vcf_name: str,sim_vcf_with_comments: str):
+    """Save the simulated VCF as a TSV file"""
     with open(sim_vcf_name, "w") as file:
         file.write(sim_vcf_with_comments)
