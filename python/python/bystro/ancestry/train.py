@@ -133,15 +133,15 @@ def load_callset_for_variants(variants: set[str]) -> pd.DataFrame:
 
 
 def _parse_vcf_line_for_dosages(
-    line: str, variants_to_keep: Container[Variant]
+    line: str, variants_to_keep: Container[Variant], num_metadata_columns: int
 ) -> tuple[Variant, list[int]] | None:
     # will throw ValueError if "PASS" not found, which is good
-    fields = line[: line.index("PASS")].split()
+    fields = line.split()[:num_metadata_columns]
     variant = ":".join([fields[0], fields[1], fields[3], fields[4]])
-    assert_true("variant is a valid variant string", is_autosomal_variant(variant))
+    assert_true(f"variant {variant} is a valid variant string", is_autosomal_variant(variant))
     if variant in variants_to_keep:
         variant_dosages = [
-            int(psa[0]) + int(psa[2]) for psa in line.split()[9:]
+            int(psa[0]) + int(psa[2]) for psa in line.split()[num_metadata_columns:]
         ]  #  pipe-separated annotation e.g. '0|1'
         return variant, variant_dosages
     return None
@@ -180,6 +180,12 @@ def parse_vcf(
         )
 
 
+def _longest_common_prefix(xs: list[T], ys: list[T]) -> list[T]:
+    if xs == [] or ys == [] or xs[0] != ys[0]:
+        return []
+    return [xs[0]] + _longest_common_prefix(xs[1:], ys[1:])
+
+
 def _parse_vcf_from_file_stream(
     file_stream: Iterable[str], variants_to_keep: Collection[str], *, return_exact_variants: bool
 ) -> pd.DataFrame:
@@ -187,13 +193,24 @@ def _parse_vcf_from_file_stream(
     dosage_data = []
     sample_ids = None
     total_lines = 0
+    METADATA_COLUMNS = ["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"]
     for line in tqdm.tqdm(file_stream):
         total_lines += 1
         if line.startswith("##"):
             continue
         if line.startswith("#CHROM"):
-            sample_ids = line.split()[9:]
-        elif variant_dosages := _parse_vcf_line_for_dosages(line, variants_to_keep):
+            fields = line.lstrip("#").split()
+            num_metadata_columns = len(_longest_common_prefix(METADATA_COLUMNS, fields))
+            if not 8 <= num_metadata_columns <= 9:
+                err_msg = (
+                    f"number of metadata columns in vcf ({fields}) should be 8 or 9,"
+                    f" got {num_metadata_columns} instead"
+                )
+                raise ValueError(err_msg)
+            sample_ids = line.split()[num_metadata_columns:]
+        elif variant_dosages := _parse_vcf_line_for_dosages(
+            line, variants_to_keep, num_metadata_columns
+        ):
             variant, dosages = variant_dosages
             found_variants.append(variant)
             dosage_data.append(dosages)
