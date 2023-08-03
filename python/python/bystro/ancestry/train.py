@@ -217,17 +217,25 @@ def _parse_vcf_from_file_stream(
             dosage_data.append(dosages)
         else:
             continue
-    if not sample_ids:
-        logger.warning("Couldn't find any sample ids in VCF")
+    if sample_ids is None:
+        msg = "Sample ids not set during VCF processing: does your VCF contain a valid header?"
+        raise AssertionError(msg)
     found_chromosomes = {_get_chromosome_from_variant(v) for v in found_variants}
-    assert_true("Extracted sample_ids from vcf", sample_ids is not None)
     logger.info(
         "processed %s lines, retaining %s variants from %s chromosomes",
         total_lines,
         len(found_variants),
         len(found_chromosomes),
     )
-    df_values: np.ndarray | list[list[float]] = np.array(dosage_data).T if dosage_data else []
+    try:
+        df_values: np.ndarray | list[list[float]] = np.array(dosage_data).T if dosage_data else []
+        logger.info(df_values)
+    except ValueError as val_err:
+        err_msg = (
+            "Couldn't convert dosage data to np.array, "
+            "do all genotype rows have the same number of fields?"
+        )
+        raise ValueError(err_msg) from val_err
     dosage_df = pd.DataFrame(df_values, index=sample_ids, columns=found_variants)
     # we assume each vcf file contains variants for a single chromosome
     recovery_rate = _calculate_recovery_rate(found_variants, variants_to_keep)
