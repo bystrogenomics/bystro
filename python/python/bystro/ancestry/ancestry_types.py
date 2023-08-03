@@ -62,7 +62,7 @@ unit_float_validator = [
 class ProbabilityInterval:
     """Represent an interval of probabilities."""
 
-    # we need these to be literal floats for msgpack serialization, not numpy floats or anything else.
+    # we need these to be literal floats for msgspec serialization, not numpy floats or anything else.
     lower_bound: float = field(converter=float, validator=unit_float_validator)
     upper_bound: float = field(converter=float, validator=unit_float_validator)
 
@@ -159,7 +159,7 @@ class AncestryResult:
     sample_id: str = field(validator=instance_of(str))
     populations: PopulationVector = field(validator=instance_of(PopulationVector))
     superpops: SuperpopVector = field(validator=instance_of(SuperpopVector))
-    # needs to be literal float for msgpack
+    # needs to be literal float for msgspec
     missingness: float = field(converter=float, validator=unit_float_validator)
 
 
