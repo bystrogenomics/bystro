@@ -148,3 +148,30 @@ def test__parse_vcf_from_file_stream_ragged_rows():
             ],
             return_exact_variants=False,
         )
+
+
+def test__parse_vcf_from_file_stream_bad_filter_values():
+    file_stream = [
+        "##Some comment",
+        "#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	sample1 sample2 sample3",
+        "chr1	1	.	T	G	.	PASS	i;n;f;o	GT	0|1	1|0	0|0",
+        "chr1	123	.	T	G	.	.	i;n;f;o	GT	0|0	1|1     1|1",
+        "chr1	123456	.	T	G	.	foo	i;n;f;o	GT	0|1	1|0	0|0",
+    ]
+
+    expected_df = pd.DataFrame(
+        [[1, 0], [1, 2], [0, 2]],
+        index=["sample1", "sample2", "sample3"],
+        columns=["chr1:1:T:G", "chr1:123:T:G"],
+    )
+
+    actual_df = _parse_vcf_from_file_stream(
+        file_stream,
+        [
+            "chr1:1:T:G",
+            "chr1:123:T:G",
+            "chr1:123456:T:G",
+        ],
+        return_exact_variants=False,
+    )
+    assert_frame_equal(expected_df, actual_df)
