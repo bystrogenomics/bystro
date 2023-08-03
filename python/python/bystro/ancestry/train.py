@@ -217,9 +217,8 @@ def _parse_vcf_from_file_stream(
             dosage_data.append(dosages)
         else:
             continue
-    if sample_ids is None:
-        msg = "Couldn't find sample ids in VCF"
-        raise ValueError(msg)
+    if not sample_ids:
+        logger.warning("Couldn't find any sample ids in VCF")
     found_chromosomes = {_get_chromosome_from_variant(v) for v in found_variants}
     assert_true("Extracted sample_ids from vcf", sample_ids is not None)
     logger.info(
