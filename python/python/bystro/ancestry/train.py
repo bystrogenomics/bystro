@@ -31,7 +31,7 @@ from sklearn.model_selection import train_test_split
 from skops.io import dump as skops_dump
 
 from bystro.ancestry.asserts import assert_equals, assert_true
-from bystro.ancestry.train_utils import get_variant_ids_from_callset, head, is_autosomal_variant
+from bystro.ancestry.train_utils import get_variant_ids_from_callset, head
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -59,6 +59,7 @@ RFC_TRAIN_SUPERPOP_ACCURACY_THRESHOLD = 0.99
 RFC_TEST_SUPERPOP_ACCURACY_THRESHOLD = 0.99
 
 VCF_METADATA_COLUMNS = ["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"]
+FILTER_FIELD_IDX = VCF_METADATA_COLUMNS.index("FILTER")
 NUM_VCF_METADATA_COLUMNS = len(VCF_METADATA_COLUMNS)
 
 # superpop definitions taken from ensembl
@@ -138,8 +139,9 @@ def load_callset_for_variants(variants: set[str]) -> pd.DataFrame:
 def _parse_vcf_line_for_dosages(
     line: str, variants_to_keep: Container[Variant]
 ) -> tuple[Variant, list[int]] | None:
-    # will throw ValueError if "PASS" not found, which is good
     fields = line.split()
+    if fields[FILTER_FIELD_IDX] not in ["PASS", "."]:
+        return None
     variant = ":".join([fields[0], fields[1], fields[3], fields[4]])
     variant = variant if variant.startswith("chr") else "chr" + variant
     if variant in variants_to_keep:
