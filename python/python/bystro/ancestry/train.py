@@ -142,7 +142,6 @@ def _parse_vcf_line_for_dosages(
     fields = line.split()
     variant = ":".join([fields[0], fields[1], fields[3], fields[4]])
     variant = variant if variant.startswith("chr") else "chr" + variant
-    assert_true(f"variant {variant} is a valid variant string", is_autosomal_variant(variant))
     if variant in variants_to_keep:
         variant_dosages = [
             int(psa[0]) + int(psa[2]) for psa in fields[NUM_VCF_METADATA_COLUMNS:]
