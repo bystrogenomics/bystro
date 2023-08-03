@@ -34,6 +34,27 @@ def test__parse_vcf_from_file_stream():
     assert_frame_equal(expected_df, actual_df)
 
 
+def test__parse_vcf_from_file_stream_no_chr_prefix():
+    file_stream = [
+        "##Some comment",
+        "#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	sample1 sample2 sample3",
+        "1	1	.	T	G	.	PASS	i;n;f;o	GT	0|1	1|0	0|0",
+    ]
+    expected_df = pd.DataFrame(
+        [[1], [1], [0]],
+        index=["sample1", "sample2", "sample3"],
+        columns=["chr1:1:T:G"],
+    )
+    actual_df = _parse_vcf_from_file_stream(
+        file_stream,
+        [
+            "chr1:1:T:G",
+        ],
+        return_exact_variants=True,
+    )
+    assert_frame_equal(expected_df, actual_df)
+
+
 def test__parse_vcf_from_file_stream_bad_metadata_fields():
     file_stream = [
         "##Some comment",
