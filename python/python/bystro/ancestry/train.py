@@ -31,7 +31,7 @@ from sklearn.model_selection import train_test_split
 from skops.io import dump as skops_dump
 
 from bystro.ancestry.asserts import assert_equals, assert_true
-from bystro.ancestry.train_utils import get_variant_ids_from_callset, head, is_autosomal_variant
+from bystro.ancestry.train_utils import get_variant_ids_from_callset, head
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -57,6 +57,10 @@ RFC_TRAIN_ACCURACY_THRESHOLD = 0.9
 RFC_TEST_ACCURACY_THRESHOLD = 0.75
 RFC_TRAIN_SUPERPOP_ACCURACY_THRESHOLD = 0.99
 RFC_TEST_SUPERPOP_ACCURACY_THRESHOLD = 0.99
+
+VCF_METADATA_COLUMNS = ["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"]
+FILTER_FIELD_IDX = VCF_METADATA_COLUMNS.index("FILTER")
+NUM_VCF_METADATA_COLUMNS = len(VCF_METADATA_COLUMNS)
 
 # superpop definitions taken from ensembl
 SUPERPOP_FROM_POP = {
@@ -135,13 +139,14 @@ def load_callset_for_variants(variants: set[str]) -> pd.DataFrame:
 def _parse_vcf_line_for_dosages(
     line: str, variants_to_keep: Container[Variant]
 ) -> tuple[Variant, list[int]] | None:
-    # will throw ValueError if "PASS" not found, which is good
-    fields = line[: line.index("PASS")].split()
+    fields = line.split()
+    if fields[FILTER_FIELD_IDX] not in ["PASS", "."]:
+        return None
     variant = ":".join([fields[0], fields[1], fields[3], fields[4]])
-    assert_true("variant is a valid variant string", is_autosomal_variant(variant))
+    variant = variant if variant.startswith("chr") else "chr" + variant
     if variant in variants_to_keep:
         variant_dosages = [
-            int(psa[0]) + int(psa[2]) for psa in line.split()[9:]
+            int(psa[0]) + int(psa[2]) for psa in fields[NUM_VCF_METADATA_COLUMNS:]
         ]  #  pipe-separated annotation e.g. '0|1'
         return variant, variant_dosages
     return None
@@ -180,6 +185,18 @@ def parse_vcf(
         )
 
 
+def _check_fields_for_metadata_columns(fields: list[str]) -> None:
+    """Assert that VCF contains expected metadata columns."""
+    metadata_fields = fields[:NUM_VCF_METADATA_COLUMNS]
+    if metadata_fields != VCF_METADATA_COLUMNS:
+        err_msg = (
+            "vcf does not contain expected metadata columns.  "
+            f"Expected: {VCF_METADATA_COLUMNS}, "
+            f"got: {metadata_fields} instead."
+        )
+        raise ValueError(err_msg)
+
+
 def _parse_vcf_from_file_stream(
     file_stream: Iterable[str], variants_to_keep: Collection[str], *, return_exact_variants: bool
 ) -> pd.DataFrame:
@@ -192,7 +209,9 @@ def _parse_vcf_from_file_stream(
         if line.startswith("##"):
             continue
         if line.startswith("#CHROM"):
-            sample_ids = line.split()[9:]
+            fields = line.lstrip("#").split()
+            _check_fields_for_metadata_columns(fields)
+            sample_ids = fields[NUM_VCF_METADATA_COLUMNS:]
         elif variant_dosages := _parse_vcf_line_for_dosages(line, variants_to_keep):
             variant, dosages = variant_dosages
             found_variants.append(variant)
@@ -200,17 +219,24 @@ def _parse_vcf_from_file_stream(
         else:
             continue
     if sample_ids is None:
-        msg = "Couldn't find sample ids in VCF"
-        raise ValueError(msg)
+        msg = "Sample ids not set during VCF processing: does your VCF contain a valid header?"
+        raise AssertionError(msg)
     found_chromosomes = {_get_chromosome_from_variant(v) for v in found_variants}
-    assert_true("Extracted sample_ids from vcf", sample_ids is not None)
     logger.info(
         "processed %s lines, retaining %s variants from %s chromosomes",
         total_lines,
         len(found_variants),
         len(found_chromosomes),
     )
-    df_values: np.ndarray | list[list[float]] = np.array(dosage_data).T if dosage_data else []
+    try:
+        df_values: np.ndarray | list[list[float]] = np.array(dosage_data).T if dosage_data else []
+        logger.info(df_values)
+    except ValueError as val_err:
+        err_msg = (
+            "Couldn't convert dosage data to np.array, "
+            "do all genotype rows have the same number of fields?"
+        )
+        raise ValueError(err_msg) from val_err
     dosage_df = pd.DataFrame(df_values, index=sample_ids, columns=found_variants)
     # we assume each vcf file contains variants for a single chromosome
     recovery_rate = _calculate_recovery_rate(found_variants, variants_to_keep)
@@ -219,8 +245,12 @@ def _parse_vcf_from_file_stream(
     if return_exact_variants:
         missing_variants = set(variants_to_keep) - set(found_variants)
         logger.info("adding NaNs for %s variants not found in VCF", len(missing_variants))
-        for missing_variant in missing_variants:
-            dosage_df[missing_variant] = np.nan
+        missing_dosages = pd.DataFrame(
+            np.nan * np.ones((len(dosage_df), len(missing_variants))),
+            index=dosage_df.index,
+            columns=list(missing_variants),
+        )
+        dosage_df = pd.concat([dosage_df, missing_dosages], axis="columns")
 
     return dosage_df
 

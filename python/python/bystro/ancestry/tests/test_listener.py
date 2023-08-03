@@ -95,6 +95,6 @@ def test_completed_msg_fn_rejects_nonmatching_vcf_paths():
 
     with pytest.raises(
         ValueError,
-        match="Ancestry submission filename .*\\.vcf doesn't match response filename .*\\.vcf",
+        match=r"Ancestry submission filename .*\.vcf doesn't match response filename .*\.vcf",
     ):
         _ancestry_job_complete_message = completed_msg_fn(ancestry_job_data, wrong_ancestry_response)
