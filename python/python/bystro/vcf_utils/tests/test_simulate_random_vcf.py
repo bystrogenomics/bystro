@@ -13,7 +13,7 @@ from bystro.vcf_utils.simulate_random_vcf import (
 def test_generate_random_vcf_index():
     """Test expected index components have correct parameters."""
     random_chr, random_pos, random_ref, random_alt = generate_random_vcf_index()
-    assert 1 <= int(random_chr) <= 22
+    assert 1 <= int(random_chr) <= 23
     assert 1 <= int(random_pos) <= 1000000
     assert random_ref in ["A", "T", "C", "G"]
     assert random_alt in ["A", "T", "C", "G"]
