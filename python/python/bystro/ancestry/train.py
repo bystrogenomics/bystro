@@ -457,7 +457,7 @@ def _load_1kgp_vcf_to_df() -> pd.DataFrame:
     return vcf_w_header
 
 
-def KGP_vcf_to_dosage(vcf_w_header: pd.DataFrame) -> pd.DataFrame:
+def convert_1kgp_vcf_to_dosage(vcf_w_header: pd.DataFrame) -> pd.DataFrame:
     """Converts phased genotype vcf to dosage matrix"""
     #TODO Determine whether we should always expect phased genotypes for reference data for training
     dosage_vcf = vcf_w_header.replace("0|0", 0)
@@ -475,7 +475,7 @@ def process_vcf_for_pc_transformation(dosage_vcf: pd.DataFrame) -> pd.DataFrame:
     genos = genos.set_index(dosage_vcf.index)
     genos = genos.sort_index()
     # Check that not all genotypes are the same for QC
-    assert len(set(genos.values.flatten())) > 1, "All genotypes are the same"
+    assert len(set(genos.to_numpy().flatten())) > 1, "All genotypes are the same"
     return genos
 
 

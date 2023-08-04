@@ -8,7 +8,7 @@ from pandas.testing import assert_frame_equal
 
 from bystro.ancestry.train import (
     _parse_vcf_from_file_stream,
-    KGP_vcf_to_dosage,
+    convert_1kgp_vcf_to_dosage,
     process_vcf_for_pc_transformation
 )
 from bystro.vcf_utils.simulate_random_vcf import (
@@ -185,7 +185,7 @@ def test__parse_vcf_from_file_stream_bad_filter_values():
     assert_frame_equal(expected_df, actual_df)
 
     
-def test_KGP_vcf_to_dosage():
+def test_1kgp_vcf_to_dosage():
     """Tests gnomad-filtered 1kgp vcf loading and processing"""
     # Pick num of samples for simulated VCF and loadings data
     num_samples = 10
@@ -193,7 +193,7 @@ def test_KGP_vcf_to_dosage():
     # Generate simulated VCF and loadings data and call load_1kgp function
     simulated_vcf = generate_simulated_vcf(num_samples, num_vars)
     sim_vcf_df = convert_sim_vcf_to_df(simulated_vcf)
-    loaded_vcf = KGP_vcf_to_dosage(sim_vcf_df)
+    loaded_vcf = convert_1kgp_vcf_to_dosage(sim_vcf_df)
     # Assert that the loaded_vcf has expected columns after processing
     expected_columns = ["Chromosome", "Position"]
     for column in expected_columns:
