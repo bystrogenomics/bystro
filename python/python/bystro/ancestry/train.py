@@ -32,6 +32,7 @@ from skops.io import dump as skops_dump
 
 from bystro.ancestry.asserts import assert_equals, assert_true
 from bystro.ancestry.train_utils import get_variant_ids_from_callset, head
+from bystro.vcf_utils.simulate_random_vcf import HEADER_COLS
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -538,7 +539,7 @@ def process_pca_loadings(loadings: pd.DataFrame) -> pd.DataFrame:
     loadings = loadings.join(gnomadPCs)
     loadings = loadings.reset_index()
     pc_range = range(8, 38)
-    pc_loadings = loadings.iloc[:, pc_range].copy()
+    pc_loadings = loadings.loc[:, list(pc_range)].copy()
     pc_loadings["variant"] = loadings["variant"]
     pc_loadings = pc_loadings.set_index("variant")
     pc_loadings = pc_loadings.sort_index()
