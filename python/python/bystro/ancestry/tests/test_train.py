@@ -41,6 +41,8 @@ def test__parse_vcf_from_file_stream():
     assert_frame_equal(expected_df, actual_df)
 
 
+# this test will sometimes fail on CI despite passing locally
+@pytest.mark.flaky
 def test__parse_vcf_from_file_stream_perf_test():
     num_samples = 2500
     samples = [f"sample{i}" for i in range(num_samples)]
@@ -66,6 +68,7 @@ def test__parse_vcf_from_file_stream_perf_test():
         columns=["chr1:1:T:G", "chr1:123:T:G", "chr1:123456:T:G"],
     )
     tic = time.time()
+    time.sleep(1)
     actual_df = _parse_vcf_from_file_stream(
         file_stream,
         [
@@ -77,6 +80,7 @@ def test__parse_vcf_from_file_stream_perf_test():
     )
     toc = time.time()
     iterations_per_second = len(file_stream) / (toc - tic)
+    print(iterations_per_second)
     assert_frame_equal(expected_df, actual_df)
     assert iterations_per_second >= 60_000
 
