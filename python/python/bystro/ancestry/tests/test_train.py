@@ -183,13 +183,6 @@ def test__parse_vcf_from_file_stream_bad_filter_values():
     assert_frame_equal(expected_df, actual_df)
 
 
-def _row_normalize_array(arr: np.ndarray) -> np.ndarray:
-    """Normalize array rows by L1-norm."""
-    norm_arr = (arr.T / arr.sum(axis=1)).T
-    assert np.allclose(np.sum(norm_arr, axis=1), 1)
-    return norm_arr
-
-
 def test_superpop_probs_from_pop_probs():
     samples = [f"sample{i}" for i in range(len(POPS))]
     # input array is identity matrix, i.e. one 100% prediction per population
