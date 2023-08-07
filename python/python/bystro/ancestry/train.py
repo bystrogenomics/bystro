@@ -42,6 +42,11 @@ KGP_VCF_DIR = DATA_DIR / "kgp_vcfs"
 INTERMEDIATE_DATA_DIR = ANCESTRY_DIR / "intermediate_data"
 VCF_PATH = DATA_DIR / "1KGP_final_variants_1percent.vcf.gz"
 ANCESTRY_MODEL_PRODUCTS_DIR = ANCESTRY_DIR / "ancestry_model_products"
+#TODO Set up download of gnomad loadings in preprocess step
+GNOMAD_LOADINGS_PATH = "gnomadloadings.tsv"
+# TODO Set up preprocess of this file that doesn't include dependency like plink or bcftools
+KGP_VCF_FILTERED_TO_GNOMAD_LOADINGS_FILEPATH = "1kgpGnomadList.vcf"
+
 
 ANCESTRY_INFO_PATH = DATA_DIR / "20130606_sample_info.txt"
 ROWS, COLS = 0, 1
