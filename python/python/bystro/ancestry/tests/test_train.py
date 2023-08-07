@@ -42,7 +42,7 @@ def test__parse_vcf_from_file_stream():
 
 
 # this test will sometimes fail on CI despite passing locally
-@pytest.mark.flaky
+@pytest.mark.flaky(max_runs=3)
 def test__parse_vcf_from_file_stream_perf_test():
     num_samples = 2500
     samples = [f"sample{i}" for i in range(num_samples)]
@@ -68,7 +68,6 @@ def test__parse_vcf_from_file_stream_perf_test():
         columns=["chr1:1:T:G", "chr1:123:T:G", "chr1:123456:T:G"],
     )
     tic = time.time()
-    time.sleep(1)
     actual_df = _parse_vcf_from_file_stream(
         file_stream,
         [
