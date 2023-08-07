@@ -13,8 +13,7 @@ from bystro.ancestry.train import (
 )
 from bystro.vcf_utils.simulate_random_vcf import (
     generate_simulated_vcf,
-    convert_sim_vcf_to_df,
-    HEADER_COLS
+    convert_sim_vcf_to_df
 )
 
 
