@@ -231,7 +231,6 @@ def test_superpop_predictions_from_pop_probs():
     pop_probs_data = np.eye(len(POPS))
     pop_probs = pd.DataFrame(pop_probs_data, index=samples, columns=POPS)
     superpop_predictions = superpop_predictions_from_pop_probs(pop_probs)
-    # expected output is matrix mapping each population to its superpop
     expected_superpop_predictions = [
         "AFR",
         "AFR",
