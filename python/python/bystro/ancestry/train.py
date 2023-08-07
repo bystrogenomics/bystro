@@ -474,7 +474,7 @@ def _calc_fst(variant_counts: pd.Series, samples: pd.DataFrame) -> float:
     return (p * (1 - p) - total) / (p * (1 - p))
 
 
-def load_1kgp_vcf_to_df(filepath: str) -> pd.DataFrame:
+def _load_1kgp_vcf_to_df() -> pd.DataFrame:
     """Temporary placeholder method that loads in 1kgp vcf
     filtered using plink2 down to the same variants as the
     gnomad loadings for WGS ancestry analysis.
@@ -486,7 +486,7 @@ def load_1kgp_vcf_to_df(filepath: str) -> pd.DataFrame:
     return vcf_w_header
 
 
-def convert_KGP_vcf_to_dosage(vcf_w_header: pd.DataFrame) -> pd.DataFrame:
+def convert_1kgp_vcf_to_dosage(vcf_w_header: pd.DataFrame) -> pd.DataFrame:
     """Converts phased genotype vcf to dosage matrix"""
     #TODO Determine whether we should always expect phased genotypes for reference data for training
     dosage_vcf = vcf_w_header.replace("0|0", 0)
@@ -504,11 +504,11 @@ def process_vcf_for_pc_transformation(dosage_vcf: pd.DataFrame) -> pd.DataFrame:
     genos = genos.set_index(dosage_vcf.index)
     genos = genos.sort_index()
     # Check that not all genotypes are the same for QC
-    assert len(set(genos.values.flatten())) > 1, "All genotypes are the same"
+    assert len(set(genos.to_numpy().flatten())) > 1, "All genotypes are the same"
     return genos
 
 
-def _load_pca_loadings(filepath: str) -> pd.DataFrame:
+def _load_pca_loadings() -> pd.DataFrame:
     """Load in the gnomad PCs and reformat for PC transformation."""
     loadings = pd.read_csv(GNOMAD_LOADINGS_PATH, sep="\t")
     return loadings
@@ -517,7 +517,6 @@ def _load_pca_loadings(filepath: str) -> pd.DataFrame:
 def process_pca_loadings(loadings: pd.DataFrame) -> pd.DataFrame:
     """Sanitize additional formatting in Gnomad pc loadings file"""
     loadings[["Chromosome", "Position"]] = loadings["locus"].str.split(":", expand=True)
-
     # Match variant format of gnomad loadings with 1kgp vcf
     def get_chr_pos(x):
         return x["locus"][3:]
