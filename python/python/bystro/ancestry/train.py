@@ -469,6 +469,80 @@ def _calc_fst(variant_counts: pd.Series, samples: pd.DataFrame) -> float:
     return (p * (1 - p) - total) / (p * (1 - p))
 
 
+def load_1kgp_vcf_to_df(filepath: str) -> pd.DataFrame:
+    """Temporary placeholder method that loads in 1kgp vcf
+    filtered using plink2 down to the same variants as the
+    gnomad loadings for WGS ancestry analysis.
+    """
+    #TODO Determine file structure of final version of preprocessed ref vcf
+    vcf_w_header = pd.read_csv(
+        KGP_VCF_FILTERED_TO_GNOMAD_LOADINGS_FILEPATH, delimiter="\t", skiprows=107
+    )
+    return vcf_w_header
+
+
+def convert_KGP_vcf_to_dosage(vcf_w_header: pd.DataFrame) -> pd.DataFrame:
+    """Converts phased genotype vcf to dosage matrix"""
+    #TODO Determine whether we should always expect phased genotypes for reference data for training
+    dosage_vcf = vcf_w_header.replace("0|0", 0)
+    dosage_vcf = dosage_vcf.replace("0|1", 1)
+    dosage_vcf = dosage_vcf.replace("1|0", 1)
+    dosage_vcf = dosage_vcf.replace("1|1", 2)
+    dosage_vcf = dosage_vcf.rename(columns={"#CHROM": "Chromosome", "POS": "Position"}, errors="raise")
+    dosage_vcf = dosage_vcf.set_index("ID", drop=False)
+    return dosage_vcf
+
+
+def process_vcf_for_pc_transformation(dosage_vcf: pd.DataFrame) -> pd.DataFrame:
+    """Process dosage_vcf so that it only includes genotypes for analysis."""
+    genos = dosage_vcf.iloc[:, len(HEADER_COLS) :]
+    genos = genos.set_index(dosage_vcf.index)
+    genos = genos.sort_index()
+    # Check that not all genotypes are the same for QC
+    assert len(set(genos.values.flatten())) > 1, "All genotypes are the same"
+    return genos
+
+
+def _load_pca_loadings(filepath: str) -> pd.DataFrame:
+    """Load in the gnomad PCs and reformat for PC transformation."""
+    loadings = pd.read_csv(GNOMAD_LOADINGS_PATH, sep="\t")
+    return loadings
+
+
+def process_pca_loadings(loadings: pd.DataFrame) -> pd.DataFrame:
+    """Sanitize additional formatting in Gnomad pc loadings file"""
+    loadings[["Chromosome", "Position"]] = loadings["locus"].str.split(":", expand=True)
+
+    # Match variant format of gnomad loadings with 1kgp vcf
+    def get_chr_pos(x):
+        return x["locus"][3:]
+
+    def get_ref_allele(x):
+        return x["alleles"][2]
+
+    def get_alt_allele(x):
+        return x["alleles"][6]
+
+    def get_variant(x):
+        return ":".join([get_chr_pos(x), get_ref_allele(x), get_alt_allele(x)])
+
+    loadings["variant"] = loadings.apply(get_variant, axis=1)
+    # Remove brackets
+    loadings["loadings"] = loadings["loadings"].str[1:-1]
+    # Split PCs and join back
+    gnomadPCs = loadings["loadings"].str.split(",", expand=True)
+    loadings = loadings.join(gnomadPCs)
+    loadings = loadings.reset_index()
+    pc_range = range(8, 38)
+    pc_loadings = loadings.iloc[:, pc_range].copy()
+    pc_loadings["variant"] = loadings["variant"]
+    pc_loadings = pc_loadings.set_index("variant")
+    pc_loadings = pc_loadings.sort_index()
+    pc_loadings = pc_loadings.astype(float)
+    assert all(pc_loadings.dtypes == np.float64)
+    return pc_loadings
+
+
 def _perform_pca(train_X: pd.DataFrame, test_X: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, PCA]:
     """Perform PCA, checking for good compression."""
     logger.info("Beginning PCA")
