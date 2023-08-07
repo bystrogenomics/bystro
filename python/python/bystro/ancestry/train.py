@@ -657,7 +657,7 @@ def superpop_predictions_from_pop_probs(pop_probs: pd.DataFrame) -> list[str]:
     """Given a matrix of population probabilities, convert to superpop predictions."""
     superpops = sorted(set(SUPERPOP_FROM_POP.values()))
     superpop_probs = superpop_probs_from_pop_probs(pop_probs)
-    return [superpops[np.argmax(ps)] for ps in superpop_probs]
+    return [superpops[np.argmax(ps)] for i, ps in superpop_probs.iterrows()]
 
 
 def _filter_variants_for_mi(
