@@ -186,8 +186,7 @@ def test__parse_vcf_from_file_stream_bad_filter_values():
 def test_superpop_probs_from_pop_probs():
     samples = [f"sample{i}" for i in range(len(POPS))]
     # input array is identity matrix, i.e. one 100% prediction per population
-    pop_probs_data = np.eye(len(POPS))
-    pop_probs = pd.DataFrame(pop_probs_data, index=samples, columns=POPS)
+    pop_probs = pd.DataFrame(np.eye(len(POPS)), index=samples, columns=POPS)
     superpop_probs = superpop_probs_from_pop_probs(pop_probs)
     # expected output is matrix mapping each population to its superpop
     expected_superpop_probs = pd.DataFrame(
@@ -228,8 +227,7 @@ def test_superpop_probs_from_pop_probs():
 def test_superpop_predictions_from_pop_probs():
     samples = [f"sample{i}" for i in range(len(POPS))]
     # input array is identity matrix, i.e. one 100% prediction per population
-    pop_probs_data = np.eye(len(POPS))
-    pop_probs = pd.DataFrame(pop_probs_data, index=samples, columns=POPS)
+    pop_probs = pd.DataFrame(np.eye(len(POPS)), index=samples, columns=POPS)
     superpop_predictions = superpop_predictions_from_pop_probs(pop_probs)
     expected_superpop_predictions = [
         "AFR",
