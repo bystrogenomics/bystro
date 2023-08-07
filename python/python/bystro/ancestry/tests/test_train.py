@@ -7,11 +7,11 @@ import pytest
 from pandas.testing import assert_frame_equal
 
 from bystro.ancestry.train import (
-    _parse_vcf_from_file_stream,
     POPS,
     SUPERPOPS,
-    superpop_probs_from_pop_probs,
+    _parse_vcf_from_file_stream,
     superpop_predictions_from_pop_probs,
+    superpop_probs_from_pop_probs,
 )
 
 
