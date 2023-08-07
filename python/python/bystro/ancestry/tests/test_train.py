@@ -1,5 +1,6 @@
 """Tests for ancestry model training code."""
 import re
+import time
 
 import numpy as np
 import pandas as pd
@@ -38,6 +39,41 @@ def test__parse_vcf_from_file_stream():
         return_exact_variants=True,
     )
     assert_frame_equal(expected_df, actual_df)
+
+
+def test__parse_vcf_from_file_stream_perf_test():
+    num_samples = 2500
+    samples = [f"sample{i}" for i in range(num_samples)]
+    file_stream = [
+        "##Some comment",
+        "#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT" + "\t" + "\t".join(samples),
+        "chr1	1	.	T	G	.	PASS	i;n;f;o	GT" + "\t" + "\t".join("0|0" for _ in range(num_samples)),
+        "chr1	123	.	T	G	.	PASS	i;n;f;o	GT" + "\t" + "\t".join("0|1" for _ in range(num_samples)),
+        "chr1	123456	.	T	G	.	PASS	i;n;f;o	GT" + "\t" + "\t".join("1|1" for _ in range(num_samples)),
+    ]
+    file_stream += [
+        "chr2	1	.	T	G	.	PASS	i;n;f;o	GT" + "\t" + "\t".join("0|0" for _ in range(num_samples)),
+    ] * 1000
+    expected_df = pd.DataFrame(
+        [[0, 1, 2]] * len(samples),
+        index=samples,
+        columns=["chr1:1:T:G", "chr1:123:T:G", "chr1:123456:T:G"],
+    )
+    tic = time.time()
+    actual_df = _parse_vcf_from_file_stream(
+        file_stream,
+        [
+            "chr1:1:T:G",
+            "chr1:123:T:G",
+            "chr1:123456:T:G",
+        ],
+        return_exact_variants=True,
+    )
+    toc = time.time()
+    iterations_per_second = len(file_stream) / (toc - tic)
+    print("iterations per second:", iterations_per_second)
+    assert_frame_equal(expected_df, actual_df)
+    assert iterations_per_second >= 60_000
 
 
 def test__parse_vcf_from_file_stream_no_chr_prefix():

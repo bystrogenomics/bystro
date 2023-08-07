@@ -139,12 +139,26 @@ def load_callset_for_variants(variants: set[str]) -> pd.DataFrame:
 def _parse_vcf_line_for_dosages(
     line: str, variants_to_keep: Container[Variant]
 ) -> tuple[Variant, list[int]] | None:
-    fields = line.split()
-    if fields[FILTER_FIELD_IDX] not in ["PASS", "."]:
+    # We want to determine if we care about the variant on this line
+    # before we parse it in full.  So we'll parse just enough of it to
+    # read the variant and filter info: if we want the variant and it
+    # passes the filter checks, then we'll parse the rest of the line
+    # for the sample genotypes, because `line.split` is the bottleneck
+    # here.  Under this approach, file IO is 75% of the walltime of
+    # parse_vcf and parsing the other 25%.
+    i = 0
+    tab_count = 0
+    while tab_count <= FILTER_FIELD_IDX:
+        if line[i] == "\t":
+            tab_count += 1
+        i += 1
+    fixed_fields = line[:i].split()
+    if fixed_fields[FILTER_FIELD_IDX] not in ["PASS", "."]:
         return None
-    variant = ":".join([fields[0], fields[1], fields[3], fields[4]])
+    variant = ":".join([fixed_fields[0], fixed_fields[1], fixed_fields[3], fixed_fields[4]])
     variant = variant if variant.startswith("chr") else "chr" + variant
     if variant in variants_to_keep:
+        fields = line.split()  # now we can parse the full line
         variant_dosages = [
             int(psa[0]) + int(psa[2]) for psa in fields[NUM_VCF_METADATA_COLUMNS:]
         ]  #  pipe-separated annotation e.g. '0|1'
