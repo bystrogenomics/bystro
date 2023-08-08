@@ -18,6 +18,7 @@ from bystro.ancestry.inference import AncestryModel, infer_ancestry
 from bystro.ancestry.train import parse_vcf
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
 from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, get_progress_reporter, listen
+from bystro.utils.timer import Timer
 
 logging.basicConfig(
     filename="ancestry_listener.log",
@@ -90,8 +91,9 @@ def handler_fn_factory(
         logger.debug("entering handler_fn with: %s", ancestry_job_data)
         vcf_path = Path(ancestry_job_data.ancestry_submission.vcf_path)
         logger.debug("loading VCF %s", vcf_path)
-        genotypes = _load_vcf(vcf_path, variants=ancestry_model.pca_loadings_df.index)
-        logger.debug("finished loading VCF %s", vcf_path)
+        with Timer() as timer:
+            genotypes = _load_vcf(vcf_path, variants=ancestry_model.pca_loadings_df.index)
+        logger.debug("finished loading VCF %s in %f seconds", vcf_path, timer.elapsed_time)
         return infer_ancestry(ancestry_model, genotypes, vcf_path)
 
     return handler_fn
