@@ -111,7 +111,7 @@ def infer_ancestry(
     logger.debug("Filling missing data for VCF: %s", vcf_path)
     with Timer() as timer:
         imputed_genotypes, missingnesses = _fill_missing_data(genotypes)
-    logger.debug("Finished filling missing data for VCF in %f seconds", round(timer.elapsed_time, 3))
+    logger.debug("Finished filling missing data for VCF in %f seconds", timer.elapsed_time)
     pop_probs_df = ancestry_model.predict_proba(imputed_genotypes)
     return _package_ancestry_response_from_pop_probs(vcf_path, pop_probs_df, missingnesses)
 
