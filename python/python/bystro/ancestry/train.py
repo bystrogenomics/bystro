@@ -33,8 +33,8 @@ from skops.io import dump as skops_dump
 from bystro.ancestry.asserts import assert_equals, assert_true
 from bystro.ancestry.train_utils import get_variant_ids_from_callset, head
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 ANCESTRY_DIR = Path().absolute()
 DATA_DIR = ANCESTRY_DIR / "data"

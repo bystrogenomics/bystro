@@ -1,6 +1,5 @@
 """Tests for ancestry model training code."""
 import re
-import time
 
 import numpy as np
 import pandas as pd
@@ -39,49 +38,6 @@ def test__parse_vcf_from_file_stream():
         return_exact_variants=True,
     )
     assert_frame_equal(expected_df, actual_df)
-
-
-# this test will sometimes fail on CI despite passing locally
-@pytest.mark.flaky(max_runs=3)
-def test__parse_vcf_from_file_stream_perf_test():
-    num_samples = 2500
-    samples = [f"sample{i}" for i in range(num_samples)]
-    genotypes0 = ["0|0" for _ in range(num_samples)]
-    genotypes1 = ["0|1" for _ in range(num_samples)]
-    genotypes2 = ["1|1" for _ in range(num_samples)]
-    HEADER_COLS = ["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"]
-    line1 = ["chr1", "1", ".", "T", "G", ".", "PASS", "i;n;f;o", "GT", *genotypes0]
-    line2 = ["chr1", "123", ".", "T", "G", ".", "PASS", "i;n;f;o", "GT", *genotypes1]
-    line3 = ["chr1", "123456", ".", "T", "G", ".", "PASS", "i;n;f;o", "GT", *genotypes2]
-    irrelevant_line = ["chr2", "1", ".", "T", "G", ".", "PASS", "i;n;f;o", "GT", *genotypes0]
-    file_stream = [
-        "##Some comment",
-        "#" + "\t".join(HEADER_COLS + samples),
-        "\t".join(line1),
-        "\t".join(line2),
-        "\t".join(line3),
-    ]
-    file_stream += ["\t".join(irrelevant_line)] * 1000
-    expected_df = pd.DataFrame(
-        [[0, 1, 2]] * len(samples),
-        index=samples,
-        columns=["chr1:1:T:G", "chr1:123:T:G", "chr1:123456:T:G"],
-    )
-    tic = time.time()
-    actual_df = _parse_vcf_from_file_stream(
-        file_stream,
-        [
-            "chr1:1:T:G",
-            "chr1:123:T:G",
-            "chr1:123456:T:G",
-        ],
-        return_exact_variants=True,
-    )
-    toc = time.time()
-    iterations_per_second = len(file_stream) / (toc - tic)
-    print(iterations_per_second)
-    assert_frame_equal(expected_df, actual_df)
-    assert iterations_per_second >= 60_000
 
 
 def test__parse_vcf_from_file_stream_no_chr_prefix():
