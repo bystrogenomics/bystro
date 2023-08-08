@@ -1,4 +1,5 @@
 black==23.3.0
+flaky==3.7.0
 mypy==1.3.0
 pandas-stubs==2.0.2.230605
 pytest==7.3.1
