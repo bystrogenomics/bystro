@@ -476,8 +476,7 @@ def _calc_fst(variant_counts: pd.Series, samples: pd.DataFrame) -> float:
 
 
 def _load_1kgp_vcf_to_df() -> pd.DataFrame:
-    """Temporary placeholder method that loads in 1kgp vcf
-    filtered using plink2 down to the same variants as the
+    """Loads in 1kgp vcf filtered using plink2 down to the same variants as the
     gnomad loadings for WGS ancestry analysis.
     """
     #TODO Determine file structure of final version of preprocessed ref vcf
