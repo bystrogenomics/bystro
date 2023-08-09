@@ -480,16 +480,16 @@ def _load_1kgp_vcf_to_df() -> pd.DataFrame:
     gnomad loadings for WGS ancestry analysis.
     """
     #TODO Determine file structure of final version of preprocessed ref vcf
-    vcf_w_header = pd.read_csv(
+    vcf_with_header = pd.read_csv(
         KGP_VCF_FILTERED_TO_GNOMAD_LOADINGS_FILEPATH, delimiter="\t", skiprows=107
     )
-    return vcf_w_header
+    return vcf_with_header
 
 
-def convert_1kgp_vcf_to_dosage(vcf_w_header: pd.DataFrame) -> pd.DataFrame:
+def convert_1kgp_vcf_to_dosage(vcf_with_header: pd.DataFrame) -> pd.DataFrame:
     """Converts phased genotype vcf to dosage matrix"""
     #TODO Determine whether we should always expect phased genotypes for reference data for training
-    dosage_vcf = vcf_w_header.replace("0|0", 0)
+    dosage_vcf = vcf_with_header.replace("0|0", 0)
     dosage_vcf = dosage_vcf.replace("0|1", 1)
     dosage_vcf = dosage_vcf.replace("1|0", 1)
     dosage_vcf = dosage_vcf.replace("1|1", 2)
