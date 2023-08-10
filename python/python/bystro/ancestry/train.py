@@ -516,8 +516,8 @@ def _load_pca_loadings() -> pd.DataFrame:
 
 def process_pca_loadings(loadings: pd.DataFrame) -> pd.DataFrame:
     """Sanitize additional formatting in Gnomad pc loadings file"""
-    loadings_copy = loadings.copy(deep=True)
-    loadings_copy[["Chromosome", "Position"]] = loadings_copy["locus"].str.split(":", expand=True)
+    pc_loadings: pd.DataFrame = loadings.copy(deep=True)
+    pc_loadings[["Chromosome", "Position"]] = pc_loadings["locus"].str.split(":", expand=True)
     # Match variant format of gnomad loadings with 1kgp vcf
     def get_chr_pos(x):
         return x["locus"][3:]
@@ -531,17 +531,15 @@ def process_pca_loadings(loadings: pd.DataFrame) -> pd.DataFrame:
     def get_variant(x):
         return ":".join([get_chr_pos(x), get_ref_allele(x), get_alt_allele(x)])
 
-    loadings_copy["variant"] = loadings_copy.apply(get_variant, axis=1)
+    pc_loadings["variant"] = pc_loadings.apply(get_variant, axis=1)
     # Remove brackets
-    loadings_copy["loadings"] = loadings_copy["loadings"].str[1:-1]
+    pc_loadings["loadings"] = pc_loadings["loadings"].str[1:-1]
     # Split PCs and join back
-    gnomadPCs = loadings_copy["loadings"].str.split(",", expand=True)
-    loadings_copy = loadings_copy.join(gnomadPCs)
-    loadings = loadings.reset_index()
-    pc_range = range(7, 37)
-    pc_loadings = loadings_copy.iloc[:, pc_range].copy()
-    pc_loadings["variant"] = loadings_copy["variant"]
+    gnomadPCs = pc_loadings["loadings"].str.split(",", expand=True)
+    pc_loadings = pc_loadings.join(gnomadPCs)
     pc_loadings = pc_loadings.set_index("variant")
+    pc_range = slice(6, 36)
+    pc_loadings = pc_loadings.iloc[:, pc_range]
     pc_loadings = pc_loadings.sort_index()
     pc_loadings = pc_loadings.astype(float)
     assert all(pc_loadings.dtypes == np.float64)
