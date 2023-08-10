@@ -32,6 +32,7 @@ from skops.io import dump as skops_dump
 
 from bystro.ancestry.asserts import assert_equals, assert_true
 from bystro.ancestry.train_utils import get_variant_ids_from_callset, head
+from bystro.vcf_utils.simulate_random_vcf import HEADER_COLS
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,11 @@ KGP_VCF_DIR = DATA_DIR / "kgp_vcfs"
 INTERMEDIATE_DATA_DIR = ANCESTRY_DIR / "intermediate_data"
 VCF_PATH = DATA_DIR / "1KGP_final_variants_1percent.vcf.gz"
 ANCESTRY_MODEL_PRODUCTS_DIR = ANCESTRY_DIR / "ancestry_model_products"
+#TODO Set up download of gnomad loadings in preprocess step
+GNOMAD_LOADINGS_PATH = "gnomadloadings.tsv"
+# TODO Set up preprocess of this file that doesn't include dependency like plink or bcftools
+KGP_VCF_FILTERED_TO_GNOMAD_LOADINGS_FILEPATH = "1kgpGnomadList.vcf"
+
 
 ANCESTRY_INFO_PATH = DATA_DIR / "20130606_sample_info.txt"
 ROWS, COLS = 0, 1
@@ -481,6 +487,77 @@ def _calc_fst(variant_counts: pd.Series, samples: pd.DataFrame) -> float:
         pi = np.mean(gs) / PLOIDY
         total += ci * pi * (1 - pi)
     return (p * (1 - p) - total) / (p * (1 - p))
+
+
+def _load_1kgp_vcf_to_df() -> pd.DataFrame:
+    """Loads in 1kgp vcf filtered using plink2 down to the same variants as the
+    gnomad loadings for WGS ancestry analysis.
+    """
+    #TODO Determine file structure of final version of preprocessed ref vcf
+    vcf_with_header = pd.read_csv(
+        KGP_VCF_FILTERED_TO_GNOMAD_LOADINGS_FILEPATH, delimiter="\t", skiprows=107
+    )
+    return vcf_with_header
+
+
+def convert_1kgp_vcf_to_dosage(vcf_with_header: pd.DataFrame) -> pd.DataFrame:
+    """Converts phased genotype vcf to dosage matrix"""
+    #TODO Determine whether we should always expect phased genotypes for reference data for training
+    dosage_vcf = vcf_with_header.replace("0|0", 0)
+    dosage_vcf = dosage_vcf.replace("0|1", 1)
+    dosage_vcf = dosage_vcf.replace("1|0", 1)
+    dosage_vcf = dosage_vcf.replace("1|1", 2)
+    dosage_vcf = dosage_vcf.rename(columns={"#CHROM": "Chromosome", "POS": "Position"}, errors="raise")
+    dosage_vcf = dosage_vcf.set_index("ID", drop=False)
+    return dosage_vcf
+
+
+def process_vcf_for_pc_transformation(dosage_vcf: pd.DataFrame) -> pd.DataFrame:
+    """Process dosage_vcf so that it only includes genotypes for analysis."""
+    genos = dosage_vcf.iloc[:, len(HEADER_COLS) :]
+    genos = genos.set_index(dosage_vcf.index)
+    genos = genos.sort_index()
+    # Check that not all genotypes are the same for QC
+    assert len(set(genos.to_numpy().flatten())) > 1, "All genotypes are the same"
+    return genos
+
+
+def _load_pca_loadings() -> pd.DataFrame:
+    """Load in the gnomad PCs and reformat for PC transformation."""
+    loadings = pd.read_csv(GNOMAD_LOADINGS_PATH, sep="\t")
+    return loadings
+
+
+def process_pca_loadings(loadings: pd.DataFrame) -> pd.DataFrame:
+    """Sanitize additional formatting in Gnomad pc loadings file"""
+    pc_loadings: pd.DataFrame = loadings.copy(deep=True)
+    pc_loadings[["Chromosome", "Position"]] = pc_loadings["locus"].str.split(":", expand=True)
+    # Match variant format of gnomad loadings with 1kgp vcf
+    def get_chr_pos(x):
+        return x["locus"][3:]
+
+    def get_ref_allele(x):
+        return x["alleles"][2]
+
+    def get_alt_allele(x):
+        return x["alleles"][6]
+
+    def get_variant(x):
+        return ":".join([get_chr_pos(x), get_ref_allele(x), get_alt_allele(x)])
+
+    pc_loadings["variant"] = pc_loadings.apply(get_variant, axis=1)
+    # Remove brackets
+    pc_loadings["loadings"] = pc_loadings["loadings"].str[1:-1]
+    # Split PCs and join back
+    gnomadPCs = pc_loadings["loadings"].str.split(",", expand=True)
+    pc_loadings = pc_loadings.join(gnomadPCs)
+    pc_loadings = pc_loadings.set_index("variant")
+    pc_range = slice(6, 36)
+    pc_loadings = pc_loadings.iloc[:, pc_range]
+    pc_loadings = pc_loadings.sort_index()
+    pc_loadings = pc_loadings.astype(float)
+    assert all(pc_loadings.dtypes == np.float64)
+    return pc_loadings
 
 
 def _perform_pca(train_X: pd.DataFrame, test_X: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, PCA]:
