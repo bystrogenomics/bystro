@@ -7,7 +7,11 @@ import pytest
 from pandas.testing import assert_frame_equal
 
 from bystro.ancestry.train import (
+    POPS,
+    SUPERPOPS,
     _parse_vcf_from_file_stream,
+    superpop_predictions_from_pop_probs,
+    superpop_probs_from_pop_probs,
     convert_1kgp_vcf_to_dosage,
     process_vcf_for_pc_transformation
 )
@@ -205,3 +209,80 @@ def test_1kgp_vcf_to_dosage():
     for column in processed_vcf.columns:
         for value in processed_vcf[column]:
             assert value in valid_values
+
+
+def test_superpop_probs_from_pop_probs():
+    samples = [f"sample{i}" for i in range(len(POPS))]
+    # input array is identity matrix, i.e. one 100% prediction per population
+    pop_probs = pd.DataFrame(np.eye(len(POPS)), index=samples, columns=POPS)
+    superpop_probs = superpop_probs_from_pop_probs(pop_probs)
+    # expected output is matrix mapping each population to its superpop
+    expected_superpop_probs = pd.DataFrame(
+        [
+            [1.0, 0.0, 0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 1.0],
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 1.0],
+            [1.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 1.0],
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 1.0],
+            [0.0, 1.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 1.0],
+            [0.0, 0.0, 0.0, 1.0, 0.0],
+            [1.0, 0.0, 0.0, 0.0, 0.0],
+        ],
+        index=samples,
+        columns=SUPERPOPS,
+    )
+    assert_frame_equal(expected_superpop_probs, superpop_probs)
+
+
+def test_superpop_predictions_from_pop_probs():
+    samples = [f"sample{i}" for i in range(len(POPS))]
+    # input array is identity matrix, i.e. one 100% prediction per population
+    pop_probs = pd.DataFrame(np.eye(len(POPS)), index=samples, columns=POPS)
+    superpop_predictions = superpop_predictions_from_pop_probs(pop_probs)
+    expected_superpop_predictions = [
+        "AFR",
+        "AFR",
+        "SAS",
+        "EAS",
+        "EUR",
+        "EAS",
+        "EAS",
+        "AMR",
+        "AFR",
+        "EUR",
+        "EUR",
+        "SAS",
+        "AFR",
+        "EUR",
+        "SAS",
+        "EAS",
+        "EAS",
+        "AFR",
+        "AFR",
+        "AMR",
+        "AMR",
+        "SAS",
+        "AMR",
+        "SAS",
+        "EUR",
+        "AFR",
+    ]
+    assert expected_superpop_predictions == superpop_predictions
