@@ -356,4 +356,4 @@ def test_apply_pca_transform():
     assert transformed_data.dtypes.apply(pd.api.types.is_numeric_dtype).all()
 
     # Check that transformed_data does not contain any NaN or missing values
-    assert not transformed_data.isnull().values.any()
+    assert not transformed_data.isna().to_numpy().any()
