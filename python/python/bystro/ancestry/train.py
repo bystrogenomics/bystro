@@ -560,6 +560,38 @@ def process_pca_loadings(loadings: pd.DataFrame) -> pd.DataFrame:
     return pc_loadings
 
 
+def restrict_loadings_variants_to_vcf(
+    pc_loadings: pd.DataFrame, genos: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame, int]:
+    """Restrict variant list to overlap between gnomad loadings and reference vcf."""
+    # IGSR version of 1kgp is current reference vcf
+    var_overlap = pc_loadings.index.intersection(genos.index)
+    pc_loadings_overlap = pc_loadings[pc_loadings.index.isin(var_overlap)]
+    genos_overlap = genos[genos.index.isin(var_overlap)]
+    # Ensure that genos transpose and pc_loadings have corresponding shape and vars
+    print("genos_overlap.index", genos_overlap.index)
+    print(pc_loadings_overlap.index)
+    assert genos_overlap.T.shape[1] == pc_loadings_overlap.shape[0]
+    assert set(genos_overlap.index) == set(pc_loadings_overlap.index)
+    assert (genos_overlap.columns == genos.columns).all()
+    assert "SampleID1" in genos_overlap.columns
+    # Record amount of overlap
+    num_var_overlap = len(var_overlap)
+    return pc_loadings_overlap, genos_overlap, num_var_overlap
+
+
+def apply_pca_transform(pc_loadings_overlap: pd.DataFrame, genos_overlap: pd.DataFrame) -> pd.DataFrame:
+    """Transform vcf with genotypes in dosage format with PCs loadings from gnomad PCA."""
+    # Dot product
+    transformed_data = genos_overlap.T @ pc_loadings_overlap
+    # Add the IDs back on to PCs
+    KGP_index = genos_overlap.T.index
+    transformed_data_with_ids = pd.DataFrame(transformed_data, index=KGP_index)
+    # Add PC labels
+    transformed_data_with_ids.columns = pd.Index(["PC" + str(i) for i in range(1, 31)])
+    return transformed_data_with_ids
+
+
 def _perform_pca(train_X: pd.DataFrame, test_X: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, PCA]:
     """Perform PCA, checking for good compression."""
     logger.info("Beginning PCA")

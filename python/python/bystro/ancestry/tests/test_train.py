@@ -13,7 +13,9 @@ from bystro.ancestry.train import (
     superpop_predictions_from_pop_probs,
     superpop_probs_from_pop_probs,
     convert_1kgp_vcf_to_dosage,
-    process_vcf_for_pc_transformation
+    process_vcf_for_pc_transformation,
+    restrict_loadings_variants_to_vcf,
+    apply_pca_transform
 )
 from bystro.vcf_utils.simulate_random_vcf import (
     generate_simulated_vcf,
@@ -286,3 +288,72 @@ def test_1kgp_vcf_to_dosage():
     for column in processed_vcf.columns:
         for value in processed_vcf[column]:
             assert value in valid_values
+
+
+def test_restrict_loadings_variants_to_vcf():
+    """Tests restriction of gnomad loadings variants to vcf variants."""
+    num_samples = 10
+    num_vars = 10
+    simulated_vcf = generate_simulated_vcf(num_samples, num_vars)
+    sim_vcf_df = convert_sim_vcf_to_df(simulated_vcf)
+    loaded_vcf = convert_1kgp_vcf_to_dosage(sim_vcf_df)
+    processed_sim_vcf = process_vcf_for_pc_transformation(loaded_vcf)
+    # Using same indices, generate sim loadings
+    num_pcs = 30
+    sim_pcs = np.random.random((num_samples, num_pcs))
+    sim_loadings = pd.DataFrame(
+        data=sim_pcs, index=processed_sim_vcf.index, columns=[f"PC{i+1}" for i in range(num_pcs)]
+    )
+    # Run restrict_loadings with sim data
+    pc_loadings_overlap, genos_overlap, num_var_overlap = restrict_loadings_variants_to_vcf(
+        sim_loadings, processed_sim_vcf
+    )
+    # Check for expected columns
+    expected_columns_loadings = ["PC1", "PC2"]
+    expected_columns_genos = ["SampleID1", "SampleID2"]
+    for column in expected_columns_loadings:
+        assert column in pc_loadings_overlap.columns
+    for column in expected_columns_genos:
+        assert column in genos_overlap.columns
+    # Check that the output DataFrames have the expected number of rows
+    expected_num_rows = num_var_overlap
+    assert pc_loadings_overlap.shape[0] == expected_num_rows
+    assert genos_overlap.shape[0] == expected_num_rows
+    # Check that the indices match up to sorting
+    assert set(genos_overlap.index) == set(pc_loadings_overlap.index)
+
+
+def test_apply_pca_transform():
+    # Prepare test data same as before
+    num_samples = 10
+    num_vars = 10
+    simulated_vcf = generate_simulated_vcf(num_samples, num_vars)
+    sim_vcf_df = convert_sim_vcf_to_df(simulated_vcf)
+    loaded_vcf = convert_1kgp_vcf_to_dosage(sim_vcf_df)
+    processed_sim_vcf = process_vcf_for_pc_transformation(loaded_vcf)
+    # Using same indices, generate sim loadings
+    num_pcs = 30
+    sim_pcs = np.random.random((num_samples, num_pcs))
+    sim_loadings = pd.DataFrame(
+        data=sim_pcs, index=processed_sim_vcf.index, columns=[f"PC{i+1}" for i in range(num_pcs)]
+    )
+    pc_loadings_overlap, genos_overlap, num_var_overlap = restrict_loadings_variants_to_vcf(
+        sim_loadings, processed_sim_vcf
+    )
+    # Call function to test
+    transformed_data = apply_pca_transform(pc_loadings_overlap, genos_overlap)
+    # Check for correct data type and columns
+    assert isinstance(transformed_data, pd.DataFrame)
+    expected_columns = ["PC" + str(i) for i in range(1, 31)]
+    assert transformed_data.columns.tolist() == expected_columns
+    # Check index of transformed_data matches genos_overlap.T.index
+    assert transformed_data.index.equals(genos_overlap.T.index)
+    # Check shape of transformed_data matches expected shape
+    expected_shape = (genos_overlap.T.shape[0], 30)
+    assert transformed_data.shape == expected_shape
+
+    # Check all values in transformed_data are numeric
+    assert transformed_data.dtypes.apply(pd.api.types.is_numeric_dtype).all()
+
+    # Check that transformed_data does not contain any NaN or missing values
+    assert not transformed_data.isnull().values.any()
