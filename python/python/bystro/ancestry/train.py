@@ -31,10 +31,11 @@ from sklearn.model_selection import train_test_split
 from skops.io import dump as skops_dump
 
 from bystro.ancestry.asserts import assert_equals, assert_true
-from bystro.ancestry.train_utils import get_variant_ids_from_callset, head, is_autosomal_variant
+from bystro.ancestry.train_utils import get_variant_ids_from_callset, head
+from bystro.vcf_utils.simulate_random_vcf import HEADER_COLS
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 ANCESTRY_DIR = Path().absolute()
 DATA_DIR = ANCESTRY_DIR / "data"
@@ -42,6 +43,11 @@ KGP_VCF_DIR = DATA_DIR / "kgp_vcfs"
 INTERMEDIATE_DATA_DIR = ANCESTRY_DIR / "intermediate_data"
 VCF_PATH = DATA_DIR / "1KGP_final_variants_1percent.vcf.gz"
 ANCESTRY_MODEL_PRODUCTS_DIR = ANCESTRY_DIR / "ancestry_model_products"
+#TODO Set up download of gnomad loadings in preprocess step
+GNOMAD_LOADINGS_PATH = "gnomadloadings.tsv"
+# TODO Set up preprocess of this file that doesn't include dependency like plink or bcftools
+KGP_VCF_FILTERED_TO_GNOMAD_LOADINGS_FILEPATH = "1kgpGnomadList.vcf"
+
 
 ANCESTRY_INFO_PATH = DATA_DIR / "20130606_sample_info.txt"
 ROWS, COLS = 0, 1
@@ -57,6 +63,10 @@ RFC_TRAIN_ACCURACY_THRESHOLD = 0.9
 RFC_TEST_ACCURACY_THRESHOLD = 0.75
 RFC_TRAIN_SUPERPOP_ACCURACY_THRESHOLD = 0.99
 RFC_TEST_SUPERPOP_ACCURACY_THRESHOLD = 0.99
+
+VCF_METADATA_COLUMNS = ["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"]
+FILTER_FIELD_IDX = VCF_METADATA_COLUMNS.index("FILTER")
+NUM_VCF_METADATA_COLUMNS = len(VCF_METADATA_COLUMNS)
 
 # superpop definitions taken from ensembl
 SUPERPOP_FROM_POP = {
@@ -135,13 +145,28 @@ def load_callset_for_variants(variants: set[str]) -> pd.DataFrame:
 def _parse_vcf_line_for_dosages(
     line: str, variants_to_keep: Container[Variant]
 ) -> tuple[Variant, list[int]] | None:
-    # will throw ValueError if "PASS" not found, which is good
-    fields = line[: line.index("PASS")].split()
-    variant = ":".join([fields[0], fields[1], fields[3], fields[4]])
-    assert_true("variant is a valid variant string", is_autosomal_variant(variant))
+    # We want to determine if we care about the variant on this line
+    # before we parse it in full.  So we'll parse just enough of it to
+    # read the variant and filter info: if we want the variant and it
+    # passes the filter checks, then we'll parse the rest of the line
+    # for the sample genotypes, because `line.split` is the bottleneck
+    # here.  Under this approach, file IO is 75% of the walltime of
+    # parse_vcf and parsing the other 25%.
+    i = 0
+    tab_count = 0
+    while tab_count <= FILTER_FIELD_IDX:
+        if line[i] == "\t":
+            tab_count += 1
+        i += 1
+    fixed_fields = line[:i].split()
+    if fixed_fields[FILTER_FIELD_IDX] not in ["PASS", "."]:
+        return None
+    variant = ":".join([fixed_fields[0], fixed_fields[1], fixed_fields[3], fixed_fields[4]])
+    variant = variant if variant.startswith("chr") else "chr" + variant
     if variant in variants_to_keep:
+        fields = line.split()  # now we can parse the full line
         variant_dosages = [
-            int(psa[0]) + int(psa[2]) for psa in line.split()[9:]
+            int(psa[0]) + int(psa[2]) for psa in fields[NUM_VCF_METADATA_COLUMNS:]
         ]  #  pipe-separated annotation e.g. '0|1'
         return variant, variant_dosages
     return None
@@ -180,6 +205,18 @@ def parse_vcf(
         )
 
 
+def _check_fields_for_metadata_columns(fields: list[str]) -> None:
+    """Assert that VCF contains expected metadata columns."""
+    metadata_fields = fields[:NUM_VCF_METADATA_COLUMNS]
+    if metadata_fields != VCF_METADATA_COLUMNS:
+        err_msg = (
+            "vcf does not contain expected metadata columns.  "
+            f"Expected: {VCF_METADATA_COLUMNS}, "
+            f"got: {metadata_fields} instead."
+        )
+        raise ValueError(err_msg)
+
+
 def _parse_vcf_from_file_stream(
     file_stream: Iterable[str], variants_to_keep: Collection[str], *, return_exact_variants: bool
 ) -> pd.DataFrame:
@@ -192,7 +229,9 @@ def _parse_vcf_from_file_stream(
         if line.startswith("##"):
             continue
         if line.startswith("#CHROM"):
-            sample_ids = line.split()[9:]
+            fields = line.lstrip("#").split()
+            _check_fields_for_metadata_columns(fields)
+            sample_ids = fields[NUM_VCF_METADATA_COLUMNS:]
         elif variant_dosages := _parse_vcf_line_for_dosages(line, variants_to_keep):
             variant, dosages = variant_dosages
             found_variants.append(variant)
@@ -200,17 +239,24 @@ def _parse_vcf_from_file_stream(
         else:
             continue
     if sample_ids is None:
-        msg = "Couldn't find sample ids in VCF"
-        raise ValueError(msg)
+        msg = "Sample ids not set during VCF processing: does your VCF contain a valid header?"
+        raise AssertionError(msg)
     found_chromosomes = {_get_chromosome_from_variant(v) for v in found_variants}
-    assert_true("Extracted sample_ids from vcf", sample_ids is not None)
     logger.info(
         "processed %s lines, retaining %s variants from %s chromosomes",
         total_lines,
         len(found_variants),
         len(found_chromosomes),
     )
-    df_values: np.ndarray | list[list[float]] = np.array(dosage_data).T if dosage_data else []
+    try:
+        df_values: np.ndarray | list[list[float]] = np.array(dosage_data).T if dosage_data else []
+        logger.info(df_values)
+    except ValueError as val_err:
+        err_msg = (
+            "Couldn't convert dosage data to np.array, "
+            "do all genotype rows have the same number of fields?"
+        )
+        raise ValueError(err_msg) from val_err
     dosage_df = pd.DataFrame(df_values, index=sample_ids, columns=found_variants)
     # we assume each vcf file contains variants for a single chromosome
     recovery_rate = _calculate_recovery_rate(found_variants, variants_to_keep)
@@ -219,8 +265,12 @@ def _parse_vcf_from_file_stream(
     if return_exact_variants:
         missing_variants = set(variants_to_keep) - set(found_variants)
         logger.info("adding NaNs for %s variants not found in VCF", len(missing_variants))
-        for missing_variant in missing_variants:
-            dosage_df[missing_variant] = np.nan
+        missing_dosages = pd.DataFrame(
+            np.nan * np.ones((len(dosage_df), len(missing_variants))),
+            index=dosage_df.index,
+            columns=list(missing_variants),
+        )
+        dosage_df = pd.concat([dosage_df, missing_dosages], axis="columns")
 
     return dosage_df
 
@@ -439,6 +489,77 @@ def _calc_fst(variant_counts: pd.Series, samples: pd.DataFrame) -> float:
     return (p * (1 - p) - total) / (p * (1 - p))
 
 
+def _load_1kgp_vcf_to_df() -> pd.DataFrame:
+    """Loads in 1kgp vcf filtered using plink2 down to the same variants as the
+    gnomad loadings for WGS ancestry analysis.
+    """
+    #TODO Determine file structure of final version of preprocessed ref vcf
+    vcf_with_header = pd.read_csv(
+        KGP_VCF_FILTERED_TO_GNOMAD_LOADINGS_FILEPATH, delimiter="\t", skiprows=107
+    )
+    return vcf_with_header
+
+
+def convert_1kgp_vcf_to_dosage(vcf_with_header: pd.DataFrame) -> pd.DataFrame:
+    """Converts phased genotype vcf to dosage matrix"""
+    #TODO Determine whether we should always expect phased genotypes for reference data for training
+    dosage_vcf = vcf_with_header.replace("0|0", 0)
+    dosage_vcf = dosage_vcf.replace("0|1", 1)
+    dosage_vcf = dosage_vcf.replace("1|0", 1)
+    dosage_vcf = dosage_vcf.replace("1|1", 2)
+    dosage_vcf = dosage_vcf.rename(columns={"#CHROM": "Chromosome", "POS": "Position"}, errors="raise")
+    dosage_vcf = dosage_vcf.set_index("ID", drop=False)
+    return dosage_vcf
+
+
+def process_vcf_for_pc_transformation(dosage_vcf: pd.DataFrame) -> pd.DataFrame:
+    """Process dosage_vcf so that it only includes genotypes for analysis."""
+    genos = dosage_vcf.iloc[:, len(HEADER_COLS) :]
+    genos = genos.set_index(dosage_vcf.index)
+    genos = genos.sort_index()
+    # Check that not all genotypes are the same for QC
+    assert len(set(genos.to_numpy().flatten())) > 1, "All genotypes are the same"
+    return genos
+
+
+def _load_pca_loadings() -> pd.DataFrame:
+    """Load in the gnomad PCs and reformat for PC transformation."""
+    loadings = pd.read_csv(GNOMAD_LOADINGS_PATH, sep="\t")
+    return loadings
+
+
+def process_pca_loadings(loadings: pd.DataFrame) -> pd.DataFrame:
+    """Sanitize additional formatting in Gnomad pc loadings file"""
+    pc_loadings: pd.DataFrame = loadings.copy(deep=True)
+    pc_loadings[["Chromosome", "Position"]] = pc_loadings["locus"].str.split(":", expand=True)
+    # Match variant format of gnomad loadings with 1kgp vcf
+    def get_chr_pos(x):
+        return x["locus"][3:]
+
+    def get_ref_allele(x):
+        return x["alleles"][2]
+
+    def get_alt_allele(x):
+        return x["alleles"][6]
+
+    def get_variant(x):
+        return ":".join([get_chr_pos(x), get_ref_allele(x), get_alt_allele(x)])
+
+    pc_loadings["variant"] = pc_loadings.apply(get_variant, axis=1)
+    # Remove brackets
+    pc_loadings["loadings"] = pc_loadings["loadings"].str[1:-1]
+    # Split PCs and join back
+    gnomadPCs = pc_loadings["loadings"].str.split(",", expand=True)
+    pc_loadings = pc_loadings.join(gnomadPCs)
+    pc_loadings = pc_loadings.set_index("variant")
+    pc_range = slice(6, 36)
+    pc_loadings = pc_loadings.iloc[:, pc_range]
+    pc_loadings = pc_loadings.sort_index()
+    pc_loadings = pc_loadings.astype(float)
+    assert all(pc_loadings.dtypes == np.float64)
+    return pc_loadings
+
+
 def _perform_pca(train_X: pd.DataFrame, test_X: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, PCA]:
     """Perform PCA, checking for good compression."""
     logger.info("Beginning PCA")
@@ -627,7 +748,7 @@ def superpop_predictions_from_pop_probs(pop_probs: pd.DataFrame) -> list[str]:
     """Given a matrix of population probabilities, convert to superpop predictions."""
     superpops = sorted(set(SUPERPOP_FROM_POP.values()))
     superpop_probs = superpop_probs_from_pop_probs(pop_probs)
-    return [superpops[np.argmax(ps)] for ps in superpop_probs]
+    return [superpops[np.argmax(ps)] for i, ps in superpop_probs.iterrows()]
 
 
 def _filter_variants_for_mi(

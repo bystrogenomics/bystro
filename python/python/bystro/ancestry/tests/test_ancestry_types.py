@@ -46,7 +46,9 @@ prob_int = ProbabilityInterval(lower_bound=0.0, upper_bound=1.0)
 
 def test_ProbabilityInterval_accepts_valid_bounds() -> None:
     """Ensure we can instantiate, validate ProbabilityInterval correctly."""
-    ProbabilityInterval(lower_bound=0.1, upper_bound=0.9)
+    prob_int = ProbabilityInterval(lower_bound=0.1, upper_bound=0.9)
+    assert type(prob_int.lower_bound) is float  # for msgspec serialization
+    assert type(prob_int.upper_bound) is float
 
 
 def test_ProbabilityInterval_rejects_bad_bounds() -> None:
@@ -56,7 +58,14 @@ def test_ProbabilityInterval_rejects_bad_bounds() -> None:
     with pytest.raises(AttrValidationError):
         ProbabilityInterval(lower_bound=-2, upper_bound=1.1)
 
-    with pytest.raises(AttrValidationError):
+    err_msg = (
+        "Lower bound must be less than or equal to upper bound.  "
+        "Got: lower_bound=1.0, upper_bound=0.0 instead."
+    )
+    with pytest.raises(
+        AttrValidationError,
+        match=err_msg,
+    ):
         ProbabilityInterval(lower_bound=1, upper_bound=0)
 
     with pytest.raises(FrozenInstanceError):
@@ -139,12 +148,13 @@ def test_SuperpopVector_is_frozen() -> None:
 
 
 def test_AncestryResult_accepts_valid_args() -> None:
-    AncestryResult(
+    ancestry_result = AncestryResult(
         sample_id="my_sample_id",
         populations=PopulationVector(**pop_kwargs),
         superpops=SuperpopVector(**superpop_kwargs),
         missingness=0.5,
     )
+    assert type(ancestry_result.missingness) is float
 
 
 def test_AncestryResult_rejects_invalid_missingness() -> None:
