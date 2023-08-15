@@ -55,7 +55,6 @@ def signup(args: argparse.Namespace, print_result=True):
 
     res = response.json()
 
-    # # Here you would actually make an API call to login. For now, we'll simulate.
     save_state(
         {
             TOKEN_KEY: res[TOKEN_KEY],
