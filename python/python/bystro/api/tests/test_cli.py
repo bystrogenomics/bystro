@@ -176,7 +176,7 @@ def test_get_job_list(mocker):
         ),
     )
     mocker.patch(
-        "requests.get", return_value=mocker.Mock(status_code=200, json=lambda: [])
+        "requests.get", return_value=mocker.Mock(status_code=200, json=lambda: []) # noqa: PIE807
     )
 
     args = SimpleNamespace(dir="./", type="completed", id=None)

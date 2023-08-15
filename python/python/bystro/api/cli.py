@@ -1,8 +1,5 @@
-#!/usr/bin/env python3
-
 import argparse
 import json
-from multiprocessing import Value
 import os
 
 import requests
@@ -160,7 +157,7 @@ def get_jobs(args: argparse.Namespace, print_result=True):
         jobs["config"] = json.loads(jobs["config"])
 
     if print_result:
-        print(f"\nJob(s) fetched successfully: \n")
+        print("\nJob(s) fetched successfully: \n")
         print(json.dumps(jobs, indent=4))
         print("\n")
 
@@ -185,7 +182,7 @@ def create_job(args: argparse.Namespace, print_result=True):
         files.append(
             (
                 "file",
-                (os.path.basename(file), open(file, "rb"), "application/octet-stream"),
+                (os.path.basename(file), open(file, "rb"), "application/octet-stream"), # noqa: SIM115
             )
         )
 
@@ -196,11 +193,12 @@ def create_job(args: argparse.Namespace, print_result=True):
 
     if response.status_code != 200:
         raise RuntimeError(
-            f"Job creation failed with response status: {response.status_code}. Error: \n{response.text}\n"
+            f"Job creation failed with response status: {response.status_code}.\
+                Error: \n{response.text}\n"
         )
 
     if print_result:
-        print(f"\nJob creation successful:\n")
+        print("\nJob creation successful:\n")
         print(json.dumps(response.json(), indent=4))
         print("\n")
 
@@ -219,7 +217,8 @@ def get_user(args, print_result=True):
 
     if response.status_code != 200:
         raise RuntimeError(
-            f"Fetching profile failed with response status: {response.status_code}. Error: \n{response.text}\n"
+            f"Fetching profile failed with response status: {response.status_code}.\
+                Error: \n{response.text}\n"
         )
 
     if print_result:
