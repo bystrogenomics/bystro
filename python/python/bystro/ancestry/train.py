@@ -568,24 +568,26 @@ def restrict_loadings_variants_to_vcf(
     var_overlap = pc_loadings.index.intersection(genos.index)
     pc_loadings_overlap = pc_loadings[pc_loadings.index.isin(var_overlap)]
     genos_overlap = genos[genos.index.isin(var_overlap)]
+    #Transpose genos_overlap
+    genos_overlap_transpose = genos_overlap.T
     # Ensure that genos transpose and pc_loadings have corresponding shape and vars
-    print("genos_overlap.index", genos_overlap.index)
-    print(pc_loadings_overlap.index)
-    assert genos_overlap.T.shape[1] == pc_loadings_overlap.shape[0]
-    assert set(genos_overlap.index) == set(pc_loadings_overlap.index)
+    assert genos_overlap_transpose.shape[1] == pc_loadings_overlap.shape[0]
+    assert set(genos_overlap_transpose.columns) == set(pc_loadings_overlap.index)
     assert (genos_overlap.columns == genos.columns).all()
-    assert "SampleID1" in genos_overlap.columns
     # Record amount of overlap
     num_var_overlap = len(var_overlap)
-    return pc_loadings_overlap, genos_overlap, num_var_overlap
+    return pc_loadings_overlap, genos_overlap_transpose, num_var_overlap
 
 
-def apply_pca_transform(pc_loadings_overlap: pd.DataFrame, genos_overlap: pd.DataFrame) -> pd.DataFrame:
+def apply_pca_transform(
+    pc_loadings_overlap: pd.DataFrame,
+    genos_overlap_transpose: pd.DataFrame
+) -> pd.DataFrame:
     """Transform vcf with genotypes in dosage format with PCs loadings from gnomad PCA."""
     # Dot product
-    transformed_data = genos_overlap.T @ pc_loadings_overlap
+    transformed_data = genos_overlap_transpose @ pc_loadings_overlap
     # Add the IDs back on to PCs
-    KGP_index = genos_overlap.T.index
+    KGP_index = genos_overlap_transpose.index
     transformed_data_with_ids = pd.DataFrame(transformed_data, index=KGP_index)
     # Add PC labels
     transformed_data_with_ids.columns = pd.Index(["PC" + str(i) for i in range(1, 31)])
