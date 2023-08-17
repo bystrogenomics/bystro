@@ -562,7 +562,7 @@ def process_pca_loadings(loadings: pd.DataFrame) -> pd.DataFrame:
 
 def restrict_loadings_variants_to_vcf(
     pc_loadings: pd.DataFrame, genos: pd.DataFrame
-) -> tuple[pd.DataFrame, pd.DataFrame, int]:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Restrict variant list to overlap between gnomad loadings and reference vcf
     and return versions only including the overlapping variants."""
     # IGSR version of 1kgp is current reference vcf
