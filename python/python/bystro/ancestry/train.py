@@ -577,7 +577,8 @@ def restrict_loadings_variants_to_vcf(
     assert (genos_overlap.columns == genos.columns).all()
     # Record amount of overlap
     num_var_overlap = len(var_overlap)
-    return pc_loadings_overlap, genos_overlap_transpose, num_var_overlap
+    logger.info("Number of overlapping variants: %d", num_var_overlap)
+    return pc_loadings_overlap, genos_overlap_transpose
 
 
 def apply_pca_transform(

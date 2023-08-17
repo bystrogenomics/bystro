@@ -305,7 +305,7 @@ def test_restrict_loadings_variants_to_vcf():
         data=sim_pcs, index=processed_sim_vcf.index, columns=[f"PC{i+1}" for i in range(num_pcs)]
     )
     # Run restrict_loadings with sim data
-    pc_loadings_overlap, genos_overlap_transpose, num_var_overlap = restrict_loadings_variants_to_vcf(
+    pc_loadings_overlap, genos_overlap_transpose = restrict_loadings_variants_to_vcf(
         sim_loadings, processed_sim_vcf
     )
     # Check for expected columns/indices
@@ -314,10 +314,6 @@ def test_restrict_loadings_variants_to_vcf():
     expected_index_genos_transpose = ["SampleID1", "SampleID2"]
     for sample in expected_index_genos_transpose:
         assert sample in genos_overlap_transpose.index
-    # Check that the output DataFrames have the expected number of rows
-    expected_num_rows = num_var_overlap
-    assert pc_loadings_overlap.shape[0] == expected_num_rows
-    assert genos_overlap_transpose.shape[1] == expected_num_rows
     # Check that the variant IDs match up to sorting
     assert set(genos_overlap_transpose.columns) == set(pc_loadings_overlap.index)
 
@@ -336,7 +332,7 @@ def test_apply_pca_transform():
     sim_loadings = pd.DataFrame(
         data=sim_pcs, index=processed_sim_vcf.index, columns=[f"PC{i+1}" for i in range(num_pcs)]
     )
-    pc_loadings_overlap, genos_overlap_transpose, num_var_overlap = restrict_loadings_variants_to_vcf(
+    pc_loadings_overlap, genos_overlap_transpose = restrict_loadings_variants_to_vcf(
         sim_loadings, processed_sim_vcf
     )
     # Call function to test
