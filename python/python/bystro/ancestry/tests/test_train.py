@@ -308,11 +308,10 @@ def test_restrict_loadings_variants_to_vcf():
     pc_loadings_overlap, genos_overlap_transpose, num_var_overlap = restrict_loadings_variants_to_vcf(
         sim_loadings, processed_sim_vcf
     )
-    # Check for expected columns
-    expected_columns_loadings = ["PC1", "PC2"]
+    # Check for expected columns/indices
+    expected_columns_loadings = [f"PC{i+1}" for i in range(num_pcs)]
+    assert set(expected_columns_loadings) == set(pc_loadings_overlap.columns)
     expected_index_genos_transpose = ["SampleID1", "SampleID2"]
-    for column in expected_columns_loadings:
-        assert column in pc_loadings_overlap.columns
     for sample in expected_index_genos_transpose:
         assert sample in genos_overlap_transpose.index
     # Check that the output DataFrames have the expected number of rows
