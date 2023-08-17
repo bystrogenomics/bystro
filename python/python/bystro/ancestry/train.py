@@ -587,12 +587,7 @@ def apply_pca_transform(
     """Transform vcf with genotypes in dosage format with PCs loadings from gnomad PCA."""
     # Dot product
     transformed_data = genos_overlap_transpose @ pc_loadings_overlap
-    # Add the IDs back on to PCs
-    KGP_index = genos_overlap_transpose.index
-    transformed_data_with_ids = pd.DataFrame(transformed_data, index=KGP_index)
-    # Add PC labels
-    transformed_data_with_ids.columns = pd.Index(["PC" + str(i) for i in range(1, 31)])
-    return transformed_data_with_ids
+    return transformed_data
 
 
 def _perform_pca(train_X: pd.DataFrame, test_X: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, PCA]:
