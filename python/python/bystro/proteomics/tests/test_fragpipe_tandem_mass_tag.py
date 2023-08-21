@@ -100,11 +100,11 @@ def test_load_tandem_mass_tag_dataset():
 
 def test__check_df_cols():
     err_msg = re.escape(
-        "expected dataframe: to begin with cols: "
-        "['Index', 'NumberPSM', 'ProteinID', 'MaxPepProb', 'ReferenceIntensity'],"
-        " got cols: "
-        "Index(['plex', 'channel', 'sample', 'sample_name', 'condition', 'replicate'],"
-        " dtype='object') instead."
+        r"expected dataframe to begin with cols: "
+        r"['Index', 'NumberPSM', 'ProteinID', 'MaxPepProb', 'ReferenceIntensity'],"
+        r" got cols: "
+        r"Index(['plex', 'channel', 'sample', 'sample_name', 'condition', 'replicate'],"
+        r" dtype='object') instead."
     )
     with pytest.raises(ValueError, match=err_msg):
         _check_df_cols(raw_annotation_df, ABUNDANCE_COLS)
