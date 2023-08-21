@@ -302,7 +302,7 @@ def test_restrict_loadings_variants_to_vcf():
     num_pcs = 30
     sim_pcs = np.random.random((num_samples, num_pcs))
     sim_loadings = pd.DataFrame(
-        data=sim_pcs, index=processed_sim_vcf.index, columns=[f"PC{i+1}" for i in range(num_pcs)]
+        data=sim_pcs, index=processed_sim_vcf.columns, columns=[f"PC{i+1}" for i in range(num_pcs)]
     )
     # Run restrict_loadings with sim data
     pc_loadings_overlap, genos_overlap_transpose = restrict_loadings_variants_to_vcf(
@@ -330,7 +330,7 @@ def test_apply_pca_transform():
     num_pcs = 30
     sim_pcs = np.random.random((num_samples, num_pcs))
     sim_loadings = pd.DataFrame(
-        data=sim_pcs, index=processed_sim_vcf.index, columns=[f"PC{i+1}" for i in range(num_pcs)]
+        data=sim_pcs, index=processed_sim_vcf.columns, columns=[f"PC{i+1}" for i in range(num_pcs)]
     )
     pc_loadings_overlap, genos_overlap_transpose = restrict_loadings_variants_to_vcf(
         sim_loadings, processed_sim_vcf
