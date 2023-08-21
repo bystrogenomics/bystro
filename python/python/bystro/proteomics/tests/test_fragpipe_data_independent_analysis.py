@@ -1,5 +1,6 @@
 from io import StringIO
 import numpy as np
+import pandas as pd
 
 from bystro.proteomics.fragpipe_data_independent_analysis import DataIndependentAnalysisDataset
 
