@@ -1,6 +1,9 @@
+"""Load and prep fragpipe tandem mass Tag datasets."""
+
 from dataclasses import dataclass
+from typing import TypeVar
+
 import pandas as pd
-from typing import TypeVar, Tuple
 
 ABUNDANCE_COLS = ["Index", "NumberPSM", "ProteinID", "MaxPepProb", "ReferenceIntensity"]
 ANNOTATION_COLS = ["plex", "channel", "sample", "sample_name", "condition", "replicate"]
@@ -10,20 +13,25 @@ T = TypeVar("T")
 
 @dataclass(frozen=True)
 class TMTDataset:
+    """Represent a Fragpipe Tandem Mass Tag dataset."""
+
     abundance_df: pd.DataFrame
     annotation_df: pd.DataFrame
 
 
-def is_prefix(xs: list[T], ys: list[T]) -> bool:
-    for x, y in zip(xs, ys, strict=False):
-        if x != y:
-            return False
-    return True
+def _check_df_cols(df: pd.DataFrame, expected_cols: list[str]) -> None:
+    actual_cols = df.columns
+    if not all(x == y for x, y in zip(expected_cols, actual_cols, strict=False)):
+        err_msg = (
+            f"expected dataframe: to begin with cols: {expected_cols}, got cols: {actual_cols} instead."
+        )
+        raise ValueError(err_msg)
 
 
-def parse_abundance_df(abundance_df: pd.DataFrame) -> pd.DataFrame:
-    if not is_prefix(ABUNDANCE_COLS, abundance_df.columns):
-        raise ValueError
+def _prep_abundance_df(abundance_df: pd.DataFrame) -> pd.DataFrame:
+    """Prep abundance_df, setting index and normalizing abundances by ReferenceIntensity."""
+    # mypy doesn't know if index is str-valued yet, so we have to cast explicitly
+    _check_df_cols(abundance_df, ABUNDANCE_COLS)
     abundance_df = abundance_df.set_index("Index")
     first_sample_column_idx = abundance_df.columns.to_list().index("ReferenceIntensity") + 1
     sample_columns = abundance_df.columns[first_sample_column_idx:]
@@ -32,18 +40,16 @@ def parse_abundance_df(abundance_df: pd.DataFrame) -> pd.DataFrame:
     return abundance_df
 
 
-def parse_annotation_df(annotation_df: pd.DataFrame) -> pd.DataFrame:
-    if not is_prefix(ANNOTATION_COLS, annotation_df.columns):
-        raise ValueError
-
+def _prep_annotation_df(annotation_df: pd.DataFrame) -> pd.DataFrame:
+    """Prep annotation df, setting index."""
+    _check_df_cols(annotation_df, ANNOTATION_COLS)
     return annotation_df.set_index("sample")
 
 
-def parse_tandem_mass_tag_files(
-    abundance_filename: str, annotation_filename: str
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def load_tandem_mass_tag_dataset(abundance_filename: str, annotation_filename: str) -> TMTDataset:
+    """Load and prep Fragpipe tandem mass tag datasets."""
     raw_abundance_df = pd.read_csv(abundance_filename, sep="\t")
     raw_annotation_df = pd.read_csv(annotation_filename, sep="\t")
-    abundance_df = parse_abundance_df(raw_abundance_df)
-    annotation_df = parse_annotation_df(raw_annotation_df)
+    abundance_df = _prep_abundance_df(raw_abundance_df)
+    annotation_df = _prep_annotation_df(raw_annotation_df)
     return TMTDataset(abundance_df, annotation_df)
