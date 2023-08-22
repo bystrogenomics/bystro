@@ -1,6 +1,4 @@
 from io import StringIO
-import pytest
-import re
 
 import pandas as pd
 from bystro.proteomics.fragpipe_tandem_mass_tag import (

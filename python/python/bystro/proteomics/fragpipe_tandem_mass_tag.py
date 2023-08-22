@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 import pandas as pd
 
-from bystro.proteomics.fragpipe_utils import ANNOTATION_COLS, prep_annotation_df, check_df_cols
+from bystro.proteomics.fragpipe_utils import prep_annotation_df, check_df_cols
 
 ABUNDANCE_COLS = ["Index", "NumberPSM", "ProteinID", "MaxPepProb", "ReferenceIntensity"]
 
