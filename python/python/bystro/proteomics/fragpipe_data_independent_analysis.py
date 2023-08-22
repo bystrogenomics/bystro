@@ -1,4 +1,4 @@
-"""Load and prep fragpipe tandem mass Tag datasets."""
+"""Load and prep fragpipe data-indepdent analysis (DIA) datasets."""
 
 from dataclasses import dataclass
 
