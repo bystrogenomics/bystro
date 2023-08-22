@@ -1,9 +1,9 @@
 """Load and prep fragpipe tandem mass Tag datasets."""
 
 from dataclasses import dataclass
-import pandas as pd
 
-from bystro.proteomics.fragpipe_utils import prep_annotation_df, check_df_cols
+import pandas as pd
+from bystro.proteomics.fragpipe_utils import check_df_cols, prep_annotation_df
 
 ABUNDANCE_COLS = ["Index", "NumberPSM", "ProteinID", "MaxPepProb", "ReferenceIntensity"]
 
