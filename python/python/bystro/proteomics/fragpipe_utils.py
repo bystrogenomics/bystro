@@ -1,9 +1,12 @@
+"""Provide various utilities for Fragpipe analysis."""
+
 import pandas as pd
 
 ANNOTATION_COLS = ["plex", "channel", "sample", "sample_name", "condition", "replicate"]
 
 
 def check_df_cols(df: pd.DataFrame, expected_cols: list[str]) -> None:
+    """Check that df cols contain expected cols as a prefix."""
     actual_cols = df.columns
     if not all(x == y for x, y in zip(expected_cols, actual_cols, strict=False)):
         err_msg = (
@@ -13,6 +16,6 @@ def check_df_cols(df: pd.DataFrame, expected_cols: list[str]) -> None:
 
 
 def prep_annotation_df(annotation_df: pd.DataFrame) -> pd.DataFrame:
-    """Prep annotation df, setting index."""
+    """Prep annotation df, using 'sample' column as index."""
     check_df_cols(annotation_df, ANNOTATION_COLS)
     return annotation_df.set_index("sample")
