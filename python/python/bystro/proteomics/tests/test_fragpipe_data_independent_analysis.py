@@ -1,8 +1,10 @@
 from io import StringIO
 import numpy as np
 import pandas as pd
+from pandas.testing import assert_frame_equal
 
-from bystro.proteomics.fragpipe_data_independent_analysis import DataIndependentAnalysisDataset
+from bystro.proteomics.fragpipe_data_independent_analysis import load_data_independent_analysis_dataset
+from bystro.proteomics.tests.test_annotation_df import raw_annotation_df, expected_annotation_df
 
 raw_pg_matrix_df = pd.DataFrame(
     {
@@ -36,4 +38,7 @@ raw_pg_matrix_df = pd.DataFrame(
 
 
 def test_parse_data_independent_analysis_dataset():
-    pg_matrix_handle = StringIO(raw_pg_matrix_df.to_csv(sep="\t"))
+    pg_matrix_handle = StringIO(raw_pg_matrix_df.to_csv(index=None, sep="\t"))
+    annotation_handle = StringIO(raw_annotation_df.to_csv(index=None, sep="\t"))
+    dia_dataset = load_data_independent_analysis_dataset(pg_matrix_handle, annotation_handle)
+    assert_frame_equal(expected_annotation_df, dia_dataset.annotation_df)
