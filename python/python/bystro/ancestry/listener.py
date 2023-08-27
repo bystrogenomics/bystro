@@ -1,7 +1,6 @@
 """Provide a worker for the ancestry model."""
 import argparse
 import logging
-import os
 from collections.abc import Callable, Collection
 from pathlib import Path
 
@@ -19,27 +18,20 @@ from bystro.ancestry.inference import AncestryModel, infer_ancestry
 from bystro.ancestry.train import parse_vcf
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
 from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, get_progress_reporter, listen
+from bystro.utils.timer import Timer
 
-logging.basicConfig(filename="ancestry_listener.log", level=logging.INFO)
+logging.basicConfig(
+    filename="ancestry_listener.log",
+    level=logging.DEBUG,
+    format="%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 logger = logging.getLogger()
 
 ANCESTRY_TUBE = "ancestry"
 ANCESTRY_BUCKET = "bystro-ancestry"
 PCA_FILE = "pca.csv"
 RFC_FILE = "rfc.skop"
-
-
-def _check_vcf_dir_access(vcf_dir: str) -> None:
-    try:
-        os.listdir(vcf_dir)
-    except FileNotFoundError as err:
-        err_msg = (
-            f"Couldn't access VCF dir {vcf_dir}, "
-            "will not be able to read VCFs in order to report ancestry results. "
-            "Check whether EFS is mounted correctly?"
-        )
-        raise FileNotFoundError(err_msg) from err
-    logger.info("Successfully checked EFS on %s", vcf_dir)
 
 
 def _get_model_from_s3(
@@ -75,16 +67,16 @@ def _load_queue_conf(queue_conf_path: str) -> QueueConf:
     return QueueConf(addresses=beanstalk_conf["addresses"], tubes=beanstalk_conf["tubes"])
 
 
-def _load_vcf(full_vcf_path: Path, variants: Collection[str]) -> pd.DataFrame:
+def _load_vcf(vcf_path: Path, variants: Collection[str]) -> pd.DataFrame:
     """Load vcf, return dosages as df where index is sample_ids, columns are variants."""
     # Currently the implementation is trivial, but we're stubbing this
     # out now in order to encapsulate future volatility arising from EFS handling, &c.
-    logger.info("loading vcf from %s", full_vcf_path)
-    return parse_vcf(full_vcf_path, variants, return_exact_variants=True)
+    logger.info("loading vcf from %s", vcf_path)
+    return parse_vcf(vcf_path, variants, return_exact_variants=True)
 
 
 def handler_fn_factory(
-    ancestry_model: AncestryModel, vcf_dir: Path
+    ancestry_model: AncestryModel,
 ) -> Callable[[ProgressPublisher, AncestryJobData], AncestryResponse]:
     """Return partialed handler_fn with ancestry_model loaded."""
 
@@ -97,9 +89,11 @@ def handler_fn_factory(
         # simply threading it through for later.
         _reporter = get_progress_reporter(publisher)
         logger.debug("entering handler_fn with: %s", ancestry_job_data)
-        vcf_path = ancestry_job_data.ancestry_submission.vcf_path
-        full_vcf_path = vcf_dir / vcf_path
-        genotypes = _load_vcf(full_vcf_path, variants=ancestry_model.pca_loadings_df.index)
+        vcf_path = Path(ancestry_job_data.ancestry_submission.vcf_path)
+        logger.debug("loading VCF %s", vcf_path)
+        with Timer() as timer:
+            genotypes = _load_vcf(vcf_path, variants=ancestry_model.pca_loadings_df.index)
+        logger.debug("finished loading VCF %s in %f seconds", vcf_path, timer.elapsed_time)
         return infer_ancestry(ancestry_model, genotypes, vcf_path)
 
     return handler_fn
@@ -120,7 +114,7 @@ def completed_msg_fn(
     if ancestry_submission.vcf_path != ancestry_response.vcf_path:
         err_msg = (
             f"Ancestry submission filename {ancestry_submission.vcf_path} "
-            "doesn't match response filename {ancestry_response.vcf_path}: this is a bug."
+            f"doesn't match response filename {ancestry_response.vcf_path}: this is a bug."
         )
         raise ValueError(err_msg)
     logger.debug("completed ancestry inference for: %s", ancestry_response)
@@ -129,9 +123,9 @@ def completed_msg_fn(
     )
 
 
-def main(ancestry_model: AncestryModel, vcf_dir: Path, queue_conf: QueueConf) -> None:
+def main(ancestry_model: AncestryModel, queue_conf: QueueConf) -> None:
     """Run ancestry listener."""
-    handler_fn_with_models = handler_fn_factory(ancestry_model, vcf_dir)
+    handler_fn_with_models = handler_fn_factory(ancestry_model)
     logger.info(
         "Ancestry worker is listening on addresses: %s, tube: %s...", queue_conf.addresses, ANCESTRY_TUBE
     )
@@ -153,18 +147,10 @@ if __name__ == "__main__":
         help="Path to the beanstalkd queue config yaml file (e.g beanstalk1.yml)",
         required=True,
     )
-    parser.add_argument(
-        "--vcf_dir",
-        type=Path,
-        help="Path to the beanstalkd queue config yaml file (e.g beanstalk1.yml)",
-        required=True,
-    )
-
     args = parser.parse_args()
 
-    _check_vcf_dir_access(args.vcf_dir)
     s3_client = boto3.client("s3")
     ancestry_model = _get_model_from_s3(s3_client)
     queue_conf = _load_queue_conf(args.queue_conf)
 
-    main(ancestry_model, args.vcf_dir, queue_conf)
+    main(ancestry_model, queue_conf)
