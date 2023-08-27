@@ -170,7 +170,7 @@ class PPCADropoutpt(PPCApt):
                 * torch.matmul(z_samples[:, : self.n_supervised], one_s)
                 + B_
             )
-            if task == 'regression':
+            if task == "regression":
                 loss_y = supervision_loss(y_hat, y_batch)
             else:
                 loss_y = supervision_loss(sigm(y_hat), y_batch)
