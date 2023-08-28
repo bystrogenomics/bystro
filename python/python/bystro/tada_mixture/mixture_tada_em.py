@@ -30,9 +30,9 @@ None
 """
 import numpy as np
 from copy import deepcopy
-import scipy.stats as st
-from sklearn.mixture import GaussianMixture
-from tqdm import trange
+import scipy.stats as st # type: ignore
+from sklearn.mixture import GaussianMixture # type: ignore
+from tqdm import trange # type: ignore
 
 import torch
 from torch import nn
