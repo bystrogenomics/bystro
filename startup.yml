@@ -18,3 +18,8 @@ apps:
     interpreter: 'python'
     args:
       --queue_conf config/beanstalk.yml
+  - name: BystroProteomicsServer
+    script: python/python/bystro/proteomics/proteomics_listener.py
+    interpreter: 'python'
+    args:
+      --queue_conf config/beanstalk.yml

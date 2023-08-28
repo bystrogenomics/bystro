@@ -1,5 +1,7 @@
 """Classify genotypes at inference time."""
+import logging
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -14,6 +16,9 @@ from bystro.ancestry.ancestry_types import (
 )
 from bystro.ancestry.asserts import assert_equals
 from bystro.ancestry.train import POPS, SUPERPOP_FROM_POP, SUPERPOPS
+from bystro.utils.timer import Timer
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -37,8 +42,14 @@ class AncestryModel:
 
     def predict_proba(self, genotypes: pd.DataFrame) -> pd.DataFrame:
         """Predict population probabilities from dosage matrix."""
-        Xpc = genotypes @ self.pca_loadings_df
-        probs = self.rfc.predict_proba(Xpc)
+        logger.debug("computing PCA transformation")
+        with Timer() as timer:
+            Xpc = genotypes @ self.pca_loadings_df
+        logger.debug("finished computing PCA transformation in %f seconds", timer.elapsed_time)
+        logger.debug("computing RFC classification")
+        with Timer() as timer:
+            probs = self.rfc.predict_proba(Xpc)
+        logger.debug("finished computing RFC classification in %f seconds", timer.elapsed_time)
         return pd.DataFrame(probs, index=genotypes.index, columns=POPS)
 
 
@@ -52,7 +63,7 @@ def _fill_missing_data(genotypes: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series
 
 
 def _package_ancestry_response_from_pop_probs(
-    vcf_path: str, pop_probs_df: pd.DataFrame, missingnesses: pd.Series
+    vcf_path: Path, pop_probs_df: pd.DataFrame, missingnesses: pd.Series
 ) -> AncestryResponse:
     """Fill out AncestryResponse using filepath, numerical model output and sample-wise missingnesses."""
     superpop_probs_df = _superpop_probs_from_pop_probs(pop_probs_df)
@@ -87,17 +98,20 @@ def _package_ancestry_response_from_pop_probs(
                 missingness=missingnesses[sample_id],
             )
         )
-    return AncestryResponse(vcf_path=vcf_path, results=ancestry_results)
+    return AncestryResponse(vcf_path=str(vcf_path), results=ancestry_results)
 
 
 # TODO: implement with ray
 def infer_ancestry(
-    ancestry_model: AncestryModel, genotypes: pd.DataFrame, vcf_path: str
+    ancestry_model: AncestryModel, genotypes: pd.DataFrame, vcf_path: Path
 ) -> AncestryResponse:
     """Run an ancestry job."""
     # TODO: main ancestry model logic goes here.  Just stubbing out for now.
 
-    imputed_genotypes, missingnesses = _fill_missing_data(genotypes)
+    logger.debug("Filling missing data for VCF: %s", vcf_path)
+    with Timer() as timer:
+        imputed_genotypes, missingnesses = _fill_missing_data(genotypes)
+    logger.debug("Finished filling missing data for VCF in %f seconds", timer.elapsed_time)
     pop_probs_df = ancestry_model.predict_proba(imputed_genotypes)
     return _package_ancestry_response_from_pop_probs(vcf_path, pop_probs_df, missingnesses)
 
