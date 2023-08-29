@@ -11,7 +11,7 @@ Methods
 None
 """
 import abc
-import cloudpickle
+import cloudpickle # type: ignore
 from copy import deepcopy
 
 

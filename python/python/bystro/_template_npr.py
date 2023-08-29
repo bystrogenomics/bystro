@@ -15,8 +15,8 @@ _BaseNPRModel(object)
 
 """
 import abc
-import cloudpickle
-import numpyro
+import cloudpickle # type: ignore
+import numpyro # type: ignore
 from copy import deepcopy
 
 
