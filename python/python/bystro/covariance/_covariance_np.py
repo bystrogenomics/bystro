@@ -11,7 +11,7 @@ EmpiricalCovariance(BaseCovariance)
 """
 import numpy as np
 from ._base_covariance import BaseCovariance
-from ..utils._misc import fill_dict
+from copy import deepcopy
 
 
 class EmpiricalCovariance(BaseCovariance):
@@ -91,4 +91,6 @@ class BayesianCovariance(BaseCovariance):
             "type": "inverse-wishart",
             "iw_params": {"pnu": 2, "sigma": 1.0},
         }
-        return fill_dict(prior_options, default_options)
+        pops = deepcopy(default_options)
+        pops.update(prior_options)
+        return pops
