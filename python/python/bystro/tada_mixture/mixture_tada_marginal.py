@@ -18,7 +18,7 @@ postdoc even though I got a PhD in statistics. Meh
 Objects
 -------
 MVTadaPoissonML(K=4,training_options={})
-    This fits a standard poisson latent variable model.
+    This fits a standard Poisson latent variable model.
 
 Methods
 -------
@@ -27,19 +27,18 @@ None
 """
 import numpy as np
 import torch
-from tqdm import trange # type: ignore 
+from tqdm import trange  # type: ignore
 from torch import nn
 from torch.distributions import Dirichlet
-from copy import deepcopy
-import scipy.stats as st # type: ignore 
-from sklearn.mixture import GaussianMixture # type: ignore 
+import scipy.stats as st  # type: ignore
+from sklearn.mixture import GaussianMixture  # type: ignore
 from torch.nn import PoissonNLLLoss
 
 
 class MVTadaPoissonML(object):
-    def __init__(self, K=4, training_options={}):
+    def __init__(self, K=4, training_options=None):
         """
-        This is a Product Poisson latent variable model.
+        This is a product Poisson latent variable model.
 
         Parameters
         ----------
@@ -119,9 +118,7 @@ class MVTadaPoissonML(object):
             mu = 0.01
             pi_ = smax(pi_logits) * mu + (1 - mu) / K
 
-            loss_logits = 0.001 * mse(
-                pi_logits, torch.zeros(K)
-            )  
+            loss_logits = 0.001 * mse(pi_logits, torch.zeros(K))
             loss_prior_pi = -1.0 * m_d.log_prob(pi_) / N
 
             loglikelihood_each = [
@@ -130,7 +127,7 @@ class MVTadaPoissonML(object):
 
             loglikelihood_sum = [
                 torch.sum(mat, axis=1) for mat in loglikelihood_each
-            ]  
+            ]
 
             loglikelihood_stack = torch.stack(loglikelihood_sum)
             loglikelihood_components = torch.transpose(
@@ -206,11 +203,12 @@ class MVTadaPoissonML(object):
         -------
         tops : dict
         """
+        if training_options is None:
+            training_options = {}
         default_options = {
             "n_iterations": 30000,
             "batch_size": 200,
             "learning_rate": 5e-5,
         }
-        tops = deepcopy(default_options)
-        tops.update(training_options)
+        tops = {**default_options, **training_options}
         return tops
