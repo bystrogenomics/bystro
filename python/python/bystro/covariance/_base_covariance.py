@@ -95,7 +95,6 @@ from numpy import linalg as la
 from datetime import datetime as dt
 import pytz
 
-
 class BaseCovariance(object):
     """
     This object basically contains all the methods asides for fitting
