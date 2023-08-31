@@ -90,7 +90,7 @@ class MVTadaPoissonML(object):
             model.fit(data)
             Lamb_init = model.means_.astype(np.float32)
         if pi_init is None:
-            pi_init = rng.normal(K).astype(np.float32)
+            pi_init = rng.dirichlet(np.ones(K)).astype(np.float32)
         lambda_latent = torch.tensor(Lamb_init, requires_grad=True)
         pi_logits = torch.tensor(pi_init, requires_grad=True)
 
