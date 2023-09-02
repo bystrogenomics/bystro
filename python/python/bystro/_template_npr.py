@@ -15,13 +15,12 @@ _BaseNPRModel(object)
 
 """
 import abc
-import cloudpickle # type: ignore
-import numpyro # type: ignore
-from copy import deepcopy
+import cloudpickle  # type: ignore
+import numpyro  # type: ignore
 
 
 class _BaseNPRModel(object):
-    def __init__(self, mcmc_options={}, hp_options={}):
+    def __init__(self, mcmc_options=None, hp_options=None):
         """
 
         Parameters
@@ -31,6 +30,10 @@ class _BaseNPRModel(object):
         -------
 
         """
+        if mcmc_options is None:
+            mcmc_options = {}
+        if hp_options is None:
+            hp_options = {}
         self.mcmc_options = self._fill_mcmc_options(mcmc_options)
         self.hp_options = self._fill_hp_options(hp_options)
         self.samples = None
@@ -101,12 +104,11 @@ class _BaseNPRModel(object):
             "num_warmup": 500,
             "num_samples": 2000,
         }
-        mcmc_opts = deepcopy(default_options)
-        mcmc_opts.update(mcmc_options)
-        if mcmc_opts["num_chains"] > 1:
+        mopts = {**default_options, **mcmc_options}
+        if mopts["num_chains"] > 1:
             print("You tried to set num_chains>1. This has been ignored.")
-            mcmc_opts["num_chains"] = 1
-        return mcmc_opts
+            mopts["num_chains"] = 1
+        return mopts
 
     @abc.abstractmethod
     def _fill_hp_options(self, hp_options):

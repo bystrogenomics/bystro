@@ -11,16 +11,17 @@ Methods
 None
 """
 import abc
-import cloudpickle # type: ignore
-from copy import deepcopy
+import cloudpickle  # type: ignore
 
 
 class _BaseSGDModel(object):
-    def __init__(self, training_options={}):
+    def __init__(self, training_options=None):
         """
         The base class of a model relying on stochastic gradient descent for
         inference
         """
+        if training_options is None:
+            training_options = {}
         self.training_options = self._fill_training_options(training_options)
 
     @abc.abstractmethod
@@ -75,8 +76,7 @@ class _BaseSGDModel(object):
         training_opts : dict
         """
         default_options = {"n_iterations": 5000}
-        training_opts = deepcopy(default_options)
-        training_opts.update(training_options)
+        training_opts = {**default_options, **training_options}
         return training_opts
 
     @abc.abstractmethod
