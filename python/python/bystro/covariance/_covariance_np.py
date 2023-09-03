@@ -11,7 +11,6 @@ EmpiricalCovariance(BaseCovariance)
 """
 import numpy as np
 from ._base_covariance import BaseCovariance
-from copy import deepcopy
 
 
 class EmpiricalCovariance(BaseCovariance):
@@ -39,13 +38,14 @@ class EmpiricalCovariance(BaseCovariance):
 class BayesianCovariance(BaseCovariance):
     # https://arxiv.org/pdf/1408.4050.pdf#:~:text=Bayesian%20estimation%20of%20a%20covariance,prior%20implemented%20in%20Bayesian%20software.
 
-    def __init__(self, prior_options={}):
+    def __init__(self, prior_options=None):
         """
         This object fits the covariance matrix as the MAP estimator using
         user-defined priors.
         """
         super().__init__()
-
+        if prior_options is None:
+            prior_options = {}
         self.prior_options = self._fill_prior_options(prior_options)
 
     def fit(self, X):
@@ -60,14 +60,11 @@ class BayesianCovariance(BaseCovariance):
         self.N, self.p = X.shape
         p_opts = self.prior_options
         covariance_empirical = np.dot(X.T, X)
-        if p_opts["type"] == "inverse-wishart":
-            nu = p_opts["iw_params"]["pnu"] + self.p
-            cov_prior = p_opts["iw_params"]["sigma"] * np.eye(self.p)
-            posterior_cov = cov_prior + covariance_empirical
-            posterior_nu = nu + self.N
-            self.covariance = posterior_cov / (posterior_nu + self.p + 1)
-        else:
-            raise ValueError("Type %s not implemented" % p_opts["type"])
+        nu = p_opts["iw_params"]["pnu"] + self.p
+        cov_prior = p_opts["iw_params"]["sigma"] * np.eye(self.p)
+        posterior_cov = cov_prior + covariance_empirical
+        posterior_nu = nu + self.N
+        self.covariance = posterior_cov / (posterior_nu + self.p + 1)
 
     def _fill_prior_options(self, prior_options):
         """
@@ -88,9 +85,7 @@ class BayesianCovariance(BaseCovariance):
             sigma : float>0 - cov = sigma*I_p
         """
         default_options = {
-            "type": "inverse-wishart",
             "iw_params": {"pnu": 2, "sigma": 1.0},
         }
-        pops = deepcopy(default_options)
-        pops.update(prior_options)
+        pops = {**default_options,**prior_options}
         return pops

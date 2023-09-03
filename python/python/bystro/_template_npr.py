@@ -19,7 +19,7 @@ import cloudpickle  # type: ignore
 import numpyro  # type: ignore
 
 
-class _BaseNPRModel(object):
+class _BaseNumpyroModel:
     def __init__(self, mcmc_options=None, hp_options=None):
         """
 
