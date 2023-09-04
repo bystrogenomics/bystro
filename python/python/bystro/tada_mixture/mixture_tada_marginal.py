@@ -50,6 +50,8 @@ class MVTadaPoissonML(object):
             The parameters for the inference scheme
         """
         self.K = int(K)
+        if training_options is None:
+            training_options = {}
         self.training_options = self._fill_training_options(training_options)
 
     def fit(self, data, progress_bar=True, Lamb_init=None, pi_init=None):
@@ -98,7 +100,7 @@ class MVTadaPoissonML(object):
         m_d = Dirichlet(torch.tensor(np.ones(self.K) * self.K))
 
         optimizer = torch.optim.SGD(
-            trainable_variables, lr=td["learning_rate"], momentum=0.99
+            trainable_variables, lr=td["learning_rate"], momentum=td["momentum"]
         )
 
         nll = PoissonNLLLoss(full=True, log_input=False, reduction="none")
@@ -123,20 +125,24 @@ class MVTadaPoissonML(object):
 
             loglikelihood_each = [
                 -1 * nll(X_batch, Lambda_[k]) for k in range(K)
-            ]
+            ]  # List of K N x p log likelihoods
 
             loglikelihood_sum = [
                 torch.sum(mat, axis=1) for mat in loglikelihood_each
-            ]
+            ]  # List of K N x 1 log likelihoods
 
             loglikelihood_stack = torch.stack(loglikelihood_sum)
+            # Matrix of N x k log likelihoods
             loglikelihood_components = torch.transpose(
                 loglikelihood_stack, 0, 1
-            ) + torch.log(pi_)
+            ) + torch.log(
+                pi_
+            )  # Matrix of Nxk posteriors
             loglikelihood_marg = torch.logsumexp(
                 loglikelihood_components, dim=1
-            )
+            )  # Vector of N x 1 marginal posteriors
             loss_likelihood = -1 * torch.mean(loglikelihood_marg)
+            # Average marginal likelihood
 
             loss = loss_logits + loss_prior_pi + loss_likelihood
             self.losses_likelihoods[i] = loss_likelihood.detach().numpy()
@@ -203,12 +209,11 @@ class MVTadaPoissonML(object):
         -------
         tops : dict
         """
-        if training_options is None:
-            training_options = {}
         default_options = {
             "n_iterations": 30000,
             "batch_size": 200,
             "learning_rate": 5e-5,
+            "momentum": 0.99,
         }
         tops = {**default_options, **training_options}
         return tops

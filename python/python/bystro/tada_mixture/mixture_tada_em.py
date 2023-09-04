@@ -53,6 +53,8 @@ class MVTadaPoissonEM:
             The parameters for the inference scheme
         """
         self.K = int(K)
+        if training_options is None:
+            training_options = {}
         self.training_options = self._fill_training_options(training_options)
 
     def fit(self, X, progress_bar=True, Lamb_init=None, pi_init=None):
@@ -282,7 +284,7 @@ class MVTadaZipEM:
 
                 for j in range(td["n_inner_iterations"]):
                     Lambda_k = Lambda_list_l[k]
-                    alpha_k = 0.8 * sigmoid(alpha_ls[k])  # Prob of being 0
+                    alpha_k = sigmoid(alpha_ls[k])
 
                     log_likelihood_poisson = -1 * myloss(Lambda_k, data_sub)
                     log_likelihood_poisson_w = (
@@ -318,7 +320,7 @@ class MVTadaZipEM:
         self.Alpha = -1000 * np.ones((K, p))
         for k in range(self.K):
             Lambda_k = Lambda_list_l[k]
-            alpha_k = 0.8 * sigmoid(alpha_ls[k])
+            alpha_k = sigmoid(alpha_ls[k])
 
             self.Lambda[k] = Lambda_k.detach().numpy()
             self.Alpha[k] = alpha_k.detach().numpy()
@@ -384,8 +386,6 @@ class MVTadaZipEM:
         -------
         tops : dict
         """
-        if training_options is None:
-            training_options = {}
         default_options = {
             "n_iterations": 2000,
             "n_inner_iterations": 50,
