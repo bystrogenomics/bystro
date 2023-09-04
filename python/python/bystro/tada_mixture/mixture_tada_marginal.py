@@ -35,7 +35,7 @@ from sklearn.mixture import GaussianMixture  # type: ignore
 from torch.nn import PoissonNLLLoss
 
 
-class MVTadaPoissonML(object):
+class MVTadaPoissonML:
     def __init__(self, K=4, training_options=None):
         """
         This is a product Poisson latent variable model.
@@ -153,6 +153,7 @@ class MVTadaPoissonML(object):
 
         self.Lambda = Lambda_.detach().numpy()
         self.pi = pi_.detach().numpy()
+        return self
 
     def predict(self, data):
         """
