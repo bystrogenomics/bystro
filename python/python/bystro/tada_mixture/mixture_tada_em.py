@@ -173,8 +173,6 @@ class MVTadaPoissonEM:
         -------
         tops : dict
         """
-        if training_options is None:
-            training_options = {}
         default_options = {"n_iterations": 100}
         tops = {**default_options, **training_options}
         return tops
@@ -195,6 +193,8 @@ class MVTadaZipEM:
             The parameters for the inference scheme
         """
         self.K = int(K)
+        if training_options is None:
+            training_options = {}
         self.training_options = self._fill_training_options(training_options)
 
     def fit(self, X, progress_bar=True):
