@@ -40,7 +40,6 @@ class EmpiricalCovariance(BaseCovariance):
 
 
 class BayesianCovariance(BaseCovariance):
-
     def __init__(self, prior_options=None):
         """
         This object fits the covariance matrix as the MAP estimator using
