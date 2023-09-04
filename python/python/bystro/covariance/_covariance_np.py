@@ -6,9 +6,12 @@ implements MAP estimation using several common priors.
 Objects
 -------
 EmpiricalCovariance(BaseCovariance)
-    
-BayesianCovariance(BaseCovariance):
+    This object just fits the covariance matrix as the standard sample
+    covariance matrix
 
+BayesianCovariance(BaseCovariance):
+    This object fits the covariance matrix as the MAP estimator using
+    user-defined priors.
 """
 import numpy as np
 from bystro.covariance._base_covariance import BaseCovariance
@@ -29,7 +32,7 @@ class EmpiricalCovariance(BaseCovariance):
         Parameters
         ----------
         X : np.array-like,(n_samples,n_covariates)
-            The data
+            The centered data
         """
         self.N, self.p = X.shape
         XTX = np.dot(X.T, X)
@@ -37,7 +40,6 @@ class EmpiricalCovariance(BaseCovariance):
 
 
 class BayesianCovariance(BaseCovariance):
-    # https://arxiv.org/pdf/1408.4050.pdf#:~:text=Bayesian%20estimation%20of%20a%20covariance,prior%20implemented%20in%20Bayesian%20software.
 
     def __init__(self, prior_options=None):
         """

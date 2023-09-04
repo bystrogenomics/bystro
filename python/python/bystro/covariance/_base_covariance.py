@@ -235,15 +235,6 @@ def _predict(covariance, Xobs, idxs):
     return preds
 
 
-#########################################
-#########################################
-##                                     ##
-##  Gaussian Likelihood-based methods  ##
-##                                     ##
-#########################################
-#########################################
-
-
 def _conditional_score(covariance, X, idxs, weights=None):
     """
     Returns the predictive log-likelihood of a subset of data.
@@ -256,7 +247,7 @@ def _conditional_score(covariance, X, idxs, weights=None):
         The covariance matrix
 
     X : np.array-like,(N,sum(idxs))
-        The data
+        The centered data
 
     idxs: np.array-like,(sum(p),)
         The observation locations
@@ -292,7 +283,7 @@ def _conditional_score_samples(covariance, X, idxs):
         The covariance matrix
 
     X : np.array-like,(N,p)
-        The data
+        The centered data
 
     idxs: np.array-like,(p,)
         The observation locations
@@ -363,7 +354,7 @@ def _marginal_score(covariance, X, idxs, weights=None):
         The covariance matrix
 
     X : np.array-like,(N,sum(idxs))
-        The data
+        The centered data
 
     idxs: np.array-like,(sum(p),)
         The observation locations
@@ -392,7 +383,7 @@ def _marginal_score_samples(covariance, X, idxs):
         The covariance matrix
 
     X : np.array-like,(N,sum(idxs))
-        The data
+        The centered data
 
     idxs: np.array-like,(sum(p),)
         The observation locations
@@ -418,7 +409,7 @@ def _score(covariance, X, weights=None):
         The covariance matrix
 
     X : np.array-like,(N,sum(p))
-        The data
+        The centered data
 
     weights : np.array-like,(N,),default=None
         The optional weights on the samples
@@ -444,7 +435,7 @@ def _score_samples(covariance, X):
         The covariance matrix
 
     X : np.array-like,(N,sum(p))
-        The data
+        The centered data
 
     Returns
     -------
@@ -463,15 +454,6 @@ def _score_samples(covariance, X):
 
     scores = term1 + term2 - 0.5 * term3
     return scores
-
-
-#####################################
-#####################################
-##                                 ##
-##  Information-theoretic methods  ##
-##                                 ##
-#####################################
-#####################################
 
 
 def _entropy(covariance):
