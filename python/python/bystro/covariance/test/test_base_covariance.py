@@ -1,7 +1,7 @@
 import numpy as np
 import numpy.linalg as la
 import scipy.stats as st  # type: ignore
-from .._base_covariance import BaseCovariance, _score_samples
+from bystro.covariance._base_covariance import BaseCovariance, _score_samples
 
 
 def test_get_stable_rank():

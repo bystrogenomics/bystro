@@ -1,6 +1,9 @@
 import numpy as np
 import numpy.linalg as la
-from .._covariance_np import EmpiricalCovariance, BayesianCovariance
+from bystro.covariance._covariance_np import (
+    EmpiricalCovariance,
+    BayesianCovariance,
+)
 
 
 def test_empirical_covariance():

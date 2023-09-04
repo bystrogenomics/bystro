@@ -1,6 +1,6 @@
 import numpy as np
 import numpy.linalg as la
-from .._base_precision import BasePrecision
+from bystro.covariance._base_precision import BasePrecision
 
 
 def test_get_stable_rank():
@@ -17,7 +17,6 @@ def test_predict():
     idxs = np.ones(10)
     idxs[8:] = 0
     model.predict(X, idxs)
-    
 
 
 def test_conditional_score_samples():
@@ -28,7 +27,6 @@ def test_conditional_score_samples():
     idxs = np.ones(10)
     idxs[8:] = 0
     model.conditional_score_samples(X, idxs)
-    
 
 
 def test_conditional_score():
@@ -39,7 +37,6 @@ def test_conditional_score():
     idxs = np.ones(10)
     idxs[8:] = 0
     model.conditional_score(X, idxs)
-    
 
 
 def test_marginal_score_samples():
@@ -50,7 +47,6 @@ def test_marginal_score_samples():
     idxs = np.ones(10)
     idxs[8:] = 0
     model.marginal_score(X[:, idxs == 1], idxs)
-    
 
 
 def test_marginal_score():
@@ -61,7 +57,6 @@ def test_marginal_score():
     idxs = np.ones(10)
     idxs[8:] = 0
     model.marginal_score(X[:, idxs == 1], idxs, weights=0.5 * np.ones(1000))
-    
 
 
 def test_score():
@@ -70,7 +65,6 @@ def test_score():
     model = BasePrecision()
     model.precision = la.inv(1 / X.shape[0] * np.dot(X.T, X))
     model.score(X, weights=0.5 * np.ones(1000))
-    
 
 
 def test_score_samples():
@@ -79,7 +73,6 @@ def test_score_samples():
     model = BasePrecision()
     model.precision = la.inv(1 / X.shape[0] * np.dot(X.T, X))
     model.score_samples(X)
-    
 
 
 def test_entropy():
@@ -88,7 +81,6 @@ def test_entropy():
     model = BasePrecision()
     model.precision = la.inv(1 / X.shape[0] * np.dot(X.T, X))
     model.entropy()
-    
 
 
 def test_entropy_subset():
@@ -99,7 +91,6 @@ def test_entropy_subset():
     idxs = np.ones(10)
     idxs[8:] = 0
     model.entropy_subset(idxs)
-    
 
 
 def test_mutual_information():
@@ -114,4 +105,3 @@ def test_mutual_information():
     idxs2[:5] = 0
     idxs2[9] = 0
     model.mutual_information(idxs1, idxs2)
-    

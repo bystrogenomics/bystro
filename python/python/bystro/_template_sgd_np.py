@@ -61,7 +61,6 @@ class _BaseSGDModel(object):
         path : str
             The directory to load the model from
         """
-        raise NotImplementedError("unpickle")
 
     def _fill_training_options(self, training_options):
         """

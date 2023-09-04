@@ -38,6 +38,7 @@ class _BaseNumpyroModel:
         self.hp_options = self._fill_hp_options(hp_options)
         self.samples = None
 
+    @abc.abstractmethod
     def fit(self, *args):
         """
 
@@ -51,6 +52,7 @@ class _BaseNumpyroModel:
 
     def render_model(self):
         """
+        This provides a graphical representation of the model
 
         Parameters
         ----------
@@ -64,6 +66,7 @@ class _BaseNumpyroModel:
 
     def pickle(self, path):
         """
+        This saves samples from a fit model
 
         Parameters
         ----------
@@ -78,6 +81,7 @@ class _BaseNumpyroModel:
 
     def unpickle(self, path):
         """
+        This loads samples from a previously saved model
 
         Parameters
         ----------
@@ -87,10 +91,13 @@ class _BaseNumpyroModel:
 
         """
         with open(path, "rb") as f:
-            return cloudpickle.load(f)
+            self.samples = cloudpickle.load(f)
 
     def _fill_mcmc_options(self, mcmc_options):
         """
+        This fills in default MCMC options of the sampler. Further methods
+        might override these but these are common/basic enough to leave in
+        as an implemented method.
 
         Parameters
         ----------
@@ -105,14 +112,14 @@ class _BaseNumpyroModel:
             "num_samples": 2000,
         }
         mopts = {**default_options, **mcmc_options}
-        if mopts["num_chains"] > 1:
-            print("You tried to set num_chains>1. This has been ignored.")
-            mopts["num_chains"] = 1
         return mopts
 
     @abc.abstractmethod
     def _fill_hp_options(self, hp_options):
         """
+        This fills in default hyperparameters of the model. Since these are
+        not conserved between models we leave this as an abstract method 
+        to be filled in per model.
 
         Parameters
         ----------

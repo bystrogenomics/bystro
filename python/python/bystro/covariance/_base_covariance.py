@@ -64,7 +64,7 @@ _get_stable_rank(covariance)
 
 _predict(covariance,Xobs,idxs)
 
-_conditional_parameters(covariance,idxs)
+_get_conditional_parameters(covariance,idxs)
     Computes the distribution parameters p(X_miss|X_obs)
 
 ----------------------------
@@ -94,6 +94,7 @@ import numpy as np
 from numpy import linalg as la
 from datetime import datetime as dt
 import pytz
+
 
 class BaseCovariance(object):
     """
@@ -194,7 +195,8 @@ def _get_stable_rank(covariance):
     Returns
     -------
     srank : float
-        The stable rank
+        The stable rank. See Vershynin High dimensional probability for 
+        discussion, but this is a statistically stable approximation to rank
     """
     singular_values = la.svd(covariance, compute_uv=False)
     srank = np.sum(singular_values) / singular_values[0]
@@ -203,7 +205,9 @@ def _get_stable_rank(covariance):
 
 def _predict(covariance, Xobs, idxs):
     """
-    Predicts missing data using observed data.
+    Predicts missing data using observed data. This uses the conditional
+    Gaussian formula (see wikipedia multivariate gaussian). Solve allows
+    us to avoid an explicit matrix inversion.
 
     Parameters
     ----------
@@ -225,13 +229,7 @@ def _predict(covariance, Xobs, idxs):
     covariance_22 = covariance_sub[:, idxs == 1]
     covariance_21 = covariance_sub[:, idxs == 0]
 
-    covariance_nonsub = covariance[idxs == 0]
-    covariance_11 = covariance_nonsub[:, idxs == 0]
-
     beta_bar = la.solve(covariance_22, covariance_21)
-    Second_part = np.dot(covariance_21.T, beta_bar)
-
-    covariance_11 - Second_part
 
     preds = np.dot(Xobs[:, idxs == 1], beta_bar)
     return preds
@@ -264,15 +262,17 @@ def _conditional_score(covariance, X, idxs, weights=None):
         The observation locations
 
     weights : np.array-like,(N,),default=None
-        The optional weights on the samples
+        The optional weights on the samples. Don't have negative values. 
+        Average value forced to 1.
 
     Returns
     -------
     avg_score : float
         Average log likelihood
     """
-    if weights is None:
-        weights = np.ones(X.shape[0])
+    weights = (
+        np.ones(X.shape[0]) if weights is None else weights / np.mean(weights)
+    )
     avg_score = np.mean(
         weights * _conditional_score_samples(covariance, X, idxs)
     )
@@ -320,7 +320,7 @@ def _conditional_score_samples(covariance, X, idxs):
     return scores
 
 
-def _conditional_parameters(covariance, idxs):
+def _get_conditional_parameters(covariance, idxs):
     """
     Computes the distribution parameters p(X_miss|X_obs)
 
@@ -489,7 +489,6 @@ def _entropy(covariance):
     entropy : float
         The differential entropy of the distribution
     """
-    covariance.shape[1]
     cov_new = 2 * np.pi * np.e * covariance
     _, logdet = la.slogdet(cov_new)
     entropy = 0.5 * logdet
@@ -543,7 +542,9 @@ def _mutual_information(covariance, idxs1, idxs2):
     idxs1_sub = idxs1[idxs == 1]
     Hy = _entropy(cov_sub[np.ix_(idxs1_sub == 1, idxs1_sub == 1)])
 
-    _, covariance_conditional = _conditional_parameters(cov_sub, 1 - idxs1_sub)
-    Hyx = _entropy(covariance_conditional)
-    mutual_information = Hy - Hyx
+    _, covariance_conditional = _get_conditional_parameters(
+        cov_sub, 1 - idxs1_sub
+    )
+    H_y_given_x = _entropy(covariance_conditional)
+    mutual_information = Hy - H_y_given_x
     return mutual_information

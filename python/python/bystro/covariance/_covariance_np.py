@@ -7,10 +7,11 @@ Objects
 -------
 EmpiricalCovariance(BaseCovariance)
     
+BayesianCovariance(BaseCovariance):
 
 """
 import numpy as np
-from ._base_covariance import BaseCovariance
+from bystro.covariance._base_covariance import BaseCovariance
 
 
 class EmpiricalCovariance(BaseCovariance):
@@ -77,9 +78,6 @@ class BayesianCovariance(BaseCovariance):
 
         Options
         -------
-        type : str, default='inverse-wishart'
-            The type of prior. Currently one lol
-
         iw_params : dict,default={'pnu':2,'sigma':1.0}
             pnu : int - nu = p + pnu
             sigma : float>0 - cov = sigma*I_p
@@ -87,5 +85,5 @@ class BayesianCovariance(BaseCovariance):
         default_options = {
             "iw_params": {"pnu": 2, "sigma": 1.0},
         }
-        pops = {**default_options,**prior_options}
+        pops = {**default_options, **prior_options}
         return pops
