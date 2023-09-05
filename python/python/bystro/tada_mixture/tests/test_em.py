@@ -1,5 +1,5 @@
 import numpy as np
-from ..mixture_tada_em import MVTadaPoissonEM, MVTadaZPoissonEM
+from ..mixture_tada_em import MVTadaPoissonEM, MVTadaZipEM
 
 
 def test_fit():
@@ -26,7 +26,7 @@ def test_fit():
         zerod_out = rng.binomial(1, Alphas[idx])
         X[i, zerod_out == 1] = 0
 
-    model = MVTadaZPoissonEM(K=K)
+    model = MVTadaZipEM(K=K)
     model.fit(X)
 
     model = MVTadaPoissonEM(K=K)
