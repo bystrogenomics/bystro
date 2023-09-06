@@ -19,15 +19,15 @@ from bystro.supervised_ppca._base import BaseGaussianFactorModel
 
 
 class PPCAanalytic(BaseGaussianFactorModel):
-    def __init__(self, n_components=2):
-        """
-        Analytic PPCA solution as described by Bishop
+    """
+    Analytic PPCA solution as described by Bishop
 
-        Parameters
-        ----------
-        n_components : int,default=2
-            The latent dimensionality
-        """
+    Parameters
+    ----------
+    n_components : int,default=2
+        The latent dimensionality
+    """
+    def __init__(self, n_components=2):
         super().__init__(n_components=n_components)
 
     def __repr__(self):
@@ -59,7 +59,7 @@ class PPCAanalytic(BaseGaussianFactorModel):
 
         L_m = np.diag((eigenvals[:L] - np.ones(L) * var) ** 0.5)
         W = np.dot(V[:L].T, L_m)
-        self._save_variables([W, var])
+        self._store_instance_variables([W, var])
 
     def get_covariance(self):
         """
@@ -79,7 +79,7 @@ class PPCAanalytic(BaseGaussianFactorModel):
         covariance = np.dot(self.W_.T, self.W_) + self.sigma2_ * np.eye(self.p)
         return covariance
 
-    def _save_variables(self, trainable_variables):
+    def _store_instance_variables(self, trainable_variables):
         """
         Saves the learned variables
 
@@ -98,3 +98,15 @@ class PPCAanalytic(BaseGaussianFactorModel):
         """
         self.W_ = trainable_variables[0].T
         self.sigma2_ = trainable_variables[1]
+
+    def _initialize_save_losses(self):
+        pass
+
+    def _save_losses(self):
+        pass
+
+    def _test_inputs(self):
+        pass
+
+    def _transform_training_data(self):
+        pass
