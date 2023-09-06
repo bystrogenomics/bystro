@@ -1,11 +1,13 @@
 import argparse
+import datetime
 import json
 import os
 
 import requests
 
+from msgspec import Struct, json as mjson, structs
+
 STATE_FILE = "bystro_authentication_token.json"
-TOKEN_KEY = "access_token"
 JOB_TYPE_ROUTE_MAP = {
     "all": "/list/all",
     "public": "/list/all/public",
@@ -15,52 +17,225 @@ JOB_TYPE_ROUTE_MAP = {
     "failed": "/list/failed",
 }
 
+class SignupResponse(Struct):
+    """
+    The response body for signing up for Bystro.
 
-def load_state(state_dir: str):
+    Attributes
+    ----------
+    email : str
+        The email of the user.
+    name : str
+        The name of the user.
+    access_token : str
+        The access token, which authorizes further API requests
+    url : str
+        The url of the Bystro server.
+    """
+
+    email: str
+    name: str
+    access_token: str
+    url: str
+
+
+class LoginResponse(Struct):
+    """
+    The response body for logging in to Bystro.
+
+    Attributes
+    ----------
+    email : str
+        The email of the user.
+    access_token : str
+        The access token, which authorizes further API requests
+    url : str
+        The url of the Bystro server.
+    """
+
+    email: str
+    access_token: str
+    url: str
+
+
+class CachedAuth(Struct):
+    """
+    The authentication state.
+
+    Attributes
+    ----------
+    email : str
+        The email of the user.
+    access_token : str
+        The access token, which authorizes further API requests
+    url : str
+        The url of the Bystro server.
+    """
+
+    email: str
+    access_token: str
+    url: str
+
+
+class JobBasicResponse(Struct):
+    """
+    The basic job information, returned in job list commands
+
+    Attributes
+    ----------
+    _id : str
+        The id of the job.
+    name : str
+        The name of the job.
+    createdAt : str
+        The date the job was created.
+    """
+
+    _id: str
+    name: str
+    createdAt: str
+
+
+class JobListResponse(Struct):
+    """
+    The response body for fetching a list of jobs.
+
+    Attributes
+    ----------
+    jobs : list[JobBasicResponse]
+        The list of jobs.
+    """
+
+    jobs: list[JobBasicResponse]
+
+
+class UserProfile(Struct):
+    """
+    The response body for fetching the user profile.
+
+    Attributes
+    ----------
+    options : dict
+        The user options.
+    _id : str
+        The id of the user.
+    name : str
+        The name of the user.
+    email : str
+        The email of the user.
+    accounts : list[str]
+        The accounts of the user.
+    role : str
+        The role of the user.
+    lastLogin : str
+        The date the user last logged in.
+    """
+
+    _id: str
+    options: dict
+    name: str
+    email: str
+    accounts: list[str]
+    role: str
+    lastLogin: datetime.datetime
+
+
+def load_state(state_dir: str) -> CachedAuth | None:
+    """
+    Loads the authentication state from the state directory.
+
+    Parameters
+    ----------
+    state_dir : str
+        The directory where the authentication state is saved.
+
+    Returns
+    -------
+    CachedAuth | None
+        The authentication state, or None if the state file doesn't exist.
+    """
     path = os.path.join(state_dir, STATE_FILE)
 
     if os.path.exists(path):
-        with open(path, "r") as f:
-            return json.load(f)
+        with open(path, "r", encoding="utf-8") as f:
+            return mjson.decode(f.read(), type=CachedAuth)
 
-    return {}
+    return None
 
 
-def save_state(data: object, state_dir: str, print_result=True):
+def save_state(data: CachedAuth, state_dir: str, print_result=True) -> None:
+    """
+    Saves the authentication state to a file.
+
+    Parameters
+    ----------
+    data : CachedAuth
+        The data to save.
+    state_dir : str
+        The directory where the authentication state will be saved.
+    print_result : bool, optional
+        Whether to print the result of the save operation, by default True.
+
+    Returns
+    --------
+    None
+    """
     save_path = os.path.join(state_dir, STATE_FILE)
+    encoded_data = mjson.encode(data).decode("utf-8")
 
-    with open(save_path, "w") as f:
-        json.dump(data, f)
+    with open(save_path, "w", encoding="utf-8") as f:
+        f.write(encoded_data)
 
     if print_result:
         print(
-            f"\nSaved authentication credentials to {save_path}:\n{json.dumps(data, indent=4)}"
+            f"\nSaved auth credentials to {save_path}:\n{mjson.format(encoded_data, indent=4)}"
         )
 
 
-def signup(args: argparse.Namespace, print_result=True):
+def signup(args: argparse.Namespace, print_result=True) -> CachedAuth:
+    """
+    Signs up for Bystro with the given email, name, and password. Additionally, logs in and 
+    saves the credentials, to enable API calls without re-authenticating.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        The arguments passed to the command.
+    print_result : bool, optional
+        Whether to print the result of the signup operation, by default True.
+
+    Returns
+    -------
+    CachedAuth
+        The saved authentication state.
+    """
     if print_result:
         print(f"\nSigning up for Bystro with email: {args.email}, name: {args.name}")
 
     url = f"{args.host}:{args.port}/api/user"
 
-    data = {"email": args.email, "name": args.name, "password": args.password}
+    data = {
+        "email": args.email,
+        "name": args.name,
+        "password": args.password
+    }
 
-    response = requests.put(url, data=data)
+    response = requests.put(url, data=data, timeout=20)
 
     if response.status_code != 200:
         raise RuntimeError(
             f"Login failed with response status: {response.status_code}. Error: \n{response.text}\n"
         )
 
-    res = response.json()
+    res = mjson.decode(response.text, type=SignupResponse)
+    state = CachedAuth(
+        access_token=res.access_token,
+        url=args.host + ":" + str(args.port),
+        email=args.email,
+    )
 
     save_state(
-        {
-            TOKEN_KEY: res[TOKEN_KEY],
-            "url": f"{args.host}:{args.port}",
-            "email": args.email,
-        },
+        state,
         args.dir,
         print_result,
     )
@@ -68,58 +243,93 @@ def signup(args: argparse.Namespace, print_result=True):
     if print_result:
         print("\nSignup & authentication successful. You may now use the Bystro API!\n")
 
-    return res
+    return state
 
 
-def login(args: argparse.Namespace, print_result=True):
+def login(args: argparse.Namespace, print_result=True) -> CachedAuth:
+    """
+    Logs in to the server and saves the authentication state to a file.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        The arguments passed to the command.
+    print_result : bool, optional
+        Whether to print the result of the login operation, by default True.
+
+    Returns
+    -------
+    CachedAuth
+        The response from the server.
+    """
     if print_result:
         print(f"\nLogging into {args.host}:{args.port} with email: {args.email}.")
 
-    url = f"{args.host}:{args.port}/api/user/auth/local"
+    url = f"{args.host}/api/user/auth/local"
 
     body = {"email": args.email, "password": args.password}
-
-    response = requests.post(url, data=body)
+    print("body", body)
+    response = requests.post(url, data=body, timeout=20)
 
     if response.status_code != 200:
         raise RuntimeError(
             f"Login failed with response status: {response.status_code}. Error: \n{response.text}\n"
         )
 
-    res = response.json()
-
-    save_state(
-        {
-            TOKEN_KEY: res[TOKEN_KEY],
-            "url": args.host + ":" + str(args.port),
-            "email": args.email,
-        },
-        args.dir,
-        print_result,
+    res = mjson.decode(response.text, type=LoginResponse)
+    state = CachedAuth(
+        access_token=res.access_token, url=f"{args.host}:{args.port}", email=args.email
     )
+    save_state(state, args.dir, print_result)
 
     if print_result:
         print("\nLogin successful. You may now use the Bystro API!\n")
 
-    return res
+    return state
 
 
-def authenticate(args):
+def authenticate(args) -> tuple[CachedAuth, dict]:
+    """
+    Authenticates the user and returns the url, auth header, and email.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        The arguments passed to the command.
+
+    Returns
+    -------
+    tuple[CachedAuth, dict]
+        The cached auth credentials and auth header
+    """
     state = load_state(args.dir)
-    url = state.get("url")
-    token = state.get(TOKEN_KEY)
-    email = state.get("email")
 
-    if not (url and token and email):
+    if not state:
         raise ValueError("\n\nYou are not logged in. Please login first.\n")
 
-    header = {"Authorization": f"Bearer {token}"}
-    return url, header, email
+    header = {"Authorization": f"Bearer {state.access_token}"}
+    return state, header
 
 
-def get_jobs(args: argparse.Namespace, print_result=True):
-    url, auth_header, _ = authenticate(args)
-    url = url + "/api/jobs"
+def get_jobs(args: argparse.Namespace, print_result=True) -> JobListResponse | dict:
+    """
+    Fetches the jobs for the given job type, or a single job if a job id is specified.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        The arguments passed to the command.
+    print_result : bool, optional
+        Whether to print the result of the job fetch operation, by default True.
+
+    Returns
+    -------
+    dict
+        The response from the server.
+
+    """
+    state, auth_header = authenticate(args)
+    url = state.url + "/api/jobs"
     job_type = args.type
     job_id = args.id
 
@@ -142,33 +352,50 @@ def get_jobs(args: argparse.Namespace, print_result=True):
         else:
             print(f"\nFetching jobs of type:\t{job_type}")
 
-    response = requests.get(url, headers=auth_header)
+    response = requests.get(url, headers=auth_header, timeout=120)
 
     if response.status_code != 200:
         raise RuntimeError(
             f"Fetching jobs failed with response status: {response.status_code}. Error: {response.text}"
         )
 
-    jobs = response.json()
-
-    if job_id:
-        # As mongo doesn't support keys with '.' in them, we need to store the config as a string
-        jobs["config"] = json.loads(jobs["config"])
-
     if print_result:
         print("\nJob(s) fetched successfully: \n")
-        print(json.dumps(jobs, indent=4))
+        print(mjson.format(response.text, indent=4))
         print("\n")
 
+    if job_id:
+        job = response.json()
+        # Because MongoDB doesn't support '.' in field names, we neede to convert the config to string before saving
+        # so unpack here
+        job["config"] = mjson.decode(job["config"])
+        return job
+
+    jobs = mjson.decode(response.text, type=JobListResponse)
     return jobs
 
 
-def create_job(args: argparse.Namespace, print_result=True):
-    url, auth_header, _ = authenticate(args)
-    url = url + "/api/jobs/upload/"
+def create_job(args: argparse.Namespace, print_result=True) -> dict:
+    """
+    Creates a job for the given files.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        The arguments passed to the command.
+    print_result : bool, optional
+        Whether to print the result of the job creation operation, by default True.
+
+    Returns
+    -------
+    dict
+        The newly created job.
+    """
+    state, auth_header = authenticate(args)
+    url = state.url + "/api/jobs/upload/"
 
     payload = {
-        "job": json.dumps(
+        "job": mjson.encode(
             {
                 "assembly": args.assembly,
                 "options": {"index": args.index},
@@ -181,14 +408,20 @@ def create_job(args: argparse.Namespace, print_result=True):
         files.append(
             (
                 "file",
-                (os.path.basename(file), open(file, "rb"), "application/octet-stream"), # noqa: SIM115
+                (
+                    os.path.basename(file),
+                    open(file, "rb"), # noqa: SIM115
+                    "application/octet-stream",
+                ),
             )
         )
 
     if print_result:
         print(f"\nCreating jobs for files: {','.join(map(lambda x: x[1][0], files))}\n")
 
-    response = requests.post(url, headers=auth_header, data=payload, files=files)
+    response = requests.post(
+        url, headers=auth_header, data=payload, files=files, timeout=20
+    )
 
     if response.status_code != 200:
         raise RuntimeError(
@@ -198,21 +431,38 @@ def create_job(args: argparse.Namespace, print_result=True):
 
     if print_result:
         print("\nJob creation successful:\n")
-        print(json.dumps(response.json(), indent=4))
+        print(mjson.format(response.text, indent=4))
         print("\n")
 
     return response.json()
 
 
-def get_user(args, print_result=True):
+def get_user(args: argparse.Namespace, print_result=True) -> UserProfile:
+    """
+    Fetches the user profile.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        The arguments passed to the command.
+    print_result : bool, optional
+        Whether to print the result of the user profile fetch operation, by default True.
+
+    Returns
+    -------
+    UserProfile
+        The user profile
+    """
     if print_result:
         print("\n\nFetching user profile\n")
 
     res = authenticate(args)
 
-    url, auth_header, email = res
+    state, auth_header = res
 
-    response = requests.request("GET", url + "/api/user/me", headers=auth_header)
+    response = requests.request(
+        "GET", state.url + "/api/user/me", headers=auth_header, timeout=20
+    )
 
     if response.status_code != 200:
         raise RuntimeError(
@@ -220,30 +470,48 @@ def get_user(args, print_result=True):
                 Error: \n{response.text}\n"
         )
 
+    user_profile = mjson.decode(response.text, type=UserProfile)
+
     if print_result:
-        print(f"\nFetched Profile for email {email}\n")
-        print(json.dumps(response.json(), indent=4))
+        print(f"\nFetched Profile for email {state.email}\n")
+        print(mjson.format(response.text, indent=4))
         print("\n")
 
-    return response.json()
+    return user_profile
 
 
 def main():
+    """
+    The main function for the CLI tool.
+
+    Returns
+    -------
+    None
+
+    """
     parser = argparse.ArgumentParser(
         prog="bystro-api", description="Bystro CLI tool for making API calls."
     )
     subparsers = parser.add_subparsers(title="commands")
 
     # Adding the user sub-command
-    login_parser = subparsers.add_parser("login", help="Login to the system")
-    login_parser.add_argument("--host", required=True, help="Host of the system")
+    login_parser = subparsers.add_parser(
+        "login", help="Authenticate with the Bystro API"
+    )
     login_parser.add_argument(
-        "--port", type=int, default=443, help="Port of the system"
+        "--host",
+        required=True,
+        help="Host of the Bystro API server, e.g. https://bystro-dev.emory.edu",
+    )
+    login_parser.add_argument(
+        "--port", type=int, default=443, help="Port of the Bystro API server, e.g. 443"
     )
     login_parser.add_argument("--email", required=True, help="Email to login with")
-    login_parser.add_argument("--password", required=True, help="Password to login")
     login_parser.add_argument(
-        "--dir", default="./", help="Where to save Bystro API login state"
+        "--password", required=True, help="Password to login with"
+    )
+    login_parser.add_argument(
+        "--dir", default="~/", help="Where to save Bystro API login state"
     )
     login_parser.set_defaults(func=login)
 
@@ -259,9 +527,13 @@ def main():
         required=True,
         help="The name you'd like to use on the Bystro platform",
     )
-    signup_parser.add_argument("--host", required=True, help="Host of the system")
     signup_parser.add_argument(
-        "--port", type=int, default=443, help="Port of the system"
+        "--host",
+        required=True,
+        help="Host of the Bystro API server, e.g. https://bystro-dev.emory.edu",
+    )
+    signup_parser.add_argument(
+        "--port", type=int, default=443, help="Port of the Bystro API server, e.g. 443"
     )
     signup_parser.add_argument(
         "--dir", default="./", help="Where to save Bystro API login state"
@@ -311,7 +583,7 @@ def main():
         help="Get a list of jobs of a specific type",
     )
     jobs_parser.add_argument(
-        "--dir", default="./", help="Where Bystro API login state is saved"
+        "--dir", default="~/", help="Where Bystro API login state is saved"
     )
     jobs_parser.set_defaults(func=get_jobs)
 
