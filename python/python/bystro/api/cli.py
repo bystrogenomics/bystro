@@ -24,20 +24,11 @@ class SignupResponse(Struct):
 
     Attributes
     ----------
-    email : str
-        The email of the user.
-    name : str
-        The name of the user.
     access_token : str
         The access token, which authorizes further API requests
-    url : str
-        The url of the Bystro server.
     """
 
-    email: str
-    name: str
     access_token: str
-    url: str
 
 
 class LoginResponse(Struct):
