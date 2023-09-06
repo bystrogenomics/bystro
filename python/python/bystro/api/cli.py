@@ -330,7 +330,7 @@ def get_jobs(
 
     if not job_id and job_type not in JOB_TYPE_ROUTE_MAP.keys():
         raise ValueError(
-            f"Invalid job type: {job_type}. Valid types are: {','.join(JOB_TYPE_ROUTE_MAP.keys())}"
+            f"Invalid job type: {job_type}. Valid types are: {', '.join(JOB_TYPE_ROUTE_MAP.keys())}"
         )
 
     url = url + f"/{job_id}" if job_id else url + JOB_TYPE_ROUTE_MAP[job_type]
