@@ -513,13 +513,16 @@ def convert_1kgp_vcf_to_dosage(vcf_with_header: pd.DataFrame) -> pd.DataFrame:
 
 
 def process_vcf_for_pc_transformation(dosage_vcf: pd.DataFrame) -> pd.DataFrame:
-    """Process dosage_vcf so that it only includes genotypes for analysis."""
+    """Process dosage_vcf and transpose so that it only includes 
+    genotypes in correct configuration for analysis."""
     genos = dosage_vcf.iloc[:, len(HEADER_COLS) :]
     genos = genos.set_index(dosage_vcf.index)
     genos = genos.sort_index()
     # Check that not all genotypes are the same for QC
     assert len(set(genos.to_numpy().flatten())) > 1, "All genotypes are the same"
-    return genos
+    #Transpose genos_overlap for analysis
+    genos_transpose = genos.T
+    return genos_transpose
 
 
 def _load_pca_loadings() -> pd.DataFrame:
@@ -558,6 +561,35 @@ def process_pca_loadings(loadings: pd.DataFrame) -> pd.DataFrame:
     pc_loadings = pc_loadings.astype(float)
     assert all(pc_loadings.dtypes == np.float64)
     return pc_loadings
+
+
+def restrict_loadings_variants_to_vcf(
+    pc_loadings: pd.DataFrame, genos_transpose: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Restrict variant list to overlap between gnomad loadings and transposed 
+    reference vcf and return versions only including the overlapping variants."""
+    # IGSR version of 1kgp is current reference vcf
+    var_overlap = pc_loadings.index.intersection(genos_transpose.columns)
+    pc_loadings_overlap = pc_loadings[pc_loadings.index.isin(var_overlap)]
+    genos_overlap_transpose = genos_transpose[genos_transpose.columns.isin(var_overlap)]
+    # Ensure that genos transpose and pc_loadings have corresponding shape and vars
+    assert genos_overlap_transpose.shape[1] == pc_loadings_overlap.shape[0]
+    assert set(genos_overlap_transpose.columns) == set(pc_loadings_overlap.index)
+    assert (genos_overlap_transpose.index == genos_transpose.index).all()
+    # Record amount of overlap
+    num_var_overlap = len(var_overlap)
+    logger.info("Number of overlapping variants: %d", num_var_overlap)
+    return pc_loadings_overlap, genos_overlap_transpose
+
+
+def apply_pca_transform(
+    pc_loadings_overlap: pd.DataFrame,
+    genos_overlap_transpose: pd.DataFrame
+) -> pd.DataFrame:
+    """Transform vcf with genotypes in dosage format with PCs loadings from gnomad PCA."""
+    # Dot product
+    transformed_data = genos_overlap_transpose @ pc_loadings_overlap
+    return transformed_data
 
 
 def _perform_pca(train_X: pd.DataFrame, test_X: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, PCA]:
