@@ -21,7 +21,7 @@ BaseGaussianFactorModel(_BaseSGDModel)
     Base class of all factor analysis models implementing any shared 
     Gaussian methods.
 
-BaseGDModel(BaseGaussianFactorModel)
+BaseSGDModel(BaseGaussianFactorModel)
     This is the base class of models that use Tensorflow stochastic
     gradient descent for inference. This reduces boilerplate code 
     associated with some of the standard methods etc.
@@ -30,27 +30,28 @@ Methods
 -------
 None
 """
-from abc import abstractmethod
+from abc import abstractmethod, ABC
+
 import numpy as np
-from bystro.covariance._base_covariance import ( # type: ignore
-    _get_stable_rank, # type: ignore
-    _conditional_score, # type: ignore
-    _conditional_score_samples, # type: ignore
-    _marginal_score, # type: ignore
-    _marginal_score_samples, # type: ignore
-    _score, # type: ignore
-    _score_samples, # type: ignore
-    _entropy, # type: ignore
-    _entropy_subset, # type: ignore
-    _mutual_information, # type: ignore
-) # type: ignore 
+from bystro.covariance._base_covariance import (  # type: ignore
+    _get_stable_rank,  # type: ignore
+    _conditional_score,  # type: ignore
+    _conditional_score_samples,  # type: ignore
+    _marginal_score,  # type: ignore
+    _marginal_score_samples,  # type: ignore
+    _score,  # type: ignore
+    _score_samples,  # type: ignore
+    _entropy,  # type: ignore
+    _entropy_subset,  # type: ignore
+    _mutual_information,  # type: ignore
+)  # type: ignore
 from numpy import linalg as la
 from datetime import datetime as dt
 import pytz
-from bystro._template_sgd_np import _BaseSGDModel # type: ignore
+from bystro._template_sgd_np import _BaseSGDModel  # type: ignore
 
 
-class BaseGaussianFactorModel(_BaseSGDModel):
+class BaseGaussianFactorModel(_BaseSGDModel, ABC):
     def __init__(self, n_components=2):
         """
         This is the base class of the model. Will never be called directly.
@@ -66,7 +67,7 @@ class BaseGaussianFactorModel(_BaseSGDModel):
             The date/time that the object was created
         """
         self.n_components = int(n_components)
-        self.creationDate = dt.now(pytz.timezone("US/Pacific"))
+        self.creationDate = dt.now(pytz.utc)
 
     @abstractmethod
     def fit(self, *args):
@@ -103,7 +104,7 @@ class BaseGaussianFactorModel(_BaseSGDModel):
         """
 
     @abstractmethod
-    def _save_variables(self, trainable_variables):
+    def _store_instance_variables(self, trainable_variables):
         """
         Saves the learned variables
 
@@ -155,8 +156,8 @@ class BaseGaussianFactorModel(_BaseSGDModel):
 
         Parameters
         ----------
-        X : np array-like,(N_samples,\sum idxs)
-            The data to transform
+        X : np array-like,(N_samples,p
+            The data to transform. 
 
         Returns
         -------
@@ -168,7 +169,9 @@ class BaseGaussianFactorModel(_BaseSGDModel):
         S = np.dot(X, coefs.T)
         return S
 
-    def conditional_score(self, X, idxs, weights=None, sherman_woodbury=False):
+    def conditional_score(
+        self, X, observed_feature_idxs, weights=None, sherman_woodbury=False
+    ):
         """
         Returns the predictive log-likelihood of a subset of data.
 
@@ -176,10 +179,10 @@ class BaseGaussianFactorModel(_BaseSGDModel):
 
         Parameters
         ----------
-        X : np.array-like,(N,sum(idxs))
+        X : np.array-like,(N,sum(observed_feature_idxs))
             The data
 
-        idxs: np.array-like,(sum(p),)
+        observed_feature_idxs: np.array-like,(sum(p),)
             The observation locations
 
         weights : np.array-like,(N,),default=None
@@ -192,12 +195,18 @@ class BaseGaussianFactorModel(_BaseSGDModel):
         """
         if sherman_woodbury is False:
             covariance = self.get_covariance()
-            avg_score = _conditional_score(covariance, X, idxs, weights=weights)
+            avg_score = _conditional_score(
+                covariance, X, observed_feature_idxs, weights=weights
+            )
         else:
-            raise NotImplementedError("Sherman woodbury not imlemented yet")
+            raise NotImplementedError(
+                "Sherman-Woodbury matrix inversion not implemented yet"
+            )
         return avg_score
 
-    def conditional_score_samples(self, X, idxs, sherman_woodbury=False):
+    def conditional_score_samples(
+        self, X, observed_feature_idxs, sherman_woodbury=False
+    ):
         """
         Return the conditional log likelihood of each sample, that is
 
@@ -208,7 +217,7 @@ class BaseGaussianFactorModel(_BaseSGDModel):
         X : np.array-like,(N,p)
             The data
 
-        idxs: np.array-like,(p,)
+        observed_feature_idxs: np.array-like,(p,)
             The observation locations
 
         Returns
@@ -218,12 +227,18 @@ class BaseGaussianFactorModel(_BaseSGDModel):
         """
         if sherman_woodbury is False:
             covariance = self.get_covariance()
-            scores = _conditional_score_samples(covariance, X, idxs)
+            scores = _conditional_score_samples(
+                covariance, X, observed_feature_idxs
+            )
         else:
-            raise NotImplementedError("Sherman woodbury not imlemented yet")
+            raise NotImplementedError(
+                "Sherman-Woodbury matrix inversion not implemented yet"
+            )
         return scores
 
-    def marginal_score(self, X, idxs, weights=None, sherman_woodbury=False):
+    def marginal_score(
+        self, X, observed_feature_idxs, weights=None, sherman_woodbury=False
+    ):
         """
         Returns the marginal log-likelihood of a subset of data
 
@@ -232,7 +247,7 @@ class BaseGaussianFactorModel(_BaseSGDModel):
         X : np.array-like,(N,sum(idxs))
             The data
 
-        idxs: np.array-like,(sum(p),)
+        observed_feature_idxs: np.array-like,(sum(p),)
             The observation locations
 
         weights : np.array-like,(N,),default=None
@@ -245,21 +260,27 @@ class BaseGaussianFactorModel(_BaseSGDModel):
         """
         if sherman_woodbury is False:
             covariance = self.get_covariance()
-            avg_score = _marginal_score(covariance, X, idxs, weights=weights)
+            avg_score = _marginal_score(
+                covariance, X, observed_feature_idxs, weights=weights
+            )
         else:
-            raise NotImplementedError("Sherman woodbury not imlemented yet")
+            raise NotImplementedError(
+                "Sherman-Woodbury matrix inversion not implemented yet"
+            )
         return avg_score
 
-    def marginal_score_samples(self, X, idxs, sherman_woodbury=False):
+    def marginal_score_samples(
+        self, X, observed_feature_idxs, sherman_woodbury=False
+    ):
         """
         Returns the marginal log-likelihood of a subset of data
 
         Parameters
         ----------
-        X : np.array-like,(N,sum(idxs))
+        X : np.array-like,(N,sum(observed_feature_idxs))
             The data
 
-        idxs: np.array-like,(sum(p),)
+        observed_feature_idxs: np.array-like,(sum(p),)
             The observation locations
 
         Returns
@@ -268,10 +289,14 @@ class BaseGaussianFactorModel(_BaseSGDModel):
             Average log likelihood
         """
         if sherman_woodbury is False:
-            self.get_covariance()
-            scores = _marginal_score_samples(X, idxs)
+            covariance = self.get_covariance()
+            scores = _marginal_score_samples(
+                covariance, X, observed_feature_idxs
+            )
         else:
-            raise NotImplementedError("Sherman woodbury not imlemented yet")
+            raise NotImplementedError(
+                "Sherman-Woodbury matrix inversion not implemented yet"
+            )
         return scores
 
     def score(self, X, weights=None, sherman_woodbury=False):
@@ -295,7 +320,9 @@ class BaseGaussianFactorModel(_BaseSGDModel):
             covariance = self.get_covariance()
             avg_score = _score(covariance, X, weights=weights)
         else:
-            raise NotImplementedError("Sherman woodbury not imlemented yet")
+            raise NotImplementedError(
+                "Sherman-Woodbury matrix inversion not implemented yet"
+            )
         return avg_score
 
     def score_samples(self, X, sherman_woodbury=False):
@@ -316,10 +343,12 @@ class BaseGaussianFactorModel(_BaseSGDModel):
             covariance = self.get_covariance()
             scores = _score_samples(covariance, X)
         else:
-            raise NotImplementedError("Sherman woodbury not imlemented yet")
+            raise NotImplementedError(
+                "Sherman-Woodbury matrix inversion not implemented yet"
+            )
         return scores
 
-    def entropy(self):
+    def get_entropy(self):
         """
         Computes the entropy of a Gaussian distribution parameterized by
         covariance.
@@ -337,14 +366,14 @@ class BaseGaussianFactorModel(_BaseSGDModel):
         entropy = _entropy(covariance)
         return entropy
 
-    def entropy_subset(self, idxs):
+    def get_entropy_subset(self, observed_feature_idxs):
         """
         Computes the entropy of a subset of the Gaussian distribution
         parameterized by covariance.
 
         Parameters
         ----------
-        idxs: np.array-like,(sum(p),)
+        observed_feature_idxs: np.array-like,(sum(p),)
             The observation locations
 
         Returns
@@ -353,20 +382,22 @@ class BaseGaussianFactorModel(_BaseSGDModel):
             The differential entropy of the distribution
         """
         covariance = self.get_covariance()
-        entropy = _entropy_subset(covariance, idxs)
+        entropy = _entropy_subset(covariance, observed_feature_idxs)
         return entropy
 
-    def mutual_information(self, idxs1, idxs2):
+    def mutual_information(
+        self, observed_feature_idxs1, observed_feature_idxs2
+    ):
         """
         This computes the mutual information bewteen the two sets of
         covariates based on the model.
 
         Parameters
         ----------
-        idxs1 : np.array-like,(p,)
+        observed_feature_idxs1 : np.array-like,(p,)
             First group of variables
 
-        idxs2 : np.array-like,(p,)
+        observed_feature_idxs2 : np.array-like,(p,)
             Second group of variables
 
         Returns
@@ -375,11 +406,13 @@ class BaseGaussianFactorModel(_BaseSGDModel):
             The mutual information between the two variables
         """
         covariance = self.get_covariance()
-        mutual_information = _mutual_information(covariance, idxs1, idxs2)
+        mutual_information = _mutual_information(
+            covariance, observed_feature_idxs1, observed_feature_idxs2
+        )
         return mutual_information
 
 
-class BaseGDModel(BaseGaussianFactorModel):
+class BaseSGDModel(BaseGaussianFactorModel, ABC):
     def __init__(
         self, n_components=2, training_options=None, prior_options=None
     ):
@@ -451,6 +484,20 @@ class BaseGDModel(BaseGaussianFactorModel):
             "momentum": 0.9,
         }
         tops = {**default_options, **training_options}
+
+        default_keys = set(default_options.keys())
+        final_keys = set(tops.keys())
+
+        expected_but_missing_keys = default_keys - final_keys
+        unexpected_but_present_keys = final_keys - default_keys
+        if expected_but_missing_keys:
+            raise ValueError(
+                "the following training options were expected but not found..."
+            )
+        if unexpected_but_present_keys:
+            raise ValueError(
+                "the following training options were unrecognized but provided..."
+            )
         return tops
 
     def _initialize_saved_losses(self):

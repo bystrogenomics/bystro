@@ -37,8 +37,7 @@ class PPCAanalytic(BaseGaussianFactorModel):
 
     def fit(self, X):
         """
-        Fits a model given covariates X as well as option labels y in the
-        supervised methods
+        Fits a model given covariates X 
 
         Parameters
         ----------
@@ -54,11 +53,11 @@ class PPCAanalytic(BaseGaussianFactorModel):
         L, p = self.n_components, self.p
 
         U, s, V = la.svd(X, full_matrices=False)
-        evals = s ** 2 / (N - 1)
+        eigenvals = s ** 2 / (N - 1)
 
-        var = 1.0 / (p - L) * (np.sum(evals) - np.sum(evals[:L]))
+        var = 1.0 / (p - L) * (np.sum(eigenvals) - np.sum(eigenvals[:L]))
 
-        L_m = np.diag((evals[:L] - np.ones(L) * var) ** 0.5)
+        L_m = np.diag((eigenvals[:L] - np.ones(L) * var) ** 0.5)
         W = np.dot(V[:L].T, L_m)
         self._save_variables([W, var])
 
