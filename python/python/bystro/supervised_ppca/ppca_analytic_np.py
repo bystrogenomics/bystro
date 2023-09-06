@@ -109,3 +109,7 @@ class PPCAanalytic(BaseGaussianFactorModel):
 
     def _transform_training_data(self):
         pass
+
+    def _save_variables(self):
+        pass
+
