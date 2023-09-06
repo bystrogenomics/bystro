@@ -84,14 +84,14 @@ class BaseSGDModel(abc.ABC):
         return training_opts
 
     @abc.abstractmethod
-    def _save_variables(self, training_variables):
+    def _store_instance_variables(self, trainable_variables):
         """
-        This saves the final parameter values after training
+        Saves the learned variables
 
         Parameters
         ----------
-        training_variables :list
-            The variables trained
+        trainable_variables : list
+            List of variables to save 
         """
 
     @abc.abstractmethod

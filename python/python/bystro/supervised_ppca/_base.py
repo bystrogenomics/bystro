@@ -103,17 +103,6 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
             The covariance matrix
         """
 
-    @abstractmethod
-    def _store_instance_variables(self, trainable_variables):
-        """
-        Saves the learned variables
-
-        Parameters
-        ----------
-        trainable_variables : list
-            List of tensorflow variables saved
-        """
-
     def get_precision(self):
         """
         Gets the precision matrix defined as the inverse of the covariance

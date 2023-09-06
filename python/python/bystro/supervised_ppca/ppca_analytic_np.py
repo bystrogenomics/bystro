@@ -27,13 +27,12 @@ class PPCAanalytic(BaseGaussianFactorModel):
     n_components : int,default=2
         The latent dimensionality
     """
+
     def __init__(self, n_components=2):
         super().__init__(n_components=n_components)
 
     def __repr__(self):
-        out_str = "PPCA_analytic object\n"
-        out_str += "n_components=%d\n" % self.n_components
-        return out_str
+        return f"PPCAAnalytic(n_components={self.n_components})"
 
     def fit(self, X):
         """
