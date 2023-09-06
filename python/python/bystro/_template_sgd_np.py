@@ -4,7 +4,8 @@ descent-based techniques for inference.
 
 Objects
 -------
-_BaseSGDModel(object):
+BaseSGDModel(training_options=None)
+    
 
 Methods
 -------
@@ -14,12 +15,13 @@ import abc
 import cloudpickle  # type: ignore
 
 
-class _BaseSGDModel(object):
+class BaseSGDModel(abc.ABC):
+    """
+    The base class of a model relying on stochastic gradient descent for
+    inference
+    """
+
     def __init__(self, training_options=None):
-        """
-        The base class of a model relying on stochastic gradient descent for
-        inference
-        """
         if training_options is None:
             training_options = {}
         self.training_options = self._fill_training_options(training_options)
@@ -51,8 +53,8 @@ class _BaseSGDModel(object):
         with open(path, "wb") as f:
             cloudpickle.dump(mydict, f)
 
-    @abc.abstractmethod
-    def unpickle(self, path):
+    @classmethod
+    def unpickle(cls, path):
         """
         Method for loading the model
 
@@ -61,6 +63,9 @@ class _BaseSGDModel(object):
         path : str
             The directory to load the model from
         """
+        with open(path, "rb") as f:
+            myDict = cloudpickle.load(f)
+        return myDict["model"]
 
     def _fill_training_options(self, training_options):
         """
@@ -79,16 +84,15 @@ class _BaseSGDModel(object):
         return training_opts
 
     @abc.abstractmethod
-    def _save_variables(self, training_variables):
+    def _store_instance_variables(self, trainable_variables):
         """
-        This saves the final parameter values after training
+        Saves the learned variables
 
         Parameters
         ----------
-        training_variables :list
-            The variables trained
+        trainable_variables : list
+            List of variables to save 
         """
-        raise NotImplementedError("_save_variables")
 
     @abc.abstractmethod
     def _initialize_save_losses(self):
@@ -99,7 +103,6 @@ class _BaseSGDModel(object):
         Parameters
         ----------
         """
-        raise NotImplementedError("_initialize_save_losses")
 
     @abc.abstractmethod
     def _save_losses(self, *args):
@@ -109,7 +112,6 @@ class _BaseSGDModel(object):
         Parameters
         ----------
         """
-        raise NotImplementedError("_save_losses")
 
     @abc.abstractmethod
     def _test_inputs(self, *args):
@@ -119,7 +121,6 @@ class _BaseSGDModel(object):
         Parameters
         ----------
         """
-        raise NotImplementedError("_transform_training_data")
 
     @abc.abstractmethod
     def _transform_training_data(self, *args):
@@ -129,4 +130,3 @@ class _BaseSGDModel(object):
         Parameters
         ----------
         """
-        raise NotImplementedError("_transform_training_data")
