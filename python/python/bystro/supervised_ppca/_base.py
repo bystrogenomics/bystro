@@ -48,10 +48,10 @@ from bystro.covariance._base_covariance import (  # type: ignore
 from numpy import linalg as la
 from datetime import datetime as dt
 import pytz
-from bystro._template_sgd_np import _BaseSGDModel  # type: ignore
+from bystro._template_sgd_np import BaseSGDModel  # type: ignore
 
 
-class BaseGaussianFactorModel(_BaseSGDModel, ABC):
+class BaseGaussianFactorModel(BaseSGDModel, ABC):
     def __init__(self, n_components=2):
         """
         This is the base class of the model. Will never be called directly.
@@ -412,7 +412,7 @@ class BaseGaussianFactorModel(_BaseSGDModel, ABC):
         return mutual_information
 
 
-class BaseSGDModel(BaseGaussianFactorModel, ABC):
+class BasePCASGDModel(BaseGaussianFactorModel, ABC):
     def __init__(
         self, n_components=2, training_options=None, prior_options=None
     ):
