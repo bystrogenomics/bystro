@@ -16,5 +16,5 @@ skops==0.7.post0
 tqdm==4.65.0
 cvxpy==1.2.1
 cloudpickle==2.0.*
-tensorflow==2.10.0
-torch==1.13.1
+tensorflow==2.11.0
+torch==2.0.1
