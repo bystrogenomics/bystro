@@ -192,7 +192,7 @@ def test_get_job_fail_validation(mocker):
 
     with pytest.raises(
         ValueError,
-        match=f"Invalid job type: dasfa. Valid types are: {','.join(JOB_TYPE_ROUTE_MAP.keys())}",
+        match=f"Invalid job type: dasfa. Valid types are: {', '.join(JOB_TYPE_ROUTE_MAP.keys())}",
     ):
         args = Namespace(dir="./", type="dasfa", id=None)
         get_jobs(args, print_result=False)
