@@ -46,6 +46,7 @@ from bystro.covariance._base_covariance import ( # type: ignore
 ) # type: ignore 
 from numpy import linalg as la
 from datetime import datetime as dt
+import pytz
 from bystro._template_sgd_np import _BaseSGDModel # type: ignore
 
 
@@ -65,7 +66,7 @@ class BaseGaussianFactorModel(_BaseSGDModel):
             The date/time that the object was created
         """
         self.n_components = int(n_components)
-        self.creationDate = dt.now(dt.timezone.utc)
+        self.creationDate = dt.now(pytz.timezone("US/Pacific"))
 
     @abstractmethod
     def fit(self, *args):
