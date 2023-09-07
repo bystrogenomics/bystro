@@ -31,3 +31,4 @@ sudo apt install -y npm;
 sudo npm install -g pm2;
 
 sudo apt install -y awscli;
+sudo apt install -y pkg-config;

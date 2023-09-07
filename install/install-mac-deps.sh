@@ -21,3 +21,4 @@ brew install nodejs;
 sudo npm install -g pm2;
 
 brew install awscli;
+brew install pkg-config;
