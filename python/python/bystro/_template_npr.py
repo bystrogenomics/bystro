@@ -10,7 +10,7 @@ hyperameter selections respectively.
 
 Objects
 -------
-_BaseNPRModel(object)
+BaseNumpyroModel(mcmc_options=None,hp_options=None)
     This is the template Numpyro model
 
 """
@@ -19,7 +19,11 @@ import cloudpickle  # type: ignore
 import numpyro  # type: ignore
 
 
-class _BaseNumpyroModel:
+class BaseNumpyroModel(abc.ABC):
+    """
+    The template for a numpyro-based model
+    """
+
     def __init__(self, mcmc_options=None, hp_options=None):
         """
 
@@ -75,11 +79,12 @@ class _BaseNumpyroModel:
         -------
 
         """
-        assert self.samples is not None, "Fit model first"
+        mydict = {"model": self}
         with open(path, "wb") as f:
-            cloudpickle.dump(self.samples, f)
+            cloudpickle.dump(mydict, f)
 
-    def unpickle(self, path):
+    @classmethod
+    def unpickle(cls, path):
         """
         This loads samples from a previously saved model
 
@@ -91,7 +96,8 @@ class _BaseNumpyroModel:
 
         """
         with open(path, "rb") as f:
-            self.samples = cloudpickle.load(f)
+            myDict = cloudpickle.load(f)
+        return myDict["model"]
 
     def _fill_mcmc_options(self, mcmc_options):
         """
