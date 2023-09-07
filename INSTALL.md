@@ -35,7 +35,10 @@ docker run bystro bystro-build.pl #Build
 
 ###### (Ubuntu)
 
-1.  `git clone https://github.com/akotlar/bystro.git && cd bystro && source ./install-apt.sh`
+
+1.  Ensure that packages are up to date (`sudo apt update`), or that you are satisified with the state of package versions.
+2.  `git clone https://github.com/akotlar/bystro.git && cd bystro && source ./install-apt.sh`
+    - Please note that this installation script requires root priveleges, in order to install system dependencies
 
 ## Example of installation on RPM-based Amazon AMI (any 'yum'-capable Amazon AMI)
 
