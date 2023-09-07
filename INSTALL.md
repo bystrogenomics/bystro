@@ -25,11 +25,11 @@ There are 2 components to Bystro:
 
 ## Installing the Bystro annotator (Perl/cli)
 
-###### (Fedora, Redhat, Centos, openSUSE, Mandriva)
+##### (Fedora, Redhat, Centos, openSUSE, Mandriva)
 
 1.  `git clone https://github.com/akotlar/bystro.git && cd bystro && source ./install-rpm.sh`
 
-###### MacOS (tested on HighSierra, interactive)
+##### MacOS (tested on HighSierra, interactive)
 
 1.  `git clone https://github.com/akotlar/bystro.git && cd bystro && source ./install-mac.sh`
 
