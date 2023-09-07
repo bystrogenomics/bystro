@@ -31,18 +31,18 @@ None
 """
 import numpy as np
 
-from sklearn import decomposition as dp
-from tqdm import trange
+from sklearn import decomposition as dp  # type: ignore
+from tqdm import trange  # type: ignore
 import torch
 from torch import nn
 from torch.distributions.multivariate_normal import MultivariateNormal
 from torch.distributions.gamma import Gamma
 
 from bystro.supervised_ppca._misc_np import softplus_inverse_np
-from bystro.supervised_ppca._base import BaseSGDModel
+from bystro.supervised_ppca._base import BasePCASGDModel
 
 
-class PPCApt(BaseSGDModel):
+class PPCApt(BasePCASGDModel):
     def __init__(
         self, n_components=2, prior_options=None, training_options=None
     ):
@@ -94,17 +94,19 @@ class PPCApt(BaseSGDModel):
         self : object
             The model
         """
+        self._test_inputs(X)
         td = self.training_options
         N, p = X.shape
         self.p = p
         rng = np.random.default_rng(int(seed))
 
         W_, sigmal_ = self._initialize_variables(X)
-        X = torch.tensor(X)
+
+        X = self._transform_training_data(X)[0]
 
         trainable_variables = [W_, sigmal_]
 
-        self._initialize_saved_losses()
+        self._initialize_save_losses()
 
         optimizer = torch.optim.SGD(
             trainable_variables, lr=td["learning_rate"], momentum=td["momentum"]
@@ -137,7 +139,7 @@ class PPCApt(BaseSGDModel):
 
             self._save_losses(i, like_tot, like_prior, posterior)
 
-        self._save_variables(trainable_variables)
+        self._store_instance_variables(trainable_variables)
 
         return self
 
@@ -160,7 +162,7 @@ class PPCApt(BaseSGDModel):
         return covariance
 
     def _create_prior(self):
-        """ 
+        """
         This creates the function representing prior on pararmeters
 
         Parameters
@@ -171,9 +173,12 @@ class PPCApt(BaseSGDModel):
         pd = self.prior_options
 
         def log_prior(trainable_variables):
-            return pd["weight_W"] * torch.mean(
-                torch.square(trainable_variables)
-            ) + Gamma(pd["alpha"], pd["beta"].log_prob(trainable_variables[1]))
+            W_ = trainable_variables[0]
+            sigma_ = trainable_variables[1]
+            part1 = -1*pd["weight_W"] * torch.mean(torch.square(W_))
+            part2 = Gamma(pd["alpha"], pd["beta"]).log_prob(sigma_)
+            out = torch.mean(part1+part2)
+            return out
 
         return log_prior
 
@@ -205,7 +210,7 @@ class PPCApt(BaseSGDModel):
         return W_, sigmal_
 
     def _save_losses(self, i, log_likelihood, log_prior, log_posterior):
-        """ 
+        """
         Saves the values of the losses at each iteration
 
         Parameters
@@ -229,7 +234,7 @@ class PPCApt(BaseSGDModel):
             self.losses_prior[i] = log_prior
         self.losses_posterior[i] = log_posterior.detach().numpy()
 
-    def _save_variables(self, trainable_variables):
+    def _store_instance_variables(self, trainable_variables):
         """
         Saves the learned variables
 
@@ -249,6 +254,13 @@ class PPCApt(BaseSGDModel):
         self.W_ = trainable_variables[0].detach().numpy()
         self.sigma2_ = nn.Softplus()(trainable_variables[1]).detach().numpy()
 
+    def _test_inputs(self, X):
+        """
+        Just tests to make sure data is numpy array
+        """
+        if isinstance(X, np.ndarray) is False:
+            raise ValueError("Data is numpy array")
+
     def _fill_prior_options(self, prior_options):
         """
         Fills in options for prior parameters
@@ -263,7 +275,7 @@ class PPCApt(BaseSGDModel):
         return new_dict
 
 
-class SPCApt(BaseSGDModel):
+class SPCApt(BasePCASGDModel):
     def __init__(
         self, n_components=2, prior_options=None, training_options=None
     ):
@@ -318,15 +330,17 @@ class SPCApt(BaseSGDModel):
         self : object
             The model
         """
+        self._test_inputs(X,groups)
         td = self.training_options
         N, p = X.shape
         self.p = p
+        self.n_groups = len(np.unique(groups))
         rng = np.random.default_rng(int(seed))
 
         W_, sigmals_ = self._initialize_variables(X)
-        X = torch.tensor(X)
 
-        self.n_groups = len(np.unique(groups))
+        X = self._transform_training_data(X)[0]
+
         self.groups = groups
         list_constants = []
         for i in range(self.n_groups):
@@ -336,7 +350,7 @@ class SPCApt(BaseSGDModel):
 
         trainable_variables = [W_] + sigmals_
 
-        self._initialize_saved_losses()
+        self._initialize_save_losses()
 
         optimizer = torch.optim.SGD(
             trainable_variables, lr=td["learning_rate"], momentum=td["momentum"]
@@ -351,11 +365,12 @@ class SPCApt(BaseSGDModel):
             idx = rng.choice(X.shape[0], size=td["batch_size"], replace=False)
             X_batch = X[idx]
 
-            sigma = torch.sum(
-                [
+            list_covs = [
                     softplus(sigmals_[k]) * list_constants[k]
                     for k in range(self.n_groups)
-                ],
+            ]
+
+            sigma = torch.sum(list_covs,
                 dim=0,
             )
             WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
@@ -374,7 +389,7 @@ class SPCApt(BaseSGDModel):
 
             self._save_losses(i, like_tot, like_prior, posterior)
 
-        self._save_variables(trainable_variables)
+        self._store_instance_variables(trainable_variables)
 
         return self
 
@@ -463,7 +478,7 @@ class SPCApt(BaseSGDModel):
         ]
         return W_, sigmal_
 
-    def _save_variables(self, trainable_variables):
+    def _store_instance_variables(self, trainable_variables):
         """
         Saves the learned variables
 
@@ -486,8 +501,19 @@ class SPCApt(BaseSGDModel):
             sigma2 = nn.Softplus()(trainable_variables[k + 1])
             self.sigmas_[self.groups == k] = sigma2
 
+    def _test_inputs(self, X, groups):
+        """
+        Just tests to make sure data is numpy array
+        """
+        if isinstance(X, np.ndarray) is False:
+            raise ValueError("X is numpy array")
+        if isinstance(groups, np.ndarray) is False:
+            raise ValueError("groups is numpy array")
+        if X.shape[1] != len(groups):
+            raise ValueError("Dimensions do not match")
 
-class FactorAnalysispt(BaseSGDModel):
+
+class FactorAnalysispt(BasePCASGDModel):
     def __init__(
         self, n_components=2, prior_options=None, training_options=None
     ):
@@ -533,17 +559,19 @@ class FactorAnalysispt(BaseSGDModel):
         self : object
             The model
         """
+        self._test_inputs(X)
         td = self.training_options
         N, p = X.shape
         self.p = p
         rng = np.random.default_rng(int(seed))
 
         W_, sigmal_ = self._initialize_variables(X)
-        X = torch.tensor(X)
+
+        X = self._transform_training_data(X)[0]
 
         trainable_variables = [W_, sigmal_]
 
-        self._initialize_saved_losses()
+        self._initialize_save_losses()
 
         optimizer = torch.optim.SGD(
             trainable_variables, lr=td["learning_rate"], momentum=td["momentum"]
@@ -576,7 +604,7 @@ class FactorAnalysispt(BaseSGDModel):
 
             self._save_losses(i, like_tot, like_prior, posterior)
 
-        self._save_variables(trainable_variables)
+        self._store_instance_variables(trainable_variables)
 
         return self
 
@@ -610,8 +638,9 @@ class FactorAnalysispt(BaseSGDModel):
         pd = self.prior_options
 
         def log_prior(trainable_variables):
+            sigma_ = nn.Softmax()(trainable_variables[1])
             return torch.mean(
-                Gamma(pd["alpha"], pd["beta"]).log_prob(trainable_variables[1])
+                Gamma(pd["alpha"], pd["beta"]).log_prob(sigma_)
             )
 
         return log_prior
@@ -658,7 +687,7 @@ class FactorAnalysispt(BaseSGDModel):
         )
         return W_, sigmal_
 
-    def _save_variables(self, trainable_variables):
+    def _store_instance_variables(self, trainable_variables):
         """
         Saves the learned variables
 
@@ -676,4 +705,11 @@ class FactorAnalysispt(BaseSGDModel):
             The diagonal variances
         """
         self.W_ = trainable_variables[0].detach().numpy()
-        self.sigma2_ = nn.Softplus()(trainable_variables[1]).detach().numpy()
+        self.sigmas_ = nn.Softplus()(trainable_variables[1]).detach().numpy()
+
+    def _test_inputs(self, X):
+        """
+        Just tests to make sure data is numpy array
+        """
+        if isinstance(X, np.ndarray) is False:
+            raise ValueError("Data is numpy array")

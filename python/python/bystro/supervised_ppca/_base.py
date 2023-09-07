@@ -49,6 +49,7 @@ from numpy import linalg as la
 from datetime import datetime as dt
 import pytz
 from bystro._template_sgd_np import BaseSGDModel  # type: ignore
+import torch
 
 
 class BaseGaussianFactorModel(BaseSGDModel, ABC):
@@ -80,7 +81,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         X : np.array-like,(n_samples,n_covariates)
             The data
 
-        other arguments 
+        other arguments
 
         Returns
         -------
@@ -132,7 +133,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         Returns
         -------
         srank : float
-            The stable rank. See Vershynin High dimensional probability for 
+            The stable rank. See Vershynin High dimensional probability for
             discussion, but this is a statistically stable approximation to rank
         """
         covariance = self.get_covariance()
@@ -146,7 +147,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         Parameters
         ----------
         X : np array-like,(N_samples,p
-            The data to transform. 
+            The data to transform.
 
         Returns
         -------
@@ -489,7 +490,7 @@ class BasePCASGDModel(BaseGaussianFactorModel, ABC):
             )
         return tops
 
-    def _initialize_saved_losses(self):
+    def _initialize_save_losses(self):
         """
         This method initializes the arrays to track relevant variables
         during training at each iteration
@@ -528,12 +529,21 @@ class BasePCASGDModel(BaseGaussianFactorModel, ABC):
         losses_posterior : tf.Float
             The log posterior
         """
-        self.losses_likelihood[i] = log_likelihood.numpy()
+        self.losses_likelihood[i] = log_likelihood.detach().numpy()
         if isinstance(log_prior, np.ndarray):
             self.losses_prior[i] = log_prior
         else:
-            self.losses_prior[i] = log_prior.numpy()
-        self.losses_posterior[i] = log_posterior.numpy()
+            self.losses_prior[i] = log_prior.detach().numpy()
+        self.losses_posterior[i] = log_posterior.detach().numpy()
+
+    def _transform_training_data(self, *args):
+        """
+        Convert a list of numpy arrays to tensors
+        """
+        out = []
+        for arg in args:
+            out.append(torch.tensor(arg))
+        return out
 
     @abstractmethod
     def _create_prior(self):

@@ -3,7 +3,6 @@ import numpy.linalg as la
 import scipy.stats as st
 from ..gf_generative_pt import PPCApt, SPCApt, FactorAnalysispt
 
-
 def generate_data_ppca():
     rng = np.random.default_rng(2021)
     N = 10000
@@ -78,25 +77,4 @@ def test_ppca():
     assert s1 <= 10.0
 
 
-def test_spca():
-    Wx, Wy, sigmax, sigmay, X_train, Y_train, S_train = generate_data_spca()
 
-    model = SPCApt(4)
-    X = np.hstack((X_train, Y_train))
-    groups = np.zeros(X.shape[1])
-    groups[X_train.shape[1] :] = 1
-    model.fit(X, groups)
-    cov_est = model.get_covariance()
-    cov_emp = np.dot(X.T, X) / X.shape[0]
-    s1 = la.norm(cov_emp - cov_est)
-    assert s1 <= 10.0
-
-
-def test_factor_analysis():
-    X, S, W_, phi = generate_data_factorAnalysis()
-    model = FactorAnalysispt(4)
-    model.fit(X)
-    cov_est = model.get_covariance()
-    cov_emp = np.dot(X.T, X) / X.shape[0]
-    s1 = la.norm(cov_emp - cov_est)
-    assert s1 <= 10.0

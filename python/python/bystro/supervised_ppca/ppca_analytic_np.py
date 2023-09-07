@@ -36,7 +36,7 @@ class PPCAanalytic(BaseGaussianFactorModel):
 
     def fit(self, X):
         """
-        Fits a model given covariates X 
+        Fits a model given covariates X
 
         Parameters
         ----------
@@ -52,7 +52,7 @@ class PPCAanalytic(BaseGaussianFactorModel):
         L, p = self.n_components, self.p
 
         U, s, V = la.svd(X, full_matrices=False)
-        eigenvals = s ** 2 / (N - 1)
+        eigenvals = s**2 / (N - 1)
 
         var = 1.0 / (p - L) * (np.sum(eigenvals) - np.sum(eigenvals[:L]))
 
@@ -112,4 +112,3 @@ class PPCAanalytic(BaseGaussianFactorModel):
 
     def _save_variables(self):
         pass
-
