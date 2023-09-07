@@ -19,30 +19,39 @@ docker run bystro bystro-annotate.pl #Annotate
 docker run bystro bystro-build.pl #Build
 ```
 
-## Installation on RPM-based distros
+## Direct (non-Docker) installation
+
+If you wish to directly install Bystro, we recommend using Miniconda to manage Bystro Python dependencies: https://docs.conda.io/projects/miniconda/en/latest/
+
+Once Bystro annotator installation is complete, and assuming Conda/Miniconda has been installed, run :
+
+```sh
+# Create or activate Bystro conda environment and install all dependencies
+. bystro/.initialize_conda_env.sh
+```
+
+to install the Python package dependencies, followed by:
+```
+# Build the Python package for local use
+make build
+```
+
+### Installing the annotator on RPM-based distros
 
 ###### (Fedora, Redhat, Centos, openSUSE, Mandriva)
 
 1.  `git clone https://github.com/akotlar/bystro.git && cd bystro && source ./install-rpm.sh`
 
-## Installation on MacOS
+### Installing the annotator on MacOS
 
 ###### (tested on HighSierra, interactive)
 
 1.  `git clone https://github.com/akotlar/bystro.git && cd bystro && source ./install-mac.sh`
 
-## Installation on Debian systems
-
-###### (Ubuntu)
-
-
+### Installing the annotator on Ubuntu
 1.  Ensure that packages are up to date (`sudo apt update`), or that you are satisified with the state of package versions.
 2.  `git clone https://github.com/akotlar/bystro.git && cd bystro && source ./install-apt.sh`
     - Please note that this installation script requires root priveleges, in order to install system dependencies
-
-## Example of installation on RPM-based Amazon AMI (any 'yum'-capable Amazon AMI)
-
-Run the script found @ https://github.com/akotlar/bystro-aws
 
 ## Configuring Bystro for annotation
 
