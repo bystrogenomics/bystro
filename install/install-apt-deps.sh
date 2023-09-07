@@ -2,7 +2,6 @@
 
 echo -e "\n\nInstalling Ubuntu/Debian (apt-get) dependencies\n";
 
-sudo apt update;
 # Installs gcc, and more; may be too much
 sudo apt install -y build-essential;
 
