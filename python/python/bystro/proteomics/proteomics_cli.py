@@ -1,35 +1,38 @@
-from typing import Tuple, BinaryIO
+"""Provide a CLI for proteomics analysis."""
 import argparse
-import os
-import requests
+from pathlib import Path
+from typing import Any, BinaryIO
 
+import requests
+from bystro.api.cli import DEFAULT_DIR, authenticate, login
 from msgspec import json as mjson
 
-from bystro.api.cli import DEFAULT_DIR, authenticate, login
+# ruff: noqa: T201
 
 UPLOAD_PROTEIN_ENDPOINT = "/api/jobs/upload_protein/"
+HTTP_STATUS_OK = 200
 
 
-def _package_filename(filename: str) -> Tuple[str, Tuple[str, BinaryIO, str]]:
+def _package_filename(filename: str) -> tuple[str, tuple[str, BinaryIO, str]]:
     """Wrap filename in a container suitable for upload through the requests library."""
+    filepath = Path(filename)
     return (
         "file",
         (
-            os.path.basename(filename),
-            open(filename, "rb"),  # noqa: SIM115
+            filepath.name,
+            filepath.open("rb"),
             "application/octet-stream",
         ),
     )
 
 
-def upload_proteomics_dataset(args: argparse.Namespace, print_result=True) -> dict:
-    """Upload a proteomics dataset (consisting of a protein abundance
-    file and an experiment annnotation file) through the /api/jobs/upload_protein endpoint.
+def upload_proteomics_dataset(args: argparse.Namespace, *, print_result: bool = True) -> dict[str, Any]:
+    """Upload a fragpipe-TMT dataset through the /api/jobs/upload_protein endpoint.
 
     Parameters
     ----------
     args : argparse.Namespace
-        The arguments passed to the command.
+        The arguments passed to the command
     print_result : bool, optional
         Whether to print the result of the upload operation, by default True.
 
@@ -40,13 +43,13 @@ def upload_proteomics_dataset(args: argparse.Namespace, print_result=True) -> di
 
     """
     state, auth_header = authenticate(args)
-    url = os.path.join(state.url, UPLOAD_PROTEIN_ENDPOINT)
+    url = str(state.url / Path(UPLOAD_PROTEIN_ENDPOINT))
 
     payload = {
         "job": mjson.encode(
             {
-                "protein_abundance_file": os.path.basename(args.protein_abundance_file),
-                "experiment_annotation_file": os.path.basename(args.experiment_annotation_file),
+                "protein_abundance_file": Path(args.protein_abundance_file).name,
+                "experiment_annotation_file": Path(args.experiment_annotation_file).name,
                 "proteomics_dataset_type": "fragpipe-TMT",  # we currently only support this format
             }
         )
@@ -60,21 +63,28 @@ def upload_proteomics_dataset(args: argparse.Namespace, print_result=True) -> di
 
     response = requests.post(url, headers=auth_header, data=payload, files=files, timeout=30)
 
-    if response.status_code != 200:
-        raise RuntimeError(
-            f"Job creation failed with response status: {response.status_code}.\
-                Error: \n{response.text}\n"
+    if response.status_code != HTTP_STATUS_OK:
+        msg = (
+            f"Job creation failed with response status: {response.status_code}.  "
+            f"Error: \n{response.text}\n"
         )
+        raise RuntimeError(msg)
 
     if print_result:
         print("\nJob creation successful:\n")
         print(mjson.format(response.text, indent=4))
         print("\n")
 
-    return response.json()
+    response_json: dict[str, Any] = response.json()
+    return response_json
 
 
-def _add_login_subparser(subparsers) -> None:
+#  subparsers is a public class of argparse but is named with a
+#  leading underscore, which is a design flaw.  The noqas on the helper methods below
+#  below suppress the warnings about this.
+
+
+def _add_login_subparser(subparsers: argparse._SubParsersAction) -> None:  # noqa: SLF001
     """Add subparser for login command."""
     login_parser = subparsers.add_parser("login", help="Authenticate with the Bystro API")
     login_parser.add_argument(
@@ -91,7 +101,9 @@ def _add_login_subparser(subparsers) -> None:
     login_parser.set_defaults(func=login)
 
 
-def _add_upload_proteomics_dataset_subparser(subparsers) -> None:
+def _add_upload_proteomics_dataset_subparser(
+    subparsers: argparse._SubParsersAction,  # noqa: SLF001
+) -> None:
     """Add subparser for upload_proteomics_dataset command."""
     upload_proteomics_dataset_parser = subparsers.add_parser(
         "upload-proteomics-dataset", help="Upload a Fragpipe TMT proteomics dataset"
@@ -128,13 +140,14 @@ def _configure_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main():
+def main() -> None:
+    """Run the proteomics CLI."""
     parser = _configure_parser()
     args = parser.parse_args()
     if hasattr(args, "func"):
         try:
             args.func(args)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"\nSomething went wrong:\t{e}\n")
 
     else:

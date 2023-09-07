@@ -1,10 +1,9 @@
 from argparse import Namespace
-import os
-
-from msgspec import json as mjson
+from pathlib import Path
 
 from bystro.api.tests.test_cli import EXAMPLE_CACHED_AUTH
 from bystro.proteomics.proteomics_cli import _configure_parser, upload_proteomics_dataset
+from msgspec import json as mjson
 
 
 def test_upload_proteomics_dataset(mocker):
@@ -24,10 +23,8 @@ def test_upload_proteomics_dataset(mocker):
         ),
     )
 
-    protein_abundance_filename = os.path.join(os.path.dirname(__file__), "protein_abundance_file.tsv")
-    experiment_annotation_filename = os.path.join(
-        os.path.dirname(__file__), "experiment_annotation_file.tsv"
-    )
+    protein_abundance_filename = str(Path(__file__).parent / "protein_abundance_file.tsv")
+    experiment_annotation_filename = str(Path(__file__).parent / "experiment_annotation_file.tsv")
 
     args = Namespace(
         protein_abundance_file=protein_abundance_filename,
