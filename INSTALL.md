@@ -1,10 +1,8 @@
-# Bystro installation
-
 For most users, we recommend not installing the software, and using https://bystro.io, where the software is hosted
 
-The web app provides full functionality for any size experiment (up to 890GB uncompressed/129GB compressed tested), a convenient search interface, and excellent performance
+The web app provides full functionality for any size experiment, a convenient search interface, and excellent performance
 
-## Docker
+# Installing Bystro using Docker
 
 ###### The recommended way to use Bystro on the command line
 
@@ -19,41 +17,54 @@ docker run bystro bystro-annotate.pl #Annotate
 docker run bystro bystro-build.pl #Build
 ```
 
-## Direct (non-Docker) installation
+# Direct (non-Docker) installation
 
-If you wish to directly install Bystro, we recommend using Miniconda to manage Bystro Python dependencies: https://docs.conda.io/projects/miniconda/en/latest/
+There are 2 components to Bystro:
+ 1. The Bystro annotator: a Perl program accessed through the command line (via bin/bystro-*)
+ 2. The Bystro Python package: where the rest of Bystro's functionality lives (statistics, proteomics, etc).
 
-Once Bystro annotator installation is complete, and assuming Conda/Miniconda has been installed, run :
-
-```sh
-# Create or activate Bystro conda environment and install all dependencies
-. bystro/.initialize_conda_env.sh
-```
-
-to install the Python package dependencies, followed by:
-```
-# Build the Python package for local use
-make build
-```
-
-### Installing the annotator on RPM-based distros
+## Installing the Bystro annotator (Perl/cli)
 
 ###### (Fedora, Redhat, Centos, openSUSE, Mandriva)
 
 1.  `git clone https://github.com/akotlar/bystro.git && cd bystro && source ./install-rpm.sh`
 
-### Installing the annotator on MacOS
-
-###### (tested on HighSierra, interactive)
+###### MacOS (tested on HighSierra, interactive)
 
 1.  `git clone https://github.com/akotlar/bystro.git && cd bystro && source ./install-mac.sh`
 
-### Installing the annotator on Ubuntu
+##### Ubuntu
 1.  Ensure that packages are up to date (`sudo apt update`), or that you are satisified with the state of package versions.
 2.  `git clone https://github.com/akotlar/bystro.git && cd bystro && source ./install-apt.sh`
     - Please note that this installation script requires root priveleges, in order to install system dependencies
 
-## Configuring Bystro for annotation
+## Installing the Bystro Python libraries and cli tools
+
+We recommend using Miniconda to manage Bystro Python dependencies: https://docs.conda.io/projects/miniconda/en/latest/
+
+Once Bystro annotator installation is complete, and assuming Conda/Miniconda has been installed, run :
+
+```sh
+# Install Rust
+curl https://sh.rustup.rs -sSf | sh -s -- -y
+echo -e "\n### Bystro: Done installing Rust! Now sourcing .cargo/env for use in the current shell ###\n"
+source "$HOME/.cargo/env"
+# Create or activate Bystro conda environment and install all dependencies
+# This assumes you are in the bystro folder
+source .initialize_conda_env.sh;
+```
+
+to install the Python package dependencies. Then, run:
+```
+# Build the Python package for local use
+make build
+```
+
+to intall the Bystro Python library.
+
+Follow the instructions below to install the Bystro annotator:
+
+## Configuring the Bystro annotator
 
 Once Bystro is installed, it needs to be configured. The easiest step is choosing the species/assemblies to annotate.
 
