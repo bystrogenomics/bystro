@@ -1,7 +1,7 @@
 import numpy as np
 import numpy.linalg as la
 import scipy.stats as st  # type: ignore
-from bystro.supervised_ppca.gf_generative_pt import PPCApt
+from bystro.supervised_ppca.gf_generative_pt import PPCA
 
 
 def generate_data_ppca():
@@ -70,7 +70,7 @@ def generate_data_factorAnalysis():
 
 def test_ppca():
     W, sigma, X, S_train = generate_data_ppca()
-    model = PPCApt(4)
+    model = PPCA(4, training_options={"n_iterations": 100})
     model.fit(X)
     cov_est = model.get_covariance()
     cov_emp = np.dot(X.T, X) / X.shape[0]

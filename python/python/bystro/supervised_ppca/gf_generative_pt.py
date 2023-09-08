@@ -43,7 +43,7 @@ from bystro.supervised_ppca._misc_np import softplus_inverse_np
 from bystro.supervised_ppca._base import BasePCASGDModel
 
 
-class PPCApt(BasePCASGDModel):
+class PPCA(BasePCASGDModel):
     def __init__(
         self, n_components=2, prior_options=None, training_options=None
     ):
@@ -71,6 +71,7 @@ class PPCApt(BasePCASGDModel):
             prior_options=prior_options,
             training_options=training_options,
         )
+        self._initialize_save_losses()
 
     def __repr__(self):
         return f"PPCApt(n_components={self.n_components})"
@@ -94,7 +95,7 @@ class PPCApt(BasePCASGDModel):
             The model
         """
         self._test_inputs(X)
-        td = self.training_options
+        training_options = self.training_options
         N, p = X.shape
         self.p = p
         rng = np.random.default_rng(int(seed))
@@ -105,10 +106,10 @@ class PPCApt(BasePCASGDModel):
 
         trainable_variables = [W_, sigmal_]
 
-        self._initialize_save_losses()
-
         optimizer = torch.optim.SGD(
-            trainable_variables, lr=td["learning_rate"], momentum=td["momentum"]
+            trainable_variables,
+            lr=training_options["learning_rate"],
+            momentum=training_options["momentum"],
         )
         eye = torch.tensor(np.eye(p).astype(np.float32))
         softplus = nn.Softplus()
@@ -117,8 +118,10 @@ class PPCApt(BasePCASGDModel):
 
         myrange = trange if progress_bar else range
 
-        for i in myrange(td["n_iterations"]):
-            idx = rng.choice(X.shape[0], size=td["batch_size"], replace=False)
+        for i in myrange(training_options["n_iterations"]):
+            idx = rng.choice(
+                X.shape[0], size=training_options["batch_size"], replace=False
+            )
             X_batch = X[idx]
 
             sigma = softplus(sigmal_)
@@ -169,13 +172,17 @@ class PPCApt(BasePCASGDModel):
         log_prior : function
             The function representing the log density of the prior
         """
-        po = self.prior_options
+        prior_options = self.prior_options
 
         def log_prior(trainable_variables):
             W_ = trainable_variables[0]
             sigma_ = trainable_variables[1]
-            part1 = -1 * po["weight_W"] * torch.mean(torch.square(W_))
-            part2 = Gamma(po["alpha"], po["beta"]).log_prob(sigma_)
+            part1 = (
+                -1 * prior_options["weight_W"] * torch.mean(torch.square(W_))
+            )
+            part2 = Gamma(
+                prior_options["alpha"], prior_options["beta"]
+            ).log_prob(sigma_)
             out = torch.mean(part1 + part2)
             return out
 
@@ -183,7 +190,9 @@ class PPCApt(BasePCASGDModel):
 
     def _initialize_variables(self, X):
         """
-        Initializes the variables of the model
+        Initializes the variables of the model. Right now fits a PCA model
+        in sklearn, uses the loadings and sets sigma^2 to be unexplained
+        variance.
 
         Parameters
         ----------
@@ -192,11 +201,11 @@ class PPCApt(BasePCASGDModel):
 
         Returns
         -------
-        W_ : tf.Variable-like,(n_components,p)
+        W_ : torch.tensor,shape=(n_components,p)
             The loadings of our latent factor model
 
-        sigmal_ : tf.Float
-            The variance of the model
+        sigmal_ : torch.tensor
+            The unrectified variance of the model
         """
         model = PCA(self.n_components)
         S_hat = model.fit_transform(X)
@@ -217,13 +226,13 @@ class PPCApt(BasePCASGDModel):
         i : int
             Current training iteration
 
-        losses_likelihood : tf.Float
+        losses_likelihood : torch.tensor
             The log likelihood
 
-        losses_prior : tf.Float
+        losses_prior : torch.tensor
             The log prior
 
-        losses_posterior : tf.Float
+        losses_posterior : torch.tensor
             The log posterior
         """
         self.losses_likelihood[i] = log_likelihood.detach().numpy()
@@ -259,7 +268,7 @@ class PPCApt(BasePCASGDModel):
         """
         if not isinstance(X, np.ndarray):
             raise ValueError("Data is numpy array")
-        if self.training_options["batch_size"] < X.shape[0]:
+        if self.training_options["batch_size"] > X.shape[0]:
             raise ValueError("Batch size exceeds number of samples")
 
     def _fill_prior_options(self, prior_options):
@@ -276,7 +285,7 @@ class PPCApt(BasePCASGDModel):
         return new_dict
 
 
-class SPCApt(BasePCASGDModel):
+class SPCA(BasePCASGDModel):
     def __init__(
         self, n_components=2, prior_options=None, training_options=None
     ):
@@ -307,6 +316,7 @@ class SPCApt(BasePCASGDModel):
             prior_options=prior_options,
             training_options=training_options,
         )
+        self._initialize_save_losses()
 
     def __repr__(self):
         return f"SPCApt(n_components={self.n_components})"
@@ -329,7 +339,7 @@ class SPCApt(BasePCASGDModel):
             The model
         """
         self._test_inputs(X, groups)
-        td = self.training_options
+        training_options = self.training_options
         N, p = X.shape
         self.p = p
         self.n_groups = len(np.unique(groups))
@@ -348,10 +358,10 @@ class SPCApt(BasePCASGDModel):
 
         trainable_variables = [W_] + sigmals_
 
-        self._initialize_save_losses()
-
         optimizer = torch.optim.SGD(
-            trainable_variables, lr=td["learning_rate"], momentum=td["momentum"]
+            trainable_variables,
+            lr=training_options["learning_rate"],
+            momentum=training_options["momentum"],
         )
         softplus = nn.Softplus()
 
@@ -359,8 +369,10 @@ class SPCApt(BasePCASGDModel):
 
         myrange = trange if progress_bar else range
 
-        for i in myrange(td["n_iterations"]):
-            idx = rng.choice(X.shape[0], size=td["batch_size"], replace=False)
+        for i in myrange(training_options["n_iterations"]):
+            idx = rng.choice(
+                X.shape[0], size=training_options["batch_size"], replace=False
+            )
             X_batch = X[idx]
 
             list_covs = [
@@ -416,15 +428,15 @@ class SPCApt(BasePCASGDModel):
         log_prior : function
             The function representing the negative log density of the prior
         """
-        pd = self.prior_options
+        prior_options = self.prior_options
 
         def log_prior(trainable_variables):
             list_gamma_log_probs = []
             for k in self.n_groups:
                 list_gamma_log_probs.append(
-                    Gamma(pd["alpha"], pd["beta"]).log_prob(
-                        trainable_variables[k + 1]
-                    )
+                    Gamma(
+                        prior_options["alpha"], prior_options["beta"]
+                    ).log_prob(trainable_variables[k + 1])
                 )
 
             gamma_log_probs = torch.stack(list_gamma_log_probs)
@@ -447,7 +459,9 @@ class SPCApt(BasePCASGDModel):
 
     def _initialize_variables(self, X):
         """
-        Initializes the variables of the model
+        Initializes the variables of the model. Right now fits a PCA model
+        in sklearn, uses the loadings and sets sigma^2 to be unexplained
+        variance for each group.
 
         Parameters
         ----------
@@ -456,7 +470,7 @@ class SPCApt(BasePCASGDModel):
 
         Returns
         -------
-        W_ : tf.Variable-like,(n_components,p)
+        W_ : torch.tensor-like,(n_components,p)
             The loadings of our latent factor model
 
         sigmal_ : list
@@ -507,11 +521,11 @@ class SPCApt(BasePCASGDModel):
             raise ValueError("groups is numpy array")
         if X.shape[1] != len(groups):
             raise ValueError("Dimensions do not match")
-        if self.training_options["batch_size"] < X.shape[0]:
+        if self.training_options["batch_size"] > X.shape[0]:
             raise ValueError("Batch size exceeds number of samples")
 
 
-class FactorAnalysispt(BasePCASGDModel):
+class FactorAnalysis(BasePCASGDModel):
     def __init__(
         self, n_components=2, prior_options=None, training_options=None
     ):
@@ -536,6 +550,7 @@ class FactorAnalysispt(BasePCASGDModel):
             prior_options=prior_options,
             training_options=training_options,
         )
+        self._initialize_save_losses()
 
     def __repr__(self):
         return f"FactorAnalysispt(n_components={self.n_components})"
@@ -555,7 +570,7 @@ class FactorAnalysispt(BasePCASGDModel):
             The model
         """
         self._test_inputs(X)
-        td = self.training_options
+        training_options = self.training_options
         N, p = X.shape
         self.p = p
         rng = np.random.default_rng(int(seed))
@@ -566,10 +581,10 @@ class FactorAnalysispt(BasePCASGDModel):
 
         trainable_variables = [W_, sigmal_]
 
-        self._initialize_save_losses()
-
         optimizer = torch.optim.SGD(
-            trainable_variables, lr=td["learning_rate"], momentum=td["momentum"]
+            trainable_variables,
+            lr=training_options["learning_rate"],
+            momentum=training_options["momentum"],
         )
         softplus = nn.Softplus()
 
@@ -577,8 +592,10 @@ class FactorAnalysispt(BasePCASGDModel):
 
         myrange = trange if progress_bar else range
 
-        for i in myrange(td["n_iterations"]):
-            idx = rng.choice(X.shape[0], size=td["batch_size"], replace=False)
+        for i in myrange(training_options["n_iterations"]):
+            idx = rng.choice(
+                X.shape[0], size=training_options["batch_size"], replace=False
+            )
             X_batch = X[idx]
 
             sigmas = softplus(sigmal_)
@@ -630,11 +647,15 @@ class FactorAnalysispt(BasePCASGDModel):
         log_prior : function
             The function representing the negative log density of the prior
         """
-        pd = self.prior_options
+        prior_options = self.prior_options
 
         def log_prior(trainable_variables):
             sigma_ = nn.Softmax()(trainable_variables[1])
-            return torch.mean(Gamma(pd["alpha"], pd["beta"]).log_prob(sigma_))
+            return torch.mean(
+                Gamma(prior_options["alpha"], prior_options["beta"]).log_prob(
+                    sigma_
+                )
+            )
 
         return log_prior
 
@@ -653,7 +674,8 @@ class FactorAnalysispt(BasePCASGDModel):
 
     def _initialize_variables(self, X):
         """
-        Initializes the variables of the model
+        Initializes the variables of the model by fitting PCA model in 
+        sklearn and using those loadings
 
         Parameters
         ----------
@@ -666,7 +688,7 @@ class FactorAnalysispt(BasePCASGDModel):
             The loadings of our latent factor model
 
         sigmal_ : torch.tensor,(p,)
-            The noise of each covariate
+            The noise of each covariate, unrectified
         """
         model = PCA(self.n_components)
         S_hat = model.fit_transform(X)
@@ -706,5 +728,5 @@ class FactorAnalysispt(BasePCASGDModel):
         """
         if not isinstance(X, np.ndarray):
             raise ValueError("Data is numpy array")
-        if self.training_options["batch_size"] < X.shape[0]:
+        if self.training_options["batch_size"] > X.shape[0]:
             raise ValueError("Batch size exceeds number of samples")

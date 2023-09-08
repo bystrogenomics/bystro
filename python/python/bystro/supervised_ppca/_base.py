@@ -507,9 +507,9 @@ class BasePCASGDModel(BaseGaussianFactorModel, ABC):
             The log posterior
         """
         n_iterations = self.training_options["n_iterations"]
-        self.losses_likelihood = np.zeros(n_iterations)
-        self.losses_prior = np.zeros(n_iterations)
-        self.losses_posterior = np.zeros(n_iterations)
+        self.losses_likelihood = np.empty(n_iterations)
+        self.losses_prior = np.empty(n_iterations)
+        self.losses_posterior = np.empty(n_iterations)
 
     def _save_losses(self, i, log_likelihood, log_prior, log_posterior):
         """
@@ -520,13 +520,13 @@ class BasePCASGDModel(BaseGaussianFactorModel, ABC):
         i : int
             Current training iteration
 
-        losses_likelihood : tf.Float
+        losses_likelihood : torch.tensor
             The log likelihood
 
-        losses_prior : tf.Float
+        losses_prior : torch.tensor
             The log prior
 
-        losses_posterior : tf.Float
+        losses_posterior : torch.tensor
             The log posterior
         """
         self.losses_likelihood[i] = log_likelihood.detach().numpy()
