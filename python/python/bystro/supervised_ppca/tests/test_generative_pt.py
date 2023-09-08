@@ -1,7 +1,7 @@
 import numpy as np
 import numpy.linalg as la
 import scipy.stats as st
-from ..gf_generative_pt import PPCApt, SPCApt, FactorAnalysispt
+from ..gf_generative_pt import PPCApt
 
 def generate_data_ppca():
     rng = np.random.default_rng(2021)

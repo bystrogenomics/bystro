@@ -5,10 +5,11 @@ parameterizes the covariance matrix as
 
     Sigma = WW^T + Lambda
 
-where Lambda is a diagonal matrix. The parameters of the diagonal determine
-the model. Probabilistic principal component analysis sets Lambda =
-sigma**2*I_p. Supervised principal component analysis parameterizes it as 
-Lambda = diag([sigma_x**2*1_p,sigma_y**21_q]), allowing for variances to 
+where Lambda is a diagonal matrix (see Bishop 2006 Chapter 12 for notation
+and model definition).  Probabilistic principal component analysis 
+sets Lambda = sigma**2*I_p. Supervised principal component analysis 
+parameterizes it as 
+Lambda = diag([sigma_x**2*1_p,sigma_y**2 1_q]), allowing for variances to 
 differ between the predictive and dependent variables. Finally, factor 
 analysis allows each diagonal component to be distinct. Models (1) and (3)
 are described in Bishop 2006, while supervised Probabilistic PCA is 
@@ -31,7 +32,7 @@ None
 """
 import numpy as np
 
-from sklearn import decomposition as dp  # type: ignore
+from sklearn.decomposition import PCA  # type: ignore
 from tqdm import trange  # type: ignore
 import torch
 from torch import nn
@@ -72,9 +73,7 @@ class PPCApt(BasePCASGDModel):
         )
 
     def __repr__(self):
-        out_str = "PPCApt object\n"
-        out_str += "n_components=%d\n" % self.n_components
-        return out_str
+        return f"PPCApt(n_components={self.n_components})"
 
     def fit(self, X, progress_bar=True, seed=2021):
         """
@@ -170,14 +169,14 @@ class PPCApt(BasePCASGDModel):
         log_prior : function
             The function representing the log density of the prior
         """
-        pd = self.prior_options
+        po = self.prior_options
 
         def log_prior(trainable_variables):
             W_ = trainable_variables[0]
             sigma_ = trainable_variables[1]
-            part1 = -1*pd["weight_W"] * torch.mean(torch.square(W_))
-            part2 = Gamma(pd["alpha"], pd["beta"]).log_prob(sigma_)
-            out = torch.mean(part1+part2)
+            part1 = -1 * po["weight_W"] * torch.mean(torch.square(W_))
+            part2 = Gamma(po["alpha"], po["beta"]).log_prob(sigma_)
+            out = torch.mean(part1 + part2)
             return out
 
         return log_prior
@@ -199,7 +198,7 @@ class PPCApt(BasePCASGDModel):
         sigmal_ : tf.Float
             The variance of the model
         """
-        model = dp.PCA(self.n_components)
+        model = PCA(self.n_components)
         S_hat = model.fit_transform(X)
         W_init = model.components_.astype(np.float32)
         W_ = torch.tensor(W_init, requires_grad=True)
@@ -258,8 +257,10 @@ class PPCApt(BasePCASGDModel):
         """
         Just tests to make sure data is numpy array
         """
-        if isinstance(X, np.ndarray) is False:
+        if not isinstance(X, np.ndarray):
             raise ValueError("Data is numpy array")
+        if self.training_options["batch_size"] < X.shape[0]:
+            raise ValueError("Batch size exceeds number of samples")
 
     def _fill_prior_options(self, prior_options):
         """
@@ -308,14 +309,11 @@ class SPCApt(BasePCASGDModel):
         )
 
     def __repr__(self):
-        out_str = "SPCApt object\n"
-        out_str += "n_components=%d\n" % self.n_components
-        return out_str
+        return f"SPCApt(n_components={self.n_components})"
 
     def fit(self, X, groups, progress_bar=True, seed=2021):
         """
-        Fits a model given covariates X as well as option labels y in the
-        supervised methods
+        Fits a model given covariates X 
 
         Parameters
         ----------
@@ -330,7 +328,7 @@ class SPCApt(BasePCASGDModel):
         self : object
             The model
         """
-        self._test_inputs(X,groups)
+        self._test_inputs(X, groups)
         td = self.training_options
         N, p = X.shape
         self.p = p
@@ -366,13 +364,11 @@ class SPCApt(BasePCASGDModel):
             X_batch = X[idx]
 
             list_covs = [
-                    softplus(sigmals_[k]) * list_constants[k]
-                    for k in range(self.n_groups)
+                softplus(sigmals_[k]) * list_constants[k]
+                for k in range(self.n_groups)
             ]
 
-            sigma = torch.sum(list_covs,
-                dim=0,
-            )
+            sigma = torch.sum(list_covs, dim=0,)
             WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
             Sigma = WWT + torch.diag(sigma)
 
@@ -466,7 +462,7 @@ class SPCApt(BasePCASGDModel):
         sigmal_ : list
             A list of the isotropic noises for each group
         """
-        model = dp.PCA(self.n_components)
+        model = PCA(self.n_components)
         S_hat = model.fit_transform(X)
         W_init = model.components_.astype(np.float32)
         W_ = torch.tensor(W_init, requires_grad=True)
@@ -505,12 +501,14 @@ class SPCApt(BasePCASGDModel):
         """
         Just tests to make sure data is numpy array
         """
-        if isinstance(X, np.ndarray) is False:
+        if not isinstance(X, np.ndarray):
             raise ValueError("X is numpy array")
-        if isinstance(groups, np.ndarray) is False:
+        if not isinstance(groups, np.ndarray):
             raise ValueError("groups is numpy array")
         if X.shape[1] != len(groups):
             raise ValueError("Dimensions do not match")
+        if self.training_options["batch_size"] < X.shape[0]:
+            raise ValueError("Batch size exceeds number of samples")
 
 
 class FactorAnalysispt(BasePCASGDModel):
@@ -540,14 +538,11 @@ class FactorAnalysispt(BasePCASGDModel):
         )
 
     def __repr__(self):
-        out_str = "FactorAnalysispt object\n"
-        out_str += "n_components=%d\n" % self.n_components
-        return out_str
+        return f"FactorAnalysispt(n_components={self.n_components})"
 
     def fit(self, X, progress_bar=True, seed=2021):
         """
-        Fits a model given covariates X as well as option labels y in the
-        supervised methods
+        Fits a model given covariates X 
 
         Parameters
         ----------
@@ -639,9 +634,7 @@ class FactorAnalysispt(BasePCASGDModel):
 
         def log_prior(trainable_variables):
             sigma_ = nn.Softmax()(trainable_variables[1])
-            return torch.mean(
-                Gamma(pd["alpha"], pd["beta"]).log_prob(sigma_)
-            )
+            return torch.mean(Gamma(pd["alpha"], pd["beta"]).log_prob(sigma_))
 
         return log_prior
 
@@ -675,7 +668,7 @@ class FactorAnalysispt(BasePCASGDModel):
         sigmal_ : torch.tensor,(p,)
             The noise of each covariate
         """
-        model = dp.PCA(self.n_components)
+        model = PCA(self.n_components)
         S_hat = model.fit_transform(X)
         W_init = model.components_.astype(np.float32)
         W_ = torch.tensor(W_init, requires_grad=True)
@@ -711,5 +704,7 @@ class FactorAnalysispt(BasePCASGDModel):
         """
         Just tests to make sure data is numpy array
         """
-        if isinstance(X, np.ndarray) is False:
+        if not isinstance(X, np.ndarray):
             raise ValueError("Data is numpy array")
+        if self.training_options["batch_size"] < X.shape[0]:
+            raise ValueError("Batch size exceeds number of samples")

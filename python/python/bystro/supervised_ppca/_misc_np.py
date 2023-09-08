@@ -10,11 +10,13 @@ Methods
 import numpy as np
 
 
-def softplus_inverse_np(x):
+def softplus_inverse_np(y):
     """
     Computes the inverse of the softplus activation of x in a
     numerically stable way
-    y = np.log(np.exp(x) - 1)
+
+    Softplus: y = log(exp(x) + 1)
+    Softplus^{-1}: y = np.log(np.exp(x) - 1)
 
     Parameters
     ----------
@@ -26,15 +28,17 @@ def softplus_inverse_np(x):
     x : np.array
         Transformed array
     """
-    threshold = np.log(np.finfo(x.dtype).eps) + 2.0
-    is_too_small = x < np.exp(threshold)
-    is_too_large = x > -threshold
-    too_small_value = np.log(x)
-    too_large_value = x
-    y = x + np.log(-(np.exp(-x) - 1))
-    y[is_too_small] = too_small_value[is_too_small]
-    y[is_too_large] = too_large_value[is_too_large]
-    return y
+    min_threshold = 10 ** -15
+    max_threshold = 500
+    safe_y = np.clip(
+        y, min_threshold, max_threshold
+    )  # we can safely pass this to the reference inverse_softplus below
+    safe_x = np.log(np.exp(safe_y) - 1)
+
+    # if y_i was below (respectively: above) the min (max) threshold, replace with log(y_i)  (y_i)
+    x = np.where(y < min_threshold, np.log(y), safe_x)
+    x = np.where(y > max_threshold, y, x)
+    return x
 
 
 def subset_square_matrix_np(Sigma, idxs):
