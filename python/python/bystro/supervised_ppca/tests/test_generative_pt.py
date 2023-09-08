@@ -1,7 +1,8 @@
 import numpy as np
 import numpy.linalg as la
-import scipy.stats as st
-from ..gf_generative_pt import PPCApt
+import scipy.stats as st  # type: ignore
+from bystro.supervised_ppca.gf_generative_pt import PPCApt
+
 
 def generate_data_ppca():
     rng = np.random.default_rng(2021)
@@ -75,6 +76,3 @@ def test_ppca():
     cov_emp = np.dot(X.T, X) / X.shape[0]
     s1 = la.norm(cov_emp - cov_est)
     assert s1 <= 10.0
-
-
-

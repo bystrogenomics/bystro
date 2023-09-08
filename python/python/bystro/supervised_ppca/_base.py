@@ -47,9 +47,9 @@ from bystro.covariance._base_covariance import (  # type: ignore
 )  # type: ignore
 from numpy import linalg as la
 from datetime import datetime as dt
-import pytz
+import pytz  # type: ignore
 from bystro._template_sgd_np import BaseSGDModel  # type: ignore
-import torch
+import torch  # type: ignore
 
 
 class BaseGaussianFactorModel(BaseSGDModel, ABC):
