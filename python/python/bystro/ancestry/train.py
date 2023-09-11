@@ -167,7 +167,7 @@ def _parse_vcf_line_for_dosages(
         fields = line.split()  # now we can parse the full line
         variant_dosages = [
             _parse_genotype_field(field) for field in fields[NUM_VCF_METADATA_COLUMNS:]
-        ]  #  genotype fields take the form e.g. '0|1', '0/1' or './.'
+        ]  #  genotype fields take the form e.g. '0|1', '0/1', './1 or './.'
         return variant, variant_dosages
     return None
 
