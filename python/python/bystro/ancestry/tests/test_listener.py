@@ -8,7 +8,6 @@ import pytest
 from bystro.ancestry.ancestry_types import AncestrySubmission
 from bystro.ancestry.listener import (
     AncestryJobData,
-    _check_vcf_dir_access,
     completed_msg_fn,
     handler_fn_factory,
     submit_msg_fn,
@@ -95,13 +94,7 @@ def test_completed_msg_fn_rejects_nonmatching_vcf_paths():
     # end instantiating another ancestry response with the wrong vcf...
 
     with pytest.raises(
-        ValueError, match="Ancestry submission filename .*\.vcf doesn't match response filename .*\.vcf"
+        ValueError,
+        match=r"Ancestry submission filename .*\.vcf doesn't match response filename .*\.vcf",
     ):
         _ancestry_job_complete_message = completed_msg_fn(ancestry_job_data, wrong_ancestry_response)
-
-
-def test__check_vcf_dir_access():
-    with pytest.raises(
-        FileNotFoundError, match="will not be able to read VCFs in order to report ancestry results"
-    ):
-        _check_vcf_dir_access(Path("my_fake_vcf_dir"))
