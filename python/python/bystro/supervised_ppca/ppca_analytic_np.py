@@ -36,7 +36,7 @@ class PPCAanalytic(BaseGaussianFactorModel):
 
     def fit(self, X):
         """
-        Fits a model given covariates X 
+        Fits a model given covariates X
 
         Parameters
         ----------
@@ -112,4 +112,3 @@ class PPCAanalytic(BaseGaussianFactorModel):
 
     def _save_variables(self):
         pass
-
