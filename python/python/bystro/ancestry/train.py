@@ -176,7 +176,7 @@ def _parse_genotype_field(psa: str) -> int | float:
     """Parse a field of the form '0|1', '0/1' or './.' as a dosage."""
     try:
         return int(psa[0]) + int(psa[2])
-    except:
+    except ValueError:
         return np.nan
 
 
@@ -204,8 +204,7 @@ def _calculate_recovery_rate(
             v for v in variants_to_keep if _get_chromosome_from_variant(v) == relevant_chromosome
         }
         return len(found_variants) / len(relevant_variants_to_keep)
-    else:
-        return len(found_variants) / len(variants_to_keep)
+    return len(found_variants) / len(variants_to_keep)
 
 
 def parse_vcf(
