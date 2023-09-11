@@ -144,7 +144,7 @@ def load_callset_for_variants(variants: set[str]) -> pd.DataFrame:
 
 def _parse_vcf_line_for_dosages(
     line: str, variants_to_keep: Container[Variant]
-) -> tuple[Variant, list[int]] | None:
+) -> tuple[Variant, list[float]] | None:
     # We want to determine if we care about the variant on this line
     # before we parse it in full.  So we'll parse just enough of it to
     # read the variant and filter info: if we want the variant and it
@@ -172,10 +172,10 @@ def _parse_vcf_line_for_dosages(
     return None
 
 
-def _parse_genotype_field(psa: str) -> int | float:
+def _parse_genotype_field(psa: str) -> float:
     """Parse a field of the form '0|1', '0/1' or './.' as a dosage."""
     try:
-        return int(psa[0]) + int(psa[2])
+        return float(psa[0]) + float(psa[2])
     except ValueError:
         return np.nan
 
