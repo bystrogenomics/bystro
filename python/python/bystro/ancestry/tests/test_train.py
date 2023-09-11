@@ -29,7 +29,7 @@ def test__parse_vcf_from_file_stream():
         "chr1	123456	.	T	G	.	PASS	i;n;f;o	GT	0|1	1|0	0|0",
     ]
     expected_df = pd.DataFrame(
-        [[1, 0, 1], [1, 2, 1], [0, 2, 0]],
+        [[1.0, 0.0, 1.0], [1.0, 2.0, 1.0], [0.0, 2.0, 0.0]],
         index=["sample1", "sample2", "sample3"],
         columns=["chr1:1:T:G", "chr1:123:T:G", "chr1:123456:T:G"],
     )
@@ -54,7 +54,7 @@ def test__parse_vcf_from_file_stream_missing_data():
         "chr1	123456	.	T	G	.	PASS	i;n;f;o	GT	0|1	1|0	0|.",
     ]
     expected_df = pd.DataFrame(
-        [[np.nan, 0, 1], [1, np.nan, 1], [0, 2, np.nan]],
+        [[np.nan, 0.0, 1.0], [1.0, np.nan, 1.0], [0.0, 2.0, np.nan]],
         index=["sample1", "sample2", "sample3"],
         columns=["chr1:1:T:G", "chr1:123:T:G", "chr1:123456:T:G"],
     )
@@ -77,7 +77,7 @@ def test__parse_vcf_from_file_stream_no_chr_prefix():
         "1	1	.	T	G	.	PASS	i;n;f;o	GT	0|1	1|0	0|0",
     ]
     expected_df = pd.DataFrame(
-        [[1], [1], [0]],
+        [[1.0], [1.0], [0.0]],
         index=["sample1", "sample2", "sample3"],
         columns=["chr1:1:T:G"],
     )
@@ -196,7 +196,7 @@ def test__parse_vcf_from_file_stream_bad_filter_values():
     ]
 
     expected_df = pd.DataFrame(
-        [[1, 0], [1, 2], [0, 2]],
+        [[1.0, 0.0], [1.0, 2.0], [0.0, 2.0]],
         index=["sample1", "sample2", "sample3"],
         columns=["chr1:1:T:G", "chr1:123:T:G"],
     )
