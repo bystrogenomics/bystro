@@ -20,6 +20,7 @@ jobs:
     - name: Install dependencies
       run: |
         source .initialize_conda_env.sh
+        pip install -r **/requirements-dev.txt
     - name: Build Bystro using Maturin
       run: |
         maturin build
