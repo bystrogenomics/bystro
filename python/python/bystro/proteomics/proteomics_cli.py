@@ -11,6 +11,7 @@ from msgspec import json as mjson
 
 UPLOAD_PROTEIN_ENDPOINT = "/api/jobs/upload_protein/"
 HTTP_STATUS_OK = 200
+ONE_HOUR_IN_SECONDS = 60 * 60
 
 
 def _package_filename(filename: str) -> tuple[str, tuple[str, BinaryIO, str]]:
@@ -61,7 +62,9 @@ def upload_proteomics_dataset(args: argparse.Namespace, *, print_result: bool = 
     if print_result:
         print(f"\nCreating jobs for files: {', '.join(files_to_upload)}\n")
 
-    response = requests.post(url, headers=auth_header, data=payload, files=files, timeout=30)
+    response = requests.post(
+        url, headers=auth_header, data=payload, files=files, timeout=ONE_HOUR_IN_SECONDS
+    )
 
     if response.status_code != HTTP_STATUS_OK:
         msg = (
