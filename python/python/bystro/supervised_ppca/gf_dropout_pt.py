@@ -301,5 +301,5 @@ class PPCADropout(PPCA):
         if self.training_options["batch_size"] > X.shape[0]:
             raise ValueError("Batch size exceeds number of samples")
         if X.shape[0] != len(y):
-            err_msg = f"Length of data matrix X must equal length of labels y: received inputs of length ({len(X}) and ({len(y}), instead."
+            err_msg = "Length of data matrix X must equal length of labels y"
             raise ValueError(err_msg)
