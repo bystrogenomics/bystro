@@ -19,9 +19,7 @@ FactorAnalysisDropout(FactorAnalysis)
 
 Methods
 -------
-_get_projection_matrix(W_,sigma_,n_components)
-    Computes the parameters for p(S|X)
-
+None
 """
 import numpy as np
 
@@ -29,7 +27,7 @@ from tqdm import trange
 import torch
 from torch import nn
 from torch.distributions.multivariate_normal import MultivariateNormal
-from sklearn.decomposition import PCA # type: ignore
+from sklearn.decomposition import PCA  # type: ignore
 
 from bystro.supervised_ppca._misc_np import softplus_inverse_np
 from bystro.supervised_ppca.gf_generative_pt import PPCA
@@ -42,24 +40,26 @@ def _get_projection_matrix(W_, sigma_):
 
     Computes the parameters for p(S|X)
 
+    Description in future to be released paper
+
     Parameters
     ----------
     W_ : pt.Tensor(n_components,p)
         The loadings
 
-    sigma_ : pt.Flaot
+    sigma_ : pt.tensor
         Isotropic noise
 
     Returns
     -------
     Proj_X : pt.tensor(n_components,p)
-        Beta such that Proj_XX = E[S|X]
+        Beta such that np.dot(Proj_X, X) = E[S|X]
 
     Cov : pt.tensor(n_components,n_components)
         Var(S|X)
     """
     n_components = int(W_.shape[0])
-    eye = torch.tensor(np.eye(n_components))  # .astype(np.float32))
+    eye = torch.tensor(np.eye(n_components))
     M = torch.matmul(W_, torch.transpose(W_, 0, 1)) + sigma_ * eye
     Proj_X = torch.linalg.solve(M, W_)
     Cov = torch.linalg.inv(M) * sigma_
@@ -117,6 +117,9 @@ class PPCADropout(PPCA):
         self.losses_supervision = np.empty(
             self.training_options["n_iterations"]
         )
+        self.W_ = None
+        self.sigma2_ = None
+        self.B_ = None
 
     def fit(self, X, y, task="classification", progress_bar=True, seed=2021):
         """
@@ -153,7 +156,7 @@ class PPCADropout(PPCA):
         self.p = p
 
         W_, sigmal_, B_ = self._initialize_variables(X)
-        X, y = self._transform_training_data(X, 1.0*y)
+        X, y = self._transform_training_data(X, 1.0 * y)
 
         if task == "classification":
             sigm = nn.Sigmoid()
@@ -161,7 +164,10 @@ class PPCADropout(PPCA):
         elif task == "regression":
             supervision_loss = nn.MSELoss()
         else:
-            supervision_loss = nn.BCELoss()
+            err_msg = (
+                f"unrecognized_task {task}, must be regression or classification"
+            )
+            raise ValueError(err_msg)
 
         trainable_variables = [W_, sigmal_, B_]
 
@@ -199,7 +205,7 @@ class PPCADropout(PPCA):
             P_x, Cov = _get_projection_matrix(W_, sigma)
             mean_z = torch.matmul(X_batch, torch.transpose(P_x, 0, 1))
             eps = torch.rand_like(mean_z)
-            C1_2 = torch.cholesky(Cov)
+            C1_2 = torch.linalg.cholesky(Cov)
             z_samples = mean_z + torch.matmul(eps, C1_2)
 
             y_hat = (
@@ -214,10 +220,10 @@ class PPCADropout(PPCA):
 
             WTW = torch.matmul(W_, torch.transpose(W_, 0, 1))
             off_diag = WTW - torch.diag(torch.diag(WTW))
-            torch.norm(off_diag)
+            loss_i = torch.matrix_norm(off_diag)
 
             posterior = like_gen + 1 / N * like_prior
-            loss = -1 * posterior + self.mu * loss_y
+            loss = -1 * posterior + self.mu * loss_y + self.gamma*loss_i
 
             optimizer.zero_grad()
             loss.backward()
@@ -243,8 +249,8 @@ class PPCADropout(PPCA):
         W_ : np.array-like,(n_components,p)
             The loadings
 
-        sigmas_ : np.array-like,(n_components,p)
-            The diagonal variances
+        sigma2_ : float
+            The isotropic variance
 
         B_ : float
             The intercept for the predictive model
@@ -273,14 +279,15 @@ class PPCADropout(PPCA):
             The unrectified variance of the model
 
         B_ : torch.tensor
+            The predictive model intercept y = XW + B_
         """
         model = PCA(self.n_components)
         S_hat = model.fit_transform(X)
-        W_init = model.components_#.astype(np.float32)
+        W_init = model.components_
         W_ = torch.tensor(W_init, requires_grad=True)
         X_recon = np.dot(S_hat, W_init)
         diff = np.mean((X - X_recon) ** 2)
-        sinv = softplus_inverse_np(diff * np.ones(1))#.astype(np.float32))
+        sinv = softplus_inverse_np(diff * np.ones(1))
         sigmal_ = torch.tensor(sinv, requires_grad=True)
         B_ = torch.tensor(0.0, requires_grad=True)
         return W_, sigmal_, B_
@@ -290,10 +297,9 @@ class PPCADropout(PPCA):
         Just tests to make sure data is numpy array and dimensions match
         """
         if not isinstance(X, np.ndarray):
-            raise ValueError("Data is numpy array")
+            raise ValueError("Data must be numpy array")
         if self.training_options["batch_size"] > X.shape[0]:
             raise ValueError("Batch size exceeds number of samples")
         if X.shape[0] != len(y):
-            raise ValueError("Dimension mismatch")
-            
-
+            err_msg = f"Length of data matrix X must equal length of labels y: received inputs of length ({len(X}) and ({len(y}), instead."
+            raise ValueError(err_msg)

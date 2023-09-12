@@ -25,8 +25,8 @@ def PPCA_generate_data(N=10000, L=5, p=30, phi=1.0, sigma=1.0):
 
 
 def test_ppca():
-    X, y, X_hat, S, W, logits = PPCA_generate_data(L=3, p=400)
-    training_options = {"n_iterations": 3000}
+    X, y, X_hat, S, W, logits = PPCA_generate_data(L=3, p=200)
+    training_options = {"n_iterations": 1000}
     model = PPCADropout(
         2, mu=100.0, gamma=10.0, delta=5.0, training_options=training_options
     )
