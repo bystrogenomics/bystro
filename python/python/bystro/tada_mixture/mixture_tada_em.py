@@ -36,9 +36,10 @@ from tqdm import trange  # type: ignore
 import torch
 from torch import nn
 from torch.nn import PoissonNLLLoss
+from bystro._template_sgd_np import BaseSGDModel  # type: ignore
 
 
-class MVTadaPoissonEM:
+class MVTadaPoissonEM(BaseSGDModel):
     def __init__(self, K=4, training_options=None):
         """
         This is a Product Poisson latent variable model.
@@ -46,16 +47,18 @@ class MVTadaPoissonEM:
         Parameters
         ----------
         K : int,default=4
-            The number of clusters, i.e. number of different types of 
+            The number of clusters, i.e. number of different types of
             genes
 
         training_options : dict,default={}
             The parameters for the inference scheme
         """
         self.K = int(K)
-        if training_options is None:
-            training_options = {}
-        self.training_options = self._fill_training_options(training_options)
+        super().__init__(training_options=training_options)
+        self._initialize_save_losses()
+
+        self.pi_ = None
+        self.Lambda_ = None
 
     def fit(self, X, progress_bar=True, Lamb_init=None, pi_init=None):
         """
@@ -70,7 +73,7 @@ class MVTadaPoissonEM:
             Whether to print a progress bar while fitting
 
         Lamb_init : np.array-like,shape=(k,p),default=None
-            Initialize the loadings of the model. Defaults to fitting a 
+            Initialize the loadings of the model. Defaults to fitting a
             GMM on the data and using those.
 
         pi_init : np.array-like,shape=(k),default=None
@@ -80,44 +83,114 @@ class MVTadaPoissonEM:
         -------
         self
         """
-        td = self.training_options
-        K = self.K
+        self._test_inputs(X)
+        training_options = self.training_options
 
         N, p = X.shape
 
+        pi_, Lambda_ = self._initialize_variables(Lamb_init, pi_init)
+
+        myrange = trange if progress_bar else range
+
+        for i in myrange(training_options["n_iterations"]):
+            # E step compute most likely categories
+            z_probs = np.zeros((N, self.K))
+            for j in range(self.K):
+                log_pmf = st.poisson.logpmf(X, Lambda_[j])
+                log_pmf_sum = np.sum(log_pmf, axis=1)
+                z_probs[:, j] = log_pmf_sum + np.log(pi_[j])
+            expectation_z = np.argmax(z_probs, axis=1)
+
+            for j in range(self.K):
+                pi_[j] = np.mean(expectation_z == j)
+                Lambda_[j] = np.mean(X[expectation_z == j], axis=0)
+
+            eps = 0.001
+            pi_ = pi_ * (1 - self.K * eps) + np.ones(self.K) * eps
+
+            self._save_losses(
+                i,
+            )
+
+        self._store_instance_variables([pi_, Lambda_])
+        return self
+
+    def _store_instance_variables(self, trainable_variables):
+        """
+        Saves the learned variables
+
+        Parameters
+        ----------
+        trainable_variables : list
+            List of variables to save
+        """
+        self.pi_ = trainable_variables[0]
+        self.Lambda_ = trainable_variables[1]
+
+    def _initialize_variables(self, X, Lamb_init, pi_init):
+        """
+        This initializes the factor loadings (Lambda), and the component
+        probabilities (pi). If Lamb_init  or pi_init are given these are
+        the values obviously. Otherwise, the initialization of the weights
+        is random and the Loadings are a Gaussian mixture model.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        """
         # Initialize variables
         if Lamb_init is None:
-            model = GaussianMixture(K)
+            model = GaussianMixture(self.K)
             model.fit(X)
             Lambda_ = model.means_
         else:
             Lambda_ = Lamb_init
 
         rng = np.random.default_rng(2021)
-        pi_ = rng.dirichlet(np.ones(K)) if pi_init is None else pi_init
+        pi_ = rng.dirichlet(np.ones(self.K)) if pi_init is None else pi_init
 
-        myrange = trange if progress_bar else range
+        return Lambda_, pi_
 
-        for i in myrange(td["n_iterations"]):
-            # E step compute most likely categories
-            z_probs = np.zeros((N, K))
-            for j in range(K):
-                log_pmf = st.poisson.logpmf(X, Lambda_[j])
-                log_pmf_sum = np.sum(log_pmf, axis=1)
-                z_probs[:, j] = log_pmf_sum + np.log(pi_[j])
-            Ez = np.argmax(z_probs, axis=1)
+    def _initialize_save_losses(self):
+        """
+        This method initializes the arrays to track relevant variables
+        during training
 
-            # M step, maximize parameters
-            for j in range(K):
-                pi_[j] = np.mean(Ez == j)
-                Lambda_[j] = np.mean(X[Ez == j], axis=0)
+        TODO
 
-            eps = 0.001
-            pi_ = pi_ * (1 - K * eps) + np.ones(K) * eps
+        Parameters
+        ----------
+        """
 
-        self.Lambda = Lambda_
-        self.pi = pi_
-        return self
+    def _save_losses(self):
+        """
+        This saves the respective losses at each iteration
+
+        TODO
+
+        Parameters
+        ----------
+        """
+
+    def _test_inputs(self, X):
+        """
+        This performs error checking on inputs for fit
+
+        Parameters
+        ----
+        """
+        if not isinstance(X, np.ndarray):
+            raise ValueError("Data must be numpy array")
+
+    def _transform_training_data(self, *args):
+        """
+        Not needed as this object does not use pytorch for inference
+
+        Parameters
+        ----------
+        """
 
     def predict(self, data):
         """
@@ -178,7 +251,7 @@ class MVTadaPoissonEM:
         return tops
 
 
-class MVTadaZipEM:
+class MVTadaZipEM(BaseSGDModel):
     def __init__(self, K=4, training_options=None):
         """
         This is a Product ZIP latent variable model.
@@ -186,18 +259,21 @@ class MVTadaZipEM:
         Parameters
         ----------
         K : int,default=4
-            The number of clusters, i.e. number of different types of 
+            The number of clusters, i.e. number of different types of
             genes
 
         training_options : dict,default={}
             The parameters for the inference scheme
         """
-        self.K = int(K)
-        if training_options is None:
-            training_options = {}
-        self.training_options = self._fill_training_options(training_options)
+        self.K = K
+        super().__init__(training_options=training_options)
+        self._initialize_save_losses()
 
-    def fit(self, X, progress_bar=True):
+        self.pi_ = None
+        self.Lambda = None
+        self.Alpha = None
+
+    def fit(self, data, progress_bar=True):
         """
         Fits a model given count data X.
 
@@ -209,46 +285,28 @@ class MVTadaZipEM:
         -------
         self
         """
-        td = self.training_options
+        self._test_inputs(data)
+        N, p = data.shape
+        training_options = self.training_options
         K = self.K
 
-        N, p = X.shape
-
-        model = GaussianMixture(K)
-        model.fit(X)
-        Lambda_list_l = []
-        for i in range(K):
-            Lambda_list_l.append(
-                torch.tensor(
-                    1.2 * model.means_[i].astype(np.float32) + 0.1,
-                    requires_grad=True,
-                )
-            )
-
-        myrange = trange if progress_bar else range
-
-        pct_0 = np.mean(X == 0, axis=0)
-        pct_0 = np.clip(pct_0, 0.01, 0.99)
-        pct_0_inv = np.log(pct_0 / (1 - pct_0))
-
-        alpha_ls = [
-            torch.tensor(pct_0_inv, requires_grad=True) for i in range(K)
-        ]
+        Lambda_list_l, alpha_ls, pi_ = self._initialize_variables(data)
 
         sigmoid = nn.Sigmoid()
 
-        data = torch.tensor(X.astype(np.float32))
-        pi_ = 1 / K * np.ones(K)
-        myloss = PoissonNLLLoss(log_input=False, full=True, reduction="none")
+        X = self._transform_training_data(data)[0]
 
-        for i in myrange(td["n_iterations"]):
+        myloss = PoissonNLLLoss(log_input=False, full=True, reduction="none")
+        myrange = trange if progress_bar else range
+
+        for i in myrange(training_options["n_iterations"]):
             # E step compute most likely categories
             z_probs = np.zeros((N, K))
             for k in range(K):
                 Lambda_k = Lambda_list_l[k]
                 alpha_k = sigmoid(alpha_ls[k])  # Prob of being 0
 
-                log_likelihood_poisson = -1 * myloss(Lambda_k, data)
+                log_likelihood_poisson = -1 * myloss(Lambda_k, X)
                 log_likelihood_poisson_w = log_likelihood_poisson + torch.log(
                     1 - alpha_k
                 )
@@ -279,10 +337,12 @@ class MVTadaZipEM:
                 trainable_variables = [Lambda_list_l[k], alpha_ls[k]]
 
                 optimizer = torch.optim.SGD(
-                    trainable_variables, lr=td["learning_rate"], momentum=0.8
+                    trainable_variables,
+                    lr=training_options["learning_rate"],
+                    momentum=0.8,
                 )
 
-                for j in range(td["n_inner_iterations"]):
+                for j in range(training_options["n_inner_iterations"]):
                     Lambda_k = Lambda_list_l[k]
                     alpha_k = sigmoid(alpha_ls[k])
 
@@ -315,15 +375,7 @@ class MVTadaZipEM:
                     Lambda_k[Lambda_k < 0] = 0
                     Lambda_k.requires_grad_(True)
 
-        self.pi = pi_
-        self.Lambda = -1000 * np.ones((K, p))
-        self.Alpha = -1000 * np.ones((K, p))
-        for k in range(self.K):
-            Lambda_k = Lambda_list_l[k]
-            alpha_k = sigmoid(alpha_ls[k])
-
-            self.Lambda[k] = Lambda_k.detach().numpy()
-            self.Alpha[k] = alpha_k.detach().numpy()
+        self._store_instance_variables([pi_, Lambda_list_l, alpha_ls])
 
         return self
 
@@ -373,6 +425,101 @@ class MVTadaZipEM:
                 probs[data[i] == 0] = log_prob_0[data[i] == 0]
                 log_proba[i, k] = np.sum(probs)
         return log_proba
+
+    def _store_instance_variables(self, trainable_variables):
+        """
+        Saves the learned variables
+
+        Parameters
+        ----------
+        trainable_variables : list
+            List of variables to save
+        """
+        self.pi = trainable_variables[0]
+        Lambda_list_l = trainable_variables[1]
+        alpha_ls = trainable_variables[2]
+        sigmoid = nn.Sigmoid()
+        for k in range(self.K):
+            Lambda_k = Lambda_list_l[k]
+            alpha_k = sigmoid(alpha_ls[k])
+
+            self.Lambda[k] = Lambda_k.detach().numpy()
+            self.Alpha[k] = alpha_k.detach().numpy()
+
+    def _initialize_variables(self, X):
+        """
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        """
+        model = GaussianMixture(self.K)
+        model.fit(X)
+        Lambda_list_l = []
+        for i in range(self.K):
+            Lambda_list_l.append(
+                torch.tensor(
+                    1.2 * model.means_[i].astype(np.float32) + 0.1,
+                    requires_grad=True,
+                )
+            )
+
+        pct_0 = np.mean(X == 0, axis=0)
+        pct_0 = np.clip(pct_0, 0.01, 0.99)
+        pct_0_inv = np.log(pct_0 / (1 - pct_0))
+
+        alpha_ls = [
+            torch.tensor(pct_0_inv, requires_grad=True) for i in range(self.K)
+        ]
+        pi_ = 1 / self.K * np.ones(self.K)
+        return Lambda_list_l, alpha_ls, pi_
+
+    def _initialize_save_losses(self):
+        """
+        This method initializes the arrays to track relevant variables
+        during training
+
+        TODO
+
+        Parameters
+        ----------
+        """
+
+    def _save_losses(self):
+        """
+        This saves the respective losses at each iteration
+
+        TODO
+
+        Parameters
+        ----------
+        """
+
+    def _test_inputs(self, X):
+        """
+        This performs error checking on inputs for fit
+
+        Parameters
+        ----
+        """
+        if not isinstance(X, np.ndarray):
+            raise ValueError("Data must be numpy array")
+        if self.training_options["batch_size"] > X.shape[0]:
+            raise ValueError("Batch size exceeds number of samples")
+
+    def _transform_training_data(self, *args):
+        """
+        Not needed as this object does not use pytorch for inference
+
+        Parameters
+        ----------
+        """
+        out = []
+        for arg in args:
+            out.append(torch.tensor(arg))
+        return out
 
     def _fill_training_options(self, training_options):
         """
