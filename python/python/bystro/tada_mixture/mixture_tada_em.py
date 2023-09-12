@@ -506,8 +506,6 @@ class MVTadaZipEM(BaseSGDModel):
         """
         if not isinstance(X, np.ndarray):
             raise ValueError("Data must be numpy array")
-        if self.training_options["batch_size"] > X.shape[0]:
-            raise ValueError("Batch size exceeds number of samples")
 
     def _transform_training_data(self, *args):
         """

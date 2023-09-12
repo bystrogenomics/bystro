@@ -7,7 +7,7 @@ p(x_ij|z=k) = Poisson(Lambda_{jk})
 
 The log likelihood is 
 
-log p(x) = log(\sum p(z=k)p(x_ij|z=k)). 
+log p(x) = log(\\sum p(z=k)p(x_ij|z=k)). 
 
 There's not an analytic formula that makes this easy to solve. But as long
 as you use the logsumexp trick you can compute this easily numerically. I 
