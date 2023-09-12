@@ -220,7 +220,7 @@ class PPCADropout(PPCA):
 
             WTW = torch.matmul(W_, torch.transpose(W_, 0, 1))
             off_diag = WTW - torch.diag(torch.diag(WTW))
-            loss_i = torch.matrix_norm(off_diag)
+            loss_i = torch.linalg.matrix_norm(off_diag)
 
             posterior = like_gen + 1 / N * like_prior
             loss = -1 * posterior + self.mu * loss_y + self.gamma*loss_i
