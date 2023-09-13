@@ -10,6 +10,20 @@ jobs:
         python-version: ["3.10.11"]
     steps:
     - uses: actions/checkout@v3
+    - name: Check modified files
+      id: file-check
+      run: |
+        # Get the list of modified files in the pull request
+        MODIFIED_FILES=$(git diff --name-only ${{ github.base_ref }} ${{ github.head_ref }})
+      
+        # Check if any modified file has a non-Perl file extension
+        if echo "$MODIFIED_FILES" | grep -E -q '.*\.(?!pl|pm$)[^.]+$'; then
+          echo "At least one non-Perl file modified. Continuing with the workflow."
+        else
+          echo "No non-Perl files modified. Exiting the workflow."
+          exit 78  # Exit with a neutral status code (78) to indicate a skipped workflow
+        fi
+      shell: bash
     - name: Build Miniconda
       uses: conda-incubator/setup-miniconda@v2
       with:
