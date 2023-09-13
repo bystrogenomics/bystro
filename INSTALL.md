@@ -11,7 +11,7 @@ Make sure you have [Docker installed](https://store.docker.com/search?type=editi
 #### Building the latest version of Bystro in Docker
 
 ```
-git clone https://github.com/akotlar/bystro.git && cd bystro
+git clone https://github.com/bystrogenomics/bystro.git && cd bystro
 docker build -t bystro .
 docker run bystro bystro-annotate.pl #Annotate
 docker run bystro bystro-build.pl #Build
@@ -27,15 +27,15 @@ There are 2 components to Bystro:
 
 ##### (Fedora, Redhat, Centos, openSUSE, Mandriva)
 
-1.  `git clone https://github.com/akotlar/bystro.git && cd bystro && source ./install-rpm.sh`
+1.  `git clone https://github.com/bystrogenomics/bystro.git && cd bystro && source ./install-rpm.sh`
 
 ##### MacOS (tested on HighSierra, interactive)
 
-1.  `git clone https://github.com/akotlar/bystro.git && cd bystro && source ./install-mac.sh`
+1.  `git clone https://github.com/bystrogenomics/bystro.git && cd bystro && source ./install-mac.sh`
 
 ##### Ubuntu
 1.  Ensure that packages are up to date (`sudo apt update`), or that you are satisified with the state of package versions.
-2.  `git clone https://github.com/akotlar/bystro.git && cd bystro && source ./install-apt.sh`
+2.  `git clone https://github.com/bystrogenomics/bystro.git && cd bystro && source ./install-apt.sh`
     - Please not that this installation script will ask you for the root password in order to install system dependencies
 
 ## Installing the Bystro Python libraries and cli tools
