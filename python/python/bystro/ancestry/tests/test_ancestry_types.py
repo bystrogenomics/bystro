@@ -17,11 +17,11 @@ from bystro.ancestry.train import POPS, SUPERPOPS
 # ruff: noqa: E721
 
 # In several tests we explicitly check that a value `is float` rather
-# than use the more pythonic `isinstance(value, float)`.  The former
-# method of checking raises E71 errors, which are exempted from the
-# linter on a file-wide basis above.  We make these explicit checks in
-# order to ensure that such values aren't np.float64's, which
-# can't easily be deserialized.
+# than use the more pythonic `isinstance(value, float)`.  We make
+# these explicit checks in order to ensure that such values are raw
+# floats and not np.float64's, which can't easily be deserialized.
+# But the former method of checking raises E71 errors, which are
+# exempted from the linter on a file-wide basis above.
 
 
 def test_AncestrySubmission_accepts_valid_vcf_paths():
