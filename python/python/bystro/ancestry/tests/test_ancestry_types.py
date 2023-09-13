@@ -14,6 +14,16 @@ from bystro.ancestry.ancestry_types import (
 from bystro.ancestry.train import POPS, SUPERPOPS
 
 
+# ruff: noqa: E721
+
+# In several tests we explicitly check that a value `is float` rather
+# than use the more pythonic `isinstance(value, float)`.  The former
+# method of checking raises E71 errors, which are exempted from the
+# linter on a file-wide basis above.  We make these explicit checks in
+# order to ensure that such values aren't np.float64's, which
+# can't easily be deserialized.
+
+
 def test_AncestrySubmission_accepts_valid_vcf_paths():
     AncestrySubmission("foo.vcf")
     AncestrySubmission("foo.vcf.gz")
@@ -48,8 +58,8 @@ def test_ProbabilityInterval_accepts_valid_bounds() -> None:
     """Ensure we can instantiate, validate ProbabilityInterval correctly."""
     prob_int = ProbabilityInterval(lower_bound=0.1, upper_bound=0.9)
     # for msgspec serialization we specifically have to check if raw float
-    assert type(prob_int.lower_bound) is float  # noqa: E721
-    assert type(prob_int.upper_bound) is float  # noqa: E721
+    assert type(prob_int.lower_bound) is float
+    assert type(prob_int.upper_bound) is float
 
 
 def test_ProbabilityInterval_rejects_bad_bounds() -> None:
@@ -155,8 +165,7 @@ def test_AncestryResult_accepts_valid_args() -> None:
         superpops=SuperpopVector(**superpop_kwargs),
         missingness=0.5,
     )
-    # for msgspec we specifically have to check if this is a raw float
-    assert type(ancestry_result.missingness) is float  # noqa: E721
+    assert type(ancestry_result.missingness) is float
 
 
 def test_AncestryResult_rejects_invalid_missingness() -> None:
