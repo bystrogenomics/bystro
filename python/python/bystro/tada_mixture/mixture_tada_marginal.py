@@ -207,7 +207,7 @@ class MVTadaPoissonML(BaseSGDModel):
         tops : dict
         """
         default_options = {
-            "n_iterations": 30000,
+            "n_iterations": 3000,
             "batch_size": 200,
             "learning_rate": 5e-5,
             "momentum": 0.99,

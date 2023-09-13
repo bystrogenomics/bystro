@@ -88,7 +88,7 @@ class MVTadaPoissonEM(BaseSGDModel):
 
         N, p = X.shape
 
-        pi_, Lambda_ = self._initialize_variables(Lamb_init, pi_init)
+        Lambda_, pi_ = self._initialize_variables(X,Lamb_init, pi_init)
 
         myrange = trange if progress_bar else range
 
@@ -112,7 +112,7 @@ class MVTadaPoissonEM(BaseSGDModel):
                 i,
             )
 
-        self._store_instance_variables([pi_, Lambda_])
+        self._store_instance_variables([Lambda_, pi_])
         return self
 
     def _store_instance_variables(self, trainable_variables):
@@ -124,8 +124,8 @@ class MVTadaPoissonEM(BaseSGDModel):
         trainable_variables : list
             List of variables to save
         """
-        self.pi_ = trainable_variables[0]
-        self.Lambda_ = trainable_variables[1]
+        self.pi_ = trainable_variables[1]
+        self.Lambda_ = trainable_variables[0]
 
     def _initialize_variables(self, X, Lamb_init, pi_init):
         """
@@ -164,7 +164,7 @@ class MVTadaPoissonEM(BaseSGDModel):
         ----------
         """
 
-    def _save_losses(self):
+    def _save_losses(self,i):
         """
         This saves the respective losses at each iteration
 
@@ -287,6 +287,7 @@ class MVTadaZipEM(BaseSGDModel):
         """
         self._test_inputs(data)
         N, p = data.shape
+        self.p = p
         training_options = self.training_options
         K = self.K
 
@@ -305,7 +306,7 @@ class MVTadaZipEM(BaseSGDModel):
             for k in range(K):
                 Lambda_k = Lambda_list_l[k]
                 alpha_k = sigmoid(alpha_ls[k])  # Prob of being 0
-
+                
                 log_likelihood_poisson = -1 * myloss(Lambda_k, X)
                 log_likelihood_poisson_w = log_likelihood_poisson + torch.log(
                     1 - alpha_k
@@ -315,11 +316,11 @@ class MVTadaZipEM(BaseSGDModel):
                     alpha_k + (1 - alpha_k) * torch.exp(-1 * Lambda_k)
                 )
                 log_likelihood_0_b = torch.broadcast_to(
-                    log_likelihood_0, data.shape
+                    log_likelihood_0, X.shape
                 )
 
                 log_likelihood_point = torch.where(
-                    data != 0, log_likelihood_poisson_w, log_likelihood_0_b
+                    X!= 0, log_likelihood_poisson_w, log_likelihood_0_b
                 )
 
                 log_marginal = torch.sum(log_likelihood_point, axis=1)
@@ -332,7 +333,7 @@ class MVTadaZipEM(BaseSGDModel):
             # M step, maximize parameters
             for k in range(K):
                 pi_[k] = np.mean(Ez == k)
-                data_sub = data[Ez == k]  # Selects relevant data
+                X_sub = X[Ez == k]  # Selects relevant data
 
                 trainable_variables = [Lambda_list_l[k], alpha_ls[k]]
 
@@ -346,7 +347,7 @@ class MVTadaZipEM(BaseSGDModel):
                     Lambda_k = Lambda_list_l[k]
                     alpha_k = sigmoid(alpha_ls[k])
 
-                    log_likelihood_poisson = -1 * myloss(Lambda_k, data_sub)
+                    log_likelihood_poisson = -1 * myloss(Lambda_k, X_sub)
                     log_likelihood_poisson_w = (
                         log_likelihood_poisson + torch.log(1 - alpha_k)
                     )
@@ -355,11 +356,11 @@ class MVTadaZipEM(BaseSGDModel):
                         alpha_k + (1 - alpha_k) * torch.exp(-1 * Lambda_k)
                     )
                     log_likelihood_0_b = torch.broadcast_to(
-                        log_likelihood_0, data_sub.shape
+                        log_likelihood_0, X_sub.shape
                     )
 
                     log_likelihood_point = torch.where(
-                        data_sub != 0,
+                        X_sub != 0,
                         log_likelihood_poisson_w,
                         log_likelihood_0_b,
                     )
@@ -439,6 +440,8 @@ class MVTadaZipEM(BaseSGDModel):
         Lambda_list_l = trainable_variables[1]
         alpha_ls = trainable_variables[2]
         sigmoid = nn.Sigmoid()
+        self.Lambda = np.zeros((self.K,self.p))
+        self.Alpha = np.zeros((self.K,self.p))
         for k in range(self.K):
             Lambda_k = Lambda_list_l[k]
             alpha_k = sigmoid(alpha_ls[k])
@@ -532,7 +535,7 @@ class MVTadaZipEM(BaseSGDModel):
         tops : dict
         """
         default_options = {
-            "n_iterations": 2000,
+            "n_iterations": 200,
             "n_inner_iterations": 50,
             "learning_rate": 5e-4,
         }
