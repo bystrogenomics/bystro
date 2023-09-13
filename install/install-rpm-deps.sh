@@ -32,4 +32,6 @@ sudo yum install nodejs -y;
 sudo npm install -g pm2;
 
 sudo yum install awscli -y;
+
+# pkg-config is required for building the wheel
 sudo yum install -y pkg-config;
