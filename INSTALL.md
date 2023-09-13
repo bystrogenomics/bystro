@@ -36,7 +36,7 @@ There are 2 components to Bystro:
 ##### Ubuntu
 1.  Ensure that packages are up to date (`sudo apt update`), or that you are satisified with the state of package versions.
 2.  `git clone https://github.com/akotlar/bystro.git && cd bystro && source ./install-apt.sh`
-    - Please note that this installation script requires root priveleges, in order to install system dependencies
+    - Please not that this installation script will ask you for the root password in order to install system dependencies
 
 ## Installing the Bystro Python libraries and cli tools
 
