@@ -20,7 +20,7 @@ jobs:
     - name: Build Bystro using Maturin
       run: |
         . .initialize_conda_env.sh
-        maturin build
+        make build
       shell: bash
     - name: Verify Bystro wheel exists
       run: |
