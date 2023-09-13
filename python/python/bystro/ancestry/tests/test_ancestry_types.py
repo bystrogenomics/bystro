@@ -57,7 +57,6 @@ prob_int = ProbabilityInterval(lower_bound=0.0, upper_bound=1.0)
 def test_ProbabilityInterval_accepts_valid_bounds() -> None:
     """Ensure we can instantiate, validate ProbabilityInterval correctly."""
     prob_int = ProbabilityInterval(lower_bound=0.1, upper_bound=0.9)
-    # for msgspec serialization we specifically have to check if raw float
     assert type(prob_int.lower_bound) is float
     assert type(prob_int.upper_bound) is float
 
