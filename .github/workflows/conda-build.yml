@@ -16,14 +16,12 @@ jobs:
           auto-update-conda: true
           auto-activate-base: true
           activate-environment: true
-          python-version: ${{ matrix.python-version }}      
-    - name: Install dependencies
-      run: |
-        source .initialize_conda_env.sh
-        pip install -r **/requirements-dev.txt
+          python-version: ${{ matrix.python-version }}   
     - name: Build Bystro using Maturin
       run: |
+        . .initialize_conda_env.sh
         maturin build
+      shell: bash
     - name: Verify Bystro wheel exists
       run: |
         if [[ ! -f "python/target/wheels/bystro-1.0.0-cp310-cp310-manylinux_2_34_x86_64.whl" ]]; then
