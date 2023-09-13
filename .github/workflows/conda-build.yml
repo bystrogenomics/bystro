@@ -11,33 +11,6 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
-      with:
-        # Explicitly set the fetch-depth to 0 to fetch all history
-        fetch-depth: 0
-
-    - name: Set up remote for head branch
-      run: |
-        # Set up the remote repository for the head branch
-        git remote add head-repo https://github.com/${{ github.head_repo }}.git
-        git fetch head-repo ${{ github.head_ref }} --depth=1
-      env:
-        GITHUB_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-
-    - name: Check modified files
-      id: file-check
-      run: |
-        # Get the list of modified files in the pull request
-        MODIFIED_FILES=$(git diff --name-only ${{ github.base_ref }} ${{ github.head_ref }})
-      
-        # Check if any modified file has a non-Perl file extension
-        if echo "$MODIFIED_FILES" | grep -E -q '.*\.(?!pl|pm$)[^.]+$'; then
-          echo "At least one non-Perl file modified. Continuing with the workflow."
-        else
-          echo "No non-Perl files modified. Exiting the workflow."
-          exit 78  # Exit with a neutral status code (78) to indicate a skipped workflow
-        fi
-      shell: bash
-
     - name: Build Miniconda
       uses: conda-incubator/setup-miniconda@v2
       with:
@@ -45,13 +18,11 @@ jobs:
           auto-activate-base: true
           activate-environment: true
           python-version: ${{ matrix.python-version }}   
-  
     - name: Build Bystro using Maturin
       run: |
         . .initialize_conda_env.sh
         make build
       shell: bash
-
     - name: Verify Bystro wheel exists
       run: |
         if [[ ! -f "python/target/wheels/bystro-1.0.0-cp310-cp310-manylinux_2_34_x86_64.whl" ]]; then
