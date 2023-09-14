@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 import pandas as pd
-from bystro.proteomics.fragpipe_utils import check_df_cols, prep_annotation_df
+from bystro.proteomics.fragpipe_utils import check_df_starts_with_cols, prep_annotation_df
 
 PG_MATRIX_COLS = ["Protein.Group", "Protein.Ids", "Protein.Names", "Genes", "First.Protein.Description"]
 
@@ -18,7 +18,7 @@ class DataIndependentAnalysisDataset:
 
 def _prep_pg_matrix_df(pg_matrix_df: pd.DataFrame) -> pd.DataFrame:
     """Prep pg_matrix_df, setting Protein.IDs as index and dropping extraneous columns."""
-    check_df_cols(pg_matrix_df, PG_MATRIX_COLS)
+    check_df_starts_with_cols(pg_matrix_df, PG_MATRIX_COLS)
     pg_matrix_df = pg_matrix_df.set_index("Protein.Ids")
     pg_matrix_df = pg_matrix_df.drop(
         ["Protein.Group", "Protein.Names", "Genes", "First.Protein.Description"], axis="columns"

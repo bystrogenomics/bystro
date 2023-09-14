@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 import pandas as pd
-from bystro.proteomics.fragpipe_utils import check_df_cols, prep_annotation_df
+from bystro.proteomics.fragpipe_utils import check_df_starts_with_cols, prep_annotation_df
 
 ABUNDANCE_COLS = ["Index", "NumberPSM", "ProteinID", "MaxPepProb", "ReferenceIntensity"]
 
@@ -18,7 +18,7 @@ class TandemMassTagDataset:
 
 def _prep_abundance_df(abundance_df: pd.DataFrame) -> pd.DataFrame:
     """Prep abundance_df, setting index and normalizing abundances by ReferenceIntensity."""
-    check_df_cols(abundance_df, ABUNDANCE_COLS)
+    check_df_starts_with_cols(abundance_df, ABUNDANCE_COLS)
     abundance_df = abundance_df.set_index("Index")
     first_sample_column_idx = abundance_df.columns.to_list().index("ReferenceIntensity") + 1
     sample_columns = abundance_df.columns[first_sample_column_idx:]
