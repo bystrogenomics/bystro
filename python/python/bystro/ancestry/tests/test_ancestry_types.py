@@ -14,6 +14,16 @@ from bystro.ancestry.ancestry_types import (
 from bystro.ancestry.train import POPS, SUPERPOPS
 
 
+# ruff: noqa: E721
+
+# In several tests we explicitly check that a value `is float` rather
+# than use the more pythonic `isinstance(value, float)`.  We make
+# these explicit checks in order to ensure that such values are raw
+# floats and not np.float64's, which can't easily be deserialized.
+# But the former method of checking raises E71 errors, which are
+# exempted from the linter on a file-wide basis above.
+
+
 def test_AncestrySubmission_accepts_valid_vcf_paths():
     AncestrySubmission("foo.vcf")
     AncestrySubmission("foo.vcf.gz")
@@ -47,7 +57,7 @@ prob_int = ProbabilityInterval(lower_bound=0.0, upper_bound=1.0)
 def test_ProbabilityInterval_accepts_valid_bounds() -> None:
     """Ensure we can instantiate, validate ProbabilityInterval correctly."""
     prob_int = ProbabilityInterval(lower_bound=0.1, upper_bound=0.9)
-    assert type(prob_int.lower_bound) is float  # for msgspec serialization
+    assert type(prob_int.lower_bound) is float
     assert type(prob_int.upper_bound) is float
 
 
