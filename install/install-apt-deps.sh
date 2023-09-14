@@ -2,7 +2,6 @@
 
 echo -e "\n\nInstalling Ubuntu/Debian (apt-get) dependencies\n";
 
-sudo apt update;
 # Installs gcc, and more; may be too much
 sudo apt install -y build-essential;
 
@@ -32,3 +31,6 @@ sudo apt install -y npm;
 sudo npm install -g pm2;
 
 sudo apt install -y awscli;
+
+# pkg-config is required for building the wheel
+sudo apt install -y pkg-config;
