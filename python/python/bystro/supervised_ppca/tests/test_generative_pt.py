@@ -70,7 +70,7 @@ def generate_data_factorAnalysis():
 
 def test_ppca():
     W, sigma, X, S_train = generate_data_ppca()
-    model = PPCA(4, training_options={"n_iterations": 100})
+    model = PPCA(n_components=4, training_options={"n_iterations": 25})
     model.fit(X)
     cov_est = model.get_covariance()
     cov_emp = np.dot(X.T, X) / X.shape[0]
