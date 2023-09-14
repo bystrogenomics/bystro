@@ -23,5 +23,5 @@ def test_fit():
         idx = int(Z_true[i])
         X[i] = rng.poisson(Lambda[idx])
 
-    model = MVTadaPoissonML(K=K)
+    model = MVTadaPoissonML(K=K, training_options={"n_iterations": 2})
     model.fit(X)

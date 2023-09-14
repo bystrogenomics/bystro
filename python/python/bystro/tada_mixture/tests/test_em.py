@@ -26,8 +26,8 @@ def test_fit():
         zerod_out = rng.binomial(1, Alphas[idx])
         X[i, zerod_out == 1] = 0
 
-    model = MVTadaZipEM(K=K)
+    model = MVTadaZipEM(K=K, training_options={"n_iterations": 2})
     model.fit(X)
 
-    model = MVTadaPoissonEM(K=K)
+    model = MVTadaPoissonEM(K=K, training_options={"n_iterations": 2})
     model.fit(X)
