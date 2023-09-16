@@ -18,8 +18,9 @@ sub BUILD {
   my $self = shift;
   $self->{_altIdx} = $self->getFieldDbName('alt');
 
-  if(!defined $self->{_altIdx}) {
-    $self->log('fatal', $self->name . ": couldn't find 'alt' feature, required for vcf tracks");
+  if ( !defined $self->{_altIdx} ) {
+    $self->log( 'fatal',
+      $self->name . ": couldn't find 'alt' feature, required for vcf tracks" );
   }
 
   # Skip accesor penalty, the get function in this package may be called
@@ -44,36 +45,36 @@ sub get {
   # Unlike other tracks, for Vcf, we only return exact matches
   # So tiling across the entire deleted region isn't appropriate
   # Could result in false positives during search
-  if($_[5] > 0) {
+  if ( $_[5] > 0 ) {
     return $_[6];
   }
 
-  my $data = $_[1]->[$_[0]->{_dbName}];
+  my $data = $_[1]->[ $_[0]->{_dbName} ];
 
-  if(!$data) {
+  if ( !$data ) {
     return $_[6];
   }
 
-  my $alt = $data->[$_[0]->{_altIdx}];
+  my $alt = $data->[ $_[0]->{_altIdx} ];
 
   # To save CPU time, only enter for loop when necessary
   # Almost all VCF sites (~99%) will not be multiallelic, and so the alt stored
   # in db will be a scalar
   # Handle this as a special, fast path
-  if(!ref $alt) {
-    if($alt eq $_[4]) {
+  if ( !ref $alt ) {
+    if ( $alt eq $_[4] ) {
       # Alt is a scalar, which means there were no overlapping database values
       # at this pposiiton, and all fields represent a single value
-      for my $i (@{$_[0]->{_fIdx}}) {
+      for my $i ( @{ $_[0]->{_fIdx} } ) {
         #$outAccum->[$idx][$alleleIdx][$posIdx] = $data->[$self->{_fDb}[$i]] }
-        $_[6]->[$i][$_[5]] = $data->[$_[0]->{_fDb}[$i]];
+        $_[6]->[$i][ $_[5] ] = $data->[ $_[0]->{_fDb}[$i] ];
       }
     }
 
     return $_[6];
   }
 
-  # If $alt is a reference (expect array: if not, this is a programmatic error 
+  # If $alt is a reference (expect array: if not, this is a programmatic error
   # which we allow to crash the program)
   # then find the matching alt if any, record its index in the database array,
   # and look up all YAML-defined fields at this index in the same db data arrayref
@@ -82,10 +83,10 @@ sub get {
 
   # Linear search; slow if many alleles, but we expect that at every site has <= 10 alleles
   for my $alt (@$alt) {
-    if($alt eq $_[4]) {
-      for my $i (@{$_[0]->{_fIdx}}) {
+    if ( $alt eq $_[4] ) {
+      for my $i ( @{ $_[0]->{_fIdx} } ) {
         #$outAccum->[$i][$posIdx] = $data->[$self->{_fDb}[$dataIdx]] }
-        $_[6]->[$i][$_[5]] = $data->[$_[0]->{_fDb}[$i]][$dataIdx];
+        $_[6]->[$i][ $_[5] ] = $data->[ $_[0]->{_fDb}[$i] ][$dataIdx];
       }
 
       #return $outAccum;

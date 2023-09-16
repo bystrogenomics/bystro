@@ -17,7 +17,7 @@ state $parentChild = {};
 
 # [ [ $child1, $child2 ], $feature2, $feature3, etc ]
 state $orderedHeaderCache = [];
-state $strHeaderCache = '';
+state $strHeaderCache     = '';
 # { childFeature1 => idx, childFeature2 => idx;
 state $orderMapCache = {};
 # { $parent => { $child1 => idxChild1, $child2 => idxChild2 }}
@@ -28,16 +28,16 @@ sub initialize {
   _clearCache();
 
   $orderedHeaderFeaturesAref = [];
-  $parentChild = {};
+  $parentChild               = {};
 
   return;
 }
 
 sub _clearCache {
-   # These get initialize/cleared every time feature added
-   # They simply track different views of
+  # These get initialize/cleared every time feature added
+  # They simply track different views of
   $orderedHeaderCache = [];
-  $orderMapCache = {};
+  $orderMapCache      = {};
   undef %parentChildHash;
   $strHeaderCache = '';
 
@@ -49,25 +49,25 @@ sub get {
 }
 
 sub getParentFeatures {
-  my ($self, $parentName) = @_;
+  my ( $self, $parentName ) = @_;
   return $parentChild->{$parentName};
 }
 
 sub getFeatureIdx {
-  my ($self, $parentName, $childName) = @_;
+  my ( $self, $parentName, $childName ) = @_;
 
-  if(!%parentChildHash) {
+  if ( !%parentChildHash ) {
     my $i = -1;
-    for my $entry (values @$orderedHeaderFeaturesAref) {
+    for my $entry ( values @$orderedHeaderFeaturesAref ) {
       $i++;
 
-      if(ref $entry) {
+      if ( ref $entry ) {
         # One key only, the parent name (trackName)
         my ($trackName) = keys %{$entry};
 
         my %children;
         my $y = -1;
-        for my $childName (@{$entry->{$trackName}}) {
+        for my $childName ( @{ $entry->{$trackName} } ) {
           $y++;
           $children{$childName} = $y;
         }
@@ -86,16 +86,17 @@ sub getFeatureIdx {
 }
 
 sub getOrderedHeader() {
-  if(@$orderedHeaderCache) {
+  if (@$orderedHeaderCache) {
     return $orderedHeaderCache;
   }
 
-  for my $i (0 .. $#$orderedHeaderFeaturesAref) {
-    if(ref $orderedHeaderFeaturesAref->[$i]) {
-      my $trackName = (keys %{$orderedHeaderFeaturesAref->[$i]})[0];
+  for my $i ( 0 .. $#$orderedHeaderFeaturesAref ) {
+    if ( ref $orderedHeaderFeaturesAref->[$i] ) {
+      my $trackName = ( keys %{ $orderedHeaderFeaturesAref->[$i] } )[0];
 
       $orderedHeaderCache->[$i] = $orderedHeaderFeaturesAref->[$i]{$trackName};
-    } else {
+    }
+    else {
       $orderedHeaderCache->[$i] = $orderedHeaderFeaturesAref->[$i];
     }
   }
@@ -105,15 +106,16 @@ sub getOrderedHeader() {
 
 # Retrieves child feature
 sub getParentIndices() {
-  if(%$orderMapCache) {
+  if (%$orderMapCache) {
     return $orderMapCache;
   }
 
-  for my $i (0 .. $#$orderedHeaderFeaturesAref) {
-    if(ref $orderedHeaderFeaturesAref->[$i]) {
-      $orderMapCache->{ (keys %{$orderedHeaderFeaturesAref->[$i]})[0] } = $i;
-    } else {
-      $orderMapCache->{$orderedHeaderFeaturesAref->[$i]} = $i;
+  for my $i ( 0 .. $#$orderedHeaderFeaturesAref ) {
+    if ( ref $orderedHeaderFeaturesAref->[$i] ) {
+      $orderMapCache->{ ( keys %{ $orderedHeaderFeaturesAref->[$i] } )[0] } = $i;
+    }
+    else {
+      $orderMapCache->{ $orderedHeaderFeaturesAref->[$i] } = $i;
     }
   }
 
@@ -123,16 +125,16 @@ sub getParentIndices() {
 sub getString {
   my $self = shift;
 
-  if($strHeaderCache) {
+  if ($strHeaderCache) {
     return $strHeaderCache;
   }
 
   my @out;
   for my $feature (@$orderedHeaderFeaturesAref) {
     #this is a parentName => [$feature1, $feature2, $feature3] entry
-    if(ref $feature) {
+    if ( ref $feature ) {
       my ($parentName) = %$feature;
-      foreach (@{ $feature->{$parentName} } ) {
+      foreach ( @{ $feature->{$parentName} } ) {
         push @out, "$parentName.$_";
       }
       next;
@@ -140,7 +142,7 @@ sub getString {
     push @out, $feature;
   }
 
-  $strHeaderCache = join("\t", @out);
+  $strHeaderCache = join( "\t", @out );
   return $strHeaderCache;
 }
 
@@ -151,37 +153,40 @@ sub getString {
 # @param <Any> $prepend: Whether or not to add the $child to the beginning of
 # the features array, or to the beginning of the $parent feature array if !!$parent
 sub addFeaturesToHeader {
-  my ($self, $child, $parent, $prepend) = @_;
+  my ( $self, $child, $parent, $prepend ) = @_;
 
   _clearCache();
 
-  if(ref $child eq 'ARRAY') {
+  if ( ref $child eq 'ARRAY' ) {
     goto &_addFeaturesToHeaderBulk;
   }
 
-  if($parent) {
+  if ($parent) {
     my $parentFound = 0;
 
     for my $headerEntry (@$orderedHeaderFeaturesAref) {
-      if(!ref $headerEntry) {
-        if($parent eq $headerEntry) {
-          $self->log('warning', "$parent equals $headerEntry, which has no
-            child features, which was not what we expected");
+      if ( !ref $headerEntry ) {
+        if ( $parent eq $headerEntry ) {
+          $self->log(
+            'warning', "$parent equals $headerEntry, which has no
+            child features, which was not what we expected"
+          );
         }
         next;
       }
 
-      my ($key, $valuesAref) = %$headerEntry;
+      my ( $key, $valuesAref ) = %$headerEntry;
 
-      if($key eq $parent) {
+      if ( $key eq $parent ) {
         # If we have already added this feature, exit the function
-        if(defined(first {$_ eq $child} @$valuesAref)) {
+        if ( defined( first { $_ eq $child } @$valuesAref ) ) {
           return;
         }
 
-        if($prepend) {
+        if ($prepend) {
           unshift @$valuesAref, $child;
-        } else {
+        }
+        else {
           push @$valuesAref, $child;
         }
 
@@ -194,9 +199,10 @@ sub addFeaturesToHeader {
     # No parent found, no need to check if feature has previously been added
     my $val = { $parent => [$child] };
 
-    if($prepend) {
+    if ($prepend) {
       unshift @$orderedHeaderFeaturesAref, $val;
-    } else {
+    }
+    else {
       push @$orderedHeaderFeaturesAref, $val;
     }
 
@@ -209,13 +215,14 @@ sub addFeaturesToHeader {
   ####### value stored, rather than a parentName => [value1, value2] ##########
 
   # If the value was previously added, exit function;
-  if( defined(first {$_ eq $child} @$orderedHeaderFeaturesAref) ) {
+  if ( defined( first { $_ eq $child } @$orderedHeaderFeaturesAref ) ) {
     return;
   }
 
-  if($prepend) {
+  if ($prepend) {
     unshift @$orderedHeaderFeaturesAref, $child;
-  } else {
+  }
+  else {
     push @$orderedHeaderFeaturesAref, $child;
   }
 
@@ -223,16 +230,16 @@ sub addFeaturesToHeader {
 }
 
 sub _addFeaturesToHeaderBulk {
-  my ($self, $childrenAref, $parent, $prepend) = @_;
+  my ( $self, $childrenAref, $parent, $prepend ) = @_;
 
-  if(!ref $childrenAref) {
+  if ( !ref $childrenAref ) {
     goto &addFeaturesToHeader;
   }
 
   my @array = $prepend ? reverse @$childrenAref : @$childrenAref;
 
   for my $child (@array) {
-    $self->addFeaturesToHeader($child, $parent, $prepend);
+    $self->addFeaturesToHeader( $child, $parent, $prepend );
   }
 
   return;

@@ -1,6 +1,7 @@
 use 5.10.0;
 use strict;
 use warnings;
+
 package Seq::Tracks::Gene;
 
 our $VERSION = '0.001';
@@ -39,7 +40,7 @@ my $geneDef = Seq::Tracks::Gene::Definition->new();
 ### Set the features default that we get from the Gene track region database ###
 has '+features' => (
   default => sub {
-    return [ @{$geneDef->ucscGeneAref}, $geneDef->txErrorName ];
+    return [ @{ $geneDef->ucscGeneAref }, $geneDef->txErrorName ];
   },
 );
 
@@ -74,8 +75,8 @@ has exonicAlleleFunctionKey => ( is => 'ro', default => 'exonicAlleleFunction' )
 # This is needed, because, as insane as it is, the transcript 'name'
 # is not a unique key, and therefore is not a primary key, which makes it
 # useless for lookup
-has txNumberKey => ( is => 'ro', lazy => 1, default => 'txNumber');
-has reportTxNumber => (is => 'ro', isa => 'Bool', default => 0);
+has txNumberKey    => ( is => 'ro', lazy => 1,      default => 'txNumber' );
+has reportTxNumber => ( is => 'ro', isa  => 'Bool', default => 0 );
 
 # has hgvsPkey => (is => 'ro', default => 'hgvsP');
 # has hgvsCkey => (is => 'ro', default => 'hgvsC');
@@ -118,7 +119,6 @@ has siteTypes => (
 # TODO: implement the truncated annotation
 state $truncated = 'truncatedCodon';
 
-
 ### objects that get used by multiple subs, but shouldn't be public attributes ###
 # All of these instantiated classes cannot be configured at instantiation time
 # so safe to use in static context
@@ -155,12 +155,12 @@ sub BUILD {
     $self->{_hasJoin} = 1;
 
     $self->{_flatJoinFeatures} =
-    [ map { "$joinTrackName.$_" } @{ $self->joinTrackFeatures } ];
+      [ map { "$joinTrackName.$_" } @{ $self->joinTrackFeatures } ];
 
     my $i = 0;
     for my $fName ( @{ $self->joinTrackFeatures } ) {
       $self->{_allCachedDbNames}{ $self->{_flatJoinFeatures}[$i] } =
-      $self->getFieldDbName($fName);
+        $self->getFieldDbName($fName);
       $i++;
     }
   }
@@ -183,15 +183,15 @@ sub setHeaders {
   # TODO: have clearer separation between computed and stored features
   ##############################################################################
   unshift @features, $self->siteTypeKey, $self->exonicAlleleFunctionKey,
-  $self->codonSequenceKey, $self->newCodonKey, $self->refAminoAcidKey,
-  $self->newAminoAcidKey, $self->codonPositionKey,
-  $self->codonNumberKey, $self->strandKey;    #$self->hgvsCkey, $self->hgvsPkey
+    $self->codonSequenceKey, $self->newCodonKey, $self->refAminoAcidKey,
+    $self->newAminoAcidKey,  $self->codonPositionKey,
+    $self->codonNumberKey,   $self->strandKey;       #$self->hgvsCkey, $self->hgvsPkey
 
   if ( $self->{_flatJoinFeatures} ) {
     push @features, @{ $self->{_flatJoinFeatures} };
   }
 
-  if($self->reportTxNumber) {
+  if ( $self->reportTxNumber ) {
     push @features, $self->txNumberKey;
   }
 
@@ -215,7 +215,7 @@ sub setHeaders {
   # so that we can manually include them in the output
   my $lastFeatIdx = $#allGeneTrackFeatures;
 
-  $self->{_featIdx}        = [ 0 .. $lastFeatIdx ];
+  $self->{_featIdx} = [ 0 .. $lastFeatIdx ];
 
   $self->{_strandFidx} = $self->{_featureIdxMap}{ $self->strandKey };
   $self->{_siteFidx}   = $self->{_featureIdxMap}{ $self->siteTypeKey };
@@ -231,7 +231,7 @@ sub setHeaders {
   $self->{_altAaFidx}      = $self->{_featureIdxMap}{ $self->newAminoAcidKey };
   $self->{_alleleFuncFidx} = $self->{_featureIdxMap}{ $self->exonicAlleleFunctionKey };
 
-  $self->{_txNumberFidx} =  $self->{_featureIdxMap}{ $self->txNumberKey };
+  $self->{_txNumberFidx} = $self->{_featureIdxMap}{ $self->txNumberKey };
 
   # $self->{_hgvsCidx} = $self->{_featureIdxMap}{$self->hgvsCkey};
   # $self->{_hgvsPidx} = $self->{_featureIdxMap}{$self->hgvsPkey};
@@ -283,12 +283,12 @@ sub get {
     # http://ideone.com/jlImGA
     for my $fName ( @{ $self->{_flatJoinFeatures} } ) {
       $outAccum->[ $idxMap->{$fName} ][$posIdx] =
-      $geneDb->[$num]{ $cachedDbNames->{$fName} };
+        $geneDb->[$num]{ $cachedDbNames->{$fName} };
     }
   }
 
   # Needs to be done early, in case !hasCodon
-  if(defined $self->{_txNumberFidx}) {
+  if ( defined $self->{_txNumberFidx} ) {
     $outAccum->[ $self->{_txNumberFidx} ][$posIdx] = $txNumbers;
   }
 
@@ -309,7 +309,8 @@ sub get {
         $hasCodon = 1;
       }
     }
-  } else {
+  }
+  else {
     # This is a bit messy; we should just push anyway, or be consistent
     # and never store an array unless multiple, through Gene.pm
     # Currently we rely on the output package to do the right thing
@@ -325,12 +326,13 @@ sub get {
   if ($multiple) {
     for my $feature ( @{ $self->{_features} } ) {
       $outAccum->[ $idxMap->{$feature} ][$posIdx] =
-      [ map { $geneDb->[$_]{ $cachedDbNames->{$feature} } } @$txNumbers ];
+        [ map { $geneDb->[$_]{ $cachedDbNames->{$feature} } } @$txNumbers ];
     }
-  } else {
+  }
+  else {
     for my $feature ( @{ $self->{_features} } ) {
       $outAccum->[ $idxMap->{$feature} ][$posIdx] =
-      $geneDb->[$txNumbers]{ $cachedDbNames->{$feature} };
+        $geneDb->[$txNumbers]{ $cachedDbNames->{$feature} };
     }
   }
 
@@ -351,20 +353,20 @@ sub get {
   my ( $i, @funcAccum, @codonNum, @codonSeq, @codonPos, @refAA, @newAA, @newCodon );
   # Set undefs for every position, other than the ones we need
   # So that we don't need to push undef's to keep transcript order
-  $#funcAccum = $#codonNum = $#codonSeq = $#codonPos = $#refAA = $#newAA = $#newCodon =
-  $multiple;
+  $#funcAccum = $#codonNum = $#codonSeq = $#codonPos = $#refAA = $#newAA =
+    $#newCodon = $multiple;
 
   $i = 0;
 
   if ( length($alt) > 1 ) {
     # Indels get everything besides the _*AminoAcidKey and _newCodonKey
     my $indelAllele =
-      substr( $alt, 0, 1 ) eq '+'
-    ? length( substr( $alt, 1 ) ) % 3
-      ? $frameshift
-      : $inFrame
-    : int($alt) % 3 ? $frameshift
-    :                 $inFrame;
+        substr( $alt, 0, 1 ) eq '+'
+      ? length( substr( $alt, 1 ) ) % 3
+        ? $frameshift
+        : $inFrame
+      : int($alt) % 3 ? $frameshift
+      :                 $inFrame;
 
     for my $site ( $multiple ? @$siteData : $siteData ) {
       $codonNum[$i] = $site->[$codonNumberIdx];
@@ -387,7 +389,8 @@ sub get {
 
       $i++;
     }
-  } else {
+  }
+  else {
     my $altCodonSequence;
 
     SNP_LOOP: for my $site ( $multiple ? @$siteData : $siteData ) {
@@ -414,8 +417,9 @@ sub get {
       # Note that $site->[$codonPositionIdx] MUST be 0-based for this to work
       if ( $site->[$strandIdx] eq '-' ) {
         substr( $altCodonSequence, $site->[$codonPositionIdx], 1 ) =
-        $negativeStrandTranslation->{$alt};
-      } else {
+          $negativeStrandTranslation->{$alt};
+      }
+      else {
         substr( $altCodonSequence, $site->[$codonPositionIdx], 1 ) = $alt;
       }
 
@@ -431,13 +435,17 @@ sub get {
 
       if ( $refAA[$i] eq $newAA[$i] ) {
         $funcAccum[$i] = $silent;
-      } elsif ( $newAA[$i] eq '*' ) {
+      }
+      elsif ( $newAA[$i] eq '*' ) {
         $funcAccum[$i] = $stopGain;
-      } elsif ( $refAA[$i] eq '*' ) {
+      }
+      elsif ( $refAA[$i] eq '*' ) {
         $funcAccum[$i] = $stopLoss;
-      } elsif ( $codonNum[$i] == 1 ) {
+      }
+      elsif ( $codonNum[$i] == 1 ) {
         $funcAccum[$i] = $startLoss;
-      } else {
+      }
+      else {
         $funcAccum[$i] = $replacement;
       }
 
@@ -448,7 +456,7 @@ sub get {
     }
   }
 
-  if($multiple) {
+  if ($multiple) {
     $outAccum->[ $self->{_codonPosFidx} ][$posIdx]   = \@codonPos;
     $outAccum->[ $self->{_codonNumFidx} ][$posIdx]   = \@codonNum;
     $outAccum->[ $self->{_alleleFuncFidx} ][$posIdx] = \@funcAccum;

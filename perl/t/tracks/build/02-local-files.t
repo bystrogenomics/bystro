@@ -9,16 +9,13 @@ use Test::More;
 
 my $localPaths = Seq::Tracks::Build::LocalFilesPaths->new();
 
-
 my $trackName = 'something';
-my $filesDir = 'a_files_dir';
+my $filesDir  = 'a_files_dir';
 
-my $localFiles = [
-  'something.chr*.txt',
-  'something.shouldnt_match_glob.chr99.txt',
-];
+my $localFiles =
+  [ 'something.chr*.txt', 'something.shouldnt_match_glob.chr99.txt', ];
 
-my @chrs = ('chr1', 'chr2', 'chr3', 'chr4', 'chr5');
+my @chrs = ( 'chr1', 'chr2', 'chr3', 'chr4', 'chr5' );
 
 my $path = path($filesDir)->child($trackName);
 $path->mkpath();
@@ -32,15 +29,17 @@ for my $chr (@chrs) {
   push @actualPaths, $filePath->stringify;
 }
 
-my $nonGlobFile = $path->child("something.shouldnt_match_glob.chr99.txt")->absolute();
+my $nonGlobFile =
+  $path->child("something.shouldnt_match_glob.chr99.txt")->absolute();
 $nonGlobFile->touch();
 
 push @actualPaths, $nonGlobFile;
 
-my $computedPaths = $localPaths->makeAbsolutePaths($filesDir, $trackName, $localFiles);
+my $computedPaths =
+  $localPaths->makeAbsolutePaths( $filesDir, $trackName, $localFiles );
 
-for my $i ( 0 .. $#$computedPaths) {
-  ok($computedPaths->[$i] eq $actualPaths[$i]);
+for my $i ( 0 .. $#$computedPaths ) {
+  ok( $computedPaths->[$i] eq $actualPaths[$i] );
 }
 
 $path->remove_tree();

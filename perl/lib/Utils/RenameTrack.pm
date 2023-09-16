@@ -24,7 +24,7 @@ extends 'Utils::Base';
 
 ########## Arguments accepted ##############
 # Take the CADD file and make it a bed file
-has renameTo => (is => 'ro', isa => 'Str', required => 1);
+has renameTo => ( is => 'ro', isa => 'Str', required => 1 );
 
 ############# Private ############
 
@@ -33,8 +33,9 @@ sub BUILD {
 
   my $databaseDir = $self->_decodedConfig->{database_dir};
 
-  if(!$databaseDir) {
-    $self->log('fatal', "database_dir required in config file for Utils::RenameTrack to work");
+  if ( !$databaseDir ) {
+    $self->log( 'fatal',
+      "database_dir required in config file for Utils::RenameTrack to work" );
     return;
   }
 
@@ -51,44 +52,54 @@ sub BUILD {
 }
 
 sub go {
-  my $self= shift;
+  my $self = shift;
 
   #TODO: rename dryRun to dryRun in main package
-  my $trackNameMapper = Seq::Tracks::Base::MapTrackNames->new({dryRun => $self->dryRun});
-    
-  my $err = $trackNameMapper->renameTrack($self->name, $self->renameTo);
+  my $trackNameMapper =
+    Seq::Tracks::Base::MapTrackNames->new( { dryRun => $self->dryRun } );
 
-  if(!$err) {
-    $self->log('info', "Renamed track from " . $self->name . " to " . $self->renameTo);
-  } else {
-    $self->log('info', "Failed to rename track " . $self->name . " because $err");
+  my $err = $trackNameMapper->renameTrack( $self->name, $self->renameTo );
+
+  if ( !$err ) {
+    $self->log( 'info', "Renamed track from " . $self->name . " to " . $self->renameTo );
+  }
+  else {
+    $self->log( 'info', "Failed to rename track " . $self->name . " because $err" );
     return;
   }
-  
 
   $self->_wantedTrack->{name} = $self->renameTo;
 
   #TODO: support renaming for the other fields
-  if(defined $self->_decodedConfig->{statistics} && $self->_decodedConfig->{statistics}{dbSNPnameField}) {
-    if($self->_decodedConfig->{statistics}{dbSNPnameField} eq $self->name) {
+  if ( defined $self->_decodedConfig->{statistics}
+    && $self->_decodedConfig->{statistics}{dbSNPnameField} )
+  {
+    if ( $self->_decodedConfig->{statistics}{dbSNPnameField} eq $self->name ) {
       $self->_decodedConfig->{statistics}{dbSNPnameField} = $self->renameTo;
     }
   }
 
-  if(defined $self->_decodedConfig->{output} && defined $self->_decodedConfig->{output}{order}) {
-    my $trackOrderIdx = first_index { $_ eq $self->name } @{ $self->_decodedConfig->{output}{order} };
+  if ( defined $self->_decodedConfig->{output}
+    && defined $self->_decodedConfig->{output}{order} )
+  {
+    my $trackOrderIdx =
+      first_index { $_ eq $self->name } @{ $self->_decodedConfig->{output}{order} };
 
-    if( $trackOrderIdx > -1 ) {
+    if ( $trackOrderIdx > -1 ) {
       $self->_decodedConfig->{output}{order}[$trackOrderIdx] = $self->renameTo;
     }
   }
 
-  my $metaPath = path($self->_decodedConfig->{database_dir})->child($self->name . '_meta');
+  my $metaPath =
+    path( $self->_decodedConfig->{database_dir} )->child( $self->name . '_meta' );
 
-  if(-e path($self->_decodedConfig->{database_dir})->child($self->name . '_meta') ) {
-    $metaPath->move( path( $self->_decodedConfig->{database_dir} )->child($self->renameTo . '_meta') );
+  if (
+    -e path( $self->_decodedConfig->{database_dir} )->child( $self->name . '_meta' ) )
+  {
+    $metaPath->move(
+      path( $self->_decodedConfig->{database_dir} )->child( $self->renameTo . '_meta' ) );
   }
-  
+
   $self->_backupAndWriteConfig();
 }
 

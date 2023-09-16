@@ -9,7 +9,7 @@ use Mouse::Role;
 requires 'name';
 
 sub regionTrackPath {
-  my ($self, $chr) = @_;
+  my ( $self, $chr ) = @_;
 
   return $self->name . "/$chr";
 }

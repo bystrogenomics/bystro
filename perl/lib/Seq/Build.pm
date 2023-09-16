@@ -28,25 +28,25 @@ extends 'Seq::Base';
 use Seq::Tracks;
 use Seq::Tracks::Base::Types;
 use Utils::Base;
-use List::Util qw/first/;
-use YAML::XS qw/LoadFile Dump/;
-use Path::Tiny qw/path/;
+use List::Util    qw/first/;
+use YAML::XS      qw/LoadFile Dump/;
+use Path::Tiny    qw/path/;
 use String::Strip qw/StripLTSpace/;
 
 use Time::localtime;
 
-has wantedType => (is => 'ro', isa => 'Maybe[Str]', lazy => 1, default => undef);
+has wantedType => ( is => 'ro', isa => 'Maybe[Str]', lazy => 1, default => undef );
 
 #TODO: allow building just one track, identified by name
-has wantedName => (is => 'ro', isa => 'Maybe[Str]', lazy => 1, default => undef);
+has wantedName => ( is => 'ro', isa => 'Maybe[Str]', lazy => 1, default => undef );
 
-has meta_only => (is => 'ro', default => 0);
+has meta_only => ( is => 'ro', default => 0 );
 
 # The config file path, used to update the config file with build version date & author
-has config => (is => 'ro', required => 1);
+has config => ( is => 'ro', required => 1 );
 
-#Figures out what track type was asked for 
-#and then builds that track by calling the tracks 
+#Figures out what track type was asked for
+#and then builds that track by calling the tracks
 #"buildTrack" method
 sub BUILD {
   my $self = shift;
@@ -60,103 +60,120 @@ sub BUILD {
   my $buildAuthor = $ENV{LOGNAME} || $ENV{USER} || getpwuid($<);
   # Meta tracks are built during instantiation, so if we only want to build the
   # meta data, we can return here safely.
-  if($self->meta_only) {
+  if ( $self->meta_only ) {
     return;
   }
-  
+
   my @builders;
   my @allBuilders = $tracks->allTrackBuilders;
 
-  if($self->wantedType) {
-    my @types = split(/,/, $self->wantedType);
-    
+  if ( $self->wantedType ) {
+    my @types = split( /,/, $self->wantedType );
+
     for my $type (@types) {
       # modifies in place
       StripLTSpace($type);
 
       my $buildersOfType = $tracks->getTrackBuildersByType($type);
 
-      if(!defined $buildersOfType) {
-        $self->log('fatal', "Track type \"$type\" not recognized");
+      if ( !defined $buildersOfType ) {
+        $self->log( 'fatal', "Track type \"$type\" not recognized" );
         return;
       }
-      
+
       push @builders, @$buildersOfType;
     }
-  } elsif($self->wantedName) {
-    my @names = split(/,/, $self->wantedName);
-    
+  }
+  elsif ( $self->wantedName ) {
+    my @names = split( /,/, $self->wantedName );
+
     for my $name (@names) {
       # modifies in place
       StripLTSpace($name);
 
       my $builderOfName = $tracks->getTrackBuilderByName($name);
 
-      if(!defined $builderOfName) {
-        $self->log('fatal', "Track name \"$name\" not recognized");
+      if ( !defined $builderOfName ) {
+        $self->log( 'fatal', "Track name \"$name\" not recognized" );
         return;
       }
 
       push @builders, $builderOfName;
     }
-  } else {
+  }
+  else {
     @builders = @allBuilders;
 
     #If we're building all tracks, reference should be first
-    if($builders[0]->name ne $tracks->getRefTrackBuilder()->name) {
-      $self->log('fatal', "Reference track should be listed first");
+    if ( $builders[0]->name ne $tracks->getRefTrackBuilder()->name ) {
+      $self->log( 'fatal', "Reference track should be listed first" );
     }
   }
 
   #TODO: return error codes from the rest of the buildTrack methods
-  my $decodedConfig = LoadFile($self->config);
+  my $decodedConfig = LoadFile( $self->config );
 
   for my $builder (@builders) {
-    $self->log('info', "Started building " . $builder->name . "\n");
-    
+    $self->log( 'info', "Started building " . $builder->name . "\n" );
+
     #TODO: implement errors for all tracks
     #Currently we expect buildTrack to die if it didn't properly complete
     $builder->buildTrack();
 
-    my $track = first{$_->{name} eq $builder->name} @{$decodedConfig->{tracks}{tracks}};
+    my $track =
+      first { $_->{name} eq $builder->name } @{ $decodedConfig->{tracks}{tracks} };
 
-    $track->{build_date} = $buildDate;
+    $track->{build_date}   = $buildDate;
     $track->{build_author} = $buildAuthor;
-    $track->{version} = $track->{version} ? ++$track->{version} : 1;
-    
-    $self->log('info', "Finished building " . $builder->name . "\n");
+    $track->{version}      = $track->{version} ? ++$track->{version} : 1;
+
+    $self->log( 'info', "Finished building " . $builder->name . "\n" );
   }
 
-  $self->log('info', "finished building all requested tracks: " 
-    . join(", ", map{ $_->name } @builders) . "\n");
+  $self->log( 'info',
+        "finished building all requested tracks: "
+      . join( ", ", map { $_->name } @builders )
+      . "\n" );
 
-  $decodedConfig->{build_date} = $buildDate;
+  $decodedConfig->{build_date}   = $buildDate;
   $decodedConfig->{build_author} = $buildAuthor;
-  $decodedConfig->{version} = $decodedConfig->{version} ? ++$decodedConfig->{version} : 1;
+  $decodedConfig->{version} =
+    $decodedConfig->{version} ? ++$decodedConfig->{version} : 1;
 
   # If this is already a symlink, remove it
-  if(-l $self->config) {
+  if ( -l $self->config ) {
     unlink $self->config;
-  } else {
+  }
+  else {
     my $backupPath = $self->config . ".build-bak.$buildDate";
-    if( system ("rm -f $backupPath; mv " . $self->config . " " . $self->config . ".build-bak.$buildDate" ) != 0 ) {
-      $self->log('fatal', "Failed to back up " . $self->config);
+    if (
+      system(
+            "rm -f $backupPath; mv "
+          . $self->config . " "
+          . $self->config
+          . ".build-bak.$buildDate"
+      ) != 0
+      )
+    {
+      $self->log( 'fatal', "Failed to back up " . $self->config );
     }
   }
 
-  my $newConfigPath = $self->config . ".build.$buildDate";
+  my $newConfigPath     = $self->config . ".build.$buildDate";
   my $newConfigPathBase = path($newConfigPath)->basename;
 
   # Write a copy of the new config file to the database-containing folder
-  $newConfigPath = path($decodedConfig->{database_dir})->child($newConfigPathBase)->stringify;
-  open(my $fh, '>', $newConfigPath) or $self->log('fatal', "Couldn't open $newConfigPath for writing" );
+  $newConfigPath =
+    path( $decodedConfig->{database_dir} )->child($newConfigPathBase)->stringify;
+  open( my $fh, '>', $newConfigPath )
+    or $self->log( 'fatal', "Couldn't open $newConfigPath for writing" );
 
   say $fh Dump($decodedConfig);
 
   close($fh);
 
   # Write a 2nd copy to the original path of the config file.
-  open($fh, '>', $self->config);
+  open( $fh, '>', $self->config );
 
   say $fh Dump($decodedConfig);
 
@@ -164,15 +181,16 @@ sub BUILD {
 
   # Create a clean copy, free of file paths, for github
   $decodedConfig->{database_dir} = '~';
-  $decodedConfig->{files_dir} = '~';
-  $decodedConfig->{temp_dir} = '~';
+  $decodedConfig->{files_dir}    = '~';
+  $decodedConfig->{temp_dir}     = '~';
 
-  $newConfigPathBase = path($self->config)->basename;
-  $newConfigPathBase = substr($newConfigPathBase, 0, rindex($newConfigPathBase, '.')) . ".clean.yml";
+  $newConfigPathBase = path( $self->config )->basename;
+  $newConfigPathBase =
+    substr( $newConfigPathBase, 0, rindex( $newConfigPathBase, '.' ) ) . ".clean.yml";
 
-  $newConfigPath = path($self->config)->parent->child($newConfigPathBase)->stringify;
+  $newConfigPath = path( $self->config )->parent->child($newConfigPathBase)->stringify;
 
-  open($fh, '>', $newConfigPath);
+  open( $fh, '>', $newConfigPath );
 
   say $fh Dump($decodedConfig);
 }

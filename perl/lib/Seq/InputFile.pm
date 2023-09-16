@@ -35,8 +35,8 @@ with 'Seq::Role::Message';
 # };
 
 state $requiredInputHeaderFields = {
-  chrField => qr/Fragment$|Chromosome[s]{0,1}$|Chrom$|Chr$/i,
-  positionField => qr/Position$|Pos$/i,
+  chrField       => qr/Fragment$|Chromosome[s]{0,1}$|Chrom$|Chr$/i,
+  positionField  => qr/Position$|Pos$/i,
   referenceField => qr/Reference$|Ref$/i,
   #will match Minor_alleles as well (just looks for prefix)
   alleleField => qr/Alt$|Alternate$|Allele[s]{0,1}$|Minor_allele[s]{0,1}$/i,
@@ -44,37 +44,38 @@ state $requiredInputHeaderFields = {
 
 state $optionalInputHeaderFields = {
   alleleCountField => qr/Allele_Counts/i,
-  typeField => qr/Type/i,
+  typeField        => qr/Type/i,
 };
 
 # @ public only the common fields exposed
-has chrFieldName => ( is => 'ro', init_arg => undef);
+has chrFieldName => ( is => 'ro', init_arg => undef );
 
-has positionFieldName => ( is => 'ro', init_arg => undef);
+has positionFieldName => ( is => 'ro', init_arg => undef );
 
-has referenceFieldName => ( is => 'ro', init_arg => undef);
+has referenceFieldName => ( is => 'ro', init_arg => undef );
 
-has typeFieldName => ( is => 'ro', init_arg => undef);
+has typeFieldName => ( is => 'ro', init_arg => undef );
 
-has alleleFieldName => ( is => 'ro', init_arg => undef);
+has alleleFieldName => ( is => 'ro', init_arg => undef );
 
-has alleleCountFieldName => ( is => 'ro', init_arg => undef);
+has alleleCountFieldName => ( is => 'ro', init_arg => undef );
 
-has chrFieldIdx => ( is => 'ro', init_arg => undef);
+has chrFieldIdx => ( is => 'ro', init_arg => undef );
 
-has positionFieldIdx => ( is => 'ro', init_arg => undef);
+has positionFieldIdx => ( is => 'ro', init_arg => undef );
 
-has referenceFieldIdx => ( is => 'ro', init_arg => undef);
+has referenceFieldIdx => ( is => 'ro', init_arg => undef );
 
-has alleleFieldIdx => ( is => 'ro', init_arg => undef);
+has alleleFieldIdx => ( is => 'ro', init_arg => undef );
 
-has typeFieldIdx => ( is => 'ro', init_arg => undef);
+has typeFieldIdx => ( is => 'ro', init_arg => undef );
 
-has alleleCountFieldIdx => ( is => 'ro', init_arg => undef);
+has alleleCountFieldIdx => ( is => 'ro', init_arg => undef );
 
 # The last field containing snp data; 5th or 6th
 # Set in checkInputFileHeader
-has lastSnpFileFieldIdx => ( is => 'ro', init_arg => undef, writer => '_setLastSnpFileFieldIdx');
+has lastSnpFileFieldIdx =>
+  ( is => 'ro', init_arg => undef, writer => '_setLastSnpFileFieldIdx' );
 
 # The first sample genotype field
 # Set in checkInputFileHeader
@@ -85,7 +86,7 @@ has lastSnpFileFieldIdx => ( is => 'ro', init_arg => undef, writer => '_setLastS
 #   my ($self, $fAref) = @_;
 #   my $strt = $self->lastSnpFileFieldIdx + 1;
 
-#   # every other field column name is blank, holds genotype probability 
+#   # every other field column name is blank, holds genotype probability
 #   # for preceeding column's sample;
 #   # don't just check for ne '', to avoid simple header issues
 #   my %data;
@@ -102,10 +103,10 @@ has lastSnpFileFieldIdx => ( is => 'ro', init_arg => undef, writer => '_setLastS
 # of the sample/genotype block section
 # @ return <ArrayRef>
 sub getSampleNamesGenos {
-  my ($self, $fAref) = @_;
+  my ( $self, $fAref ) = @_;
   my $strt = $self->lastSnpFileFieldIdx + 1;
 
-  # every other field column name is blank, holds genotype probability 
+  # every other field column name is blank, holds genotype probability
   # for preceeding column's sample;
   # don't just check for ne '', to avoid simple header issues
   my @genosIdx;
@@ -113,11 +114,11 @@ sub getSampleNamesGenos {
   # We expect that if this is a .snp file containing genotypes it will have
   # a genotype call and then a confidence
   # If there isn't at least one field past the $strt, we don't have genotypes
-  if($#$fAref < $strt) {
+  if ( $#$fAref < $strt ) {
     return undef;
   }
 
-  for(my $i = $strt; $i <= $#$fAref; $i += 2) {
+  for ( my $i = $strt; $i <= $#$fAref; $i += 2 ) {
     push @genosIdx, $i;
   }
 
@@ -129,17 +130,19 @@ sub getSampleNamesGenos {
 sub checkInputFileHeader {
   my ( $self, $inputFieldsAref, $dontDieOnUnkown ) = @_;
 
-  if(!defined $inputFieldsAref) {
+  if ( !defined $inputFieldsAref ) {
     return "No tab-separated header fields found";
   }
 
-  my $totalHeaderKeys = scalar(keys %{$requiredInputHeaderFields}) + scalar(keys %{$optionalInputHeaderFields});
+  my $totalHeaderKeys = scalar( keys %{$requiredInputHeaderFields} )
+    + scalar( keys %{$optionalInputHeaderFields} );
 
-  my @firstFields = @$inputFieldsAref[0 .. $totalHeaderKeys - 1];
+  my @firstFields = @$inputFieldsAref[ 0 .. $totalHeaderKeys - 1 ];
 
-  if($firstFields[0] !~ $requiredInputHeaderFields->{chrField} ||
-  $firstFields[1] !~ $requiredInputHeaderFields->{positionField} ||
-  $firstFields[2] !~ $requiredInputHeaderFields->{referenceField}) {
+  if ( $firstFields[0] !~ $requiredInputHeaderFields->{chrField}
+    || $firstFields[1] !~ $requiredInputHeaderFields->{positionField}
+    || $firstFields[2] !~ $requiredInputHeaderFields->{referenceField} )
+  {
     return "First three fields must be chrom, pos, ref";
   }
 
@@ -147,29 +150,33 @@ sub checkInputFileHeader {
   my $found;
   my @indicesFound;
 
-  REQ_LOOP: for my $fieldType (keys %$requiredInputHeaderFields) {
+  REQ_LOOP: for my $fieldType ( keys %$requiredInputHeaderFields ) {
     $found = 0;
-    for (my $i = 0; $i < @firstFields; $i++) {
-      if(defined $firstFields[$i] && $firstFields[$i] =~ $requiredInputHeaderFields->{$fieldType} ) {
-        $self->{$fieldType . "Name"} = $firstFields[$i];
-        $self->{$fieldType . "Idx"} = $i;
+    for ( my $i = 0; $i < @firstFields; $i++ ) {
+      if ( defined $firstFields[$i]
+        && $firstFields[$i] =~ $requiredInputHeaderFields->{$fieldType} )
+      {
+        $self->{ $fieldType . "Name" } = $firstFields[$i];
+        $self->{ $fieldType . "Idx" }  = $i;
 
         push @indicesFound, $i;
         $found = 1;
       }
     }
 
-    if(!$found) {
+    if ( !$found ) {
       $notFound = $fieldType;
       last;
     }
   }
 
-  OPTIONAL: for my $fieldType (keys %$optionalInputHeaderFields) {
-    for (my $i = 0; $i < @firstFields; $i++) {
-      if(defined $firstFields[$i] && $firstFields[$i] =~ $optionalInputHeaderFields->{$fieldType} ) {
-        $self->{$fieldType . "Name"} = $firstFields[$i];
-        $self->{$fieldType . "Idx"} = $i;
+  OPTIONAL: for my $fieldType ( keys %$optionalInputHeaderFields ) {
+    for ( my $i = 0; $i < @firstFields; $i++ ) {
+      if ( defined $firstFields[$i]
+        && $firstFields[$i] =~ $optionalInputHeaderFields->{$fieldType} )
+      {
+        $self->{ $fieldType . "Name" } = $firstFields[$i];
+        $self->{ $fieldType . "Idx" }  = $i;
 
         push @indicesFound, $i;
       }
@@ -182,7 +189,7 @@ sub checkInputFileHeader {
 
   # $self->_setFirstSampleIdx($lastSnpFileFieldIdx + 1);
 
-  if($notFound) {
+  if ($notFound) {
     return "Couldn't find required field $notFound";
   }
 

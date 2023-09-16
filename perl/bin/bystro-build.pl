@@ -18,29 +18,30 @@ use DDP;
 use Seq::Build;
 
 my (
-  $yaml_config, $wantedType,        $wantedName,        $verbose, $maxThreads,
-  $help,        $wantedChr,        $dryRunInsertions,   $logDir,  $metaOnly,
-  $debug,       $overwrite,  $delete, $regionTrackOnly, $skipCompletionCheck
+  $yaml_config, $wantedType,      $wantedName, $verbose,
+  $maxThreads,  $help,            $wantedChr,  $dryRunInsertions,
+  $logDir,      $metaOnly,        $debug,      $overwrite,
+  $delete,      $regionTrackOnly, $skipCompletionCheck
 );
 
 $debug = 0;
 # usage
 GetOptions(
-  'c|config=s'   => \$yaml_config,
-  't|type|wantedType=s'     => \$wantedType,
-  'n|name|wantedName=s'     => \$wantedName,
-  'v|verbose=i'    => \$verbose,
-  'h|help'       => \$help,
-  'd|debug=i'      => \$debug,
-  'o|overwrite'  => \$overwrite,
-  'chr|wantedChr=s' => \$wantedChr,
-  'delete' => \$delete,
-  'build_region_track_only' => \$regionTrackOnly,
+  'c|config=s'                                => \$yaml_config,
+  't|type|wantedType=s'                       => \$wantedType,
+  'n|name|wantedName=s'                       => \$wantedName,
+  'v|verbose=i'                               => \$verbose,
+  'h|help'                                    => \$help,
+  'd|debug=i'                                 => \$debug,
+  'o|overwrite'                               => \$overwrite,
+  'chr|wantedChr=s'                           => \$wantedChr,
+  'delete'                                    => \$delete,
+  'build_region_track_only'                   => \$regionTrackOnly,
   'skipCompletionCheck|skip_completion_check' => \$skipCompletionCheck,
-  'dry_run_insertions|dry|dryRun' => \$dryRunInsertions,
-  'log_dir=s' => \$logDir,
-  'maxThreads=i' => \$maxThreads,
-  'meta_only' => \$metaOnly,
+  'dry_run_insertions|dry|dryRun'             => \$dryRunInsertions,
+  'log_dir=s'                                 => \$logDir,
+  'maxThreads=i'                              => \$maxThreads,
+  'meta_only'                                 => \$metaOnly,
 );
 
 if ($help) {
@@ -49,32 +50,31 @@ if ($help) {
 }
 
 my %options = (
-  'c|config=s'   => \$yaml_config,
-  't|type|wantedType=s'     => \$wantedType,
-  'n|name|wantedName=s'     => \$wantedName,
-  'v|verbose=i'    => \$verbose,
-  'h|help'       => \$help,
-  'd|debug=i'      => \$debug,
-  'o|overwrite'  => \$overwrite,
-  'chr|wantedChr=s' => \$wantedChr,
-  'delete' => \$delete,
-  'build_region_track_only' => \$regionTrackOnly,
+  'c|config=s'                                => \$yaml_config,
+  't|type|wantedType=s'                       => \$wantedType,
+  'n|name|wantedName=s'                       => \$wantedName,
+  'v|verbose=i'                               => \$verbose,
+  'h|help'                                    => \$help,
+  'd|debug=i'                                 => \$debug,
+  'o|overwrite'                               => \$overwrite,
+  'chr|wantedChr=s'                           => \$wantedChr,
+  'delete'                                    => \$delete,
+  'build_region_track_only'                   => \$regionTrackOnly,
   'skipCompletionCheck|skip_completion_check' => \$skipCompletionCheck,
-  'dry_run_insertions|dry|dryRun' => \$dryRunInsertions,
-  'log_dir=s' => \$logDir,
-  'maxThreads=i' => \$maxThreads,
-  'meta_only' => \$metaOnly,
+  'dry_run_insertions|dry|dryRun'             => \$dryRunInsertions,
+  'log_dir=s'                                 => \$logDir,
+  'maxThreads=i'                              => \$maxThreads,
+  'meta_only'                                 => \$metaOnly,
 );
 
 unless ($yaml_config) {
   Pod::Usage::pod2usage();
 }
 
-if($debug) {
-  say STDERR "Running with the following parameters:" ;
+if ($debug) {
+  say STDERR "Running with the following parameters:";
   p %options;
 }
-
 
 # read config file to determine genome name for log and check validity
 my $config_href = LoadFile($yaml_config);
@@ -82,15 +82,18 @@ my $config_href = LoadFile($yaml_config);
 # get absolute path for YAML file and db_location
 $yaml_config = path($yaml_config)->absolute->stringify;
 
-my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime();
+my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst ) = localtime();
 
 $year += 1900;
 #   # set log file
-my $log_name = join '.', 'build', $config_href->{assembly}, $wantedType ||
-$wantedName || 'allTracks', $wantedChr || 'allChr',
-"$mday\_$mon\_$year\_$hour\:$min\:$sec", 'log';
+my $log_name =
+     join '.', 'build', $config_href->{assembly}, $wantedType
+  || $wantedName
+  || 'allTracks', $wantedChr
+  || 'allChr',
+  "$mday\_$mon\_$year\_$hour\:$min\:$sec", 'log';
 
-if(!$logDir) {
+if ( !$logDir ) {
   $logDir = $config_href->{database_dir};
 
   # make or silently fail
@@ -99,22 +102,22 @@ if(!$logDir) {
 my $logPath = path($logDir)->child($log_name)->absolute->stringify;
 
 my $builder_options_href = {
-  config   => $yaml_config,
-  wantedChr    => $wantedChr,
-  wantedType   => $wantedType,
-  wantedName   => $wantedName,
-  overwrite    => $overwrite || 0,
-  debug        => $debug || 0,
-  logPath      => $logPath,
-  delete       => !!$delete,
+  config                  => $yaml_config,
+  wantedChr               => $wantedChr,
+  wantedType              => $wantedType,
+  wantedName              => $wantedName,
+  overwrite               => $overwrite || 0,
+  debug                   => $debug     || 0,
+  logPath                 => $logPath,
+  delete                  => !!$delete,
   build_region_track_only => !!$regionTrackOnly,
-  skipCompletionCheck => !!$skipCompletionCheck,
-  dryRun => !!$dryRunInsertions,
-  meta_only => !!$metaOnly,
-  verbose => $verbose,
+  skipCompletionCheck     => !!$skipCompletionCheck,
+  dryRun                  => !!$dryRunInsertions,
+  meta_only               => !!$metaOnly,
+  verbose                 => $verbose,
 };
 
-if(defined $maxThreads) {
+if ( defined $maxThreads ) {
   $builder_options_href->{maxThreads} = $maxThreads;
 }
 # my $log_file = path(".")->child($log_name)->absolute->stringify;
@@ -123,7 +126,6 @@ if(defined $maxThreads) {
 my $builder = Seq::Build->new_with_config($builder_options_href);
 
 #say "done: " . $wantedType || $wantedName . $wantedChr ? ' for $wantedChr' : '';
-
 
 __END__
 

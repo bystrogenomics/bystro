@@ -8,7 +8,7 @@ use POSIX qw/lround/;
 
 #TODO: Allow configuratino through YAML
 
-has scalingFactor => (is => 'ro', isa => 'Int', required => 1);
+has scalingFactor => ( is => 'ro', isa => 'Int', required => 1 );
 
 sub round {
   #my ($self, $value) = @_;
@@ -16,7 +16,7 @@ sub round {
 
   #We have updated Data::MessagePack to support, enforce single-precision floats
   #So 5 bytes at most when prefer_float32() enabled
-  return lround($_[1] * $_[0]->scalingFactor);
+  return lround( $_[1] * $_[0]->scalingFactor );
 }
 
 __PACKAGE__->meta->make_immutable;

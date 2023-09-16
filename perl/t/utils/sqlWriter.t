@@ -10,10 +10,10 @@ use Utils::SqlWriter;
 use Path::Tiny;
 
 my $outDir = './t/utils/raw/sqlWriter';
-my $db = 'hg19';
+my $db     = 'hg19';
 
 my %config = (
-    sql => "SELECT r.*, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.kgID, '')) SEPARATOR
+  sql => "SELECT r.*, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.kgID, '')) SEPARATOR
               ';') FROM kgXref x WHERE x.refseq=r.name) AS kgID, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.description,
               '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS description,
               (SELECT GROUP_CONCAT(DISTINCT(NULLIF(e.value, '')) SEPARATOR ';') FROM knownToEnsembl
@@ -28,39 +28,39 @@ my %config = (
               x.refseq=r.name) AS mRNA, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.rfamAcc,
               '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS rfamAcc FROM
               refGene r WHERE r.name='NM_019046' OR r.name='NM_001009943' OR r.name='NM_001009941';",
-    connection => {
-        database => $db,
-        host => 'genome-mysql.soe.ucsc.edu',
-        user => 'genome',
-        port => '3306'
-    },
-    outputDir => './t/utils/raw/sqlWriter',
-    compress => 0,
+  connection => {
+    database => $db,
+    host     => 'genome-mysql.soe.ucsc.edu',
+    user     => 'genome',
+    port     => '3306'
+  },
+  outputDir => './t/utils/raw/sqlWriter',
+  compress  => 0,
 );
 
 path($outDir)->remove_tree();
 path($outDir)->mkpath();
 
-my $sqlWriter = Utils::SqlWriter->new(\%config);
+my $sqlWriter = Utils::SqlWriter->new( \%config );
 $sqlWriter->go();
 
 my $exp = path($outDir)->child("$db.kgXref.fetch.txt")->stringify;
 
-open(my $fh, '<', $exp);
+open( my $fh, '<', $exp );
 
 my @stuff = <$fh>;
 
-ok(@stuff == 4, "Ok, got the expected number of rows");
+ok( @stuff == 4, "Ok, got the expected number of rows" );
 
 chomp @stuff;
 
 my @rows;
 
 for my $r (@stuff) {
-    push @rows, [split '\t', $r];
+  push @rows, [ split '\t', $r ];
 }
 
-my @head = @{$rows[0]};
+my @head = @{ $rows[0] };
 
 # We expect
 # [
@@ -91,28 +91,28 @@ my @head = @{$rows[0]};
 #     [24] "rfamAcc"
 # ]
 
-ok(@head == 25, "The first line is a header");
+ok( @head == 25, "The first line is a header" );
 
 my $idx = 0;
 for my $f (@head) {
-    if($f eq 'name') {
-        last;
-    }
+  if ( $f eq 'name' ) {
+    last;
+  }
 
-    $idx++;
+  $idx++;
 }
 
-my @tx = sort { $a cmp $b } ($rows[1][$idx], $rows[2][$idx], $rows[3][$idx]);
-my @exp = sort { $a cmp $b } ('NM_019046', 'NM_001009943', 'NM_001009941');
+my @tx  = sort { $a cmp $b } ( $rows[1][$idx], $rows[2][$idx], $rows[3][$idx] );
+my @exp = sort { $a cmp $b } ( 'NM_019046', 'NM_001009943', 'NM_001009941' );
 
-ok(join("\t", @tx) eq join("\t", @exp), "Find expected tx");
+ok( join( "\t", @tx ) eq join( "\t", @exp ), "Find expected tx" );
 
 path($outDir)->remove_tree();
 
 close $fh;
 
 %config = (
-    sql => "SELECT r.*, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.kgID, '')) SEPARATOR
+  sql => "SELECT r.*, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.kgID, '')) SEPARATOR
               ';') FROM kgXref x WHERE x.refseq=r.name) AS kgID, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.description,
               '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS description,
               (SELECT GROUP_CONCAT(DISTINCT(NULLIF(e.value, '')) SEPARATOR ';') FROM knownToEnsembl
@@ -127,25 +127,24 @@ close $fh;
               x.refseq=r.name) AS mRNA, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.rfamAcc,
               '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS rfamAcc FROM
               refGene r WHERE r.name='Ndjfalkjsdlkajf';",
-    connection => {
-        database => $db,
-        host => 'genome-mysql.soe.ucsc.edu',
-        user => 'genome',
-        port => '3306'
-    },
-    outputDir => './t/utils/raw/sqlWriter',
-    compress => 0,
+  connection => {
+    database => $db,
+    host     => 'genome-mysql.soe.ucsc.edu',
+    user     => 'genome',
+    port     => '3306'
+  },
+  outputDir => './t/utils/raw/sqlWriter',
+  compress  => 0,
 );
-
 
 path($outDir)->mkpath();
 
-$sqlWriter = Utils::SqlWriter->new(\%config);
+$sqlWriter = Utils::SqlWriter->new( \%config );
 $sqlWriter->go();
 
 $exp = path($outDir)->child("$db.kgXref.fetch.txt")->stringify;
 
-ok(! -e $exp, "No file generated when empty query");
+ok( !-e $exp, "No file generated when empty query" );
 
 path($outDir)->remove_tree();
 

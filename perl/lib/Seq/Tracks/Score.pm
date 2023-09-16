@@ -14,7 +14,7 @@ use namespace::autoclean;
 
 extends 'Seq::Tracks::Get';
 
-has scalingFactor => (is => 'ro', isa => 'Int', default => 100);
+has scalingFactor => ( is => 'ro', isa => 'Int', default => 100 );
 
 sub BUILD {
   my $self = shift;
@@ -36,11 +36,13 @@ sub get {
   # $_[5] == <Int> $positionIdx : the position in the indel, if any
   # $_[6] == <ArrayRef> $outAccum : a reference to the output, which we mutate
 
-  $_[6][$_[5]] = defined $_[1]->[ $_[0]->{_dbName} ] ?  $_[1]->[ $_[0]->{_dbName} ] / $_[0]->{_s} : undef;
+  $_[6][ $_[5] ] =
+    defined $_[1]->[ $_[0]->{_dbName} ]
+    ? $_[1]->[ $_[0]->{_dbName} ] / $_[0]->{_s}
+    : undef;
 
   return $_[6];
 }
-
 
 __PACKAGE__->meta->make_immutable;
 1;

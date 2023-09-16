@@ -25,12 +25,12 @@ use Seq::InputFile;
 with 'Seq::Role::IO', 'Seq::Role::Message';
 
 has _inputFileBaseName => (
-  isa => 'Str',
-  is => 'ro',
+  isa      => 'Str',
+  is       => 'ro',
   init_arg => undef,
   required => 0,
-  lazy => 1,
-  default => sub {
+  lazy     => 1,
+  default  => sub {
     my $self = shift;
     return $self->snpfile->basename(qr/\..*/);
   },
@@ -39,19 +39,19 @@ has _inputFileBaseName => (
 sub validateInputFile {
   my ( $self, $inputFilePath ) = @_;
 
-  my @parts = split("/", $inputFilePath);
+  my @parts = split( "/", $inputFilePath );
 
   my $last = $parts[-1];
 
   # TODO: support more types
-  for my $type (("vcf", "snp")) {
-    my ($format, $gz) = $last =~ /\.($type)(\.\w+)?/;
+  for my $type ( ( "vcf", "snp" ) ) {
+    my ( $format, $gz ) = $last =~ /\.($type)(\.\w+)?/;
 
-    if($format) {
-      return (0, lc($format));
+    if ($format) {
+      return ( 0, lc($format) );
     }
   }
 
-  return ("Couldn't identify format of $inputFilePath", "");
+  return ( "Couldn't identify format of $inputFilePath", "" );
 }
 1;

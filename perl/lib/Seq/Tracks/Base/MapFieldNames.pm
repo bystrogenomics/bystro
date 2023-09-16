@@ -25,10 +25,12 @@ with 'Seq::Role::Message';
 # This makes it important, in long-running processes, where many jobs are executed,
 # spanning multiple config files, across which track names may not be unique
 # to call "initialize" and clear an old config/job's data
-has name => (is => 'ro', isa => 'Str', required => 1);
+has name => ( is => 'ro', isa => 'Str', required => 1 );
 
-has fieldNamesMap => (is => 'ro', init_arg => undef, lazy => 1, default => sub { {} });
-has fieldDbNamesMap => (is => 'ro', init_arg => undef, lazy => 1, default => sub { {} });
+has fieldNamesMap =>
+  ( is => 'ro', init_arg => undef, lazy => 1, default => sub { {} } );
+has fieldDbNamesMap =>
+  ( is => 'ro', init_arg => undef, lazy => 1, default => sub { {} } );
 
 ################### Private ##########################
 #Under which key fields are mapped in the meta database belonging to the
@@ -39,29 +41,34 @@ state $metaKey = 'fields';
 # The db cannot be held in a static variable, because in a long-running/daemon env.
 # multiple databases may be called for; the Seq::DBManager package is configured
 # before this class is instantiated, on each run.
-has _db => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
-  return Seq::DBManager->new();
-});
+has _db => (
+  is       => 'ro',
+  init_arg => undef,
+  lazy     => 1,
+  default  => sub {
+    return Seq::DBManager->new();
+  }
+);
 
 sub getFieldDbName {
   #my ($self, $fieldName) = @_;
-  
+
   #$self = $_[0]
   #$fieldName = $_[1]
-  if (! exists $_[0]->fieldNamesMap->{$_[0]->name} ) {
+  if ( !exists $_[0]->fieldNamesMap->{ $_[0]->name } ) {
     $_[0]->_fetchMetaFields();
   }
 
-  if(! exists $_[0]->fieldNamesMap->{$_[0]->name}{ $_[1] } ) {
+  if ( !exists $_[0]->fieldNamesMap->{ $_[0]->name }{ $_[1] } ) {
     $_[0]->addMetaField( $_[1] );
   }
 
-  if(!defined $_[0]->fieldNamesMap->{$_[0]->name}->{$_[1]} ) {
-    $_[0]->log('warn', "getFieldDbName failed to find or make a dbName for $_[1]");
+  if ( !defined $_[0]->fieldNamesMap->{ $_[0]->name }->{ $_[1] } ) {
+    $_[0]->log( 'warn', "getFieldDbName failed to find or make a dbName for $_[1]" );
     return;
   }
 
-  return $_[0]->fieldNamesMap->{$_[0]->name}->{$_[1]};
+  return $_[0]->fieldNamesMap->{ $_[0]->name }->{ $_[1] };
 }
 
 #this function returns the human readable name
@@ -73,53 +80,53 @@ sub getFieldName {
 
   #$self = $_[0]
   #$fieldNumber = $_[1]
-  if (! exists $_[0]->fieldNamesMap->{ $_[0]->name } ) {
+  if ( !exists $_[0]->fieldNamesMap->{ $_[0]->name } ) {
     $_[0]->_fetchMetaFields();
   }
 
-  if(! defined $_[0]->fieldDbNamesMap->{ $_[0]->name }{ $_[1] } ) {
-    $_[0]->log('warn', "getFieldName failed to find a name for $_[1]");
+  if ( !defined $_[0]->fieldDbNamesMap->{ $_[0]->name }{ $_[1] } ) {
+    $_[0]->log( 'warn', "getFieldName failed to find a name for $_[1]" );
     return;
   }
 
   return $_[0]->fieldDbNamesMap->{ $_[0]->name }{ $_[1] };
 }
 
-
 sub _fetchMetaFields {
   my $self = shift;
 
-  my $dataHref = $self->_db->dbReadMeta($self->name, $metaKey) ;
-  
+  my $dataHref = $self->_db->dbReadMeta( $self->name, $metaKey );
+
   #if we don't find anything, just store a new hash reference
   #to keep a consistent data type
-  if( !$dataHref ) {
-    $self->fieldNamesMap->{$self->name} =  {};
-    $self->fieldDbNamesMap->{$self->name} = {};
+  if ( !$dataHref ) {
+    $self->fieldNamesMap->{ $self->name }   = {};
+    $self->fieldDbNamesMap->{ $self->name } = {};
     return;
   }
 
-  $self->fieldNamesMap->{$self->name} = $dataHref;
+  $self->fieldNamesMap->{ $self->name } = $dataHref;
   #fieldNames map is name => dbName; dbNamesMap is the inverse
-  for my $fieldName (keys %$dataHref) {
-    $self->fieldDbNamesMap->{$self->name}{ $dataHref->{$fieldName} } = $fieldName;
+  for my $fieldName ( keys %$dataHref ) {
+    $self->fieldDbNamesMap->{ $self->name }{ $dataHref->{$fieldName} } = $fieldName;
   }
 }
 
 sub addMetaField {
-  my $self = shift;
+  my $self      = shift;
   my $fieldName = shift;
 
-  my @fieldKeys = keys %{ $self->fieldDbNamesMap->{$self->name} };
-  
+  my @fieldKeys = keys %{ $self->fieldDbNamesMap->{ $self->name } };
+
   my $fieldNumber;
-  if(!@fieldKeys) {
+  if ( !@fieldKeys ) {
     $fieldNumber = 0;
-  } else {
+  }
+  else {
     #https://ideone.com/eX3dOh
     $fieldNumber = max(@fieldKeys) + 1;
   }
-  
+
   #need a way of checking if the insertion actually worked
   #but that may be difficult with the currrent LMDB_File API
   #I've had very bad performance returning errors from transactions
@@ -127,12 +134,10 @@ sub addMetaField {
   #but I may have mistook one issue for another
   #passing 1 to overwrite existing fields
   #since the below mapping ends up relying on our new values
-  $self->_db->dbPatchMeta($self->name, $metaKey, {
-    $fieldName => $fieldNumber
-  }, 1);
+  $self->_db->dbPatchMeta( $self->name, $metaKey, { $fieldName => $fieldNumber }, 1 );
 
-  $self->fieldNamesMap->{$self->name}{$fieldName} = $fieldNumber;
-  $self->fieldDbNamesMap->{$self->name}{$fieldNumber} = $fieldName;
+  $self->fieldNamesMap->{ $self->name }{$fieldName}     = $fieldNumber;
+  $self->fieldDbNamesMap->{ $self->name }{$fieldNumber} = $fieldName;
 }
 
 __PACKAGE__->meta->make_immutable;

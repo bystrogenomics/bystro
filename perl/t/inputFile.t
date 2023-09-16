@@ -9,36 +9,41 @@ use DDP;
 
 my $inputter = Seq::InputFile->new();
 
-my $err = $inputter->checkInputFileHeader(["Chrom", "Pos", "Ref", "Alt", "Type"]);
+my $err =
+  $inputter->checkInputFileHeader( [ "Chrom", "Pos", "Ref", "Alt", "Type" ] );
 
-ok(!defined $err);
+ok( !defined $err );
 
-$err = $inputter->checkInputFileHeader(["Fragment", "Position", "Reference", "Alleles", "Type"]);
+$err = $inputter->checkInputFileHeader(
+  [ "Fragment", "Position", "Reference", "Alleles", "Type" ] );
 
-ok(!defined $err);
+ok( !defined $err );
 
-$err = $inputter->checkInputFileHeader(["Fragment", "Position", "Reference", "Minor_alleles", "Type"]);
+$err = $inputter->checkInputFileHeader(
+  [ "Fragment", "Position", "Reference", "Minor_alleles", "Type" ] );
 
-ok(!defined $err);
+ok( !defined $err );
 
-$err = $inputter->checkInputFileHeader(["Fragment", "Position", "Reference", "Type", "Alt"]);
+$err = $inputter->checkInputFileHeader(
+  [ "Fragment", "Position", "Reference", "Type", "Alt" ] );
 
-ok(!defined $err, "Alt, Type order doesn't matter");
+ok( !defined $err, "Alt, Type order doesn't matter" );
 
-$err = $inputter->checkInputFileHeader(["Position", "Fragment", "Reference", "Type", "Alt"]);
+$err = $inputter->checkInputFileHeader(
+  [ "Position", "Fragment", "Reference", "Type", "Alt" ] );
 
-ok($err, "Chrom, Pos, Ref order matters");
+ok( $err, "Chrom, Pos, Ref order matters" );
 
-$err = $inputter->checkInputFileHeader(["Type", "Alt"]);
+$err = $inputter->checkInputFileHeader( [ "Type", "Alt" ] );
 
-ok($err, "Chrom, Pos, Ref required");
+ok( $err, "Chrom, Pos, Ref required" );
 
-$err = $inputter->checkInputFileHeader(["Ref", "Type", "Alt"]);
+$err = $inputter->checkInputFileHeader( [ "Ref", "Type", "Alt" ] );
 
-ok($err, "Chrom, Pos, Ref required");
+ok( $err, "Chrom, Pos, Ref required" );
 
-$err = $inputter->checkInputFileHeader(["Pos,", "Ref", "Type", "Alt"]);
+$err = $inputter->checkInputFileHeader( [ "Pos,", "Ref", "Type", "Alt" ] );
 
-ok($err, "Chrom, Pos, Ref required");
+ok( $err, "Chrom, Pos, Ref required" );
 
 done_testing();

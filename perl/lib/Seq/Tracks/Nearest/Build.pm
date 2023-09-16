@@ -61,7 +61,7 @@ my $mp = Data::MessagePack->new()->canonical();
 # or through build_field_transformations: exonEnds: split(,)
 # would appear to this program as an array of numbers, which this program
 # doesn't currently know what to do with
-has from => (is => 'ro', isa => 'Str', required => 1);
+has from => ( is => 'ro', isa => 'Str', required => 1 );
 
 # Coordinate we look to
 # Typically used for gene tracks, would 'txEnd' or nothing
@@ -70,16 +70,21 @@ has from => (is => 'ro', isa => 'Str', required => 1);
 # a "nearestTss" track
 # To simplify the funcitons, we default to the "from" attribute
 # In our BUILDARGS
-has to => (is => 'ro', isa => 'Str', lazy => 1, default => sub {
-  my $self = shift;
-  return $self->from;
-});
+has to => (
+  is      => 'ro',
+  isa     => 'Str',
+  lazy    => 1,
+  default => sub {
+    my $self = shift;
+    return $self->from;
+  }
+);
 
 # If we're not given local_files, get them from a track reference
-has ref => (is => 'ro', isa => 'Seq::Tracks::Build');
+has ref => ( is => 'ro', isa => 'Seq::Tracks::Build' );
 
 # So that we know which db to store within (db is segregated on chromosome)
-has chromField => (is => 'ro', isa => 'Str', default => 'chrom');
+has chromField => ( is => 'ro', isa => 'Str', default => 'chrom' );
 
 # Should we store not just the stuff that is intergenic (or between defined regions)
 # but also that within the regions themselves
@@ -87,22 +92,22 @@ has chromField => (is => 'ro', isa => 'Str', default => 'chrom');
 # for every position in genome
 # This I think is reasonable, and from my perspective provides a nice search advantage
 # We can search for nearest.dist < 5000 for instance, and include things that are 0 distance away
-has storeOverlap => (is => 'ro', isa => 'Bool', default => 1);
-has storeNearest => (is => 'ro', isa => 'Bool', default => 1);
+has storeOverlap => ( is => 'ro', isa => 'Bool', default => 1 );
+has storeNearest => ( is => 'ro', isa => 'Bool', default => 1 );
 my $txNumberKey = 'txNumber';
 
 around BUILDARGS => sub {
-  my($orig, $self, $data) = @_;
+  my ( $orig, $self, $data ) = @_;
 
-  if(!defined $data->{local_files}) {
+  if ( !defined $data->{local_files} ) {
     # Careful with the reference
     $data->{local_files} = $data->{ref}->local_files;
   }
 
   # We require non-empty 'from'
-  if(!$data->{from}) {
+  if ( !$data->{from} ) {
     # A nicer exit
-    $self->log('fatal', "'from' property must be specified for 'nearest' tracks");
+    $self->log( 'fatal', "'from' property must be specified for 'nearest' tracks" );
   }
 
   ############# Add "from" and "to" to "features" if not present ###############
@@ -111,39 +116,41 @@ around BUILDARGS => sub {
 
   my $hasFrom;
   my $hasTo;
-  for my $feat (@{$data->{features}}) {
-    if($feat eq $data->{from}) {
+  for my $feat ( @{ $data->{features} } ) {
+    if ( $feat eq $data->{from} ) {
       $hasFrom = 1;
     }
 
-    if($data->{to} && $feat eq $data->{to}) {
+    if ( $data->{to} && $feat eq $data->{to} ) {
       $hasTo = 1;
     }
   }
 
-  if($data->{to} && !$hasTo) {
-    unshift @{$data->{features}}, $data->{to};
+  if ( $data->{to} && !$hasTo ) {
+    unshift @{ $data->{features} }, $data->{to};
   }
 
-  if(!$hasFrom) {
-    unshift @{$data->{features}}, $data->{from};
+  if ( !$hasFrom ) {
+    unshift @{ $data->{features} }, $data->{from};
   }
 
   ##### Ensure that we get the exact 0-based, half-open coordinates correct ######
   # allows us to consider from .. to rather than from .. to - 1, from - 1 .. to, etc
   # TODO: don't assume UCSC-style genes, and require a build_field_transformation
   # For anything other than 'from' as 0-based closed and 'to' as 0-based open (+1 of true)
-  if($data->{build_field_transformations}{$data->{from}} && (!$data->{to} || $data->{build_field_transformations}{$data->{to}})) {
+  if ( $data->{build_field_transformations}{ $data->{from} }
+    && ( !$data->{to} || $data->{build_field_transformations}{ $data->{to} } ) )
+  {
     return $self->$orig($data);
   }
 
   # We softly enforce build_field_transformations for the comm
-  if($data->{from} eq 'txEnd' || $data->{from} eq 'cdsEnd') {
-    $data->{build_field_transformations}{$data->{from}} = '- 1';
+  if ( $data->{from} eq 'txEnd' || $data->{from} eq 'cdsEnd' ) {
+    $data->{build_field_transformations}{ $data->{from} } = '- 1';
   }
 
-  if($data->{to} && ($data->{to} eq 'txEnd' || $data->{to} eq 'cdsEnd')) {
-    $data->{build_field_transformations}{$data->{to}} = '- 1';
+  if ( $data->{to} && ( $data->{to} eq 'txEnd' || $data->{to} eq 'cdsEnd' ) ) {
+    $data->{build_field_transformations}{ $data->{to} } = '- 1';
   }
 
   return $self->$orig($data);
@@ -157,8 +164,8 @@ sub BUILD {
   # Should that be needed
   # We'll store these regardless of the 'dist' property
   # Won't add many bytes (<18 per transcript), and add flexibility for the user
-  $self->getFieldDbName($self->from);
-  $self->getFieldDbName($self->to);
+  $self->getFieldDbName( $self->from );
+  $self->getFieldDbName( $self->to );
 
   #Check that
 }
@@ -173,9 +180,9 @@ sub buildTrack {
   my @allFiles = $self->allLocalFiles;
 
   # Only allow 1 thread because perl eats memory like candy
-  my $pm = Parallel::ForkManager->new($self->maxThreads);
+  my $pm = Parallel::ForkManager->new( $self->maxThreads );
 
-  my %allIdx; # a map <Hash> { featureName => columnIndexInFile}
+  my %allIdx;    # a map <Hash> { featureName => columnIndexInFile}
   my %regionIdx; #like allIdx, but only for features going into the region databae
   # Every row (besides header) describes a transcript
   my %regionData;
@@ -184,31 +191,36 @@ sub buildTrack {
 
   my $txNumber;
 
-  my @fieldDbNames = sort { $a <=> $b } map { $self->getFieldDbName($_) } @{$self->features};
+  my @fieldDbNames =
+    sort { $a <=> $b } map { $self->getFieldDbName($_) } @{ $self->features };
 
   my %completedChrs;
-  $pm->run_on_finish( sub {
-    my ($pid, $exitCode, $fileName, $exitSignal, $coreDump, $errOrChrs) = @_;
+  $pm->run_on_finish(
+    sub {
+      my ( $pid, $exitCode, $fileName, $exitSignal, $coreDump, $errOrChrs ) = @_;
 
-    if($exitCode != 0) {
-      my $err = $self->name . ": got exitCode $exitCode for $fileName: $exitSignal . Dump: $coreDump";
+      if ( $exitCode != 0 ) {
+        my $err = $self->name
+          . ": got exitCode $exitCode for $fileName: $exitSignal . Dump: $coreDump";
 
-      $self->log('fatal', $err);
-    }
+        $self->log( 'fatal', $err );
+      }
 
-    if($errOrChrs && ref $errOrChrs eq 'HASH') {
-      for my $chr (keys %$errOrChrs) {
-        if(!$completedChrs{$chr}) {
-          $completedChrs{$chr} = [$fileName];
-        } else {
-          push @{$completedChrs{$chr}}, $fileName;
+      if ( $errOrChrs && ref $errOrChrs eq 'HASH' ) {
+        for my $chr ( keys %$errOrChrs ) {
+          if ( !$completedChrs{$chr} ) {
+            $completedChrs{$chr} = [$fileName];
+          }
+          else {
+            push @{ $completedChrs{$chr} }, $fileName;
+          }
         }
       }
-    }
 
-    #Only message that is different, in that we don't pass the $fileName
-    $self->log('info', $self->name . ": completed building from $fileName");
-  });
+      #Only message that is different, in that we don't pass the $fileName
+      $self->log( 'info', $self->name . ": completed building from $fileName" );
+    }
+  );
 
   # Assume one file per loop, or all sites in one file. Tracks::Build warns if not
   for my $file (@allFiles) {
@@ -218,156 +230,168 @@ sub buildTrack {
     $self->db->cleanUp();
 
     $pm->start($file) and next;
-      my ($err, undef, $fh)  = $self->getReadFh($file);
+    my ( $err, undef, $fh ) = $self->getReadFh($file);
 
-      if ($err) {
-        $self->log('fatal', $self->name . ": $err");
+    if ($err) {
+      $self->log( 'fatal', $self->name . ": $err" );
+    }
+
+    my $firstLine = <$fh>;
+
+    # Fatal/exit will only affect that process, won't affect others
+    if ( !defined $firstLine ) {
+      $self->log( 'fatal', $self->name . ": Failed to read header of $file" );
+    }
+
+    chomp $firstLine;
+
+    # If the user wanted to transform the input field names, do, so source field names match
+    # those expected by the track
+    my @fields = map { $self->fieldMap->{$_} || $_ } split( '\t', $firstLine );
+
+    # Store all features we can find, for Seq::Build::Gene::TX. Avoid autocracy,
+    # don't need to know what Gene::TX requires.
+    my $fieldIdx = 0;
+    for my $field (@fields) {
+      $allIdx{$field} = $fieldIdx;
+      $fieldIdx++;
+    }
+
+    my $fromIdx = $allIdx{ $self->from };
+    my $toIdx   = $allIdx{ $self->to };
+
+    # Except w.r.t the chromosome field, txStart, txEnd, txNumber definitely need these
+    if (
+      !( defined $allIdx{ $self->chromField } && defined $fromIdx && defined $toIdx ) )
+    {
+      $self->log( 'fatal', $self->name . ': must provide chrom, from, to fields' );
+    }
+
+    # Region database features; as defined by user in the YAML config, or our default
+    REGION_FEATS: for my $field ( @{ $self->features } ) {
+      if ( exists $allIdx{$field} ) {
+        $regionIdx{$field} = $allIdx{$field};
+        next REGION_FEATS;
       }
 
-      my $firstLine = <$fh>;
+      $self->log( 'fatal',
+        $self->name . ": required $field missing in $file header: $firstLine" );
+    }
 
-      # Fatal/exit will only affect that process, won't affect others
-      if(!defined $firstLine) {
-        $self->log('fatal', $self->name . ": Failed to read header of $file");
+    # We add the "from" and "to" fields to allow distance calculations
+
+    # Read the file.
+    # We store everything on the basis of chr, so that we can accept
+    # Either a file that contains multiple chromosomes
+    # Or multiples file that contains a single chromosome each
+    my $fromDbName = $self->getFieldDbName( $self->from );
+    my $toDbName   = $self->getFieldDbName( $self->to );
+    my $rowIdx     = 0;
+
+    my %visitedChrs;
+
+    #TODO: ADD check if we have any wanted chrs
+    FH_LOOP: while (<$fh>) {
+      chomp;
+      my @fields = split( '\t', $_ );
+
+      # Normalize the representation, such that having or missing 'chr'
+      # or using MT instead of M won't matter
+      my $chr = $self->normalizedWantedChr->{ $fields[ $allIdx{ $self->chromField } ] };
+
+      # falsy value is ''
+      if ( !defined $wantedChr || ( !defined $chr || $wantedChr ne $chr ) ) {
+        $wantedChr = $self->chrWantedAndIncomplete($chr);
       }
 
-      chomp $firstLine;
-
-      # If the user wanted to transform the input field names, do, so source field names match
-      # those expected by the track
-      my @fields = map{ $self->fieldMap->{$_} || $_ } split('\t', $firstLine);
-
-      # Store all features we can find, for Seq::Build::Gene::TX. Avoid autocracy,
-      # don't need to know what Gene::TX requires.
-      my $fieldIdx = 0;
-      for my $field (@fields) {
-        $allIdx{$field} = $fieldIdx;
-        $fieldIdx++;
+      # We no longer care if we have multiple chromosomes in a single file
+      # because memory usage is well controlled despite our use of pre-calculated
+      # overlaps
+      # We also no longer exit if finding an unwanted chromosome, for safety (ensure all sites found)
+      # at expense of runtime
+      # TODO: think about handling chrPerFile
+      if ( !defined $wantedChr ) {
+        next FH_LOOP;
       }
 
-      my $fromIdx = $allIdx{$self->from};
-      my $toIdx = $allIdx{$self->to};
+      $visitedChrs{$wantedChr} //= 1;
 
-      # Except w.r.t the chromosome field, txStart, txEnd, txNumber definitely need these
-      if( !(defined $allIdx{$self->chromField} && defined $fromIdx && defined $toIdx) ) {
-        $self->log('fatal', $self->name . ': must provide chrom, from, to fields');
-      }
+      my @rowData;
 
-      # Region database features; as defined by user in the YAML config, or our default
-      REGION_FEATS: for my $field (@{$self->features}) {
-        if(exists $allIdx{$field} ) {
-          $regionIdx{$field} = $allIdx{$field};
-          next REGION_FEATS;
+      # Field db names are numerical, from 0 to N - 1
+      # Assign the last one as the last index, rather than by $#fieldDbNames
+      # so that if we have sparse feature names, rowData still can accomodate them
+      $#rowData = $fieldDbNames[-1];
+      ACCUM_VALUES: for my $fieldName ( keys %regionIdx ) {
+        my $data = $fields[ $regionIdx{$fieldName} ];
+
+        # say split, etc; comes first so that each individual value
+        # in an array (if split) can be coerced
+        if ( $self->hasTransform($fieldName) ) {
+          $data = $self->transformField( $fieldName, $data );
         }
 
-        $self->log('fatal', $self->name . ": required $field missing in $file header: $firstLine");
+        # convert the value into some type, typically number(N)
+        $data = $self->coerceFeatureType( $fieldName, $data );
+
+        # if this is a field that we need to store in the region db
+        # create a shortened field name
+        my $fieldDbName = $self->getFieldDbName($fieldName);
+
+        #store under a shortened fieldName to save space in the db
+        $rowData[$fieldDbName] = $data;
       }
 
-      # We add the "from" and "to" fields to allow distance calculations
+      my $from = $rowData[$fromDbName];
+      my $to   = $rowData[$toDbName];
 
-      # Read the file.
-      # We store everything on the basis of chr, so that we can accept
-      # Either a file that contains multiple chromosomes
-      # Or multiples file that contains a single chromosome each
-      my $fromDbName = $self->getFieldDbName($self->from);
-      my $toDbName = $self->getFieldDbName($self->to);
-      my $rowIdx = 0;
-
-      my %visitedChrs;
-
-      #TODO: ADD check if we have any wanted chrs
-      FH_LOOP: while (<$fh>) {
-        chomp;
-        my @fields = split('\t', $_);
-
-        # Normalize the representation, such that having or missing 'chr'
-        # or using MT instead of M won't matter
-        my $chr = $self->normalizedWantedChr->{ $fields[$allIdx{$self->chromField}] };
-
-        # falsy value is ''
-        if(!defined $wantedChr || (!defined $chr || $wantedChr ne $chr)) {
-          $wantedChr = $self->chrWantedAndIncomplete($chr);
-        }
-
-        # We no longer care if we have multiple chromosomes in a single file
-        # because memory usage is well controlled despite our use of pre-calculated
-        # overlaps
-        # We also no longer exit if finding an unwanted chromosome, for safety (ensure all sites found)
-        # at expense of runtime
-        # TODO: think about handling chrPerFile
-        if(!defined $wantedChr) {
-          next FH_LOOP;
-        }
-
-        $visitedChrs{$wantedChr} //= 1;
-
-        my @rowData;
-
-        # Field db names are numerical, from 0 to N - 1
-        # Assign the last one as the last index, rather than by $#fieldDbNames
-        # so that if we have sparse feature names, rowData still can accomodate them
-        $#rowData = $fieldDbNames[-1];
-        ACCUM_VALUES: for my $fieldName (keys %regionIdx) {
-          my $data = $fields[$regionIdx{$fieldName}];
-
-          # say split, etc; comes first so that each individual value
-          # in an array (if split) can be coerced
-          if($self->hasTransform($fieldName) ) {
-            $data = $self->transformField($fieldName, $data);
-          }
-
-          # convert the value into some type, typically number(N)
-          $data = $self->coerceFeatureType($fieldName, $data);
-
-          # if this is a field that we need to store in the region db
-          # create a shortened field name
-          my $fieldDbName = $self->getFieldDbName($fieldName);
-
-          #store under a shortened fieldName to save space in the db
-          $rowData[$fieldDbName] = $data;
-        }
-
-        my $from = $rowData[$fromDbName];
-        my $to = $rowData[$toDbName];
-
-        if( !(defined $from && defined $to && looks_like_number($from) && looks_like_number($to)) ) {
-          $self->log('fatal', "Expected numeric 'from' and 'to' fields, found: $from and $to");
-        }
-
-        $regionData{$wantedChr}{$rowIdx} = [$rowIdx, \@rowData];
-
-        $rowIdx++;
+      if (
+        !(
+          defined $from && defined $to && looks_like_number($from) && looks_like_number($to)
+        )
+        )
+      {
+        $self->log( 'fatal',
+          "Expected numeric 'from' and 'to' fields, found: $from and $to" );
       }
 
-      #Commit, sync everything, including completion status, and release mmap
-      $self->db->cleanUp();
+      $regionData{$wantedChr}{$rowIdx} = [ $rowIdx, \@rowData ];
 
-      # If we fork a process in order to read (example zcat) prevent that process
-      # from becoming defunct
-      $self->safeCloseBuilderFh($fh, $file, 'fatal');
+      $rowIdx++;
+    }
 
-      # We've now accumulated everything from this file
-      # So write it. LMDB will serialize writes, so this is fine, even
-      # if the file is not properly organized by chromosome
-      # Requires that each file contains only one kind of chromosome
-      for my $chr (keys %regionData) {
-        $self->_writeNearestData($chr, $regionData{$chr}, \@fieldDbNames);
+    #Commit, sync everything, including completion status, and release mmap
+    $self->db->cleanUp();
 
-        # We've finished with 1 chromosome, so write that to meta to disk
-        $self->completionMeta->recordCompletion($chr);
-      }
+    # If we fork a process in order to read (example zcat) prevent that process
+    # from becoming defunct
+    $self->safeCloseBuilderFh( $fh, $file, 'fatal' );
 
-      #Commit, sync everything, including completion status, and release mmap
-      $self->db->cleanUp();
-    $pm->finish(0, \%visitedChrs);
+    # We've now accumulated everything from this file
+    # So write it. LMDB will serialize writes, so this is fine, even
+    # if the file is not properly organized by chromosome
+    # Requires that each file contains only one kind of chromosome
+    for my $chr ( keys %regionData ) {
+      $self->_writeNearestData( $chr, $regionData{$chr}, \@fieldDbNames );
+
+      # We've finished with 1 chromosome, so write that to meta to disk
+      $self->completionMeta->recordCompletion($chr);
+    }
+
+    #Commit, sync everything, including completion status, and release mmap
+    $self->db->cleanUp();
+    $pm->finish( 0, \%visitedChrs );
   }
 
   $pm->wait_all_children();
 
-  for my $chr (keys %completedChrs) {
+  for my $chr ( keys %completedChrs ) {
     $self->completionMeta->recordCompletion($chr);
 
-    $self->log('info', $self->name . ": recorded $chr completed, from " . (join(",", @{$completedChrs{$chr}})));
+    $self->log( 'info',
+          $self->name
+        . ": recorded $chr completed, from "
+        . ( join( ",", @{ $completedChrs{$chr} } ) ) );
   }
 
   #TODO: figure out why this is necessary, even with DEMOLISH
@@ -392,26 +416,28 @@ sub buildTrack {
 # take the largest end
 # And for any ends sharing a start, take the smallest start
 sub _writeNearestData {
-  my ($self, $chr, $regionDataHref, $fieldDbNames) = @_;
+  my ( $self, $chr, $regionDataHref, $fieldDbNames ) = @_;
 
-  my $fromDbName = $self->getFieldDbName($self->from);
-  my $toDbName = $self->getFieldDbName($self->to);
+  my $fromDbName = $self->getFieldDbName( $self->from );
+  my $toDbName   = $self->getFieldDbName( $self->to );
 
   my $regionDbName = $self->regionTrackPath($chr);
 
   my $uniqNumMaker = _getTxNumber();
-  my $uniqRegionEntryMaker = _makeUniqueRegionData($fromDbName, $toDbName, $fieldDbNames);
+  my $uniqRegionEntryMaker =
+    _makeUniqueRegionData( $fromDbName, $toDbName, $fieldDbNames );
 
   # First sort by to position, ascending (smallest to largest)
   # then by from position (smallest to largest)
-  my @sorted = sort { $a->[1][$fromDbName] <=> $b->[1][$fromDbName] } sort { $a->[1][$toDbName] <=> $b->[1][$toDbName] } values %{$regionDataHref};
+  my @sorted = sort { $a->[1][$fromDbName] <=> $b->[1][$fromDbName] }
+    sort { $a->[1][$toDbName] <=> $b->[1][$toDbName] } values %{$regionDataHref};
 
   # the tx starts ($self->from key)
   my %startData;
 
   for my $data (@sorted) {
     my $start = $data->[1][$fromDbName];
-    push @{$startData{$start}}, $data;
+    push @{ $startData{$start} }, $data;
   }
 
   # the tx ends ($self->to key)
@@ -419,16 +445,18 @@ sub _writeNearestData {
 
   for my $data (@sorted) {
     my $end = $data->[1][$toDbName];
-    push @{$endData{$end}}, $data;
+    push @{ $endData{$end} }, $data;
   }
 
-  $self->log('info', $self->name . ": starting for $chr");
+  $self->log( 'info', $self->name . ": starting for $chr" );
 
   # Get database length : assumes reference track already in the db
   my $genomeNumberOfEntries = $self->db->dbGetNumberOfEntries($chr);
 
-  if(!$genomeNumberOfEntries) {
-    $self->log('fatal', $self->name . " requires at least the reference track, to know how many bases in $chr");
+  if ( !$genomeNumberOfEntries ) {
+    $self->log( 'fatal',
+      $self->name
+        . " requires at least the reference track, to know how many bases in $chr" );
   }
 
   # Track the longest (further in db toward end of genome) txEnd, because
@@ -454,7 +482,7 @@ sub _writeNearestData {
 
   my $count = 0;
 
-  TXSTART_LOOP: for (my $n = 0; $n < @sorted; $n++) {
+  TXSTART_LOOP: for ( my $n = 0; $n < @sorted; $n++ ) {
     my $start = $sorted[$n][1][$fromDbName];
 
     # We are no longer tracking; see line ~ 506
@@ -470,21 +498,21 @@ sub _writeNearestData {
 
     # Assign a unique txNumber based on the overlap of transcripts
     # Idempotent
-    my $txNumber = $uniqNumMaker->($startData{$start});
+    my $txNumber = $uniqNumMaker->( $startData{$start} );
 
     # If we're 1 short of the new txNumber (index), we have some unique data
     # add the new item
-    if(@globalTxData == $txNumber) {
-      my $combinedValues = $uniqRegionEntryMaker->($startData{$start});
+    if ( @globalTxData == $txNumber ) {
+      my $combinedValues = $uniqRegionEntryMaker->( $startData{$start} );
 
       # write the region database, storing the region data at our sequential txNumber, allow us to release the data
-      $self->db->dbPut($regionDbName, $txNumber, $combinedValues);
+      $self->db->dbPut( $regionDbName, $txNumber, $combinedValues );
 
       # we only need to store the longest end; only value that is needed below from combinedValues
       push @globalTxData, $combinedValues->[$toDbName];
     }
 
-    if(defined $previousLongestEnd) {
+    if ( defined $previousLongestEnd ) {
       # Here we can assume that both $start and $longestPreviousEnd are both 0-based, closed
       # and so the first intergenic base is + 1 of the longestPreviousTxEnd and - 1 of the current start
       #say previousLongestEnd == 1
@@ -492,7 +520,7 @@ sub _writeNearestData {
       #end..2..3..4..5..Midpoint..7..8..9..10..start
       #(11 - 1 ) / 2 == 5; 5 + end = 5 + 1 == 6 == midpoint
       # unnecessary extra precedence parenthesis, makes me feel safer :|
-      $midPoint = $previousLongestEnd + ( ($start - $previousLongestEnd) / 2 );
+      $midPoint = $previousLongestEnd + ( ( $start - $previousLongestEnd ) / 2 );
     }
 
     #### Accumulate txNumber or longestPreviousTxNumber for positions between transcripts ####
@@ -500,24 +528,26 @@ sub _writeNearestData {
     # If we have no previous end or midpoint, we're starting from 0 index in db
     # and moving until the $start
     $previousLongestEnd //= -1;
-    $midPoint //= -1;
+    $midPoint           //= -1;
 
     # Consider/store intergenic things (note: if previousLongestEnd > $start, last tx overlapped this one)
-    if($self->storeNearest && $previousLongestEnd < $start) {
+    if ( $self->storeNearest && $previousLongestEnd < $start ) {
       # we force both the end and start to be 0-based closed, so start from +1 of previous end
       # and - 1 of the start
       POS_LOOP: for my $pos ( $previousLongestEnd + 1 .. $start - 1 ) {
         $cursor //= $self->db->dbStartCursorTxn($chr);
 
-        if($pos >= $midPoint) {
+        if ( $pos >= $midPoint ) {
           #Args:             $cursor, $chr, $dbName, $pos, $newValue
-          $self->db->dbPatchCursorUnsafe($cursor, $chr, $self->dbName, $pos, $txNumber);
-        } else {
+          $self->db->dbPatchCursorUnsafe( $cursor, $chr, $self->dbName, $pos, $txNumber );
+        }
+        else {
           #Args:             $cursor, $chr, $dbName, $pos, $newValue
-          $self->db->dbPatchCursorUnsafe($cursor, $chr, $self->dbName, $pos, $previousTxNumber);
+          $self->db->dbPatchCursorUnsafe( $cursor, $chr, $self->dbName, $pos,
+            $previousTxNumber );
         }
 
-        if($count > $self->commitEvery) {
+        if ( $count > $self->commitEvery ) {
           $self->db->dbEndCursorTxn($chr);
           undef $cursor;
 
@@ -531,10 +561,10 @@ sub _writeNearestData {
     my $longestEnd = $globalTxData[$txNumber];
 
     # If we want to store the stuff in the regions themselves, do that
-    if($self->storeOverlap) {
+    if ( $self->storeOverlap ) {
       # Remember, here longest end is 0-based, closed (last pos is the last 0-based
       # position in the transcript)
-      for my $pos ($start .. $longestEnd) {
+      for my $pos ( $start .. $longestEnd ) {
         # We may clear this at any point, to prpevent db from over-growing
         $cursor //= $self->db->dbStartCursorTxn($chr);
 
@@ -555,41 +585,42 @@ sub _writeNearestData {
         my @overlap;
 
         # We investigate everything from the present tx down;
-        I_LOOP: for (my $i = $n; $i < @sorted; $i++) {
+        I_LOOP: for ( my $i = $n; $i < @sorted; $i++ ) {
           my $iFrom = $sorted[$i]->[1][$fromDbName];
-          my $iTo = $sorted[$i]->[1][$toDbName];
+          my $iTo   = $sorted[$i]->[1][$toDbName];
 
-          if($pos >= $iFrom && $pos <= $iTo) {
+          if ( $pos >= $iFrom && $pos <= $iTo ) {
             push @overlap, $sorted[$i];
-          } elsif($iFrom > $pos) {
+          }
+          elsif ( $iFrom > $pos ) {
             last I_LOOP;
           }
         }
 
-        if(!@overlap) {
+        if ( !@overlap ) {
           say STDERR "no overlap for the $chr\:$pos";
           next;
         }
 
         # Make a unique overlap combination
-        my $txNumber = $uniqNumMaker->(\@overlap);
+        my $txNumber = $uniqNumMaker->( \@overlap );
 
         # If we're 1 short of the new txNumber (index), we have some unique data
         # add the new item
-        if(@globalTxData == $txNumber) {
-          my $combinedValues = $uniqRegionEntryMaker->(\@overlap);
+        if ( @globalTxData == $txNumber ) {
+          my $combinedValues = $uniqRegionEntryMaker->( \@overlap );
 
           # write the region database, storing the region data at our sequential txNumber, allow us to release the data
-          $self->db->dbPut($regionDbName, $txNumber, $combinedValues);
+          $self->db->dbPut( $regionDbName, $txNumber, $combinedValues );
 
           # we only need to store the longest end; only value that is needed from combinedValues
           push @globalTxData, $combinedValues->[$toDbName];
         }
 
         # Assign the transcript number; args: $cursor, $chr, $dbName, $pos, $newValue)
-        $self->db->dbPatchCursorUnsafe($cursor, $chr, $self->dbName, $pos, $txNumber);
+        $self->db->dbPatchCursorUnsafe( $cursor, $chr, $self->dbName, $pos, $txNumber );
 
-        if($count > $self->commitEvery) {
+        if ( $count > $self->commitEvery ) {
           $self->db->dbEndCursorTxn($chr);
           undef $cursor;
 
@@ -601,33 +632,34 @@ sub _writeNearestData {
     }
 
     ###### Store the previous values for the next loop's midpoint calc ######
-    my $longestEndTxNumber = $uniqNumMaker->($endData{$longestEnd});
+    my $longestEndTxNumber = $uniqNumMaker->( $endData{$longestEnd} );
 
-    if(@globalTxData == $longestEndTxNumber) {
-      my $combinedValues = $uniqRegionEntryMaker->($endData{$longestEnd});
+    if ( @globalTxData == $longestEndTxNumber ) {
+      my $combinedValues = $uniqRegionEntryMaker->( $endData{$longestEnd} );
 
       # write the region database, storing the region data at our sequential txNumber, allow us to release the data
-      $self->db->dbPut($regionDbName, $longestEndTxNumber, $combinedValues);
+      $self->db->dbPut( $regionDbName, $longestEndTxNumber, $combinedValues );
 
       # we only need to store the longest end; only value that is needed from combinedValues
       # TODO: Should this be $longestEnd?
       push @globalTxData, $combinedValues->[$toDbName];
     }
 
-    $previousTxNumber = $longestEndTxNumber;
+    $previousTxNumber   = $longestEndTxNumber;
     $previousLongestEnd = $longestEnd;
   }
 
-  if($self->storeNearest) {
+  if ( $self->storeNearest ) {
     # Once we've reached the last transcript, we still likely have some data remaining
     END_LOOP: for my $pos ( $previousLongestEnd + 1 .. $genomeNumberOfEntries - 1 ) {
       # We may clear this at any point, to prpevent db from over-growing
       $cursor //= $self->db->dbStartCursorTxn($chr);
 
       #Args:             $cursor, $chr, $dbName, $pos, $newValue)
-      $self->db->dbPatchCursorUnsafe($cursor, $chr, $self->dbName, $pos, $previousTxNumber);
+      $self->db->dbPatchCursorUnsafe( $cursor, $chr, $self->dbName, $pos,
+        $previousTxNumber );
 
-      if($count > $self->commitEvery) {
+      if ( $count > $self->commitEvery ) {
         $self->db->dbEndCursorTxn($chr);
         undef $cursor;
 
@@ -643,7 +675,7 @@ sub _writeNearestData {
 
   $self->db->cleanUp();
 
-  $self->log('info', $self->name . ": finished for $chr");
+  $self->log( 'info', $self->name . ": finished for $chr" );
 }
 
 sub _getTxNumber {
@@ -658,9 +690,9 @@ sub _getTxNumber {
     # sort isn't necessary unless we don't trust the caller to give us
     # pre-sorted data
     # so...to reduce bug burden from future changes, sort here.
-    my $hash = join('_', sort { $a <=> $b } map { $_->[0] } @$numAref);
+    my $hash = join( '_', sort { $a <=> $b } map { $_->[0] } @$numAref );
 
-    if(defined $uniqCombos{$hash}) {
+    if ( defined $uniqCombos{$hash} ) {
       return $uniqCombos{$hash};
     }
 
@@ -707,13 +739,13 @@ sub _getTxNumber {
 # and ALWAYS expect no more than array depth 3, I don't think it presents much of a
 # parsing challenge
 sub _makeUniqueRegionData {
-  my ($fromDbName, $toDbName, $featureKeysAref) = @_;
+  my ( $fromDbName, $toDbName, $featureKeysAref ) = @_;
 
   my @featureKeys = @$featureKeysAref;
   my @nonFromToFeatures;
 
   for my $feat (@featureKeys) {
-    if($feat != $fromDbName && $feat != $toDbName) {
+    if ( $feat != $fromDbName && $feat != $toDbName ) {
       push @nonFromToFeatures, $feat;
     }
   }
@@ -733,11 +765,11 @@ sub _makeUniqueRegionData {
       # Because we calculate uniqueness based all keys but from and to
       # it is important to calculate the min and max bounds here
       # as the consumer expects the maximum overlapping regions
-      if(!defined $minFrom || $minFrom > $val->[1][$fromDbName]) {
+      if ( !defined $minFrom || $minFrom > $val->[1][$fromDbName] ) {
         $minFrom = $val->[1][$fromDbName];
       }
 
-      if(!defined $maxTo || $maxTo < $val->[1][$toDbName]) {
+      if ( !defined $maxTo || $maxTo < $val->[1][$toDbName] ) {
         $maxTo = $val->[1][$toDbName];
       }
 
@@ -758,23 +790,23 @@ sub _makeUniqueRegionData {
       # if done, doesn't lose information (for instance, printing such strings isn't guaranteed)
       # to be handled well
       # in tests, looks ok
-      my $hash = $mp->pack(\@nonFromTo);
+      my $hash = $mp->pack( \@nonFromTo );
 
-      if($dup{$hash}) {
+      if ( $dup{$hash} ) {
         next;
       }
 
       $dup{$hash} = 1;
 
       for my $intKey (@featureKeys) {
-        push @{$out[$intKey]}, $val->[1][$intKey];
+        push @{ $out[$intKey] }, $val->[1][$intKey];
       }
     }
 
     my @uniqInner;
     my %seen;
     for my $intKey (@featureKeys) {
-      if(!ref $out[$intKey]) {
+      if ( !ref $out[$intKey] ) {
         next;
       }
 
@@ -783,11 +815,11 @@ sub _makeUniqueRegionData {
 
       # If the first element is a reference, then we have an array of arrays
       # Lets generate hashes of everything and see if they're unique
-      if(@{$out[$intKey]} > 1) {
-        for my $val (@{$out[$intKey]}) {
-          my $hash = ref $val ? $mp->pack($val) : ($val || '');
+      if ( @{ $out[$intKey] } > 1 ) {
+        for my $val ( @{ $out[$intKey] } ) {
+          my $hash = ref $val ? $mp->pack($val) : ( $val || '' );
 
-          if($seen{$hash}) {
+          if ( $seen{$hash} ) {
             next;
           }
 
@@ -801,7 +833,7 @@ sub _makeUniqueRegionData {
         # we either have [val1, val2, vale] for the Nth feature, or [val1] in case
         # val1, val2, and val3 are duplicates
         # If only val1 and val2 are duplicates, then we must keep [val1, val2, val3]
-        if(@uniqInner == 1) {
+        if ( @uniqInner == 1 ) {
           # Cannot use $uniqInnr[0] because we may not always be able to distinguish
           # multiple scalar values from N overlapping regions
           # or a single region with N values
@@ -814,13 +846,13 @@ sub _makeUniqueRegionData {
     # If all features have only 1 val, no need to store arrays, scalars will suffice
     my $maxKeys = 1;
     for my $i (@nonFromToFeatures) {
-      if(@{$out[$i]} != 1) {
+      if ( @{ $out[$i] } != 1 ) {
         $maxKeys = 100;
         last;
       }
     }
 
-    if($maxKeys == 1) {
+    if ( $maxKeys == 1 ) {
       for my $i (@nonFromToFeatures) {
         $out[$i] = $out[$i][0];
       }
@@ -832,7 +864,7 @@ sub _makeUniqueRegionData {
     # calculate the minFrom and maxTo based on this input data, not on the
     # non-redundant data
     $out[$fromDbName] = $minFrom;
-    $out[$toDbName] = $maxTo;
+    $out[$toDbName]   = $maxTo;
 
     return \@out;
   }

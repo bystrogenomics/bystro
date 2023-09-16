@@ -5,9 +5,9 @@ use warnings;
 # TODO: refactor to allow mutliple alleles, and multiple posiitions
 package Seq::Tracks::Cadd;
 
-#A track whose features are only reported if they match the minor allele 
+#A track whose features are only reported if they match the minor allele
 #present in the sample
-#Called cadd because at the time of writing it's the 
+#Called cadd because at the time of writing it's the
 use Mouse 2;
 use namespace::autoclean;
 use Seq::Tracks::Cadd::Order;
@@ -15,7 +15,7 @@ use Seq::Tracks::Cadd::Order;
 # This esesntially is a score track, just needs to lookup the value in the array
 extends 'Seq::Tracks::Get';
 
-has scalingFactor => (is => 'ro', isa => 'Int', default => 10);
+has scalingFactor => ( is => 'ro', isa => 'Int', default => 10 );
 
 sub BUILD {
   my $self = shift;
@@ -45,36 +45,37 @@ sub get {
   # Alternatively the CADD data for this position may be missing (not defined)
   # It's slightly faster to check for truthiness, rather than definition
   # Since we always either store undef or an array, truthiness is sufficient
-  if(!defined $_[1]->[$_[0]->{_dbName}]) {
-    $_[6][$_[5]] = undef;
+  if ( !defined $_[1]->[ $_[0]->{_dbName} ] ) {
+    $_[6][ $_[5] ] = undef;
 
     return $_[6];
   }
 
-  if(!defined $order->{$_[3]} ) {
-    $_[0]->log('warn', "reference base $_[3] doesn't look valid, in Cadd.pm");
-    
-    $_[6][$_[5]] = undef;
+  if ( !defined $order->{ $_[3] } ) {
+    $_[0]->log( 'warn', "reference base $_[3] doesn't look valid, in Cadd.pm" );
+
+    $_[6][ $_[5] ] = undef;
 
     return $_[6];
   }
 
   #if (defined $order->{ $refBase }{ $altAlleles } ) {
-  if (defined $order->{$_[3]}{$_[4]} ) {
-    $_[6][$_[5]] = $_[1]->[$_[0]->{_dbName}][ $order->{$_[3]}{$_[4]} ] / $_[0]->{_s};
+  if ( defined $order->{ $_[3] }{ $_[4] } ) {
+    $_[6][ $_[5] ] =
+      $_[1]->[ $_[0]->{_dbName} ][ $order->{ $_[3] }{ $_[4] } ] / $_[0]->{_s};
 
     return $_[6];
   }
 
   # For indels, which will be the least frequent, return it all
-  if (length( $_[4] ) > 1) {
-    $_[6][$_[5]] = [ map { $_ / $_[0]->{_s} } @{$_[1]->[ $_[0]->{_dbName} ]} ];
+  if ( length( $_[4] ) > 1 ) {
+    $_[6][ $_[5] ] = [ map { $_ / $_[0]->{_s} } @{ $_[1]->[ $_[0]->{_dbName} ] } ];
 
     return $_[6];
   }
 
   # Allele isn't an indel, but !defined $order->{ $refBase }{ $altAlleles }
-  $_[6][$_[5]] = undef;
+  $_[6][ $_[5] ] = undef;
 
   return $_[6];
 }
