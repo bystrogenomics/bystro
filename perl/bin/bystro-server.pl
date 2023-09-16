@@ -14,8 +14,6 @@ use warnings;
 
 use Try::Tiny;
 
-use lib './lib';
-
 use Log::Any::Adapter;
 use File::Basename;
 use Getopt::Long;

@@ -11,3 +11,11 @@ develop:
 serve-dev: develop
 	ray stop && ray start --head
 	pm2 delete all 2> /dev/null || true && pm2 start startup.yml
+
+clean:
+	@find . -iname "*.bak" -print0 | xargs -0 rm -f
+	@rm -f perl/Bytro-0.001.tar.gz
+	@rm -rf perl/Bytro-0.001
+
+build-bystro-docker:
+	@cd perl && dzil build && docker build -t bystro .
