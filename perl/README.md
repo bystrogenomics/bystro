@@ -18,3 +18,9 @@ dzil build && docker build -t bystro .
 cpanm Dist::Zilla
 dzil authordeps | cpanm
 ```
+
+## Code Tidying
+
+```bash
+cpanm Code::TidyAll Perl::Critic Perl::Tidy
+```
