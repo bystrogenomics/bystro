@@ -1,17 +1,17 @@
 """
-This maximizes the marginal likelihood for the Poisson model, for now only 
-a Possion is implemented. The generative model is 
+This maximizes the marginal likelihood for the Poisson model, for now only
+a Possion is implemented. The generative model is
 
 p(z) = Dir(alpha_k)
 p(x_ij|z=k) = Poisson(Lambda_{jk})
 
-The log likelihood is 
+The log likelihood is
 
-log p(x) = log(\sum p(z=k)p(x_ij|z=k)). 
+log p(x) = log(\sum p(z=k)p(x_ij|z=k)).
 
 There's not an analytic formula that makes this easy to solve. But as long
-as you use the logsumexp trick you can compute this easily numerically. I 
-honestly don't know why that isn't taught more, I only learned it as a 
+as you use the logsumexp trick you can compute this easily numerically. I
+honestly don't know why that isn't taught more, I only learned it as a
 postdoc even though I got a PhD in statistics. Meh
 
 
@@ -43,7 +43,7 @@ class MVTadaPoissonML:
         Parameters
         ----------
         K : int,default=4
-            The number of clusters, i.e. number of different types of 
+            The number of clusters, i.e. number of different types of
             genes
 
         training_options : dict,default={}
@@ -99,9 +99,7 @@ class MVTadaPoissonML:
 
         m_d = Dirichlet(torch.tensor(np.ones(self.K) * self.K))
 
-        optimizer = torch.optim.SGD(
-            trainable_variables, lr=td["learning_rate"], momentum=td["momentum"]
-        )
+        optimizer = torch.optim.SGD(trainable_variables, lr=td["learning_rate"], momentum=td["momentum"])
 
         nll = PoissonNLLLoss(full=True, log_input=False, reduction="none")
         mse = nn.MSELoss()
@@ -133,9 +131,7 @@ class MVTadaPoissonML:
 
             loglikelihood_stack = torch.stack(loglikelihood_sum)
             # Matrix of N x k log likelihoods
-            loglikelihood_components = torch.transpose(
-                loglikelihood_stack, 0, 1
-            ) + torch.log(
+            loglikelihood_components = torch.transpose(loglikelihood_stack, 0, 1) + torch.log(
                 pi_
             )  # Matrix of Nxk posteriors
             loglikelihood_marg = torch.logsumexp(
@@ -193,9 +189,7 @@ class MVTadaPoissonML:
         log_proba = np.zeros((N, self.K))
         for i in range(N):
             for k in range(self.K):
-                log_proba[i, k] = np.sum(
-                    st.poisson.logpmf(data[i], self.Lambda[k])
-                )
+                log_proba[i, k] = np.sum(st.poisson.logpmf(data[i], self.Lambda[k]))
         return log_proba
 
     def _fill_training_options(self, training_options):

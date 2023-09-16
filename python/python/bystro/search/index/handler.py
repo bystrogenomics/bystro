@@ -14,7 +14,7 @@ from ruamel.yaml import YAML
 
 from bystro.beanstalkd.worker import ProgressPublisher, get_progress_reporter
 from bystro.search.index.bystro_file import (  # type: ignore # pylint: disable=no-name-in-module,import-error  # noqa: E501
-    read_annotation_tarball, 
+    read_annotation_tarball,
 )
 from bystro.search.utils.annotation import get_delimiters
 from bystro.search.utils.opensearch import gather_opensearch_args

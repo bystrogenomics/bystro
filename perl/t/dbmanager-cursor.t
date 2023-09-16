@@ -87,6 +87,7 @@ catch {
 
 ok( defined $commitErr && $commitErr =~ /expects existing environment/,
   "Fatal errors clear dbManager environment state" );
+
 # ok(defined $commitErr, "dbForceCommit is a void function");
 
 # Note, unfortunately we can do this,

@@ -15,7 +15,7 @@ beanstalkd:
       submission: filters
       events: filters_events
   events:
-    started : started
-    completed : completed
-    failed : failed
-    progress : progress
+    started: started
+    completed: completed
+    failed: failed
+    progress: progress

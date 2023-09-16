@@ -39,6 +39,7 @@ use DDP;
 with 'Seq::Role::IO', 'MouseX::Getopt';
 
 state $tracksKey = 'tracks';
+
 #The only "Trick" added here is that we take everything that is outside the
 #"tracks" key, and push that stuff in each tracks array item
 #THe logic is that our YAML config file has 2 levels of content
@@ -67,6 +68,7 @@ sub new_with_config {
   my $trackConfig;
 
   if ( ref $opts{$tracksKey} eq 'ARRAY' ) {
+
     # Back compatibility with b10
     my $temp = $opts{$tracksKey};
 

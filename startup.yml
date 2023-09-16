@@ -1,25 +1,21 @@
 apps:
   - name: BystroAnnotationServer
     script: bin/bystro-server.pl
-    interpreter: 'perl'
+    interpreter: "perl"
     args: -q config/beanstalk.yml --debug
   - name: BystroSaveServer
     script: bystro-save-worker
-    interpreter: 'python'
-    args:
-      --conf_dir config --queue_conf config/beanstalk.yml --search_conf config/elastic-config2.yml
+    interpreter: "python"
+    args: --conf_dir config --queue_conf config/beanstalk.yml --search_conf config/elastic-config2.yml
   - name: BystroIndexServer
     script: bystro-index-worker
-    interpreter: 'python'
-    args:
-      --conf_dir config --queue_conf config/beanstalk.yml --search_conf config/elastic-config2.yml
+    interpreter: "python"
+    args: --conf_dir config --queue_conf config/beanstalk.yml --search_conf config/elastic-config2.yml
   - name: BystroAncestryServer
     script: python/python/bystro/ancestry/listener.py
-    interpreter: 'python'
-    args:
-      --queue_conf config/beanstalk.yml
+    interpreter: "python"
+    args: --queue_conf config/beanstalk.yml
   - name: BystroProteomicsServer
     script: python/python/bystro/proteomics/proteomics_listener.py
-    interpreter: 'python'
-    args:
-      --queue_conf config/beanstalk.yml
+    interpreter: "python"
+    args: --queue_conf config/beanstalk.yml

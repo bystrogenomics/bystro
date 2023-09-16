@@ -32,6 +32,7 @@ sub BUILD {
 }
 
 sub get {
+
   # Avoid assignments, save overhead
   #my ($self, $href, $chr, $refBase, $allele, $outAccum, $alleleNumber) = @_
   # $_[0] == $self
@@ -63,9 +64,11 @@ sub get {
   # Handle this as a special, fast path
   if ( !ref $alt ) {
     if ( $alt eq $_[4] ) {
+
       # Alt is a scalar, which means there were no overlapping database values
       # at this pposiiton, and all fields represent a single value
       for my $i ( @{ $_[0]->{_fIdx} } ) {
+
         #$outAccum->[$idx][$alleleIdx][$posIdx] = $data->[$self->{_fDb}[$i]] }
         $_[6]->[$i][ $_[5] ] = $data->[ $_[0]->{_fDb}[$i] ];
       }
@@ -85,6 +88,7 @@ sub get {
   for my $alt (@$alt) {
     if ( $alt eq $_[4] ) {
       for my $i ( @{ $_[0]->{_fIdx} } ) {
+
         #$outAccum->[$i][$posIdx] = $data->[$self->{_fDb}[$dataIdx]] }
         $_[6]->[$i][ $_[5] ] = $data->[ $_[0]->{_fDb}[$i] ][$dataIdx];
       }

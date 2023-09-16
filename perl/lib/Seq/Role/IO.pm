@@ -1,6 +1,7 @@
 use 5.10.0;
 use strict;
 use warnings;
+
 # TODO: Also support reading zipped files (right now only gzip files)
 package Seq::Role::IO;
 
@@ -21,6 +22,7 @@ use Try::Tiny;
 use DDP;
 use Scalar::Util qw/looks_like_number/;
 with 'Seq::Role::Message';
+
 # tried various ways of assigning this to an attrib, with the intention that
 # one could change the taint checking characters allowed but this is the simpliest
 # one that worked; wanted it precompiled to improve the speed of checking
@@ -100,6 +102,7 @@ sub getReadArgs {
 
   return $outerCommand;
 }
+
 #@param {Path::Tiny} $file : the Path::Tiny object representing a single input file
 #@param {Str} $innerFile : if passed a tarball, we will want to stream a single file within
 #@return file handle
@@ -200,11 +203,16 @@ sub getInnerFileCommand {
 
   my $innerCommand;
   if ( $filePath =~ /[.]lz4$/ ) {
-    $innerCommand = $compressed ? "\"$innerFile\" | $lz4 -d -c -" : "\"$innerFile\"";
+    $innerCommand =
+      $compressed
+      ? "\"$innerFile\" | $lz4 -d -c -"
+      : "\"$innerFile\"";
   }
   else {
     $innerCommand =
-      $compressed ? "\"$innerFile\" | $gzip $gzipDcmpArgs -" : "\"$innerFile\"";
+      $compressed
+      ? "\"$innerFile\" | $gzip $gzipDcmpArgs -"
+      : "\"$innerFile\"";
   }
 
   # We do this because we have not built in error handling from opening streams
@@ -239,7 +247,10 @@ sub isCompressedSingle {
     return 0;
   }
 
-  if ( $basename =~ /[.]gz$/ || $basename =~ /[.]bgz$/ || $basename =~ /[.]zip$/ ) {
+  if ( $basename =~ /[.]gz$/
+    || $basename =~ /[.]bgz$/
+    || $basename =~ /[.]zip$/ )
+  {
     return "gzip";
   }
 
@@ -306,6 +317,7 @@ sub getWriteFh {
 
 # Allows user to return an error; dies with logging by default
 sub safeOpen {
+
   #my ($self, $fh, $operator, $operand, $errCode) = @_;
   #    $_[0], $_[1], $_[2],   $_[3], $_[4]
 
@@ -372,6 +384,7 @@ sub setLineEndings {
     $/ = "\n";
   }
   elsif ( $firstLine =~ /\015/ ) {
+
     # Match ^M (MacOS style line endings, which Excel outputs on Macs)
     $/ = "\015";
   }
@@ -466,7 +479,8 @@ sub compressDirIntoTarball {
   my $tarCommand = sprintf(
     "cd %s; $tarProg --exclude '.*' --exclude %s -cf %s * --remove-files",
     $dir,
-    $tarballName, #and don't include our new compressed file in our tarball
+    $tarballName
+    ,             #and don't include our new compressed file in our tarball
     $tarballName, # the name of our tarball
   );
 

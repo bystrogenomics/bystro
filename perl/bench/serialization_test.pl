@@ -1,6 +1,7 @@
 use 5.10.0;
 use strict;
 use warnings;
+
 # use blib;
 use Benchmark       qw(cmpthese :hireswallclock);
 use Sereal::Decoder qw(decode_sereal sereal_decode_with_object);
@@ -19,12 +20,14 @@ use lib './lib';
 use Seq::DBManager;
 use Scalar::Util qw/looks_like_number/;
 use Data::Float;
+
 # my $seq = MockBuilder->new_with_config({config => './config/hg19.yml', debug => 1});
 Seq::DBManager::initialize(
   databaseDir => '/mnt/annotator/bystro-dev/hg19/index',
   readOnly    => 1,
 );
 my $db = Seq::DBManager->new();
+
 # my $stuff = $db->dbReadOne('chr21', 49e6, 0 , 1);
 # p $stuff;
 my $nobless;
@@ -32,6 +35,7 @@ my $nobless;
 my $mpt = Data::MessagePack->new()->prefer_float32();
 
 my $test = encode_cbor(-24);
+
 # say "length of 64 is  " . (length($test));
 # exit;
 #Credit to https://github.com/Sereal/Sereal/wiki/Sereal-Comparison-Graphs
@@ -55,6 +59,7 @@ GetOptions(
   'real_array'                      => \( my $real_array         = 0 ),
   'real_array_sigfig'               => \( my $real_array_sigfig  = 0 ),
   'small_hash'                      => \( my $small_hash         = 0 ),
+
   # 'no_bless|no-bless|nobless'          => \( my $nobless            = 0 ),
   'sereal_only|sereal-only|serealonly' => \( my $sereal_only        = 0 ),
   'diagrams'                           => \( my $diagrams           = 0 ),
@@ -88,6 +93,7 @@ our (
 my $storable_tag = "strbl";
 my $sereal_tag   = "srl";
 my %meta         = (
+
   # jxs => {
   #     enc  => '$::jsonxs->encode($data);',
   #     dec  => '$::jsonxs->decode($encoded);',
@@ -124,6 +130,7 @@ my %meta         = (
       $msgpack = Data::MessagePack->new()->prefer_integer()->prefer_float32();
     },
   },
+
   # mp => {
   #     enc  => '$::msgpack->pack($data);',
   #     dec  => '$::msgpack->unpack($encoded);',
@@ -148,6 +155,7 @@ my %meta         = (
       $cbor = CBOR::XS->new();
     },
   },
+
   # dd_noind => {
   #     enc  => 'Data::Dumper->new([$data])->Indent(0)->Dump();',
   #     dec  => 'eval $encoded;',
@@ -457,6 +465,7 @@ sub make_data {
   }
   elsif ($array_data) {
     $data_set_name = "Bystro-like data composed of multiple values in an array";
+
     # my $data = [
     #     0, 23.2, 0.01, -1.0, [0, 1], ["Segawa syndrome, autosomal recessive","germline","Uncertain significance", 1, "G", "A", "criteria provided, single submitter"], [3.23625e-05, 5.86098e-05, 0, 0, 0, 0, 0, 30900, 14968, 302, 978, 3492, 17062, 13838], ["rs139474171", ["A", "G"], ["near-gene-5", "missense"], [0.000398, 0.999602], [49, 123117], "single", "+"]
     # ];
@@ -517,6 +526,7 @@ sub make_data {
   elsif ($large_array) {
     $data_set_name =
       "Bystro-like large data composed of multiple values in an array, a few overlapping annotations per annotation type";
+
     # my $data = [
     #     0, 23.2, 0.01, -1.0, [0, 1], ["Segawa syndrome, autosomal recessive","germline","Uncertain significance", 1, "G", "A", "criteria provided, single submitter"], [3.23625e-05, 5.86098e-05, 0, 0, 0, 0, 0, 30900, 14968, 302, 978, 3492, 17062, 13838], ["rs139474171", ["A", "G"], ["near-gene-5", "missense"], [0.000398, 0.999602], [49, 123117], "single", "+"]
     # ];
@@ -589,6 +599,7 @@ sub make_data {
   elsif ($large_array_sigfig) {
     $data_set_name =
       "Bystro-like large data composed of multiple values in an array, a few overlapping annotations per annotation type";
+
     # my $data = [
     #     0, 23.2, 0.01, -1.0, [0, 1], ["Segawa syndrome, autosomal recessive","germline","Uncertain significance", 1, "G", "A", "criteria provided, single submitter"], [3.23625e-05, 5.86098e-05, 0, 0, 0, 0, 0, 30900, 14968, 302, 978, 3492, 17062, 13838], ["rs139474171", ["A", "G"], ["near-gene-5", "missense"], [0.000398, 0.999602], [49, 123117], "single", "+"]
     # ];
@@ -699,7 +710,9 @@ sub make_data {
       }
 
       if ( looks_like_number($val) ) {
-        return int($val) == $val ? int($val) : FormatSigFigs( $val, 2 ) +0;
+        return int($val) == $val
+          ? int($val)
+          : FormatSigFigs( $val, 2 ) +0;
       }
 
       return $val;

@@ -241,7 +241,7 @@ def go(  # pylint:disable=invalid-name
         tarball_name = os.path.basename(outputs.archived)
 
         ret = subprocess.call(
-            f'cd {output_dir}; tar --exclude ".*" --exclude={tarball_name} -cf {tarball_name} * --remove-files', # noqa: E501
+            f'cd {output_dir}; tar --exclude ".*" --exclude={tarball_name} -cf {tarball_name} * --remove-files',  # noqa: E501
             shell=True,
         )
         if ret != 0:

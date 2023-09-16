@@ -86,11 +86,14 @@ sub makeOutputString {
 
   for my $row (@$outputDataAref) {
     next if !$row;
+
     # info = [$outIdx, $numFeatures, $missingValue]
     # if $numFeatures == 0, this track has no features
     TRACK_LOOP: for my $oIdx ( @{ $self->{_trackOutIndices} } ) {
+
       # If this track has no features
       if ( $featCounts->[$oIdx] == 0 ) {
+
         # We always expect output, for any track
         # to be at least a 1 member array
         # because we need to know where in an indel we are
@@ -130,9 +133,11 @@ sub makeOutputString {
               ? (
               ref $_
               ?
+
                 # at this position this feature has multiple values
                 join( $valDelim, map { defined $_ ? $_ : $missChar } @$_ )
               :
+
                 # at this position this feature has 1 value
                 $_
               )
@@ -175,9 +180,11 @@ sub makeOutputString {
                 ? (
                 ref $_
                 ?
+
                   # at this position this feature has multiple values
                   join( $overlapDelim, map { defined $_ ? $_ : $missChar } @$_ )
                 :
+
                   # at this position this feature has 1 value
                   $_
                 )
@@ -215,9 +222,11 @@ sub makeOutputString {
                 ? (
                 ref $_
                 ?
+
                   # at this position this feature has multiple values
                   join( $overlapDelim, map { defined $_ ? $_ : $missChar } @$_ )
                 :
+
                   # at this position this feature has 1 value
                   $_
                 )

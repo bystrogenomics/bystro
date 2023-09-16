@@ -11,6 +11,7 @@ use POSIX qw/lround/;
 has scalingFactor => ( is => 'ro', isa => 'Int', required => 1 );
 
 sub round {
+
   #my ($self, $value) = @_;
   #   ($_[0], $_[1] ) = @_;
 

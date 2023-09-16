@@ -1,6 +1,5 @@
----
-  assembly: danRer10
-  chromosomes:
+assembly: danRer10
+chromosomes:
   - chr1
   - chr2
   - chr3
@@ -27,38 +26,38 @@
   - chr24
   - chr25
   - chrM
-  database_dir: '~'
-  files: '~'
-  files_dir: ~
-  statistics:
-    dbSNPnameField: ~
-    exonicAlleleFunctionField: refSeq.exonicAlleleFunction
-    outputExtensions:
-      json: .statistics.json
-      qc: .statistics.qc.tab
-      tab: .statistics.tab
-    refTrackField: ref
-    siteTypeField: refSeq.siteType
-    programPath: bystro-stats
-  temp_dir: '~'
-  fileProcessors:
-    snp:
-      args: --emptyField ! --minGq .95
-      program: bystro-snp
-    vcf:
-      args: --emptyField ! --keepId --keepPos
-      program: bystro-vcf
-  tracks:
+database_dir: "~"
+files: "~"
+files_dir: ~
+statistics:
+  dbSNPnameField: ~
+  exonicAlleleFunctionField: refSeq.exonicAlleleFunction
+  outputExtensions:
+    json: .statistics.json
+    qc: .statistics.qc.tab
+    tab: .statistics.tab
+  refTrackField: ref
+  siteTypeField: refSeq.siteType
+  programPath: bystro-stats
+temp_dir: "~"
+fileProcessors:
+  snp:
+    args: --emptyField ! --minGq .95
+    program: bystro-snp
+  vcf:
+    args: --emptyField ! --keepId --keepPos
+    program: bystro-vcf
+tracks:
   - local_files:
-    - danRer10.fa.gz
+      - danRer10.fa.gz
     name: ref
     remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/danRer10/bigZips/
     remote_files:
-    - danRer10.fa.gz
+      - danRer10.fa.gz
     type: reference
   - features:
-    - name
-    - name2
+      - name
+      - name2
     name: refSeq
     sql_statement: SELECT * FROM danRer10.refGene
     type: gene

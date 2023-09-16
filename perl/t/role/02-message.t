@@ -9,8 +9,11 @@ use Mouse 2;
 
 with 'Seq::Role::Message', 'Seq::Role::IO';
 
-has logPath =>
-  ( is => 'ro', init_arg => undef, default => 't/role/02-message.test.log' );
+has logPath => (
+  is       => 'ro',
+  init_arg => undef,
+  default  => 't/role/02-message.test.log'
+);
 
 sub BUILD {
   my $self = shift;

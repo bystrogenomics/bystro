@@ -79,7 +79,10 @@ sub _isCompleted {
 
   my $allCompleted = $self->db->dbReadMeta( $self->name, $metaKey );
 
-  if ( $allCompleted && defined $allCompleted->{$chr} && $allCompleted->{$chr} == 1 ) {
+  if ( $allCompleted
+    && defined $allCompleted->{$chr}
+    && $allCompleted->{$chr} == 1 )
+  {
     $self->_completed->{$chr} = 1;
   }
   else {

@@ -53,6 +53,7 @@ $geneBuilder->buildTrack();
 
 my $mainDbAref     = $db->dbReadAll('chrM');
 my $regionDataAref = $db->dbReadAll('refSeq.nearest/chrM');
+
 # p $mainDbAref;
 my $hasNearestCount    = 0;
 my $hasNearestTssCount = 0;
@@ -242,6 +243,7 @@ for my $pos ( 0 .. $#$mainDbAref ) {
 
     # same as nGene within the gene when storeNearest is false
     ok( join( ",", @$name2Gene ) eq 'RNR2,RNR2_FAKE1' );
+
     # ok(!defined $distGene);
 
     # for spaces between two from points of adjacent transcripts/regions
@@ -279,6 +281,7 @@ for my $pos ( 0 .. $#$mainDbAref ) {
     ok(
       join( ",", sort { $a cmp $b } @$name2Gene ) eq
         join( ",", sort { $a cmp $b } 'RNR2', 'RNR2_FAKE1', 'RNR2_FAKE2' ) );
+
     # ok(!defined $distGene);
 
     #For single-point (from) nearest tracks, this case is equivalent to being
@@ -308,6 +311,7 @@ for my $pos ( 0 .. $#$mainDbAref ) {
     ok(
       join( ",", sort { $a cmp $b } @$name2Gene ) eq
         join( ",", sort { $a cmp $b } 'RNR2', 'RNR2_FAKE2' ) );
+
     # ok(!defined $distGene);
 
     # For txStart, these flank 2300 - 3230
@@ -317,6 +321,7 @@ for my $pos ( 0 .. $#$mainDbAref ) {
     # NR_FAKE3C chrM  + 3800  4500  3810  3900  1 1672, 3230, 0 FAKE3 NA  NA  NA  NA  NA  NA  NA  NA  NA  NA  NA
 
     if ( $pos < 2200 + ( 3800 - 2200 ) / 2 ) {
+
       #For single-point (from) nearest tracks, this case is equivalent to being
       #intergenic (or on top of @2200) and past/on top of the last transcript (NR_FAKE2)
       ok( $distTss == 2200 - $pos );
@@ -353,6 +358,7 @@ for my $pos ( 0 .. $#$mainDbAref ) {
     ok( $name2 eq 'RNR2_FAKE2' );
 
     ok( $name2Gene eq $name2 );
+
     # ok(!defined $distGene);
 
     #For single-point (from) nearest tracks, this case is equivalent to being
@@ -375,6 +381,7 @@ for my $pos ( 0 .. $#$mainDbAref ) {
   # NR_FAKE3C  chrM  + 3800  4500  3810  3900  1 1672, 3230, 0 FAKE3  NA  NA  NA  NA  NA  NA  NA  NA  NA  NA  NA
   # NR_FAKE4  chrM  + 4300  5000  3810  3900  1 1672, 3230, 0 FAKE4  NA  NA  NA  NA  NA  NA  NA  NA  NA  NA  NA
   if ( $pos >= 3400 && $pos < 3800 ) {
+
     # nearest is from txStart to txEnd, so use end to calc distance
 
     # for refSeq.gene, we don't consider intergenice
@@ -400,9 +407,11 @@ for my $pos ( 0 .. $#$mainDbAref ) {
     }
 
     if ( $pos < 2200 + ( 3800 - 2200 ) / 2 ) {
+
       # should never appear here
       ok( $nameTss eq 'NR_FAKE2' );
       ok( $name2Tss eq 'RNR2_FAKE2' );
+
       # for nearestTss, only txStart is considered of NR_FAKE2
       ok( $distTss == 2200 - $pos );
     }
@@ -411,6 +420,7 @@ for my $pos ( 0 .. $#$mainDbAref ) {
         join( ",", sort { $a cmp $b } @$nameTss ) eq
           join( ",", sort { $a cmp $b } 'NR_FAKE3', 'NR_FAKE3B', 'NR_FAKE3C' ) );
       ok( join( ",", @$name2Tss ) eq 'FAKE3' );
+
       # for nearestTss, only txStart is considered of NR_FAKE2
       ok( $distTss == 3800 - $pos );
     }
@@ -444,6 +454,7 @@ for my $pos ( 0 .. $#$mainDbAref ) {
       ok(
         join( ",", sort { $a cmp $b } @$name ) eq
           join( ",", sort { $a cmp $b } 'NR_FAKE3B', 'NR_FAKE3C' ) );
+
       # We de-dup, to unique values
       ok( join( ",", @$name2 ) eq 'FAKE3' );
 
@@ -454,6 +465,7 @@ for my $pos ( 0 .. $#$mainDbAref ) {
 
     # midopint to NR_FAKE4  chrM  + 4300  5000  3810  3900  1 1672, 3230, 0 FAKE4  NA  NA  NA  NA  NA  NA  NA  NA  NA  NA  NA
     if ( $pos < 3800 + ( 4300 - 3800 ) / 2 ) {
+
       #For single-point (from) nearest tracks, this case is equivalent to being
       #intergenic (or on top of txStart)
       ok( $distTss == 3800 - $pos );
@@ -513,6 +525,7 @@ for my $pos ( 0 .. $#$mainDbAref ) {
 
   # Intergenic, after the end
   if ( $pos >= 5000 ) {
+
     # 5000 is the end + 1 of the 0-based end
     ok( $dist == 4999 - $pos );
     ok( $name eq 'NR_FAKE4' );
@@ -525,6 +538,7 @@ for my $pos ( 0 .. $#$mainDbAref ) {
     ok( $name2Tss eq 'FAKE4' );
 
     ok( !defined $name2Gene );
+
     # ok(!defined $distGene);
   }
 }

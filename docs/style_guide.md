@@ -1,8 +1,9 @@
 # Style Guide
 
 ## Notes on Tooling
+
 For Python development, Bystro uses `black` for formatting, `ruff` for linting, `mypy` for static
-analysis, and `pytest` for unit-testing.  For best results, these tools should be run from the
+analysis, and `pytest` for unit-testing. For best results, these tools should be run from the
 python project top-level and called with their project-specific configuration files:
 
 ```
@@ -20,10 +21,9 @@ pytest .
 Opinionated tools, like the ones we use in this repository, offer significant advantages in error
 prevention and code consistency. By automatically enforcing coding conventions, these tools save
 time and mental effort for developers. They detect common static errors, promote best practices, and
-ensure uniformity between developer workflows.  These tools work together to catch errors at
+ensure uniformity between developer workflows. These tools work together to catch errors at
 different levels, from simple syntax issues to more complex logic problems. They become even more
 valuable as the codebase grows, providing essential checks in larger projects.
-
 
 #### The Right Balance
 

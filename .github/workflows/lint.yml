@@ -1,7 +1,5 @@
 name: lint
-
 on: [push, pull_request]
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -9,29 +7,29 @@ jobs:
       matrix:
         python-version: ["3.10.11"]
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        python -m venv ~/.venv/ci-venv
-        source ~/.venv/ci-venv/bin/activate
-        python -m pip install --upgrade pip
-        pip install -r **/requirements.txt
-        pip install -r **/requirements-dev.txt
-    - name: Linting with ruff
-      run: |
-        source ~/.venv/ci-venv/bin/activate
-        ruff $(git ls-files '*.py')
-    - name: Static analysis with mypy
-      run: |
-        source ~/.venv/ci-venv/bin/activate
-        mypy --config-file python/mypy.ini $(git ls-files '*.py')
-    - name: Tests
-      run: |
-        source ~/.venv/ci-venv/bin/activate
-        cd python
-        maturin develop        
-        pytest
+      - uses: actions/checkout@v3
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m venv ~/.venv/ci-venv
+          source ~/.venv/ci-venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r **/requirements.txt
+          pip install -r **/requirements-dev.txt
+      - name: Linting with ruff
+        run: |
+          source ~/.venv/ci-venv/bin/activate
+          ruff $(git ls-files '*.py')
+      - name: Static analysis with mypy
+        run: |
+          source ~/.venv/ci-venv/bin/activate
+          mypy --config-file python/mypy.ini $(git ls-files '*.py')
+      - name: Tests
+        run: |
+          source ~/.venv/ci-venv/bin/activate
+          cd python
+          maturin develop
+          pytest

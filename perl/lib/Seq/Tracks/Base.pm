@@ -3,6 +3,7 @@ use strict;
 use warnings;
 
 package Seq::Tracks::Base;
+
 #Every track class extends this. The attributes detailed within are used
 #regardless of whether we're building or annotating
 #and nothing else ends up here (for instance, required_fields goes to Tracks::Build)
@@ -18,6 +19,7 @@ use List::Util qw/first/;
 use Seq::Tracks::Base::MapTrackNames;
 use Seq::Tracks::Base::MapFieldNames;
 use Seq::DBManager;
+
 # use String::Util qw/trim/;
 
 # automatically imports TrackType
@@ -40,8 +42,12 @@ has joinTrackFeatures => (
   writer   => '_setJoinTrackFeatures'
 );
 
-has joinTrackName =>
-  ( is => 'ro', isa => 'Str', init_arg => undef, writer => '_setJoinTrackName' );
+has joinTrackName => (
+  is       => 'ro',
+  isa      => 'Str',
+  init_arg => undef,
+  writer   => '_setJoinTrackName'
+);
 
 ###################### Required Arguments ############################
 # the track name
@@ -50,6 +56,7 @@ has name => ( is => 'ro', isa => 'Str', required => 1 );
 has type => ( is => 'ro', isa => 'TrackType', required => 1 );
 
 has assembly => ( is => 'ro', isa => 'Str', required => 1 );
+
 #anything with an underscore comes from the config format
 #anything config keys that can be set in YAML but that only need to be used
 #during building should be defined here
@@ -109,6 +116,7 @@ has normalizedWantedChr => (
     # And vice versa
     for my $chr ( keys %chromosomes ) {
       if ( substr( $chr, 0, 3 ) eq 'chr' ) {
+
         # Add if not already present, in case user for some reason wants to
         # have chr1 and 1 point to distinct databases.
         my $part = substr( $chr, 3 );
@@ -184,6 +192,7 @@ has debug => ( is => 'ro', isa => 'Bool', lazy => 1, default => 0 );
 #### Initialize / make dbnames for features and tracks before forking occurs ###
 sub BUILD {
   my $self = shift;
+
   # getFieldDbNames is not a pure function; sideEffect of setting auto-generated dbNames in the
   # database the first time (ever) that it is run for a track
   # We could change this effect; for now, initialize here so that each thread
@@ -258,6 +267,7 @@ around BUILDARGS => sub {
   }
 
   if ( defined $data->{features} && ref $data->{features} ne 'ARRAY' ) {
+
     #This actually works :)
     $class->log( 'fatal', 'features must be array' );
   }

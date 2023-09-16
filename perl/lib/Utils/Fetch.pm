@@ -92,6 +92,7 @@ sub _fetchFromUCSCsql {
 
     my $trackFeatures;
     foreach ( @{ $self->_wantedTrack->{features} } ) {
+
       # YAML config spec defines optional type on feature names, so some features
       # Can be hashes. Take only the feature name, ignore type, UCSC doesn't use them
       my $featureName;
@@ -148,6 +149,7 @@ sub _fetchFiles {
   my $isS3    = 0;
 
   if ( $self->remoteDir ) {
+
     # remove http:// (or whatever protocol)
     $self->remoteDir =~ m/$pathRe/;
 
@@ -217,11 +219,14 @@ sub _fetchFiles {
     $self->log( 'info', "Fetching: $command" );
 
     # http://stackoverflow.com/questions/11514947/capture-the-output-of-perl-system
-    open( my $fh, "-|", "$command" ) or $self->log( 'fatal', "Couldn't fork: $!\n" );
+    open( my $fh, "-|", "$command" )
+      or $self->log( 'fatal', "Couldn't fork: $!\n" );
 
     my $progress;
     while (<$fh>) {
-      if ( $self->debug ) { say $_ } # we may want to watch progress in stdout
+      if ( $self->debug ) {
+        say $_;
+      } # we may want to watch progress in stdout
       $self->log( 'info', $_ );
     }
     close($fh);

@@ -9,17 +9,21 @@ use namespace::autoclean;
 use List::Util qw/first/;
 
 with 'Seq::Role::Message';
+
 #stored as array ref to preserve order
 # [ { $parent => [ $child1, $child2 ] }, $feature2, $feature3, etc ]
 state $orderedHeaderFeaturesAref = [];
+
 # { $parent => [ $child1, $child2 ] }
 state $parentChild = {};
 
 # [ [ $child1, $child2 ], $feature2, $feature3, etc ]
 state $orderedHeaderCache = [];
 state $strHeaderCache     = '';
+
 # { childFeature1 => idx, childFeature2 => idx;
 state $orderMapCache = {};
+
 # { $parent => { $child1 => idxChild1, $child2 => idxChild2 }}
 my %parentChildHash;
 
@@ -34,6 +38,7 @@ sub initialize {
 }
 
 sub _clearCache {
+
   # These get initialize/cleared every time feature added
   # They simply track different views of
   $orderedHeaderCache = [];
@@ -62,6 +67,7 @@ sub getFeatureIdx {
       $i++;
 
       if ( ref $entry ) {
+
         # One key only, the parent name (trackName)
         my ($trackName) = keys %{$entry};
 
@@ -131,6 +137,7 @@ sub getString {
 
   my @out;
   for my $feature (@$orderedHeaderFeaturesAref) {
+
     #this is a parentName => [$feature1, $feature2, $feature3] entry
     if ( ref $feature ) {
       my ($parentName) = %$feature;
@@ -178,6 +185,7 @@ sub addFeaturesToHeader {
       my ( $key, $valuesAref ) = %$headerEntry;
 
       if ( $key eq $parent ) {
+
         # If we have already added this feature, exit the function
         if ( defined( first { $_ eq $child } @$valuesAref ) ) {
           return;

@@ -1,4 +1,3 @@
----
 assembly: rn6
 chromosomes:
   - chr1
@@ -44,28 +43,28 @@ fileProcessors:
     args: --emptyField ! --keepId --keepPos
     program: bystro-vcf
 tracks:
-- name: ref
-  remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/rn6/bigZips/
-  remote_files:
-  - rn6.fa.gz
-  type: reference
-- features:
-  - name
-  - name2
-  name: refSeq
-  sql_statement: SELECT * FROM rn6.refGene
-  type: gene
-- local_files:
-  - rn6.phastCons20way.wigFix.gz
-  name: phastCons
-  remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/rn6/phastCons20way/
-  remote_files:
-  - rn6.phastCons20way.wigFix.gz
-  type: score
-- local_files:
-  - rn6.phyloP20way.wigFix.gz
-  name: phyloP
-  remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/rn6/phyloP20way/
-  remote_files:
-  - rn6.phyloP20way.wigFix.gz
-  type: score
+  - name: ref
+    remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/rn6/bigZips/
+    remote_files:
+      - rn6.fa.gz
+    type: reference
+  - features:
+      - name
+      - name2
+    name: refSeq
+    sql_statement: SELECT * FROM rn6.refGene
+    type: gene
+  - local_files:
+      - rn6.phastCons20way.wigFix.gz
+    name: phastCons
+    remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/rn6/phastCons20way/
+    remote_files:
+      - rn6.phastCons20way.wigFix.gz
+    type: score
+  - local_files:
+      - rn6.phyloP20way.wigFix.gz
+    name: phyloP
+    remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/rn6/phyloP20way/
+    remote_files:
+      - rn6.phyloP20way.wigFix.gz
+    type: score

@@ -512,29 +512,29 @@ mappings:
               type: keyword
               normalizer: lowercase_normalizer
             ac:
-                type: integer
+              type: integer
             af:
               type: half_float
             an:
               type: integer
             ac_afr:
-                type: integer
+              type: integer
             ac_amr:
-                type: integer
+              type: integer
             ac_asj:
-                type: integer
+              type: integer
             ac_eas:
-                type: integer
+              type: integer
             ac_fin:
-                type: integer
+              type: integer
             ac_nfe:
-                type: integer
+              type: integer
             ac_oth:
-                type: integer
+              type: integer
             ac_male:
-                type: integer
+              type: integer
             ac_female:
-                type: integer
+              type: integer
             an_afr:
               type: integer
             an_amr:

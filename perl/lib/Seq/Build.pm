@@ -7,6 +7,7 @@ use lib './lib';
 our $VERSION = '0.001';
 
 use DDP;
+
 # ABSTRACT: A class for building all files associated with a genome assembly
 # VERSION
 
@@ -58,6 +59,7 @@ sub BUILD {
 
   #http://stackoverflow.com/questions/1378221/how-can-i-get-name-of-the-user-executing-my-perl-script
   my $buildAuthor = $ENV{LOGNAME} || $ENV{USER} || getpwuid($<);
+
   # Meta tracks are built during instantiation, so if we only want to build the
   # meta data, we can return here safely.
   if ( $self->meta_only ) {
@@ -71,6 +73,7 @@ sub BUILD {
     my @types = split( /,/, $self->wantedType );
 
     for my $type (@types) {
+
       # modifies in place
       StripLTSpace($type);
 
@@ -88,6 +91,7 @@ sub BUILD {
     my @names = split( /,/, $self->wantedName );
 
     for my $name (@names) {
+
       # modifies in place
       StripLTSpace($name);
 

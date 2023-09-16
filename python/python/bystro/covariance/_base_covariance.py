@@ -1,14 +1,14 @@
 """
-This provides the base class for covariance estimation. While there are 
-many methods for estimating covariance matrices, once such a matrix has 
-been estimated most of the procedures for evaulating fit, comparing 
-quantities etc are shared between models. This implementation allows for 
-us to implement these methods a single time and for most code being 
-centered on the fit method and a small number of auxiliary methods. This 
-also will provide the basis for factor analysis and probablistic PCA. As 
-a practical design choice, these methods are implemented as separate 
-functions, which are simply converted into object methods by replacing 
-covariance with self.covariance. Documentation is provided in the 
+This provides the base class for covariance estimation. While there are
+many methods for estimating covariance matrices, once such a matrix has
+been estimated most of the procedures for evaulating fit, comparing
+quantities etc are shared between models. This implementation allows for
+us to implement these methods a single time and for most code being
+centered on the fit method and a small number of auxiliary methods. This
+also will provide the basis for factor analysis and probablistic PCA. As
+a practical design choice, these methods are implemented as separate
+functions, which are simply converted into object methods by replacing
+covariance with self.covariance. Documentation is provided in the
 functional method and omitted from the object methods.
 
 Objects
@@ -16,10 +16,10 @@ Objects
 BaseCovariance
 
     get_precision()
-        Gets the precision matrix defined as the inverse of the covariance 
+        Gets the precision matrix defined as the inverse of the covariance
 
     get_stable_rank()
-        Returns the stable rank defined as 
+        Returns the stable rank defined as
         ||A||_F^2/||A||^2
 
     predict(Xobs,idxs)
@@ -31,7 +31,7 @@ BaseCovariance
 
     conditional_score_samples(X,idxs)
         log p(X[idx==1]|X[idx==0],covariance)
-    
+
     marginal_score(X,idxs,weights=None)
         mean(log p(X[idx==1]|covariance))
 
@@ -46,9 +46,9 @@ BaseCovariance
 
     --------------------
     entropy()
-        Computes the entropy of a Gaussian distribution parameterized by 
+        Computes the entropy of a Gaussian distribution parameterized by
         covariance.
-    
+
     entropy_subset(idxs)
         Computes the entropy of a subset of the covariates
 
@@ -195,7 +195,7 @@ def _get_stable_rank(covariance):
     Returns
     -------
     srank : float
-        The stable rank. See Vershynin High dimensional probability for 
+        The stable rank. See Vershynin High dimensional probability for
         discussion, but this is a statistically stable approximation to rank
     """
     singular_values = la.svd(covariance, compute_uv=False)
@@ -253,7 +253,7 @@ def _conditional_score(covariance, X, idxs, weights=None):
         The observation locations
 
     weights : np.array-like,(N,),default=None
-        The optional weights on the samples. Don't have negative values. 
+        The optional weights on the samples. Don't have negative values.
         Average value forced to 1.
 
     Returns
@@ -261,12 +261,8 @@ def _conditional_score(covariance, X, idxs, weights=None):
     avg_score : float
         Average log likelihood
     """
-    weights = (
-        np.ones(X.shape[0]) if weights is None else weights / np.mean(weights)
-    )
-    avg_score = np.mean(
-        weights * _conditional_score_samples(covariance, X, idxs)
-    )
+    weights = np.ones(X.shape[0]) if weights is None else weights / np.mean(weights)
+    avg_score = np.mean(weights * _conditional_score_samples(covariance, X, idxs))
     return avg_score
 
 
@@ -524,9 +520,7 @@ def _mutual_information(covariance, idxs1, idxs2):
     idxs1_sub = idxs1[idxs == 1]
     Hy = _entropy(cov_sub[np.ix_(idxs1_sub == 1, idxs1_sub == 1)])
 
-    _, covariance_conditional = _get_conditional_parameters(
-        cov_sub, 1 - idxs1_sub
-    )
+    _, covariance_conditional = _get_conditional_parameters(cov_sub, 1 - idxs1_sub)
     H_y_given_x = _entropy(covariance_conditional)
     mutual_information = Hy - H_y_given_x
     return mutual_information

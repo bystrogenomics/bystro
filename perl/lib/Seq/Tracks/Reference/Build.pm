@@ -57,6 +57,7 @@ sub buildTrack {
   );
 
   for my $file ( $self->allLocalFiles ) {
+
     # Expects 1 chr per file for n+1 files, or all chr in 1 file
     # Single writer to reduce copy-on-write db inflation
     $self->log( 'info', $self->name . ": Beginning building from $file" );
@@ -78,12 +79,14 @@ sub buildTrack {
     my $chrPosition = $self->based;
 
     my $count = 0;
+
     # Record which chromosomes we've worked on
     my %visitedChrs;
 
     my $cursor;
 
     FH_LOOP: while ( my $line = $fh->getline() ) {
+
       #super chomp; also helps us avoid weird characters in the fasta data string
       $line =~ s/^\s+|\s+$//g; #trim both ends, but not what's in between
 
@@ -102,9 +105,12 @@ sub buildTrack {
         $chr = $self->normalizedWantedChr->{$chr};
 
         # falsy value is ''
-        if ( !defined $wantedChr || ( !defined $chr || $wantedChr ne $chr ) ) {
+        if ( !defined $wantedChr
+          || ( !defined $chr || $wantedChr ne $chr ) )
+        {
           # We switched chromosomes
           if ( defined $wantedChr ) {
+
             # cleans up entire environment, commits/closes all cursors, syncs
             $self->db->cleanUp();
             undef $cursor;
@@ -137,6 +143,7 @@ sub buildTrack {
       }
 
       if ( $line =~ $dataRegex ) {
+
         # Store the uppercase bases; how UCSC does it, how people likely expect it
         for my $char ( split '', uc($1) ) {
           $cursor //= $self->db->dbStartCursorTxn($wantedChr);

@@ -72,6 +72,7 @@ if ( !$names ) {
 say "Running utils for : " . $names;
 
 for my $wantedName ( split ',', $names ) {
+
   # modifies in place
   StripLTSpace($wantedName);
 

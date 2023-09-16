@@ -139,7 +139,10 @@ sub buildTrack {
       my ( $pid, $exitCode, $fileName, undef, undef, $errOrChrs ) = @_;
 
       if ( $exitCode != 0 ) {
-        my $err = $errOrChrs ? "due to: $$errOrChrs" : "due to an untimely demise";
+        my $err =
+          $errOrChrs
+          ? "due to: $$errOrChrs"
+          : "due to an untimely demise";
 
         $self->log( 'fatal', $self->name . ": Failed to build $fileName $err" );
       }
@@ -170,6 +173,7 @@ sub buildTrack {
     my ( $err, $vcfNameMap, $vcfFilterMap ) = $self->_extractHeader($file);
 
     if ($err) {
+
       # DB not open yet, no need to commit
       $pm->finish( 255, \$err );
     }
@@ -199,6 +203,7 @@ sub buildTrack {
 
     FH_LOOP: while ( my $line = $fh->getline() ) {
       chomp $line;
+
       # This is the annotation input first 7 lines, plus id, info
       @fields = split '\t', $line;
 
@@ -207,9 +212,12 @@ sub buildTrack {
       $chr = $self->normalizedWantedChr->{ $fields[$chrIdx] };
 
       # falsy value is ''
-      if ( !defined $wantedChr || ( !defined $chr || $wantedChr ne $chr ) ) {
+      if ( !defined $wantedChr
+        || ( !defined $chr || $wantedChr ne $chr ) )
+      {
         # We have a new chromosome
         if ( defined $wantedChr ) {
+
           #Commit any remaining transactions, remove the db map from memory
           #this also has the effect of closing all cursors
           $self->db->cleanUp();
@@ -253,11 +261,11 @@ sub buildTrack {
         next;
       }
 
-      ( $err, my $data ) =
-        $self->_extractFeatures( \@fields, $infoIdx, $alleleIdx, $vcfNameMap,
-        $vcfFilterMap );
+      ( $err, my $data ) = $self->_extractFeatures( \@fields, $infoIdx, $alleleIdx,
+        $vcfNameMap, $vcfFilterMap );
 
       if ($err) {
+
         #Commit, sync everything, including completion status, and release mmap
         $self->db->cleanUp();
 
@@ -271,8 +279,8 @@ sub buildTrack {
       }
 
       #Args:                         $cursor, $chr,       $trackIndex,   $pos,   $trackValue, $mergeFunction
-      $self->db->dbPatchCursorUnsafe( $cursor, $wantedChr, $self->dbName, $dbPos, $data,
-        $mergeFunc );
+      $self->db->dbPatchCursorUnsafe( $cursor, $wantedChr,
+        $self->dbName, $dbPos, $data, $mergeFunc );
 
       if ( $count > $self->commitEvery ) {
         $self->db->dbEndCursorTxn($wantedChr);
@@ -421,7 +429,9 @@ sub _getHeaderFeatures {
     if ( defined $featuresMap{$fName} ) {
       $idx = $featuresMap{$fName};
     }
-    elsif ( defined $fieldMap{$fName} && defined $featuresMap{ $fieldMap{$fName} } ) {
+    elsif ( defined $fieldMap{$fName}
+      && defined $featuresMap{ $fieldMap{$fName} } )
+    {
       $idx = $featuresMap{ $fieldMap{$fName} };
     }
 
@@ -552,6 +562,7 @@ sub _extractHeader {
       my $infoName = $self->{_infoFeatureNames}{$feature};
 
       if ( index( $h, "INFO\=\<ID\=$infoName," ) > 0 ) {
+
         # my $vcfName = "$feature=";
         # In case Number and Type aren't adjacent to each other
         # $return[$featIdx] = [$number, $type];
@@ -565,6 +576,7 @@ sub _extractHeader {
       my $infoName = $self->{_infoFeatureNames}{$feature} || $feature;
 
       if ( index( $h, "INFO\=\<ID\=$infoName," ) > 0 ) {
+
         # my $vcfName = "$feature=";
         # In case Number and Type aren't adjacent to each other
         # $return[$featIdx] = [$number, $type];
@@ -597,11 +609,13 @@ sub _extractFeatures {
   my $val;
 
   my $totalNeeded = @returnData + $self->{_numFilters};
+
   # $arr holds
   # 1) field name
   # 2) index in intermediate annotation
   # 3) index in database
   for my $arr ( @{ $self->{_headerFeatures} } ) {
+
     # $arr->[0] is the fieldName
     # $arr->[1] is the field idx
     if ( $self->hasTransform( $arr->[0] ) ) {
@@ -616,6 +630,7 @@ sub _extractFeatures {
   my $alleleIdx = $fieldsAref->[$multiAlleleIdx];
 
   for my $info ( split ';', $fieldsAref->[$infoIdx] ) {
+
     # If # found == scalar @{$self->features}
     if ( $found == $totalNeeded ) {
       last;

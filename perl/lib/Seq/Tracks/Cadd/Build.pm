@@ -1,6 +1,7 @@
 use 5.10.0;
 use strict;
 use warnings;
+
 # Adds cadd data to our main database
 # Reads CADD's bed-like format
 package Seq::Tracks::Cadd::Build;
@@ -160,6 +161,7 @@ sub buildTrack {
     my $isBed;
 
     if ( @headerFields == 7 ) {
+
       # It's the bed-like format
       $based = 0;
       $isBed = 1;
@@ -195,8 +197,8 @@ sub buildTrack {
     my @fields;
 
     my ( $chr, $wantedChr, $dbPosition );
-    my ( @caddData, $caddRef, $dbData, $assemblyRefBase, $altAllele, $refBase,
-      $phredScoresAref );
+    my ( @caddData, $caddRef, $dbData, $assemblyRefBase, $altAllele,
+      $refBase, $phredScoresAref );
 
     # Manage our own cursors, to improve performance
     my $cursor;
@@ -219,9 +221,12 @@ sub buildTrack {
       $chr = $self->normalizedWantedChr->{ $fields[0] };
 
       #If the chromosome is new, write any data we have & see if we want new one
-      if ( !defined $wantedChr || ( !defined $chr || $wantedChr ne $chr ) ) {
+      if ( !defined $wantedChr
+        || ( !defined $chr || $wantedChr ne $chr ) )
+      {
         # We switched chromosomes
         if ( defined $wantedChr ) {
+
           #Clean up the database, commit & close any cursors, free memory;
           $self->db->cleanUp();
           undef $cursor;
@@ -273,6 +278,7 @@ sub buildTrack {
       # because we delay commits to increase performance
       if ( defined $lastPosition && $lastPosition != $dbPosition ) {
         if ( defined $skipSites{"$wantedChr\_$lastPosition"} ) {
+
           #use debug because this logs hundreds of MB of data for lifted over hg38, and never seen a mistake
           #can have billions of messages, avoid string copy by checking if would log/print anything
           #From Seq::Role::Message
@@ -292,9 +298,11 @@ sub buildTrack {
 
           #Can delete because order guaranteed
           delete $skipSites{"$wantedChr\_$lastPosition"};
+
           # There is nothing to write in this case since sorting is guaranteed
         }
         elsif ( !@caddData ) {
+
           # Could occur if we skipped the lastPosition because refBase didn't match
           # assemblyRefBase
           $self->log( 'warn',
@@ -318,6 +326,7 @@ sub buildTrack {
           # When lifted over, reference base is not lifted, can cause mismatch
           # In these cases it makes no sense to store this position's CADD data
           if ( $assemblyRefBase ne $caddRef ) {
+
             # Don't log, in hg38 case there will be much of the genome logged
             $changedRefPositions++;
 
@@ -331,6 +340,7 @@ sub buildTrack {
               $self->_accumulateScores( $wantedChr, \@caddData, $caddRef, $lastPosition );
 
             if ( !defined $phredScoresAref ) {
+
               # Sorted guaranteed, but no score found
               # This can actually happen as a result of liftover
               # chr22 20668231 has 6 scores, because liftOver mapped 2 different positions
@@ -419,6 +429,7 @@ sub buildTrack {
       # This is NOT the same thing as the multiple base call that CADD sometimes
       # uses for the reference (e.g and "M", or "R")
       if ( $caddRef ne $refBase ) {
+
         # Mark for $missingValue insertion
         $skipSites{"$wantedChr\_$lastPosition"} = "multi_ref";
         $multiRefPositions++;
@@ -432,7 +443,9 @@ sub buildTrack {
       # If no phastIdx found for this site, there cannot be 3 scores accumulated
       # so mark it as for skipping; important because when out of order
       # we may have cryptic 3-mers, which we don't want to insert
-      if ( !defined $fields[$phastIdx] || !looks_like_number( $fields[$phastIdx] ) ) {
+      if ( !defined $fields[$phastIdx]
+        || !looks_like_number( $fields[$phastIdx] ) )
+      {
         # Mark for undef insertion
         $skipSites{"$wantedChr\_$lastPosition"} = "missing_score";
         $missingScorePositions++;
@@ -470,6 +483,7 @@ sub buildTrack {
 
         # always safe to delete here; last time we'll check it
         delete $skipSites{"$wantedChr\_$lastPosition"};
+
         #Since sorting is guaranteed, no need to write anything
       }
       else {
@@ -481,6 +495,7 @@ sub buildTrack {
 
           $self->log( 'debug',
             $self->name . ": $wantedChr\:$lastPosition: Ref doesn't match. Skipping." );
+
           #Since sorting is guaranteed, no need to write anything
         }
         else {
@@ -591,11 +606,13 @@ sub buildTrack {
 }
 
 sub _accumulateScores {
+
   #my ($self, $chr, $dataAref, $caddRef, $lastPosition) = @_;
   #    $_[0] , $_[1], $_[2],   $_[3],    $_[4]
 
   # (@{$dataAref} != 3)
   if ( @{ $_[2] } != 3 ) {
+
     # May be called before 3 scores accumulated
     return undef;
   }
@@ -604,8 +621,10 @@ sub _accumulateScores {
   # Make sure we place them in the correct order
   my @phredScores;
   my $index;
+
   #            ( @{$dataAref} )
   for my $aref ( @{ $_[2] } ) {
+
     #In the aref, first position is the altAllele, 2nd is the phred score
     #                   {$caddRef}
     $index = $order->{ $_[3] }{ $aref->[0] };
@@ -613,6 +632,7 @@ sub _accumulateScores {
     # checks whether ref and alt allele are ACTG
     if ( !defined $index ) {
       my $err = $_[0]->name . ": $_[1]\:$_[4]: no score possible for altAllele $aref->[0]";
+
       #      $self->log
       $_[0]->log( 'fatal', $err );
     }

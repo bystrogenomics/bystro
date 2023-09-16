@@ -72,7 +72,6 @@ tracks:
         ALL_PMIDS: pmids
         ORIGIN: origin
         XREFS: xrefs
-        LAST_EVALUATED: last_evaluated
       local_files:
         - clinvar_alleles.single.b38.vcf.1lines.gz
       name: clinvar.match

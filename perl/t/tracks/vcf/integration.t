@@ -27,7 +27,11 @@ my $dbPath = $file->{database_dir};
 path($dbPath)->remove_tree( { keep_root => 1 } );
 
 my $seq = MockBuilder->new_with_config(
-  { config => path('./t/tracks/vcf/test.hg38.chr22.yml')->absolute, debug => 0 } );
+  {
+    config => path('./t/tracks/vcf/test.hg38.chr22.yml')->absolute,
+    debug  => 0
+  }
+);
 
 my $tracks     = $seq->tracksObj;
 my $refBuilder = $tracks->getRefTrackBuilder();

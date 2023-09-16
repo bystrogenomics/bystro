@@ -1,8 +1,8 @@
 """
-This provides the base class for covariance estimation in terms of the 
+This provides the base class for covariance estimation in terms of the
 precision matrix. While in the futre I'll rewrite separate methods for some
-of these to take advantage of the fact that we estimated the precision 
-matrix rather than covariance matrix, for now I just invert precision and 
+of these to take advantage of the fact that we estimated the precision
+matrix rather than covariance matrix, for now I just invert precision and
 use the covariance matrix methods. Yuck right?
 
 Objects
@@ -10,10 +10,10 @@ Objects
 BasePrecision
 
     get_covariance()
-        Gets the precision matrix defined as the inverse of the covariance 
+        Gets the precision matrix defined as the inverse of the covariance
 
     get_stable_rank()
-        Returns the stable rank defined as 
+        Returns the stable rank defined as
         ||A||_F^2/||A||^2
 
     predict(Xobs,idxs)
@@ -25,7 +25,7 @@ BasePrecision
 
     conditional_score_samples(X,idxs)
         log p(X[idx==1]|X[idx==0],covariance)
-    
+
     marginal_score(X,idxs)
         mean(log p(X[idx==1]|covariance))
 
@@ -40,9 +40,9 @@ BasePrecision
 
     --------------------
     entropy()
-        Computes the entropy of a Gaussian distribution parameterized by 
+        Computes the entropy of a Gaussian distribution parameterized by
         covariance.
-    
+
     entropy_subset(idxs)
         Computes the entropy of a subset of the covariates
 
@@ -91,9 +91,7 @@ class BasePrecision(BaseCovariance):
     def conditional_score(self, X, idxs, weights=None):
         if not hasattr(self, "covariance"):
             self.covariance = la.inv(self.precision)
-        return super(BasePrecision, self).conditional_score(
-            X, idxs, weights=weights
-        )
+        return super(BasePrecision, self).conditional_score(X, idxs, weights=weights)
 
     def conditional_score_samples(self, X, idxs):
         if not hasattr(self, "covariance"):
@@ -103,9 +101,7 @@ class BasePrecision(BaseCovariance):
     def marginal_score(self, X, idxs, weights=None):
         if not hasattr(self, "covariance"):
             self.covariance = la.inv(self.precision)
-        return super(BasePrecision, self).marginal_score(
-            X, idxs, weights=weights
-        )
+        return super(BasePrecision, self).marginal_score(X, idxs, weights=weights)
 
     def marginal_score_samples(self, X, idxs):
         if not hasattr(self, "covariance"):

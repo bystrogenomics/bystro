@@ -115,6 +115,7 @@ sub go {
     my $outPath;
 
     my $outPathBase;
+
     # If this is a compressed file, strip the preceeding extension
     if ( $inPath =~ /.gz$/ ) {
       $outPathBase = substr( $inPath,      0, rindex( $inPath,      '.' ) );
@@ -174,6 +175,7 @@ sub go {
 
       # May be unwanted if coming from CADD directly
       if ( !exists $wantedChrs{$chr} ) {
+
         #https://ideone.com/JDtX3z
         #CADD files don't use 'chr', but our cadd bed-like files do
         if ( index( $chr, 'chr' ) == -1 ) {

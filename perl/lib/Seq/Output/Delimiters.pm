@@ -50,6 +50,7 @@ has cleanDelims => (
     my $reEnd = qr/[$vD$pD$oD$gr]+$/;
 
     return sub {
+
       #my ($line) = @_;
       #    $_[0]
 
@@ -75,6 +76,7 @@ has splitByField => (
     # Returns unmodified value, or a list of split values
     # Used in list context either 1 or many values emitted
     return sub {
+
       #my ($line) = @_;
       #    $_[0]
 
@@ -100,6 +102,7 @@ has splitByPosition => (
     # Returns unmodified value, or a list of split values
     # Used in list context either 1 or many values emitted
     return sub {
+
       #my ($line) = @_;
       #    $_[0]
 
@@ -127,6 +130,7 @@ has splitByOverlap => (
     # Returns unmodified value, or a list of split values
     # Used in list context either 1 or many values emitted
     return sub {
+
       #my ($line) = @_;
       #    $_[0]
 
@@ -154,6 +158,7 @@ has splitByValue => (
     # Returns unmodified value, or a list of split values
     # Used in list context either 1 or many values emitted
     return sub {
+
       #my ($line) = @_;
       #    $_[0]
 

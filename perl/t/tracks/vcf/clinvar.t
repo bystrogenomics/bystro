@@ -96,6 +96,7 @@ my $ucIdx         = $vcf->getFieldDbName('uncertain_significance');
 my $benignIdx     = $vcf->getFieldDbName('benign');
 my $lbenignIdx    = $vcf->getFieldDbName('likely_benign');
 my $rsIdx         = $vcf->getFieldDbName('review_status');
+
 # we specify "ALL_TRAITS" => 'traits' in YAML
 my $traitsIdx = $vcf->getFieldDbName('traits');
 

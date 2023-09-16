@@ -31,16 +31,12 @@ EXAMPLE_USER = UserProfile(
     email="test@gmail.com",
     accounts=["bystro"],
     role="user",
-    lastLogin=datetime.strptime(EXAMPLE_DATE_STRING, EXAMPLE_FORMAT_STRING).replace(
-        tzinfo=timezone.utc
-    ),
+    lastLogin=datetime.strptime(EXAMPLE_DATE_STRING, EXAMPLE_FORMAT_STRING).replace(tzinfo=timezone.utc),
 )
 
 EXAMPLE_SIGNUP_RESPONSE = SignupResponse(access_token="20302493029=02934")
 
-EXAMPLE_CACHED_AUTH = CachedAuth(
-    email="blah", url="http://localhost", access_token="blah"
-)
+EXAMPLE_CACHED_AUTH = CachedAuth(email="blah", url="http://localhost", access_token="blah")
 
 EXAMPLE_JOB = {
     "_id": "64db4e67fb86b79cbda4f386",
@@ -100,9 +96,7 @@ def test_load_state_existing_file(mocker):
 
     mocker.patch(
         "builtins.open",
-        mocker.mock_open(
-            read_data=json.encode(EXAMPLE_CACHED_AUTH).decode("utf-8")
-        ),
+        mocker.mock_open(read_data=json.encode(EXAMPLE_CACHED_AUTH).decode("utf-8")),
     )
     result = load_state("./")
 
@@ -119,9 +113,7 @@ def test_save_state(mocker):
     mock_open = mocker.patch("builtins.open", mocker.mock_open())
 
     save_state(EXAMPLE_CACHED_AUTH, "./", print_result=False)
-    mock_open.assert_called_once_with(
-        "./bystro_authentication_token.json", "w", encoding="utf-8"
-    )
+    mock_open.assert_called_once_with("./bystro_authentication_token.json", "w", encoding="utf-8")
 
 
 @pytest.mark.parametrize(
@@ -178,15 +170,11 @@ def test_get_job_fail_validation(mocker):
         return_value=(EXAMPLE_CACHED_AUTH, {"Authorization": "Bearer TOKEN"}),
     )
 
-    with pytest.raises(
-        ValueError, match="Please specify either a job id or a job type"
-    ):
+    with pytest.raises(ValueError, match="Please specify either a job id or a job type"):
         args = Namespace(dir="./", type=None, id=None)
         get_jobs(args, print_result=False)
 
-    with pytest.raises(
-        ValueError, match="Please specify either a job id or a job type, not both"
-    ):
+    with pytest.raises(ValueError, match="Please specify either a job id or a job type, not both"):
         args = Namespace(dir="./", type="completed", id="1234")
         get_jobs(args, print_result=False)
 
@@ -242,9 +230,7 @@ def test_get_job(mocker):
 
     mocker.patch(
         "requests.get",
-        return_value=mocker.Mock(
-            status_code=200, text=json.encode(EXAMPLE_JOB).decode("utf-8")
-        ),
+        return_value=mocker.Mock(status_code=200, text=json.encode(EXAMPLE_JOB).decode("utf-8")),
     )
 
     args = Namespace(dir="./", id="12341", type=None)
@@ -264,24 +250,18 @@ def test_signup(mocker):
     )
     mocker.patch(
         "requests.put",
-        return_value=mocker.Mock(
-            status_code=200, text=json.encode(expected_response).decode("utf-8")
-        ),
+        return_value=mocker.Mock(status_code=200, text=json.encode(expected_response).decode("utf-8")),
     )
     email = "test@example.com"
     host = "http://localhost"
     port = 8080
-    args = Namespace(
-        dir="./", email=email, password="password", name="test", host=host, port=port
-    )
+    args = Namespace(dir="./", email=email, password="password", name="test", host=host, port=port)
 
     response = signup(args, print_result=False)
 
     url = _fq_host(Namespace(host=host, port=port))
 
-    expected_return = CachedAuth(
-        email=email, url=url, access_token=expected_response.access_token
-    )
+    expected_return = CachedAuth(email=email, url=url, access_token=expected_response.access_token)
     assert response == expected_return
 
 
@@ -292,9 +272,7 @@ def test_get_user(mocker):
     )
     mocker.patch(
         "requests.get",
-        return_value=mocker.Mock(
-            status_code=200, text=json.encode(EXAMPLE_USER).decode("utf-8")
-        ),
+        return_value=mocker.Mock(status_code=200, text=json.encode(EXAMPLE_USER).decode("utf-8")),
     )
     args = Namespace(dir="./", email="test@example.com", password="password")
     user = get_user(args, print_result=False)

@@ -25,6 +25,7 @@ use Seq::Output::Delimiters;
 use String::Strip qw/StripLTSpace/;
 
 extends 'Seq::Tracks::Base';
+
 # All builders need getReadFh
 with 'Seq::Role::IO';
 
@@ -157,6 +158,7 @@ sub BUILD {
   $self->{_cleanDelims} = $d->cleanDelims;
   $self->{_missChar}    = $d->emptyFieldChar;
   $self->{_replChar}    = $d->globalReplaceChar;
+
   # Commit, sync, and remove any databases opened
   # This is useful because locking may occur if there is an open transaction
   # before fork(), and to make sure that any database meta data is properly
@@ -197,6 +199,7 @@ around BUILDARGS => sub {
 state $converter = Seq::Tracks::Base::Types->new();
 
 sub coerceFeatureType {
+
   #my ($self, $feature, $data) = @_;
   # $self == $_[0] , $feature == $_[1], $data == $_[2]
 
@@ -312,6 +315,7 @@ sub passesFilter {
         . ", uses an  operator $infix that isn\'t supported.
       Therefore this filter won\'t be run, and all values for $featureName will be allowed"
     );
+
     #allow all
     $cachedFilters->{$featureName} = sub { return 1; };
   }
@@ -350,6 +354,7 @@ sub transformField {
   if ( $self->_isTransformOperator($leftHand) ) {
     if ( $leftHand eq '.' ) {
       $codeRef = sub {
+
         # my $fieldValue = shift;
         # same as $_[0];
 
@@ -358,6 +363,7 @@ sub transformField {
     }
     elsif ( $leftHand eq '-' ) {
       $codeRef = sub {
+
         # my $fieldValue = shift;
         # same as $_[0];
 
@@ -366,6 +372,7 @@ sub transformField {
     }
     elsif ( $leftHand eq '+' ) {
       $codeRef = sub {
+
         # my $fieldValue = shift;
         # same as $_[0];
 
@@ -374,6 +381,7 @@ sub transformField {
     }
     elsif ( $leftHand eq 'split' ) {
       $codeRef = sub {
+
         # my $fieldValue = shift;
         # same as $_[0];
         my @out;
@@ -388,6 +396,7 @@ sub transformField {
         # ordered to fall out of order
         # evalute the choice on line 349
         foreach ( split( /$rightHand/, $_[0] ) ) {
+
           # Remove trailing/leading whitespace
           $_ =~ s/^\s+//;
           $_ =~ s/\s+$//;
@@ -401,7 +410,9 @@ sub transformField {
       }
     }
     elsif ( $leftHand eq 'replace' ) {
-      if ( substr( $rightHand, 0, 1 ) ne '/' || substr( $rightHand, -1, 1 ) ne '/' ) {
+      if ( substr( $rightHand, 0, 1 ) ne '/'
+        || substr( $rightHand, -1, 1 ) ne '/' )
+      {
         $self->log( 'fatal',
           $self->name
             . ": build_field_transformation 'replace' expects /from/to/, found $rightHand" );
@@ -413,6 +424,7 @@ sub transformField {
       my $to   = $parts[2];
 
       $codeRef = sub {
+
         # my $fieldValue = shift;
         #    $_[0]
         $_[0] =~ s/$from/$to/gs;
@@ -422,9 +434,11 @@ sub transformField {
     }
   }
   elsif ( $self->_isTransformOperator($rightHand) ) {
+
     # Append text in the other direction
     if ( $rightHand eq '.' ) {
       $codeRef = sub {
+
         # my $fieldValue = shift;
         # same as $_[0];
         return $leftHand . $_[0];
@@ -485,10 +499,12 @@ sub makeMergeFunc {
           next;
         }
 
-        $updated[$i] = [ @{ $oldTrackVal->[$i] }, $newTrackVal->[$i] ];
+        $updated[$i] =
+          [ @{ $oldTrackVal->[$i] }, $newTrackVal->[$i] ];
       }
 
       if ( !$seen ) {
+
         # commits automatically, so that we are ensured that overlaps
         # called from different threads succeed
         $self->db->dbPut( "$tempDbName/$chr", $pos, 1 );
@@ -508,6 +524,7 @@ sub makeMergeFunc {
 
 # TODO: Allow to be configured on per-track basis
 sub _stripAndCoerceUndef {
+
   #my ($self, $dataStr) = @_;
 
   # TODO: This will be configurable, per-track
@@ -581,6 +598,7 @@ sub safeCloseBuilderFh {
   my $err = $self->safeClose($fh);
 
   if ($err) {
+
     #Can happen when closing immediately after opening
     if ( $? != 13 ) {
       $self->log( $errCode, $self->name . ": Failed to close $fileName: $err ($?)" );

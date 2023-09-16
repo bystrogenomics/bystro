@@ -30,6 +30,7 @@ use Parallel::ForkManager;
 use Scalar::Util qw/looks_like_number/;
 use DDP;
 use List::Util qw/max min/;
+
 # http://fastcompression.blogspot.com/2014/07/xxhash-wider-64-bits.html
 # much faster than md5, no cryptographic guarantee should suffice for our use
 # Unfortunately, that turned out not to be true, failed tests
@@ -40,6 +41,7 @@ use Data::MessagePack;
 use Seq::Tracks;
 
 extends 'Seq::Tracks::Build';
+
 #exports regionTrackPath
 with 'Seq::Tracks::Region::RegionTrackPath';
 
@@ -100,12 +102,14 @@ around BUILDARGS => sub {
   my ( $orig, $self, $data ) = @_;
 
   if ( !defined $data->{local_files} ) {
+
     # Careful with the reference
     $data->{local_files} = $data->{ref}->local_files;
   }
 
   # We require non-empty 'from'
   if ( !$data->{from} ) {
+
     # A nicer exit
     $self->log( 'fatal', "'from' property must be specified for 'nearest' tracks" );
   }
@@ -138,8 +142,11 @@ around BUILDARGS => sub {
   # allows us to consider from .. to rather than from .. to - 1, from - 1 .. to, etc
   # TODO: don't assume UCSC-style genes, and require a build_field_transformation
   # For anything other than 'from' as 0-based closed and 'to' as 0-based open (+1 of true)
-  if ( $data->{build_field_transformations}{ $data->{from} }
-    && ( !$data->{to} || $data->{build_field_transformations}{ $data->{to} } ) )
+  if (
+    $data->{build_field_transformations}{ $data->{from} }
+    && (!$data->{to}
+      || $data->{build_field_transformations}{ $data->{to} } )
+    )
   {
     return $self->$orig($data);
   }
@@ -149,7 +156,9 @@ around BUILDARGS => sub {
     $data->{build_field_transformations}{ $data->{from} } = '- 1';
   }
 
-  if ( $data->{to} && ( $data->{to} eq 'txEnd' || $data->{to} eq 'cdsEnd' ) ) {
+  if ( $data->{to}
+    && ( $data->{to} eq 'txEnd' || $data->{to} eq 'cdsEnd' ) )
+  {
     $data->{build_field_transformations}{ $data->{to} } = '- 1';
   }
 
@@ -191,8 +200,8 @@ sub buildTrack {
 
   my $txNumber;
 
-  my @fieldDbNames =
-    sort { $a <=> $b } map { $self->getFieldDbName($_) } @{ $self->features };
+  my @fieldDbNames = sort { $a <=> $b }
+    map { $self->getFieldDbName($_) } @{ $self->features };
 
   my %completedChrs;
   $pm->run_on_finish(
@@ -224,6 +233,7 @@ sub buildTrack {
 
   # Assume one file per loop, or all sites in one file. Tracks::Build warns if not
   for my $file (@allFiles) {
+
     # Although this should be unnecessary, environments must be created
     # within the process that uses them
     # This provides a measure of safety
@@ -300,7 +310,9 @@ sub buildTrack {
       my $chr = $self->normalizedWantedChr->{ $fields[ $allIdx{ $self->chromField } ] };
 
       # falsy value is ''
-      if ( !defined $wantedChr || ( !defined $chr || $wantedChr ne $chr ) ) {
+      if ( !defined $wantedChr
+        || ( !defined $chr || $wantedChr ne $chr ) )
+      {
         $wantedChr = $self->chrWantedAndIncomplete($chr);
       }
 
@@ -513,6 +525,7 @@ sub _writeNearestData {
     }
 
     if ( defined $previousLongestEnd ) {
+
       # Here we can assume that both $start and $longestPreviousEnd are both 0-based, closed
       # and so the first intergenic base is + 1 of the longestPreviousTxEnd and - 1 of the current start
       #say previousLongestEnd == 1
@@ -532,19 +545,21 @@ sub _writeNearestData {
 
     # Consider/store intergenic things (note: if previousLongestEnd > $start, last tx overlapped this one)
     if ( $self->storeNearest && $previousLongestEnd < $start ) {
+
       # we force both the end and start to be 0-based closed, so start from +1 of previous end
       # and - 1 of the start
       POS_LOOP: for my $pos ( $previousLongestEnd + 1 .. $start - 1 ) {
         $cursor //= $self->db->dbStartCursorTxn($chr);
 
         if ( $pos >= $midPoint ) {
+
           #Args:             $cursor, $chr, $dbName, $pos, $newValue
           $self->db->dbPatchCursorUnsafe( $cursor, $chr, $self->dbName, $pos, $txNumber );
         }
         else {
           #Args:             $cursor, $chr, $dbName, $pos, $newValue
-          $self->db->dbPatchCursorUnsafe( $cursor, $chr, $self->dbName, $pos,
-            $previousTxNumber );
+          $self->db->dbPatchCursorUnsafe( $cursor, $chr,
+            $self->dbName, $pos, $previousTxNumber );
         }
 
         if ( $count > $self->commitEvery ) {
@@ -562,9 +577,11 @@ sub _writeNearestData {
 
     # If we want to store the stuff in the regions themselves, do that
     if ( $self->storeOverlap ) {
+
       # Remember, here longest end is 0-based, closed (last pos is the last 0-based
       # position in the transcript)
       for my $pos ( $start .. $longestEnd ) {
+
         # We may clear this at any point, to prpevent db from over-growing
         $cursor //= $self->db->dbStartCursorTxn($chr);
 
@@ -650,14 +667,16 @@ sub _writeNearestData {
   }
 
   if ( $self->storeNearest ) {
+
     # Once we've reached the last transcript, we still likely have some data remaining
-    END_LOOP: for my $pos ( $previousLongestEnd + 1 .. $genomeNumberOfEntries - 1 ) {
+    END_LOOP:
+    for my $pos ( $previousLongestEnd + 1 .. $genomeNumberOfEntries - 1 ) {
       # We may clear this at any point, to prpevent db from over-growing
       $cursor //= $self->db->dbStartCursorTxn($chr);
 
       #Args:             $cursor, $chr, $dbName, $pos, $newValue)
-      $self->db->dbPatchCursorUnsafe( $cursor, $chr, $self->dbName, $pos,
-        $previousTxNumber );
+      $self->db->dbPatchCursorUnsafe( $cursor, $chr, $self->dbName,
+        $pos, $previousTxNumber );
 
       if ( $count > $self->commitEvery ) {
         $self->db->dbEndCursorTxn($chr);
@@ -759,9 +778,11 @@ sub _makeUniqueRegionData {
 
     my $minFrom;
     my $maxTo;
+
     # Assumes arrays of equal length
     #Expects val to have:
     for my $val (@$aRef) {
+
       # Because we calculate uniqueness based all keys but from and to
       # it is important to calculate the min and max bounds here
       # as the consumer expects the maximum overlapping regions
@@ -781,6 +802,7 @@ sub _makeUniqueRegionData {
       my @nonFromTo;
 
       for my $i (@nonFromToFeatures) {
+
         #not as clean as having $aRef contain only the [1] values, but maybe less meme
         push @nonFromTo, defined $val->[1][$i] ? $val->[1][$i] : "";
       }
@@ -834,6 +856,7 @@ sub _makeUniqueRegionData {
         # val1, val2, and val3 are duplicates
         # If only val1 and val2 are duplicates, then we must keep [val1, val2, val3]
         if ( @uniqInner == 1 ) {
+
           # Cannot use $uniqInnr[0] because we may not always be able to distinguish
           # multiple scalar values from N overlapping regions
           # or a single region with N values

@@ -7,6 +7,7 @@ package MockBuild;
 use Mouse 2;
 use Seq::Tracks::Build;
 extends "Seq::Base";
+
 #TODO: allow building just one track, identified by name
 has config => ( is => 'ro', isa => 'Str', required => 1 );
 
@@ -61,6 +62,7 @@ my $clinvarTrackIndex = $clinvarTrackGetter->dbName;
 
 my $clinvarDataAref = $dataAref->[$clinvarTrackIndex];
 my @clinvarData     = @$clinvarDataAref;
+
 #p @clinvarData;
 
 ok( $clinvarData[0][0] == 24776 && $clinvarData[0][1] == 99999 );
@@ -70,6 +72,7 @@ ok( $clinvarData[2][0] eq "Pathogenic" && $clinvarData[2][1] eq "Pathogenic" );
 ok(    $clinvarData[3][0] eq "deletion"
     && $clinvarData[3][1] eq "single nucleotide variant" );
 ok( $clinvarData[4][0] eq "germline" && $clinvarData[4][1] eq "germline" );
+
 #numberSubmitters
 ok( $clinvarData[5][0] == 1 && $clinvarData[5][1] == 1 );
 ok(
@@ -109,6 +112,7 @@ $dataAref = $db->dbReadOne( 'chrY', 2787334 - 1 );
 
 $clinvarDataAref = $dataAref->[$clinvarTrackIndex];
 @clinvarData     = @$clinvarDataAref;
+
 #p @clinvarData;
 
 ok( $clinvarData[0] == 24780 );
@@ -117,6 +121,7 @@ ok(    $clinvarData[1][0] eq "46,XY sex reversal, type 1"
 ok( $clinvarData[2] eq "Pathogenic" );
 ok( $clinvarData[3] eq "single nucleotide variant" );
 ok( $clinvarData[4] eq "germline" );
+
 #numberSubmitters
 ok( $clinvarData[5] == 1 );
 ok( !defined $clinvarData[6],

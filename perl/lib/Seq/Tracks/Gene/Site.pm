@@ -70,7 +70,8 @@ state $combinedMap;
 if ( !$combinedMap ) {
   foreach ( keys %{ $siteTypeMap->siteTypeMap } ) {
     for my $num ( 0, 1 ) {
-      $combinedMap->{ $_ - $num } = [ $num ? '+' : '-', $siteTypeMap->siteTypeMap->{$_} ];
+      $combinedMap->{ $_ - $num } =
+        [ $num ? '+' : '-', $siteTypeMap->siteTypeMap->{$_} ];
     }
   }
 }
@@ -105,7 +106,10 @@ sub pack {
   push @outArray, $siteTypeNum - $strandMap->{$strand};
 
   if ( defined $codonNumber || defined $codonPosition || defined $codonSeq ) {
-    if ( !defined $codonNumber && !defined $codonPosition && !defined $codonSeq ) {
+    if ( !defined $codonNumber
+      && !defined $codonPosition
+      && !defined $codonSeq )
+    {
       $self->log( 'fatal',
         "Codons must be given codonNumber, codonPosition, and codonSeq" );
     }
@@ -136,6 +140,7 @@ sub pack {
 
   return \@outArray;
 }
+
 #@param <Seq::Tracks::Gene::Site> $self
 #@param <ArrayRef> $codon
 # This function assumes that the first value in any site array is the txNumber
@@ -143,6 +148,7 @@ sub pack {
 # The first value of that array is a combined siteType and strand
 # Note also that we store codonPosition as 0 index (to try to store as 1/2 byte)
 sub unpack {
+
   # my $self, $codon
   # $_[0],    $_[1]
 
@@ -151,10 +157,12 @@ sub unpack {
   # So if the first value isn't an array, we have a single transcript
   #! ref $codon->[0]
   if ( !ref $_[1]->[0] ) {
+
     # If the length of our only codon is 2, which happens in intergenic cases
     # Then we return just the transcript number, and [strand, siteType]
     #   #@{$codon} == 2
     if ( @{ $_[1] } == 2 ) {
+
       #returns: transcriptNum, [<Str>$strand, <Str>$siteType ]
       #      ( $codon->[0]),[( @{ $combinedMap->{ $codon->[1]} })  ]
       return ( $_[1]->[0], [ ( @{ $combinedMap->{ $_[1]->[1] } } ) ] );
@@ -175,14 +183,17 @@ sub unpack {
 
   my ( @site, @txNumbers );
   foreach ( @{ $_[1] } ) {
+
     # The first value is txNumber, and is always present
     push @txNumbers, $_->[0];
 
     if ( @{$_} == 2 ) {
+
       # [ ( @{ $combinedMap->{ $_->[1] } } ) ]
       push @site, [ ( @{ $combinedMap->{ $_->[1] } } ) ];
       next;
     }
+
     #push @site,[ ( @{ $combinedMap->{ $_->[1] } } ), $_->[$codonNumberIdx], $_->[$codonPositionIdx] + 1,
     # $codonMap->num2Codon( $_->[$codonSequenceIdx] ) ];
     push @site,

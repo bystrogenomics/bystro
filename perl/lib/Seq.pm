@@ -90,6 +90,7 @@ sub annotate {
 }
 
 sub annotateFile {
+
   #Inspired by T.S Wingo: https://github.com/wingolab-org/GenPro/blob/master/bin/vcfToSnp
   my $self = shift;
   my $type = shift;
@@ -159,6 +160,7 @@ sub annotateFile {
 
   my $outputter =
     Seq::Output->new( { header => $finalHeader, trackOutIndices => \@allOutIndices } );
+
   # my $outputFn;
   # if($self->outputJson) {
   #   $outputFn = \&encode_json;
@@ -184,6 +186,7 @@ sub annotateFile {
   # my %normalizedNames = %{$self->normalizedWantedChrs};
 
   mce_loop_f {
+
     #my ($mce, $slurp_ref, $chunk_id) = @_;
     #    $_[0], $_[1],     $_[2]
     #open my $MEM_FH, '<', $slurp_ref; binmode $MEM_FH, ':raw';
@@ -231,6 +234,7 @@ sub annotateFile {
 
       if ( !defined $dataFromDbAref ) {
         $self->_errorWithCleanup("Wrong assembly? $fields[0]\: $fields[1] not found.");
+
         # Store a reference to the error, allowing us to exit with a useful fail message
         MCE->gather( 0, 0, "Wrong assembly? $fields[0]\: $fields[1] not found." );
         $_[0]->abort();
@@ -238,14 +242,18 @@ sub annotateFile {
       }
 
       if ( length( $fields[4] ) > 1 ) {
+
         # INS or DEL
         if ( looks_like_number( $fields[4] ) ) {
+
           # We ignore -1 alleles, treat them just like SNPs
           if ( $fields[4] < -1 ) {
+
             # Grab everything from + 1 the already fetched position to the $pos + number of deleted bases - 1
             # Note that position_1_based - (negativeDelLength + 2) == position_0_based + (delLength - 1)
             if ( $fields[4] < $maxDel ) {
               @indelDbData = ( $fields[1] .. $fields[1] - ( $maxDel + 2 ) );
+
               # $self->log('info', "$fields[0]:$fields[1]: long deletion. Annotating up to $maxDel");
             }
             else {
@@ -284,7 +292,8 @@ sub annotateFile {
         ############### Gather all track data (besides reference) #################
         for my $posIdx ( 0 .. $#indelDbData ) {
           for my $trackIndex (@trackIndicesExceptReference) {
-            $fields[ $outIndicesExceptReference[$trackIndex] ] //= [];
+            $fields[ $outIndicesExceptReference[$trackIndex] ] //=
+              [];
 
             $trackGettersExceptReference[$trackIndex]->get(
               $indelDbData[$posIdx], $fields[0], $indelRef[$posIdx], $fields[4], $posIdx,
@@ -392,6 +401,7 @@ sub makeLogProgressAndPrint {
     $throttleThreshold = 1e4;
   }
   return sub {
+
     #<Int>$annotatedCount, <Int>$skipCount, <Str>$err, <Str>$outputLines, <Bool> $forcePublish = @_;
     ##    $_[0],          $_[1]           , $_[2],     $_[3].           , $_[4]
     if ( $_[2] ) {
@@ -403,7 +413,9 @@ sub makeLogProgressAndPrint {
       $thresholdAnn     += $_[0];
       $thresholdSkipped += $_[1];
 
-      if ( $_[4] || $thresholdAnn + $thresholdSkipped >= $throttleThreshold ) {
+      if ( $_[4]
+        || $thresholdAnn + $thresholdSkipped >= $throttleThreshold )
+      {
         $totalAnnotated += $thresholdAnn;
         $totalSkipped   += $thresholdSkipped;
 

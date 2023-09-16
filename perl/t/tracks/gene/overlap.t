@@ -133,6 +133,7 @@ my $intronic       = $siteTypeMap->intronicSiteType;
 
 # NM_001009943 index; has some overlapping values in mRNA, rfamAcc, description
 my $targetIdx;
+
 # NM_001009941
 my $target2Idx;
 my $expSpIds = join( "\t", sort { $a cmp $b } ( 'F8WEI4', 'Q6P6B7' ) );
@@ -173,7 +174,8 @@ for my $pos ( 0 .. $dbLen - 1 ) {
     ok( !ref $siteType );
 
     ok(
-      $txNumber == 2, "The 3rd transcript in the input file is NM_019046,
+      $txNumber == 2,
+      "The 3rd transcript in the input file is NM_019046,
       and we get the correct txNumber"
     );
     ok( $names eq 'NM_019046' );
@@ -191,6 +193,7 @@ for my $pos ( 0 .. $dbLen - 1 ) {
     # 16371 is exonStarts[1] which is closed interval (so no - 1 to get first base)
     if ( $pos > 966 - 1 && $pos < 16371 ) {
       if ( $pos == 966 || $pos == 967 ) {
+
         # First 2 bases are really the last; so first 2 should be spliceAcceptor
         # when on negative strand, instead of spliceDonor
         ok( $siteType eq $spliceAcceptor );
@@ -242,6 +245,7 @@ for my $pos ( 0 .. $dbLen - 1 ) {
     ok( $spIds2 eq $exp2SpIds );
     ok( $descs2 eq $exp2Desc );
   }
+
   #   ok($out->[$siteTypeIdx][0] eq $intronic);
 }
 

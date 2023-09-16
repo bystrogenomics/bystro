@@ -85,6 +85,7 @@ for my $pos ( 0 .. $#$mainDbAref ) {
   my $dbData = $mainDbAref->[$pos];
 
   my @out;
+
   # not an indel
   my $posIdx = 0;
   $geneGetter->get( $dbData, 'chrM', $refGetter->get($dbData), 'A', $posIdx, \@out );

@@ -86,6 +86,7 @@ has trackBuilders => (
 state $trackBuildersByName = {};
 
 sub getTrackBuilderByName {
+
   # my ($self, $name) = @_; #$_[1] == $name
   return $trackBuildersByName->{ $_[1] };
 }
@@ -93,6 +94,7 @@ sub getTrackBuilderByName {
 state $trackBuildersByType = {};
 
 sub getTrackBuildersByType {
+
   #my ($self, $type) = @_; #$_[1] == $type
   return $trackBuildersByType->{ $_[1] };
 }
@@ -112,6 +114,7 @@ has trackGetters => (
 state $trackGettersByName = {};
 
 sub getTrackGetterByName {
+
   #my ($self, $name) = @_; #$_[1] == $name
   return $trackGettersByName->{ $_[1] };
 }
@@ -119,6 +122,7 @@ sub getTrackGetterByName {
 state $trackGettersByType = {};
 
 sub getTrackGettersByType {
+
   # my ($self, $type) = @_; # $_[1] == $type
   return $trackGettersByType->{ $_[1] };
 }
@@ -262,6 +266,7 @@ sub _buildTrackGetters {
 
   my %seenTrackNames;
   my $seenRef = 0;
+
   # We may have previously configured this class in a long running process
   # If so, remove the tracks, free the memory
   _clearStaticGetters();
@@ -360,6 +365,7 @@ sub _buildTrackBuilders {
 
   my %seenTrackNames;
   my $seenRef;
+
   # We may have previously configured this class in a long running process
   # If so, remove the tracks, free the memory
   _clearStaticBuilders();
@@ -368,6 +374,7 @@ sub _buildTrackBuilders {
     if ( $trackHref->{ref} ) {
       $trackHref->{ref} = $trackBuildersByName->{ $trackHref->{ref} };
     }
+
     #class
     my $className = $self->_toTrackBuilderClass( $trackHref->{type} );
 

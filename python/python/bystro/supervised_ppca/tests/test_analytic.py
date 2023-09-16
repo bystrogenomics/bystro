@@ -11,9 +11,7 @@ def test_methods():
     W = rng.normal(size=(L, p))
     sigma = 0.2
     cov = np.dot(W.T, W) + sigma * np.eye(p)
-    X = st.multivariate_normal.rvs(
-        mean=np.zeros(p), cov=cov, size=N, random_state=1993
-    )
+    X = st.multivariate_normal.rvs(mean=np.zeros(p), cov=cov, size=N, random_state=1993)
     model = PPCAanalytic(n_components=L)
     model.fit(X)
     cov_est = model.get_covariance()

@@ -7,16 +7,17 @@ from msgspec import Struct
 
 class StatisticsOutputs(Struct, frozen=True):
     """
-        Paths to all possible Bystro statistics outputs
+    Paths to all possible Bystro statistics outputs
 
-        Attributes:
-            json: str
-                Basename of the JSON statistics file
-            tab: str
-                Basename of the TSV statistics file
-            qc: str
-                Basename of the QC statistics file
+    Attributes:
+        json: str
+            Basename of the JSON statistics file
+        tab: str
+            Basename of the TSV statistics file
+        qc: str
+            Basename of the QC statistics file
     """
+
     json: str
     tab: str
     qc: str
@@ -24,21 +25,22 @@ class StatisticsOutputs(Struct, frozen=True):
 
 class AnnotationOutputs(Struct, frozen=True):
     """
-        Paths to all possible Bystro annotation outputs
-        
-        Attributes:
-            output_dir: str
-                Output directory
-            archived: str
-                Basename of the archive
-            annotation: str
-                Basename of the annotation TSV file, inside the archive
-            sampleList: Optional[str]
-                Basename of the sample list file, inside the archive
-            log: Basename of the log file, inside the archive
-            statistics: Optional[StatisticsOutputs]
-                Basenames of the statistics files, inside the archive
+    Paths to all possible Bystro annotation outputs
+
+    Attributes:
+        output_dir: str
+            Output directory
+        archived: str
+            Basename of the archive
+        annotation: str
+            Basename of the annotation TSV file, inside the archive
+        sampleList: Optional[str]
+            Basename of the sample list file, inside the archive
+        log: Basename of the log file, inside the archive
+        statistics: Optional[StatisticsOutputs]
+            Basenames of the statistics files, inside the archive
     """
+
     archived: str
     annotation: str
     sampleList: str

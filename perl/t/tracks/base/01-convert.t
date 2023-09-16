@@ -23,6 +23,7 @@ ok( looks_like_number($roundedConvert), "number(2) looks like number" );
 ok( $floatConvert == .0000000000001567, "number doesn't round" );
 ok( "$floatConvert" eq "1.567e-13",
   "perl represents large floats in scientific notation" );
+
 # Is too small to display by default in decimal notation
 ok( $roundedConvert == .00000000000016, "number(2) rounds to 2 sigfigs" );
 

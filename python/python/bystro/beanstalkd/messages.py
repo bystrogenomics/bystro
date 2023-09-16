@@ -6,6 +6,7 @@ from msgspec import Struct, field
 SubmissionID = str | int
 BeanstalkJobID = int
 
+
 class Event(str, Enum):
     """Beanstalkd Event"""
 
@@ -14,6 +15,7 @@ class Event(str, Enum):
     STARTED = "started"
     COMPLETED = "completed"
 
+
 class BaseMessage(Struct, frozen=True):
     submissionID: SubmissionID
 
@@ -21,15 +23,19 @@ class BaseMessage(Struct, frozen=True):
     def keys_with_types(cls) -> dict:
         return get_type_hints(cls)
 
+
 class SubmittedJobMessage(BaseMessage, frozen=True):
     event: Event = Event.STARTED
+
 
 class CompletedJobMessage(BaseMessage, frozen=True):
     event: Event = Event.COMPLETED
 
+
 class FailedJobMessage(BaseMessage, frozen=True):
     reason: str
     event: Event = Event.FAILED
+
 
 class InvalidJobMessage(Struct, frozen=True):
     # Invalid jobs that are invalid because the submission breaks serialization invariants
@@ -42,9 +48,11 @@ class InvalidJobMessage(Struct, frozen=True):
     def keys_with_types(cls) -> dict:
         return get_type_hints(cls)
 
+
 class ProgressData(Struct):
     progress: int = 0
     skipped: int = 0
+
 
 class ProgressMessage(BaseMessage, frozen=True):
     """Beanstalkd Message"""

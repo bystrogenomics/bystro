@@ -1,11 +1,11 @@
 """
-This implements a base class for any model using stochastic gradient 
-descent-based techniques for inference. 
+This implements a base class for any model using stochastic gradient
+descent-based techniques for inference.
 
 Objects
 -------
 BaseSGDModel(training_options=None)
-    
+
 
 Methods
 -------
@@ -91,7 +91,7 @@ class BaseSGDModel(abc.ABC):
         Parameters
         ----------
         trainable_variables : list
-            List of variables to save 
+            List of variables to save
         """
 
     @abc.abstractmethod

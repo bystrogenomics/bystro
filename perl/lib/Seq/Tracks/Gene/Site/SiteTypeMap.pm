@@ -7,15 +7,24 @@ package Seq::Tracks::Gene::Site::SiteTypeMap;
 use Mouse 2;
 use Mouse::Util::TypeConstraints;
 use DDP;
+
 # Define allowable types
 
 # Safe for use when instantiated to static variable; no set - able properties
 state $codingSite = 'exonic';
-has codingSiteType =>
-  ( is => 'ro', lazy => 1, init_arg => undef, default => sub { $codingSite } );
+has codingSiteType => (
+  is       => 'ro',
+  lazy     => 1,
+  init_arg => undef,
+  default  => sub { $codingSite }
+);
 state $fivePrimeSite = 'UTR5';
-has fivePrimeSiteType =>
-  ( is => 'ro', lazy => 1, init_arg => undef, default => sub { $fivePrimeSite } );
+has fivePrimeSiteType => (
+  is       => 'ro',
+  lazy     => 1,
+  init_arg => undef,
+  default  => sub { $fivePrimeSite }
+);
 state $threePrimeSite = 'UTR3';
 has threePrimeSiteType => (
   is       => 'ro',
@@ -24,17 +33,33 @@ has threePrimeSiteType => (
   default  => sub { $threePrimeSite }
 );
 state $spliceAcSite = 'spliceAcceptor';
-has spliceAcSiteType =>
-  ( is => 'ro', lazy => 1, init_arg => undef, default => sub { $spliceAcSite } );
+has spliceAcSiteType => (
+  is       => 'ro',
+  lazy     => 1,
+  init_arg => undef,
+  default  => sub { $spliceAcSite }
+);
 state $spliceDonSite = 'spliceDonor';
-has spliceDonSiteType =>
-  ( is => 'ro', lazy => 1, init_arg => undef, default => sub { $spliceDonSite } );
+has spliceDonSiteType => (
+  is       => 'ro',
+  lazy     => 1,
+  init_arg => undef,
+  default  => sub { $spliceDonSite }
+);
 state $ncRNAsite = 'ncRNA';
-has ncRNAsiteType =>
-  ( is => 'ro', lazy => 1, init_arg => undef, default => sub { $ncRNAsite } );
+has ncRNAsiteType => (
+  is       => 'ro',
+  lazy     => 1,
+  init_arg => undef,
+  default  => sub { $ncRNAsite }
+);
 state $intronicSite = 'intronic';
-has intronicSiteType =>
-  ( is => 'ro', lazy => 1, init_arg => undef, default => sub { $intronicSite } );
+has intronicSiteType => (
+  is       => 'ro',
+  lazy     => 1,
+  init_arg => undef,
+  default  => sub { $intronicSite }
+);
 
 # #Coding type always first; order of interest
 state $siteTypes = [
@@ -153,8 +178,10 @@ has siteTypeMapInverse => (
 sub _buildSiteTypeMapInverse {
   my $self = shift;
 
-  state $inverse =
-    { map { $self->siteTypeMap->{$_} => $_ } keys %{ $self->siteTypeMap } };
+  state $inverse = {
+    map { $self->siteTypeMap->{$_} => $_ }
+      keys %{ $self->siteTypeMap }
+  };
 
   return $inverse;
 }

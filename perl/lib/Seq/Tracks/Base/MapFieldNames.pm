@@ -51,6 +51,7 @@ has _db => (
 );
 
 sub getFieldDbName {
+
   #my ($self, $fieldName) = @_;
 
   #$self = $_[0]
@@ -76,6 +77,7 @@ sub getFieldDbName {
 #like annotation
 #@param <Number> $fieldNumber : the database name
 sub getFieldName {
+
   #my ($self, $fieldNumber) = @_;
 
   #$self = $_[0]
@@ -106,6 +108,7 @@ sub _fetchMetaFields {
   }
 
   $self->fieldNamesMap->{ $self->name } = $dataHref;
+
   #fieldNames map is name => dbName; dbNamesMap is the inverse
   for my $fieldName ( keys %$dataHref ) {
     $self->fieldDbNamesMap->{ $self->name }{ $dataHref->{$fieldName} } = $fieldName;

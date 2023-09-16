@@ -91,6 +91,7 @@ my $beanstalkEvents = Beanstalk::Client->new(
 my $events = $conf->{beanstalkd}{events};
 
 while ( my $job = $beanstalk->reserve ) {
+
   # Parallel ForkManager used only to throttle number of jobs run in parallel
   # cannot use run_on_finish with blocking reserves, use try catch instead
   # Also using forks helps clean up leaked memory from LMDB_File
@@ -140,6 +141,7 @@ while ( my $job = $beanstalk->reserve ) {
     }
 
     for my $track (@$trackConfig) {
+
       # Strip local_files of their directory names, for security reasons
       $track->{local_files} =
         [ map { !$_ ? "" : path($_)->basename } @{ $track->{local_files} } ];
@@ -300,6 +302,7 @@ sub getConfigFilePath {
     my @maybePath = glob( $configPathBaseDir . $assembly . ".y*ml" );
     if ( scalar @maybePath ) {
       if ( scalar @maybePath > 1 ) {
+
         #should log
         say "\n\nMore than 1 config path found, choosing first";
       }

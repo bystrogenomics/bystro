@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use lib '../';
+
 # Takes a yaml file that defines one local file, and splits it on chromosome
 # Only works for tab-delimitd files that have the c
 package Utils::LiftOverCadd;
@@ -83,7 +84,10 @@ sub go {
 
     my $outPath = $outDir->child($baseName)->stringify;
 
-    $outPath = $isCompressed ? substr( $outPath, 0, rindex( $outPath, "." ) ) : $outPath;
+    $outPath =
+      $isCompressed
+      ? substr( $outPath, 0, rindex( $outPath, "." ) )
+      : $outPath;
 
     my $compressOutput = $isCompressed || $self->compress;
 

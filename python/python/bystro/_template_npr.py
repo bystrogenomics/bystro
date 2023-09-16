@@ -1,11 +1,11 @@
 """
-This provides a basic template for any model that uses numpyro as an 
+This provides a basic template for any model that uses numpyro as an
 inference method. It has several methods that should be filled by any
 object extending the template, namely
     fit
     _fill_hp_options
 
-These are the methods for running the samples given data and providing 
+These are the methods for running the samples given data and providing
 hyperameter selections respectively.
 
 Objects
@@ -124,7 +124,7 @@ class BaseNumpyroModel(abc.ABC):
     def _fill_hp_options(self, hp_options):
         """
         This fills in default hyperparameters of the model. Since these are
-        not conserved between models we leave this as an abstract method 
+        not conserved between models we leave this as an abstract method
         to be filled in per model.
 
         Parameters

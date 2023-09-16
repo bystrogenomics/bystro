@@ -20,8 +20,9 @@ docker run bystro bystro-build.pl #Build
 # Direct (non-Docker) installation
 
 There are 2 components to Bystro:
- 1. The Bystro annotator: a Perl program accessed through the command line (via bin/bystro-*)
- 2. The Bystro Python package: where the rest of Bystro's functionality lives (statistics, proteomics, etc).
+
+1.  The Bystro annotator: a Perl program accessed through the command line (via bin/bystro-\*)
+2.  The Bystro Python package: where the rest of Bystro's functionality lives (statistics, proteomics, etc).
 
 ## Installing the Bystro annotator (Perl/cli)
 
@@ -34,6 +35,7 @@ There are 2 components to Bystro:
 1.  `git clone https://github.com/bystrogenomics/bystro.git && cd bystro && source ./install-mac.sh`
 
 ##### Ubuntu
+
 1.  Ensure that packages are up to date (`sudo apt update`), or that you are satisified with the state of package versions.
 2.  `git clone https://github.com/bystrogenomics/bystro.git && cd bystro && source ./install-apt.sh`
     - Please not that this installation script will ask you for the root password in order to install system dependencies
@@ -55,6 +57,7 @@ source .initialize_conda_env.sh;
 ```
 
 to install the Python package dependencies. Then, run:
+
 ```
 # Build the Python package for local use
 make build

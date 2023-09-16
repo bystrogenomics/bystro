@@ -1,5 +1,5 @@
 """
-This implements two objects, the empirical covariance estimator used as a 
+This implements two objects, the empirical covariance estimator used as a
 baseline comparison method. It also implements BayesianCovariance, which
 implements MAP estimation using several common priors.
 

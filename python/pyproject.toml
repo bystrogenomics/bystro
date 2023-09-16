@@ -72,7 +72,7 @@ ignore = [
 "ANN102",  # don't require to annotate cls
 "D203", # one-blank-line-before class: conflicts with D211
 "D213",  # multiline-summary-second-string: conflicts with D212
-"N803",  # upercase variable names are often ok in scientific programming 
+"N803",  # upercase variable names are often ok in scientific programming
 "N806",  # upercase function names are often ok in scientific programming(ditto)
 "N815",  # ignore camelCase for now (remove this eventually)
 "RET504",  # allow variable assignments before return values

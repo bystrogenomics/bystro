@@ -1,4 +1,4 @@
-# Explicitly declare all files to retain LF end-of-line 
+# Explicitly declare all files to retain LF end-of-line
 #   (only \n, not \r\n), even on Windows
 
 * text eol=lf

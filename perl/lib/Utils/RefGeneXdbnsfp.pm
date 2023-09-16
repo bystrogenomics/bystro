@@ -51,6 +51,7 @@ sub go {
   my $self = shift;
 
   $self->log( 'info', 'Beginning RefGeneXdbnsfp' );
+
   # Store output handles by chromosome, so we can write even if input file
   # out of order
   my %outFhs;
@@ -106,6 +107,7 @@ sub go {
 
   my %dbNSFP;
   while (<$dbnsfpFh>) {
+
     #appropriate chomp based on line endings
     chomp;
 
@@ -255,6 +257,7 @@ sub go {
 
       my $foundDbNFSP;
       for my $field (@fields) {
+
         # Empirically determine
         if ( $dbNSFP{$field} ) {
           push @fields, @{ $dbNSFP{$field} };

@@ -1,29 +1,29 @@
 """
-This provides the base class of any Gaussian factor model, such as 
-(probabilistic) PCA, supervised PCA, and factor analysis, as well as 
-supervised and adversarial derivatives. 
+This provides the base class of any Gaussian factor model, such as
+(probabilistic) PCA, supervised PCA, and factor analysis, as well as
+supervised and adversarial derivatives.
 
-Implementing an extension model requires that the following methods be 
+Implementing an extension model requires that the following methods be
 implemented
     fit - Learns the model given data (and optionally supervised/adversarial
                        labels
     get_covariance - Given a fitted model returns the covariance matrix
 
-For the remaining shared methods computing likelihoods etc, there are two 
+For the remaining shared methods computing likelihoods etc, there are two
 options, compute the covariance matrix then use the default methods from
-the covariance module, or use the Sherman-Woodbury matrix identity to 
+the covariance module, or use the Sherman-Woodbury matrix identity to
 invert the matrix more efficiently. Currently only the first is implemented
 but left the options for future implementation.
 
 Objects
 -------
 BaseGaussianFactorModel(_BaseSGDModel)
-    Base class of all factor analysis models implementing any shared 
+    Base class of all factor analysis models implementing any shared
     Gaussian methods.
 
 BaseSGDModel(BaseGaussianFactorModel)
     This is the base class of models that use Tensorflow stochastic
-    gradient descent for inference. This reduces boilerplate code 
+    gradient descent for inference. This reduces boilerplate code
     associated with some of the standard methods etc.
 
 Methods
@@ -159,9 +159,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         S = np.dot(X, coefs.T)
         return S
 
-    def conditional_score(
-        self, X, observed_feature_idxs, weights=None, sherman_woodbury=False
-    ):
+    def conditional_score(self, X, observed_feature_idxs, weights=None, sherman_woodbury=False):
         """
         Returns the predictive log-likelihood of a subset of data.
 
@@ -185,18 +183,12 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         """
         if sherman_woodbury is False:
             covariance = self.get_covariance()
-            avg_score = _conditional_score(
-                covariance, X, observed_feature_idxs, weights=weights
-            )
+            avg_score = _conditional_score(covariance, X, observed_feature_idxs, weights=weights)
         else:
-            raise NotImplementedError(
-                "Sherman-Woodbury matrix inversion not implemented yet"
-            )
+            raise NotImplementedError("Sherman-Woodbury matrix inversion not implemented yet")
         return avg_score
 
-    def conditional_score_samples(
-        self, X, observed_feature_idxs, sherman_woodbury=False
-    ):
+    def conditional_score_samples(self, X, observed_feature_idxs, sherman_woodbury=False):
         """
         Return the conditional log likelihood of each sample, that is
 
@@ -217,18 +209,12 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         """
         if sherman_woodbury is False:
             covariance = self.get_covariance()
-            scores = _conditional_score_samples(
-                covariance, X, observed_feature_idxs
-            )
+            scores = _conditional_score_samples(covariance, X, observed_feature_idxs)
         else:
-            raise NotImplementedError(
-                "Sherman-Woodbury matrix inversion not implemented yet"
-            )
+            raise NotImplementedError("Sherman-Woodbury matrix inversion not implemented yet")
         return scores
 
-    def marginal_score(
-        self, X, observed_feature_idxs, weights=None, sherman_woodbury=False
-    ):
+    def marginal_score(self, X, observed_feature_idxs, weights=None, sherman_woodbury=False):
         """
         Returns the marginal log-likelihood of a subset of data
 
@@ -250,18 +236,12 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         """
         if sherman_woodbury is False:
             covariance = self.get_covariance()
-            avg_score = _marginal_score(
-                covariance, X, observed_feature_idxs, weights=weights
-            )
+            avg_score = _marginal_score(covariance, X, observed_feature_idxs, weights=weights)
         else:
-            raise NotImplementedError(
-                "Sherman-Woodbury matrix inversion not implemented yet"
-            )
+            raise NotImplementedError("Sherman-Woodbury matrix inversion not implemented yet")
         return avg_score
 
-    def marginal_score_samples(
-        self, X, observed_feature_idxs, sherman_woodbury=False
-    ):
+    def marginal_score_samples(self, X, observed_feature_idxs, sherman_woodbury=False):
         """
         Returns the marginal log-likelihood of a subset of data
 
@@ -280,13 +260,9 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         """
         if sherman_woodbury is False:
             covariance = self.get_covariance()
-            scores = _marginal_score_samples(
-                covariance, X, observed_feature_idxs
-            )
+            scores = _marginal_score_samples(covariance, X, observed_feature_idxs)
         else:
-            raise NotImplementedError(
-                "Sherman-Woodbury matrix inversion not implemented yet"
-            )
+            raise NotImplementedError("Sherman-Woodbury matrix inversion not implemented yet")
         return scores
 
     def score(self, X, weights=None, sherman_woodbury=False):
@@ -310,9 +286,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
             covariance = self.get_covariance()
             avg_score = _score(covariance, X, weights=weights)
         else:
-            raise NotImplementedError(
-                "Sherman-Woodbury matrix inversion not implemented yet"
-            )
+            raise NotImplementedError("Sherman-Woodbury matrix inversion not implemented yet")
         return avg_score
 
     def score_samples(self, X, sherman_woodbury=False):
@@ -333,9 +307,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
             covariance = self.get_covariance()
             scores = _score_samples(covariance, X)
         else:
-            raise NotImplementedError(
-                "Sherman-Woodbury matrix inversion not implemented yet"
-            )
+            raise NotImplementedError("Sherman-Woodbury matrix inversion not implemented yet")
         return scores
 
     def get_entropy(self):
@@ -375,9 +347,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         entropy = _entropy_subset(covariance, observed_feature_idxs)
         return entropy
 
-    def mutual_information(
-        self, observed_feature_idxs1, observed_feature_idxs2
-    ):
+    def mutual_information(self, observed_feature_idxs1, observed_feature_idxs2):
         """
         This computes the mutual information bewteen the two sets of
         covariates based on the model.
@@ -403,9 +373,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
 
 
 class BasePCASGDModel(BaseGaussianFactorModel, ABC):
-    def __init__(
-        self, n_components=2, training_options=None, prior_options=None
-    ):
+    def __init__(self, n_components=2, training_options=None, prior_options=None):
         """
         This is the base class of models that use stochastic
         gradient descent for inference. This reduces boilerplate code
@@ -481,13 +449,9 @@ class BasePCASGDModel(BaseGaussianFactorModel, ABC):
         expected_but_missing_keys = default_keys - final_keys
         unexpected_but_present_keys = final_keys - default_keys
         if expected_but_missing_keys:
-            raise ValueError(
-                "the following training options were expected but not found..."
-            )
+            raise ValueError("the following training options were expected but not found...")
         if unexpected_but_present_keys:
-            raise ValueError(
-                "the following training options were unrecognized but provided..."
-            )
+            raise ValueError("the following training options were unrecognized but provided...")
         return tops
 
     def _initialize_save_losses(self):

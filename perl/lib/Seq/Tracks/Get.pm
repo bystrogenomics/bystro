@@ -3,6 +3,7 @@ use strict;
 use warnings;
 
 package Seq::Tracks::Get;
+
 # Synopsis: For fetching data
 # TODO: make this a role?
 our $VERSION = '0.001';
@@ -36,7 +37,8 @@ sub BUILD {
     return;
   }
 
-  $self->{_fDb}  = [ map { $self->getFieldDbName($_) } @{ $self->features } ];
+  $self->{_fDb} =
+    [ map { $self->getFieldDbName($_) } @{ $self->features } ];
   $self->{_fIdx} = [ 0 .. $#{ $self->features } ];
 }
 
@@ -59,6 +61,7 @@ sub setHeaders {
 # @return <HashRef> : A hash ref of featureName => featureValue pairs for
 # all features the user specified for this Track in their config file
 sub get {
+
   #my ($self, $href, $chr, $refBase, $allele, $outAccum, $alleleNumber) = @_
   # $_[0] == $self
   # $_[1] == <ArrayRef> $href : the database data, with each top-level index corresponding to a track
@@ -75,6 +78,7 @@ sub get {
   #some features simply don't have any features, and for those just return
   #the value they stored
   if ( !$_[0]->{_fIdx} ) {
+
     #$outAccum->[$posIdx] = $href->[ $self->{_dbName} ]
     # $_[6]->[$_[5]] = $_[1]->[ $_[0]->{_dbName} ];
 
@@ -101,6 +105,7 @@ sub get {
   # return [ map { $_[1]->[$_[0]->{_dbName}][$_] } @{$_[0]->{_fieldDbNames}} ];
   my $idx = 0;
   for my $fieldDbName ( @{ $_[0]->{_fDb} } ) {
+
     #$outAccum->[$idx][$posIdx] = $href->[$self->{_dbName}][$fieldDbName] }
     $_[6]->[$idx][ $_[5] ] = $_[1]->[ $_[0]->{_dbName} ][$fieldDbName];
     $idx++;

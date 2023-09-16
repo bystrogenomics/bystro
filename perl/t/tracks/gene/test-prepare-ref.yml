@@ -1,13 +1,12 @@
----
 assembly: hg19
 chromosomes:
-- chrY
+  - chrY
 database_dir: t/tracks/gene/db/index-prepared-ref/
 files_dir: t/tracks/gene/db/raw
 temp_dir: /mnt/annotator/bystro-dev/tmp
 tracks:
   tracks:
-  - local_files:
-    - chrY.fa.gz
-    name: ref
-    type: reference
+    - local_files:
+        - chrY.fa.gz
+      name: ref
+      type: reference

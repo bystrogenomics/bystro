@@ -69,6 +69,7 @@ has hasDebugLevel => (
     return $debug || $verbose == 0;
   }
 );
+
 # should only be run after setPublisher is executed if program doesn't want default
 has hasPublisher => (
   is       => 'ro',
@@ -89,6 +90,7 @@ sub initialize {
 
 sub setLogPath {
   my ( $self, $path ) = @_;
+
   #open($Seq::Role::Message::Fh, '<', $path);
 
   #Results in deep recursion issue if we include Seq::Role::IO (which requires Role::Message
@@ -114,6 +116,7 @@ sub setVerbosity {
   my ( $self, $verboseLevel ) = @_;
 
   if ( $verboseLevel != 0 && $verboseLevel != 1 && $verboseLevel != 2 ) {
+
     # Should log this
     say STDERR "Verbose level must be 0, 1, or 2, setting to 10000 (no verbose output)";
     $verbose = 10000;
@@ -154,6 +157,7 @@ sub setPublisher {
 
 # note, accessing hash directly because traits don't work with Maybe types
 sub publishMessage {
+
   # my ( $self, $msg ) = @_;
   # to save on perf, $_[0] == $self, $_[1] == $msg;
 
@@ -173,6 +177,7 @@ sub publishMessage {
 }
 
 sub publishProgress {
+
   # my ( $self, $annotatedCount, $skippedCount ) = @_;
   #     $_[0],  $_[1],           $_[2]
 
@@ -190,6 +195,7 @@ sub publishProgress {
 }
 
 sub log {
+
   #my ( $self, $log_method, $msg ) = @_;
   #$_[0] == $self, $_[1] == $log_method, $_[2] == $msg;
 

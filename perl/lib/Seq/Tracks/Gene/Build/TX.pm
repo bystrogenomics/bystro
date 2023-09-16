@@ -26,6 +26,7 @@ our $VERSION = '0.001';
 
 use Mouse 2;
 use MouseX::NativeTraits;
+
 # We need pre-initialized tracks
 use Seq::Tracks;
 use Seq::Tracks::Gene::Site;
@@ -38,6 +39,7 @@ use DDP;
 
 #how many bases away from exon bound we will call spliceAc or spliceDon site
 my $spliceSiteLength = 2;
+
 #placeholder for annotation in string
 my $annBase = '0';
 
@@ -167,6 +169,7 @@ sub BUILD {
 
   my $errorsAref =
     $self->_buildTranscriptErrors( $seq, $seqPosMapAref, $txAnnotationHref );
+
   #if errors warn; some transcripts will be malformed
   #we could pass an array reference to log, but let's give some additional
   #context
@@ -292,10 +295,13 @@ sub _buildTranscript {
   }
 
   if ( $self->strand eq "-" ) {
+
     #reverse the sequence, just as in _build_transcript_db
     $txSequence = reverse $txSequence;
+
     # get the complement, just as in _build_transcript_db
     $txSequence =~ tr/ACGT/TGCA/;
+
     #reverse the positions, just as done in _build_transcript_abs_position
     @sequencePositions = reverse @sequencePositions;
   }
@@ -315,6 +321,7 @@ sub _buildTranscriptAnnotation {
   my $codingEnd   = $self->cdsEnd;
 
   my $posStrand = $self->strand eq '+';
+
   #https://ideone.com/B3ygW6
   #is this a bug? isn't cdsEnd open, so shouldn't it be cdsStart == cdsEnd - 1
   #nope: http://genome.soe.ucsc.narkive.com/NHHMnfwF/cdsstart-cdsend-definition
@@ -332,6 +339,7 @@ sub _buildTranscriptAnnotation {
     if ( !$nextExonStart ) {
       last INTRON_LOOP;
     }
+
     #exon Ends are open, so the exon actually ends $exonEnds - 1
     for ( my $intronPos = $thisExonEnd; $intronPos < $nextExonStart; $intronPos++ ) {
       $txAnnotationHref->{$intronPos} = $codonPacker->siteTypeMap->intronicSiteType;
@@ -340,6 +348,7 @@ sub _buildTranscriptAnnotation {
 
   #Then store non-coding, 5'UTR, 3'UTR annotations
   for ( my $i = 0; $i < @exonStarts; $i++ ) {
+
     # Annotate splice donor/acceptor bp
     #  - i.e., bp within $spliceSiteLength bp of exon start / stop
     #  - what we want to capture is the bp that are within $spliceSiteLength bp of the start or end of
@@ -382,6 +391,7 @@ sub _buildTranscriptAnnotation {
 
     # We cannot have a spliceAcceptor site unless there was an upstream exon
     if ( defined $previousExonEnd ) {
+
       # And if the length of the intron is smaller than 2*spliceSiteLength
       # we would have overlap between our spliceAcceptor and donor, which doesn't make sense
       #exonEnd is open, so previousExonEnd is the first base of the intron
@@ -419,9 +429,11 @@ sub _buildTranscriptAnnotation {
     }
 
     if ( defined $nextExonStart ) {
+
       #exonEnd is the first intron, exonStart is +1 of the intron
       if ( $nextExonStart - $exonEnds[$i] >= 2 * $spliceSiteLength ) {
         for ( my $n = 1; $n <= $spliceSiteLength; $n++ ) {
+
           # The exonEnd is already the first intron, which means the first spliceDonor site
           # so we subtract 1 and add however many bases of spliceSiteLength wanted
           my $exonPos = $exonEnds[$i] - 1 + $n;
@@ -467,6 +479,7 @@ sub _buildTranscriptAnnotation {
       # while $codingEnd is 0-based, half-open, end-excluded
       if ( $exonPos < $codingEnd ) {
         if ( $exonPos >= $codingStart ) {
+
           #It's in the body of the translated region
           next UTR_NCRNA_LOOP;
         }
@@ -489,6 +502,7 @@ sub _buildTranscriptAnnotation {
   #my $errorsAref = $self->_buildTranscriptErrors($txSequence, $txAnnotationHref);
 
   return $txAnnotationHref;
+
   #return ($txAnnotationHref, $errorsAref);
 }
 
@@ -519,10 +533,12 @@ sub _buildTranscriptSites {
   }
 
   my $codingBaseCount = 0;
+
   #Then, make all of the codons in locations that aren't in the $tempTXsites
 
   #Example (informal test): #https://ideone.com/a9NYhb
   CODING_LOOP: for ( my $i = 0; $i < length($txSequence); $i++ ) {
+
     #get the genomic position
     my $pos = $seqPosMapAref->[$i];
 
@@ -538,6 +554,7 @@ sub _buildTranscriptSites {
     # Since we've accounted for non-coding, UTR, and ~ splice sites
 
     if ( substr( $txSequence, $i, 1 ) =~ m/[ACGT]/ ) {
+
       #the codon number ; POSIX::floor safer than casting int for rounding
       #but we just want to truncate; http://perldoc.perl.org/functions/int.html
       $codonNumber = 1 + int( $codingBaseCount / 3 );
@@ -572,6 +589,7 @@ sub _buildTranscriptSites {
 
   #Now compact the site details
   for my $pos ( sort { $a <=> $b } keys %tempTXsites ) {
+
     #stores the codon information as binary
     #this was "$self->add_transcript_site($site)"
     # passing args in list context
@@ -607,6 +625,7 @@ sub _buildTranscriptErrors {
   my @errors = ();
 
   if ( $self->cdsStart == $self->cdsEnd ) {
+
     #it's a non-coding site, so it has no sequence information stored at all
     return \@errors;
   }
@@ -622,7 +641,9 @@ sub _buildTranscriptErrors {
 
   my $codingSeq2;
   for ( my $i = 0; $i < length($seq); $i++ ) {
-    if ( $seqPosAref->[$i] >= $self->cdsStart && $seqPosAref->[$i] < $self->cdsEnd ) {
+    if ( $seqPosAref->[$i] >= $self->cdsStart
+      && $seqPosAref->[$i] < $self->cdsEnd )
+    {
       $codingSeq2 .= substr( $seq, $i, 1 );
     }
   }

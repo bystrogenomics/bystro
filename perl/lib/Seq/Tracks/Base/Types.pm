@@ -16,49 +16,82 @@ use namespace::autoclean;
 use Scalar::Util  qw/looks_like_number/;
 use Math::SigFigs qw(:all);
 use DDP;
+
 #What the types must be called in the config file
 # TODO: build these track maps automatically
 # by title casing the "type" field
 # And therefore maybe don't use these at all.
 state $refType = 'reference';
-has refType =>
-  ( is => 'ro', init_arg => undef, lazy => 1, default => sub { $refType } );
+has refType => (
+  is       => 'ro',
+  init_arg => undef,
+  lazy     => 1,
+  default  => sub { $refType }
+);
 
 state $scoreType = 'score';
-has scoreType =>
-  ( is => 'ro', init_arg => undef, lazy => 1, default => sub { $scoreType } );
+has scoreType => (
+  is       => 'ro',
+  init_arg => undef,
+  lazy     => 1,
+  default  => sub { $scoreType }
+);
 
 state $sparseType = 'sparse';
-has sparseType =>
-  ( is => 'ro', init_arg => undef, lazy => 1, default => sub { $sparseType } );
+has sparseType => (
+  is       => 'ro',
+  init_arg => undef,
+  lazy     => 1,
+  default  => sub { $sparseType }
+);
 
 state $regionType = 'region';
-has regionType =>
-  ( is => 'ro', init_arg => undef, lazy => 1, default => sub { $regionType } );
+has regionType => (
+  is       => 'ro',
+  init_arg => undef,
+  lazy     => 1,
+  default  => sub { $regionType }
+);
 
 state $geneType = 'gene';
-has geneType =>
-  ( is => 'ro', init_arg => undef, lazy => 1, default => sub { $geneType } );
+has geneType => (
+  is       => 'ro',
+  init_arg => undef,
+  lazy     => 1,
+  default  => sub { $geneType }
+);
 
 state $caddType = 'cadd';
-has caddType =>
-  ( is => 'ro', init_arg => undef, lazy => 1, default => sub { $caddType } );
+has caddType => (
+  is       => 'ro',
+  init_arg => undef,
+  lazy     => 1,
+  default  => sub { $caddType }
+);
 
 state $vcfType = 'vcf';
-has vcfType =>
-  ( is => 'ro', init_arg => undef, lazy => 1, default => sub { $vcfType } );
+has vcfType => (
+  is       => 'ro',
+  init_arg => undef,
+  lazy     => 1,
+  default  => sub { $vcfType }
+);
 
 state $nearestType = 'nearest';
-has nearestType =>
-  ( is => 'ro', init_arg => undef, lazy => 1, default => sub { $nearestType } );
+has nearestType => (
+  is       => 'ro',
+  init_arg => undef,
+  lazy     => 1,
+  default  => sub { $nearestType }
+);
 
 has trackTypes => (
   is       => 'ro',
   init_arg => undef,
   lazy     => 1,
   default  => sub {
-    return [ $refType, $scoreType, $sparseType, $regionType, $geneType, $caddType,
-      $vcfType ];
+    return [ $refType, $scoreType, $sparseType, $regionType,
+      $geneType, $caddType, $vcfType ];
   }
 );
 
@@ -70,15 +103,18 @@ enum TrackType => [
 #Convert types; Could move the conversion code elsewehre,
 #but I wanted types definition close to implementation
 
-subtype DataType => as 'Str' =>
-  where { $_ =~ /number|number\(\d+\)/ }; #['float', 'int', 'number', 'number(2)'];
+subtype DataType => as 'Str' => where {
+  $_ =~ /number|number\(\d+\)/
+}; #['float', 'int', 'number', 'number(2)'];
 
 # float / number / int can give a precision in the form number(2)
 state $precision = {};
 state $typeFunc  = {};
+
 #idiomatic way to re-use a stack, gain some efficiency
 #expects ->convert('string or number', 'type')
 sub convert {
+
   #my ($self, $value, $type)
   #    $_[0], $_[1],  $_[2]
   if ( !$typeFunc->{ $_[2] } ) {
@@ -89,6 +125,7 @@ sub convert {
       my $type = substr( $_[2], 0, $idx );
 
       $typeFunc->{ $_[2] } = \&{$type};
+
       # if number(2) take "2" + 0 == 2
       $precision->{ $_[2] } = substr( $_[2], $idx + 1, index( $_[2], ')' ) - $idx - 1 ) +0;
     }
@@ -105,6 +142,7 @@ sub convert {
 
 # Truncate a number
 sub int {
+
   #my ($value, $precision) = @_;
   #    $_[0], $_[1],
   if ( !looks_like_number( $_[0] ) ) {
@@ -121,6 +159,7 @@ sub int {
 # Will always take the smallest possible value, so will only be stored as float
 # if needed
 sub number {
+
   #my ($value, $precision) = @_;
   #    $_[0], $_[1],
   if ( !looks_like_number( $_[0] ) ) {

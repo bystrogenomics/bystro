@@ -53,9 +53,10 @@ sub connect {
   $databaseName = $self->database || $databaseName;
 
   my $connection = $self->driver;
-  $connection .= ":database=$databaseName;host=" . $self->host if $self->host;
-  $connection .= ";port=" . $self->port                        if $self->port;
-  $connection .= ";mysql_socket=" . $self->port_num            if $self->socket;
+  $connection .= ":database=$databaseName;host=" . $self->host
+    if $self->host;
+  $connection .= ";port=" . $self->port             if $self->port;
+  $connection .= ";mysql_socket=" . $self->port_num if $self->socket;
   $connection .= ";mysql_read_default_group=client";
 
   return DBI->connect(

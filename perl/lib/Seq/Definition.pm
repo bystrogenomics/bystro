@@ -17,6 +17,7 @@ use Seq::Statistics;
 
 with 'Seq::Role::IO';
 with 'Seq::Output::Fields';
+
 # Note: All init_arg undef methods must be lazy if they rely on arguments that are
 # not init_arg => undef, and do not have defaults (aka are required)
 ######################## Required ##############################
@@ -114,6 +115,7 @@ has outputFilesInfo => (
     }
 
     if ( $self->archive ) {
+
       # Seq::Role::IO method
       # Only compress the tarball if we're not compressing the inner file
       # because this wastes a lot of time, since the compressed inner annotation
@@ -171,6 +173,7 @@ has _statisticsRunner => (
     my $self = shift;
 
     my $basePath = $self->_workingDir->child( $self->outBaseName )->stringify;
+
     # Assumes that is run_statistics is specified, $self-statistics exists
     if ( $self->run_statistics ) {
       my %args = (

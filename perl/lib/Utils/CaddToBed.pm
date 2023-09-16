@@ -3,6 +3,7 @@ use strict;
 use warnings;
 
 use lib '../';
+
 # Takes a CADD file and makes it into a bed-like file, retaining the property
 # That each base has 3 (or 4 for ambiguous) lines
 package Utils::CaddToBed;
@@ -54,6 +55,7 @@ sub go {
     $self->log( 'fatal', "input file path $inFilePath doesn't exist" );
     return;
   }
+
   # Store output handles by chromosome, so we can write even if input file
   # out of order
   my %outFhs;
@@ -85,7 +87,10 @@ sub go {
 
   my $outExt = 'bed'
     . (
-    $self->compress ? '.gz' : substr( $outPathBase, rindex( $outPathBase, '.' ) ) );
+    $self->compress
+    ? '.gz'
+    : substr( $outPathBase, rindex( $outPathBase, '.' ) )
+    );
 
   $outPathBase = substr( $outPathBase, 0, rindex( $outPathBase, '.' ) );
 
@@ -112,6 +117,7 @@ sub go {
 
     # The part that actually has the id, ex: in chrX "X" is the id
     my $chrIdPart;
+
     # Get the chromosome
     # It could be stored as a number/single character or "chr"
     # Grab the chr part, and normalize it to our case format (chr)

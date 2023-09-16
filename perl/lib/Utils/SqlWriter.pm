@@ -41,7 +41,10 @@ my $nowTimestamp = sprintf( "%d-%02d-%02d", $year, $mos, $day );
 sub BUILD {
   my $self = shift;
 
-  my $config = defined $self->connection ? { connection => $self->connection } : {};
+  my $config =
+    defined $self->connection
+    ? { connection => $self->connection }
+    : {};
 
   $self->_setSqlClient( Utils::SqlWriter::Connection->new($config) );
 }
@@ -70,7 +73,9 @@ sub go {
 
   # We'll return the relative path to the files we wrote
   my @outRelativePaths;
-  CHR_LOOP: for my $chr ( $perChromosome ? @{ $self->chromosomes } : 'fetch' ) {
+  CHR_LOOP:
+  for my $chr ( $perChromosome ? @{ $self->chromosomes } : 'fetch' ) {
+
     # for return data
     my @sql_data = ();
 
@@ -128,7 +133,8 @@ sub go {
     ########### Connect to database ##################
     my $dbh = $self->sqlClient->connect($databaseName);
     ########### Prepare and execute SQL ##############
-    my $sth = $dbh->prepare($query) or $self->log( 'fatal', $dbh->errstr );
+    my $sth = $dbh->prepare($query)
+      or $self->log( 'fatal', $dbh->errstr );
 
     $sth->execute or $self->log( 'fatal', $dbh->errstr );
 
@@ -138,6 +144,7 @@ sub go {
       $count++;
 
       if ( $count == 0 ) {
+
         # Write header
         # Cleaner here, because there is nothing in {NAME} when empty query
         my @stuff = @{ $sth->{NAME} };
@@ -160,6 +167,7 @@ sub go {
     }
 
     $sth->finish();
+
     # Must commit before this works, or will get DESTROY before explicit disconnect()
     $dbh->disconnect();
 
@@ -180,6 +188,7 @@ sub go {
     $self->log( "error",
       "No results found for $chr: \n query: $query, \n archive: $targetFile, \n output: $symlinkedFile)\n\n"
     );
+
     # # We may have had 0 results;
     # if (-z $targetFile) {
     #   unlink $targetFile;

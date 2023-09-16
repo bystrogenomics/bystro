@@ -104,6 +104,7 @@ sub buildTrack {
     my $count = 0;
 
     FH_LOOP: while (<$fh>) {
+
       #super chomp; #trim both ends, but not what's in between
       $_ =~ s/^\s+|\s+$//g;
 
@@ -131,8 +132,11 @@ sub buildTrack {
         $chr = $self->normalizedWantedChr->{$chr};
 
         # falsy value is ''
-        if ( !defined $wantedChr || ( !defined $chr || $wantedChr ne $chr ) ) {
+        if ( !defined $wantedChr
+          || ( !defined $chr || $wantedChr ne $chr ) )
+        {
           if ( defined $wantedChr ) {
+
             #Commit any remaining transactions, remove the db map from memory
             #this also has the effect of closing all cursors
             $self->db->cleanUp();
@@ -168,8 +172,8 @@ sub buildTrack {
       $cursor //= $self->db->dbStartCursorTxn($wantedChr);
 
       #Args:                         $cursor,             $chr,       $trackIndex,   $pos,         $trackValue
-      $self->db->dbPatchCursorUnsafe( $cursor, $wantedChr, $self->dbName, $chrPosition,
-        $self->{_rounder}->round($_) );
+      $self->db->dbPatchCursorUnsafe( $cursor, $wantedChr,
+        $self->dbName, $chrPosition, $self->{_rounder}->round($_) );
 
       if ( $count > $self->commitEvery ) {
         $self->db->dbEndCursorTxn($wantedChr);

@@ -37,8 +37,13 @@ has '+commitEvery' => ( default => 1e3 );
 
 #These cannot be overriden (change in api), but users can use fieldMap to rename any field
 #in the input file
-has chromField =>
-  ( is => 'ro', isa => 'Str', init_arg => undef, lazy => 1, default => 'chrom' );
+has chromField => (
+  is       => 'ro',
+  isa      => 'Str',
+  init_arg => undef,
+  lazy     => 1,
+  default  => 'chrom'
+);
 has chromStartField => (
   is       => 'ro',
   isa      => 'Str',
@@ -91,7 +96,10 @@ sub buildTrack {
       my ( $pid, $exitCode, $fileName, undef, undef, $errOrChrs ) = @_;
 
       if ( $exitCode != 0 ) {
-        my $err = $errOrChrs ? "due to: $$errOrChrs" : "due to an untimely demise";
+        my $err =
+          $errOrChrs
+          ? "due to: $$errOrChrs"
+          : "due to an untimely demise";
 
         $self->log( 'fatal', $self->name . ": Failed to build $fileName $err" );
         die $self->name . ": Failed to build $fileName $err";
@@ -139,8 +147,8 @@ sub buildTrack {
       $self->log( 'fatal', $self->name . ': failed to read header line' );
     }
 
-    my ( $featureIdxHref, $reqIdxHref, $fieldsToTransformIdx, $fieldsToFilterOnIdx,
-      $numColumns )
+    my ( $featureIdxHref, $reqIdxHref, $fieldsToTransformIdx,
+      $fieldsToFilterOnIdx, $numColumns )
       = $self->_getHeaderFields( $file, $firstLine, $self->features );
     ############## Read file and insert data into main database #############
     my $wantedChr;
@@ -182,8 +190,11 @@ sub buildTrack {
       $chr = $self->normalizedWantedChr->{ $fields[ $reqIdxHref->{ $self->chromField } ] };
 
       #If the chromosome is new, write any data we have & see if we want new one
-      if ( !defined $wantedChr || ( !defined $chr || $wantedChr ne $chr ) ) {
+      if ( !defined $wantedChr
+        || ( !defined $chr || $wantedChr ne $chr ) )
+      {
         if ( defined $wantedChr ) {
+
           #Commit, commit & close cursors, flush anything remaining to disk, release mapped memory
           $self->db->cleanUp();
           undef $cursor;
@@ -201,6 +212,7 @@ sub buildTrack {
       ( $start, $end ) = $self->_getPositions( \@fields, $reqIdxHref );
 
       if ( $end + 1 - $start > $self->maxVariantSize ) {
+
         # TODO: think about adding this back in; results in far too many log messages
         # $self->log('debug', "Line spans > " . $self->maxVariantSize . " skipping: $line");
         $tooLong++;
@@ -226,8 +238,8 @@ sub buildTrack {
         $cursor //= $self->db->dbStartCursorTxn($wantedChr);
 
         #Args:                         $cursor,             $chr,       $trackIndex,   $pos,  $trackValue,  $mergeFunction
-        $self->db->dbPatchCursorUnsafe( $cursor, $wantedChr, $self->dbName, $pos,
-          \@sparseData, $mergeFunc );
+        $self->db->dbPatchCursorUnsafe( $cursor, $wantedChr, $self->dbName,
+          $pos, \@sparseData, $mergeFunc );
 
         if ( $count > $self->commitEvery ) {
           $self->db->dbEndCursorTxn($wantedChr);
@@ -240,6 +252,7 @@ sub buildTrack {
       }
 
       undef @sparseData;
+
       # Track affected chromosomes for completion recording
       $visitedChrs{$wantedChr} //= 1;
     }
@@ -319,8 +332,8 @@ sub joinTrack {
       $self->log( 'fatal', $self->name . ": couldn't read first line of $file" );
     }
 
-    my ( $featureIdxHref, $reqIdxHref, $fieldsToTransformIdx, $fieldsToFilterOnIdx,
-      $numColumns )
+    my ( $featureIdxHref, $reqIdxHref, $fieldsToTransformIdx,
+      $fieldsToFilterOnIdx, $numColumns )
       = $self->_getHeaderFields( $file, $firstLine, $wantedFeaturesAref );
 
     my @allWantedFeatureIdx = keys %$featureIdxHref;
@@ -348,6 +361,7 @@ sub joinTrack {
       $chr = $self->normalizedWantedChr->{ $fields[ $reqIdxHref->{ $self->chromField } ] };
 
       if ( !defined $chr || $chr ne $wantedChr ) {
+
         # TODO: Rethink chrPerFile handling
         # This should be safe, provided that chrPerFile is a manually-set flag
         # in the YAML track config
@@ -485,6 +499,7 @@ sub _validLine {
   my ( $self, $fieldAref, $lineNumber, $reqIdxHref, $numColumns ) = @_;
 
   if ( @$fieldAref != $numColumns ) {
+
     # $self->log('debug', "Line $lineNumber has fewer columns than expected, skipping");
     return;
   }
@@ -502,6 +517,7 @@ sub _validLine {
 
 sub _transform {
   my ( $self, $fieldsToTransformIdx, $fieldsAref ) = @_;
+
   #If the user wants to modify the values of any fields, do that first
   for my $fieldName ( $self->allFieldsToTransform ) {
     $fieldsAref->[ $fieldsToTransformIdx->{$fieldName} ] =
@@ -512,6 +528,7 @@ sub _transform {
 
 sub _passesFilter {
   my ( $self, $fieldsToFilterOnIdx, $fieldsAref, $lineNumber ) = @_;
+
   # Then, if the user wants to exclude rows that don't pass some criteria
   # that they defined in the YAML file, allow that.
   for my $fieldName ( $self->allFieldsToFilterOn ) {

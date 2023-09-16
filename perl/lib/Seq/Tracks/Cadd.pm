@@ -31,6 +31,7 @@ state $order = Seq::Tracks::Cadd::Order->new();
 $order = $order->order;
 
 sub get {
+
   #my ($self, $href, $chr, $refBase, $allele, $outAccum, $alleleNumber) = @_
   # $_[0] == $self
   # $_[1] == <ArrayRef> $href : the database data, with each top-level index corresponding to a track
@@ -69,7 +70,8 @@ sub get {
 
   # For indels, which will be the least frequent, return it all
   if ( length( $_[4] ) > 1 ) {
-    $_[6][ $_[5] ] = [ map { $_ / $_[0]->{_s} } @{ $_[1]->[ $_[0]->{_dbName} ] } ];
+    $_[6][ $_[5] ] =
+      [ map { $_ / $_[0]->{_s} } @{ $_[1]->[ $_[0]->{_dbName} ] } ];
 
     return $_[6];
   }

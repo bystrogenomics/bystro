@@ -25,6 +25,7 @@ my (
 );
 
 $debug = 0;
+
 # usage
 GetOptions(
   'c|config=s'                                => \$yaml_config,
@@ -85,6 +86,7 @@ $yaml_config = path($yaml_config)->absolute->stringify;
 my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst ) = localtime();
 
 $year += 1900;
+
 #   # set log file
 my $log_name =
      join '.', 'build', $config_href->{assembly}, $wantedType
@@ -120,6 +122,7 @@ my $builder_options_href = {
 if ( defined $maxThreads ) {
   $builder_options_href->{maxThreads} = $maxThreads;
 }
+
 # my $log_file = path(".")->child($log_name)->absolute->stringify;
 # Log::Any::Adapter->set( 'File', $log_file );
 

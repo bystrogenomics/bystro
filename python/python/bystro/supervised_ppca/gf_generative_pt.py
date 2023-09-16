@@ -1,18 +1,18 @@
 """
 This implements Gaussian factor analysis models with generative (standard)
-inference. There are three different models. Gaussian factor analysis 
-parameterizes the covariance matrix as 
+inference. There are three different models. Gaussian factor analysis
+parameterizes the covariance matrix as
 
     Sigma = WW^T + Lambda
 
 where Lambda is a diagonal matrix (see Bishop 2006 Chapter 12 for notation
-and model definition).  Probabilistic principal component analysis 
-sets Lambda = sigma**2*I_p. Supervised principal component analysis 
-parameterizes it as 
-Lambda = diag([sigma_x**2*1_p,sigma_y**2 1_q]), allowing for variances to 
-differ between the predictive and dependent variables. Finally, factor 
+and model definition).  Probabilistic principal component analysis
+sets Lambda = sigma**2*I_p. Supervised principal component analysis
+parameterizes it as
+Lambda = diag([sigma_x**2*1_p,sigma_y**2 1_q]), allowing for variances to
+differ between the predictive and dependent variables. Finally, factor
 analysis allows each diagonal component to be distinct. Models (1) and (3)
-are described in Bishop 2006, while supervised Probabilistic PCA is 
+are described in Bishop 2006, while supervised Probabilistic PCA is
 described in several papers, including Yu 2006.
 
 Objects
@@ -44,9 +44,7 @@ from bystro.supervised_ppca._base import BasePCASGDModel
 
 
 class PPCA(BasePCASGDModel):
-    def __init__(
-        self, n_components=2, prior_options=None, training_options=None
-    ):
+    def __init__(self, n_components=2, prior_options=None, training_options=None):
         """
         This implements probabilistic PCA with stochastic gradient descent.
         There are two benefits over the standard baseline method (1) it
@@ -119,9 +117,7 @@ class PPCA(BasePCASGDModel):
         myrange = trange if progress_bar else range
 
         for i in myrange(training_options["n_iterations"]):
-            idx = rng.choice(
-                X.shape[0], size=training_options["batch_size"], replace=False
-            )
+            idx = rng.choice(X.shape[0], size=training_options["batch_size"], replace=False)
             X_batch = X[idx]
 
             sigma = softplus(sigmal_)
@@ -177,12 +173,8 @@ class PPCA(BasePCASGDModel):
         def log_prior(trainable_variables):
             W_ = trainable_variables[0]
             sigma_ = trainable_variables[1]
-            part1 = (
-                -1 * prior_options["weight_W"] * torch.mean(torch.square(W_))
-            )
-            part2 = Gamma(
-                prior_options["alpha"], prior_options["beta"]
-            ).log_prob(sigma_)
+            part1 = -1 * prior_options["weight_W"] * torch.mean(torch.square(W_))
+            part2 = Gamma(prior_options["alpha"], prior_options["beta"]).log_prob(sigma_)
             out = torch.mean(part1 + part2)
             return out
 
@@ -286,9 +278,7 @@ class PPCA(BasePCASGDModel):
 
 
 class SPCA(BasePCASGDModel):
-    def __init__(
-        self, n_components=2, prior_options=None, training_options=None
-    ):
+    def __init__(self, n_components=2, prior_options=None, training_options=None):
         """
         This implements supervised probabilistic component analysis. Unlike
         PPCA there are no analytic solutions for this model. While the
@@ -323,7 +313,7 @@ class SPCA(BasePCASGDModel):
 
     def fit(self, X, groups, progress_bar=True, seed=2021):
         """
-        Fits a model given covariates X 
+        Fits a model given covariates X
 
         Parameters
         ----------
@@ -370,17 +360,15 @@ class SPCA(BasePCASGDModel):
         myrange = trange if progress_bar else range
 
         for i in myrange(training_options["n_iterations"]):
-            idx = rng.choice(
-                X.shape[0], size=training_options["batch_size"], replace=False
-            )
+            idx = rng.choice(X.shape[0], size=training_options["batch_size"], replace=False)
             X_batch = X[idx]
 
-            list_covs = [
-                softplus(sigmals_[k]) * list_constants[k]
-                for k in range(self.n_groups)
-            ]
+            list_covs = [softplus(sigmals_[k]) * list_constants[k] for k in range(self.n_groups)]
 
-            sigma = torch.sum(list_covs, dim=0,)
+            sigma = torch.sum(
+                list_covs,
+                dim=0,
+            )
             WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
             Sigma = WWT + torch.diag(sigma)
 
@@ -434,9 +422,9 @@ class SPCA(BasePCASGDModel):
             list_gamma_log_probs = []
             for k in self.n_groups:
                 list_gamma_log_probs.append(
-                    Gamma(
-                        prior_options["alpha"], prior_options["beta"]
-                    ).log_prob(trainable_variables[k + 1])
+                    Gamma(prior_options["alpha"], prior_options["beta"]).log_prob(
+                        trainable_variables[k + 1]
+                    )
                 )
 
             gamma_log_probs = torch.stack(list_gamma_log_probs)
@@ -483,9 +471,7 @@ class SPCA(BasePCASGDModel):
         X_recon = np.dot(S_hat, W_init)
         diff = np.mean((X - X_recon) ** 2)
         sinv = softplus_inverse_np(diff * np.ones(1).astype(np.float32))
-        sigmal_ = [
-            torch.tensor(sinv, requires_grad=True) for i in range(self.n_groups)
-        ]
+        sigmal_ = [torch.tensor(sinv, requires_grad=True) for i in range(self.n_groups)]
         return W_, sigmal_
 
     def _store_instance_variables(self, trainable_variables):
@@ -526,9 +512,7 @@ class SPCA(BasePCASGDModel):
 
 
 class FactorAnalysis(BasePCASGDModel):
-    def __init__(
-        self, n_components=2, prior_options=None, training_options=None
-    ):
+    def __init__(self, n_components=2, prior_options=None, training_options=None):
         """
         This implements factor analysis which allows for each covariate to
         have it's own isotropic noise. No analytic solution that I know of
@@ -557,7 +541,7 @@ class FactorAnalysis(BasePCASGDModel):
 
     def fit(self, X, progress_bar=True, seed=2021):
         """
-        Fits a model given covariates X 
+        Fits a model given covariates X
 
         Parameters
         ----------
@@ -593,9 +577,7 @@ class FactorAnalysis(BasePCASGDModel):
         myrange = trange if progress_bar else range
 
         for i in myrange(training_options["n_iterations"]):
-            idx = rng.choice(
-                X.shape[0], size=training_options["batch_size"], replace=False
-            )
+            idx = rng.choice(X.shape[0], size=training_options["batch_size"], replace=False)
             X_batch = X[idx]
 
             sigmas = softplus(sigmal_)
@@ -651,11 +633,7 @@ class FactorAnalysis(BasePCASGDModel):
 
         def log_prior(trainable_variables):
             sigma_ = nn.Softmax()(trainable_variables[1])
-            return torch.mean(
-                Gamma(prior_options["alpha"], prior_options["beta"]).log_prob(
-                    sigma_
-                )
-            )
+            return torch.mean(Gamma(prior_options["alpha"], prior_options["beta"]).log_prob(sigma_))
 
         return log_prior
 
@@ -674,7 +652,7 @@ class FactorAnalysis(BasePCASGDModel):
 
     def _initialize_variables(self, X):
         """
-        Initializes the variables of the model by fitting PCA model in 
+        Initializes the variables of the model by fitting PCA model in
         sklearn and using those loadings
 
         Parameters
@@ -697,9 +675,7 @@ class FactorAnalysis(BasePCASGDModel):
         X_recon = np.dot(S_hat, W_init)
         diff = np.mean((X - X_recon) ** 2)
         sinv = softplus_inverse_np(diff * np.ones(1))
-        sigmal_ = torch.tensor(
-            sinv[0] * np.ones(self.p).astype(np.float32), requires_grad=True
-        )
+        sigmal_ = torch.tensor(sinv[0] * np.ones(self.p).astype(np.float32), requires_grad=True)
         return W_, sigmal_
 
     def _store_instance_variables(self, trainable_variables):

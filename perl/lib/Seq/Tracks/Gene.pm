@@ -219,6 +219,7 @@ sub setHeaders {
 
   $self->{_strandFidx} = $self->{_featureIdxMap}{ $self->strandKey };
   $self->{_siteFidx}   = $self->{_featureIdxMap}{ $self->siteTypeKey };
+
   # Avoid accessor penalties by aliasing to the $self hash
   # These correspond to all of the sites held in Gene::Site
   $self->{_codonSidx}    = $self->{_featureIdxMap}{ $self->codonSequenceKey };
@@ -238,6 +239,7 @@ sub setHeaders {
 }
 
 sub get {
+
   #my ($self, $dbData, $chr, $refBase, $alt, $posIdx, $outAccum) = @_;
   #    $_[0], $_[1], $_[1], $_[3],   $_[4],   $_[5]    $_[6]
   # WARNING: If $_[1]->[$_[0]->{_dbName} isn't defined, will be treated as the 0 index!!!
@@ -277,9 +279,11 @@ sub get {
   $multiple = ref $txNumbers ? $#$txNumbers : 0;
 
   if ( $self->{_hasJoin} ) {
+
     # For join tracks, use only the entry for the first of multiple transcripts
     # Because the data stored is always identical at one position
     my $num = $multiple ? $txNumbers->[0] : $txNumbers;
+
     # http://ideone.com/jlImGA
     for my $fName ( @{ $self->{_flatJoinFeatures} } ) {
       $outAccum->[ $idxMap->{$fName} ][$posIdx] =
@@ -321,6 +325,7 @@ sub get {
       $hasCodon = 1;
     }
   }
+
   # ################# Populate geneTrack's user-defined features #####################
   #Reads:            $self->{_features}
   if ($multiple) {
@@ -351,6 +356,7 @@ sub get {
   ######Populate _codon*Key, exonicAlleleFunction, amion acids keys ############
 
   my ( $i, @funcAccum, @codonNum, @codonSeq, @codonPos, @refAA, @newAA, @newCodon );
+
   # Set undefs for every position, other than the ones we need
   # So that we don't need to push undef's to keep transcript order
   $#funcAccum = $#codonNum = $#codonSeq = $#codonPos = $#refAA = $#newAA =
@@ -359,6 +365,7 @@ sub get {
   $i = 0;
 
   if ( length($alt) > 1 ) {
+
     # Indels get everything besides the _*AminoAcidKey and _newCodonKey
     my $indelAllele =
         substr( $alt, 0, 1 ) eq '+'

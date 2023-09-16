@@ -38,6 +38,7 @@ state $requiredInputHeaderFields = {
   chrField       => qr/Fragment$|Chromosome[s]{0,1}$|Chrom$|Chr$/i,
   positionField  => qr/Position$|Pos$/i,
   referenceField => qr/Reference$|Ref$/i,
+
   #will match Minor_alleles as well (just looks for prefix)
   alleleField => qr/Alt$|Alternate$|Allele[s]{0,1}$|Minor_allele[s]{0,1}$/i,
 };

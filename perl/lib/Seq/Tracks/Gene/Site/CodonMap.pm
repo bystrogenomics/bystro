@@ -103,6 +103,7 @@ state $codonMap = {
 };
 
 sub codon2Num {
+
   #my ( $self, $codon ) = @_;
   #will return undefined if not found
   return $codonMap->{ $_[1] };
@@ -111,6 +112,7 @@ sub codon2Num {
 state $codonInverseMap = { map { $codonMap->{$_} => $_ } keys %$codonMap };
 
 sub num2Codon {
+
   #my ( $self, $codon ) = @_;
   #will return undefined if not found
 
@@ -185,6 +187,7 @@ state $codonAAmap = {
 };
 
 sub codon2aa {
+
   #my ( $self, $codon ) = @_;
   #will return undefined if not found
   return $codonAAmap->{ $_[1] };

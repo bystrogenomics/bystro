@@ -10,4 +10,3 @@
 #deletion => del
 #insertion => ins
 indel => ins,del
-

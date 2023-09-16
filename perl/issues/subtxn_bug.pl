@@ -20,6 +20,7 @@ sub dbPut {
 
   if ( !$db->{db}->Alive ) {
     $db->{db}->Txn = $db->{env}->BeginTxn();
+
     # not strictly necessary, but I am concerned about hard to trace abort bugs related to scope
     $db->{db}->Txn->AutoCommit(1);
   }
@@ -47,6 +48,7 @@ sub dbReadOne {
 
   if ( !$db->{db}->Alive ) {
     $db->{db}->Txn = $db->{env}->BeginTxn();
+
     # not strictly necessary, but I am concerned about hard to trace abort bugs related to scope
     $db->{db}->Txn->AutoCommit(1);
   }
@@ -85,6 +87,7 @@ sub dbStartCursorTxn {
 }
 
 sub _getDbi {
+
   # Exists and not defined, because in read only database we may discover
   # that some chromosomes don't have any data (example: hg38 refSeq chrM)
 

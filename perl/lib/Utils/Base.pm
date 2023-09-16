@@ -131,6 +131,7 @@ has _dateOfRun => (
 
 sub BUILD {
   my $self = shift;
+
   # Must happen here, because we need to account for the case where track isn't found
   # And you cannot throw an error from within a default, and I think it is
   # More clear to throw a fatal error from the BUILD method than a builder=> method
@@ -204,6 +205,7 @@ sub _backupAndWriteConfig {
   if ( -e $backPath ) {
     unlink $backPath;
   }
+
   # If this is already a symlink, remove it
   if ( -l $self->configPath ) {
     unlink $self->configPath;

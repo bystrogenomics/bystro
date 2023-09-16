@@ -3,6 +3,7 @@ use strict;
 use warnings;
 
 use lib '../';
+
 # Takes a yaml file that defines one local file, and splits it on chromosome
 # Only works for tab-delimitd files that have the c
 package Utils::RenameTrack;
@@ -82,8 +83,8 @@ sub go {
   if ( defined $self->_decodedConfig->{output}
     && defined $self->_decodedConfig->{output}{order} )
   {
-    my $trackOrderIdx =
-      first_index { $_ eq $self->name } @{ $self->_decodedConfig->{output}{order} };
+    my $trackOrderIdx = first_index { $_ eq $self->name }
+    @{ $self->_decodedConfig->{output}{order} };
 
     if ( $trackOrderIdx > -1 ) {
       $self->_decodedConfig->{output}{order}[$trackOrderIdx] = $self->renameTo;

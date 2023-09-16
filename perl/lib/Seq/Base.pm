@@ -20,8 +20,10 @@ use Seq::DBManager;
 use Seq::Tracks;
 
 use DDP;
+
 #exports new_with_config
 with 'Seq::Role::ConfigFromFile',
+
   #setLogLevel, setLogPath, setPublisher
   'Seq::Role::Message',
 ############# Required Arguments ###########
@@ -39,7 +41,8 @@ has tracksObj => (
   default  => sub {
     my $self = shift;
 
-    my %config = ( %{ $self->tracks }, ( gettersOnly => $self->readOnly ) );
+    my %config =
+      ( %{ $self->tracks }, ( gettersOnly => $self->readOnly ) );
     return Seq::Tracks->new(%config);
   }
 );

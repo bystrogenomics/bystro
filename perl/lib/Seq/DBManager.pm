@@ -56,13 +56,16 @@ my $internalLog = Log::Fast->new(
 # }
 ####################### Static Properties ############################
 my $instance;
+
 # instanceConfig contains
 # databaseDir => <Path::Tiny>
 # readOnly => <Bool>
 my %instanceConfig;
+
 # Each process should open each environment only once.
 # http://www.lmdb.tech/doc/starting.html
 my %envs;
+
 # We are enforcing a singel transaction per environment for the moment, especially
 # in light of the apparent LMDB_File restriction to this effect
 my %cursors;
@@ -135,6 +138,7 @@ my $mp = Data::MessagePack->new()->prefer_integer()->prefer_float32();
 # Unsafe for $_[2] ; will be modified if an array is passed
 # Read transactions are committed by default
 sub dbReadOne {
+
   #my ($self, $chr, $posAref, $skipCommit, $stringKeys,) = @_;
   #== $_[0], $_[1], $_[2],    $_[3],       $_[4] (don't assign to avoid copy)
 
@@ -145,6 +149,7 @@ sub dbReadOne {
 
   if ( !$db->{db}->Alive ) {
     $db->{db}->Txn = $db->{env}->BeginTxn();
+
     # not strictly necessary, but I am concerned about hard to trace abort bugs related to scope
     $db->{db}->Txn->AutoCommit(1);
   }
@@ -170,6 +175,7 @@ sub dbReadOne {
 # Unsafe for $_[2] ; will be modified if an array is passed
 # Read transactions are committed by default
 sub dbRead {
+
   #my ($self, $chr, $posAref, $skipCommit, $stringKeys) = @_;
   #== $_[0], $_[1], $_[2],    $_[3],       $_[4] (don't assign to avoid copy)
   if ( !ref $_[2] ) {
@@ -184,6 +190,7 @@ sub dbRead {
 
   if ( !$db->{db}->Alive ) {
     $db->{db}->Txn = $db->{env}->BeginTxn();
+
     # not strictly necessary, but I am concerned about hard to trace abort bugs related to scope
     $db->{db}->Txn->AutoCommit(1);
   }
@@ -255,6 +262,7 @@ sub dbPatchHash {
 
   if ( !$db->{db}->Alive ) {
     $db->{db}->Txn = $db->{env}->BeginTxn();
+
     # not strictly necessary, but I am concerned about hard to trace abort bugs related to scope
     $db->{db}->Txn->AutoCommit(1);
   }
@@ -284,11 +292,13 @@ sub dbPatchHash {
     # Allows undefined trackValue
 
     if ( defined $href->{$trackKey} ) {
+
       # Deletion and insertion are mutually exclusive
       if ( $self->delete ) {
         delete $href->{$trackKey};
       }
       elsif ($overwrite) {
+
         # Merge with righthand hash taking precedence, https://ideone.com/SBbfYV
         # Will overwrite any keys of the same name (why it's called $overwrite)
         $href = merge $href, $dataHref;
@@ -308,6 +318,7 @@ sub dbPatchHash {
       }
     }
     elsif ( $self->delete ) {
+
       # We want to delete a non-existant key, skip
       $skip = 1;
     }
@@ -316,6 +327,7 @@ sub dbPatchHash {
     }
   }
   elsif ( $self->delete ) {
+
     # If we want to delete, and no data, there's nothing to do, skip
     $skip = 1;
   }
@@ -349,6 +361,7 @@ sub dbPatchHash {
 # Write transactions are by default committed
 # Removed delete, overwrite capacities
 sub dbPatch {
+
   #my ($self, $chr, $trackIndex, $pos, $trackValue, $mergeFunc, $skipCommit, $stringKeys) = @_;
   #.   $_[0], $_[1] $_[2]        $_[3] $_[4]        $_[5]       $_[6]        $_[7]
 
@@ -364,6 +377,7 @@ sub dbPatch {
 
   if ( !$db->{db}->Alive ) {
     $db->{db}->Txn = $db->{env}->BeginTxn();
+
     # not strictly necessary, but I am concerned about hard to trace abort bugs related to scope
     $db->{db}->Txn->AutoCommit(1);
   }
@@ -376,6 +390,7 @@ sub dbPatch {
 
   if ($LMDB_File::last_err) {
     if ( $LMDB_File::last_err != MDB_NOTFOUND ) {
+
       #$self->
       $_[0]->_errorWithCleanup("dbPatch LMDB error $LMDB_File::last_err");
       return 255;
@@ -390,12 +405,15 @@ sub dbPatch {
   #Undefined track values are allowed as universal-type "missing data" signal
   #$aref->[$trackIndex]
   if ( defined $aref->[ $_[2] ] ) {
+
     #if($mergeFunc) {
     if ( $_[5] ) {
+
       #$aref->[$trackIndex]) = $mergeFunc->($chr, $pos, $aref->[$trackIndex], $trackValue);
       ( my $err, $aref->[ $_[2] ] ) = $_[5]->( $_[1], $_[3], $aref->[ $_[2] ], $_[4] );
 
       if ($err) {
+
         #$self
         $_[0]->_errorWithCleanup("mergeFunc error: $err");
         return 255;
@@ -418,6 +436,7 @@ sub dbPatch {
 
   #if($self->dryRun) {
   if ( $_[0]->dryRun ) {
+
     #$self->
     $_[0]->log( 'info', "DBManager dry run: would have dbPatch $_[1]\:$_[3]" );
   }
@@ -431,6 +450,7 @@ sub dbPatch {
 
   if ($LMDB_File::last_err) {
     if ( $LMDB_File::last_err != MDB_KEYEXIST ) {
+
       #$self->
       $_[0]->_errorWithCleanup("dbPatch put or commit LMDB error $LMDB_File::last_err");
       return 255;
@@ -468,6 +488,7 @@ sub dbPut {
 
   if ( !$db->{db}->Alive ) {
     $db->{db}->Txn = $db->{env}->BeginTxn();
+
     # not strictly necessary, but I am concerned about hard to trace abort bugs related to scope
     $db->{db}->Txn->AutoCommit(1);
   }
@@ -506,6 +527,7 @@ sub dbDelete {
 
   if ( !$db->{db}->Alive ) {
     $db->{db}->Txn = $db->{env}->BeginTxn();
+
     # not strictly necessary, but I am concerned about hard to trace abort bugs related to scope
     $db->{db}->Txn->AutoCommit(1);
   }
@@ -537,6 +559,7 @@ sub dbDelete {
 # Read transactions are by default not committed
 sub dbReadAll {
   my ( $self, $chr, $skipCommit, $stringKeys ) = @_;
+
   #==   $_[0], $_[1], $_[2]
 
   #It is possible not to find a database in dbReadOnly mode (for ex: refSeq for a while didn't have chrM)
@@ -545,6 +568,7 @@ sub dbReadAll {
 
   if ( !$db->{db}->Alive ) {
     $db->{db}->Txn = $db->{env}->BeginTxn();
+
     # not strictly necessary, but I am concerned about hard to trace abort bugs related to scope
     $db->{db}->Txn->AutoCommit(1);
   }
@@ -609,6 +633,7 @@ sub dbDeleteAll {
 
   if ( !$db->{db}->Alive ) {
     $db->{db}->Txn = $db->{env}->BeginTxn();
+
     # not strictly necessary, but I am concerned about hard to trace abort bugs related to scope
     $db->{db}->Txn->AutoCommit(1);
   }
@@ -732,6 +757,7 @@ sub dbStartCursorTxn {
 # Assumes user manages their own transactions
 # Don't copy variables on the stack, since this may be called billions of times
 sub dbReadOneCursorUnsafe {
+
   #my ($self, $cursor, $pos) = @_;
   #$_[0]. $_[1].   $_[2]
 
@@ -740,6 +766,7 @@ sub dbReadOneCursorUnsafe {
 
   if ($LMDB_File::last_err) {
     if ( $LMDB_File::last_err != MDB_NOTFOUND ) {
+
       #$self->_errorWithCleanup
       $_[0]->_errorWithCleanup("dbEndCursorTxn LMDB error: $LMDB_File::last_err");
       return 255;
@@ -755,11 +782,13 @@ sub dbReadOneCursorUnsafe {
 # Don't copy variables on the stack, since this may be called billions of times
 # Instead, modify the passed $posAref (arg 3)
 sub dbReadCursorUnsafe {
+
   #my ($self, $cursor, $posAref) = @_;
   #$_[0]. $_[1].   $_[2]
 
   #foreach(@{$posAref})
   foreach ( @{ $_[2] } ) {
+
     #$cursor->[1]->_get($_, my $json, MDB_SET);
     $_[1]->[1]->_get( $_, my $json, MDB_SET );
 
@@ -768,6 +797,7 @@ sub dbReadCursorUnsafe {
 
   if ($LMDB_File::last_err) {
     if ( $LMDB_File::last_err != MDB_NOTFOUND ) {
+
       #$self
       $_[0]->_errorWithCleanup("dbEndCursorTxn LMDB error: $LMDB_File::last_err");
       return 255;
@@ -786,6 +816,7 @@ sub dbReadCursorUnsafe {
 # LMDB tells you : if you commit the cursor is closed, needs to be renewed
 # Don't copy variables on the stack, since this may be called billions of times
 sub dbPatchCursorUnsafe {
+
   #my ( $self, $cursor, $chr, $dbName, $pos, $newValue, $mergeFunc) = @_;
   #    $_[0]. $_[1].   $_[2]. $_[3].  $_[4] $_[5].     $_[6]
 
@@ -793,8 +824,10 @@ sub dbPatchCursorUnsafe {
   $_[1]->[1]->_get( $_[4], my $json, MDB_SET );
 
   my $existingValue = defined $json ? $mp->unpack($json) : [];
+
   #                            [$dbName]
   if ( defined $existingValue->[ $_[3] ] ) {
+
     # ($mergeFunc)
     if ( $_[6] )
     { #[$dbName]=$mergeFunc->($chr, $pos, $existingValue->[$dbName], $newValue);
@@ -827,6 +860,7 @@ sub dbPatchCursorUnsafe {
   #_put as used here will not return errors if the cursor is inactive
   # hence, "unsafe"
   if ( defined $json ) {
+
     #$cursor->[1]->_put($pos, $mp->pack($existingValue), MDB_CURRENT);
     $_[1]->[1]->_put( $_[4], $mp->pack($existingValue), MDB_CURRENT );
   }
@@ -836,7 +870,9 @@ sub dbPatchCursorUnsafe {
   }
 
   if ($LMDB_File::last_err) {
-    if ( $LMDB_File::last_err != MDB_NOTFOUND && $LMDB_File::last_err != MDB_KEYEXIST ) {
+    if ( $LMDB_File::last_err != MDB_NOTFOUND
+      && $LMDB_File::last_err != MDB_KEYEXIST )
+    {
       #$self->_errorWithCleanup...
       $_[0]->_errorWithCleanup("dbEndCursorTxn LMDB error: $LMDB_File::last_err");
       return 255;
@@ -868,7 +904,9 @@ sub dbEndCursorTxn {
 
   # Allow two relatively innocuous errors, kill for anything else
   if ($LMDB_File::last_err) {
-    if ( $LMDB_File::last_err != MDB_NOTFOUND && $LMDB_File::last_err != MDB_KEYEXIST ) {
+    if ( $LMDB_File::last_err != MDB_NOTFOUND
+      && $LMDB_File::last_err != MDB_KEYEXIST )
+    {
       $self->_errorWithCleanup("dbEndCursorTxn LMDB error: $LMDB_File::last_err");
       return 255;
     }
@@ -917,8 +955,10 @@ sub dbPatchMeta {
   my ( $self, $databaseName, $metaKey, $data ) = @_;
 
   my $dbName = $databaseName . $metaDbNamePart;
+
   # If the user treats this metaKey as a scalar value, overwrite whatever was there
   if ( !ref $data ) {
+
     # undef : commit every transcation
     # 1 : use string keys
     $self->dbPut( $dbName, $metaKey, $data, undef, 1 );
@@ -953,6 +993,7 @@ sub dbDropDatabase {
   my $db = $self->_getDbi( $chr, 0, $stringKeys );
   if ( !$db->{db}->Alive ) {
     $db->{db}->Txn = $db->{env}->BeginTxn();
+
     # not strictly necessary, but I am concerned about hard to trace abort bugs related to scope
     $db->{db}->Txn->AutoCommit(1);
   }
@@ -964,6 +1005,7 @@ sub dbDropDatabase {
 }
 
 sub _getDbi {
+
   # Exists and not defined, because in read only database we may discover
   # that some chromosomes don't have any data (example: hg38 refSeq chrM)
   if ( $envs{ $_[1] } ) {
@@ -978,12 +1020,14 @@ sub _getDbi {
 
   # Create the database, only if that is what is intended
   if ( !$dbPath->is_dir ) {
+
     # If dbReadOnly flag set, this database will NEVER be created during the
     # current execution cycle
     if ( $instanceConfig{readOnly} ) {
       return;
     }
     elsif ($dontCreate) {
+
       # dontCreate does not imply the database will never be created,
       # so we don't want to update $self->_envs
       return;
@@ -1010,6 +1054,7 @@ sub _getDbi {
       mapsize => 128 * 1024 * 1024 * 1024, # Plenty space, don't worry
       #maxdbs => 20, # Some databases
       mode => 0600,
+
       #can't just use ternary that outputs 0 if not read only...
       #MDB_RDONLY can also be set per-transcation; it's just not mentioned
       #in the docs
@@ -1101,6 +1146,7 @@ sub cleanUp {
 
   # We track the unsafe stuff, just as a precaution
   foreach ( keys %cursors ) {
+
     # Check defined because database may be empty (and will be stored as undef)
     if ( defined $cursors{$_} ) {
 
@@ -1121,6 +1167,7 @@ sub cleanUp {
   }
 
   foreach ( keys %envs ) {
+
     # Check defined because database may be empty (and will be stored as undef)
     if ( defined $envs{$_} ) {
       if ( defined $envs{$_}{db} && $envs{$_}{db}->Alive ) {
@@ -1128,6 +1175,7 @@ sub cleanUp {
       }
 
       if ( defined $envs{$_}{env} ) {
+
         # Sync in case MDB_NOSYNC, MDB_MAPASYNC, or MDB_NOMETASYNC were enabled
         # sync(1) flag needed to ensure that disk buffer is flushed with MDB_NOSYNC, MAPASYNC
         $envs{$_}{env}->sync(1);

@@ -19,6 +19,7 @@ use Seq::Tracks::Gene::Definition;
 use Seq::Tracks;
 
 extends 'Seq::Tracks::Build';
+
 #exports regionTrackPath
 with 'Seq::Tracks::Region::RegionTrackPath';
 
@@ -71,6 +72,7 @@ sub BUILD {
   my $self = shift;
 
   $self->getFieldDbName( $geneDef->txErrorName );
+
   # Do this before we build, to avoid threading-related issues
   for my $f (@coordinateFields) {
     $self->getFieldDbName($f);
@@ -85,6 +87,7 @@ sub BUILD {
 # 6) Write nearest genes if user wants those
 sub buildTrack {
   my $self = shift;
+
   # txErrorName isn't a default feature, initializing here to make sure
   # we store this value (if calling for first time) before any threads get to it
   my @allFiles = $self->allLocalFiles;
@@ -122,6 +125,7 @@ sub buildTrack {
 
   # Assume one file per loop, or all sites in one file. Tracks::Build warns if not
   for my $file (@allFiles) {
+
     # Although this should be unnecessary, environments must be created
     # within the process that uses them
     # This provides a measure of safety
@@ -153,6 +157,7 @@ sub buildTrack {
     # If we skipped the $file, will never get here, so this is an error
     # Can happen if only 1 file, with only 1 chromosome (not building all chrs)
     if ( !%all && $seenChrs == 1 ) {
+
       # This returns to parent, in $pm->run_on_finish
       $pm->finish(0);
     }
@@ -170,6 +175,7 @@ sub buildTrack {
 
     TX_LOOP: for my $chr (@allChrs) {
       $visitedChrs{$chr} //= 1;
+
       # We may want to just update the region track,
       # TODO: Note that this won't store any txErrors
       if ( $self->build_region_track_only ) {
@@ -207,7 +213,8 @@ sub buildTrack {
           # https://github.com/salortiz/LMDB_File/issues/30
           my $cursor = $self->db->dbStartCursorTxn($chr);
 
-          INNER: for ( my $i = 0; $i < @{ $txInfo->transcriptSites }; $i += 2 ) {
+          INNER:
+          for ( my $i = 0; $i < @{ $txInfo->transcriptSites }; $i += 2 ) {
             # $txInfo->transcriptSites->[$i] corresponds to $pos, $i + 1 to value
             # Commit for every position
             # This also ensures that $mainMergeFunc will always be called with fresh data
@@ -215,10 +222,13 @@ sub buildTrack {
               $cursor,
               $chr,
               $self->dbName,
+
               #pos
               $txInfo->transcriptSites->[$i],
+
               #value <Array[Scalar]>
               $txInfo->transcriptSites->[ $i + 1 ],
+
               #how we handle cases where multiple overlap
               \&_dbMergeFunc
             );
@@ -229,7 +239,8 @@ sub buildTrack {
 
           if ( @{ $txInfo->transcriptErrors } ) {
             my @errors = @{ $txInfo->transcriptErrors };
-            $regions{$chr}->{$txNumber}{$txErrorDbname} = \@errors;
+            $regions{$chr}->{$txNumber}{$txErrorDbname} =
+              \@errors;
           }
         }
 
@@ -278,8 +289,10 @@ sub buildTrack {
 }
 
 sub _dbMergeFunc {
+
   # Only when called when there is a defined $oldVal
   my ( $chr, $pos, $oldVal, $newVal ) = @_;
+
   # make it an array of arrays (array of geneTrack site records)
   if ( !ref $oldVal->[0] ) {
     return ( undef, [ $oldVal, $newVal ] );
@@ -300,6 +313,7 @@ sub _getIdx {
   chomp $firstLine;
 
   my ( %allIdx, %regionIdx );
+
   # If the user wanted to transform the input field names, do, so source field names match
   # those expected by the track
   my @fields = map { $self->fieldMap->{$_} || $_ } split( '\t', $firstLine );
@@ -491,6 +505,7 @@ sub _writeRegionData {
   my @txNums = sort { $a <=> $b } keys %$regionsHref;
 
   for my $txNumber (@txNums) {
+
     # Patch one at a time, because we assume performance isn't an issue
     # And neither is size, so hash keys are fine
     # TODO: move away from this; don't store any hashes, use arrays
@@ -624,6 +639,7 @@ sub _joinTracksToGeneTrackRegionDb {
         }
 
         if ( defined $hrefToAdd->{$_} ) {
+
           # Our LMDB writer requires a value, so only add to our list of db entries
           # to update if we have a value
           #$self->getFieldDbName generates a name for the field we're joining, named $_

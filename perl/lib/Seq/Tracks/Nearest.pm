@@ -9,7 +9,7 @@ our $VERSION = '0.001';
 =head1 DESCRIPTION
 
   @class B<Seq::Gene>
-  
+
   A Region track that also calculates distance if the user wishes
   IE it pulls any requested features by a region reference (an in 0 to N-1)
   And then if "dist" is specified, calculates that based on the "from" and "to" features
@@ -47,17 +47,21 @@ sub BUILD {
 
   # We only have 1 end
   $self->{_eq} = !$self->to || $self->from eq $self->to;
+
   # We expect to ALWAYS have a from field
   $self->{_fromD} = $self->getFieldDbName( $self->from );
+
   # But "to" is optional
-  $self->{_toD} = !$self->{_eq} ? $self->getFieldDbName( $self->to ) : undef;
+  $self->{_toD} =
+    !$self->{_eq} ? $self->getFieldDbName( $self->to ) : undef;
 
   $self->{_db}     = Seq::DBManager->new();
   $self->{_dbName} = $self->dbName;
 
   # We may or may not want to calculate distance
-  $self->{_dist}         = !!$self->dist;
-  $self->{_fieldDbNames} = [ map { $self->getFieldDbName($_) } @{ $self->features } ];
+  $self->{_dist} = !!$self->dist;
+  $self->{_fieldDbNames} =
+    [ map { $self->getFieldDbName($_) } @{ $self->features } ];
 }
 
 sub setHeaders {
@@ -79,6 +83,7 @@ sub setHeaders {
 }
 
 sub get {
+
   #my ($self, $href, $chr, $refBase, $allele, $positionIdx, $outAccum, $position) = @_
   # $_[0] == $self
   # $_[1] == <ArrayRef> $href : the database data, with each top-level index corresponding to a track
@@ -128,6 +133,7 @@ sub get {
   # Here we accumulate all features, except for the dist (not included in _fieldDbNames)
   my $i = 0;
   for my $fieldDbName ( @{ $_[0]->{_fieldDbNames} } ) {
+
     #$outAccum->[$i][$positionIdx] = $href->[$self->{_dbName}][$self->{_fieldDbNames}[$i]] }
     $_[6]->[$i][ $_[5] ] = $geneDb->[$fieldDbName];
     $i++;
@@ -138,11 +144,13 @@ sub get {
   # Notice that dist is our last feature, because $i incremented +1 here
   if ( $_[0]->{_dist} ) {
     if ( $_[0]->{_eq} || $_[7] < $geneDb->[ $_[0]->{_fromD} ] ) {
+
       # We're before the starting position of the nearest region
       # Or we're only checking one boundary (the from boundary)
       $_[6]->[$i][ $_[5] ] = $geneDb->[ $_[0]->{_fromD} ] - $_[7];
     }
     elsif ( $_[7] <= $geneDb->[ $_[0]->{_toD} ] ) {
+
       # We already know $zeroPos >= $geneDb->[$_[0]->{_fromD}]
       # so if we're here, we are within the range of the requested region at this position
       # ie == 0 distance to the region

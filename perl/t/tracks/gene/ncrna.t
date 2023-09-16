@@ -63,6 +63,7 @@ for my $idx ( 0 .. $#pos ) {
 }
 
 for my $idx ( 0 .. $#pos ) {
+
   # my $base = $baseMapper->baseMap->{$sequence[$idx]};
   my $result = $db->dbReadOne( 'chr19', $pos[$idx] );
 
@@ -80,6 +81,7 @@ my $geneGetter = $tracks->getTrackGetterByName('refSeq');
 
 my $siteTypeDbName = $geneGetter->getFieldDbName('siteType');
 my $funcDbName     = $geneGetter->getFieldDbName('exonicAlleleFunction');
+
 # my $funcDbName = $geneGetter->getFieldDbName('exonicAlleleFunction');
 # my $funcDbName = $geneGetter->getFieldDbName('exonicAlleleFunction');
 # my $funcDbName = $geneGetter->getFieldDbName('exonicAlleleFunction');
@@ -129,6 +131,7 @@ for my $pos ( 0 .. 100000 ) {
   # and 60950 is +0 of the transcript (txStart is closed)
   # anything outside of that is missing/intergenic
   if ( $pos < 60950 || $pos > 70965 ) {
+
     # $intergenic++;
     ok( !defined $mainDbAref->[$geneIdx] );
     next;
@@ -151,12 +154,14 @@ for my $pos ( 0 .. 100000 ) {
 
   if ( $pos >= 61894 && $pos < 66345 ) {
     if ( $pos == 61894 || $pos == 61895 ) {
+
       # we're on the negative strand, so should be acceptor
       ok( $out->[$siteTypeIdx][0] eq $spliceAcceptor );
       next;
     }
 
     if ( $pos == 66343 || $pos == 66344 ) {
+
       # we're on the negative strand, so should be donor at "end"
       ok( $out->[$siteTypeIdx][0] eq $spliceDonor );
       next;
@@ -175,12 +180,14 @@ for my $pos ( 0 .. 100000 ) {
   # 70927 is exonStarts of exon 3
   if ( $pos >= 66499 && $pos < 70927 ) {
     if ( $pos == 66499 || $pos == 66500 ) {
+
       # negative strand
       ok( $out->[$siteTypeIdx][0] eq $spliceAcceptor );
       next;
     }
 
     if ( $pos == 70925 || $pos == 70926 ) {
+
       # negative strand
       ok( $out->[$siteTypeIdx][0] eq $spliceDonor );
       next;

@@ -1,17 +1,17 @@
 """
 This uses the expectation maximization algorithm to fit a latent variable
-model for TADA, with two flavors, a Zero-Inflated Poisson (ZIP) and a 
-standard Poisson. The generative formulation is 
+model for TADA, with two flavors, a Zero-Inflated Poisson (ZIP) and a
+standard Poisson. The generative formulation is
 
 p(z) = Dir(alpha_k)
 p(x_ij|z=k) = (ZI)Poisson(Lambda_{jk})
 
 Obviously the ZIP will have a parameter pi for probability of 0.
 
-ZIP does not have an analytic maximum likelihood formula. This is not a 
+ZIP does not have an analytic maximum likelihood formula. This is not a
 problem for EM,  the M step only requires that we be able to maximize
-the likelihood, not that it has an analytic solution. So we just use 
-standard gradient descent with automatic differentiation in Torch. This 
+the likelihood, not that it has an analytic solution. So we just use
+standard gradient descent with automatic differentiation in Torch. This
 could be naughty if the objective was multimodal, but I strongly doubt that
 this is the case.
 
@@ -46,7 +46,7 @@ class MVTadaPoissonEM:
         Parameters
         ----------
         K : int,default=4
-            The number of clusters, i.e. number of different types of 
+            The number of clusters, i.e. number of different types of
             genes
 
         training_options : dict,default={}
@@ -70,7 +70,7 @@ class MVTadaPoissonEM:
             Whether to print a progress bar while fitting
 
         Lamb_init : np.array-like,shape=(k,p),default=None
-            Initialize the loadings of the model. Defaults to fitting a 
+            Initialize the loadings of the model. Defaults to fitting a
             GMM on the data and using those.
 
         pi_init : np.array-like,shape=(k),default=None
@@ -156,9 +156,7 @@ class MVTadaPoissonEM:
         log_proba = np.zeros((N, self.K))
         for i in range(N):
             for k in range(self.K):
-                log_proba[i, k] = np.sum(
-                    st.poisson.logpmf(data[i], self.Lambda[k])
-                )
+                log_proba[i, k] = np.sum(st.poisson.logpmf(data[i], self.Lambda[k]))
         return log_proba
 
     def _fill_training_options(self, training_options):
@@ -186,7 +184,7 @@ class MVTadaZipEM:
         Parameters
         ----------
         K : int,default=4
-            The number of clusters, i.e. number of different types of 
+            The number of clusters, i.e. number of different types of
             genes
 
         training_options : dict,default={}
@@ -231,9 +229,7 @@ class MVTadaZipEM:
         pct_0 = np.clip(pct_0, 0.01, 0.99)
         pct_0_inv = np.log(pct_0 / (1 - pct_0))
 
-        alpha_ls = [
-            torch.tensor(pct_0_inv, requires_grad=True) for i in range(K)
-        ]
+        alpha_ls = [torch.tensor(pct_0_inv, requires_grad=True) for i in range(K)]
 
         sigmoid = nn.Sigmoid()
 
@@ -249,16 +245,10 @@ class MVTadaZipEM:
                 alpha_k = sigmoid(alpha_ls[k])  # Prob of being 0
 
                 log_likelihood_poisson = -1 * myloss(Lambda_k, data)
-                log_likelihood_poisson_w = log_likelihood_poisson + torch.log(
-                    1 - alpha_k
-                )
+                log_likelihood_poisson_w = log_likelihood_poisson + torch.log(1 - alpha_k)
 
-                log_likelihood_0 = torch.log(
-                    alpha_k + (1 - alpha_k) * torch.exp(-1 * Lambda_k)
-                )
-                log_likelihood_0_b = torch.broadcast_to(
-                    log_likelihood_0, data.shape
-                )
+                log_likelihood_0 = torch.log(alpha_k + (1 - alpha_k) * torch.exp(-1 * Lambda_k))
+                log_likelihood_0_b = torch.broadcast_to(log_likelihood_0, data.shape)
 
                 log_likelihood_point = torch.where(
                     data != 0, log_likelihood_poisson_w, log_likelihood_0_b
@@ -278,25 +268,17 @@ class MVTadaZipEM:
 
                 trainable_variables = [Lambda_list_l[k], alpha_ls[k]]
 
-                optimizer = torch.optim.SGD(
-                    trainable_variables, lr=td["learning_rate"], momentum=0.8
-                )
+                optimizer = torch.optim.SGD(trainable_variables, lr=td["learning_rate"], momentum=0.8)
 
                 for j in range(td["n_inner_iterations"]):
                     Lambda_k = Lambda_list_l[k]
                     alpha_k = sigmoid(alpha_ls[k])
 
                     log_likelihood_poisson = -1 * myloss(Lambda_k, data_sub)
-                    log_likelihood_poisson_w = (
-                        log_likelihood_poisson + torch.log(1 - alpha_k)
-                    )
+                    log_likelihood_poisson_w = log_likelihood_poisson + torch.log(1 - alpha_k)
 
-                    log_likelihood_0 = torch.log(
-                        alpha_k + (1 - alpha_k) * torch.exp(-1 * Lambda_k)
-                    )
-                    log_likelihood_0_b = torch.broadcast_to(
-                        log_likelihood_0, data_sub.shape
-                    )
+                    log_likelihood_0 = torch.log(alpha_k + (1 - alpha_k) * torch.exp(-1 * Lambda_k))
+                    log_likelihood_0_b = torch.broadcast_to(log_likelihood_0, data_sub.shape)
 
                     log_likelihood_point = torch.where(
                         data_sub != 0,
@@ -365,10 +347,7 @@ class MVTadaZipEM:
         for i in range(N):
             for k in range(self.K):
                 log_prob_poisson = st.poisson.logpmf(data[i], self.Lambda[k])
-                log_prob_0 = np.log(
-                    self.Alpha[k]
-                    + (1 - self.Alpha[k]) * np.exp(-1 * self.Lambda[k])
-                )
+                log_prob_0 = np.log(self.Alpha[k] + (1 - self.Alpha[k]) * np.exp(-1 * self.Lambda[k]))
                 probs = log_prob_poisson.copy()
                 probs[data[i] == 0] = log_prob_0[data[i] == 0]
                 log_proba[i, k] = np.sum(probs)

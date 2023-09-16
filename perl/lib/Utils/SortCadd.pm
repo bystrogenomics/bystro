@@ -3,6 +3,7 @@ use strict;
 use warnings;
 
 use lib '../';
+
 # Takes a yaml file that defines one local file, and splits it on chromosome
 # Only works for tab-delimitd files that have the c
 package Utils::SortCadd;
@@ -74,12 +75,14 @@ sub go {
     $self->log( 'info', "Read header line: $headerLine" );
 
     while ( my $l = $readFh->getline() ) {
+
       #https://ideone.com/05wEAl
       #Faster than split
       my $chr = substr( $l, 0, index( $l, "\t" ) );
 
       # May be unwanted if coming from CADD directly
       if ( !exists $wantedChrs{$chr} ) {
+
         #https://ideone.com/JDtX3z
         #CADD files don't use 'chr', but our cadd bed-like files do
         if ( substr( $chr, 0, 3 ) ne 'chr' ) {
@@ -193,6 +196,7 @@ sub go {
         "Failed to sort $outPath. Exit status: $exitStatus. Expect fatal message and program exit."
       );
     }
+
     # returns the exit status for run_on_finish to die
     $pm->finish($exitStatus);
   }

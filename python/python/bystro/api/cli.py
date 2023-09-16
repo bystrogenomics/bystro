@@ -298,9 +298,8 @@ def authenticate(args) -> tuple[CachedAuth, dict]:
     header = {"Authorization": f"Bearer {state.access_token}"}
     return state, header
 
-def get_jobs(
-    args: argparse.Namespace, print_result=True
-) -> list[JobBasicResponse] | dict:
+
+def get_jobs(args: argparse.Namespace, print_result=True) -> list[JobBasicResponse] | dict:
     """
     Fetches the jobs for the given job type, or a single job if a job id is specified.
 
@@ -408,9 +407,7 @@ def create_job(args: argparse.Namespace, print_result=True) -> dict:
     if print_result:
         print(f"\nCreating jobs for files: {','.join(map(lambda x: x[1][0], files))}\n")
 
-    response = requests.post(
-        url, headers=auth_header, data=payload, files=files, timeout=30
-    )
+    response = requests.post(url, headers=auth_header, data=payload, files=files, timeout=30)
 
     if response.status_code != 200:
         raise RuntimeError(
@@ -480,9 +477,7 @@ def main():
     subparsers = parser.add_subparsers(title="commands")
 
     # Adding the user sub-command
-    login_parser = subparsers.add_parser(
-        "login", help="Authenticate with the Bystro API"
-    )
+    login_parser = subparsers.add_parser("login", help="Authenticate with the Bystro API")
     login_parser.add_argument(
         "--host",
         required=True,
@@ -492,12 +487,8 @@ def main():
         "--port", type=int, default=443, help="Port of the Bystro API server, e.g. 443"
     )
     login_parser.add_argument("--email", required=True, help="Email to login with")
-    login_parser.add_argument(
-        "--password", required=True, help="Password to login with"
-    )
-    login_parser.add_argument(
-        "--dir", default=DEFAULT_DIR, help="Where to save Bystro API login state"
-    )
+    login_parser.add_argument("--password", required=True, help="Password to login with")
+    login_parser.add_argument("--dir", default=DEFAULT_DIR, help="Where to save Bystro API login state")
     login_parser.set_defaults(func=login)
 
     signup_parser = subparsers.add_parser("signup", help="Sign up to Bystro")
@@ -520,16 +511,12 @@ def main():
     signup_parser.add_argument(
         "--port", type=int, default=443, help="Port of the Bystro API server, e.g. 443"
     )
-    signup_parser.add_argument(
-        "--dir", default=DEFAULT_DIR, help="Where to save Bystro API login state"
-    )
+    signup_parser.add_argument("--dir", default=DEFAULT_DIR, help="Where to save Bystro API login state")
     signup_parser.set_defaults(func=signup)
 
     user_parser = subparsers.add_parser("get-user", help="Handle user operations")
     user_parser.add_argument("--profile", action="store_true", help="Get user profile")
-    user_parser.add_argument(
-        "--dir", default=DEFAULT_DIR, help="Where Bystro API login state is saved"
-    )
+    user_parser.add_argument("--dir", default=DEFAULT_DIR, help="Where Bystro API login state is saved")
     user_parser.set_defaults(func=get_user)
 
     # Adding the jobs sub-command
@@ -558,18 +545,14 @@ def main():
     )
     create_jobs_parser.set_defaults(func=create_job)
 
-    jobs_parser = subparsers.add_parser(
-        "get-jobs", help="Fetch one job or a list of jobs"
-    )
+    jobs_parser = subparsers.add_parser("get-jobs", help="Fetch one job or a list of jobs")
     jobs_parser.add_argument("--id", type=str, help="Get a specific job by ID")
     jobs_parser.add_argument(
         "--type",
         choices=list(JOB_TYPE_ROUTE_MAP.keys()),
         help="Get a list of jobs of a specific type",
     )
-    jobs_parser.add_argument(
-        "--dir", default=DEFAULT_DIR, help="Where Bystro API login state is saved"
-    )
+    jobs_parser.add_argument("--dir", default=DEFAULT_DIR, help="Where Bystro API login state is saved")
     jobs_parser.set_defaults(func=get_jobs)
 
     args = parser.parse_args()
