@@ -1,0 +1,6 @@
+; Install Code::TidyAll
+; run "tidyall -a" to tidy all files
+; run "tidyall -g" to tidy only files modified from git
+[PerlTidy]
+argv = --pro="$ROOT/.perltidyrc"
+select = {bench,bin,issues,lib,t}/**/*.{pl,pm,t}
