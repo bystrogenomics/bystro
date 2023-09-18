@@ -16,7 +16,7 @@ GNU_TAR_MACOSX = "gtar"
 
 
 def _determine_os() -> OperatingSystem:
-    """Determine whether we're running on Linux or MacOSX."""
+    """Determine whether we're running on Linux or MacOSX by inspecting uname output."""
     result = subprocess.run(["uname", "-a"], capture_output=True, text=True)
     if "Darwin" in result.stdout:
         return OperatingSystem.macosx
