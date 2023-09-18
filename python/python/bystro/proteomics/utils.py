@@ -5,6 +5,8 @@ import subprocess
 
 
 class OperatingSystem(Enum):
+    """Represent the operating system on which code is currently running."""
+
     linux = "linux"
     macosx = "macosx"
 
