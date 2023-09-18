@@ -214,7 +214,7 @@ def _predict(covariance, Xobs, idxs):
     covariance : np.array-like(p,p)
         The covariance matrix
 
-    Xobs : np array-like,(N_samples,\sum idxs)
+    Xobs : np array-like,(N_samples,\\sum idxs)
         The observed data
 
     idxs: np.array-like,(sum(p),)
@@ -222,7 +222,7 @@ def _predict(covariance, Xobs, idxs):
 
     Returns
     -------
-    preds : np.array-like,(N_samples,p-\sum idxs)
+    preds : np.array-like,(N_samples,p-\\sum idxs)
         The predicted values
     """
     covariance_sub = covariance[idxs == 1]
