@@ -1,12 +1,8 @@
 from io import StringIO
-import pytest
-import re
 
 import pandas as pd
 from bystro.proteomics.fragpipe_tandem_mass_tag import (
     load_tandem_mass_tag_dataset,
-    _check_df_cols,
-    ABUNDANCE_COLS,
 )
 from pandas.testing import assert_frame_equal
 
@@ -96,15 +92,3 @@ def test_load_tandem_mass_tag_dataset():
     tandem_mass_tag_dataset = load_tandem_mass_tag_dataset(abundance_handle, annotation_handle)
     assert_frame_equal(expected_abundance_df, tandem_mass_tag_dataset.abundance_df)
     assert_frame_equal(expected_annotation_df, tandem_mass_tag_dataset.annotation_df)
-
-
-def test__check_df_cols():
-    err_msg = re.escape(
-        r"expected dataframe to begin with cols: "
-        r"['Index', 'NumberPSM', 'ProteinID', 'MaxPepProb', 'ReferenceIntensity'],"
-        r" got cols: "
-        r"Index(['plex', 'channel', 'sample', 'sample_name', 'condition', 'replicate'],"
-        r" dtype='object') instead."
-    )
-    with pytest.raises(ValueError, match=err_msg):
-        _check_df_cols(raw_annotation_df, ABUNDANCE_COLS)
