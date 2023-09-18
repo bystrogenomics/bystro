@@ -37,13 +37,13 @@ from bystro.vcf_utils.simulate_random_vcf import HEADER_COLS
 logger = logging.getLogger(__name__)
 
 
-ANCESTRY_DIR = Path().absolute()
+ANCESTRY_DIR = Path(__file__).parent
 DATA_DIR = ANCESTRY_DIR / "data"
 KGP_VCF_DIR = DATA_DIR / "kgp_vcfs"
 INTERMEDIATE_DATA_DIR = ANCESTRY_DIR / "intermediate_data"
 VCF_PATH = DATA_DIR / "1KGP_final_variants_1percent.vcf.gz"
 ANCESTRY_MODEL_PRODUCTS_DIR = ANCESTRY_DIR / "ancestry_model_products"
-#TODO Set up download of gnomad loadings in preprocess step
+# TODO Set up download of gnomad loadings in preprocess step
 GNOMAD_LOADINGS_PATH = "gnomadloadings.tsv"
 # TODO Set up preprocess of this file that doesn't include dependency like plink or bcftools
 KGP_VCF_FILTERED_TO_GNOMAD_LOADINGS_FILEPATH = "1kgpGnomadList.vcf"
@@ -144,7 +144,7 @@ def load_callset_for_variants(variants: set[str]) -> pd.DataFrame:
 
 def _parse_vcf_line_for_dosages(
     line: str, variants_to_keep: Container[Variant]
-) -> tuple[Variant, list[int]] | None:
+) -> tuple[Variant, list[float]] | None:
     # We want to determine if we care about the variant on this line
     # before we parse it in full.  So we'll parse just enough of it to
     # read the variant and filter info: if we want the variant and it
@@ -166,10 +166,18 @@ def _parse_vcf_line_for_dosages(
     if variant in variants_to_keep:
         fields = line.split()  # now we can parse the full line
         variant_dosages = [
-            int(psa[0]) + int(psa[2]) for psa in fields[NUM_VCF_METADATA_COLUMNS:]
-        ]  #  pipe-separated annotation e.g. '0|1'
+            _parse_genotype_field(field) for field in fields[NUM_VCF_METADATA_COLUMNS:]
+        ]  #  genotype fields take the form e.g. '0|1', '0/1', './1 or './.'
         return variant, variant_dosages
     return None
+
+
+def _parse_genotype_field(psa: str) -> float:
+    """Parse a field of the form '0|1', '0/1' or './.' as a dosage."""
+    try:
+        return float(psa[0]) + float(psa[2])
+    except ValueError:
+        return np.nan
 
 
 def _get_chromosome_from_variant(variant: Variant) -> str:
@@ -185,14 +193,18 @@ def _calculate_recovery_rate(
     if len(found_variants) == 0:
         return 0.0
     found_chromosomes = {_get_chromosome_from_variant(v) for v in found_variants}
-    if len(found_chromosomes) > 1:
-        msg = "Found chromosomes contains more than one chromosome"
-        raise ValueError(msg, found_chromosomes)
-    relevant_chromosome = head(found_chromosomes)
-    relevant_variants_to_keep = {
-        v for v in variants_to_keep if _get_chromosome_from_variant(v) == relevant_chromosome
-    }
-    return len(found_variants) / len(relevant_variants_to_keep)
+    # We might have parsed a vcf containing variants for many
+    # chromosomes, or for one only.  if for one chromosome only, we
+    # calculate the recovery rate only for variants belonging to that
+    # chromosome.  Otherwise, we calculate the recovery rate over all
+    # chromosomes.
+    if len(found_chromosomes) == 1:
+        relevant_chromosome = head(found_chromosomes)
+        relevant_variants_to_keep = {
+            v for v in variants_to_keep if _get_chromosome_from_variant(v) == relevant_chromosome
+        }
+        return len(found_variants) / len(relevant_variants_to_keep)
+    return len(found_variants) / len(variants_to_keep)
 
 
 def parse_vcf(
@@ -493,7 +505,7 @@ def _load_1kgp_vcf_to_df() -> pd.DataFrame:
     """Loads in 1kgp vcf filtered using plink2 down to the same variants as the
     gnomad loadings for WGS ancestry analysis.
     """
-    #TODO Determine file structure of final version of preprocessed ref vcf
+    # TODO Determine file structure of final version of preprocessed ref vcf
     vcf_with_header = pd.read_csv(
         KGP_VCF_FILTERED_TO_GNOMAD_LOADINGS_FILEPATH, delimiter="\t", skiprows=107
     )
@@ -502,7 +514,7 @@ def _load_1kgp_vcf_to_df() -> pd.DataFrame:
 
 def convert_1kgp_vcf_to_dosage(vcf_with_header: pd.DataFrame) -> pd.DataFrame:
     """Converts phased genotype vcf to dosage matrix"""
-    #TODO Determine whether we should always expect phased genotypes for reference data for training
+    # TODO Determine whether we should always expect phased genotypes for reference data for training
     dosage_vcf = vcf_with_header.replace("0|0", 0)
     dosage_vcf = dosage_vcf.replace("0|1", 1)
     dosage_vcf = dosage_vcf.replace("1|0", 1)
@@ -513,14 +525,14 @@ def convert_1kgp_vcf_to_dosage(vcf_with_header: pd.DataFrame) -> pd.DataFrame:
 
 
 def process_vcf_for_pc_transformation(dosage_vcf: pd.DataFrame) -> pd.DataFrame:
-    """Process dosage_vcf and transpose so that it only includes 
+    """Process dosage_vcf and transpose so that it only includes
     genotypes in correct configuration for analysis."""
     genos = dosage_vcf.iloc[:, len(HEADER_COLS) :]
     genos = genos.set_index(dosage_vcf.index)
     genos = genos.sort_index()
     # Check that not all genotypes are the same for QC
     assert len(set(genos.to_numpy().flatten())) > 1, "All genotypes are the same"
-    #Transpose genos_overlap for analysis
+    # Transpose genos_overlap for analysis
     genos_transpose = genos.T
     return genos_transpose
 
@@ -535,6 +547,7 @@ def process_pca_loadings(loadings: pd.DataFrame) -> pd.DataFrame:
     """Sanitize additional formatting in Gnomad pc loadings file"""
     pc_loadings: pd.DataFrame = loadings.copy(deep=True)
     pc_loadings[["Chromosome", "Position"]] = pc_loadings["locus"].str.split(":", expand=True)
+
     # Match variant format of gnomad loadings with 1kgp vcf
     def get_chr_pos(x):
         return x["locus"][3:]
@@ -566,7 +579,7 @@ def process_pca_loadings(loadings: pd.DataFrame) -> pd.DataFrame:
 def restrict_loadings_variants_to_vcf(
     pc_loadings: pd.DataFrame, genos_transpose: pd.DataFrame
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Restrict variant list to overlap between gnomad loadings and transposed 
+    """Restrict variant list to overlap between gnomad loadings and transposed
     reference vcf and return versions only including the overlapping variants."""
     # IGSR version of 1kgp is current reference vcf
     var_overlap = pc_loadings.index.intersection(genos_transpose.columns)
@@ -583,8 +596,7 @@ def restrict_loadings_variants_to_vcf(
 
 
 def apply_pca_transform(
-    pc_loadings_overlap: pd.DataFrame,
-    genos_overlap_transpose: pd.DataFrame
+    pc_loadings_overlap: pd.DataFrame, genos_overlap_transpose: pd.DataFrame
 ) -> pd.DataFrame:
     """Transform vcf with genotypes in dosage format with PCs loadings from gnomad PCA."""
     # Dot product
