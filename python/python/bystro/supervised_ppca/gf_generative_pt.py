@@ -15,6 +15,14 @@ analysis allows each diagonal component to be distinct. Models (1) and (3)
 are described in Bishop 2006, while supervised Probabilistic PCA is
 described in several papers, including Yu 2006.
 
+Note that in the code W is a L x p array, where L is the latent dimensionality 
+and  p is the covariate dimension, for implementation convenience. However, 
+mathematically it is often pxL for notational convenience. Given that the 
+most insidious errors are mathematical in nature rather than coding, (as faulty
+math is difficult to detect in unit tests), our notation matches mathematics 
+rather than code, specifically when naming WWT and WTW to match the Bishop 2006
+notation rather than code.
+
 Objects
 -------
 PPCApt(BaseSGDModel)
