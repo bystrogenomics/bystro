@@ -182,7 +182,11 @@ def _get_num_slices(client, index_name, max_query_size, max_slices, query) -> in
     response = client.count(body=query_no_sort, index=index_name)
 
     n_docs = response["count"]
-    assert n_docs > 0
+    if n_docs < 1:
+        err_msg = (
+            f"Expected at least one document in response['count'], got response: {response} instead."
+        )
+        raise RuntimeError(err_msg)
 
     num_slices_necessary = math.ceil(n_docs / max_query_size)
     num_slices_planned = min(num_slices_necessary, max_slices)
