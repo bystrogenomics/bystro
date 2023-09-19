@@ -77,11 +77,12 @@ def _get_projection_matrix(W_, sigma_):
 
 class PPCADropout(PPCA):
     """
-    This implements supervised PPCA according to the paper draft that I'm
-    working on. That is the generative mechanism matches probabilistic 
-    PCA with  isotropic variance. However, a variational lower bound on
-    a predictive objective is used to ensure that a subset of latent 
-    variables are predictive of an auxiliary task.
+    This implements supervised PPCA according to the paper draft in 
+    prepration (Talbot et al, 2023), robust variational inference with
+    variational objectivesThat is the generative mechanism matches 
+    probabilistic PCA with  isotropic variance. However, a variational 
+    lower bound ona predictive objective is used to ensure that a subset 
+    of latent variables are predictive of an auxiliary task.
 
     Parameters
     ----------
