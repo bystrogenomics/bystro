@@ -122,7 +122,7 @@ def _make_output_string_spec(rows, delims):
     for row_idx, row in enumerate(rows):  # pylint:disable=too-many-nested-blocks
         # Some fields may just be missing; we won't store even the alt/pos [[]] structure for those
         row = do_row(row)
-        rows[row_idx] = delims["field"].join(row)
+        rows[row_idx] = row
     return bytes("\n".join(rows) + "\n", encoding="utf-8")
 
 
@@ -144,30 +144,56 @@ def do_row(input_row):
             row[i] = str(column)
             continue
 
-        for j, position_data in enumerate(column):
-            if position_data is None:
-                column[j] = empty_field_char
-                continue
+        column = do_column(column)
+        row[i] = column
+    return delims["field"].join(row)
 
-            if isinstance(position_data, list):
-                inner_values = []
-                for sub in position_data:
-                    if sub is None:
-                        inner_values.append(empty_field_char)
-                        continue
 
-                    if isinstance(sub, list):
-                        inner_values.append(
-                            delims["value"].join(
-                                map(lambda x: str(x) if x is not None else empty_field_char, sub)
-                            )
-                        )
-                    else:
-                        inner_values.append(str(sub))
+def do_column(input_column):
+    column = copy.deepcopy(input_column)
+    delims = get_delimiters()
+    empty_field_char = delims["empty_field"]
 
-                column[j] = delims["position"].join(inner_values)
-        row[i] = delims["overlap"].join(column)
-    return row
+    for j, position_data in enumerate(column):
+        if position_data is None:
+            column[j] = empty_field_char
+            continue
+
+        if isinstance(position_data, list):
+            inner_values = do_position_data(position_data)
+            column[j] = delims["position"].join(inner_values)
+    column = delims["overlap"].join(column)
+    return column
+
+
+def do_position_data(input_position_data):
+    position_data = copy.deepcopy(input_position_data)
+    delims = get_delimiters()
+    empty_field_char = delims["empty_field"]
+
+    inner_values = []
+    for sub in position_data:
+        if sub is None:
+            inner_values.append(empty_field_char)
+            continue
+        inner_values.append(do_sub(sub))
+    return inner_values
+
+
+def do_sub(sub):
+    delims = get_delimiters()
+    empty_field_char = delims["empty_field"]
+    if isinstance(sub, list):
+        return delims["value"].join(map(to_string_or_empty_field_char, sub))
+    else:
+        return str(sub)
+
+
+def to_string_or_empty_field_char(x):
+    delims = get_delimiters()
+    empty_field_char = delims["empty_field"]
+
+    return str(x) if x is not None else empty_field_char
 
 
 def _process_rows(resp, field_names):
