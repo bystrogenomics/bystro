@@ -121,79 +121,54 @@ def _make_output_string_spec(rows, delims):
     empty_field_char = delims["empty_field"]
     for row_idx, row in enumerate(rows):  # pylint:disable=too-many-nested-blocks
         # Some fields may just be missing; we won't store even the alt/pos [[]] structure for those
-        row = do_row(row)
-        rows[row_idx] = row
+        rows[row_idx] = do_row(row, delims)
     return bytes("\n".join(rows) + "\n", encoding="utf-8")
 
 
 import copy
 
 
-def do_row(input_row):
+def do_row(input_row, delims):
     row = copy.deepcopy(input_row)
-    delims = get_delimiters()
-    empty_field_char = delims["empty_field"]
     for i, column in enumerate(row):
-        if column is None:
-            row[i] = empty_field_char
-            continue
-
-        # For now, we don't store multiallelics; top level array is placeholder only
-        # With breadth 1
-        if not isinstance(column, list):
-            row[i] = str(column)
-            continue
-
-        column = do_column(column)
-        row[i] = column
+        row[i] = do_column(column, delims)
     return delims["field"].join(row)
 
 
-def do_column(input_column):
+def do_column(input_column, delims):
     column = copy.deepcopy(input_column)
-    delims = get_delimiters()
-    empty_field_char = delims["empty_field"]
-
+    if column is None:
+        return delims["empty_field"]
+    if not isinstance(column, list):
+        return str(column)
     for j, position_data in enumerate(column):
-        if position_data is None:
-            column[j] = empty_field_char
-            continue
-
         if isinstance(position_data, list):
-            inner_values = do_position_data(position_data)
-            column[j] = inner_values
-    column = delims["overlap"].join(column)
-    return column
+            column[j] = do_position_data(position_data, delims)
+    return delims["overlap"].join(column)
 
 
-def do_position_data(input_position_data):
+def do_position_data(input_position_data, delims):
     position_data = copy.deepcopy(input_position_data)
-    delims = get_delimiters()
-    empty_field_char = delims["empty_field"]
-
+    if position_data is None:
+        return delims["empty_field"]
     inner_values = []
     for sub in position_data:
-        if sub is None:
-            inner_values.append(empty_field_char)
-            continue
-        inner_values.append(do_sub(sub))
+        inner_values.append(do_sub(sub, delims))
     return delims["position"].join(inner_values)
 
 
-def do_sub(sub):
-    delims = get_delimiters()
-    empty_field_char = delims["empty_field"]
+def do_sub(sub, delims):
+    if sub is None:
+        return delims["empty_field"]
     if isinstance(sub, list):
-        return delims["value"].join(map(to_string_or_empty_field_char, sub))
+        sub_strings = [to_string_or_empty_field_char(s, delims) for s in sub]
+        return delims["value"].join(sub_strings)
     else:
         return str(sub)
 
 
-def to_string_or_empty_field_char(x):
-    delims = get_delimiters()
-    empty_field_char = delims["empty_field"]
-
-    return str(x) if x is not None else empty_field_char
+def to_string_or_empty_field_char(x, delims):
+    return str(x) if x is not None else delims["empty_field"]
 
 
 def _process_rows(resp, field_names):
