@@ -161,7 +161,7 @@ def do_column(input_column):
 
         if isinstance(position_data, list):
             inner_values = do_position_data(position_data)
-            column[j] = delims["position"].join(inner_values)
+            column[j] = inner_values
     column = delims["overlap"].join(column)
     return column
 
@@ -177,7 +177,7 @@ def do_position_data(input_position_data):
             inner_values.append(empty_field_char)
             continue
         inner_values.append(do_sub(sub))
-    return inner_values
+    return delims["position"].join(inner_values)
 
 
 def do_sub(sub):
