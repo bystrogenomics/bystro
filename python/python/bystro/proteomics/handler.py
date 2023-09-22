@@ -126,7 +126,11 @@ def _make_output_string_spec(rows, delims):
     return bytes("\n".join(rows) + "\n", encoding="utf-8")
 
 
-def do_row(row):
+import copy
+
+
+def do_row(input_row):
+    row = copy.deepcopy(input_row)
     delims = get_delimiters()
     empty_field_char = delims["empty_field"]
     for i, column in enumerate(row):
