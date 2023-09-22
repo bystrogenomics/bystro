@@ -1,24 +1,24 @@
-from typing import Tuple
-
+"""Query an annotation file and return a list of sample_ids and genes meeting the query criteria."""
+import copy
 import gzip
+import io
 import math
 import os
 import pathlib
 import subprocess
 import traceback
-from typing import Any
 from pathlib import Path
+from typing import Any, Tuple
+
 import numpy as np
-import ray
 import pandas as pd
-from opensearchpy import OpenSearch
-import io
-from bystro.beanstalkd.worker import ProgressPublisher
+import ray
+from bystro.proteomics.tests.example_query import DEFAULT_FIELDS  # TK
+from bystro.proteomics.utils import GNU_TAR_EXECUTABLE_NAME
 from bystro.search.utils.annotation import AnnotationOutputs, get_delimiters
 from bystro.search.utils.messages import SaveJobData
 from bystro.search.utils.opensearch import gather_opensearch_args
-from bystro.proteomics.utils import GNU_TAR_EXECUTABLE_NAME
-from bystro.proteomics.tests.example_query import DEFAULT_FIELDS  # TK
+from opensearchpy import OpenSearch
 from ruamel.yaml import YAML
 
 ray.init(ignore_reinit_error=True, address="auto")
@@ -26,8 +26,8 @@ RAY_ERROR = -1  # the error code we use if a ray remote job fails to return
 
 ONE_DAY = "1d"  # default keep_alive time for opensearch point in time index
 
-
-with open(Path.home() / "bystro/config/opensearch.yml") as search_config_file:
+opensearch_config_filepath = Path.home() / "bystro/config/opensearch.yml"
+with opensearch_config_filepath.open() as search_config_file:
     SEARCH_CONF = YAML(typ="safe").load(search_config_file)
     SEARCH_CONF["connection"]["request_timeout"] = 5
 
@@ -59,11 +59,11 @@ def _get_header(field_names: list[str]) -> Tuple[list[str], list[str | list[str]
 
 
 def _populate_data(
-    field_path: list[str] | str, data_for_end_of_path: list | dict[str, Any] | None
+    field_path: list[str] | str, data_for_end_of_path: list[str] | dict[str, Any] | None
 ) -> dict[str, Any] | list[str] | None:
     if not isinstance(field_path, list) or data_for_end_of_path is None:
         return data_for_end_of_path
-    assert isinstance(data_for_end_of_path, dict)
+    assert isinstance(data_for_end_of_path, dict)  # noqa: S101
     for child_field in field_path:
         data_for_end_of_path = data_for_end_of_path.get(child_field)
         if data_for_end_of_path is None:
@@ -72,70 +72,21 @@ def _populate_data(
     return data_for_end_of_path
 
 
-def _make_output_string(rows: list[list[list[list[str | None]]]], delims: dict[str, str]) -> bytes:
-    empty_field_char = delims["empty_field"]
-    for row_idx, row in enumerate(rows):  # pylint:disable=too-many-nested-blocks
+def _make_output_string(rows: list[list[str]], delims: dict[str, str]) -> bytes:
+    for row_idx, row in enumerate(rows):
         # Some fields may just be missing; we won't store even the alt/pos [[]] structure for those
-        for i, column in enumerate(row):
-            if column is None:
-                row[i] = empty_field_char
-                continue
-
-            # For now, we don't store multiallelics; top level array is placeholder only
-            # With breadth 1
-            if not isinstance(column, list):
-                row[i] = str(column)
-                continue
-
-            for j, position_data in enumerate(column):
-                if position_data is None:
-                    column[j] = empty_field_char
-                    continue
-
-                if isinstance(position_data, list):
-                    inner_values = []
-                    for sub in position_data:
-                        if sub is None:
-                            inner_values.append(empty_field_char)
-                            continue
-
-                        if isinstance(sub, list):
-                            inner_values.append(
-                                delims["value"].join(
-                                    map(lambda x: str(x) if x is not None else empty_field_char, sub)
-                                )
-                            )
-                        else:
-                            inner_values.append(str(sub))
-
-                    column[j] = delims["position"].join(inner_values)
-
-            row[i] = delims["overlap"].join(column)
-
-        rows[row_idx] = delims["field"].join(row)
-
+        rows[row_idx] = _do_row(row, delims)
     return bytes("\n".join(rows) + "\n", encoding="utf-8")
 
 
-def _make_output_string_spec(rows, delims):
-    empty_field_char = delims["empty_field"]
-    for row_idx, row in enumerate(rows):  # pylint:disable=too-many-nested-blocks
-        # Some fields may just be missing; we won't store even the alt/pos [[]] structure for those
-        rows[row_idx] = do_row(row, delims)
-    return bytes("\n".join(rows) + "\n", encoding="utf-8")
-
-
-import copy
-
-
-def do_row(input_row, delims):
+def _do_row(input_row: list, delims: dict[str, str]) -> str:
     row = copy.deepcopy(input_row)
     for i, column in enumerate(row):
-        row[i] = do_column(column, delims)
+        row[i] = _do_column(column, delims)
     return delims["field"].join(row)
 
 
-def do_column(input_column, delims):
+def _do_column(input_column: list | None, delims: dict[str, str]):
     column = copy.deepcopy(input_column)
     if column is None:
         return delims["empty_field"]
@@ -143,21 +94,21 @@ def do_column(input_column, delims):
         return str(column)
     for j, position_data in enumerate(column):
         if isinstance(position_data, list):
-            column[j] = do_position_data(position_data, delims)
+            column[j] = _do_position_data(position_data, delims)
     return delims["overlap"].join(column)
 
 
-def do_position_data(input_position_data, delims):
+def _do_position_data(input_position_data, delims: dict[str, str]):
     position_data = copy.deepcopy(input_position_data)
     if position_data is None:
         return delims["empty_field"]
     inner_values = []
     for sub in position_data:
-        inner_values.append(do_sub(sub, delims))
+        inner_values.append(_do_sub(sub, delims))
     return delims["position"].join(inner_values)
 
 
-def do_sub(sub, delims):
+def _do_sub(sub, delims: dict[str, str]):
     if sub is None:
         return delims["empty_field"]
     if isinstance(sub, list):
@@ -167,7 +118,7 @@ def do_sub(sub, delims):
         return str(sub)
 
 
-def to_string_or_empty_field_char(x, delims):
+def to_string_or_empty_field_char(x, delims: dict[str, str]):
     return str(x) if x is not None else delims["empty_field"]
 
 
@@ -259,7 +210,7 @@ def _process_query_pure(
 
 
 def _get_num_slices(client, index_name, max_query_size, max_slices, query) -> int:
-    """Count number of hits for the index"""
+    """Count number of hits for the index."""
     query_no_sort = query.copy()
     query_no_sort.pop("sort", None)  # delete these keys if present
     query_no_sort.pop("track_total_hits", None)
@@ -276,68 +227,6 @@ def _get_num_slices(client, index_name, max_query_size, max_slices, query) -> in
     num_slices_necessary = math.ceil(n_docs / max_query_size)
     num_slices_planned = min(num_slices_necessary, max_slices)
     return max(num_slices_planned, 1)
-
-
-def run_query_and_write_output(
-    job_data: SaveJobData,
-    search_conf: dict,
-    max_query_size: int = 10_000,
-    max_slices=1024,
-    keep_alive=ONE_DAY,
-) -> AnnotationOutputs:
-    """Main function for running the query and writing the output"""
-    output_dir = Path(job_data.outputBasePath).parent.absolute()
-    basename = Path(job_data.outputBasePath).name
-    pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
-    outputs = AnnotationOutputs.from_path(output_dir, basename, compress=True)
-
-    written_chunks = [os.path.join(output_dir, f"{job_data.indexName}_header")]
-
-    header = bytes("\t".join(job_data.fieldNames) + "\n", encoding="utf-8")
-    with gzip.open(written_chunks[0], "wb") as fw:
-        fw.write(header)  # type: ignore
-
-    search_client_args = gather_opensearch_args(search_conf)
-    client = OpenSearch(**search_client_args)
-
-    query = _preprocess_query(job_data.queryBody)
-    num_slices = _get_num_slices(client, job_data.indexName, max_query_size, max_slices, query)
-    point_in_time = client.create_point_in_time(  # type: ignore[attr-defined]
-        index=job_data.indexName, params={"keep_alive": keep_alive}
-    )
-    pit_id = point_in_time["pit_id"]
-    query["pit"] = {"id": pit_id}
-    query["size"] = max_query_size
-    remote_queries = []
-    try:
-        for slice_id in range(num_slices):
-            chunk_output_name = os.path.join(output_dir, f"{job_data.indexName}_{slice_id}")
-            written_chunks.append(chunk_output_name)
-            slice_query = query.copy()
-            if num_slices > 1:
-                # Slice queries require max > 1
-                slice_query["slice"] = {"id": slice_id, "max": num_slices}
-            remote_query = _process_query.remote(
-                query_args={"body": slice_query},
-                search_client_args=search_client_args,
-                field_names=job_data.fieldNames,
-                chunk_output_name=chunk_output_name,
-                delimiters=get_delimiters(),
-            )
-            remote_queries.append(remote_query)
-        results_processed = ray.get(remote_queries)
-
-        if RAY_ERROR in results_processed:
-            raise IOError("Failed to process chunk")
-
-        _write_tarball(written_chunks, output_dir, outputs)
-    except IOError as io_err:
-        client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore
-        raise IOError(io_err) from io_err
-
-    client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore
-
-    return outputs
 
 
 def run_query_and_write_output_pure(
@@ -369,7 +258,7 @@ def run_query_and_write_output_pure(
             if num_slices > 1:
                 # Slice queries require max > 1
                 slice_query["slice"] = {"id": slice_id, "max": num_slices}
-            remote_query = _process_query_pure.remote(
+            remote_query = _process_query_pure.remote(  # type: ignore[call-arg]
                 query_args={"body": slice_query},
                 search_client_args=search_client_args,
                 field_names=job_data.fieldNames,
@@ -379,14 +268,15 @@ def run_query_and_write_output_pure(
         results_processed = ray.get(remote_queries)
 
         if RAY_ERROR in results_processed:
-            raise IOError("Failed to process chunk")
-    except IOError as io_err:
+            msg = "Failed to process chunk"
+            raise OSError(msg)
+    except OSError as io_err:
         client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore
-        raise IOError(io_err) from io_err
+        raise OSError(io_err) from io_err
 
     client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore
 
-    payload = [header] + results_processed
+    payload = [header, *results_processed]
     payload_str = "".join([byte_str.decode("utf-8") for byte_str in payload])
     samples_and_genes_df = pd.read_csv(io.StringIO(payload_str), sep="\t")
     assert all(
@@ -395,7 +285,7 @@ def run_query_and_write_output_pure(
     samples_and_genes_df = samples_and_genes_df.drop("discordant", axis=1)
     samples_and_genes_df = samples_and_genes_df.rename({"refSeq.name2": "gene_name"}, axis=1)
     output = []
-    for i, row in samples_and_genes_df.iterrows():
+    for _i, row in samples_and_genes_df.iterrows():
         gene_names = deduplicate(split_gene_names(row.gene_name, delimiters))
         homozygotes = row.homozygotes.split("|") if row.homozygotes != "!" else []
         heterozygotes = row.heterozygotes.split("|") if row.heterozygotes != "!" else []
@@ -425,7 +315,8 @@ def _write_tarball(written_chunks: list[str], output_dir: str, outputs: Annotati
     cat_command = f"cat {all_chunks} > {annotation_path}; rm {all_chunks}"
     ret_code = subprocess.call(cat_command, shell=True)
     if ret_code != 0:
-        raise IOError(f"Failed to write {annotation_path}")
+        msg = f"Failed to write {annotation_path}"
+        raise OSError(msg)
 
     tarball_name = os.path.basename(outputs.archived)
     tar_command = (
@@ -435,10 +326,8 @@ def _write_tarball(written_chunks: list[str], output_dir: str, outputs: Annotati
     )
     ret_code = subprocess.call(tar_command, shell=True)
     if ret_code != 0:
-        raise IOError(
-            f"Command: '{tar_command}', failed with retcode {ret_code}, "
-            f"could not generate: {outputs.archived}"
-        )
+        msg = f"Command: '{tar_command}', failed with retcode {ret_code}, could not generate: {outputs.archived}"
+        raise OSError(msg)
 
 
 def _package_opensearch_query_from_query_string(query_string: str) -> dict[str, Any]:
@@ -469,10 +358,9 @@ def get_samples_and_genes(user_query_string: str, index_name: str) -> Tuple[set[
         assembly="hg38",
         queryBody=query,
         indexName=index_name,
-        outputBasePath=None,
+        outputBasePath=".",
         fieldNames=field_names,
     )
-    publisher = ProgressPublisher(host="127.0.0.1", port=1337, queue="proteomics", message=None)
     samples_and_genes_df = run_query_and_write_output_pure(job_data, SEARCH_CONF)
     samples = set(samples_and_genes_df.sample_id)
     genes = set(samples_and_genes_df.gene_name)
