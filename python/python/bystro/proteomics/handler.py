@@ -130,7 +130,6 @@ def do_row(row):
     delims = get_delimiters()
     empty_field_char = delims["empty_field"]
     for i, column in enumerate(row):
-        column = do_column
         if column is None:
             row[i] = empty_field_char
             continue
