@@ -1,6 +1,5 @@
-"""A module to handle the saving of search results into a new annotation"""
 from typing import Tuple
-from typing import Optional
+
 import gzip
 import math
 import os
@@ -8,22 +7,29 @@ import pathlib
 import subprocess
 import traceback
 from typing import Any
-
+from pathlib import Path
 import numpy as np
 import ray
-
+import pandas as pd
 from opensearchpy import OpenSearch
-
-from bystro.beanstalkd.worker import ProgressPublisher, get_progress_reporter
+import io
+from bystro.beanstalkd.worker import ProgressPublisher
 from bystro.search.utils.annotation import AnnotationOutputs, get_delimiters
 from bystro.search.utils.messages import SaveJobData
 from bystro.search.utils.opensearch import gather_opensearch_args
 from bystro.proteomics.utils import GNU_TAR_EXECUTABLE_NAME
+from bystro.proteomics.tests.example_query import DEFAULT_FIELDS  # TK
+from ruamel.yaml import YAML
 
 ray.init(ignore_reinit_error=True, address="auto")
 RAY_ERROR = -1  # the error code we use if a ray remote job fails to return
 
 ONE_DAY = "1d"  # default keep_alive time for opensearch point in time index
+
+
+with open(Path.home() / "bystro/config/opensearch.yml") as search_config_file:
+    SEARCH_CONF = YAML(typ="safe").load(search_config_file)
+    SEARCH_CONF["connection"]["request_timeout"] = 5
 
 
 def _preprocess_query(input_query_body: dict[str, Any]) -> dict[str, Any]:
@@ -32,7 +38,7 @@ def _preprocess_query(input_query_body: dict[str, Any]) -> dict[str, Any]:
 
     deletable_fields = ["aggs", "slice", "size"]
     for field in deletable_fields:
-        clean_query_body.pop("aggs", None)
+        clean_query_body.pop(field, None)
 
     return clean_query_body
 
@@ -40,7 +46,7 @@ def _preprocess_query(input_query_body: dict[str, Any]) -> dict[str, Any]:
 def _get_header(field_names: list[str]) -> Tuple[list[str], list[str | list[str]]]:
     parents: list[str] = []
     children: list[str | list[str]] = []
-    for i, field in enumerate(field_names):
+    for field in field_names:
         if "." in field:
             path = field.split(".")
             parents.append(path[0])
@@ -53,21 +59,20 @@ def _get_header(field_names: list[str]) -> Tuple[list[str], list[str | list[str]
 
 
 def _populate_data(
-    field_path: list[str] | str, data_for_end_of_path: dict[str, Any] | None
-) -> Optional[dict[str, Any]]:
+    field_path: list[str] | str, data_for_end_of_path: list | dict[str, Any] | None
+) -> dict[str, Any] | list[str] | None:
     if not isinstance(field_path, list) or data_for_end_of_path is None:
         return data_for_end_of_path
-
+    assert isinstance(data_for_end_of_path, dict)
     for child_field in field_path:
         data_for_end_of_path = data_for_end_of_path.get(child_field)
-
         if data_for_end_of_path is None:
             return data_for_end_of_path
 
     return data_for_end_of_path
 
 
-def _make_output_string(rows: list[list[None | str]], delims: dict[str, str]) -> bytes:
+def _make_output_string(rows: list[list[list[list[str | None]]]], delims: dict[str, str]) -> bytes:
     empty_field_char = delims["empty_field"]
     for row_idx, row in enumerate(rows):  # pylint:disable=too-many-nested-blocks
         # Some fields may just be missing; we won't store even the alt/pos [[]] structure for those
@@ -112,7 +117,59 @@ def _make_output_string(rows: list[list[None | str]], delims: dict[str, str]) ->
     return bytes("\n".join(rows) + "\n", encoding="utf-8")
 
 
+def _make_output_string_spec(rows, delims):
+    empty_field_char = delims["empty_field"]
+    for row_idx, row in enumerate(rows):  # pylint:disable=too-many-nested-blocks
+        # Some fields may just be missing; we won't store even the alt/pos [[]] structure for those
+        row = do_row(row)
+        rows[row_idx] = delims["field"].join(row)
+    return bytes("\n".join(rows) + "\n", encoding="utf-8")
+
+
+def do_row(row):
+    delims = get_delimiters()
+    empty_field_char = delims["empty_field"]
+    for i, column in enumerate(row):
+        column = do_column
+        if column is None:
+            row[i] = empty_field_char
+            continue
+
+        # For now, we don't store multiallelics; top level array is placeholder only
+        # With breadth 1
+        if not isinstance(column, list):
+            row[i] = str(column)
+            continue
+
+        for j, position_data in enumerate(column):
+            if position_data is None:
+                column[j] = empty_field_char
+                continue
+
+            if isinstance(position_data, list):
+                inner_values = []
+                for sub in position_data:
+                    if sub is None:
+                        inner_values.append(empty_field_char)
+                        continue
+
+                    if isinstance(sub, list):
+                        inner_values.append(
+                            delims["value"].join(
+                                map(lambda x: str(x) if x is not None else empty_field_char, sub)
+                            )
+                        )
+                    else:
+                        inner_values.append(str(sub))
+
+                column[j] = delims["position"].join(inner_values)
+        row[i] = delims["overlap"].join(column)
+    return row
+
+
 def _process_rows(resp, field_names):
+    with open("safe_response.py", "w") as f:
+        f.write(str(resp))
     parent_fields, child_fields = _get_header(field_names)
     try:
         discordant_idx = field_names.index("discordant")
@@ -120,7 +177,8 @@ def _process_rows(resp, field_names):
         err_msg = f"response: {resp} with field_names: {field_names} lacked field: 'discordant'"
         raise ValueError(err_msg)
     rows = []
-    for doc in resp["hits"]["hits"]:
+    docs = resp["hits"]["hits"]
+    for doc in docs:
         row = np.empty(len(field_names), dtype=object)
         for field_name_idx in range(len(field_names)):
             parent_field = parent_fields[field_name_idx]
@@ -141,7 +199,6 @@ def _process_query(
     search_client_args: dict,
     field_names: list,
     chunk_output_name: str,
-    reporter,
     delimiters,
 ):
     """Process OpenSearch query and save results.
@@ -162,15 +219,39 @@ def _process_query(
     assert len(resp["hits"]["hits"]) == resp["hits"]["total"]["value"]
 
     rows = _process_rows(resp, field_names)
+    output_string = _make_output_string(rows, delimiters)
     try:
         with gzip.open(chunk_output_name, "wb") as fw:
-            fw.write(_make_output_string(rows, delimiters))
-        reporter.increment.remote(resp["hits"]["total"]["value"])
+            fw.write(output_string)
+        resp["hits"]["total"]["value"] += 1
     except Exception:
         traceback.print_exc()
         return RAY_ERROR
 
     return resp["hits"]["total"]["value"]
+
+
+@ray.remote
+def _process_query_pure(
+    query_args: dict,
+    search_client_args: dict,
+    field_names: list,
+    delimiters,
+):
+    """Process OpenSearch query and return results."""
+    client = OpenSearch(**search_client_args)
+    resp = client.search(**query_args)
+
+    if resp["hits"]["total"]["value"] == 0:
+        return 0
+
+    # Each sliced scroll chunk should get all records for that chunk
+    assert len(resp["hits"]["hits"]) == resp["hits"]["total"]["value"]
+
+    rows = _process_rows(resp, field_names)
+    print("rows:", rows)
+    output_string = _make_output_string(rows, delimiters)
+    return output_string
 
 
 def _get_num_slices(client, index_name, max_query_size, max_slices, query) -> int:
@@ -196,14 +277,13 @@ def _get_num_slices(client, index_name, max_query_size, max_slices, query) -> in
 def run_query_and_write_output(
     job_data: SaveJobData,
     search_conf: dict,
-    publisher: ProgressPublisher,
     max_query_size: int = 10_000,
     max_slices=1024,
     keep_alive=ONE_DAY,
 ) -> AnnotationOutputs:
     """Main function for running the query and writing the output"""
-    output_dir = os.path.dirname(job_data.outputBasePath)
-    basename = os.path.basename(job_data.outputBasePath)
+    output_dir = Path(job_data.outputBasePath).parent.absolute()
+    basename = Path(job_data.outputBasePath).name
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
     outputs = AnnotationOutputs.from_path(output_dir, basename, compress=True)
 
@@ -224,7 +304,6 @@ def run_query_and_write_output(
     pit_id = point_in_time["pit_id"]
     query["pit"] = {"id": pit_id}
     query["size"] = max_query_size
-    reporter = get_progress_reporter(publisher)
     remote_queries = []
     try:
         for slice_id in range(num_slices):
@@ -239,7 +318,6 @@ def run_query_and_write_output(
                 search_client_args=search_client_args,
                 field_names=job_data.fieldNames,
                 chunk_output_name=chunk_output_name,
-                reporter=reporter,
                 delimiters=get_delimiters(),
             )
             remote_queries.append(remote_query)
@@ -251,11 +329,90 @@ def run_query_and_write_output(
         _write_tarball(written_chunks, output_dir, outputs)
     except IOError as io_err:
         client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore
-        raise IOError(io_err) from io_er
+        raise IOError(io_err) from io_err
 
     client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore
 
     return outputs
+
+
+def run_query_and_write_output_pure(
+    job_data: SaveJobData,
+    search_conf: dict,
+    max_query_size: int = 10_000,
+    max_slices=1024,
+    keep_alive=ONE_DAY,
+) -> pd.DataFrame:
+    assert isinstance(max_query_size, int), type(max_query_size)
+    header = bytes("\t".join(job_data.fieldNames) + "\n", encoding="utf-8")
+
+    search_client_args = gather_opensearch_args(search_conf)
+    client = OpenSearch(**search_client_args)
+    delimiters = get_delimiters()
+
+    query = _preprocess_query(job_data.queryBody)
+    num_slices = _get_num_slices(client, job_data.indexName, max_query_size, max_slices, query)
+    point_in_time = client.create_point_in_time(  # type: ignore[attr-defined]
+        index=job_data.indexName, params={"keep_alive": keep_alive}
+    )
+    pit_id = point_in_time["pit_id"]
+    query["pit"] = {"id": pit_id}
+    query["size"] = max_query_size
+    remote_queries = []
+    try:
+        for slice_id in range(num_slices):
+            slice_query = query.copy()
+            if num_slices > 1:
+                # Slice queries require max > 1
+                slice_query["slice"] = {"id": slice_id, "max": num_slices}
+            remote_query = _process_query_pure.remote(
+                query_args={"body": slice_query},
+                search_client_args=search_client_args,
+                field_names=job_data.fieldNames,
+                delimiters=delimiters,
+            )
+            remote_queries.append(remote_query)
+        results_processed = ray.get(remote_queries)
+
+        if RAY_ERROR in results_processed:
+            raise IOError("Failed to process chunk")
+    except IOError as io_err:
+        client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore
+        raise IOError(io_err) from io_err
+
+    client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore
+
+    payload = [header] + results_processed
+    payload_str = "".join([byte_str.decode("utf-8") for byte_str in payload])
+    samples_and_genes_df = pd.read_csv(io.StringIO(payload_str), sep="\t")
+    assert all(
+        samples_and_genes_df.columns == ["discordant", "homozygotes", "heterozygotes", "refSeq.name2"]
+    )
+    samples_and_genes_df = samples_and_genes_df.drop("discordant", axis=1)
+    samples_and_genes_df = samples_and_genes_df.rename({"refSeq.name2": "gene_name"}, axis=1)
+    output = []
+    for i, row in samples_and_genes_df.iterrows():
+        gene_names = deduplicate(split_gene_names(row.gene_name, delimiters))
+        homozygotes = row.homozygotes.split("|") if row.homozygotes != "!" else []
+        heterozygotes = row.heterozygotes.split("|") if row.heterozygotes != "!" else []
+        for gene_name in gene_names:
+            for heterozygote in heterozygotes:
+                output.append((heterozygote, gene_name, 1))
+            for homozygote in homozygotes:
+                output.append((homozygote, gene_name, 2))
+    return pd.DataFrame(output, columns=["sample_id", "gene_name", "dosage"])
+
+
+def split_gene_names(gene_names: str, delimiters: dict[str, str]) -> list[str]:
+    names = []
+    for group in gene_names.split(delimiters["position"]):
+        for name in group.split(delimiters["overlap"]):
+            names.append(name)
+    return names
+
+
+def deduplicate(xs: list) -> list:
+    return list(set(xs))
 
 
 def _write_tarball(written_chunks: list[str], output_dir: str, outputs: AnnotationOutputs) -> None:
@@ -278,3 +435,41 @@ def _write_tarball(written_chunks: list[str], output_dir: str, outputs: Annotati
             f"Command: '{tar_command}', failed with retcode {ret_code}, "
             f"could not generate: {outputs.archived}"
         )
+
+
+def _package_opensearch_query_from_query_string(query_string: str) -> dict[str, Any]:
+    return {
+        "query": {
+            "bool": {
+                "filter": {
+                    "query_string": {
+                        "default_operator": "AND",
+                        "query": query_string,
+                        "fields": DEFAULT_FIELDS,
+                        "lenient": True,
+                        "phrase_slop": 5,
+                        "tie_breaker": 0.3,
+                    }
+                }
+            }
+        }
+    }
+
+
+def get_samples_and_genes(user_query_string: str, index_name: str) -> Tuple[set[str], set[str]]:
+    """Given a query and index, return a list of samples and genes for subsetting a proteomics matrix."""
+    query = _package_opensearch_query_from_query_string(user_query_string)
+    field_names = ["discordant", "homozygotes", "heterozygotes", "refSeq.name2"]
+    job_data = SaveJobData(
+        submissionID="1337",
+        assembly="hg38",
+        queryBody=query,
+        indexName=index_name,
+        outputBasePath=None,
+        fieldNames=field_names,
+    )
+    publisher = ProgressPublisher(host="127.0.0.1", port=1337, queue="proteomics", message=None)
+    samples_and_genes_df = run_query_and_write_output_pure(job_data, SEARCH_CONF)
+    samples = set(samples_and_genes_df.sample_id)
+    genes = set(samples_and_genes_df.gene_name)
+    return samples, genes
