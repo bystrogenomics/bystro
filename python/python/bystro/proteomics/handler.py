@@ -72,53 +72,54 @@ def _populate_data(
     return data_for_end_of_path
 
 
-def _make_output_string(rows: list[list[str]], delims: dict[str, str]) -> bytes:
-    for row_idx, row in enumerate(rows):
-        # Some fields may just be missing; we won't store even the alt/pos [[]] structure for those
-        rows[row_idx] = _do_row(row, delims)
-    return bytes("\n".join(rows) + "\n", encoding="utf-8")
+Sub = list[str | None] | str | None
+PositionData = list[Sub]
+Column = None | list[PositionData]
+Row = list[Column]
 
 
-def _do_row(input_row: list, delims: dict[str, str]) -> str:
-    row = copy.deepcopy(input_row)
-    for i, column in enumerate(row):
-        row[i] = _do_column(column, delims)
-    return delims["field"].join(row)
+def _make_output_string(rows: list[Row], delims: dict[str, str]) -> bytes:
+    output_rows = [_do_row(row, delims) for row in rows]
+    return bytes("\n".join(output_rows) + "\n", encoding="utf-8")
 
 
-def _do_column(input_column: list | None, delims: dict[str, str]):
-    column = copy.deepcopy(input_column)
+def _do_row(row: Row, delims: dict[str, str]) -> str:
+    output_row = [_do_column(col, delims) for col in row]
+    return delims["field"].join(output_row)
+
+
+def _do_column(column: Column, delims: dict[str, str]):
     if column is None:
         return delims["empty_field"]
     if not isinstance(column, list):
         return str(column)
-    for j, position_data in enumerate(column):
-        if isinstance(position_data, list):
-            column[j] = _do_position_data(position_data, delims)
-    return delims["overlap"].join(column)
+    output_column = [
+        _do_position_data(pos_data, delims) for pos_data in column if isinstance(pos_data, list)
+    ]
+    return delims["overlap"].join(output_column)
 
 
-def _do_position_data(input_position_data, delims: dict[str, str]):
-    position_data = copy.deepcopy(input_position_data)
-    if position_data is None:
-        return delims["empty_field"]
-    inner_values = []
-    for sub in position_data:
-        inner_values.append(_do_sub(sub, delims))
+def _do_position_data(position_data: list[Sub], delims: dict[str, str]):
+    # if position_data is None:
+    #     return delims["empty_field"]
+    inner_values = [_do_sub(sub, delims) for sub in position_data]
     return delims["position"].join(inner_values)
 
 
-def _do_sub(sub, delims: dict[str, str]):
+def _do_sub(sub: Sub, delims: dict[str, str]):
     if sub is None:
         return delims["empty_field"]
     if isinstance(sub, list):
         sub_strings = [to_string_or_empty_field_char(s, delims) for s in sub]
         return delims["value"].join(sub_strings)
+    elif isinstance(sub, str):
+        return sub
     else:
+        raise AssertionError(sub)
         return str(sub)
 
 
-def to_string_or_empty_field_char(x, delims: dict[str, str]):
+def to_string_or_empty_field_char(x: str | None, delims: dict[str, str]):
     return str(x) if x is not None else delims["empty_field"]
 
 
@@ -204,7 +205,7 @@ def _process_query_pure(
     assert len(resp["hits"]["hits"]) == resp["hits"]["total"]["value"]
 
     rows = _process_rows(resp, field_names)
-    print("rows:", rows)
+    # print("rows:", rows)
     output_string = _make_output_string(rows, delimiters)
     return output_string
 
