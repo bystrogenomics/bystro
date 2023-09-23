@@ -1,10 +1,8 @@
 """Query an annotation file and return a list of sample_ids and genes meeting the query criteria."""
-import copy
 import gzip
 import io
 import math
 import os
-import pathlib
 import subprocess
 import traceback
 from pathlib import Path
@@ -88,7 +86,7 @@ def _do_row(row: Row, delims: dict[str, str]) -> str:
     return delims["field"].join(output_row)
 
 
-def _do_column(column: Column, delims: dict[str, str]):
+def _do_column(column: Column, delims: dict[str, str]) -> str:
     if column is None:
         return delims["empty_field"]
     if not isinstance(column, list):
@@ -99,14 +97,13 @@ def _do_column(column: Column, delims: dict[str, str]):
     return delims["overlap"].join(output_column)
 
 
-def _do_position_data(position_data: list[Sub], delims: dict[str, str]):
+def _do_position_data(position_data: list[Sub], delims: dict[str, str]) -> str:
     # if position_data is None:
-    #     return delims["empty_field"]
     inner_values = [_do_sub(sub, delims) for sub in position_data]
     return delims["position"].join(inner_values)
 
 
-def _do_sub(sub: Sub, delims: dict[str, str]):
+def _do_sub(sub: Sub, delims: dict[str, str]) -> str:
     if sub is None:
         return delims["empty_field"]
     if isinstance(sub, list):
@@ -115,23 +112,21 @@ def _do_sub(sub: Sub, delims: dict[str, str]):
     elif isinstance(sub, str):
         return sub
     else:
-        raise AssertionError(sub)
+        raise TypeError(sub)
         return str(sub)
 
 
-def to_string_or_empty_field_char(x: str | None, delims: dict[str, str]):
+def to_string_or_empty_field_char(x: str | None, delims: dict[str, str]) -> str:
     return str(x) if x is not None else delims["empty_field"]
 
 
 def _process_rows(resp, field_names):
-    with open("safe_response.py", "w") as f:
-        f.write(str(resp))
     parent_fields, child_fields = _get_header(field_names)
     try:
         discordant_idx = field_names.index("discordant")
-    except ValueError:
+    except ValueError as val_err:
         err_msg = f"response: {resp} with field_names: {field_names} lacked field: 'discordant'"
-        raise ValueError(err_msg)
+        raise ValueError(err_msg) from val_err
     rows = []
     docs = resp["hits"]["hits"]
     for doc in docs:
@@ -142,9 +137,13 @@ def _process_rows(resp, field_names):
                 child_fields[field_name_idx], doc["_source"].get(parent_field)
             )
         if row[discordant_idx][0][0] is False:
-            row[discordant_idx][0][0] = 0
+            row[discordant_idx][0][0] = "0"
         elif row[discordant_idx][0][0] is True:
-            row[discordant_idx][0][0] = 1
+            row[discordant_idx][0][0] = "1"
+        elif row[discordant_idx][0][0] in ["0", "1"]:
+            pass
+        else:
+            raise AssertionError(row[discordant_idx][0][0])
         rows.append(row)
     return rows
 
@@ -205,7 +204,6 @@ def _process_query_pure(
     assert len(resp["hits"]["hits"]) == resp["hits"]["total"]["value"]
 
     rows = _process_rows(resp, field_names)
-    # print("rows:", rows)
     output_string = _make_output_string(rows, delimiters)
     return output_string
 
@@ -253,31 +251,31 @@ def run_query_and_write_output_pure(
     query["pit"] = {"id": pit_id}
     query["size"] = max_query_size
     remote_queries = []
-    try:
-        for slice_id in range(num_slices):
-            slice_query = query.copy()
-            if num_slices > 1:
-                # Slice queries require max > 1
-                slice_query["slice"] = {"id": slice_id, "max": num_slices}
-            remote_query = _process_query_pure.remote(  # type: ignore[call-arg]
-                query_args={"body": slice_query},
-                search_client_args=search_client_args,
-                field_names=job_data.fieldNames,
-                delimiters=delimiters,
-            )
-            remote_queries.append(remote_query)
-        results_processed = ray.get(remote_queries)
+    for slice_id in range(num_slices):
+        slice_query = query.copy()
+        if num_slices > 1:
+            # Slice queries require max > 1
+            slice_query["slice"] = {"id": slice_id, "max": num_slices}
+        remote_query = _process_query_pure.remote(  # type: ignore[call-arg]
+            query_args={"body": slice_query},
+            search_client_args=search_client_args,
+            field_names=job_data.fieldNames,
+            delimiters=delimiters,
+        )
+        remote_queries.append(remote_query)
+    results_processed = ray.get(remote_queries)
 
-        if RAY_ERROR in results_processed:
-            msg = "Failed to process chunk"
-            raise OSError(msg)
-    except OSError as io_err:
+    if RAY_ERROR in results_processed:
+        msg = "Failed to process chunk"
         client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore
-        raise OSError(io_err) from io_err
-
+        raise OSError(msg)
     client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore
 
     payload = [header, *results_processed]
+    return _process_payload(payload, delimiters)
+
+
+def _process_payload(payload: list[str], delimiters) -> pd.DataFrame:
     payload_str = "".join([byte_str.decode("utf-8") for byte_str in payload])
     samples_and_genes_df = pd.read_csv(io.StringIO(payload_str), sep="\t")
     assert all(
