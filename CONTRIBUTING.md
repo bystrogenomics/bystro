@@ -178,18 +178,13 @@ resolved before merging.
 
 #### Code Review Improvements Over Time
 
-```
-If you follow these guidelines and you are strict with your code
-reviews, you should find that the entire code review process
-tends to go faster and faster over time. Developers learn what is
-required for healthy code, and send you CLs that are great from
-the start, requiring less and less review time. Reviewers learn
-to respond quickly and not add unnecessary latency into the
-review process. But don’t compromise on the code review standards
-or quality for an imagined improvement in velocity—it’s not
-actually going to make anything happen more quickly, in the long
-run.
-```
+> If you follow these guidelines and you are strict with your code reviews, you should find that the
+> entire code review process tends to go faster and faster over time. Developers learn what is
+> required for healthy code, and send you CLs that are great from the start, requiring less and less
+> review time. Reviewers learn to respond quickly and not add unnecessary latency into the review
+> process. But don’t compromise on the code review standards or quality for an imagined improvement in
+> velocity—it’s not actually going to make anything happen more quickly, in the long run.
+
 
 
 ### How to Write Code Review Comments
@@ -246,13 +241,10 @@ future.
 - Remain polite and friendly and keep requests for changes professional
 
 #### On "Cleaning It Up Later"
-```
-A common source of push back is that developers (understandably)
-want to get things done. They don’t want to go through another
-round of review just to get this CL in. So they say they will
-clean something up in a later CL, and thus you should LGTM this
-CL now.
-```
+> A common source of push back is that developers (understandably) want to get things done. They
+> don’t want to go through another round of review just to get this CL in. So they say they will clean
+> something up in a later CL, and thus you should LGTM this CL now.
+
 - "Cleaning it up later" could, theoretically, work
 - But in practice it's rare, because people are human and have other things to do, and scheduled maintenance of technical debt is never as exciting or rewarding as working on new features.
 - It's also harder to come back to something and clean it up later than to clean it up now, because of context switches.
@@ -261,16 +253,16 @@ CL now.
   frustation, avoidance and procrastination when working with that code.
 
 #### General Complaints About Strictness
-```
-If you previously had fairly lax code reviews and you switch to having strict reviews, some
-developers will complain very loudly. Improving the speed of your code reviews usually causes these
-complaints to fade away.
 
-Sometimes it can take months for these complaints to fade away, but eventually developers tend to
-see the value of strict code reviews as they see what great code they help generate. Sometimes the
-loudest protesters even become your strongest supporters once something happens that causes them to
-really see the value you’re adding by being strict.
-```
+> If you previously had fairly lax code reviews and you switch to having strict reviews, some
+> developers will complain very loudly. Improving the speed of your code reviews usually causes these
+> complaints to fade away.
+
+> Sometimes it can take months for these complaints to fade away, but eventually developers tend to
+> see the value of strict code reviews as they see what great code they help generate. Sometimes the
+> loudest protesters even become your strongest supporters once something happens that causes them to
+> really see the value you’re adding by being strict.
+
 #### Resolving Conflicts
 Above all, refer to The Standard of Code Review: "does this PR definitely improve code health overall?" when resolving conflicts.
 
@@ -295,17 +287,17 @@ close that issue.)
 ### Small PRs
 Small, simple CLs are:
 
-```
-- Reviewed more quickly. It’s easier for a reviewer to find five minutes several times to review small CLs than to set aside a 30 minute block to review one large CL.
-- Reviewed more thoroughly. With large changes, reviewers and authors tend to get frustrated by large volumes of detailed commentary shifting back and forth—sometimes to the point where important points get missed or dropped.
-- Less likely to introduce bugs. Since you’re making fewer changes, it’s easier for you and your reviewer to reason effectively about the impact of the CL and see if a bug has been introduced.
-- Less wasted work if they are rejected. If you write a huge CL and then your reviewer says that the overall direction is wrong, you’ve wasted a lot of work.
-- Easier to merge. Working on a large CL takes a long time, so you will have lots of conflicts when you merge, and you will have to merge frequently.
-- Easier to design well. It’s a lot easier to polish the design and code health of a small change than it is to refine all the details of a large change.
-- Less blocking on reviews. Sending self-contained portions of your overall change allows you to continue coding while you wait for your current CL in review.
-- Simpler to roll back. A large CL will more likely touch files that get updated between the initial CL submission and a rollback CL, complicating the rollback (the intermediate CLs will probably need to be rolled back too).
-- Note that reviewers have discretion to reject your change outright for the sole reason of it being too large. Usually they will thank you for your contribution but request that you somehow make it into a series of smaller changes. It can be a lot of work to split up a change after you’ve already written it, or require lots of time arguing about why the reviewer should accept your large change. It’s easier to just write small CLs in the first place.
-```
+
+> - Reviewed more quickly. It’s easier for a reviewer to find five minutes several times to review small CLs than to set aside a 30 minute block to review one large CL.
+> - Reviewed more thoroughly. With large changes, reviewers and authors tend to get frustrated by large volumes of detailed commentary shifting back and forth—sometimes to the point where important points get missed or dropped.
+> - Less likely to introduce bugs. Since you’re making fewer changes, it’s easier for you and your reviewer to reason effectively about the impact of the CL and see if a bug has been introduced.
+> - Less wasted work if they are rejected. If you write a huge CL and then your reviewer says that the overall direction is wrong, you’ve wasted a lot of work.
+> - Easier to merge. Working on a large CL takes a long time, so you will have lots of conflicts when you merge, and you will have to merge frequently.
+> - Easier to design well. It’s a lot easier to polish the design and code health of a small change than it is to refine all the details of a large change.
+> - Less blocking on reviews. Sending self-contained portions of your overall change allows you to continue coding while you wait for your current CL in review.
+> - Simpler to roll back. A large CL will more likely touch files that get updated between the initial CL submission and a rollback CL, complicating the rollback (the intermediate CLs will probably need to be rolled back too).
+> - Note that reviewers have discretion to reject your change outright for the sole reason of it being too large. Usually they will thank you for your contribution but request that you somehow make it into a series of smaller changes. It can be a lot of work to split up a change after you’ve already written it, or require lots of time arguing about why the reviewer should accept your large change. It’s easier to just write small CLs in the first place.
+
 ### What is Small?
 - The ideal PR size is: "one self-contained change"
 - Include relevant tests and documentation in the same PR.
