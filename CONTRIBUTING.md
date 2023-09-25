@@ -109,7 +109,7 @@ ensure that the submitted code is:
 
 - necessary (the problem is worth solving and cannot be solved by any easier method)
 - appropriately designed (the high-level design is a reasonable approach to solving the problem)
-- correct (the code faithfully implements the high leven design)
+- correct (the code faithfully implements the high level design)
 - clear (the code is written so that it's easy to read, modify and extend)
 
 Review also helps to disseminate knowledge of the codebase, and of
