@@ -1,7 +1,7 @@
 """Utility functions for proteomics module."""
 
-from enum import Enum
 import subprocess
+from enum import Enum
 
 
 class OperatingSystem(Enum):
@@ -20,11 +20,10 @@ def _determine_os() -> OperatingSystem:
     result = subprocess.run(["uname", "-a"], capture_output=True, text=True)
     if "Darwin" in result.stdout:
         return OperatingSystem.macosx
-    elif "Linux" in result.stdout:
+    if "Linux" in result.stdout:
         return OperatingSystem.linux
-    else:
-        err_msg = f"Could not determine OS from `uname -a` output: {result.stdout}"
-        raise RuntimeError(err_msg)
+    err_msg = f"Could not determine OS from `uname -a` output: {result.stdout}"
+    raise RuntimeError(err_msg)
 
 
 def _get_gnu_tar_executable_name() -> str:
@@ -35,21 +34,20 @@ def _get_gnu_tar_executable_name() -> str:
     operating_system = _determine_os()
     if operating_system is OperatingSystem.linux:
         return GNU_TAR_LINUX
-    elif operating_system is OperatingSystem.macosx:
+    if operating_system is OperatingSystem.macosx:
         _assert_gtar_installed()
         return GNU_TAR_MACOSX
-    else:
-        err_msg = (
-            "Tried to determine name of GNU tar executable for operating system"
-            f"but didn't recognize operating system: {operating_system}"
-        )
-        raise AssertionError(err_msg)
+    err_msg = (
+        "Tried to determine name of GNU tar executable for operating system"
+        f"but didn't recognize operating system: {operating_system}"
+    )
+    raise AssertionError(err_msg)
 
 
 def _assert_gtar_installed() -> None:
     """Check that gtar is installed, raising RuntimeError if not."""
     try:
-        result = subprocess.run([GNU_TAR_MACOSX, "--version"], capture_output=True, text=True)
+        subprocess.run([GNU_TAR_MACOSX, "--version"], capture_output=True, text=True)
     except FileNotFoundError as fnf_err:
         err_msg = (
             "It looks like you're on a mac but don't have GNU tar installed, "

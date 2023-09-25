@@ -1,14 +1,11 @@
 """Query an annotation file and return a list of sample_ids and genes meeting the query criteria."""
-import gzip
 import io
 import math
 import os
 import subprocess
-import traceback
 from pathlib import Path
 from typing import Any, Tuple
 
-import numpy as np
 import pandas as pd
 import ray
 from bystro.proteomics.tests.example_query import DEFAULT_FIELDS  # TK
@@ -53,6 +50,7 @@ def _get_header(field_names: list[str]) -> Tuple[list[str], list[str | list[str]
             parents.append(field)
             children.append(field)
 
+    assert len(parents) == len(children)
     return parents, children
 
 
@@ -107,7 +105,7 @@ def _do_sub(sub: Sub, delims: dict[str, str]) -> str:
     if sub is None:
         return delims["empty_field"]
     if isinstance(sub, list):
-        sub_strings = [to_string_or_empty_field_char(s, delims) for s in sub]
+        sub_strings = [_to_string_or_empty_field_char(s, delims) for s in sub]
         return delims["value"].join(sub_strings)
     elif isinstance(sub, str):
         return sub
@@ -116,74 +114,57 @@ def _do_sub(sub: Sub, delims: dict[str, str]) -> str:
         return str(sub)
 
 
-def to_string_or_empty_field_char(x: str | None, delims: dict[str, str]) -> str:
+def _to_string_or_empty_field_char(x: str | None, delims: dict[str, str]) -> str:
     return str(x) if x is not None else delims["empty_field"]
 
 
-def _process_rows(resp, field_names):
+from typing import cast
+
+
+def _process_rows(resp: dict, field_names: list[str]) -> list[Row]:
     parent_fields, child_fields = _get_header(field_names)
     try:
         discordant_idx = field_names.index("discordant")
     except ValueError as val_err:
         err_msg = f"response: {resp} with field_names: {field_names} lacked field: 'discordant'"
         raise ValueError(err_msg) from val_err
-    rows = []
+    rows: list[Row] = []
     docs = resp["hits"]["hits"]
     for doc in docs:
-        row = np.empty(len(field_names), dtype=object)
-        for field_name_idx in range(len(field_names)):
-            parent_field = parent_fields[field_name_idx]
-            row[field_name_idx] = _populate_data(
-                child_fields[field_name_idx], doc["_source"].get(parent_field)
-            )
-        if row[discordant_idx][0][0] is False:
-            row[discordant_idx][0][0] = "0"
-        elif row[discordant_idx][0][0] is True:
-            row[discordant_idx][0][0] = "1"
-        elif row[discordant_idx][0][0] in ["0", "1"]:
-            pass
-        else:
-            raise AssertionError(row[discordant_idx][0][0])
-        rows.append(row)
+        row = []
+        for parent_field, child_field in zip(parent_fields, child_fields):
+            row.append(_populate_data(child_field, doc["_source"].get(parent_field)))
+        row[discordant_idx][0][0] = cast(str, _fix_discordancy(row[discordant_idx][0][0]))  # type: ignore
+        rows.append(row)  # type: ignore
     return rows
 
 
-@ray.remote
-def _process_query(
-    query_args: dict,
-    search_client_args: dict,
-    field_names: list,
-    chunk_output_name: str,
-    delimiters,
-):
-    """Process OpenSearch query and save results.
+def _fix_discordancy(x: bool | str) -> str:
+    return {False: "0", True: "1", "0": "0", "1": "1"}[x]
 
-    - Run OpenSearch query against index specified in
-    - search_client_args Write output to disk under chunk_output_name.
-    - Warning: this method does not implement exception-based error
-      handling but returns an error code of RAY_ERROR if any exception is encountered.
-    - returns... what? TK
-    """
-    client = OpenSearch(**search_client_args)
-    resp = client.search(**query_args)
 
-    if resp["hits"]["total"]["value"] == 0:
-        return 0
+# @ray.remote
+# def _process_query(
+#     query_args: dict,
+#     search_client_args: dict,
+#     field_names: list,
+#     chunk_output_name: str,
+#     delimiters,
+# ):
+#     """Process OpenSearch query and save results.
 
-    # Each sliced scroll chunk should get all records for that chunk
-    assert len(resp["hits"]["hits"]) == resp["hits"]["total"]["value"]
+#     - Run OpenSearch query against index specified in
+#     - search_client_args Write output to disk under chunk_output_name.
+#     - Warning: this method does not implement exception-based error
+#       handling but returns an error code of RAY_ERROR if any exception is encountered.
+#     - returns... what? TK
+#     """
 
-    rows = _process_rows(resp, field_names)
-    output_string = _make_output_string(rows, delimiters)
-    try:
-        with gzip.open(chunk_output_name, "wb") as fw:
-            fw.write(output_string)
-        resp["hits"]["total"]["value"] += 1
-    except Exception:
-        traceback.print_exc()
-        return RAY_ERROR
+#     if resp["hits"]["total"]["value"] == 0:
 
-    return resp["hits"]["total"]["value"]
+#     # Each sliced scroll chunk should get all records for that chunk
+
+#         with gzip.open(chunk_output_name, "wb") as fw:
 
 
 @ray.remote
@@ -191,24 +172,38 @@ def _process_query_pure(
     query_args: dict,
     search_client_args: dict,
     field_names: list,
-    delimiters,
-):
+    delimiters: dict[str, str],
+) -> int | bytes:
     """Process OpenSearch query and return results."""
     client = OpenSearch(**search_client_args)
     resp = client.search(**query_args)
+    return _process_response(resp, field_names, delimiters)
 
+
+def _process_response(resp, field_names, delimiters) -> int | bytes:
     if resp["hits"]["total"]["value"] == 0:
         return 0
 
     # Each sliced scroll chunk should get all records for that chunk
-    assert len(resp["hits"]["hits"]) == resp["hits"]["total"]["value"]
-
+    if len(resp["hits"]["hits"]) != resp["hits"]["total"]["value"]:
+        err_msg = (
+            f"response hits: {len(resp['hits']['hits'])} didn't equal "
+            f"total value: {resp['hits']['total']['value']}. "
+            "This is a bug."
+        )
+        raise ValueError(err_msg)
     rows = _process_rows(resp, field_names)
     output_string = _make_output_string(rows, delimiters)
     return output_string
 
 
-def _get_num_slices(client, index_name, max_query_size, max_slices, query) -> int:
+def _get_num_slices(
+    client: OpenSearch,
+    index_name: str,
+    max_query_size: int,
+    max_slices: int,
+    query: dict[str, Any],
+) -> int:
     """Count number of hits for the index."""
     query_no_sort = query.copy()
     query_no_sort.pop("sort", None)  # delete these keys if present
@@ -264,18 +259,19 @@ def run_query_and_write_output_pure(
         )
         remote_queries.append(remote_query)
     results_processed = ray.get(remote_queries)
-
-    if RAY_ERROR in results_processed:
-        msg = "Failed to process chunk"
-        client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore
-        raise OSError(msg)
     client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore
+    if RAY_ERROR in results_processed:
+        failing_idx = results_processed.index(RAY_ERROR)
+        err_msg = (
+            f"Encountered Ray error while processing query {failing_idx} of {len(results_processed)}"
+        )
+        raise OSError(err_msg)
 
     payload = [header, *results_processed]
     return _process_payload(payload, delimiters)
 
 
-def _process_payload(payload: list[str], delimiters) -> pd.DataFrame:
+def _process_payload(payload: list[bytes], delimiters: dict[str, str]) -> pd.DataFrame:
     payload_str = "".join([byte_str.decode("utf-8") for byte_str in payload])
     samples_and_genes_df = pd.read_csv(io.StringIO(payload_str), sep="\t")
     assert all(
