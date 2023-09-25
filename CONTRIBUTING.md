@@ -179,78 +179,100 @@ resolved before merging.
 #### Code Review Improvements Over Time
 
 ```
-If you follow these guidelines and you are strict with your code reviews, you should find that the entire code review process tends to go faster and faster over time. Developers learn what is required for healthy code, and send you CLs that are great from the start, requiring less and less review time. Reviewers learn to respond quickly and not add unnecessary latency into the review process. But don’t compromise on the code review standards or quality for an imagined improvement in velocity—it’s not actually going to make anything happen more quickly, in the long run.
+If you follow these guidelines and you are strict with your code
+reviews, you should find that the entire code review process
+tends to go faster and faster over time. Developers learn what is
+required for healthy code, and send you CLs that are great from
+the start, requiring less and less review time. Reviewers learn
+to respond quickly and not add unnecessary latency into the
+review process. But don’t compromise on the code review standards
+or quality for an imagined improvement in velocity—it’s not
+actually going to make anything happen more quickly, in the long
+run.
 ```
 
 
 ### How to Write Code Review Comments
 How to write code review comments
 #### Summary
-Be kind.
-Explain your reasoning.
-Balance giving explicit directions with just pointing out problems and letting the developer decide.
-Encourage developers to simplify code or add code comments instead of just explaining the complexity to you.
+- Be kind.
+- Explain your reasoning.
+- Balance giving explicit directions with just pointing out problems and letting the developer decide.
+- Encourage developers to simplify code or add code comments instead of just explaining the complexity to you.
 #### Courtesy
-In general, it is important to be courteous and respectful while also being very clear and helpful to the developer whose code you are reviewing. One way to do this is to be sure that you are always making comments about the code and never making comments about the developer. You don’t always have to follow this practice, but you should definitely use it when saying something that might otherwise be upsetting or contentious. For example:
-
-Bad: “Why did you use threads here when there’s obviously no benefit to be gained from concurrency?”
-
-Good: “The concurrency model here is adding complexity to the system without any actual performance benefit that I can see. Because there’s no performance benefit, it’s best for this code to be single-threaded instead of using multiple threads.”
-
+- Be courteous and professional
+- Stick to commenting about the code, rather than about the person who wrote it.
+- Always remember that you might just be misunderstanding.  But also strive to find ways to reduce future misunderstandings.
 #### Explain Why
-One thing you’ll notice about the “good” example from above is that it helps the developer understand why you are making your comment. You don’t always need to include this information in your review comments, but sometimes it’s appropriate to give a bit more explanation around your intent, the best practice you’re following, or how your suggestion improves code health.
+Try to give context and explanation for why you're making your comments.
 
 #### Giving Guidance
-In general it is the developer’s responsibility to fix a CL, not the reviewer’s. You are not required to do detailed design of a solution or write code for the developer.
-
-This doesn’t mean the reviewer should be unhelpful, though. In general you should strike an appropriate balance between pointing out problems and providing direct guidance. Pointing out problems and letting the developer make a decision often helps the developer learn, and makes it easier to do code reviews. It also can result in a better solution, because the developer is closer to the code than the reviewer is.
-
-However, sometimes direct instructions, suggestions, or even code are more helpful. The primary goal of code review is to get the best CL possible. A secondary goal is improving the skills of developers so that they require less and less review over time.
-
-Remember that people learn from reinforcement of what they are doing well and not just what they could do better. If you see things you like in the CL, comment on those too! Examples: developer cleaned up a messy algorithm, added exemplary test coverage, or you as the reviewer learned something from the CL. Just as with all comments, include why you liked something, further encouraging the developer to continue good practices.
+- In general, it's the author's ultimate responsibility to fix a PR, not the reviewer's.
+- But we should always look for opportunities to get a high return on investment by spending a little of our own time in order to save a lot of our colleagues.
+- Aim to strike a balance between giving direct instructions vs. pointing out a problem and advising the author on the options to fix it.
+- Praise what the author did particularly well in addition to identifying problems in code.
 
 #### Label comment severity
-Consider labeling the severity of your comments, differentiating required changes from guidelines or suggestions.
-
-Here are some examples:
-
-Nit: This is a minor thing. Technically you should do it, but it won’t hugely impact things.
-
-Optional (or Consider): I think this may be a good idea, but it’s not strictly required.
-
-FYI: I don’t expect you to do this in this CL, but you may find this interesting to think about for the future.
-
-This makes review intent explicit and helps authors prioritize the importance of various comments. It also helps avoid misunderstandings; for example, without comment labels, authors may interpret all comments as mandatory, even if some comments are merely intended to be informational or optional.
+Make it clear whether you consider your requested change mandatory for approval.  Use the preface
+`nit:` or similar language in order to make clear that a requested change is optional.
 
 #### Accepting Explanations
-If you ask a developer to explain a piece of code that you don’t understand, that should usually result in them rewriting the code more clearly. Occasionally, adding a comment in the code is also an appropriate response, as long as it’s not just explaining overly complex code.
+If you ask for an explanation of a piece of code, *strongly* prefer that the explanation be somehow
+baked into the PR, and not simply as a reply in the code review tool.
 
-Explanations written only in the code review tool are not helpful to future code readers. They are acceptable only in a few circumstances, such as when you are reviewing an area you are not very familiar with and the developer explains something that normal readers of the code would have already known.
+The best response to a request for clarification is usually a rewriting of that code to make the
+reviewer's question unnecessary.  Rewriting code includes refactoring, but also renaming of variable
+or function names, expansion of docstrings, additional tests, updated documentation, &c.
+
+Sometimes the author's reply to a reviewer question can simply be copied and pasted into the code as
+a code comment.  This is most appropriate when the comment addresses *why* a piece of code does what
+it does, and not merely *how* it does it.
+
+Rarely, a direct reply to a reviewer in the code review tool may be appropriate.  This is usually
+only true when the author is communicating information that is unknown to the reviewer, but could be
+normally expected of anyone reading the code.  Bear in mind, though, that in a small organization
+the reviewer is typically *ipso facto* representative of someone who will read the code in the
+future.
+
 ### Handling Pushback in Code Reviews
-Who is right?
-When a developer disagrees with your suggestion, first take a moment to consider if they are correct. Often, they are closer to the code than you are, and so they might really have a better insight about certain aspects of it. Does their argument make sense? Does it make sense from a code health perspective? If so, let them know that they are right and let the issue drop.
-
-However, developers are not always right. In this case the reviewer should further explain why they believe that their suggestion is correct. A good explanation demonstrates both an understanding of the developer’s reply, and additional information about why the change is being requested.
-
-In particular, when the reviewer believes their suggestion will improve code health, they should continue to advocate for the change, if they believe the resulting code quality improvement justifies the additional work requested. Improving code health tends to happen in small steps.
-
-Sometimes it takes a few rounds of explaining a suggestion before it really sinks in. Just make sure to always stay polite and let the developer know that you hear what they’re saying, you just don’t agree.
+#### Who is right?
+- The author is typically closer to the code than the reviewer and may have insight into the problem that the reviewer lacks
+- But the reviewer, by virtue of being further away from the code, is often a better judge of how the code will appear to engineers who will have to maintain it later.
+- Don't be afraid to continue to advocate for changes if the improvement to code health justifies the work required.
 
 #### Upsetting Developers
-Reviewers sometimes believe that the developer will be upset if the reviewer insists on an improvement. Sometimes developers do become upset, but it is usually brief and they become very thankful later that you helped them improve the quality of their code. Usually, if you are polite in your comments, developers actually don’t become upset at all, and the worry is just in the reviewer’s mind. Upsets are usually more about the way comments are written than about the reviewer’s insistence on code quality.
+- Reviewers naturally worry about upsetting authors by requesting changes
+- Sometimes this happens, but it's typically short-lived and authors are usually thankful later that the code is improved
+- Remain polite and friendly and keep requests for changes professional
 
-#### Cleaning It Up Later
-A common source of push back is that developers (understandably) want to get things done. They don’t want to go through another round of review just to get this CL in. So they say they will clean something up in a later CL, and thus you should LGTM this CL now. Some developers are very good about this, and will immediately write a follow-up CL that fixes the issue. However, experience shows that as more time passes after a developer writes the original CL, the less likely this clean up is to happen. In fact, usually unless the developer does the clean up immediately after the present CL, it never happens. This isn’t because developers are irresponsible, but because they have a lot of work to do and the cleanup gets lost or forgotten in the press of other work. Thus, it is usually best to insist that the developer clean up their CL now, before the code is in the codebase and “done.” Letting people “clean things up later” is a common way for codebases to degenerate.
-
-If a CL introduces new complexity, it must be cleaned up before submission unless it is an emergency. If the CL exposes surrounding problems and they can’t be addressed right now, the developer should file a bug for the cleanup and assign it to themselves so that it doesn’t get lost. They can optionally also write a TODO comment in the code that references the filed bug.
+#### On "Cleaning It Up Later"
+```
+A common source of push back is that developers (understandably)
+want to get things done. They don’t want to go through another
+round of review just to get this CL in. So they say they will
+clean something up in a later CL, and thus you should LGTM this
+CL now.
+```
+- "Cleaning it up later" could, theoretically, work
+- But in practice it's rare, because people are human and have other things to do, and scheduled maintenance of technical debt is never as exciting or rewarding as working on new features.
+- It's also harder to come back to something and clean it up later than to clean it up now, because of context switches.
+- A strategy of "cleaning it up later" is, empirically, "a common way for codebases to degenerate".
+  Degenerating code health leads to low velocity and developer morale, with attendant feelings of
+  frustation, avoidance and procrastination when working with that code.
 
 #### General Complaints About Strictness
-If you previously had fairly lax code reviews and you switch to having strict reviews, some developers will complain very loudly. Improving the speed of your code reviews usually causes these complaints to fade away.
+```
+If you previously had fairly lax code reviews and you switch to having strict reviews, some
+developers will complain very loudly. Improving the speed of your code reviews usually causes these
+complaints to fade away.
 
-Sometimes it can take months for these complaints to fade away, but eventually developers tend to see the value of strict code reviews as they see what great code they help generate. Sometimes the loudest protesters even become your strongest supporters once something happens that causes them to really see the value you’re adding by being strict.
-
+Sometimes it can take months for these complaints to fade away, but eventually developers tend to
+see the value of strict code reviews as they see what great code they help generate. Sometimes the
+loudest protesters even become your strongest supporters once something happens that causes them to
+really see the value you’re adding by being strict.
+```
 #### Resolving Conflicts
-If you are following all of the above but you still encounter a conflict between yourself and a developer that can’t be resolved, see The Standard of Code Review for guidelines and principles that can help resolve the conflict.
+Above all, refer to The Standard of Code Review: "does this PR definitely improve code health overall?" when resolving conflicts.
 
 ## Author's guide to code review
 https://google.github.io/eng-practices/review/developer/
