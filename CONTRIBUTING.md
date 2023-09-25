@@ -118,10 +118,12 @@ simulated dry run for code maintenance.  Difficulties that the
 reviewer encounters while reading the code are likely to be
 difficulties that the next engineer will have when modifying it.
 
-https://storage.googleapis.com/pub-tools-public-publication-data/pdf/80735342aebcbfc8af4878373f842c25323cb985.pdf
+The remainder of this section summarizes code review guidelines developed at Google. from the
+reviewer's and author's perspectives.  A study of the effectiveness of these guidelines can be found
+[here](https://storage.googleapis.com/pub-tools-public-publication-data/pdf/80735342aebcbfc8af4878373f842c25323cb985.pdf).
 
 ## Reviewer's guide to code review
-https://google.github.io/eng-practices/review/reviewer/
+This section summarizes Google's [code review guidelines for reviewers](https://google.github.io/eng-practices/review/reviewer/).  
 
 ### The Standard of Code Review
 
@@ -248,7 +250,7 @@ future.
 - "Cleaning it up later" could, theoretically, work
 - But in practice it's rare, because people are human and have other things to do, and scheduled maintenance of technical debt is never as exciting or rewarding as working on new features.
 - It's also harder to come back to something and clean it up later than to clean it up now, because of context switches.
-- A strategy of "cleaning it up later" is, empirically, "a common way for codebases to degenerate".
+- A strategy of cleaning it up later is, empirically, "a common way for codebases to degenerate".
   Degenerating code health leads to low velocity and developer morale, with attendant feelings of
   frustation, avoidance and procrastination when working with that code.
 
@@ -267,7 +269,7 @@ future.
 Above all, refer to The Standard of Code Review: "does this PR definitely improve code health overall?" when resolving conflicts.
 
 ## Author's guide to code review
-https://google.github.io/eng-practices/review/developer/
+This section summarizes Google's [code review guidelines for authors](https://google.github.io/eng-practices/review/developer/).  
 ### Writing Good PR Descriptions
 
 PR descriptions should take the following format:
