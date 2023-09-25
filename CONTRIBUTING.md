@@ -310,13 +310,13 @@ Small, simple CLs are:
 - Make sure you understand what the reviewer is asking for before responding, and ask for clarification if unsure.
 - If you understand but disagree, respond in a way that drives the code review process towards resolution
   instead of shutting it down:
-  ```
-  Bad: “No, I’m not going to do that.”
 
-  Good: “I went with X because of [these pros/cons] with [these tradeoffs]. My understanding is that using Y would be 
-  worse because of [these reasons]. Are you suggesting that Y better serves the original tradeoffs, that we should 
-  weigh the tradeoffs differently, or something else?”
-```
+> Bad: “No, I’m not going to do that.”
+> 
+> Good: “I went with X because of [these pros/cons] with [these tradeoffs]. My understanding is that using Y would be 
+> worse because of [these reasons]. Are you suggesting that Y better serves the original tradeoffs, that we should 
+> weigh the tradeoffs differently, or something else?”
+
   
 - Be courteous and respectful, and try to bear in mind that both author and reviewer have the same
   interests in incorporating the author's contributions while maintaining the overall code health of the
