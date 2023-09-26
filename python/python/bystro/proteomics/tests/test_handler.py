@@ -1,3 +1,5 @@
+import pytest
+
 from bystro.beanstalkd.worker import ProgressPublisher
 from bystro.proteomics.handler import (
     SEARCH_CONF,
@@ -10,11 +12,8 @@ from bystro.proteomics.tests.test_response import resp as TEST_RESPONSE
 from bystro.search.utils.annotation import get_delimiters
 from bystro.search.utils.messages import SaveJobData
 
-INDEX_NAME = "64c889415acb6d3b3e40e07b_63ddc9ce1e740e0020c39928"
+SAMPLE_INDEX_NAME = "64c889415acb6d3b3e40e07b_63ddc9ce1e740e0020c39928"
 DELIMITERS = get_delimiters()
-
-
-DANGEROUS_FIELDS = ["refSeq.refAminoAcid.exact", "refSeq.altAminoAcid.exact"]
 
 
 def my_test_end_to_end2(query, field_names):
@@ -28,7 +27,7 @@ def my_test_end_to_end2(query, field_names):
         submissionID="1337",
         assembly="hg38",
         queryBody=query_copy,
-        indexName=INDEX_NAME,
+        indexName=SAMPLE_INDEX_NAME,
         outputBasePath="foo/bar",
         fieldNames=["discordant", *field_names],
     )
@@ -47,7 +46,7 @@ def my_test_end_to_end_pure(query, field_names):
         submissionID="1337",
         assembly="hg38",
         queryBody=query_copy,
-        indexName=INDEX_NAME,
+        indexName=SAMPLE_INDEX_NAME,
         outputBasePath="foo/bar",
         fieldNames=["discordant", *field_names],
     )
@@ -55,16 +54,13 @@ def my_test_end_to_end_pure(query, field_names):
     return annotation_output
 
 
+@pytest.mark.vpn_integration_test
 def test_get_samples_and_genes():
     query = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
-    samples, genes = get_samples_and_genes(query, INDEX_NAME)
+    samples, genes = get_samples_and_genes(query, SAMPLE_INDEX_NAME)
+    assert 3 == len(samples)
+    assert 689 == len(genes)
 
-
-# def test_populate_data():
-#         "description": [
-#         ],
-#         "ensemblID": [
-#         ],
 
 import copy
 
