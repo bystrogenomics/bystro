@@ -19,6 +19,23 @@ use Path::Tiny;
 use Scalar::Util qw/looks_like_number/;
 use DDP;
 
+sub HaveRequiredBinary {
+  my $binary         = shift;
+  my $path_to_binary = `which $binary`;
+  chomp($path_to_binary); # Remove trailing newline, if any
+  if ($path_to_binary) {
+    return 1;
+  }
+  else {
+    return;
+  }
+}
+
+# Check required binary is available
+if ( !HaveRequiredBinary("bystro-vcf") ) {
+  plan skip_all => "Testing relies on bystro-vcf binary, which is not present";
+}
+
 my $baseMapper = Seq::Tracks::Reference::MapBases->new();
 
 my $config = './t/tracks/vcf/test.scrambled_multiple_files.yml';

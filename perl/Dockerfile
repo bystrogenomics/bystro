@@ -58,7 +58,7 @@ RUN rm -rf /app/LMDB_File
 COPY ./Bytro-0.001.tar.gz .
 
 # Install Bystro
-RUN cpanm -n Bytro-0.001.tar.gz && rm -rf Bytro-0.001.tar.gz
+RUN cpanm Bytro-0.001.tar.gz && rm -rf Bytro-0.001.tar.gz
 
 # Setup enyry point that launches individual perl scripts
 COPY entrypoint.sh /app/bin/
