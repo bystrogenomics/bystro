@@ -17,11 +17,16 @@ GNU_TAR_MACOSX = "gtar"
 
 def _determine_os() -> OperatingSystem:
     """Determine whether we're running on Linux or MacOSX by inspecting uname output."""
-    result = subprocess.run(["uname", "-a"], capture_output=True, text=True)
-    downcased_output = result.stdout.lower()
-    if "darwin" in downcased_output:
+    try:
+        result = subprocess.run(["uname", "-a"], capture_output=True, text=True)
+    except FileNotFoundError as file_not_found_error:
+        err_msg = "Couldn't run `uname -a` in shell to determine OS: "
+        err_msg += "only linux and macosx are supported."
+        raise AssertionError(err_msg) from file_not_found_error
+    downcased_uname_output = result.stdout.lower()
+    if "darwin" in downcased_uname_output:
         return OperatingSystem.macosx
-    if "linux" in downcased_output:
+    if "linux" in downcased_uname_output:
         return OperatingSystem.linux
     err_msg = f"Could not determine OS from `uname -a` output: `{result.stdout}`"
     raise AssertionError(err_msg)
