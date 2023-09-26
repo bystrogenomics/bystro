@@ -23,7 +23,7 @@ def _mock_subprocess_run_macosx_gnu_tar_installed(args: list, **_kwargs: dict[st
     """Simulate subprocess runs on macosx if GNU tar installed."""
     if args == ["uname", "-a"]:
         mock = Mock()
-        mock.stdout = "some string with Darwin in it"
+        mock.stdout = "some uname output string with Darwin in it"
     elif args == ["gtar", "--version"]:
         mock = Mock()
         mock.stdout = "some string with tar in it"
@@ -43,7 +43,7 @@ def _mock_subprocess_run_macosx_gnu_tar_not_installed(args: list, **_kwargs: dic
     print(args)
     if args == ["uname", "-a"]:
         mock = Mock()
-        mock.stdout = "some string with Darwin in it"
+        mock.stdout = "some uname output string with Darwin in it"
     elif args == ["gtar", "--version"]:
         raise FileNotFoundError
     else:
@@ -62,7 +62,7 @@ def _mock_subprocess_run_linux(args: list, **_kwargs: dict[str, Any]) -> Mock:
     """Simulate subprocess runs on linux."""
     if args == ["uname", "-a"]:
         mock = Mock()
-        mock.stdout = "some string with Linux in it"
+        mock.stdout = "some uname output string with Linux in it"
     else:
         err_msg = f"Couldn't interpret args: {args} correctly, this is an error in the test."
         raise AssertionError(err_msg)
@@ -78,7 +78,7 @@ def _mock_subprocess_run_unknown_os(args: list, **_kwargs: dict[str, Any]) -> Mo
     """Simulate subprocess runs some arbitrary unrecognized OS."""
     if args == ["uname", "-a"]:
         mock = Mock()
-        mock.stdout = "some string from unrecognized OS"
+        mock.stdout = "some uname output string from unrecognized OS"
     else:
         err_msg = f"Couldn't interpret args: {args} correctly, this is an error in the test."
         raise AssertionError(err_msg)
