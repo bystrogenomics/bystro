@@ -90,5 +90,5 @@ def _mock_subprocess_run_unknown_os(args: list[str], **_kwargs: dict[str, Any]) 
 
 def test_get_gnu_tar_executable_unknown_os(monkeypatch):
     monkeypatch.setattr(subprocess, "run", _mock_subprocess_run_unknown_os)
-    with pytest.raises(OSError):
+    with pytest.raises(OSError, match="Could not determine OS"):
         _get_gnu_tar_executable_name()
