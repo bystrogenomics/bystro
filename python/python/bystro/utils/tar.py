@@ -11,14 +11,20 @@ class OperatingSystem(Enum):
     macosx = "macosx"
 
 
-GNU_TAR_LINUX = "tar"
-GNU_TAR_MACOSX = "gtar"
+# here and throughout, fully qualify executable names to avoid privilege escalation
+GNU_TAR_LINUX = "/usr/bin/tar"
+GNU_TAR_MACOSX = "/opt/homebrew/bin/gtar"
 
 
 def _determine_os() -> OperatingSystem:
     """Determine whether we're running on Linux or MacOSX by inspecting uname output."""
     try:
-        result = subprocess.run(["uname", "-a"], capture_output=True, text=True)
+        result = subprocess.run(
+            ["/usr/bin/uname", "-a"],  # noqa: S603 (this input is safe)
+            capture_output=True,
+            text=True,
+            check=True,
+        )
     except FileNotFoundError as file_not_found_error:
         err_msg = "Couldn't run `uname -a` in shell to determine OS: "
         err_msg += "only linux and macosx are supported."
@@ -53,7 +59,12 @@ def _get_gnu_tar_executable_name() -> str:
 def _assert_gtar_installed_on_macosx() -> None:
     """Check that gtar is installed, raising RuntimeError if not."""
     try:
-        subprocess.run([GNU_TAR_MACOSX, "--version"], capture_output=True, text=True)
+        subprocess.run(
+            [GNU_TAR_MACOSX, "--version"],  # noqa: S603 (this input is safe)
+            capture_output=True,
+            text=True,
+            check=True,
+        )
     except FileNotFoundError as file_not_found_error:
         err_msg = "Could not detect GNU tar on system, try: `brew install gnu-tar`"
         raise RuntimeError(err_msg) from file_not_found_error
