@@ -26,7 +26,7 @@ def _mock_subprocess_run_macosx_gnu_tar_installed(args: list[str], **_kwargs: di
     if args == ["/usr/bin/uname", "-a"]:
         mock = Mock()
         mock.stdout = "some uname output string with Darwin in it"
-    elif args == [GNU_TAR_MACOSX, "--version"]:
+    elif args == ["/opt/homebrew/bin/gtar", "--version"]:
         mock = Mock()
         mock.stdout = "some string with tar in it"
     else:
@@ -47,7 +47,7 @@ def _mock_subprocess_run_macosx_gnu_tar_not_installed(
     if args == ["/usr/bin/uname", "-a"]:
         mock = Mock()
         mock.stdout = "some uname output string with Darwin in it"
-    elif args == [GNU_TAR_MACOSX, "--version"]:
+    elif args == ["/opt/homebrew/bin/gtar", "--version"]:
         raise FileNotFoundError
     else:
         err_msg = f"Couldn't interpret args: {args} correctly, this is an error in the test."
@@ -79,7 +79,7 @@ def test_get_gnu_tar_executable_linux(monkeypatch):
 
 def _mock_subprocess_run_unknown_os(args: list[str], **_kwargs: dict[str, Any]) -> Mock:
     """Simulate subprocess runs some arbitrary unrecognized OS."""
-    if args == ["uname", "-a"]:
+    if args == ["/usr/bin/uname", "-a"]:
         mock = Mock()
         mock.stdout = "some uname output string from unrecognized OS"
     else:
@@ -90,5 +90,5 @@ def _mock_subprocess_run_unknown_os(args: list[str], **_kwargs: dict[str, Any]) 
 
 def test_get_gnu_tar_executable_unknown_os(monkeypatch):
     monkeypatch.setattr(subprocess, "run", _mock_subprocess_run_unknown_os)
-    with pytest.raises(AssertionError):
+    with pytest.raises(OSError):
         _get_gnu_tar_executable_name()
