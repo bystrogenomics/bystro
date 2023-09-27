@@ -5,7 +5,7 @@ from enum import Enum
 
 
 class OperatingSystem(Enum):
-    """Represent the operating system on which code is currently running."""
+    """Represent the operating system on the current Python process is running."""
 
     linux = "linux"
     macosx = "macosx"
