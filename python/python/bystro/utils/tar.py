@@ -54,11 +54,10 @@ def _get_gnu_tar_executable_name() -> str:
     operating_system = _determine_os()
     if operating_system is OperatingSystem.linux:
         return GNU_TAR_LINUX
-    elif operating_system is OperatingSystem.macosx:
+    if operating_system is OperatingSystem.macosx:
         _assert_gtar_installed_on_macosx()
         return GNU_TAR_MACOSX
-    else:
-        return assert_never(operating_system)
+    return assert_never(operating_system)
 
 
 def _assert_gtar_installed_on_macosx() -> None:
