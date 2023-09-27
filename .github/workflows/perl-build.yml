@@ -1,7 +1,9 @@
-name: perl-build
+name: bystro-perl
+
 on: [push, pull_request]
 
 jobs:
+
   test:
     runs-on: ubuntu-latest
 
@@ -9,29 +11,17 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
-    - name: Set up Perl
-      uses: shogo82148/actions-setup-perl@v1
+    - name: Setup perl and dependencies
+      uses: ./.github/actions/setup-perl
       with:
         perl-version: '5.34'
-        working-directory: perl
 
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libmysqlclient-dev
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-    - name: Install dependencies
+    - name: Test Bystro perl codebase
       run: |
-        cpanm Dist::Zilla Archive::Tar::Wrapper
-        cpanm https://github.com/bystrogenomics/msgpack-perl.git
-        cpanm --force MouseX::Getopt
-        git clone --recurse-submodules https://github.com/salortiz/LMDB_File.git \
-          && cd LMDB_File \
-          && perl Makefile.PL \
-          && make test \
-          && make install && rm -rf /app/LMDB_File
+        cd perl
         dzil authordeps | cpanm
-
-    - name: Run tests
-      run: |
-        dzil build --no-tgz .
+        dzil listdeps | cpanm
+        dzil test

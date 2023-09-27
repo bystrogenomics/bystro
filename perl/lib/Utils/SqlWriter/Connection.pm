@@ -3,7 +3,9 @@ use strict;
 use warnings;
 
 package Utils::SqlWriter::Connection;
+
 use DBI;
+use DBD::mysql;
 
 our $VERSION = '0.001';
 
@@ -52,6 +54,12 @@ sub connect {
 
   $databaseName = $self->database || $databaseName;
 
+  if ( !$self->have_driver( $self->driver ) ) {
+    print STDERR "unrecognized driver: " . $self->driver;
+    print STDERR "update Utils/SqlWriter/Connection.pm with driver to correct";
+    exit 1;
+  }
+
   my $connection = $self->driver;
   $connection .= ":database=$databaseName;host=" . $self->host
     if $self->host;
@@ -69,6 +77,17 @@ sub connect {
       AutoCommit => 1
     }
   );
+}
+
+sub have_driver {
+  my $self   = shift;
+  my $driver = shift;
+
+  if ( $driver =~ m/mysql/ ) {
+    return 1;
+  }
+
+  return;
 }
 
 __PACKAGE__->meta->make_immutable();

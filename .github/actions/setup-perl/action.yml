@@ -1,0 +1,32 @@
+name: 'Setup Perl with build dependencies'
+description: 'Sets up a specific version of Perl and installs author dependencies'
+
+inputs:
+  perl-version:
+    description: 'Version of Perl to setup'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup perl
+      uses: shogo82148/actions-setup-perl@v1
+      with:
+        perl-version: ${{ inputs.perl-version }}
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y lz4
+
+    - name: Install perl dependencies
+      shell: bash
+      run: |
+        cpanm Dist::Zilla Archive::Tar::Wrapper
+        cpanm https://github.com/bystrogenomics/msgpack-perl.git
+        cpanm --force MouseX::Getopt
+        git clone --recurse-submodules https://github.com/salortiz/LMDB_File.git \
+          && cd LMDB_File \
+          && perl Makefile.PL \
+          && make test \
+          && make install && rm -rf /app/LMDB_File

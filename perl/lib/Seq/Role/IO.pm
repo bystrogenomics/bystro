@@ -42,6 +42,7 @@ has delimiter => (
   writer  => '_setDelimiter',
 );
 
+# TODO: should check for return and hault if required external dependencies are not found
 my $tar  = which('tar');
 my $gzip = which('bgzip') || which('pigz') || which('gzip');
 my $lz4  = which('lz4');

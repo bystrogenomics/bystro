@@ -16,8 +16,6 @@ use Seq::Tracks::Score::Build::Round;
 
 use YAML::XS qw/LoadFile Dump/;
 
-plan skip_all => 'TODO: Fix this test';
-
 my $config = LoadFile('./t/utils/filterCadd.yml');
 
 Seq::DBManager::initialize( { databaseDir => $config->{database_dir}, } );
@@ -76,6 +74,8 @@ my $filter = Utils::FilterCadd->new(
     config     => './t/utils/filterCadd.yml',
     name       => 'cadd',
     maxThreads => 1,
+    utilName   => 'fetch',
+    compress   => 0
   }
 );
 

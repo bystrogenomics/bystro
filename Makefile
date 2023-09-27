@@ -1,5 +1,4 @@
 # Assumes you have run ". .initialize-conda-env.sh"; since each make command runs in a separate subshell we need this to happen first
-
 build:
 	cd python && maturin build --release && cd ../
 
@@ -14,8 +13,20 @@ serve-dev: develop
 
 clean:
 	@find . -iname "*.bak" -print0 | xargs -0 rm -f
-	@rm -f perl/Bytro-0.001.tar.gz
-	@rm -rf perl/Bytro-0.001
+	@find perl/t -name "*.mdb" -print0 | xargs -0 rm -f
+	@rm -f perl/Bytro-*.tar.gz
+	@rm -rf perl/Bytro-*
 
 build-bystro-docker:
 	@cd perl && dzil build && docker build -t bystro .
+
+build-bystro:
+	@cd perl
+	@dzil authordeps | cpanm
+	@dzil build
+
+test-bystro:
+	@cd perl
+	@dzil authordeps | cpanm
+	@dzil listdeps | cpanm
+	@dzil test
