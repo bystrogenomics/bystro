@@ -15,6 +15,7 @@ runs:
         perl-version: ${{ inputs.perl-version }}
 
     - name: Install system dependencies
+      shell: bash
       run: |
         sudo apt-get update
         sudo apt-get install -y lz4
