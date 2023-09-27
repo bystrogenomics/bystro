@@ -1,0 +1,35 @@
+name: Bystro Annotator Build & Test
+
+on: pull_request
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Load cached Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/docker-layers
+          key: docker-layers-${{ runner.os }}-${{ hashFiles('Dockerfile') }}
+          restore-keys: |
+            docker-layers-${{ runner.os }}-
+      
+      - name: Build Docker image
+        run: |
+          # Check if there's a cache hit. If so, load from cache.
+          if [[ -d "/tmp/docker-layers" ]]; then
+            cat /tmp/docker-layers/*.tar | docker load
+          fi
+          docker build -t bystro .
+          
+          # Save Docker layers to cache.
+          mkdir -p /tmp/docker-layers
+          docker save bystro:latest | gzip -1 > /tmp/docker-layers/image.tar
+
+      - name: Run tests in Docker container
+        run: |
+          docker run bystro prove ../t/**
