@@ -11,7 +11,7 @@ def test_get_bystro_project_root():
 
 @patch("pathlib.Path.glob", return_value=[])
 def test_get_bystro_project_root_error_case(mocked_glob):  # noqa: ARG001  (arg is actually necessary)
-    """Test case where Path.glob never returns startup.yml."""
+    """Test case where Path.glob never finds startup.yml in any directory it searches."""
     with pytest.raises(FileNotFoundError, match="this is a bug"):
         get_bystro_project_root()
 
