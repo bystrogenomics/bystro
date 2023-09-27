@@ -35,7 +35,7 @@ def _determine_os() -> OperatingSystem:
     if "linux" in downcased_uname_output:
         return OperatingSystem.linux
     err_msg = f"Could not determine OS from `uname -a` output: `{result.stdout}`"
-    raise AssertionError(err_msg)
+    raise OSError(err_msg)
 
 
 def _get_gnu_tar_executable_name() -> str:
@@ -53,7 +53,7 @@ def _get_gnu_tar_executable_name() -> str:
         "Tried to determine name of GNU tar executable for operating system"
         f"but didn't recognize operating system: `{operating_system}`"
     )
-    raise AssertionError(err_msg)
+    raise OSError(err_msg)
 
 
 def _assert_gtar_installed_on_macosx() -> None:
