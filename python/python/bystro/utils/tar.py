@@ -33,8 +33,9 @@ def _determine_os() -> OperatingSystem:
             check=True,
         )
     except FileNotFoundError as file_not_found_error:
-        err_msg = "Couldn't run `uname -a` in shell to determine OS: "
-        err_msg += "only linux and macosx are supported."
+        err_msg = (
+            "Couldn't run `uname -a` in shell to determine OS: only linux and macosx are supported."
+        )
         raise AssertionError(err_msg) from file_not_found_error
     downcased_uname_output = result.stdout.lower()
     if "darwin" in downcased_uname_output:
