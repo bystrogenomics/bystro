@@ -32,4 +32,4 @@ jobs:
 
       - name: Run tests in Docker container
         run: |
-          docker run bystro prove ../t/**
+          docker run bystro prove /bystro/t/**
