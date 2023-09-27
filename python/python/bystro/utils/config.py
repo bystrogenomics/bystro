@@ -19,9 +19,9 @@ def get_bystro_project_root() -> Path:
     # find project root by walking up the tree until we get to top level bystro directory.
     # The bystro top level is assumed to be the unique directory containing a startup.yml file.
     path = Path().absolute()
-    ROOT = Path("/")
+    FILESYSTEM_ROOT = Path("/")
     found_startup_file = False
-    while path != ROOT:
+    while path != FILESYSTEM_ROOT:
         if any(path.glob("startup.yml")):
             found_startup_file = True
             break
