@@ -1,7 +1,8 @@
-"""Utility functions for proteomics module."""
+"""Utility functions for safely invoking tar in cross-OS manner."""
 
 import subprocess
 from enum import Enum
+from typing import NoReturn
 
 
 class OperatingSystem(Enum):
@@ -14,6 +15,12 @@ class OperatingSystem(Enum):
 # here and throughout, fully qualify executable names to avoid privilege escalation
 GNU_TAR_LINUX = "/usr/bin/tar"
 GNU_TAR_MACOSX = "/opt/homebrew/bin/gtar"
+
+
+def assert_never(value: NoReturn) -> NoReturn:
+    """Raise error for mypy if code is proven reachable."""
+    msg = f"Unhandled value: {value} ({type(value).__name__})"
+    raise AssertionError(msg)
 
 
 def _determine_os() -> OperatingSystem:
@@ -46,14 +53,11 @@ def _get_gnu_tar_executable_name() -> str:
     operating_system = _determine_os()
     if operating_system is OperatingSystem.linux:
         return GNU_TAR_LINUX
-    if operating_system is OperatingSystem.macosx:
+    elif operating_system is OperatingSystem.macosx:
         _assert_gtar_installed_on_macosx()
         return GNU_TAR_MACOSX
-    err_msg = (
-        "Tried to determine name of GNU tar executable for operating system"
-        f"but didn't recognize operating system: `{operating_system}`"
-    )
-    raise OSError(err_msg)
+    else:
+        return assert_never(operating_system)
 
 
 def _assert_gtar_installed_on_macosx() -> None:
