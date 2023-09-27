@@ -13,12 +13,18 @@ from bystro.utils.tar import (
 )
 
 
+def test_GNU_TAR_EXECUTABLE_NAME():
+    assert GNU_TAR_EXECUTABLE_NAME in ["/usr/bin/tar", "/opt/homebrew/bin/gtar"]
+
+
 # These tests check that we correctly infer the name of the GNU tar
 # executable regardless of the operating system we find ourselves
 # running on, or that we raise an appropriate error if we can't
-# determine the correct executable.
-def test_GNU_TAR_EXECUTABLE_NAME():
-    assert GNU_TAR_EXECUTABLE_NAME in ["/usr/bin/tar", "/opt/homebrew/bin/gtar"]
+# determine the correct executable.  The
+# _mock_subprocess_run_... methods mocks all interaction with
+# subprocess.run under various OS scenarios and the tests ensure that
+# we return the correct GNU tar executable name or raise the appropriate
+# exception.
 
 
 def _mock_subprocess_run_macosx_gnu_tar_installed(args: list[str], **_kwargs: dict[str, Any]) -> Mock:
