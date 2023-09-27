@@ -1,13 +1,13 @@
-name: 'Setup Perl with build dependencies'
-description: 'Sets up a specific version of Perl and installs author dependencies'
+name: "Setup Perl with build dependencies"
+description: "Sets up a specific version of Perl and installs dependencies"
 
 inputs:
   perl-version:
-    description: 'Version of Perl to setup'
+    description: "Version of Perl to setup"
     required: true
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Setup perl
       uses: shogo82148/actions-setup-perl@v1
@@ -20,10 +20,34 @@ runs:
         sudo apt-get update
         sudo apt-get install -y lz4
 
-    - name: Install perl dependencies
+    # NOTE: we opted to enumerate author depenencies as they were set on 2023-09-27, but you should always use `dzil authordeps | cpanm` to capture any new dependencies.
+    - name: Install perl author dependencies
       shell: bash
       run: |
-        cpanm Dist::Zilla Archive::Tar::Wrapper
+        cpanm Dist::Zilla Archive::Tar::Wrapper \
+          Dist::Zilla::Plugin::AutoPrereqs \
+          Dist::Zilla::Plugin::ConfirmRelease \
+          Dist::Zilla::Plugin::Encoding \
+          Dist::Zilla::Plugin::ExecDir \
+          Dist::Zilla::Plugin::GatherDir \
+          Dist::Zilla::Plugin::License \
+          Dist::Zilla::Plugin::MakeMaker \
+          Dist::Zilla::Plugin::Manifest \
+          Dist::Zilla::Plugin::ManifestSkip \
+          Dist::Zilla::Plugin::MetaYAML \
+          Dist::Zilla::Plugin::PruneCruft \
+          Dist::Zilla::Plugin::Readme \
+          Dist::Zilla::Plugin::RemovePrereqs \
+          Dist::Zilla::Plugin::ShareDir \
+          Dist::Zilla::Plugin::Test::ReportPrereqs \
+          Dist::Zilla::Plugin::Test::Version \
+          Dist::Zilla::Plugin::TestRelease \
+          Software::License::Apache_2_0
+
+    # NOTE: we opted to enumerate bystro package depenencies as they were set on 2023-09-27, but you should always use `dzil listdeps | cpanm` to capture any new dependencies.
+    - name: Install perl bystro package dependencies
+      shell: bash
+      run: |
         cpanm https://github.com/bystrogenomics/msgpack-perl.git
         cpanm --force MouseX::Getopt
         git clone --recurse-submodules https://github.com/salortiz/LMDB_File.git \
@@ -31,3 +55,53 @@ runs:
           && perl Makefile.PL \
           && make test \
           && make install && rm -rf /app/LMDB_File
+        cpanm Archive::Extract \
+          Beanstalk::Client \
+          Carp \
+          Clone \
+          CPAN::Meta \
+          Cpanel::JSON::XS \
+          Cwd \
+          Data::MessagePack \
+          DBD::mysql \
+          DBI \
+          DDP \
+          Digest::MD5 \
+          ExtUtils::MakeMaker \
+          File::Basename \
+          File::Glob \
+          File::Spec \
+          File::Which \
+          Getopt::Long \
+          Getopt::Long::Descriptive \
+          Hash::Merge::Simple \
+          JSON::XS \
+          List::MoreUtils \
+          List::Util \
+          LMDB_File \
+          Log::Any::Adapter \
+          Log::Fast \
+          Math::SigFigs \
+          MCE::Loop \
+          Mouse \
+          Mouse::Role \
+          Mouse::Util::TypeConstraints \
+          MouseX::Getopt \
+          MouseX::NativeTraits \
+          namespace::autoclean \
+          Parallel::ForkManager \
+          Path::Tiny \
+          PerlIO::gzip \
+          PerlIO::utf8_strict \
+          Pod::Usage \
+          POSIX \
+          Scalar::Util \
+          String::Strip \
+          Sys::CpuAffinity \
+          Test::More \
+          Time::localtime \
+          Try::Tiny \
+          Type::Params \
+          Types::Path::Tiny \
+          Types::Standard \
+          YAML::XS
