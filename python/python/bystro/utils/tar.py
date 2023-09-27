@@ -6,7 +6,7 @@ from typing import NoReturn
 
 
 class OperatingSystem(Enum):
-    """Represent the operating system on the current Python process is running."""
+    """Represent the operating system on which the current Python process is running."""
 
     linux = "linux"
     macosx = "macosx"
