@@ -16,7 +16,7 @@ jobs:
       with:
         perl-version: '5.34'
 
-    - name: Test Bystro perl codebase
+    - name: Test Bystro Perl codebase
       run: |
         cd perl
         dzil authordeps | cpanm

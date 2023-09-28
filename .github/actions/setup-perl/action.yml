@@ -9,7 +9,7 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Setup perl
+    - name: Setup Perl
       uses: shogo82148/actions-setup-perl@v1
       with:
         perl-version: ${{ inputs.perl-version }}
@@ -21,7 +21,7 @@ runs:
         sudo apt-get install -y lz4
 
     # NOTE: we opted to enumerate author depenencies as they were set on 2023-09-27, but you should always use `dzil authordeps | cpanm` to capture any new dependencies.
-    - name: Install perl author dependencies
+    - name: Install Perl author dependencies
       shell: bash
       run: |
         cpanm Dist::Zilla Archive::Tar::Wrapper \
@@ -45,7 +45,7 @@ runs:
           Software::License::Apache_2_0
 
     # NOTE: we opted to enumerate bystro package depenencies as they were set on 2023-09-27, but you should always use `dzil listdeps | cpanm` to capture any new dependencies.
-    - name: Install perl bystro package dependencies
+    - name: Install Perl Bystro package dependencies
       shell: bash
       run: |
         cpanm https://github.com/bystrogenomics/msgpack-perl.git
