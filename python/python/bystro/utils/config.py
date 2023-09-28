@@ -14,7 +14,7 @@ ConfigDict = Dict[str, Union["ConfigDictValue", list["ConfigDictValue"]]]
 ConfigDictValue = Union[str, int, float, "ConfigDict"]
 
 
-def get_bystro_project_root() -> Path:
+def _get_bystro_project_root() -> Path:
     """Return Path of bystro project root."""
     # find project root by walking up the tree until we get to top level bystro directory.
     # The bystro top level is assumed to be the unique directory containing a startup.yml file.
@@ -32,10 +32,12 @@ def get_bystro_project_root() -> Path:
     return path
 
 
+BYSTRO_PROJECT_ROOT = _get_bystro_project_root()
+
+
 def get_opensearch_config() -> ConfigDict:
     """Read opensearch config and return parsed YAML."""
-    BYSTRO_ROOT = get_bystro_project_root()
-    opensearch_config_filepath = BYSTRO_ROOT / "config/opensearch.yml"
+    opensearch_config_filepath = BYSTRO_PROJECT_ROOT / "config/opensearch.yml"
     with opensearch_config_filepath.open() as search_config_file:
         config_dict: ConfigDict = YAML(typ="safe").load(search_config_file)
     return config_dict
