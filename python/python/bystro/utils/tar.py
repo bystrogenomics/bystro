@@ -1,6 +1,7 @@
 """Utility functions for safely invoking tar in cross-OS manner."""
 
 import subprocess
+from subprocess import CalledProcessError
 from enum import Enum
 from typing import NoReturn
 
@@ -13,8 +14,15 @@ class OperatingSystem(Enum):
 
 
 # here and throughout, fully qualify executable names to avoid privilege escalation
-GNU_TAR_LINUX = "/usr/bin/tar"
-GNU_TAR_MACOSX = "/opt/homebrew/bin/gtar"
+
+
+def _get_executable_name(name: str) -> str:
+    try:
+        result = subprocess.run(["which", name], capture_output=True, text=True, check=True)
+    except CalledProcessError:
+        err_msg = f"executable `{name}` not found on system, is it installed?"
+        raise OSError(err_msg)
+    return result.stdout.strip()
 
 
 def assert_never(value: NoReturn) -> NoReturn:
@@ -27,7 +35,7 @@ def _determine_os() -> OperatingSystem:
     """Determine whether we're running on Linux or MacOSX by inspecting uname output."""
     try:
         result = subprocess.run(
-            ["/usr/bin/uname", "-a"],  # noqa: S603 (this input is safe)
+            ["/usr/bin/uname", "-a"],
             capture_output=True,
             text=True,
             check=True,
@@ -53,10 +61,9 @@ def _get_gnu_tar_executable_name() -> str:
     # want to use 'gtar' instead of 'tar'.
     operating_system = _determine_os()
     if operating_system is OperatingSystem.linux:
-        return GNU_TAR_LINUX
+        return _get_executable_name("tar")
     if operating_system is OperatingSystem.macosx:
-        _assert_gtar_installed_on_macosx()
-        return GNU_TAR_MACOSX
+        return _get_executable_name("gtar")
     return assert_never(operating_system)
 
 
