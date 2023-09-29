@@ -1,14 +1,13 @@
 """Test functions for utils module."""
 
 import subprocess
+from subprocess import CalledProcessError
 from typing import Any
 from unittest.mock import Mock
 
 import pytest
 from bystro.utils.tar import (
     GNU_TAR_EXECUTABLE_NAME,
-    GNU_TAR_LINUX,
-    GNU_TAR_MACOSX,
     _get_gnu_tar_executable_name,
 )
 
@@ -27,74 +26,56 @@ def test_GNU_TAR_EXECUTABLE_NAME():
 # exception.
 
 
-def _mock_subprocess_run_macosx_gnu_tar_installed(args: list[str], **_kwargs: dict[str, Any]) -> Mock:
-    """Simulate subprocess runs on macosx if GNU tar installed."""
-    if args == ["/usr/bin/uname", "-a"]:
-        mock = Mock()
-        mock.stdout = "some uname output string with Darwin in it"
-    elif args == ["/opt/homebrew/bin/gtar", "--version"]:
-        mock = Mock()
-        mock.stdout = "some string with tar in it"
-    else:
-        err_msg = f"Couldn't interpret args: {args} correctly, this is an error in the test."
-        raise AssertionError(err_msg)
-    return mock
+def _mock_subprocess(response_table: dict[tuple[str], (str | Exception)]) -> Mock:
+    """Simulate subprocess.run."""
+
+    def generate_subprocess_mock(args: list[str], **_kwargs: dict[str, Any]):
+        response = response_table.get(tuple(args))
+        if response is None:
+            err_msg = f"Couldn't find args: {args} in response table, this is an error in the test."
+            raise AssertionError(err_msg)
+        elif isinstance(response, Exception):
+            raise response
+        mocked_subprocess_response = Mock()
+        mocked_subprocess_response.stdout = response
+        return mocked_subprocess_response
+
+    return generate_subprocess_mock
 
 
 def test_get_gnu_tar_executable_macosx_gnu_tar_installed(monkeypatch):
-    monkeypatch.setattr(subprocess, "run", _mock_subprocess_run_macosx_gnu_tar_installed)
-    assert GNU_TAR_MACOSX == _get_gnu_tar_executable_name()
-
-
-def _mock_subprocess_run_macosx_gnu_tar_not_installed(
-    args: list[str], **_kwargs: dict[str, Any]
-) -> Mock:
-    """Simulate subprocess runs on macosx if GNU tar not installed."""
-    if args == ["/usr/bin/uname", "-a"]:
-        mock = Mock()
-        mock.stdout = "some uname output string with Darwin in it"
-    elif args == ["/opt/homebrew/bin/gtar", "--version"]:
-        raise FileNotFoundError
-    else:
-        err_msg = f"Couldn't interpret args: {args} correctly, this is an error in the test."
-        raise AssertionError(err_msg)
-    return mock
+    subprocess_response_table = {
+        ("/usr/bin/uname", "-a"): "some uname output string with Darwin in it",
+        ("which", "gtar"): "/opt/homebrew/bin/gtar\n",
+    }
+    monkeypatch.setattr(subprocess, "run", _mock_subprocess(subprocess_response_table))
+    assert "/opt/homebrew/bin/gtar" == _get_gnu_tar_executable_name()
 
 
 def test_get_gnu_tar_executable_macosx_gnu_tar_not_installed(monkeypatch):
-    monkeypatch.setattr(subprocess, "run", _mock_subprocess_run_macosx_gnu_tar_not_installed)
-    with pytest.raises(RuntimeError):
-        _get_gnu_tar_executable_name()
+    subprocess_responses = {
+        ("/usr/bin/uname", "-a"): "some string with Darwin in it",
+        ("which", "gtar"): CalledProcessError(cmd=["which", "gtar"], returncode=1),
+    }
 
-
-def _mock_subprocess_run_linux(args: list[str], **_kwargs: dict[str, Any]) -> Mock:
-    """Simulate subprocess runs on linux."""
-    if args == ["/usr/bin/uname", "-a"]:
-        mock = Mock()
-        mock.stdout = "some uname output string with Linux in it"
-    else:
-        err_msg = f"Couldn't interpret args: {args} correctly, this is an error in the test."
-        raise AssertionError(err_msg)
-    return mock
+    monkeypatch.setattr(subprocess, "run", _mock_subprocess(subprocess_responses))
+    with pytest.raises(OSError, match="executable `gtar` not found on system"):
+        response = _get_gnu_tar_executable_name()
 
 
 def test_get_gnu_tar_executable_linux(monkeypatch):
-    monkeypatch.setattr(subprocess, "run", _mock_subprocess_run_linux)
-    assert GNU_TAR_LINUX == _get_gnu_tar_executable_name()
-
-
-def _mock_subprocess_run_unknown_os(args: list[str], **_kwargs: dict[str, Any]) -> Mock:
-    """Simulate subprocess runs some arbitrary unrecognized OS."""
-    if args == ["/usr/bin/uname", "-a"]:
-        mock = Mock()
-        mock.stdout = "some uname output string from unrecognized OS"
-    else:
-        err_msg = f"Couldn't interpret args: {args} correctly, this is an error in the test."
-        raise AssertionError(err_msg)
-    return mock
+    subprocess_response_table = {
+        ("/usr/bin/uname", "-a"): "some uname output string with Linux in it",
+        ("which", "tar"): "/usr/bin/tar\n",
+    }
+    monkeypatch.setattr(subprocess, "run", _mock_subprocess(subprocess_response_table))
+    assert "/usr/bin/tar" == _get_gnu_tar_executable_name()
 
 
 def test_get_gnu_tar_executable_unknown_os(monkeypatch):
-    monkeypatch.setattr(subprocess, "run", _mock_subprocess_run_unknown_os)
+    subprocess_response_table = {
+        ("/usr/bin/uname", "-a"): "some uname output string from unknown OS",
+    }
+    monkeypatch.setattr(subprocess, "run", _mock_subprocess(subprocess_response_table))
     with pytest.raises(OSError, match="Could not determine OS"):
         _get_gnu_tar_executable_name()
