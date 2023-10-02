@@ -1,8 +1,8 @@
 """Utility functions for safely invoking tar in cross-OS manner."""
 
 import subprocess
-from subprocess import CalledProcessError
 from enum import Enum
+from subprocess import CalledProcessError
 from typing import NoReturn
 
 
@@ -18,10 +18,12 @@ class OperatingSystem(Enum):
 
 def _get_executable_name(name: str) -> str:
     try:
-        result = subprocess.run(["which", name], capture_output=True, text=True, check=True)
-    except CalledProcessError:
+        result = subprocess.run(
+            ["which", name], capture_output=True, text=True, check=True, shell=False  # noqa: S603, S607
+        )
+    except CalledProcessError as err:
         err_msg = f"executable `{name}` not found on system, is it installed?"
-        raise OSError(err_msg)
+        raise OSError(err_msg) from err
     return result.stdout.strip()
 
 
@@ -35,7 +37,7 @@ def _determine_os() -> OperatingSystem:
     """Determine whether we're running on Linux or MacOSX by inspecting uname output."""
     try:
         result = subprocess.run(
-            ["/usr/bin/uname", "-a"],
+            ["/usr/bin/uname", "-a"],  # noqa: S603
             capture_output=True,
             text=True,
             check=True,
@@ -44,7 +46,7 @@ def _determine_os() -> OperatingSystem:
         err_msg = (
             "Couldn't run `uname -a` in shell to determine OS: only linux and macosx are supported."
         )
-        raise AssertionError(err_msg) from file_not_found_error
+        raise OSError(err_msg) from file_not_found_error
     downcased_uname_output = result.stdout.lower()
     if "darwin" in downcased_uname_output:
         return OperatingSystem.macosx
@@ -65,20 +67,6 @@ def _get_gnu_tar_executable_name() -> str:
     if operating_system is OperatingSystem.macosx:
         return _get_executable_name("gtar")
     return assert_never(operating_system)
-
-
-def _assert_gtar_installed_on_macosx() -> None:
-    """Check that gtar is installed, raising RuntimeError if not."""
-    try:
-        subprocess.run(
-            [GNU_TAR_MACOSX, "--version"],  # noqa: S603 (this input is safe)
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-    except FileNotFoundError as file_not_found_error:
-        err_msg = "Could not detect GNU tar on system, try: `brew install gnu-tar`"
-        raise RuntimeError(err_msg) from file_not_found_error
 
 
 GNU_TAR_EXECUTABLE_NAME = _get_gnu_tar_executable_name()
