@@ -19,7 +19,11 @@ class OperatingSystem(Enum):
 def _get_executable_name(name: str) -> str:
     try:
         result = subprocess.run(
-            ["which", name], capture_output=True, text=True, check=True, shell=False  # noqa: S603, S607
+            ["/usr/bin/which", name],
+            capture_output=True,
+            text=True,
+            check=True,
+            shell=False,  # noqa: S603 (input is safe)
         )
     except CalledProcessError as err:
         err_msg = f"executable `{name}` not found on system, is it installed?"
@@ -37,7 +41,7 @@ def _determine_os() -> OperatingSystem:
     """Determine whether we're running on Linux or MacOSX by inspecting uname output."""
     try:
         result = subprocess.run(
-            ["/usr/bin/uname", "-a"],  # noqa: S603
+            ["/usr/bin/uname", "-a"],  # noqa: S603 (input is safe)
             capture_output=True,
             text=True,
             check=True,
