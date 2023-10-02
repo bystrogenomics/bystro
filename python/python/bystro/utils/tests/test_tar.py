@@ -46,7 +46,7 @@ def _mock_subprocess(response_table: dict[tuple[str], (str | Exception)]) -> Moc
 def test_get_gnu_tar_executable_macosx_gnu_tar_installed(monkeypatch):
     subprocess_response_table = {
         ("/usr/bin/uname", "-a"): "some uname output string with Darwin in it",
-        ("which", "gtar"): "/opt/homebrew/bin/gtar\n",
+        ("/usr/bin/which", "gtar"): "/opt/homebrew/bin/gtar\n",
     }
     monkeypatch.setattr(subprocess, "run", _mock_subprocess(subprocess_response_table))
     assert "/opt/homebrew/bin/gtar" == _get_gnu_tar_executable_name()
@@ -55,7 +55,7 @@ def test_get_gnu_tar_executable_macosx_gnu_tar_installed(monkeypatch):
 def test_get_gnu_tar_executable_macosx_gnu_tar_not_installed(monkeypatch):
     subprocess_responses = {
         ("/usr/bin/uname", "-a"): "some string with Darwin in it",
-        ("which", "gtar"): CalledProcessError(cmd=["which", "gtar"], returncode=1),
+        ("/usr/bin/which", "gtar"): CalledProcessError(cmd=["which", "gtar"], returncode=1),
     }
 
     monkeypatch.setattr(subprocess, "run", _mock_subprocess(subprocess_responses))
@@ -66,7 +66,7 @@ def test_get_gnu_tar_executable_macosx_gnu_tar_not_installed(monkeypatch):
 def test_get_gnu_tar_executable_linux(monkeypatch):
     subprocess_response_table = {
         ("/usr/bin/uname", "-a"): "some uname output string with Linux in it",
-        ("which", "tar"): "/usr/bin/tar\n",
+        ("/usr/bin/which", "tar"): "/usr/bin/tar\n",
     }
     monkeypatch.setattr(subprocess, "run", _mock_subprocess(subprocess_response_table))
     assert "/usr/bin/tar" == _get_gnu_tar_executable_name()
