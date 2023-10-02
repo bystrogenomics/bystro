@@ -24,3 +24,5 @@ brew install awscli;
 
 # pkg-config is required for building the wheel
 brew install pkg-config;
+
+brew install gnu-tar
