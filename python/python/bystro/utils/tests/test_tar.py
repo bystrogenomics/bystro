@@ -27,7 +27,7 @@ def test_GNU_TAR_EXECUTABLE_NAME():
 
 
 def _mock_subprocess(response_table: dict[tuple[str], (str | Exception)]) -> Mock:
-    """Simulate subprocess.run."""
+    """Mock subprocess.run, given dictionary of inputs and outputs."""
 
     def generate_subprocess_mock(args: list[str], **_kwargs: dict[str, Any]):
         response = response_table.get(tuple(args))
