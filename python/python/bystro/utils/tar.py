@@ -1,13 +1,6 @@
 """Utility functions for safely invoking tar in cross-OS manner."""
-import sys
 import shutil
-import subprocess
-from enum import Enum
-from subprocess import CalledProcessError
-from typing import NoReturn
-
-
-# here and throughout, fully qualify executable names to avoid privilege escalation
+import sys
 
 
 def _get_executable_name(name: str) -> str:
@@ -16,12 +9,6 @@ def _get_executable_name(name: str) -> str:
         err_msg = f"executable `{name}` not found on system"
         raise OSError(err_msg)
     return executable_name
-
-
-def assert_never(value: NoReturn) -> NoReturn:
-    """Raise error for mypy if code is proven reachable."""
-    msg = f"Unhandled value: {value} ({type(value).__name__})"
-    raise AssertionError(msg)
 
 
 def _get_gnu_tar_executable_name() -> str:

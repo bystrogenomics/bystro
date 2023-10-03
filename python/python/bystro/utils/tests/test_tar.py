@@ -1,9 +1,9 @@
 """Test functions for utils module."""
 import shutil
-import sys
 import subprocess
+import sys
 from subprocess import CalledProcessError
-from typing import Any
+from typing import Any, Callable, NoReturn
 from unittest.mock import Mock
 
 import pytest
@@ -27,12 +27,13 @@ def test_GNU_TAR_EXECUTABLE_NAME():
 # exception.
 
 
-def _mock_subprocess(stdout_string: str) -> Mock:
+def _mock_subprocess(stdout_string: str) -> Callable[[Any, Any], Mock]:
     """Mock subprocess.run, given dictionary of inputs and outputs."""
-    mock = Mock
+    mock = Mock()
     mock.stdout = stdout_string
 
-    def f(*args, **kwargs):
+    def f(*args: list[str], **kwargs: dict[str, Any]) -> Mock:
+        del args, kwargs
         return mock
 
     return f
@@ -46,10 +47,11 @@ def test_get_gnu_tar_executable_macosx_gnu_tar_installed(monkeypatch):
 
 
 def test_get_gnu_tar_executable_macosx_gnu_tar_not_installed(monkeypatch):
-    def raise_error(*args, **kwargs):
+    def raise_error(args: list[str], kwargs: dict[str, Any]) -> NoReturn:
+        del args, kwargs
         raise CalledProcessError(cmd=["which", "gtar"], returncode=1)
 
-    monkeypatch.setattr(shutil, "which", lambda name: None)
+    monkeypatch.setattr(shutil, "which", lambda _name: None)
     with pytest.raises(OSError, match="executable `gtar` not found on system"):
         _get_gnu_tar_executable_name()
 
