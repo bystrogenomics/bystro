@@ -42,7 +42,7 @@ def _mock_subprocess(stdout_string: str) -> Callable[[Any, Any], Mock]:
 def test_get_gnu_tar_executable_macosx_gnu_tar_installed(monkeypatch):
     monkeypatch.setattr(subprocess, "run", _mock_subprocess("/opt/homebrew/bin/gtar\n"))
     monkeypatch.setattr(sys, "platform", "darwin")
-    monkeypatch.setattr(shutil, "which", "/opt/homebrew/bin/gtar")
+    monkeypatch.setattr(shutil, "which", lambda _name: "/opt/homebrew/bin/gtar")
     assert "/opt/homebrew/bin/gtar" == _get_gnu_tar_executable_name()
 
 
@@ -60,7 +60,7 @@ def test_get_gnu_tar_executable_macosx_gnu_tar_not_installed(monkeypatch):
 def test_get_gnu_tar_executable_linux(monkeypatch):
     monkeypatch.setattr(subprocess, "run", _mock_subprocess("/usr/bin/tar\n"))
     monkeypatch.setattr(sys, "platform", "linux")
-    monkeypatch.setattr(shutil, "which", "/usr/bin/tar")
+    monkeypatch.setattr(shutil, "which", lambda _name: "/usr/bin/tar")
     assert "/usr/bin/tar" == _get_gnu_tar_executable_name()
 
 
