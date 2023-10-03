@@ -28,7 +28,7 @@ def test_GNU_TAR_EXECUTABLE_NAME():
 
 
 def _mock_subprocess(stdout_string: str) -> Callable[[Any, Any], Mock]:
-    """Mock subprocess.run, given dictionary of inputs and outputs."""
+    """Create a subprocess.run mock that returns stdout_string."""
     mock = Mock()
     mock.stdout = stdout_string
 
