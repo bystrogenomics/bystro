@@ -1,5 +1,6 @@
 """Test functions for utils module."""
-
+import shutil
+import sys
 import subprocess
 from subprocess import CalledProcessError
 from typing import Any
@@ -26,56 +27,40 @@ def test_GNU_TAR_EXECUTABLE_NAME():
 # exception.
 
 
-def _mock_subprocess(response_table: dict[tuple[str], (str | Exception)]) -> Mock:
+def _mock_subprocess(stdout_string: str) -> Mock:
     """Mock subprocess.run, given dictionary of inputs and outputs."""
+    mock = Mock
+    mock.stdout = stdout_string
 
-    def generate_subprocess_mock(args: list[str], **_kwargs: dict[str, Any]):
-        response = response_table.get(tuple(args))
-        if response is None:
-            err_msg = f"Couldn't find args: {args} in response table, this is an error in the test."
-            raise AssertionError(err_msg)
-        elif isinstance(response, Exception):
-            raise response
-        mocked_subprocess_response = Mock()
-        mocked_subprocess_response.stdout = response
-        return mocked_subprocess_response
+    def f(*args, **kwargs):
+        return mock
 
-    return generate_subprocess_mock
+    return f
 
 
 def test_get_gnu_tar_executable_macosx_gnu_tar_installed(monkeypatch):
-    subprocess_response_table = {
-        ("/usr/bin/uname", "-a"): "some uname output string with Darwin in it",
-        ("/usr/bin/which", "gtar"): "/opt/homebrew/bin/gtar\n",
-    }
-    monkeypatch.setattr(subprocess, "run", _mock_subprocess(subprocess_response_table))
+    mock = Mock()
+    mock.stdout = "/opt/homebrew/bin/gtar\n"
+    monkeypatch.setattr(subprocess, "run", _mock_subprocess("/opt/homebrew/bin/gtar\n"))
     assert "/opt/homebrew/bin/gtar" == _get_gnu_tar_executable_name()
 
 
 def test_get_gnu_tar_executable_macosx_gnu_tar_not_installed(monkeypatch):
-    subprocess_responses = {
-        ("/usr/bin/uname", "-a"): "some string with Darwin in it",
-        ("/usr/bin/which", "gtar"): CalledProcessError(cmd=["which", "gtar"], returncode=1),
-    }
+    def raise_error(*args, **kwargs):
+        raise CalledProcessError(cmd=["which", "gtar"], returncode=1)
 
-    monkeypatch.setattr(subprocess, "run", _mock_subprocess(subprocess_responses))
+    monkeypatch.setattr(shutil, "which", lambda name: None)
     with pytest.raises(OSError, match="executable `gtar` not found on system"):
-        response = _get_gnu_tar_executable_name()
+        _get_gnu_tar_executable_name()
 
 
 def test_get_gnu_tar_executable_linux(monkeypatch):
-    subprocess_response_table = {
-        ("/usr/bin/uname", "-a"): "some uname output string with Linux in it",
-        ("/usr/bin/which", "tar"): "/usr/bin/tar\n",
-    }
-    monkeypatch.setattr(subprocess, "run", _mock_subprocess(subprocess_response_table))
+    monkeypatch.setattr(subprocess, "run", _mock_subprocess("/usr/bin/tar\n"))
+    monkeypatch.setattr(sys, "platform", "linux")
     assert "/usr/bin/tar" == _get_gnu_tar_executable_name()
 
 
 def test_get_gnu_tar_executable_unknown_os(monkeypatch):
-    subprocess_response_table = {
-        ("/usr/bin/uname", "-a"): "some uname output string from unknown OS",
-    }
-    monkeypatch.setattr(subprocess, "run", _mock_subprocess(subprocess_response_table))
-    with pytest.raises(OSError, match="Could not determine OS"):
+    monkeypatch.setattr(sys, "platform", "some unknown OS")
+    with pytest.raises(OSError, match="got some unknown OS instead"):
         _get_gnu_tar_executable_name()
