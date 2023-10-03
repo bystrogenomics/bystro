@@ -40,9 +40,8 @@ def _mock_subprocess(stdout_string: str) -> Callable[[Any, Any], Mock]:
 
 
 def test_get_gnu_tar_executable_macosx_gnu_tar_installed(monkeypatch):
-    mock = Mock()
-    mock.stdout = "/opt/homebrew/bin/gtar\n"
     monkeypatch.setattr(subprocess, "run", _mock_subprocess("/opt/homebrew/bin/gtar\n"))
+    monkeypatch.setattr(sys, "platform", "darwin")
     assert "/opt/homebrew/bin/gtar" == _get_gnu_tar_executable_name()
 
 
@@ -52,6 +51,7 @@ def test_get_gnu_tar_executable_macosx_gnu_tar_not_installed(monkeypatch):
         raise CalledProcessError(cmd=["which", "gtar"], returncode=1)
 
     monkeypatch.setattr(shutil, "which", lambda _name: None)
+    monkeypatch.setattr(sys, "platform", "darwin")
     with pytest.raises(OSError, match="executable `gtar` not found on system"):
         _get_gnu_tar_executable_name()
 
