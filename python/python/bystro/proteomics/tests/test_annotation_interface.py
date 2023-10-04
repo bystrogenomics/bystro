@@ -6,7 +6,7 @@ from bystro.proteomics.annotation_interface import (
     #    _make_output_string,
     _process_response,
     get_samples_and_genes,
-    run_query_and_write_output_pure,
+    run_annotation_query,
 )
 from bystro.proteomics.tests.test_response import TEST_RESPONSE
 from bystro.search.utils.annotation import get_delimiters
@@ -32,7 +32,7 @@ def my_test_end_to_end2(query, field_names):
         fieldNames=["discordant", *field_names],
     )
     publisher = ProgressPublisher(host="127.0.0.1", port=1337, queue="proteomics", message=None)
-    run_query_and_write_output(job_data, SEARCH_CONF, publisher)
+    run_annotation_query(job_data, SEARCH_CONF, publisher)
 
 
 def my_test_end_to_end_pure(query, field_names):
@@ -50,7 +50,7 @@ def my_test_end_to_end_pure(query, field_names):
         outputBasePath="foo/bar",
         fieldNames=["discordant", *field_names],
     )
-    annotation_output = run_query_and_write_output_pure(job_data, SEARCH_CONF)
+    annotation_output = run_annotation_query(job_data, SEARCH_CONF)
     return annotation_output
 
 

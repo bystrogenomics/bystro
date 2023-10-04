@@ -1,20 +1,14 @@
 """Query an annotation file and return a list of sample_ids and genes meeting the query criteria."""
-import io
 import math
-import os
-import subprocess
-from pathlib import Path
 from typing import Any, Tuple
 
 import pandas as pd
 import ray
-from bystro.proteomics.tests.example_query import DEFAULT_FIELDS, SPEC_FIELDS  # TK
-from bystro.search.utils.annotation import AnnotationOutputs, get_delimiters
+from bystro.proteomics.tests.example_query import DEFAULT_FIELDS  # TK
 from bystro.search.utils.messages import SaveJobData
 from bystro.search.utils.opensearch import gather_opensearch_args
 from bystro.utils.config import get_opensearch_config
 from opensearchpy import OpenSearch
-from ruamel.yaml import YAML
 
 ray.init(ignore_reinit_error=True, address="auto")
 OPENSEARCH_CONFIG = get_opensearch_config()
@@ -39,7 +33,8 @@ GeneName = str
 Dosage = int
 
 
-def flatten(xs):
+def flatten(xs: object) -> list[Any]:
+    """Flatten an arbitrarily nested list."""
     if not isinstance(xs, list):
         return [xs]
     output = []
@@ -48,7 +43,7 @@ def flatten(xs):
     return output
 
 
-def _process_hit(hit: dict[str, Any]) -> list[tuple[SampleID, GeneName, Dosage]]:
+def _process_hit(hit: dict[str, Any]) -> pd.DataFrame:
     source = hit["_source"]
     gene_names = flatten(source["refSeq"]["name2"])
     heterozygotes = flatten(source.get("heterozygotes", []))
@@ -56,9 +51,9 @@ def _process_hit(hit: dict[str, Any]) -> list[tuple[SampleID, GeneName, Dosage]]
     rows = []
     for gene_name in gene_names:
         for heterozygote in heterozygotes:
-            rows.append(({"sample_id": heterozygote, "gene_name": gene_name, "dosage": 1}))
+            rows.append({"sample_id": heterozygote, "gene_name": gene_name, "dosage": 1})
         for homozygote in homozygotes:
-            rows.append(({"sample_id": homozygote, "gene_name": gene_name, "dosage": 2}))
+            rows.append({"sample_id": homozygote, "gene_name": gene_name, "dosage": 2})
     return pd.DataFrame(rows)
 
 
@@ -66,8 +61,6 @@ def _process_hit(hit: dict[str, Any]) -> list[tuple[SampleID, GeneName, Dosage]]
 def _process_query_pure(
     query_args: dict,
     search_client_args: dict,
-    field_names: list,
-    delimiters: dict[str, str],
 ) -> pd.DataFrame:
     """Process OpenSearch query and return results."""
     client = OpenSearch(**search_client_args)
@@ -75,7 +68,7 @@ def _process_query_pure(
     return _process_response(resp)
 
 
-def _process_response(resp) -> pd.DataFrame:
+def _process_response(resp: dict[str, Any]) -> pd.DataFrame:
     if len(resp["hits"]["hits"]) != resp["hits"]["total"]["value"]:
         err_msg = (
             f"response hits: {len(resp['hits']['hits'])} didn't equal "
@@ -84,10 +77,10 @@ def _process_response(resp) -> pd.DataFrame:
         )
         raise ValueError(err_msg)
 
-    df = pd.concat([_process_hit(hit) for hit in resp["hits"]["hits"]])
+    samples_genes_dosages_df = pd.concat([_process_hit(hit) for hit in resp["hits"]["hits"]])
     # we may have multiple variants per gene in the results, so we
     # need to drop duplicates here.
-    return df.drop_duplicates()
+    return samples_genes_dosages_df.drop_duplicates()
 
 
 def _get_num_slices(
@@ -104,7 +97,7 @@ def _get_num_slices(
 
     response = client.count(body=query_no_sort, index=index_name)
 
-    n_docs = response["count"]
+    n_docs: int = response["count"]
     if n_docs < 1:
         err_msg = (
             f"Expected at least one document in response['count'], got response: {response} instead."
@@ -116,19 +109,16 @@ def _get_num_slices(
     return max(num_slices_planned, 1)
 
 
-def run_query_and_write_output_pure(
+def run_annotation_query(
     job_data: SaveJobData,
     search_conf: dict,
     max_query_size: int = 10_000,
-    max_slices=1024,
-    keep_alive=ONE_DAY,
+    max_slices: int = 1024,
+    keep_alive: str = ONE_DAY,
 ) -> pd.DataFrame:
-    assert isinstance(max_query_size, int), type(max_query_size)
-    header = bytes("\t".join(job_data.fieldNames) + "\n", encoding="utf-8")
-
+    """Given query and index contained in SaveJobData, run query and return results in dataframe."""
     search_client_args = gather_opensearch_args(search_conf)
     client = OpenSearch(**search_client_args)
-    delimiters = get_delimiters()
 
     query = _preprocess_query(job_data.queryBody)
     num_slices = _get_num_slices(client, job_data.indexName, max_query_size, max_slices, query)
@@ -147,12 +137,10 @@ def run_query_and_write_output_pure(
         remote_query = _process_query_pure.remote(  # type: ignore[call-arg]
             query_args={"body": slice_query},
             search_client_args=search_client_args,
-            field_names=job_data.fieldNames,
-            delimiters=delimiters,
         )
         remote_queries.append(remote_query)
-    results_processed = ray.get(remote_queries)
-    client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore
+    results_processed: list[pd.DataFrame] = ray.get(remote_queries)
+    client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore[attr-defined]
     return pd.concat(results_processed)
 
 
@@ -164,7 +152,6 @@ def _package_opensearch_query_from_query_string(query_string: str) -> dict[str, 
                     "query_string": {
                         "default_operator": "AND",
                         "query": query_string,
-                        # "fields": SPEC_FIELDS,
                         "fields": DEFAULT_FIELDS,
                         "lenient": True,
                         "phrase_slop": 5,
@@ -176,7 +163,7 @@ def _package_opensearch_query_from_query_string(query_string: str) -> dict[str, 
     }
 
 
-def get_samples_and_genes(user_query_string: str, index_name: str) -> Tuple[set[str], set[str]]:
+def get_samples_and_genes(user_query_string: str, index_name: str) -> pd.DataFrame:
     """Given a query and index, return a list of samples and genes for subsetting a proteomics matrix."""
     query = _package_opensearch_query_from_query_string(user_query_string)
     field_names = ["discordant", "homozygotes", "heterozygotes", "refSeq.name2"]
@@ -188,5 +175,5 @@ def get_samples_and_genes(user_query_string: str, index_name: str) -> Tuple[set[
         outputBasePath=".",
         fieldNames=field_names,
     )
-    samples_and_genes_df = run_query_and_write_output_pure(job_data, OPENSEARCH_CONFIG)
+    samples_and_genes_df = run_annotation_query(job_data, OPENSEARCH_CONFIG)
     return samples_and_genes_df
