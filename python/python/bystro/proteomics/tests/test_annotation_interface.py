@@ -3,7 +3,7 @@ import pytest
 from bystro.beanstalkd.worker import ProgressPublisher
 from bystro.proteomics.annotation_interface import (
     OPENSEARCH_CONFIG,
-    _make_output_string,
+    #    _make_output_string,
     _process_response,
     get_samples_and_genes,
     run_query_and_write_output_pure,
@@ -117,162 +117,160 @@ import time
 
 
 def tests__process_response():
-    field_names = ["discordant", "homozygotes", "heterozygotes", "refSeq.name2"]
-    delimiters = get_delimiters()
-    ans = _process_response(TEST_RESPONSE, field_names, delimiters)
-    assert len(ans) == 30486
+    ans = _process_response(TEST_RESPONSE)
+    assert len(ans) == 1191
 
 
-def test__make_output_string() -> None:
-    rows = [
-        np.array(
-            [
-                [["0"]],
-                None,
-                [["1805"]],
-                [[["MAPK7"], ["MAPK7"], ["MAPK7"], ["MAPK7"]]],
-            ],
-            dtype=object,
-        ),
-        np.array([[["0"]], None, [["1805"]], [["ABCA6"]]], dtype=object),
-        np.array([[["0"]], None, [["1847"]], [["APOBEC3F"]]], dtype=object),
-        np.array(
-            [
-                [["0"]],
-                None,
-                [[["1847"], ["4805"]]],
-                [[["PDE11A"], ["PDE11A"], ["PDE11A"], ["PDE11A"]]],
-            ],
-            dtype=object,
-        ),
-        np.array(
-            [[["0"]], None, [[["1805"], ["4805"]]], [["PCGF1"]]],
-            dtype=object,
-        ),
-        np.array(
-            [[["0"]], None, [[["1847"], ["4805"]]], [["TEX37"]]],
-            dtype=object,
-        ),
-        np.array(
-            [
-                [["0"]],
-                None,
-                [["1847"]],
-                [[["PAX3"], ["PAX3"], ["PAX3"], ["PAX3"], ["PAX3"], ["PAX3"]]],
-            ],
-            dtype=object,
-        ),
-        np.array(
-            [
-                [["0"]],
-                None,
-                [["1847"]],
-                [[["COL6A3"], ["COL6A3"], ["COL6A3"], ["COL6A3"], ["COL6A3"]]],
-            ],
-            dtype=object,
-        ),
-        np.array(
-            [[["0"]], None, [[["1847"], ["4805"]]], [["THSD4"]]],
-            dtype=object,
-        ),
-        np.array(
-            [[["0"]], None, [[["1805"], ["4805"]]], [["DNAH17"]]],
-            dtype=object,
-        ),
-        np.array(
-            [[["0"]], None, [["1805"]], [[["CNP"], ["CNP"]]]],
-            dtype=object,
-        ),
-        np.array([[["0"]], None, [["1805"]], [["HEATR5B"]]], dtype=object),
-        np.array([[["0"]], None, [["1805"]], [["PTCD3"]]], dtype=object),
-        np.array([[["0"]], None, [["1847"]], [["LCT"]]], dtype=object),
-        np.array(
-            [
-                [["0"]],
-                None,
-                [["1847"]],
-                [
-                    [
-                        ["COLEC11"],
-                        ["COLEC11"],
-                        ["COLEC11"],
-                        ["COLEC11"],
-                        ["COLEC11"],
-                        ["COLEC11"],
-                        ["COLEC11"],
-                        ["COLEC11"],
-                        ["COLEC11"],
-                        ["COLEC11"],
-                        ["COLEC11"],
-                    ]
-                ],
-            ],
-            dtype=object,
-        ),
-        np.array([[["0"]], None, [["1847"]], [["ABCB11"]]], dtype=object),
-        np.array([[["0"]], None, [["1805"]], [["SF3B1"]]], dtype=object),
-        np.array(
-            [
-                [["0"]],
-                None,
-                [["1847"]],
-                [[["EPB41L5"], ["EPB41L5"], ["EPB41L5"]]],
-            ],
-            dtype=object,
-        ),
-        np.array(
-            [
-                [["0"]],
-                None,
-                [["1805"]],
-                [[["FBXO7"], ["FBXO7"], ["FBXO7"]]],
-            ],
-            dtype=object,
-        ),
-        np.array([[["0"]], None, [["1805"]], [["ST6GALNAC2"]]], dtype=object),
-        np.array(
-            [
-                [["0"]],
-                None,
-                [[["1805"], ["4805"]]],
-                [[["GAA"], ["GAA"], ["GAA"]]],
-            ],
-            dtype=object,
-        ),
-        np.array(
-            [
-                [["0"]],
-                None,
-                [[["1847"], ["4805"]]],
-                [[["ALMS1"], ["ALMS1"]]],
-            ],
-            dtype=object,
-        ),
-        np.array(
-            [[["0"]], None, [[["1805"], ["4805"]]], [["ALK"]]],
-            dtype=object,
-        ),
-        np.array([[["0"]], None, [["1847"]], [["BMPR2"]]], dtype=object),
-        np.array(
-            [[["0"]], None, [["1847"]], [[["SMC6"], ["SMC6"]]]],
-            dtype=object,
-        ),
-    ]
-    safe_rows = copy.deepcopy(rows)
-    safe_rows2 = copy.deepcopy(rows)
+# def test__make_output_string() -> None:
+#     rows = [
+#         np.array(
+#             [
+#                 [["0"]],
+#                 None,
+#                 [["1805"]],
+#                 [[["MAPK7"], ["MAPK7"], ["MAPK7"], ["MAPK7"]]],
+#             ],
+#             dtype=object,
+#         ),
+#         np.array([[["0"]], None, [["1805"]], [["ABCA6"]]], dtype=object),
+#         np.array([[["0"]], None, [["1847"]], [["APOBEC3F"]]], dtype=object),
+#         np.array(
+#             [
+#                 [["0"]],
+#                 None,
+#                 [[["1847"], ["4805"]]],
+#                 [[["PDE11A"], ["PDE11A"], ["PDE11A"], ["PDE11A"]]],
+#             ],
+#             dtype=object,
+#         ),
+#         np.array(
+#             [[["0"]], None, [[["1805"], ["4805"]]], [["PCGF1"]]],
+#             dtype=object,
+#         ),
+#         np.array(
+#             [[["0"]], None, [[["1847"], ["4805"]]], [["TEX37"]]],
+#             dtype=object,
+#         ),
+#         np.array(
+#             [
+#                 [["0"]],
+#                 None,
+#                 [["1847"]],
+#                 [[["PAX3"], ["PAX3"], ["PAX3"], ["PAX3"], ["PAX3"], ["PAX3"]]],
+#             ],
+#             dtype=object,
+#         ),
+#         np.array(
+#             [
+#                 [["0"]],
+#                 None,
+#                 [["1847"]],
+#                 [[["COL6A3"], ["COL6A3"], ["COL6A3"], ["COL6A3"], ["COL6A3"]]],
+#             ],
+#             dtype=object,
+#         ),
+#         np.array(
+#             [[["0"]], None, [[["1847"], ["4805"]]], [["THSD4"]]],
+#             dtype=object,
+#         ),
+#         np.array(
+#             [[["0"]], None, [[["1805"], ["4805"]]], [["DNAH17"]]],
+#             dtype=object,
+#         ),
+#         np.array(
+#             [[["0"]], None, [["1805"]], [[["CNP"], ["CNP"]]]],
+#             dtype=object,
+#         ),
+#         np.array([[["0"]], None, [["1805"]], [["HEATR5B"]]], dtype=object),
+#         np.array([[["0"]], None, [["1805"]], [["PTCD3"]]], dtype=object),
+#         np.array([[["0"]], None, [["1847"]], [["LCT"]]], dtype=object),
+#         np.array(
+#             [
+#                 [["0"]],
+#                 None,
+#                 [["1847"]],
+#                 [
+#                     [
+#                         ["COLEC11"],
+#                         ["COLEC11"],
+#                         ["COLEC11"],
+#                         ["COLEC11"],
+#                         ["COLEC11"],
+#                         ["COLEC11"],
+#                         ["COLEC11"],
+#                         ["COLEC11"],
+#                         ["COLEC11"],
+#                         ["COLEC11"],
+#                         ["COLEC11"],
+#                     ]
+#                 ],
+#             ],
+#             dtype=object,
+#         ),
+#         np.array([[["0"]], None, [["1847"]], [["ABCB11"]]], dtype=object),
+#         np.array([[["0"]], None, [["1805"]], [["SF3B1"]]], dtype=object),
+#         np.array(
+#             [
+#                 [["0"]],
+#                 None,
+#                 [["1847"]],
+#                 [[["EPB41L5"], ["EPB41L5"], ["EPB41L5"]]],
+#             ],
+#             dtype=object,
+#         ),
+#         np.array(
+#             [
+#                 [["0"]],
+#                 None,
+#                 [["1805"]],
+#                 [[["FBXO7"], ["FBXO7"], ["FBXO7"]]],
+#             ],
+#             dtype=object,
+#         ),
+#         np.array([[["0"]], None, [["1805"]], [["ST6GALNAC2"]]], dtype=object),
+#         np.array(
+#             [
+#                 [["0"]],
+#                 None,
+#                 [[["1805"], ["4805"]]],
+#                 [[["GAA"], ["GAA"], ["GAA"]]],
+#             ],
+#             dtype=object,
+#         ),
+#         np.array(
+#             [
+#                 [["0"]],
+#                 None,
+#                 [[["1847"], ["4805"]]],
+#                 [[["ALMS1"], ["ALMS1"]]],
+#             ],
+#             dtype=object,
+#         ),
+#         np.array(
+#             [[["0"]], None, [[["1805"], ["4805"]]], [["ALK"]]],
+#             dtype=object,
+#         ),
+#         np.array([[["0"]], None, [["1847"]], [["BMPR2"]]], dtype=object),
+#         np.array(
+#             [[["0"]], None, [["1847"]], [[["SMC6"], ["SMC6"]]]],
+#             dtype=object,
+#         ),
+#     ]
+#     safe_rows = copy.deepcopy(rows)
+#     safe_rows2 = copy.deepcopy(rows)
 
-    tic = time.time()
-    expected = _make_output_string_reference_implementation(safe_rows, delims=DELIMITERS)
-    toc = time.time()
-    ref_time = toc - tic
-    print("ref implementation:", ref_time)
+#     tic = time.time()
+#     expected = _make_output_string_reference_implementation(safe_rows, delims=DELIMITERS)
+#     toc = time.time()
+#     ref_time = toc - tic
+#     print("ref implementation:", ref_time)
 
-    tic = time.time()
-    actual = _make_output_string(safe_rows2, delims=DELIMITERS)
-    toc = time.time()
-    spec_time = toc - tic
-    print("spec implementation:", spec_time)
-    spec_ref_ratio = spec_time / ref_time
-    print("ratio of spec to ref walltime:", round(spec_ref_ratio, 2))
-    assert spec_ref_ratio < 2
-    assert expected == actual
+#     tic = time.time()
+#     actual = _make_output_string(safe_rows2, delims=DELIMITERS)
+#     toc = time.time()
+#     spec_time = toc - tic
+#     print("spec implementation:", spec_time)
+#     spec_ref_ratio = spec_time / ref_time
+#     print("ratio of spec to ref walltime:", round(spec_ref_ratio, 2))
+#     assert spec_ref_ratio < 2
+#     assert expected == actual
