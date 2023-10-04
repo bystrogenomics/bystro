@@ -1,6 +1,6 @@
 """Query an annotation file and return a list of sample_ids and genes meeting the query criteria."""
 import math
-from typing import Any, Tuple
+from typing import Any
 
 import pandas as pd
 import ray
