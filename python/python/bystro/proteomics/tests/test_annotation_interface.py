@@ -1,17 +1,13 @@
-
 import opensearchpy
 import pytest
 from bystro.proteomics.annotation_interface import (
     _process_response,
     get_samples_and_genes,
 )
-from bystro.proteomics.tests.test_response import TEST_RESPONSE
+from bystro.proteomics.tests.sample_response_data import TEST_RESPONSE
 from bystro.utils.config import get_opensearch_config
 
 OPENSEARCH_CONFIG = get_opensearch_config()
-import logging
-
-logger = logging.getLogger(__name__)
 
 
 @pytest.mark.network()
@@ -28,7 +24,6 @@ def test_get_samples_and_genes_unit(monkeypatch):
 
     class MockOpenSearch:
         def __init__(*args, **kwargs) -> None:
-            logger.info("making mock: %s, %s", args, kwargs)
             pass
 
         def search(*args, **kwargs):
@@ -51,15 +46,3 @@ def test_get_samples_and_genes_unit(monkeypatch):
 def tests__process_response():
     ans = _process_response(TEST_RESPONSE)
     assert len(ans) == 1191
-
-
-# def test__process_query_inner(monkeypatch):
-#         "body": _preprocess_query(
-#             _package_opensearch_query_from_query_string(
-
-#     class MockOpenSearchClient:
-#         def __init__(*args, **kwargs):
-#             pass
-
-#         def search(*args, **kwargs):
-
