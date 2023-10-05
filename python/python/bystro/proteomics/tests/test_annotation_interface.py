@@ -7,7 +7,6 @@ from bystro.proteomics.annotation_interface import (
     _process_response,
     get_samples_and_genes,
 )
-from bystro.utils.config import get_opensearch_config
 
 TEST_RESPONSE_FILENAME = Path(__file__).parent / "test_response.pkl"
 
