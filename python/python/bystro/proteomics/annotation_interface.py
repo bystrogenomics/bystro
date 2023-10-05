@@ -1,5 +1,6 @@
 """Query an annotation file and return a list of sample_ids and genes meeting the query criteria."""
 import math
+from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
@@ -62,7 +63,6 @@ def _process_query(
     search_client_args: dict,
 ) -> pd.DataFrame:
     """Process OpenSearch query and return results."""
-    assert "query" not in query_args, query_args
     client = OpenSearch(**search_client_args)
     resp = client.search(**query_args)
     return _process_response(resp)
@@ -92,11 +92,19 @@ def _process_response(resp: dict[str, Any]) -> pd.DataFrame:
     return samples_genes_dosages_df.drop_duplicates()
 
 
+@dataclass
+class OpenSearchQueryOptions:
+    """Represent parameters for configuring OpenSearch queries."""
+
+    max_query_size: int = 10_000
+    max_slices: int = 1024
+    keep_alive: str = ONE_DAY
+
+
 def _get_num_slices(
     client: OpenSearch,
     index_name: str,
-    max_query_size: int,
-    max_slices: int,
+    opensearch_query_options: OpenSearchQueryOptions,
     query: dict[str, Any],
 ) -> int:
     """Count number of hits for the index."""
@@ -113,31 +121,30 @@ def _get_num_slices(
         )
         raise RuntimeError(err_msg)
 
-    num_slices_necessary = math.ceil(n_docs / max_query_size)
-    num_slices_planned = min(num_slices_necessary, max_slices)
+    num_slices_necessary = math.ceil(n_docs / opensearch_query_options.max_query_size)
+    num_slices_planned = min(num_slices_necessary, opensearch_query_options.max_slices)
     return max(num_slices_planned, 1)
 
 
 def run_annotation_query(
     job_data: SaveJobData,
     search_conf: dict,
-    use_ray=False,
-    max_query_size: int = 10_000,
-    max_slices: int = 1024,
-    keep_alive: str = ONE_DAY,
+    opensearch_query_options: OpenSearchQueryOptions,
+    *,
+    use_ray: bool = False,
 ) -> pd.DataFrame:
     """Given query and index contained in SaveJobData, run query and return results in dataframe."""
     search_client_args = gather_opensearch_args(search_conf)
     client = OpenSearch(**search_client_args)
 
     query = job_data.queryBody
-    num_slices = _get_num_slices(client, job_data.indexName, max_query_size, max_slices, query)
+    num_slices = _get_num_slices(client, job_data.indexName, opensearch_query_options, query)
     point_in_time = client.create_point_in_time(  # type: ignore[attr-defined]
-        index=job_data.indexName, params={"keep_alive": keep_alive}
+        index=job_data.indexName, params={"keep_alive": opensearch_query_options.keep_alive}
     )
     pit_id = point_in_time["pit_id"]
     query["pit"] = {"id": pit_id}
-    query["size"] = max_query_size
+    query["size"] = opensearch_query_options.max_query_size
     remote_queries = []
     query_func = _process_query_ray.remote if use_ray else _process_query
     for slice_id in range(num_slices):
@@ -146,7 +153,6 @@ def run_annotation_query(
             # Slice queries require max > 1
             slice_query["slice"] = {"id": slice_id, "max": num_slices}
         query_args = {"body": slice_query}
-        print("query_args:", query_args)
         remote_query = query_func(  # type: ignore[call-arg]
             query_args=query_args,
             search_client_args=search_client_args,
@@ -188,5 +194,5 @@ def get_samples_and_genes(user_query_string: str, index_name: str) -> pd.DataFra
         outputBasePath=".",
         fieldNames=field_names,
     )
-    samples_and_genes_df = run_annotation_query(job_data, OPENSEARCH_CONFIG)
+    samples_and_genes_df = run_annotation_query(job_data, OPENSEARCH_CONFIG, OpenSearchQueryOptions())
     return samples_and_genes_df
