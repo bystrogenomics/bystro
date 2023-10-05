@@ -1,4 +1,6 @@
 from pathlib import Path
+from typing import Any
+
 import dill
 import opensearchpy
 import pytest
@@ -11,7 +13,7 @@ from bystro.utils.config import get_opensearch_config
 TEST_RESPONSE_FILENAME = Path(__file__).parent / "test_response.pkl"
 
 with TEST_RESPONSE_FILENAME.open("rb") as f:
-    TEST_RESPONSE = dill.load(f)
+    TEST_RESPONSE = dill.load(f)  # noqa: S301 (data is safe)
 
 OPENSEARCH_CONFIG = get_opensearch_config()
 
@@ -29,20 +31,25 @@ def test_get_samples_and_genes_unit(monkeypatch):
     index_name = "mock_index_name"
 
     class MockOpenSearch:
-        def __init__(*args, **kwargs) -> None:
+        def __init__(*args: Any, **kwargs: Any) -> None:
+            del args, kwargs
             pass
 
-        def search(*args, **kwargs):
+        def search(*args, **kwargs) -> dict:
+            del args, kwargs
             return TEST_RESPONSE
 
-        def count(*args, **kwargs):
+        def count(*args, **kwargs) -> dict:
+            del args, kwargs
             return {"count": 1}
 
-        def create_point_in_time(*args, **kwargs):
+        def create_point_in_time(*args, **kwargs) -> dict:
+            del args, kwargs
             return {"pit_id": 12345}
 
-        def delete_point_in_time(*args, **kwargs):
-            return None
+        def delete_point_in_time(*args, **kwargs) -> None:
+            del args, kwargs
+            return
 
     monkeypatch.setattr(opensearchpy.OpenSearch, "__new__", MockOpenSearch)
     samples_and_genes_df = get_samples_and_genes(user_query_string, index_name)

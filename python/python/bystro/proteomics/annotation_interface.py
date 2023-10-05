@@ -4,16 +4,13 @@ from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
-import ray
 from bystro.proteomics.tests.example_query import DEFAULT_FIELDS  # TK
 from bystro.search.utils.messages import SaveJobData
 from bystro.search.utils.opensearch import gather_opensearch_args
 from bystro.utils.config import get_opensearch_config
 from opensearchpy import OpenSearch
 
-ray.init(ignore_reinit_error=True, address="auto")
 OPENSEARCH_CONFIG = get_opensearch_config()
-RAY_ERROR = -1  # the error code we use if a ray remote job fails to return
 
 ONE_DAY = "1d"  # default keep_alive time for opensearch point in time index
 
@@ -68,7 +65,6 @@ def _process_query(
     return _process_response(resp)
 
 
-@ray.remote
 def _process_query_ray(
     query_args: dict,
     search_client_args: dict,
@@ -130,8 +126,6 @@ def run_annotation_query(
     job_data: SaveJobData,
     search_conf: dict,
     opensearch_query_options: OpenSearchQueryOptions,
-    *,
-    use_ray: bool = False,
 ) -> pd.DataFrame:
     """Given query and index contained in SaveJobData, run query and return results in dataframe."""
     search_client_args = gather_opensearch_args(search_conf)
@@ -146,21 +140,19 @@ def run_annotation_query(
     query["pit"] = {"id": pit_id}
     query["size"] = opensearch_query_options.max_query_size
     remote_queries = []
-    query_func = _process_query_ray.remote if use_ray else _process_query
     for slice_id in range(num_slices):
         slice_query = query.copy()
         if num_slices > 1:
             # Slice queries require max > 1
             slice_query["slice"] = {"id": slice_id, "max": num_slices}
         query_args = {"body": slice_query}
-        remote_query = query_func(  # type: ignore[call-arg]
+        remote_query = _process_query(  # type: ignore[call-arg]
             query_args=query_args,
             search_client_args=search_client_args,
         )
         remote_queries.append(remote_query)
-    results_processed: list[pd.DataFrame] = ray.get(remote_queries) if use_ray else remote_queries
     client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore[attr-defined]
-    return pd.concat(results_processed)
+    return pd.concat(remote_queries)
 
 
 def _package_opensearch_query_from_query_string(query_string: str) -> dict[str, Any]:
