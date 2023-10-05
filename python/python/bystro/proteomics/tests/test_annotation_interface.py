@@ -1,11 +1,17 @@
+from pathlib import Path
+import dill
 import opensearchpy
 import pytest
 from bystro.proteomics.annotation_interface import (
     _process_response,
     get_samples_and_genes,
 )
-from bystro.proteomics.tests.sample_response_data import TEST_RESPONSE
 from bystro.utils.config import get_opensearch_config
+
+TEST_RESPONSE_FILENAME = Path(__file__).parent / "test_response.pkl"
+
+with TEST_RESPONSE_FILENAME.open("rb") as f:
+    TEST_RESPONSE = dill.load(f)
 
 OPENSEARCH_CONFIG = get_opensearch_config()
 
@@ -46,3 +52,6 @@ def test_get_samples_and_genes_unit(monkeypatch):
 def tests__process_response():
     ans = _process_response(TEST_RESPONSE)
     assert len(ans) == 1191
+    assert {"1805", "1847", "4805"} == set(ans.sample_id.unique())
+    assert 689 == len(ans.gene_name.unique())
+    assert {1, 2} == set(ans.dosage.unique())
