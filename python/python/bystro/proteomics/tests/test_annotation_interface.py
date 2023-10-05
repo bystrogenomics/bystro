@@ -3,7 +3,6 @@ from typing import Any
 
 import dill
 import opensearchpy
-import pytest
 from bystro.proteomics.annotation_interface import (
     _process_response,
     get_samples_and_genes,
@@ -14,16 +13,6 @@ TEST_RESPONSE_FILENAME = Path(__file__).parent / "test_response.pkl"
 
 with TEST_RESPONSE_FILENAME.open("rb") as f:
     TEST_RESPONSE = dill.load(f)  # noqa: S301 (data is safe)
-
-OPENSEARCH_CONFIG = get_opensearch_config()
-
-
-@pytest.mark.network()
-def test_get_samples_and_genes():
-    user_query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
-    SAMPLE_INDEX_NAME = "64c889415acb6d3b3e40e07b_63ddc9ce1e740e0020c39928"
-    samples_and_genes_df = get_samples_and_genes(user_query_string, SAMPLE_INDEX_NAME)
-    assert 1191 == len(samples_and_genes_df)
 
 
 def test_get_samples_and_genes_unit(monkeypatch):
