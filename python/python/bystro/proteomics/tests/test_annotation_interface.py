@@ -11,7 +11,11 @@ from bystro.proteomics.annotation_interface import (
 TEST_RESPONSE_FILENAME = Path(__file__).parent / "test_response.pkl"
 
 with TEST_RESPONSE_FILENAME.open("rb") as f:
-    TEST_RESPONSE = pickle.load(f)  # noqa: S301 (data is safe)
+    try:
+        TEST_RESPONSE = pickle.load(f)  # noqa: S301 (data is safe)
+    except Exception as e:
+        err_msg = f"pickling error with pickle version: {pickle.format_version}"
+        raise RuntimeError(err_msg) from e
 
 
 def test_get_samples_and_genes_unit(monkeypatch):
