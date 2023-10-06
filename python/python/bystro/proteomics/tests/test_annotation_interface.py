@@ -14,7 +14,8 @@ with TEST_RESPONSE_FILENAME.open("rb") as f:
     try:
         TEST_RESPONSE = pickle.load(f)  # noqa: S301 (data is safe)
     except Exception as e:
-        err_msg = f"pickling error with pickle version: {pickle.format_version}"
+        version = pickle.format_version  # type: ignore[attr-defined]
+        err_msg = f"pickling error with pickle version: {version}"
         raise RuntimeError(err_msg) from e
 
 
