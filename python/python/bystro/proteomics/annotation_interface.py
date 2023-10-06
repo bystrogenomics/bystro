@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
-from bystro.proteomics.tests.example_query import DEFAULT_FIELDS  # TK
+from bystro.proteomics.default_query_fields import DEFAULT_FIELDS
 from bystro.search.utils.messages import SaveJobData
 from bystro.search.utils.opensearch import gather_opensearch_args
 from bystro.utils.config import get_opensearch_config
