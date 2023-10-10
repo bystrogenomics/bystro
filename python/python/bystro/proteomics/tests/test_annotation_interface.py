@@ -1,17 +1,17 @@
 from pathlib import Path
 from typing import Any
 
-import cloudpickle
+import msgspec
 import opensearchpy
 from bystro.proteomics.annotation_interface import (
     _process_response,
     get_samples_and_genes,
 )
 
-TEST_RESPONSE_FILENAME = Path(__file__).parent / "test_response.pkl"
+TEST_RESPONSE_FILENAME = Path(__file__).parent / "test_response.dat"
 
 with TEST_RESPONSE_FILENAME.open("rb") as f:
-    TEST_RESPONSE = cloudpickle.load(f)  # noqa: S301 (data is safe)
+    TEST_RESPONSE = msgspec.msgpack.decode(f.read())  # noqa: S301 (data is safe)
 
 
 def test_get_samples_and_genes_unit(monkeypatch):
