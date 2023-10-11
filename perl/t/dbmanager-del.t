@@ -4,7 +4,6 @@ use warnings;
 
 package TestMe;
 use Test::More;
-use lib './lib';
 use Seq::Tracks::Build;
 use Try::Tiny;
 use DDP;

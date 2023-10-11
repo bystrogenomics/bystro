@@ -1,7 +1,6 @@
 use 5.10.0;
 use strict;
 use warnings;
-use lib './lib';
 
 package MockBuild;
 use Mouse 2;
@@ -11,7 +10,6 @@ extends "Seq::Base";
 has config => ( is => 'ro', isa => 'Str', required => 1 );
 
 package MockAnnotate;
-use lib './lib';
 use Test::More;
 use DDP;
 use Seq::DBManager;

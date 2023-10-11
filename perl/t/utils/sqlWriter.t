@@ -5,7 +5,6 @@ use warnings;
 use Test::More;
 
 use DDP;
-use lib './lib';
 use Utils::SqlWriter;
 use Path::Tiny;
 

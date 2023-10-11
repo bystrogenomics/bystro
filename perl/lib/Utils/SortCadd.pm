@@ -2,7 +2,6 @@ use 5.10.0;
 use strict;
 use warnings;
 
-use lib '../';
 # Takes a yaml file that defines one local file, and splits it on chromosome
 # Only works for tab-delimitd files that have the c
 package Utils::SortCadd;

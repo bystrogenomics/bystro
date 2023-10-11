@@ -2,7 +2,6 @@ use 5.10.0;
 use strict;
 use warnings;
 
-use lib '../';
 # Takes a CADD file and makes it into a bed-like file, retaining the property
 # That each base has 3 (or 4 for ambiguous) lines
 package Utils::CaddToBed;

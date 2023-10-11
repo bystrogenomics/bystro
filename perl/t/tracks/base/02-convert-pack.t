@@ -5,8 +5,6 @@ use warnings;
 use Test::More;
 use DDP;
 
-use lib './lib';
-
 use Data::MessagePack;
 use Seq::Tracks::Base::Types;
 

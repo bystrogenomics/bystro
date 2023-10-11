@@ -2,7 +2,6 @@ use 5.10.0;
 use strict;
 use warnings;
 
-use lib './lib';
 use Seq::Tracks::Build::LocalFilesPaths;
 use Path::Tiny;
 use Test::More;

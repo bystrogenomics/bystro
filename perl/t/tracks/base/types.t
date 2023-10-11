@@ -2,8 +2,6 @@ use 5.10.0;
 use strict;
 use warnings;
 
-use lib './lib';
-
 use Seq::Tracks::Base::Types;
 use Test::More;
 

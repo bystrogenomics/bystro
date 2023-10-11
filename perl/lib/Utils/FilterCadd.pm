@@ -2,8 +2,6 @@ use 5.10.0;
 use strict;
 use warnings;
 
-use lib '../';
-
 # The Bystro db contains only QC'd CADD sites
 # Use these to filter the source CADD sites and output a cleaned version
 package Utils::FilterCadd;

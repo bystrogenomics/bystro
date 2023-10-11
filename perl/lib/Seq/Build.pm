@@ -3,7 +3,6 @@ use strict;
 use warnings;
 
 package Seq::Build;
-use lib './lib';
 our $VERSION = '0.001';
 
 use DDP;

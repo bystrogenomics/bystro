@@ -25,11 +25,10 @@ tracks:
     filterCadd_completed: 2023-05-26T14:05:00
     filterCadd_date: 2017-09-12T19:18:00
     local_files:
-    - test.filterCadd.cadd.chr22.chr22.filtered.txt
-    - test.filterCadd.cadd.chr1.chr1.filtered.txt
-    - test.filterCadd.cadd.chr2.chr2.filtered.txt
+    - test.filterCadd.cadd.chr22.txt
+    - test.filterCadd.cadd.chr1.txt.gz
+    - test.filterCadd.cadd.chr2.txt
     name: cadd
     sortCadd_date: 2017-01-20T23:53:00
     sorted: 1
     type: cadd
-

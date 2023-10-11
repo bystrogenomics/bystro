@@ -15,7 +15,6 @@ use Getopt::Long     qw(GetOptions);
 use Compress::Snappy qw/compress decompress/;
 require bytes;
 
-use lib './lib';
 use Seq::DBManager;
 use Scalar::Util qw/looks_like_number/;
 use Data::Float;

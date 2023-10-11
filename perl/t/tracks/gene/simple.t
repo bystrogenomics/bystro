@@ -3,7 +3,6 @@ use strict;
 use warnings;
 
 package MockBuilder;
-use lib './lib';
 use Mouse;
 extends 'Seq::Base';
 

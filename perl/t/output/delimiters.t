@@ -4,7 +4,6 @@ use warnings;
 
 package TestMe;
 use Test::More;
-use lib './lib';
 use Try::Tiny;
 use DDP;
 

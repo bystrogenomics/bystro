@@ -2,8 +2,6 @@ use 5.14.0;
 use strict;
 use warnings;
 
-use lib '../';
-
 # Adds dbnsfp to refGene
 package Utils::RefGeneXdbnsfp;
 

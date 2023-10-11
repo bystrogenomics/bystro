@@ -6,7 +6,6 @@ package Testing;
 
 use Test::More;
 use DDP;
-use lib './lib';
 
 # plan tests => 13;
 

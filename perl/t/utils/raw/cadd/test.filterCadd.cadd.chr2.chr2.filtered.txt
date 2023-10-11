@@ -1,5 +1,0 @@
-## CADD v1.3 (c) University of Washington and Hudson-Alpha Institute for Biotechnology 2013-2015. All rights reserved.
-chrom	chromStart	chromEnd	Ref	Alt	RawScore	PHRED
-chr2	10002	10003	T	A	0.370069	6.349
-chr2	10002	10003	T	C	0.094635	3.551
-chr2	10002	10003	T	G	0.210401	4.788

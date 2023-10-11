@@ -3,7 +3,6 @@ use 5.10.0;
 use strict;
 use warnings;
 use Test::More;
-use lib './lib';
 use Mouse 2;
 use Seq::Tracks::Base::Types;
 use DDP;

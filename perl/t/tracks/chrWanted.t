@@ -3,7 +3,6 @@ use strict;
 use warnings;
 
 use Test::More;
-use lib './lib';
 use Seq::Tracks::Build;
 use DDP;
 

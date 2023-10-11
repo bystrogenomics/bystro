@@ -6,8 +6,6 @@ use Test::More;
 use DDP;
 use Path::Tiny qw/path/;
 
-use lib './lib';
-
 use Utils::FilterCadd;
 use Seq::DBManager;
 use Seq::Tracks::Cadd;

@@ -13,7 +13,6 @@ use namespace::autoclean;
 use Time::localtime;
 use Path::Tiny qw/path/;
 
-use lib './lib/';
 use Utils::SqlWriter::Connection;
 with 'Seq::Role::IO', 'Seq::Role::Message';
 
