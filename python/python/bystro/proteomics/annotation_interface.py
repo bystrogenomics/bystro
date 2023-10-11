@@ -127,7 +127,7 @@ def _run_annotation_query(
     point_in_time = client.create_point_in_time(  # type: ignore[attr-defined]
         index=job_data.indexName, params={"keep_alive": opensearch_query_options.keep_alive}
     )
-    try:  # make sure we clean up the PIT index properly no matter what
+    try:  # make sure we clean up the PIT index properly no matter what happens in this block
         pit_id = point_in_time["pit_id"]
         query["pit"] = {"id": pit_id}
         query["size"] = opensearch_query_options.max_query_size
