@@ -2,8 +2,17 @@
 /.build
 /.tidyall.d
 Bytro-*
+t/db
+t/tracks/build/db
+t/tracks/gene/db
+t/tracks/nearest/db/hg19
+t/tracks/reference/db
+t/tracks/score/db
+t/tracks/sparse/index
+t/tracks/vcf/index
 t/utils/filterCadd.*.yml
 t/utils/filterCadd.yml.utils-bak.*
+t/utils/index
 t/utils/raw/cadd/cadd.*.log
 t/utils/raw/cadd/cadd.*.log
 t/utils/raw/cadd/test.*
