@@ -181,7 +181,7 @@ def get_samples_and_genes_from_query(
     index_name: str,
     client: OpenSearch,
 ) -> pd.DataFrame:
-    """Given a query and index, return a dataframe of (sample_id, gene, dosage) triplets matching query."""
+    """Given a query and index, return a dataframe of (sample_id, gene, dosage) rows matching query."""
     query = _build_opensearch_query_from_query_string(user_query_string)
     job_data = SaveJobData(
         submissionID="1337",
