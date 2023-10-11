@@ -72,6 +72,8 @@ my $filter = Utils::FilterCadd->new(
     config     => './t/utils/filterCadd.yml',
     name       => 'cadd',
     maxThreads => 1,
+    utilName   => 'fetch',
+    compress   => 0
   }
 );
 
