@@ -9,7 +9,7 @@ use lib './lib';
 use Getopt::Long;
 use Path::Tiny qw/path/;
 use Pod::Usage;
-use YAML::XS qw/LoadFile/;
+use YAML::XS      qw/LoadFile/;
 use String::Strip qw/StripLTSpace/;
 
 use DDP;
@@ -27,50 +27,51 @@ use Seq::Build;
 # TODO: refactor to automatically call util by string value
 # i.e: --util filterCadd launches Utils::FilterCadd
 my (
-  $yaml_config, $names, $sortCadd, $filterCadd, $renameTrack, $utilName,
-  $help,        $liftOverCadd, $liftOverPath, $liftOverChainPath,
-  $debug,       $overwrite, $fetch, $caddToBed, $compress, $toBed,
-  $renameTrackTo, $verbose, $dryRunInsertions, $maxThreads,
+  $yaml_config,   $names,             $sortCadd,         $filterCadd,
+  $renameTrack,   $utilName,          $help,             $liftOverCadd,
+  $liftOverPath,  $liftOverChainPath, $debug,            $overwrite,
+  $fetch,         $caddToBed,         $compress,         $toBed,
+  $renameTrackTo, $verbose,           $dryRunInsertions, $maxThreads,
 );
 
 # usage
 GetOptions(
-  'c|config=s'   => \$yaml_config,
-  'n|name=s'     => \$names,
-  'h|help'       => \$help,
-  'u|util=s'     => \$utilName,
+  'c|config=s'     => \$yaml_config,
+  'n|name=s'       => \$names,
+  'h|help'         => \$help,
+  'u|util=s'       => \$utilName,
   'd|debug=i'      => \$debug,
-  'o|overwrite'  => \$overwrite,
-  'v|verbose=i' => \$verbose,
-  'r|dryRun' => \$dryRunInsertions,
+  'o|overwrite'    => \$overwrite,
+  'v|verbose=i'    => \$verbose,
+  'r|dryRun'       => \$dryRunInsertions,
   'm|maxThreads=i' => \$maxThreads,
 );
 
-if ($help || !$yaml_config) {
+if ( $help || !$yaml_config ) {
   Pod::Usage::pod2usage();
 }
 
-if(!$names) {
+if ( !$names ) {
   my $config = LoadFile($yaml_config);
   my @tracks;
-  for my $track (@{$config->{tracks}{tracks}}) {
+  for my $track ( @{ $config->{tracks}{tracks} } ) {
     my $hasUtils = !!$track->{utils};
 
-    if($hasUtils) {
+    if ($hasUtils) {
       push @tracks, $track->{name};
     }
   }
 
-  $names = join(",", @tracks);
+  $names = join( ",", @tracks );
 }
 
-if(!$names) {
+if ( !$names ) {
   say STDERR "No tracks found with 'utils' property";
 }
 
 say "Running utils for : " . $names;
 
-for my $wantedName (split ',', $names) {
+for my $wantedName ( split ',', $names ) {
   # modifies in place
   StripLTSpace($wantedName);
 
@@ -79,20 +80,20 @@ for my $wantedName (split ',', $names) {
   my $trackIdx = 0;
 
   my %options = (
-    config       => $yaml_config,
-    name         => $wantedName,
-    debug        => $debug,
-    overwrite    => $overwrite || 0,
-    verbose      => $verbose,
-    dryRun       => $dryRunInsertions,
+    config    => $yaml_config,
+    name      => $wantedName,
+    debug     => $debug,
+    overwrite => $overwrite || 0,
+    verbose   => $verbose,
+    dryRun    => $dryRunInsertions,
   );
 
-  if($maxThreads) {
+  if ($maxThreads) {
     $options{maxThreads} = $maxThreads;
   }
 
-  for my $track (@{$config->{tracks}{tracks}}) {
-    if($track->{name} eq $wantedName) {
+  for my $track ( @{ $config->{tracks}{tracks} } ) {
+    if ( $track->{name} eq $wantedName ) {
       $utilConfigs = $track->{utils};
       last;
     }
@@ -100,12 +101,12 @@ for my $wantedName (split ',', $names) {
     $trackIdx++;
   }
 
-  if (!$utilConfigs) {
+  if ( !$utilConfigs ) {
     die "The $wantedName track must have 'utils' property";
   }
 
-  for(my $utilIdx = 0; $utilIdx < @$utilConfigs; $utilIdx++) {
-    if($utilName && $utilConfigs->[$utilIdx]{name} ne $utilName) {
+  for ( my $utilIdx = 0; $utilIdx < @$utilConfigs; $utilIdx++ ) {
+    if ( $utilName && $utilConfigs->[$utilIdx]{name} ne $utilName ) {
       next;
     }
 
@@ -118,12 +119,15 @@ for my $wantedName (split ',', $names) {
 
     # Uppercase the first letter of the utility class name
     # aka user may specify "fetch" and we grab Utils::Fetch
-    my $className = 'Utils::' . uc( substr($utilName, 0, 1) ) . substr($utilName, 1, length($utilName) - 1);
+    my $className =
+        'Utils::'
+      . uc( substr( $utilName, 0, 1 ) )
+      . substr( $utilName, 1, length($utilName) - 1 );
     my $args = $utilConfig->{args} || {};
 
-    my %finalOpts = (%options, %$args, (utilIdx => $utilIdx, utilName => $utilName));
+    my %finalOpts = ( %options, %$args, ( utilIdx => $utilIdx, utilName => $utilName ) );
 
-    my $instance = $className->new(\%finalOpts);
+    my $instance = $className->new( \%finalOpts );
     $instance->go();
   }
 }

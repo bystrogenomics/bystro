@@ -30,7 +30,7 @@ extends 'Seq::Base';
 # We  add a few of our own annotation attributes
 # These will be re-used in the body of the annotation processor below
 # Users may configure these
-has input_file => (is => 'rw', isa => 'Str', required => 1);
+has input_file => ( is => 'rw', isa => 'Str', required => 1 );
 
 # Maximum (signed) size of del allele
 has maxDel => ( is => 'ro', isa => 'Int', default => -32, writer => 'setMaxDel' );
@@ -43,7 +43,7 @@ has fileProcessors => ( is => 'ro', isa => 'HashRef', default => 'bystro-vcf' );
 with 'Seq::Definition', 'Seq::Role::Validator';
 
 # To initialize Seq::Base with only getters
-has '+readOnly' => (init_arg => undef, default => 1);
+has '+readOnly' => ( init_arg => undef, default => 1 );
 
 # TODO: further reduce complexity
 sub BUILD {
@@ -55,9 +55,10 @@ sub BUILD {
 
   ################## Make the full output path ######################
   # The output path always respects the $self->output_file_base attribute path;
-  $self->{_outPath} = $self->_workingDir->child( $self->outputFilesInfo->{annotation} );
+  $self->{_outPath} =
+    $self->_workingDir->child( $self->outputFilesInfo->{annotation} );
 
-  $self->{_headerPath} = $self->_workingDir->child($self->outputFilesInfo->{header});
+  $self->{_headerPath} = $self->_workingDir->child( $self->outputFilesInfo->{header} );
 
   # Must come before statistics, which relies on a configured Seq::Tracks
   #Expects DBManager to have been given a database_dir
@@ -77,9 +78,9 @@ sub annotate {
 
   $self->log( 'info', 'Checking input file format' );
 
-  my ($err, $fileType) = $self->validateInputFile($self->input_file);
+  my ( $err, $fileType ) = $self->validateInputFile( $self->input_file );
 
-  if($err) {
+  if ($err) {
     $self->_errorWithCleanup($err);
     return ( $err, undef );
   }
@@ -93,7 +94,7 @@ sub annotateFile {
   my $self = shift;
   my $type = shift;
 
-  my ($err, $fh, $outFh, $statsFh, $headerFh) = $self->_getFileHandles($type);
+  my ( $err, $fh, $outFh, $statsFh, $headerFh ) = $self->_getFileHandles($type);
 
   if ($err) {
     $self->_errorWithCleanup($err);
@@ -104,56 +105,60 @@ sub annotateFile {
   my $header = <$fh>;
   $self->setLineEndings($header);
 
-  my ($finalHeader, $numberSplitFields) = $self->_getFinalHeader($header);
+  my ( $finalHeader, $numberSplitFields ) = $self->_getFinalHeader($header);
 
   ## A programmatically useful representation of the header
-  say $headerFh encode_json($finalHeader->getOrderedHeader());
+  say $headerFh encode_json( $finalHeader->getOrderedHeader() );
   my $outputHeader = $finalHeader->getString();
 
-  if(!$self->outputJson) {
+  if ( !$self->outputJson ) {
     say $outFh $outputHeader;
   }
-  
-  if($statsFh) {
+
+  if ($statsFh) {
     say $statsFh $outputHeader;
   }
 
   ######################## Build the fork pool #################################
   my $abortErr;
 
-  my $messageFreq = (2e4 / 4) * $self->maxThreads;
+  my $messageFreq = ( 2e4 / 4 ) * $self->maxThreads;
 
   # Report every 1e4 lines, to avoid thrashing receiver
   my $progressFunc =
-  $self->makeLogProgressAndPrint( \$abortErr, $outFh, $statsFh, $messageFreq );
+    $self->makeLogProgressAndPrint( \$abortErr, $outFh, $statsFh, $messageFreq );
   MCE::Loop::init {
     max_workers => $self->maxThreads || 8,
     use_slurpio => 1,
-    chunk_size => 'auto',
-    gather => $progressFunc,
+    chunk_size  => 'auto',
+    gather      => $progressFunc,
   };
 
   # We separate out the reference track getter so that we can check for discordant
   # bases, and pass the true reference base to other getters that may want it (like CADD)
 
   # To avoid the Moose/Mouse accessor penalty, store reference to underlying data
-  my $db = $self->{_db};
+  my $db             = $self->{_db};
   my $refTrackGetter = $self->{_tracks}->getRefTrackGetter();
-  my @trackGettersExceptReference = @{$self->{_tracks}->getTrackGettersExceptReference()};
+  my @trackGettersExceptReference =
+    @{ $self->{_tracks}->getTrackGettersExceptReference() };
   my @trackIndicesExceptReference = 0 .. $#trackGettersExceptReference;
 
   my $outIndicesMap = $finalHeader->getParentIndices();
-  my @outIndicesExceptReference = map { $outIndicesMap->{$_->name} } @trackGettersExceptReference;
+  my @outIndicesExceptReference =
+    map { $outIndicesMap->{ $_->name } } @trackGettersExceptReference;
 
   ######### Set Outputter #########
-  my @allOutIndices = map { $outIndicesMap->{$_->name} } @{$self->{_tracks}->trackGetters};
+  my @allOutIndices =
+    map { $outIndicesMap->{ $_->name } } @{ $self->{_tracks}->trackGetters };
 
   # Now that header is prepared, make the outputter
   # Note, that the only features that we need to iterate over
   # Are the features that come from our database
   # Meaning, we can skip anything forwarded from the pre-processor
-  
-  my $outputter = Seq::Output->new({header => $finalHeader, trackOutIndices => \@allOutIndices});
+
+  my $outputter =
+    Seq::Output->new( { header => $finalHeader, trackOutIndices => \@allOutIndices } );
   # my $outputFn;
   # if($self->outputJson) {
   #   $outputFn = \&encode_json;
@@ -162,9 +167,8 @@ sub annotateFile {
   #   $outputFn = \$outputter->makeOutputString;
   # }
 
-
   ###### Processes pre-processor output passed from file reader/producer #######
-  my $refTrackOutIdx = $outIndicesMap->{$refTrackGetter->name};
+  my $refTrackOutIdx = $outIndicesMap->{ $refTrackGetter->name };
 
   my %wantedChromosomes = %{ $refTrackGetter->chromosomes };
   my $maxDel            = $self->maxDel;
@@ -204,10 +208,10 @@ sub annotateFile {
     # chrom \t pos \t type \t inputRef \t alt \t hets \t homozygotes \n
     # the chrom is always in ucsc form, chr (the golang program guarantees it)
     my $outputJson = $self->outputJson;
-    while (my $line = $MEM_FH->getline()) {
+    while ( my $line = $MEM_FH->getline() ) {
       chomp $line;
 
-      my @fields = split('\t', $line, $numberSplitFields);
+      my @fields = split( '\t', $line, $numberSplitFields );
 
       $total++;
 
@@ -219,11 +223,11 @@ sub annotateFile {
 
       # Caveat: It seems that, per database ($chr), we can have only one
       # read-only transaction; so ... yeah can't combine with dbRead, dbReadOne
-      if(!$cursors{$fields[0]}) {
-        $cursors{$fields[0]} = $db->dbStartCursorTxn($fields[0]);
+      if ( !$cursors{ $fields[0] } ) {
+        $cursors{ $fields[0] } = $db->dbStartCursorTxn( $fields[0] );
       }
 
-      $dataFromDbAref = $db->dbReadOneCursorUnsafe($cursors{$fields[0]}, $zeroPos);
+      $dataFromDbAref = $db->dbReadOneCursorUnsafe( $cursors{ $fields[0] }, $zeroPos );
 
       if ( !defined $dataFromDbAref ) {
         $self->_errorWithCleanup("Wrong assembly? $fields[0]\: $fields[1] not found.");
@@ -243,12 +247,13 @@ sub annotateFile {
             if ( $fields[4] < $maxDel ) {
               @indelDbData = ( $fields[1] .. $fields[1] - ( $maxDel + 2 ) );
               # $self->log('info', "$fields[0]:$fields[1]: long deletion. Annotating up to $maxDel");
-            } else {
+            }
+            else {
               @indelDbData = ( $fields[1] .. $fields[1] - ( $fields[4] + 2 ) );
             }
 
             #last argument: skip commit
-            $db->dbReadCursorUnsafe($cursors{$fields[0]},  \@indelDbData);
+            $db->dbReadCursorUnsafe( $cursors{ $fields[0] }, \@indelDbData );
 
             #Note that the first position keeps the same $inputRef
             #This means in the (rare) discordant multiallelic situation, the reference
@@ -259,11 +264,14 @@ sub annotateFile {
             #Add the db data that we already have for this position
             unshift @indelDbData, $dataFromDbAref;
           }
-        } else {
+        }
+        else {
           #It's an insertion, we always read + 1 to the position being annotated
           # which itself is + 1 from the db position, so we read  $out[1][0][0] to get the + 1 base
           # Read without committing by using 1 as last argument
-          @indelDbData = ($dataFromDbAref, $db->dbReadOneCursorUnsafe($cursors{$fields[0]}, $fields[1]));
+          @indelDbData = (
+            $dataFromDbAref, $db->dbReadOneCursorUnsafe( $cursors{ $fields[0] }, $fields[1] )
+          );
 
           #Note that the first position keeps the same $inputRef
           #This means in the (rare) discordant multiallelic situation, the reference
@@ -274,13 +282,14 @@ sub annotateFile {
 
       if (@indelDbData) {
         ############### Gather all track data (besides reference) #################
-        for my $posIdx (0 .. $#indelDbData) {
+        for my $posIdx ( 0 .. $#indelDbData ) {
           for my $trackIndex (@trackIndicesExceptReference) {
-            $fields[$outIndicesExceptReference[$trackIndex]] //= [];
+            $fields[ $outIndicesExceptReference[$trackIndex] ] //= [];
 
             $trackGettersExceptReference[$trackIndex]->get(
               $indelDbData[$posIdx], $fields[0], $indelRef[$posIdx], $fields[4], $posIdx,
-              $fields[$outIndicesExceptReference[$trackIndex]], $zeroPos + $posIdx
+              $fields[ $outIndicesExceptReference[$trackIndex] ],
+              $zeroPos + $posIdx
             );
           }
 
@@ -290,14 +299,14 @@ sub annotateFile {
         # If we have multiple indel alleles at one position, need to clear stored values
         @indelDbData = ();
         @indelRef    = ();
-      } else {
-         for my $trackIndex (@trackIndicesExceptReference) {
-          $fields[$outIndicesExceptReference[$trackIndex]] //= [];
+      }
+      else {
+        for my $trackIndex (@trackIndicesExceptReference) {
+          $fields[ $outIndicesExceptReference[$trackIndex] ] //= [];
 
-          $trackGettersExceptReference[$trackIndex]->get(
-            $dataFromDbAref, $fields[0], $fields[3], $fields[4], 0,
-            $fields[$outIndicesExceptReference[$trackIndex]], $zeroPos
-          );
+          $trackGettersExceptReference[$trackIndex]
+            ->get( $dataFromDbAref, $fields[0], $fields[3], $fields[4], 0,
+            $fields[ $outIndicesExceptReference[$trackIndex] ], $zeroPos );
         }
 
         $fields[$refTrackOutIdx][0] = $refTrackGetter->get($dataFromDbAref);
@@ -311,20 +320,27 @@ sub annotateFile {
 
     close $MEM_FH;
 
-    if(@lines) {
-      if($outJson) {
-        MCE->gather(scalar @lines, $total - @lines, undef, encode_json(\@lines));
-      } else {
-        MCE->gather(scalar @lines, $total - @lines, undef, $outputter->makeOutputString(\@lines));
+    if (@lines) {
+      if ($outJson) {
+        MCE->gather( scalar @lines, $total - @lines, undef, encode_json( \@lines ) );
       }
-    } else {
+      else {
+        MCE->gather(
+          scalar @lines,
+          $total - @lines,
+          undef, $outputter->makeOutputString( \@lines )
+        );
+      }
+    }
+    else {
       MCE->gather( 0, $total );
     }
 
-  } $fh;
+  }
+  $fh;
 
   # Force flush
-  $progressFunc->(0, 0, undef, undef, 1);
+  $progressFunc->( 0, 0, undef, undef, 1 );
 
   MCE::Loop::finish();
 
@@ -345,22 +361,20 @@ sub annotateFile {
   # Sync to ensure all files written
   # This simply tries each close/sync/move operation in order
   # And returns an error early, or proceeds to next operation
-  $err = $self->safeClose($outFh)
-          ||
-          ($statsFh && $self->safeClose($statsFh))
-          ||
-          $self->safeSystem('sync')
-          ||
-          $self->_moveFilesToOutputDir();
+  $err =
+       $self->safeClose($outFh)
+    || ( $statsFh && $self->safeClose($statsFh) )
+    || $self->safeSystem('sync')
+    || $self->_moveFilesToOutputDir();
 
-  if($err) {
+  if ($err) {
     $self->_errorWithCleanup($err);
-    return ($err, undef);
+    return ( $err, undef );
   }
 
   $db->cleanUp();
 
-  return ($err, $self->outputFilesInfo);
+  return ( $err, $self->outputFilesInfo );
 }
 
 sub makeLogProgressAndPrint {
@@ -413,7 +427,7 @@ sub makeLogProgressAndPrint {
 sub _getFileHandles {
   my ( $self, $type ) = @_;
 
-  my ($outFh, $statsFh, $inFh, $headerFh);
+  my ( $outFh, $statsFh, $inFh, $headerFh );
   my $err;
 
   ( $err, $inFh ) = $self->_openAnnotationPipe($type);
@@ -435,51 +449,52 @@ sub _getFileHandles {
   }
 
   # $fhs{stats} = $$statsFh;
-  ($err, $outFh) = $self->getWriteFh($self->{_outPath});
+  ( $err, $outFh ) = $self->getWriteFh( $self->{_outPath} );
 
-  if($err) {
-    return ($err, undef, undef, undef);
+  if ($err) {
+    return ( $err, undef, undef, undef );
   }
 
-  ($err, $headerFh) = $self->getWriteFh($self->{_headerPath});
+  ( $err, $headerFh ) = $self->getWriteFh( $self->{_headerPath} );
 
-  if($err) {
-    return ($err, undef, undef, undef);
+  if ($err) {
+    return ( $err, undef, undef, undef );
   }
 
-  return (undef, $inFh, $outFh, $statsFh, $headerFh);
+  return ( undef, $inFh, $outFh, $statsFh, $headerFh );
 }
 
 sub _openAnnotationPipe {
-  my ($self, $type) = @_;
-  if(!$self->fileProcessors->{$type}) {
+  my ( $self, $type ) = @_;
+  if ( !$self->fileProcessors->{$type} ) {
     $self->_errorWithCleanup("No fileProcessors defined for $type file type");
   }
 
-  my $inPath = $self->input_file;
+  my $inPath   = $self->input_file;
   my $basename = path($inPath)->basename;
 
-  my $errPath = $self->_workingDir->child($basename . '.file-log.log');
+  my $errPath = $self->_workingDir->child( $basename . '.file-log.log' );
 
   #cat is wasteful, but we expect no one reads large uncompressed files
   my $echoProg = $self->getReadArgs($inPath) || "cat $inPath";
 
   my $fp = $self->fileProcessors->{$type};
-  
+
   my $finalProgram;
-  if($fp->{no_stdin}) {
+  if ( $fp->{no_stdin} ) {
     $finalProgram = $fp->{program} . " " . $inPath;
-  } else {
+  }
+  else {
     $finalProgram = $echoProg . " | " . $fp->{program};
   }
-  
-  if($fp->{args}) {
+
+  if ( $fp->{args} ) {
     my $args = $fp->{args};
 
-    for my $type (keys %{$self->outputFilesInfo}) {
-      if(index($args, "\%$type\%") > -1) {
-        substr($args, index($args, "\%$type\%"), length("\%$type\%"))
-          = $self->_workingDir->child($self->outputFilesInfo->{$type});
+    for my $type ( keys %{ $self->outputFilesInfo } ) {
+      if ( index( $args, "\%$type\%" ) > -1 ) {
+        substr( $args, index( $args, "\%$type\%" ), length("\%$type\%") ) =
+          $self->_workingDir->child( $self->outputFilesInfo->{$type} );
       }
     }
 
@@ -487,13 +502,13 @@ sub _openAnnotationPipe {
   }
 
   my $fh;
-  my $err = $self->safeOpen($fh, '-|', "$finalProgram 2> $errPath");
+  my $err = $self->safeOpen( $fh, '-|', "$finalProgram 2> $errPath" );
 
   return ( $err, $fh );
 }
 
 sub _getFinalHeader {
-  my ($self, $header) = @_;
+  my ( $self, $header ) = @_;
   chomp $header;
 
   ######### Build the header, and write it as the first line #############
@@ -511,12 +526,13 @@ sub _getFinalHeader {
   # idx 5: variable: anything the preprocessor provides
   my $numberSplitFields;
   my @headerFields;
-  if($self->outputJson) {
-    @headerFields = split('\t', $header);
+  if ( $self->outputJson ) {
+    @headerFields      = split( '\t', $header );
     $numberSplitFields = @headerFields;
-  } else {
+  }
+  else {
     $numberSplitFields = 5 + 1;
-    @headerFields = split('\t', $header, $numberSplitFields);
+    @headerFields      = split( '\t', $header, $numberSplitFields );
   }
 
   # Our header class checks the name of each feature
@@ -530,7 +546,7 @@ sub _getFinalHeader {
   # Prepend all of the headers created by the pre-processor
   $finalHeader->addFeaturesToHeader( \@headerFields, undef, 1 );
 
-  return ($finalHeader, $numberSplitFields);
+  return ( $finalHeader, $numberSplitFields );
 }
 
 sub _errorWithCleanup {

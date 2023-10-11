@@ -11,6 +11,7 @@ use DDP;
 my $app = Interface->new_with_options();
 
 $app->annotate;
+
 =head1 NAME
 
 annotate_snpfile.pl

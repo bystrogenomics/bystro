@@ -29,21 +29,21 @@ use YAML::XS qw/LoadFile/;
 use Seq;
 use Path::Tiny qw/path/;
 
-my ($verbose, $queueConfigPath, $connectionConfigPath, $maxThreads, $debug);
+my ( $verbose, $queueConfigPath, $connectionConfigPath, $maxThreads, $debug );
 
 GetOptions(
-  'v|verbose=i'   => \$verbose,
-  'd|debug'    => \$debug,
-  'q|queueConfig=s'   => \$queueConfigPath,
-  'c|connectionConfig=s'   => \$connectionConfigPath,
-  'maxThreads=i' => \$maxThreads,
+  'v|verbose=i'          => \$verbose,
+  'd|debug'              => \$debug,
+  'q|queueConfig=s'      => \$queueConfigPath,
+  'c|connectionConfig=s' => \$connectionConfigPath,
+  'maxThreads=i'         => \$maxThreads,
 );
 
 my $type = 'annotation';
 
-my $PROGRESS = "progress";
-my $FAILED = "failed";
-my $STARTED = "started";
+my $PROGRESS  = "progress";
+my $FAILED    = "failed";
+my $STARTED   = "started";
 my $COMPLETED = "completed";
 
 my $conf = LoadFile($queueConfigPath);
@@ -51,41 +51,46 @@ my $conf = LoadFile($queueConfigPath);
 # The properties that we accept from the worker caller
 my %requiredForAll = (
   output_file_base => 'outputBasePath',
-  assembly => 'assembly',
+  assembly         => 'assembly',
 );
 
-my $requiredForType = {input_file => 'inputFilePath'};
+my $requiredForType = { input_file => 'inputFilePath' };
 
 say "Running Annotation queue server";
 
-my $configPathBaseDir = "config/";
+my $configPathBaseDir  = "config/";
 my $configFilePathHref = {};
 
 my $queueConfig = $conf->{beanstalkd}{tubes}{$type};
 
-if(!$queueConfig) {
-  die "Queue config format not recognized. Options are " . ( join(', ', @{keys %{$conf->{beanstalkd}{tubes}}} ) );
+if ( !$queueConfig ) {
+  die "Queue config format not recognized. Options are "
+    . ( join( ', ', @{ keys %{ $conf->{beanstalkd}{tubes} } } ) );
 }
 
-my $beanstalk = Beanstalk::Client->new({
-  server    => $conf->{beanstalkd}{addresses}[0],
-  default_tube => $queueConfig->{submission},
-  connect_timeout => 1,
-  encoder => sub { encode_json(\@_) },
-  decoder => sub { @{decode_json(shift)} },
-});
+my $beanstalk = Beanstalk::Client->new(
+  {
+    server          => $conf->{beanstalkd}{addresses}[0],
+    default_tube    => $queueConfig->{submission},
+    connect_timeout => 1,
+    encoder         => sub { encode_json( \@_ ) },
+    decoder         => sub { @{ decode_json(shift) } },
+  }
+);
 
-my $beanstalkEvents = Beanstalk::Client->new({
-  server    => $conf->{beanstalkd}{addresses}[0],
-  default_tube => $queueConfig->{events},
-  connect_timeout => 1,
-  encoder => sub { encode_json(\@_) },
-  decoder => sub { @{decode_json(shift)} },
-});
+my $beanstalkEvents = Beanstalk::Client->new(
+  {
+    server          => $conf->{beanstalkd}{addresses}[0],
+    default_tube    => $queueConfig->{events},
+    connect_timeout => 1,
+    encoder         => sub { encode_json( \@_ ) },
+    decoder         => sub { @{ decode_json(shift) } },
+  }
+);
 
 my $events = $conf->{beanstalkd}{events};
 
-while(my $job = $beanstalk->reserve) {
+while ( my $job = $beanstalk->reserve ) {
   # Parallel ForkManager used only to throttle number of jobs run in parallel
   # cannot use run_on_finish with blocking reserves, use try catch instead
   # Also using forks helps clean up leaked memory from LMDB_File
@@ -93,12 +98,12 @@ while(my $job = $beanstalk->reserve) {
   # prevents anything within the try from executing
 
   my $jobDataHref;
-  my ($err, $outputFileNamesHashRef);
+  my ( $err, $outputFileNamesHashRef );
 
   try {
     $jobDataHref = decode_json( $job->data );
 
-    if(defined $debug) {
+    if ( defined $debug ) {
       say "Reserved job with id " . $job->id . " which contains:";
       p $jobDataHref;
 
@@ -107,81 +112,91 @@ while(my $job = $beanstalk->reserve) {
       p $stats;
     }
 
-    ($err, my $inputHref) = coerceInputs($jobDataHref, $job->id);
+    ( $err, my $inputHref ) = coerceInputs( $jobDataHref, $job->id );
 
-    if($err) {
+    if ($err) {
       die $err;
     }
 
-    my $configData = LoadFile($inputHref->{config});
+    my $configData = LoadFile( $inputHref->{config} );
 
     # Hide the server paths in the config we send back;
     # Those represent a security concern
     $configData->{files_dir} = 'hidden';
 
-    if($configData->{temp_dir}) {
+    if ( $configData->{temp_dir} ) {
       $configData->{temp_dir} = 'hidden';
     }
 
     $configData->{database_dir} = 'hidden';
 
     my $trackConfig;
-    if(ref $configData->{tracks} eq 'ARRAY') {
+    if ( ref $configData->{tracks} eq 'ARRAY' ) {
       $trackConfig = $configData->{tracks};
-    } else {
+    }
+    else {
       # New version
       $trackConfig = $configData->{tracks}{tracks};
     }
 
     for my $track (@$trackConfig) {
       # Strip local_files of their directory names, for security reasons
-      $track->{local_files} = [map { !$_ ? "" : path($_)->basename } @{$track->{local_files}}]
+      $track->{local_files} =
+        [ map { !$_ ? "" : path($_)->basename } @{ $track->{local_files} } ];
     }
 
-    $beanstalkEvents->put({ priority => 0, data => encode_json({
-      event => $STARTED,
-      jobConfig => $configData,
-      submissionID   => $jobDataHref->{submissionID},
-      queueID => $job->id,
-    })  });
+    $beanstalkEvents->put(
+      {
+        priority => 0,
+        data     => encode_json(
+          {
+            event        => $STARTED,
+            jobConfig    => $configData,
+            submissionID => $jobDataHref->{submissionID},
+            queueID      => $job->id,
+          }
+        )
+      }
+    );
 
     if ($debug) {
-      say STDERR "job ". $job->id . " starting with inputHref:";
+      say STDERR "job " . $job->id . " starting with inputHref:";
       p $inputHref;
     }
 
     my $annotate_instance = Seq->new_with_config($inputHref);
 
-    ($err, $outputFileNamesHashRef) = $annotate_instance->annotate();
+    ( $err, $outputFileNamesHashRef ) = $annotate_instance->annotate();
 
-    if(defined $debug) {
+    if ( defined $debug ) {
       p $err;
     }
-  } catch {
+  }
+  catch {
     $err = $_;
   };
 
-  if(defined $debug) {
+  if ( defined $debug ) {
     p $err;
   }
 
   if ($err) {
     $err =~ s/\sat\s\w+\/\w+.*\sline\s\d+.*//;
 
-    say "job ". $job->id . " failed";
+    say "job " . $job->id . " failed";
 
     my $data = {
-      event => $FAILED,
-      reason => $err,
-      queueID => $job->id,
-      submissionID   => $jobDataHref->{submissionID},
+      event        => $FAILED,
+      reason       => $err,
+      queueID      => $job->id,
+      submissionID => $jobDataHref->{submissionID},
     };
 
     $beanstalkEvents->put( { priority => 0, data => encode_json($data) } );
 
     $job->delete();
 
-    if($beanstalkEvents->error && defined $debug) {
+    if ( $beanstalkEvents->error && defined $debug ) {
       say STDERR "Beanstalkd last error:";
       p $beanstalkEvents->error;
     }
@@ -190,26 +205,24 @@ while(my $job = $beanstalk->reserve) {
   }
 
   my $data = {
-    event => $COMPLETED,
-    queueID => $job->id,
-    submissionID   => $jobDataHref->{submissionID},
-    results => {
-      outputFileNames => $outputFileNamesHashRef,
-    }
+    event        => $COMPLETED,
+    queueID      => $job->id,
+    submissionID => $jobDataHref->{submissionID},
+    results      => { outputFileNames => $outputFileNamesHashRef, }
   };
 
-  if(defined $debug) {
+  if ( defined $debug ) {
     say STDERR "putting completiong event";
     p $data;
   }
 
   # Signal completion before completion actually occurs via delete
   # To be conservative; since after delete message is lost
-  $beanstalkEvents->put({ priority => 0, data => encode_json($data)} );
+  $beanstalkEvents->put( { priority => 0, data => encode_json($data) } );
 
   $job->delete();
 
-  if($beanstalkEvents->error && defined $debug) {
+  if ( $beanstalkEvents->error && defined $debug ) {
     say "Beanstalkd last error:";
     p $beanstalkEvents->error;
   }
@@ -219,62 +232,62 @@ while(my $job = $beanstalk->reserve) {
 
 sub coerceInputs {
   my $jobDetailsHref = shift;
-  my $queueId = shift;
+  my $queueId        = shift;
 
   my %args;
   my $err;
 
   my %jobSpecificArgs;
-  for my $key (keys %requiredForAll) {
-    if(!defined $jobDetailsHref->{$requiredForAll{$key}}) {
+  for my $key ( keys %requiredForAll ) {
+    if ( !defined $jobDetailsHref->{ $requiredForAll{$key} } ) {
       $err = "Missing required key: $key in job message";
-      return ($err, undef);
+      return ( $err, undef );
     }
 
-    $jobSpecificArgs{$key} = $jobDetailsHref->{$requiredForAll{$key}};
+    $jobSpecificArgs{$key} = $jobDetailsHref->{ $requiredForAll{$key} };
   }
 
-  for my $key (keys %$requiredForType) {
-    if(!defined $jobDetailsHref->{$requiredForType->{$key}}) {
+  for my $key ( keys %$requiredForType ) {
+    if ( !defined $jobDetailsHref->{ $requiredForType->{$key} } ) {
       $err = "Missing required key: $key in job message";
-      return ($err, undef);
+      return ( $err, undef );
     }
 
-    $jobSpecificArgs{$key} = $jobDetailsHref->{$requiredForType->{$key}};
+    $jobSpecificArgs{$key} = $jobDetailsHref->{ $requiredForType->{$key} };
   }
 
-  my $configFilePath = getConfigFilePath($jobSpecificArgs{assembly});
+  my $configFilePath = getConfigFilePath( $jobSpecificArgs{assembly} );
 
-  if(!$configFilePath) {
+  if ( !$configFilePath ) {
     $err = "Assembly $jobSpecificArgs{assembly} doesn't have corresponding config file";
-    return ($err, undef);
+    return ( $err, undef );
   }
 
   my %commmonArgs = (
-    config             => $configFilePath,
+    config    => $configFilePath,
     publisher => {
-      server => $conf->{beanstalkd}{addresses}[0],
-      queue  => $queueConfig->{events},
+      server      => $conf->{beanstalkd}{addresses}[0],
+      queue       => $queueConfig->{events},
       messageBase => {
-        event => $PROGRESS,
-        queueID => $queueId,
+        event        => $PROGRESS,
+        queueID      => $queueId,
         submissionID => $jobDetailsHref->{submissionID},
-        data => undef,
+        data         => undef,
       }
     },
-    compress => 1,
-    archive => 1,
-    verbose => $verbose,
+    compress       => 1,
+    archive        => 1,
+    verbose        => $verbose,
     run_statistics => 1,
   );
 
-  if($maxThreads) {
+  if ($maxThreads) {
     $commmonArgs{maxThreads} = $maxThreads;
   }
 
-  my %combined = (%commmonArgs, %jobSpecificArgs);
+  my %combined = ( %commmonArgs, %jobSpecificArgs );
 
-  return (undef, \%combined);
+  return ( undef, \%combined );
 }
 
 sub getConfigFilePath {

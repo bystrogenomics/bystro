@@ -34,7 +34,7 @@ state $order = {
   }
 };
 
-has order => (is => 'ro', init_arg => undef, default => sub{$order});
+has order => ( is => 'ro', init_arg => undef, default => sub { $order } );
 
 __PACKAGE__->meta->make_immutable;
 1;

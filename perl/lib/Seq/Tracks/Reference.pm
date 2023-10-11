@@ -16,7 +16,7 @@ use namespace::autoclean;
 
 use Seq::Tracks::Reference::MapBases;
 
-state $baseMapper = Seq::Tracks::Reference::MapBases->new();
+state $baseMapper     = Seq::Tracks::Reference::MapBases->new();
 state $baseMapInverse = $baseMapper->baseMapInverse;
 
 extends 'Seq::Tracks::Get';
@@ -24,7 +24,7 @@ extends 'Seq::Tracks::Get';
 sub get {
   # $_[0] == $self; $_[1] = dbDataAref
   # $self->{_dbName} inherited from Seq::Tracks::Get
-  # not declared here because putting in a builder here results in 
+  # not declared here because putting in a builder here results in
   # "Oops Destroying Active Enviroment in LMDB_File
   return $baseMapInverse->[ $_[1]->[ $_[0]->{_dbName} ] ];
 }

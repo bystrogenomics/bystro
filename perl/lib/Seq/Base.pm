@@ -12,7 +12,7 @@ package Seq::Base;
 # VERSION
 
 # TODO:
-  # Rename database_dir to databaseDir
+# Rename database_dir to databaseDir
 
 use Mouse 2;
 use namespace::autoclean;
@@ -21,34 +21,39 @@ use Seq::Tracks;
 
 use DDP;
 #exports new_with_config
-with 'Seq::Role::ConfigFromFile', 
-#setLogLevel, setLogPath, setPublisher
-'Seq::Role::Message',
+with 'Seq::Role::ConfigFromFile',
+  #setLogLevel, setLogPath, setPublisher
+  'Seq::Role::Message',
 ############# Required Arguments ###########
-has database_dir => (is => 'ro', required => 1);
+  has database_dir => ( is => 'ro', required => 1 );
 
-has tracks => (is => 'ro', required => 1);
+has tracks => ( is => 'ro', required => 1 );
 
 ############ Public Exports ###################
-has readOnly => (is => 'ro', default => 0);
+has readOnly => ( is => 'ro', default => 0 );
 
-has tracksObj => (is => 'ro', init_arg => undef, lazy => 1, default => sub {
-  my $self = shift;
-	
-  my %config = (%{$self->tracks}, (gettersOnly => $self->readOnly));		
-  return Seq::Tracks->new(%config);
-});
+has tracksObj => (
+  is       => 'ro',
+  init_arg => undef,
+  lazy     => 1,
+  default  => sub {
+    my $self = shift;
+
+    my %config = ( %{ $self->tracks }, ( gettersOnly => $self->readOnly ) );
+    return Seq::Tracks->new(%config);
+  }
+);
 
 ############# Optional Arguments #############
-has publisher => (is => 'ro');
+has publisher => ( is => 'ro' );
 
-has logPath => (is => 'ro');
+has logPath => ( is => 'ro' );
 
-has verbose => (is => 'ro');
+has verbose => ( is => 'ro' );
 
-has debug => (is => 'ro', default => 0);
+has debug => ( is => 'ro', default => 0 );
 
-has readAhead => (is => 'ro', default => 0);
+has readAhead => ( is => 'ro', default => 0 );
 
 sub BUILD {
   my $self = shift;
@@ -62,11 +67,13 @@ sub BUILD {
   # Spend no time in unconfigured state; readOnly needs to applied immediately
   # because otherwise could corrupt database
   # Inspiration: https://peter.bourgon.org/go-best-practices-2016/#repository-structure
-  Seq::DBManager::initialize({
-    databaseDir => $self->database_dir,
-    readOnly => $self->readOnly,
-    readAhead => $self->readAhead,
-  });
+  Seq::DBManager::initialize(
+    {
+      databaseDir => $self->database_dir,
+      readOnly    => $self->readOnly,
+      readAhead   => $self->readAhead,
+    }
+  );
 
   # Similarly Seq::Role::Message acts as a singleton
   # Clear previous consumer's state, if in long-running process
@@ -88,22 +95,23 @@ sub BUILD {
   # Treating publisher, logPath, verbose, debug as instance variables
   # would result in having to configure this class in every consuming class
   # TODO: move to static methods, to understand where the functions are defined
-  if(defined $self->publisher) {
-    $self->setPublisher($self->publisher);
+  if ( defined $self->publisher ) {
+    $self->setPublisher( $self->publisher );
   }
 
-  if(defined $self->logPath) {
-    $self->setLogPath($self->logPath);
+  if ( defined $self->logPath ) {
+    $self->setLogPath( $self->logPath );
   }
 
-  if(defined $self->verbose) {
-    $self->setVerbosity($self->verbose);
+  if ( defined $self->verbose ) {
+    $self->setVerbosity( $self->verbose );
   }
 
   #todo: finisih ;for now we have only one level
-  if ($self->debug) {
+  if ( $self->debug ) {
     $self->setLogLevel('DEBUG');
-  } else {
+  }
+  else {
     $self->setLogLevel('INFO');
   }
 }

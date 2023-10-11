@@ -1,6 +1,7 @@
 use 5.10.0;
 use strict;
 use warnings;
+
 package Seq::Tracks::Nearest;
 
 our $VERSION = '0.001';
@@ -30,13 +31,13 @@ use Seq::DBManager;
 
 # Coordinate we start looking from
 # Typically used for gene tracks, would be 'txStart'
-has from => (is => 'ro', isa => 'Str', required => 1);
+has from => ( is => 'ro', isa => 'Str', required => 1 );
 
 # Coordinate we look to
 # Typically used for gene tracks, would 'txEnd' or nothing
-has to => (is => 'ro', isa => 'Maybe[Str]');
+has to => ( is => 'ro', isa => 'Maybe[Str]' );
 
-has dist => (is => 'ro', isa => 'Bool', default => 1);
+has dist => ( is => 'ro', isa => 'Bool', default => 1 );
 
 #### Add our other "features", everything we find for this site ####
 sub BUILD {
@@ -47,34 +48,34 @@ sub BUILD {
   # We only have 1 end
   $self->{_eq} = !$self->to || $self->from eq $self->to;
   # We expect to ALWAYS have a from field
-  $self->{_fromD} = $self->getFieldDbName($self->from);
+  $self->{_fromD} = $self->getFieldDbName( $self->from );
   # But "to" is optional
-  $self->{_toD} = !$self->{_eq} ? $self->getFieldDbName($self->to) : undef;
+  $self->{_toD} = !$self->{_eq} ? $self->getFieldDbName( $self->to ) : undef;
 
-  $self->{_db} = Seq::DBManager->new();
+  $self->{_db}     = Seq::DBManager->new();
   $self->{_dbName} = $self->dbName;
 
   # We may or may not want to calculate distance
-  $self->{_dist} = !!$self->dist;
-  $self->{_fieldDbNames} = [map { $self->getFieldDbName($_) } @{$self->features}];
+  $self->{_dist}         = !!$self->dist;
+  $self->{_fieldDbNames} = [ map { $self->getFieldDbName($_) } @{ $self->features } ];
 }
 
 sub setHeaders {
   my $self = shift;
 
-  my $headers = Seq::Headers->new();
-  my @features = @{$self->features};
+  my $headers  = Seq::Headers->new();
+  my @features = @{ $self->features };
 
-  if($self->dist) {
+  if ( $self->dist ) {
     push @features, 'dist';
   }
 
-  $headers->addFeaturesToHeader(\@features, $self->name);
+  $headers->addFeaturesToHeader( \@features, $self->name );
 
   # If we have dist, it comes as our last feature
   # We don't have a field db name for dist...this is a calculated feature
   # so we just want to get into the header, and into the output
-  $self->{_fIdx} = [0 .. $#{$self->features}];
+  $self->{_fIdx} = [ 0 .. $#{ $self->features } ];
 }
 
 sub get {
@@ -102,17 +103,18 @@ sub get {
 
   # WARNING: If $_[1]->[$_[0]->{_dbName} isn't defined, will be treated as the 0 index!!!
   # therefore return here if that is the case
-  if(!defined $_[1]->[$_[0]->{_dbName}]) {
-    for my $i (@{$_[0]->{_fIdx}}) {
-      $_[6]->[$i][$_[5]] = undef;
+  if ( !defined $_[1]->[ $_[0]->{_dbName} ] ) {
+    for my $i ( @{ $_[0]->{_fIdx} } ) {
+      $_[6]->[$i][ $_[5] ] = undef;
     }
 
     return $_[6];
   }
 
-  $_[0]->{_regionData}{$_[2]} //= $_[0]->{_db}->dbReadAll( $_[0]->regionTrackPath($_[2]) );
+  $_[0]->{_regionData}{ $_[2] } //=
+    $_[0]->{_db}->dbReadAll( $_[0]->regionTrackPath( $_[2] ) );
 
-  my $geneDb = $_[0]->{_regionData}{$_[2]}[$_[1]->[$_[0]->{_dbName}]];
+  my $geneDb = $_[0]->{_regionData}{ $_[2] }[ $_[1]->[ $_[0]->{_dbName} ] ];
 
   # exit;
   # We have features, so let's find those and return them
@@ -125,33 +127,35 @@ sub get {
   # what gene tracks used to do
   # Here we accumulate all features, except for the dist (not included in _fieldDbNames)
   my $i = 0;
-  for my $fieldDbName (@{$_[0]->{_fieldDbNames}}) {
+  for my $fieldDbName ( @{ $_[0]->{_fieldDbNames} } ) {
     #$outAccum->[$i][$positionIdx] = $href->[$self->{_dbName}][$self->{_fieldDbNames}[$i]] }
-    $_[6]->[$i][$_[5]] = $geneDb->[$fieldDbName];
+    $_[6]->[$i][ $_[5] ] = $geneDb->[$fieldDbName];
     $i++;
   }
 
   # Calculate distance if requested
   # We always expect from and to fields to be scalars
   # Notice that dist is our last feature, because $i incremented +1 here
-  if($_[0]->{_dist}) {
-    if($_[0]->{_eq} || $_[7] < $geneDb->[$_[0]->{_fromD}]) {
+  if ( $_[0]->{_dist} ) {
+    if ( $_[0]->{_eq} || $_[7] < $geneDb->[ $_[0]->{_fromD} ] ) {
       # We're before the starting position of the nearest region
       # Or we're only checking one boundary (the from boundary)
-      $_[6]->[$i][$_[5]] = $geneDb->[$_[0]->{_fromD}] - $_[7];
-    } elsif($_[7] <= $geneDb->[$_[0]->{_toD}]) {
+      $_[6]->[$i][ $_[5] ] = $geneDb->[ $_[0]->{_fromD} ] - $_[7];
+    }
+    elsif ( $_[7] <= $geneDb->[ $_[0]->{_toD} ] ) {
       # We already know $zeroPos >= $geneDb->[$_[0]->{_fromD}]
       # so if we're here, we are within the range of the requested region at this position
       # ie == 0 distance to the region
-      $_[6]->[$i][$_[5]] = 0
-    } else {
+      $_[6]->[$i][ $_[5] ] = 0;
+    }
+    else {
       # occurs after the 'to' position
-      $_[6]->[$i][$_[5]] = $geneDb->[$_[0]->{_toD}] - $_[7];
+      $_[6]->[$i][ $_[5] ] = $geneDb->[ $_[0]->{_toD} ] - $_[7];
     }
   }
 
   return $_[6];
-};
+}
 
 __PACKAGE__->meta->make_immutable;
 

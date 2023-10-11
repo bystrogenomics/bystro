@@ -6,7 +6,6 @@ use warnings;
 package Seq::Tracks::Region::Build;
 use Mouse 2;
 
-
 our $VERSION = '0.001';
 
 #Finish if needed

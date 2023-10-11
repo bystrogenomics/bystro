@@ -16,10 +16,10 @@ use Seq::Headers;
 # Note that Seq::Headeres is a singleton class
 # The headers property is exported only to allow easier overriding of setHeaders
 has headers => (
-  is => 'ro',
+  is       => 'ro',
   init_arg => undef,
-  lazy => 1,
-  default => sub { Seq::Headers->new() },
+  lazy     => 1,
+  default  => sub { Seq::Headers->new() },
 );
 
 sub BUILD {
@@ -32,24 +32,24 @@ sub BUILD {
   #register all features for this track
   #@params $parent, $child
   #if this class has no features, then the track's name is also its only feature
-  if($self->noFeatures) {
+  if ( $self->noFeatures ) {
     return;
   }
 
-  $self->{_fDb} = [map { $self->getFieldDbName($_) } @{$self->features}];
-  $self->{_fIdx} = [0 .. $#{$self->features}];
+  $self->{_fDb}  = [ map { $self->getFieldDbName($_) } @{ $self->features } ];
+  $self->{_fIdx} = [ 0 .. $#{ $self->features } ];
 }
 
 # Decouple from build to allow decoupling from dbName / build order
 sub setHeaders {
   my $self = shift;
 
-  if($self->noFeatures) {
-    $self->headers->addFeaturesToHeader($self->name);
+  if ( $self->noFeatures ) {
+    $self->headers->addFeaturesToHeader( $self->name );
     return;
   }
 
-  $self->headers->addFeaturesToHeader($self->features, $self->name);
+  $self->headers->addFeaturesToHeader( $self->features, $self->name );
 }
 
 # Take an array reference containing  (that is passed to this function), and get back all features
@@ -74,7 +74,7 @@ sub get {
 
   #some features simply don't have any features, and for those just return
   #the value they stored
-  if(!$_[0]->{_fIdx}) {
+  if ( !$_[0]->{_fIdx} ) {
     #$outAccum->[$posIdx] = $href->[ $self->{_dbName} ]
     # $_[6]->[$_[5]] = $_[1]->[ $_[0]->{_dbName} ];
 
@@ -85,14 +85,13 @@ sub get {
   # TODO: decide whether we want to revert to old system of returning a bunch of !
   # one for each feature
   # This is clunky, to have _i and fieldDbNames
-  if(!defined $_[1]->[$_[0]->{_dbName}]) {
-    for my $i (@{$_[0]->{_fIdx}}) {
-      $_[6]->[$i][$_[5]] = undef;
+  if ( !defined $_[1]->[ $_[0]->{_dbName} ] ) {
+    for my $i ( @{ $_[0]->{_fIdx} } ) {
+      $_[6]->[$i][ $_[5] ] = undef;
     }
 
     return $_[6];
   }
-
 
   # We have features, so let's find those and return them
   # Since all features are stored in some shortened form in the db, we also
@@ -101,9 +100,9 @@ sub get {
   # #http://ideone.com/WD3Ele
   # return [ map { $_[1]->[$_[0]->{_dbName}][$_] } @{$_[0]->{_fieldDbNames}} ];
   my $idx = 0;
-  for my $fieldDbName (@{$_[0]->{_fDb}}) {
+  for my $fieldDbName ( @{ $_[0]->{_fDb} } ) {
     #$outAccum->[$idx][$posIdx] = $href->[$self->{_dbName}][$fieldDbName] }
-    $_[6]->[$idx][$_[5]] = $_[1]->[$_[0]->{_dbName}][$fieldDbName];
+    $_[6]->[$idx][ $_[5] ] = $_[1]->[ $_[0]->{_dbName} ][$fieldDbName];
     $idx++;
   }
 

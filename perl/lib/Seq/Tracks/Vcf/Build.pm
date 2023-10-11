@@ -39,14 +39,15 @@ with 'Seq::Output::Fields';
 
 # We assume sparse tracks have at least one feature; can remove this requirement
 # But will need to update makeMergeFunc to not assume an array of values (at least one key => value)
-has '+features' => (required => 1);
+has '+features' => ( required => 1 );
 
 # Like Sparse tracks are typically quite small, with potentiall quite large values
 # so to make optimal use of pages
 # lets set a smaller default commitEvery
-has '+commitEvery' => (default => 1e3);
+has '+commitEvery' => ( default => 1e3 );
 
-has vcfProcessor => (is => 'ro', isa => 'Str', required => 1, default => 'bystro-vcf');
+has vcfProcessor =>
+  ( is => 'ro', isa => 'Str', required => 1, default => 'bystro-vcf' );
 
 state $converter = Seq::Tracks::Base::Types->new();
 
@@ -56,19 +57,20 @@ state $converter = Seq::Tracks::Base::Types->new();
 # 1) allow any of them to be used under "features"
 # 2) if their names clash with fields in INFO, will ignore the INFO fields
 # TODO: allow users to specify info.field to avoid nameclash
-state $requiredHeader = ['chrom', 'pos', 'ref', 'alt', 'trTv', 'id', 'alleleIdx', 'info'];
+state $requiredHeader =
+  [ 'chrom', 'pos', 'ref', 'alt', 'trTv', 'id', 'alleleIdx', 'info' ];
 
 sub BUILD {
   my $self = shift;
 
-  if(!@{$self->features}) {
-    $self->log('fatal', 'VCF build requires INFO features');
+  if ( !@{ $self->features } ) {
+    $self->log( 'fatal', 'VCF build requires INFO features' );
   }
 
-  my ($err, $feats) = $self->_findExpectedFeatures($requiredHeader);
+  my ( $err, $feats ) = $self->_findExpectedFeatures($requiredHeader);
 
-  if($err) {
-    $self->log('fatal', $self->name . ": $err");
+  if ($err) {
+    $self->log( 'fatal', $self->name . ": $err" );
   }
 
   $self->{_vcfFeatures} = $feats;
@@ -78,7 +80,7 @@ sub BUILD {
   # TODO: prevent header features from overriding info fields by using info.field
   # notation as a feature
   $self->{_infoFeatureNames} = $self->_getInfoFeatureNames();
-  $self->{_numFilters} = scalar keys %{$self->build_row_filters} || 0;
+  $self->{_numFilters}       = scalar keys %{ $self->build_row_filters } || 0;
 
   # Precalculate the field db names, for faster accesss
   # TODO: think about moving away from storing the "db name" in the database
@@ -89,7 +91,7 @@ sub BUILD {
   # shorter than some of the remaining field indices stored in db, potentially
   my %fieldDbNames;
 
-  for my $feature (@{$self->features}) {
+  for my $feature ( @{ $self->features } ) {
     $fieldDbNames{$feature} = $self->getFieldDbName($feature);
   }
 
@@ -112,49 +114,52 @@ sub buildTrack {
   my $tracks = Seq::Tracks->new();
   $self->{_refTrack} = $tracks->getRefTrackGetter();
 
-  my $pm = Parallel::ForkManager->new($self->maxThreads);
+  my $pm = Parallel::ForkManager->new( $self->maxThreads );
 
   # my $altIdx = $self->headerFeatures->{ALT};
   # my $idIdx = $self->headerFeatures->{ID};
 
-  my $lastIdx = $#{$self->features};
+  my $lastIdx = $#{ $self->features };
 
   # location of these features in input file (intermediate annotation)
-  my $refIdx = $self->{_vcfFeatures}->{ref};
-  my $posIdx = $self->{_vcfFeatures}->{pos};
-  my $chrIdx = $self->{_vcfFeatures}->{chrom};
-  my $altIdx = $self->{_vcfFeatures}->{alt};
+  my $refIdx    = $self->{_vcfFeatures}->{ref};
+  my $posIdx    = $self->{_vcfFeatures}->{pos};
+  my $chrIdx    = $self->{_vcfFeatures}->{chrom};
+  my $altIdx    = $self->{_vcfFeatures}->{alt};
   my $alleleIdx = $self->{_vcfFeatures}->{alleleIdx};
-  my $infoIdx = $self->{_vcfFeatures}->{info};
+  my $infoIdx   = $self->{_vcfFeatures}->{info};
 
   # Track over-written positions
   # Hashes all values passed in, to make sure that duplicate values aren't written
-  my ($mergeFunc, $cleanUpMerge) = $self->makeMergeFunc();
+  my ( $mergeFunc, $cleanUpMerge ) = $self->makeMergeFunc();
 
   my %completedDetails;
-  $pm->run_on_finish(sub {
-    my ($pid, $exitCode, $fileName, undef, undef, $errOrChrs) = @_;
+  $pm->run_on_finish(
+    sub {
+      my ( $pid, $exitCode, $fileName, undef, undef, $errOrChrs ) = @_;
 
-    if($exitCode != 0) {
-      my $err = $errOrChrs ? "due to: $$errOrChrs" : "due to an untimely demise";
+      if ( $exitCode != 0 ) {
+        my $err = $errOrChrs ? "due to: $$errOrChrs" : "due to an untimely demise";
 
-      $self->log('fatal', $self->name . ": Failed to build $fileName $err");
-    }
-
-    # TODO: check for hash ref
-    for my $chr (keys %$errOrChrs) {
-      if(!$completedDetails{$chr}) {
-        $completedDetails{$chr} = [$fileName];
-      } else {
-        push @{$completedDetails{$chr}}, $fileName;
+        $self->log( 'fatal', $self->name . ": Failed to build $fileName $err" );
       }
+
+      # TODO: check for hash ref
+      for my $chr ( keys %$errOrChrs ) {
+        if ( !$completedDetails{$chr} ) {
+          $completedDetails{$chr} = [$fileName];
+        }
+        else {
+          push @{ $completedDetails{$chr} }, $fileName;
+        }
+      }
+
+      $self->log( 'info', $self->name . ": completed building from $fileName" );
     }
+  );
 
-    $self->log('info', $self->name . ": completed building from $fileName");
-  });
-
-  for my $file (@{$self->local_files}) {
-    $self->log('info', $self->name . ": beginning building from $file");
+  for my $file ( @{ $self->local_files } ) {
+    $self->log( 'info', $self->name . ": beginning building from $file" );
 
     # Although this should be unnecessary, environments must be created
     # within the process that uses them
@@ -162,128 +167,134 @@ sub buildTrack {
     $self->db->cleanUp();
 
     $pm->start($file) and next;
-      my ($err, $vcfNameMap, $vcfFilterMap) = $self->_extractHeader($file);
+    my ( $err, $vcfNameMap, $vcfFilterMap ) = $self->_extractHeader($file);
 
-      if($err) {
-        # DB not open yet, no need to commit
-        $pm->finish(255, \$err);
-      }
+    if ($err) {
+      # DB not open yet, no need to commit
+      $pm->finish( 255, \$err );
+    }
 
-       # Record which chromosomes were recorded for completionMeta
-      my %visitedChrs;
-      my $chr;
-      my @fields;
-      my $dbData;
-      my $wantedChr;
-      my $refExpected;
-      my $dbPos;
+    # Record which chromosomes were recorded for completionMeta
+    my %visitedChrs;
+    my $chr;
+    my @fields;
+    my $dbData;
+    my $wantedChr;
+    my $refExpected;
+    my $dbPos;
 
-      # We use "unsafe" writers, whose active count we need to track
-      my $cursor;
-      my $count = 0;
+    # We use "unsafe" writers, whose active count we need to track
+    my $cursor;
+    my $count = 0;
 
-      my $fh;
-      ($err, $fh) = $self->_openVcfPipe($file);
+    my $fh;
+    ( $err, $fh ) = $self->_openVcfPipe($file);
 
-      if($err) {
-        $self->log('fatal', $self->name . ": $err");
-      }
+    if ($err) {
+      $self->log( 'fatal', $self->name . ": $err" );
+    }
 
-      # TODO: Read header, and configure vcf header feature indices based on that
-      my $header = <$fh>;
+    # TODO: Read header, and configure vcf header feature indices based on that
+    my $header = <$fh>;
 
-      FH_LOOP: while ( my $line = $fh->getline() ) {
-        chomp $line;
-        # This is the annotation input first 7 lines, plus id, info
-        @fields = split '\t', $line;
+    FH_LOOP: while ( my $line = $fh->getline() ) {
+      chomp $line;
+      # This is the annotation input first 7 lines, plus id, info
+      @fields = split '\t', $line;
 
-        # Transforms $chr if it's not prepended with a 'chr' or is 'chrMT' or 'MT'
-        # and checks against our list of wanted chromosomes
-        $chr = $self->normalizedWantedChr->{ $fields[$chrIdx] };
+      # Transforms $chr if it's not prepended with a 'chr' or is 'chrMT' or 'MT'
+      # and checks against our list of wanted chromosomes
+      $chr = $self->normalizedWantedChr->{ $fields[$chrIdx] };
 
-        # falsy value is ''
-        if(!defined $wantedChr || (!defined $chr || $wantedChr ne $chr)) {
-          # We have a new chromosome
-          if(defined $wantedChr) {
-            #Commit any remaining transactions, remove the db map from memory
-            #this also has the effect of closing all cursors
-            $self->db->cleanUp();
-            undef $cursor;
-
-            $count = 0;
-          }
-
-          $wantedChr = $self->chrWantedAndIncomplete($chr);
-        }
-
-        # TODO: rethink chPerFile handling
-        if(!defined $wantedChr) {
-          next FH_LOOP;
-        }
-
-        $visitedChrs{$wantedChr} //= 1;
-
-        # 0-based position: VCF is 1-based
-        $dbPos = $fields[$posIdx] - 1;
-
-        if(!looks_like_number($dbPos)) {
+      # falsy value is ''
+      if ( !defined $wantedChr || ( !defined $chr || $wantedChr ne $chr ) ) {
+        # We have a new chromosome
+        if ( defined $wantedChr ) {
+          #Commit any remaining transactions, remove the db map from memory
+          #this also has the effect of closing all cursors
           $self->db->cleanUp();
-
-          $pm->finish(255, \"Invalid position @ $chr\: $dbPos");
-        }
-
-        $cursor //= $self->db->dbStartCursorTxn($wantedChr);
-
-        # We want to keep a consistent view of our universe, so use one transaction
-        # during read/modify/write
-        $dbData = $self->db->dbReadOneCursorUnsafe($cursor, $dbPos);
-
-        $refExpected = $self->{_refTrack}->get($dbData);
-        if($fields[$refIdx] ne $refExpected) {
-          $self->log('warn', $self->name . " $chr\:$fields[$posIdx]: "
-            . " Discordant. Expected ref: $refExpected, found: ref: $fields[$refIdx], alt:$fields[$altIdx]. Skipping");
-          next;
-        }
-
-        ($err, my $data) = $self->_extractFeatures(\@fields, $infoIdx, $alleleIdx, $vcfNameMap, $vcfFilterMap);
-
-        if($err) {
-          #Commit, sync everything, including completion status, and release mmap
-          $self->db->cleanUp();
-
-          $pm->finish(255, \$err);
-        }
-
-        # If the row didn't pass filters, $data will be undefined
-        # In all other cases it will be an array
-        if(!defined $data) {
-          next;
-        }
-
-        #Args:                         $cursor, $chr,       $trackIndex,   $pos,   $trackValue, $mergeFunction
-        $self->db->dbPatchCursorUnsafe($cursor, $wantedChr, $self->dbName, $dbPos, $data, $mergeFunc);
-
-        if($count > $self->commitEvery) {
-          $self->db->dbEndCursorTxn($wantedChr);
           undef $cursor;
 
           $count = 0;
         }
 
-        $count++;
+        $wantedChr = $self->chrWantedAndIncomplete($chr);
       }
 
-      #Commit, sync everything, including completion status, and release mmap
-      $self->db->cleanUp();
+      # TODO: rethink chPerFile handling
+      if ( !defined $wantedChr ) {
+        next FH_LOOP;
+      }
 
-      $self->safeCloseBuilderFh($fh, $file, 'fatal');
+      $visitedChrs{$wantedChr} //= 1;
 
-    $pm->finish(0, \%visitedChrs);
+      # 0-based position: VCF is 1-based
+      $dbPos = $fields[$posIdx] - 1;
+
+      if ( !looks_like_number($dbPos) ) {
+        $self->db->cleanUp();
+
+        $pm->finish( 255, \"Invalid position @ $chr\: $dbPos" );
+      }
+
+      $cursor //= $self->db->dbStartCursorTxn($wantedChr);
+
+      # We want to keep a consistent view of our universe, so use one transaction
+      # during read/modify/write
+      $dbData = $self->db->dbReadOneCursorUnsafe( $cursor, $dbPos );
+
+      $refExpected = $self->{_refTrack}->get($dbData);
+      if ( $fields[$refIdx] ne $refExpected ) {
+        $self->log( 'warn',
+              $self->name
+            . " $chr\:$fields[$posIdx]: "
+            . " Discordant. Expected ref: $refExpected, found: ref: $fields[$refIdx], alt:$fields[$altIdx]. Skipping"
+        );
+        next;
+      }
+
+      ( $err, my $data ) =
+        $self->_extractFeatures( \@fields, $infoIdx, $alleleIdx, $vcfNameMap,
+        $vcfFilterMap );
+
+      if ($err) {
+        #Commit, sync everything, including completion status, and release mmap
+        $self->db->cleanUp();
+
+        $pm->finish( 255, \$err );
+      }
+
+      # If the row didn't pass filters, $data will be undefined
+      # In all other cases it will be an array
+      if ( !defined $data ) {
+        next;
+      }
+
+      #Args:                         $cursor, $chr,       $trackIndex,   $pos,   $trackValue, $mergeFunction
+      $self->db->dbPatchCursorUnsafe( $cursor, $wantedChr, $self->dbName, $dbPos, $data,
+        $mergeFunc );
+
+      if ( $count > $self->commitEvery ) {
+        $self->db->dbEndCursorTxn($wantedChr);
+        undef $cursor;
+
+        $count = 0;
+      }
+
+      $count++;
+    }
+
+    #Commit, sync everything, including completion status, and release mmap
+    $self->db->cleanUp();
+
+    $self->safeCloseBuilderFh( $fh, $file, 'fatal' );
+
+    $pm->finish( 0, \%visitedChrs );
   }
 
   $pm->wait_all_children();
 
-  for my $chr (keys %completedDetails) {
+  for my $chr ( keys %completedDetails ) {
     $self->completionMeta->recordCompletion($chr);
 
     # cleanUpMerge placed here so that only after all files are processed do we
@@ -292,8 +303,10 @@ sub buildTrack {
     # overlapping sites
     $cleanUpMerge->($chr);
 
-    $self->log('info', $self->name . ": recorded $chr completed, from "
-    . (join(",", @{$completedDetails{$chr}})));
+    $self->log( 'info',
+          $self->name
+        . ": recorded $chr completed, from "
+        . ( join( ",", @{ $completedDetails{$chr} } ) ) );
   }
 
   #TODO: figure out why this is necessary, even with DEMOLISH
@@ -302,25 +315,25 @@ sub buildTrack {
 }
 
 sub _findExpectedFeatures {
-  my ($self, $expFeaturesAref) = @_;
+  my ( $self, $expFeaturesAref ) = @_;
 
   my $file = $self->local_files->[0];
 
-  if(!$file) {
-    return ("Require at least one file in local_file", undef);
+  if ( !$file ) {
+    return ( "Require at least one file in local_file", undef );
   }
 
-  my ($err, $fh) = $self->_openVcfPipe($self->local_files->[0]);
+  my ( $err, $fh ) = $self->_openVcfPipe( $self->local_files->[0] );
 
-  if($err) {
-    return ($err, undef);
+  if ($err) {
+    return ( $err, undef );
   }
 
   my $header = <$fh>;
   chomp $header;
 
-  if(!$header) {
-    return ("Couldn't read intermediate header of $file", undef);
+  if ( !$header ) {
+    return ( "Couldn't read intermediate header of $file", undef );
   }
 
   my @head = split '\t', $header;
@@ -334,8 +347,8 @@ sub _findExpectedFeatures {
   for my $f (@head) {
     $idx++;
 
-    if(defined $found{$f} && $found{$f} != -1) {
-      return ("Found $f at least twice in header of $file", undef);
+    if ( defined $found{$f} && $found{$f} != -1 ) {
+      return ( "Found $f at least twice in header of $file", undef );
     }
 
     $found{$f} = $idx;
@@ -343,26 +356,29 @@ sub _findExpectedFeatures {
 
   my @missing = grep { $found{$_} == -1 } @$expFeaturesAref;
 
-  if(@missing) {
-    return ("Couldn't find all expected header fields, missing: " . join(',', @missing), undef);
+  if (@missing) {
+    return (
+      "Couldn't find all expected header fields, missing: " . join( ',', @missing ),
+      undef );
   }
 
-  return (undef, \%found);
+  return ( undef, \%found );
 }
 
 sub _getInfoFeatureNames {
   my $self = shift;
 
-  my %reverseFieldMap = map { $self->fieldMap->{$_} => $_ } keys %{$self->fieldMap};
+  my %reverseFieldMap = map { $self->fieldMap->{$_} => $_ } keys %{ $self->fieldMap };
 
   my %infoFeatureNames;
-  for my $feature (@{$self->features}) {
+  for my $feature ( @{ $self->features } ) {
     my $originalName = $reverseFieldMap{$feature} || $feature;
 
     # If we encounter a name clash, choose the intermediate header output
     # rather than the field in INFO
-    if(defined $self->{_vcfFeatures}{$originalName}) {
-      $self->log('info', $self->name . ": taking $feature from intermediate header, not INFO");
+    if ( defined $self->{_vcfFeatures}{$originalName} ) {
+      $self->log( 'info',
+        $self->name . ": taking $feature from intermediate header, not INFO" );
       next;
     }
 
@@ -381,18 +397,19 @@ sub _getHeaderFeatures {
   my %featuresMap;
   my $features = $self->features;
 
-  for(my $i = 0; $i < @{$features}; $i++) {
-    $featuresMap{$features->[$i]} = $i;
+  for ( my $i = 0; $i < @{$features}; $i++ ) {
+    $featuresMap{ $features->[$i] } = $i;
   }
 
-  if(!defined $featuresMap{alt}) {
-    $self->log('fatal', $self->name . ": 'alt' feature not specified, required for vcf tracks");
+  if ( !defined $featuresMap{alt} ) {
+    $self->log( 'fatal',
+      $self->name . ": 'alt' feature not specified, required for vcf tracks" );
   }
 
-  my %fieldMap = map{ $_ => $self->fieldMap->{$_} } keys %{$self->fieldMap};
+  my %fieldMap = map { $_ => $self->fieldMap->{$_} } keys %{ $self->fieldMap };
 
   my @headerFeatures;
-  for my $fName (keys %{$self->{_vcfFeatures}}) {
+  for my $fName ( keys %{ $self->{_vcfFeatures} } ) {
     my $idx;
 
     # Because VCF files are so flexible with feature definitions, it will be
@@ -401,14 +418,15 @@ sub _getHeaderFeatures {
     # may correctly surmise that we read the VCF after transformation to intermediate
     # annotated format
 
-    if(defined $featuresMap{$fName}) {
+    if ( defined $featuresMap{$fName} ) {
       $idx = $featuresMap{$fName};
-    } elsif(defined $fieldMap{$fName} && defined $featuresMap{$fieldMap{$fName}}) {
-      $idx = $featuresMap{$fieldMap{$fName}};
+    }
+    elsif ( defined $fieldMap{$fName} && defined $featuresMap{ $fieldMap{$fName} } ) {
+      $idx = $featuresMap{ $fieldMap{$fName} };
     }
 
     # This $fName isn't requested by the user
-    if(!defined $idx) {
+    if ( !defined $idx ) {
       next;
     }
 
@@ -416,51 +434,57 @@ sub _getHeaderFeatures {
     #1) The feature name (post-transformation)
     #2) The feature's index in the pre-processor's header
     #3) The index in the database
-    push @headerFeatures, [
-      $self->features->[$idx],
-      $self->{_vcfFeatures}{$fName},
-      $self->getFieldDbName($self->features->[$idx])
-    ];
+    push @headerFeatures,
+      [
+      $self->features->[$idx], $self->{_vcfFeatures}{$fName},
+      $self->getFieldDbName( $self->features->[$idx] )
+      ];
   }
-
 
   return \@headerFeatures;
 }
 
 sub _openVcfPipe {
-  my ($self, $file) = @_;
+  my ( $self, $file ) = @_;
 
   my $outputter = Seq::Output::Delimiters->new();
 
   my $delim = $outputter->emptyFieldChar;
-  my $prog = $self->isCompressedSingle($file) ? $self->gzip . ' ' . $self->decompressArgs : 'cat';
+  my $prog =
+      $self->isCompressedSingle($file)
+    ? $self->gzip . ' ' . $self->decompressArgs
+    : 'cat';
 
   my $errPath = $file . ".build." . localtime() . ".log";
 
-  my $op = "$prog $file | " . $self->vcfProcessor. " --emptyField $delim" . " --keepId --keepInfo";
+  my $op =
+      "$prog $file | "
+    . $self->vcfProcessor
+    . " --emptyField $delim"
+    . " --keepId --keepInfo";
 
   my $fh;
-  my $err = $self->safeOpen($fh, '-|', $op);
+  my $err = $self->safeOpen( $fh, '-|', $op );
 
-  return ($err, $fh);
+  return ( $err, $fh );
 }
 
 sub _extractHeader {
-  my $self = shift;
-  my $file = shift;
+  my $self          = shift;
+  my $file          = shift;
   my $dieIfNotFound = shift;
 
-  my ($err, undef, $fh) = $self->getReadFh($file);
+  my ( $err, undef, $fh ) = $self->getReadFh($file);
 
-  if($err) {
-    return ($err, undef, undef);
+  if ($err) {
+    return ( $err, undef, undef );
   }
 
   my @header;
-  while(<$fh>) {
+  while (<$fh>) {
     chomp;
 
-    if(substr($_, 0, 1) eq '#') {
+    if ( substr( $_, 0, 1 ) eq '#' ) {
       push @header, $_;
       next;
     }
@@ -468,14 +492,14 @@ sub _extractHeader {
     last;
   }
 
-  $err = $self->safeCloseBuilderFh($fh, $file, 'error');
+  $err = $self->safeCloseBuilderFh( $fh, $file, 'error' );
 
-  if($err) {
-    return ($err, undef, undef);
+  if ($err) {
+    return ( $err, undef, undef );
   }
 
   my $idxOfInfo = -9;
-  my $idx = -1;
+  my $idx       = -1;
 
   my %nameMap;
   my %filterMap;
@@ -486,11 +510,11 @@ sub _extractHeader {
   for my $h (@header) {
     $idx++;
 
-    if($h !~ /\#\#INFO=/) {
+    if ( $h !~ /\#\#INFO=/ ) {
       next;
     }
 
-    if($idxOfInfo == -9) {
+    if ( $idxOfInfo == -9 ) {
       $idxOfInfo = $idx;
     }
 
@@ -505,11 +529,12 @@ sub _extractHeader {
     # Keep track of things that look like they could mess up INFO string order
     # Flag in particular seems often missing, so we'll do a linear search
     # From $idx - $idxOfInfo to +$flagCount
-    if(looks_like_number($number)) {
-      if($number == 0) {
-         $flagCount++;
+    if ( looks_like_number($number) ) {
+      if ( $number == 0 ) {
+        $flagCount++;
       }
-    } elsif($number eq '.') {
+    }
+    elsif ( $number eq '.' ) {
       $flagCount++;
     }
 
@@ -519,47 +544,48 @@ sub _extractHeader {
     # Not critial, but will have less efficient search
     # Requires precise spelling of the vcf feature
     # TODO: Die if don't find header for any requested feature
-    FEATURE_LOOP: for my $feature (@{$self->features}) {
-      if(!defined $self->{_infoFeatureNames}{$feature}) {
+    FEATURE_LOOP: for my $feature ( @{ $self->features } ) {
+      if ( !defined $self->{_infoFeatureNames}{$feature} ) {
         next;
       }
 
       my $infoName = $self->{_infoFeatureNames}{$feature};
 
-      if(index($h, "INFO\=\<ID\=$infoName,") > 0) {
+      if ( index( $h, "INFO\=\<ID\=$infoName," ) > 0 ) {
         # my $vcfName = "$feature=";
         # In case Number and Type aren't adjacent to each other
         # $return[$featIdx] = [$number, $type];
-        $nameMap{$infoName} = [$feature, $number, $type, $idx, ];
+        $nameMap{$infoName} = [ $feature, $number, $type, $idx, ];
         last FEATURE_LOOP;
       }
     }
 
     # Filters on INFO fields
-    FEATURE_LOOP: for my $feature (keys %{$self->build_row_filters}) {
+    FEATURE_LOOP: for my $feature ( keys %{ $self->build_row_filters } ) {
       my $infoName = $self->{_infoFeatureNames}{$feature} || $feature;
 
-      if(index($h, "INFO\=\<ID\=$infoName,") > 0) {
+      if ( index( $h, "INFO\=\<ID\=$infoName," ) > 0 ) {
         # my $vcfName = "$feature=";
         # In case Number and Type aren't adjacent to each other
         # $return[$featIdx] = [$number, $type];
-        $filterMap{$infoName} = [$feature, $number, $type, $idx, ];
+        $filterMap{$infoName} = [ $feature, $number, $type, $idx, ];
         last FEATURE_LOOP;
       }
     }
   }
 
-  return (undef, \%nameMap, \%filterMap);
+  return ( undef, \%nameMap, \%filterMap );
 }
 
 sub _extractFeatures {
-  my ($self, $fieldsAref, $infoIdx, $multiAlleleIdx, $vcfNameMap, $vcfFilterMap) = @_;
+  my ( $self, $fieldsAref, $infoIdx, $multiAlleleIdx, $vcfNameMap, $vcfFilterMap ) =
+    @_;
 
   # vcfProcessor will split multiallelics, store the alleleIdx
   # my @infoFields = ;
 
   my @returnData;
-  $#returnData = $#{$self->features};
+  $#returnData = $#{ $self->features };
 
   my $firstChars;
 
@@ -575,50 +601,52 @@ sub _extractFeatures {
   # 1) field name
   # 2) index in intermediate annotation
   # 3) index in database
-  for my $arr (@{$self->{_headerFeatures}}) {
+  for my $arr ( @{ $self->{_headerFeatures} } ) {
     # $arr->[0] is the fieldName
     # $arr->[1] is the field idx
-    if($self->hasTransform($arr->[0]) ) {
-      $fieldsAref->[$arr->[1]] = $self->transformField($arr->[0], $fieldsAref->[$arr->[1]]);
+    if ( $self->hasTransform( $arr->[0] ) ) {
+      $fieldsAref->[ $arr->[1] ] =
+        $self->transformField( $arr->[0], $fieldsAref->[ $arr->[1] ] );
     }
 
-    $returnData[$arr->[2]] = $self->coerceFeatureType($arr->[0], $fieldsAref->[$arr->[1]]);
+    $returnData[ $arr->[2] ] =
+      $self->coerceFeatureType( $arr->[0], $fieldsAref->[ $arr->[1] ] );
   }
 
   my $alleleIdx = $fieldsAref->[$multiAlleleIdx];
 
-  for my $info (split ';', $fieldsAref->[$infoIdx]) {
+  for my $info ( split ';', $fieldsAref->[$infoIdx] ) {
     # If # found == scalar @{$self->features}
-    if($found == $totalNeeded) {
+    if ( $found == $totalNeeded ) {
       last;
     }
 
-    $name = substr($info, 0, index($info, '='));
+    $name = substr( $info, 0, index( $info, '=' ) );
 
     $entry = $vcfNameMap->{$name} || $vcfFilterMap->{$name};
-    if(!$entry) {
+    if ( !$entry ) {
       next;
     }
 
     $found++;
 
-    $val = substr($info, index($info, '=') + 1);
+    $val = substr( $info, index( $info, '=' ) + 1 );
 
     # A types have a value per allele
-    if($entry->[1] eq 'A') {
+    if ( $entry->[1] eq 'A' ) {
       my @vals = split ',', $val;
 
-      if(@vals - 1 < $alleleIdx) {
-        return ("Err: Type=A field has fewer values than alleles", undef);
+      if ( @vals - 1 < $alleleIdx ) {
+        return ( "Err: Type=A field has fewer values than alleles", undef );
       }
 
       $val = $vals[$alleleIdx];
     }
 
     # Using $entry->[0] allows us to map the name of the property to be filtered
-    if($self->hasFilter($entry->[0])) {
-      if(!$self->passesFilter($entry->[0], $val)) {
-        return (undef, undef);
+    if ( $self->hasFilter( $entry->[0] ) ) {
+      if ( !$self->passesFilter( $entry->[0], $val ) ) {
+        return ( undef, undef );
       }
 
       next;
@@ -626,16 +654,17 @@ sub _extractFeatures {
 
     # All field to be split if the user requests that in the YAML config
     # $entry->[0] is the fieldName
-    if($self->hasTransform($entry->[0]) ) {
-      $val = $self->transformField($entry->[0], $val);
+    if ( $self->hasTransform( $entry->[0] ) ) {
+      $val = $self->transformField( $entry->[0], $val );
     }
 
     # TODO: support non-scalar values
     # TODO: configure from either type specified in YAML, or from VCF Type=
-    $returnData[$self->{_fieldDbNames}{$entry->[0]}] = $self->coerceFeatureType($entry->[0], $val);
+    $returnData[ $self->{_fieldDbNames}{ $entry->[0] } ] =
+      $self->coerceFeatureType( $entry->[0], $val );
   }
 
-  return (undef, \@returnData);
+  return ( undef, \@returnData );
 }
 
 __PACKAGE__->meta->make_immutable;

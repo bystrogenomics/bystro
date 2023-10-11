@@ -25,14 +25,15 @@ Used in:
 Extended by: None
 
 =cut
+
 use Mouse::Role 2;
 
 use Carp qw/ croak /;
 use namespace::autoclean;
-use Type::Params qw/ compile /;
+use Type::Params    qw/ compile /;
 use Types::Standard qw/ :types /;
-use Scalar::Util qw/ reftype /;
-use YAML::XS qw/ LoadFile /;
+use Scalar::Util    qw/ reftype /;
+use YAML::XS        qw/ LoadFile /;
 use DDP;
 
 with 'Seq::Role::IO', 'MouseX::Getopt';
@@ -58,27 +59,25 @@ sub new_with_config {
   %opts = ( %$hash, %$opts );
 
   # If no "tracks object, nothing left to do"
-  if(! $opts{$tracksKey} ) {
+  if ( !$opts{$tracksKey} ) {
     $class->new( \%opts );
     return;
   }
 
   my $trackConfig;
 
-  if(ref $opts{$tracksKey} eq 'ARRAY') {
+  if ( ref $opts{$tracksKey} eq 'ARRAY' ) {
     # Back compatibility with b10
     my $temp = $opts{$tracksKey};
 
-    $opts{$tracksKey} = {
-      $tracksKey => $temp
-    };
+    $opts{$tracksKey} = { $tracksKey => $temp };
   }
 
   #Now push every single global option into each individual track
   #Since they are meant to operate as independent units
   my @nonTrackKeys = grep { $_ ne $tracksKey } keys %opts;
 
-  if( ref $opts{$tracksKey}{$tracksKey} ne 'ARRAY') {
+  if ( ref $opts{$tracksKey}{$tracksKey} ne 'ARRAY' ) {
     croak "expect $tracksKey to contain an array of data";
   }
 
