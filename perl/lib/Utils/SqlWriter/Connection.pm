@@ -3,7 +3,9 @@ use strict;
 use warnings;
 
 package Utils::SqlWriter::Connection;
+
 use DBI;
+use DBD::mysql 4.051;
 
 our $VERSION = '0.001';
 
