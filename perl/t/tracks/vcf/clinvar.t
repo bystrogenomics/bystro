@@ -3,6 +3,7 @@ use strict;
 use warnings;
 
 package MockBuilder;
+
 use Mouse;
 extends 'Seq::Base';
 
@@ -17,6 +18,23 @@ use Test::More;
 use Path::Tiny;
 use Scalar::Util qw/looks_like_number/;
 use DDP;
+
+sub HaveRequiredBinary {
+  my $binary         = shift;
+  my $path_to_binary = `which $binary`;
+  chomp($path_to_binary); # Remove trailing newline, if any
+  if ($path_to_binary) {
+    return 1;
+  }
+  else {
+    return;
+  }
+}
+
+# Check required binary is available
+if ( !HaveRequiredBinary("bystro-vcf") ) {
+  plan skip_all => "Testing relies on bystro-vcf binary, which is not present";
+}
 
 my $baseMapper = Seq::Tracks::Reference::MapBases->new();
 
@@ -95,6 +113,7 @@ my $ucIdx         = $vcf->getFieldDbName('uncertain_significance');
 my $benignIdx     = $vcf->getFieldDbName('benign');
 my $lbenignIdx    = $vcf->getFieldDbName('likely_benign');
 my $rsIdx         = $vcf->getFieldDbName('review_status');
+
 # we specify "ALL_TRAITS" => 'traits' in YAML
 my $traitsIdx = $vcf->getFieldDbName('traits');
 

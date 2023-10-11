@@ -3,6 +3,7 @@ use strict;
 use warnings;
 
 package MockBuilder;
+
 use Mouse;
 extends 'Seq::Base';
 
@@ -18,6 +19,23 @@ use Path::Tiny;
 use Scalar::Util qw/looks_like_number/;
 use DDP;
 
+sub HaveRequiredBinary {
+  my $binary         = shift;
+  my $path_to_binary = `which $binary`;
+  chomp($path_to_binary); # Remove trailing newline, if any
+  if ($path_to_binary) {
+    return 1;
+  }
+  else {
+    return;
+  }
+}
+
+# Check required binary is available
+if ( !HaveRequiredBinary("bystro-vcf") ) {
+  plan skip_all => "Testing relies on bystro-vcf binary, which is not present";
+}
+
 my $baseMapper = Seq::Tracks::Reference::MapBases->new();
 
 my $file   = LoadFile('./t/tracks/vcf/test.hg38.chr22.yml');
@@ -26,7 +44,11 @@ my $dbPath = $file->{database_dir};
 path($dbPath)->remove_tree( { keep_root => 1 } );
 
 my $seq = MockBuilder->new_with_config(
-  { config => path('./t/tracks/vcf/test.hg38.chr22.yml')->absolute, debug => 0 } );
+  {
+    config => path('./t/tracks/vcf/test.hg38.chr22.yml')->absolute,
+    debug  => 0
+  }
+);
 
 my $tracks     = $seq->tracksObj;
 my $refBuilder = $tracks->getRefTrackBuilder();
