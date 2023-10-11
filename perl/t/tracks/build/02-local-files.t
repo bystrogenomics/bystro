@@ -9,7 +9,7 @@ use Test::More;
 my $localPaths = Seq::Tracks::Build::LocalFilesPaths->new();
 
 my $trackName = 'something';
-my $filesDir  = 'a_files_dir';
+my $filesDir  = Path::Tiny->tempdir();
 
 my $localFiles =
   [ 'something.chr*.txt', 'something.shouldnt_match_glob.chr99.txt', ];
