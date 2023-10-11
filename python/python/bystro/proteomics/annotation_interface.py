@@ -169,15 +169,19 @@ def _build_opensearch_query_from_query_string(query_string: str) -> dict[str, An
                         "lenient": True,
                         "phrase_slop": 5,
                         "tie_breaker": 0.3,
-                    }
-                }
-            }
-        }
+                    },
+                },
+            },
+        },
     }
 
 
-def get_samples_and_genes(client: OpenSearch, user_query_string: str, index_name: str) -> pd.DataFrame:
-    """Given a query and index, return a list of samples and genes for subsetting a proteomics matrix."""
+def get_samples_and_genes_from_query(
+    user_query_string: str,
+    index_name: str,
+    client: OpenSearch,
+) -> pd.DataFrame:
+    """Given a query and index, return a dataframe of (sample_id, gene, dosage) triplets matching query."""
     query = _build_opensearch_query_from_query_string(user_query_string)
     job_data = SaveJobData(
         submissionID="1337",
