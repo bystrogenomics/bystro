@@ -4,7 +4,7 @@ from typing import Any
 import msgspec
 from bystro.proteomics.annotation_interface import (
     _process_response,
-    get_samples_and_genes,
+    get_samples_and_genes_from_query,
 )
 
 TEST_RESPONSE_FILENAME = Path(__file__).parent / "test_response.dat"
@@ -13,8 +13,7 @@ with TEST_RESPONSE_FILENAME.open("rb") as f:
     TEST_RESPONSE = msgspec.msgpack.decode(f.read())  # noqa: S301 (data is safe)
 
 
-# @pytest.mark.skip()
-def test_get_samples_and_genes_unit(monkeypatch):
+def test_get_samples_and_genes_from_query():
     user_query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
     index_name = "mock_index_name"
 
@@ -40,8 +39,7 @@ def test_get_samples_and_genes_unit(monkeypatch):
             return
 
     mock_client = MockOpenSearch()
-    samples_and_genes_df = get_samples_and_genes(mock_client, user_query_string, index_name)
-    monkeypatch.undo()
+    samples_and_genes_df = get_samples_and_genes_from_query(user_query_string, index_name, mock_client)
     assert 1191 == len(samples_and_genes_df)
 
 
