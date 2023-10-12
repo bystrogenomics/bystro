@@ -4,30 +4,21 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
+import numpy as np
 import pandas as pd
-from bystro.search.utils.messages import SaveJobData
 from bystro.utils.config import get_opensearch_config
 from opensearchpy import OpenSearch
-
 
 logger = logging.getLogger(__file__)
 
 OPENSEARCH_CONFIG = get_opensearch_config()
 HETEROZYGOTE_DOSAGE = 1
 HOMOZYGOTE_DOSAGE = 2
+MISSING_GENO_DOSAGE = np.nan
 ONE_DAY = "1d"  # default keep_alive time for opensearch point in time index
 
-
-def _preprocess_query(query_body: dict[str, Any]) -> dict[str, Any]:
-    """Preprocess opensearch query by adding/updating or deleting keys."""
-    clean_query_body = query_body.copy()
-    clean_query_body["sort"] = ["_doc"]
-
-    deletable_fields = ["aggs", "slice", "size"]
-    for field in deletable_fields:
-        clean_query_body.pop(field, None)
-
-    return clean_query_body
+# The fields to return for each variant matched by the query
+OUTPUT_FIELDS = ["refSeq.name2", "homozygotes", "heterozygotes", "missingGenos"]
 
 
 def _flatten(xs: Any) -> list[Any]:
@@ -45,6 +36,7 @@ def _get_samples_genes_dosages_from_hit(hit: dict[str, Any]) -> pd.DataFrame:
     # represent them as empty lists if not.
     heterozygotes = _flatten(source.get("heterozygotes", []))
     homozygotes = _flatten(source.get("homozygotes", []))
+    missing_genos = _flatten(source.get("missingGenos", []))
     rows = []
     for gene_name in gene_names:
         for heterozygote in heterozygotes:
@@ -53,6 +45,11 @@ def _get_samples_genes_dosages_from_hit(hit: dict[str, Any]) -> pd.DataFrame:
             )
         for homozygote in homozygotes:
             rows.append({"sample_id": homozygote, "gene_name": gene_name, "dosage": HOMOZYGOTE_DOSAGE})
+        for missing_geno in missing_genos:
+            rows.append(
+                {"sample_id": missing_geno, "gene_name": gene_name, "dosage": MISSING_GENO_DOSAGE}
+            )
+
     return pd.DataFrame(rows)
 
 
@@ -116,16 +113,15 @@ def _get_num_slices(
 
 
 def _run_annotation_query(
-    job_data: SaveJobData,
+    query: dict[str, Any],
+    index_name: str,
     client: OpenSearch,
     opensearch_query_options: OpenSearchQueryOptions,
 ) -> pd.DataFrame:
-    """Given query and index contained in SaveJobData, run query and return  in dataframe."""
-
-    query = job_data.queryBody
-    num_slices = _get_num_slices(client, job_data.indexName, opensearch_query_options, query)
+    """Given query and index contained in SaveJobData, run query and return results as dataframe."""
+    num_slices = _get_num_slices(client, index_name, opensearch_query_options, query)
     point_in_time = client.create_point_in_time(  # type: ignore[attr-defined]
-        index=job_data.indexName, params={"keep_alive": opensearch_query_options.keep_alive}
+        index=index_name, params={"keep_alive": opensearch_query_options.keep_alive}
     )
     try:  # make sure we clean up the PIT index properly no matter what happens in this block
         pit_id = point_in_time["pit_id"]
@@ -137,7 +133,10 @@ def _run_annotation_query(
             if num_slices > 1:
                 # Slice queries require max > 1
                 slice_query["slice"] = {"id": slice_id, "max": num_slices}
-            query_args = {"body": slice_query}
+            query_args = {
+                "body": slice_query,
+                "_source_includes": OUTPUT_FIELDS,
+            }
             query_result = _execute_query(  # type: ignore[call-arg]
                 client,
                 query_args=query_args,
@@ -147,7 +146,7 @@ def _run_annotation_query(
         err_msg = (
             f"Encountered exception: {repr(e)} while running opensearch_query, "
             "deleting PIT index and exiting.\n"
-            f"job_data: {job_data}\n"
+            f"query: {query}\n"
             f"client: {client}\n"
             f"opensearch_query_options: {opensearch_query_options}\n"
         )
@@ -159,7 +158,7 @@ def _run_annotation_query(
 
 
 def _build_opensearch_query_from_query_string(query_string: str) -> dict[str, Any]:
-    return {
+    base_query = {
         "query": {
             "bool": {
                 "filter": {
@@ -173,7 +172,9 @@ def _build_opensearch_query_from_query_string(query_string: str) -> dict[str, An
                 },
             },
         },
+        "sort": "_doc",
     }
+    return base_query
 
 
 def get_samples_and_genes_from_query(
@@ -183,13 +184,5 @@ def get_samples_and_genes_from_query(
 ) -> pd.DataFrame:
     """Given a query and index, return a dataframe of (sample_id, gene, dosage) rows matching query."""
     query = _build_opensearch_query_from_query_string(user_query_string)
-    job_data = SaveJobData(
-        submissionID="1337",
-        assembly="hg38",
-        queryBody=_preprocess_query(query),
-        indexName=index_name,
-        outputBasePath=".",
-        fieldNames=[],
-    )
-    samples_and_genes_df = _run_annotation_query(job_data, client, OpenSearchQueryOptions())
+    samples_and_genes_df = _run_annotation_query(query, index_name, client, OpenSearchQueryOptions())
     return samples_and_genes_df

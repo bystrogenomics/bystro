@@ -16,7 +16,12 @@ def test_foo():
     # present, this test may fail for no fault of the tested code's own.
     index_name = "64c889415acb6d3b3e40e07b_63ddc9ce1e740e0020c39928"
     samples_genes_df = get_samples_and_genes_from_query(user_query_string, index_name, opensearch_client)
-    assert samples_genes_df.shape == (1191, 3)
+    assert samples_genes_df.shape == (1231, 3)
     assert {"1805", "1847", "4805"} == set(samples_genes_df.sample_id.unique())
     assert 689 == len(samples_genes_df.gene_name.unique())
-    assert {1, 2} == set(samples_genes_df.dosage.unique())
+    # it's awkward to test for equality of NaN objects, so fill them
+    # and compare the filled sets instead.
+    MISSING_GENO_VALUE = -1
+    expected_dosage_values = {1, 2, MISSING_GENO_VALUE}
+    actual_dosage_values = set(samples_genes_df.dosage.fillna(MISSING_GENO_VALUE).unique())
+    assert expected_dosage_values == actual_dosage_values

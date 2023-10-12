@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any
 
 import msgspec
+
 from bystro.proteomics.annotation_interface import (
     _process_response,
     get_samples_and_genes_from_query,
@@ -40,12 +41,17 @@ def test_get_samples_and_genes_from_query():
 
     mock_client = MockOpenSearch()
     samples_and_genes_df = get_samples_and_genes_from_query(user_query_string, index_name, mock_client)
-    assert 1191 == len(samples_and_genes_df)
+    assert 1231 == len(samples_and_genes_df)
 
 
 def tests__process_response():
     ans = _process_response(TEST_RESPONSE)
-    assert len(ans) == 1191
+    assert len(ans) == 1231
     assert {"1805", "1847", "4805"} == set(ans.sample_id.unique())
     assert 689 == len(ans.gene_name.unique())
-    assert {1, 2} == set(ans.dosage.unique())
+    # it's awkward to test for equality of NaN objects, so fill them
+    # and compare the filled sets instead.
+    MISSING_GENO_VALUE = -1
+    expected_dosage_values = {1.0, 2.0, MISSING_GENO_VALUE}
+    actual_dosage_values = set(ans.dosage.fillna(MISSING_GENO_VALUE).unique())
+    assert expected_dosage_values == actual_dosage_values
