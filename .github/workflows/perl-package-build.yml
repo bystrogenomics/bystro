@@ -1,0 +1,44 @@
+name: Build Bystro Perl Package
+
+on: [push, pull_request]
+
+jobs:
+  test-perl-package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup perl
+        uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: ${{ inputs.perl-version }}
+
+      - name: Install Dist::Zilla
+        shell: bash
+        run: |
+          cpanm --quiet Dist::Zilla Archive::Tar::Wrapper
+
+      - name: Install system dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lz4
+
+      - name: Install one-off Bystro dependencies
+        shell: bash
+        run: |
+          cpanm --quiet https://github.com/bystrogenomics/msgpack-perl.git
+          cpanm --quiet --notest MouseX::Getopt
+          cpanm --quiet DBD::mysql@4.051
+          git clone --depth 1 --recurse-submodules https://github.com/salortiz/LMDB_File.git \
+            && cd LMDB_File \
+            && cpanm --quiet .
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Test Bystro perl codebase
+        run: |
+          cd perl
+          dzil authordeps --missing | cpanm --quiet
+          dzil listdeps --missing | cpanm --quiet
+          dzil test
