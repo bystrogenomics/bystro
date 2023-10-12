@@ -9,7 +9,7 @@ import pandas as pd
 from bystro.utils.config import get_opensearch_config
 from opensearchpy import OpenSearch
 
-logger = logging.getLogger(__file__)
+# logger = logging.getLogger(__file__)
 
 OPENSEARCH_CONFIG = get_opensearch_config()
 HETEROZYGOTE_DOSAGE = 1
@@ -19,6 +19,18 @@ ONE_DAY = "1d"  # default keep_alive time for opensearch point in time index
 
 # The fields to return for each variant matched by the query
 OUTPUT_FIELDS = ["refSeq.name2", "homozygotes", "heterozygotes", "missingGenos"]
+
+
+@dataclass
+class OpenSearchQueryConfig:
+    """Represent parameters for configuring OpenSearch queries."""
+
+    max_query_size: int = 10_000
+    max_slices: int = 1024
+    keep_alive: str = ONE_DAY
+
+
+OPENSEARCH_QUERY_CONFIG = OpenSearchQueryConfig()
 
 
 def _flatten(xs: Any) -> list[Any]:  # noqa: ANN401 (`Any` is really correct here)
@@ -78,19 +90,9 @@ def _process_response(resp: dict[str, Any]) -> pd.DataFrame:
     return samples_genes_dosages_df.drop_duplicates()
 
 
-@dataclass
-class OpenSearchQueryOptions:
-    """Represent parameters for configuring OpenSearch queries."""
-
-    max_query_size: int = 10_000
-    max_slices: int = 1024
-    keep_alive: str = ONE_DAY
-
-
 def _get_num_slices(
     client: OpenSearch,
     index_name: str,
-    opensearch_query_options: OpenSearchQueryOptions,
     query: dict[str, Any],
 ) -> int:
     """Count number of hits for the index."""
@@ -107,8 +109,8 @@ def _get_num_slices(
         )
         raise RuntimeError(err_msg)
 
-    num_slices_necessary = math.ceil(n_docs / opensearch_query_options.max_query_size)
-    num_slices_planned = min(num_slices_necessary, opensearch_query_options.max_slices)
+    num_slices_necessary = math.ceil(n_docs / OPENSEARCH_QUERY_CONFIG.max_query_size)
+    num_slices_planned = min(num_slices_necessary, OPENSEARCH_QUERY_CONFIG.max_slices)
     return max(num_slices_planned, 1)
 
 
@@ -116,17 +118,16 @@ def _run_annotation_query(
     query: dict[str, Any],
     index_name: str,
     client: OpenSearch,
-    opensearch_query_options: OpenSearchQueryOptions,
 ) -> pd.DataFrame:
     """Given query and index contained in SaveJobData, run query and return results as dataframe."""
-    num_slices = _get_num_slices(client, index_name, opensearch_query_options, query)
+    num_slices = _get_num_slices(client, index_name, query)
     point_in_time = client.create_point_in_time(  # type: ignore[attr-defined]
-        index=index_name, params={"keep_alive": opensearch_query_options.keep_alive}
+        index=index_name, params={"keep_alive": OPENSEARCH_QUERY_CONFIG.keep_alive}
     )
     try:  # make sure we clean up the PIT index properly no matter what happens in this block
         pit_id = point_in_time["pit_id"]
         query["pit"] = {"id": pit_id}
-        query["size"] = opensearch_query_options.max_query_size
+        query["size"] = OPENSEARCH_QUERY_CONFIG.max_query_size
         remote_queries = []
         for slice_id in range(num_slices):
             slice_query = query.copy()
@@ -148,7 +149,7 @@ def _run_annotation_query(
             "deleting PIT index and exiting.\n"
             f"query: {query}\n"
             f"client: {client}\n"
-            f"opensearch_query_options: {opensearch_query_options}\n"
+            f"opensearch_query_config: {OPENSEARCH_QUERY_CONFIG}\n"
         )
         logger.exception(err_msg, exc_info=e)
         client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore[attr-defined]
@@ -184,5 +185,5 @@ def get_samples_and_genes_from_query(
 ) -> pd.DataFrame:
     """Given a query and index, return a dataframe of (sample_id, gene, dosage) rows matching query."""
     query = _build_opensearch_query_from_query_string(user_query_string)
-    samples_and_genes_df = _run_annotation_query(query, index_name, client, OpenSearchQueryOptions())
+    samples_and_genes_df = _run_annotation_query(query, index_name, client)
     return samples_and_genes_df
