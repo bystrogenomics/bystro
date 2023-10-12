@@ -17,3 +17,6 @@ beanstalkd:
     ancestry:
       submission: ancestry
       events: ancestry_events
+    prs:
+      submission: prs
+      events: prs_events
