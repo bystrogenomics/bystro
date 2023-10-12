@@ -56,7 +56,7 @@ def _get_samples_genes_dosages_from_hit(hit: dict[str, Any]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _process_query(
+def _execute_query(
     client: OpenSearch,
     query_args: dict,
 ) -> pd.DataFrame:
@@ -138,11 +138,11 @@ def _run_annotation_query(
                 # Slice queries require max > 1
                 slice_query["slice"] = {"id": slice_id, "max": num_slices}
             query_args = {"body": slice_query}
-            remote_query = _process_query(  # type: ignore[call-arg]
+            query_result = _execute_query(  # type: ignore[call-arg]
                 client,
                 query_args=query_args,
             )
-            remote_queries.append(remote_query)
+            remote_queries.append(query_result)
     except Exception as e:
         err_msg = (
             f"Encountered exception: {repr(e)} while running opensearch_query, "
@@ -173,6 +173,7 @@ def _build_opensearch_query_from_query_string(query_string: str) -> dict[str, An
                 },
             },
         },
+        "_source_includes": {"includes": ["foo", "bar"]},
     }
 
 
