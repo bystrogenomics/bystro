@@ -21,7 +21,7 @@ ONE_DAY = "1d"  # default keep_alive time for opensearch point in time index
 OUTPUT_FIELDS = ["refSeq.name2", "homozygotes", "heterozygotes", "missingGenos"]
 
 
-def _flatten(xs: Any) -> list[Any]:
+def _flatten(xs: Any) -> list[Any]:  # noqa: ANN401 (`Any` is really correct here)
     """Flatten an arbitrarily nested list."""
     if not isinstance(xs, list):
         return [xs]
@@ -137,14 +137,14 @@ def _run_annotation_query(
                 "body": slice_query,
                 "_source_includes": OUTPUT_FIELDS,
             }
-            query_result = _execute_query(  # type: ignore[call-arg]
+            query_result = _execute_query(
                 client,
                 query_args=query_args,
             )
             remote_queries.append(query_result)
     except Exception as e:
         err_msg = (
-            f"Encountered exception: {repr(e)} while running opensearch_query, "
+            f"Encountered exception: {e!r} while running opensearch_query, "
             "deleting PIT index and exiting.\n"
             f"query: {query}\n"
             f"client: {client}\n"
