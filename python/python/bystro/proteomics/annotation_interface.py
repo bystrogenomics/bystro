@@ -9,7 +9,7 @@ import pandas as pd
 from bystro.utils.config import get_opensearch_config
 from opensearchpy import OpenSearch
 
-# logger = logging.getLogger(__file__)
+logger = logging.getLogger(__file__)
 
 OPENSEARCH_CONFIG = get_opensearch_config()
 HETEROZYGOTE_DOSAGE = 1
