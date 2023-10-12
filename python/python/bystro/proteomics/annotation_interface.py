@@ -128,7 +128,7 @@ def _run_annotation_query(
         pit_id = point_in_time["pit_id"]
         query["body"]["pit"] = {"id": pit_id}
         query["body"]["size"] = OPENSEARCH_QUERY_CONFIG.max_query_size
-        remote_queries = []
+        query_results = []
         for slice_id in range(num_slices):
             slice_query = query.copy()
             if num_slices > 1:
@@ -138,7 +138,7 @@ def _run_annotation_query(
                 client,
                 query_args=query,
             )
-            remote_queries.append(query_result)
+            query_results.append(query_result)
     except Exception as e:
         err_msg = (
             f"Encountered exception: {e!r} while running opensearch_query, "
@@ -151,7 +151,7 @@ def _run_annotation_query(
         client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore[attr-defined]
         raise
     client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore[attr-defined]
-    return pd.concat(remote_queries)
+    return pd.concat(query_results)
 
 
 def _build_opensearch_query_from_query_string(query_string: str) -> dict[str, Any]:
