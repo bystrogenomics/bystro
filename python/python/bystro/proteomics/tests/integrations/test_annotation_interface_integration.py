@@ -7,7 +7,7 @@ from bystro.proteomics.annotation_interface import get_samples_and_genes_from_qu
 
 
 @pytest.mark.integration
-def test_foo():
+def test_get_samples_and_genes_from_query_integration():
     opensearch_config = gather_opensearch_args(get_opensearch_config())
     opensearch_client = OpenSearch(**opensearch_config)
     user_query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"

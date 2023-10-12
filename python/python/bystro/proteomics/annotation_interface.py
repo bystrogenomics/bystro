@@ -96,7 +96,7 @@ def _get_num_slices(
     query: dict[str, Any],
 ) -> int:
     """Count number of hits for the index."""
-    get_num_slices_query = query.copy()
+    get_num_slices_query = query["body"].copy()
     get_num_slices_query.pop("sort", None)
     get_num_slices_query.pop("track_total_hits", None)
 
@@ -126,21 +126,17 @@ def _run_annotation_query(
     )
     try:  # make sure we clean up the PIT index properly no matter what happens in this block
         pit_id = point_in_time["pit_id"]
-        query["pit"] = {"id": pit_id}
-        query["size"] = OPENSEARCH_QUERY_CONFIG.max_query_size
+        query["body"]["pit"] = {"id": pit_id}
+        query["body"]["size"] = OPENSEARCH_QUERY_CONFIG.max_query_size
         remote_queries = []
         for slice_id in range(num_slices):
             slice_query = query.copy()
             if num_slices > 1:
                 # Slice queries require max > 1
                 slice_query["slice"] = {"id": slice_id, "max": num_slices}
-            query_args = {
-                "body": slice_query,
-                "_source_includes": OUTPUT_FIELDS,
-            }
             query_result = _execute_query(
                 client,
-                query_args=query_args,
+                query_args=query,
             )
             remote_queries.append(query_result)
     except Exception as e:
@@ -160,20 +156,23 @@ def _run_annotation_query(
 
 def _build_opensearch_query_from_query_string(query_string: str) -> dict[str, Any]:
     base_query = {
-        "query": {
-            "bool": {
-                "filter": {
-                    "query_string": {
-                        "default_operator": "AND",
-                        "query": query_string,
-                        "lenient": True,
-                        "phrase_slop": 5,
-                        "tie_breaker": 0.3,
+        "body": {
+            "query": {
+                "bool": {
+                    "filter": {
+                        "query_string": {
+                            "default_operator": "AND",
+                            "query": query_string,
+                            "lenient": True,
+                            "phrase_slop": 5,
+                            "tie_breaker": 0.3,
+                        },
                     },
                 },
             },
+            "sort": "_doc",
         },
-        "sort": "_doc",
+        "_source_includes": OUTPUT_FIELDS,
     }
     return base_query
 
