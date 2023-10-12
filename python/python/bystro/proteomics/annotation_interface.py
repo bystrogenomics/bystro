@@ -173,7 +173,6 @@ def _build_opensearch_query_from_query_string(query_string: str) -> dict[str, An
                 },
             },
         },
-        "_source_includes": {"includes": ["foo", "bar"]},
     }
 
 
