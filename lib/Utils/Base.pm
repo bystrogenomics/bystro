@@ -16,6 +16,7 @@ use List::MoreUtils qw/first_index/;
 use YAML::XS qw/LoadFile Dump/;
 use Path::Tiny qw/path/;
 use Time::localtime;
+use Sys::CpuAffinity;
 
 ############## Arguments accepted #############
 # The track name that they want to use
@@ -69,7 +70,9 @@ has verbose => (is => 'ro');
 
 has dryRun => (is => 'ro', isa => 'Bool', default => 0);
 
-has maxThreads => (is => 'ro', isa => 'Int', default => 8);
+has maxThreads => (is => 'ro', isa => 'Int', lazy => 1, default => sub {
+  return Sys::CpuAffinity::getNumCpus();
+});
 
 #########'Protected' vars (Meant to be used by child class only) ############ 
 has _wantedTrack => ( is => 'ro', init_arg => undef, writer => '_setWantedTrack' );
