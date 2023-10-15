@@ -1,5 +1,6 @@
 # Bystro Perl package
 
+
 ## Installing Bystro using docker
 
 To build a docker image using the `Dockerfile`, run the following:
@@ -10,6 +11,8 @@ docker build --tag bystro-cli .
 
 ## Installing Bystro dependencies locally
 
+The instructions for installing Bystro locally uses [`cpanm`](https://metacpan.org/pod/App::cpanminus).
+
 Assuming that you've cloned the repository and are working on it locally, then the dependencies can mostly be installed with cpanm.
 But there are a few one-off dependencies that require a slightly modified approach.
 
@@ -18,9 +21,9 @@ One-off dependencies can be installed as follows:
 ```bash
 cpanm --quiet https://github.com/bystrogenomics/msgpack-perl.git
 cpanm --quiet --notest MouseX::Getopt
-git clone --depth 1 -branch v0.12 --recurse-submodules https://github.com/salortiz/LMDB_File.git \
+git clone --depth 1 --recurse-submodules https://github.com/salortiz/LMDB_File.git \
   && cd LMDB_File \
-  && cpanm --quiet .
+  && cpanm --quiet . \
   && cd .. \
   && rm -rf LMDB_File
 cpanm --quiet DBD::mysql@4.051
@@ -57,6 +60,12 @@ dzil install
 
 The `.perltidyrc` gives the coding style and `tidyall` from [Code::TidyAll](https://metacpan.org/dist/Code-TidyAll) can be used to tidy all files with `tidyall -a`.
 Please tidy all files before submitting patches.
+
+Install tidyall, perltidy, and perlcritic like so
+
+```bash
+cpanm Code::TidyAll Perl::Tidy Perl::Critic
+```
 
 ## Specifying libraries in Perl
 
