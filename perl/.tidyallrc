@@ -12,3 +12,4 @@ select = {bench,bin,issues,lib,t}/**/*.{pl,pm,t}
 
 [SortLines]
 select = .gitignore
+select = .dockerignore
