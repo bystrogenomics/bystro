@@ -105,7 +105,7 @@ https://github.com/bystrogenomics/bystro/blob/master/python/python/bystro/search
 
 The [submit_msg_fn](https://github.com/bystrogenomics/bystro/blob/master/python/python/bystro/search/index/listener.py#L71), or submit message function, defines what message is sent on this job types `events` tube upon successfully receiving a job message, parsing it's json, and validating that the JSON is of the expected shape/type (here `IndexJobData` as mentioned above)
 
-It is quite simple:
+Here is an example:
 
 ```yaml
 def submit_msg_fn(job_data: IndexJobData):
