@@ -70,7 +70,7 @@ def handler_fn(publisher: ProgressPublisher, beanstalkd_job_data: IndexJobData):
     ))
 ```
 
-The handler_fn takes a ` ProgressPublisher``, which is configured to publish event messages to the this job's  `event``tube, and`IndexJobData`, which is the `msgspec.Struct` that defines the JSON message the worker expects.
+The handler_fn takes a ` ProgressPublisher`, which is configured to publish event messages to the this job's `event`tube, and `IndexJobData`, which is the `msgspec.Struct` that defines the JSON message the worker expects.
 
 Let's take a look at [IndexJobData](https://github.com/bystrogenomics/bystro/blob/91934b83002694f46e34b0317fa398441e4293ed/python/python/bystro/search/utils/messages.py#L5):
 
