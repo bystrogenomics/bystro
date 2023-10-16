@@ -11,7 +11,7 @@ Like Redis, it features multiple tubes/channels, which we can use to differentia
 
 ## Submitting a job
 
-Every Bystro job must be defined in the beanstalkd config, [config/beanstalk.clean.yml](https://github.com/bystrogenomics/bystro/blob/master/config/beanstalk.clean.yml). When Bystro is deployed on a server, this file should be renamed to `beanstalk.yml``, and the address of the beanstalk must be filled under the addresses field (more than 1 address allowed):
+Every Bystro job must be defined in the beanstalkd config, [config/beanstalk.clean.yml](https://github.com/bystrogenomics/bystro/blob/master/config/beanstalk.clean.yml). When Bystro is deployed on a server, this file should be renamed to `beanstalk.yml``, and the address of the beanstalk must be filled under the addresses field (more than 1 address is allowed):
 
 Here is the structure of the beanstalkd.clean.yml:
 
