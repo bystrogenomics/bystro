@@ -6,13 +6,12 @@ Briefly, Beanstalkd is a simple pub-sub protocol that features persistence and w
 
 - Exactly once delivery semantics: A message can be reserved by only a single beanstlakd client at a time.
 - TTR: Time To Run. If a message is reserved for too long, it will be released back for further reservation, to guard against workers that lose connectivity
-- If a worker that has an active lea
 
 Like Redis, it features multiple tubes/channels, which we can use to differentiate between job categories/types.
 
 ## Submitting a job
 
-Every Bystro job must be defined in the beanstalkd config, [config/beanstalk.clean.yml](https://github.com/bystrogenomics/bystro/blob/master/config/beanstalk.clean.yml). When Bystro is deployed on a server, this file should be renamed to `beanstalk.yml``, and the address of the beanstalk must be filled under the addresses field (more than 1 address allowed):
+Every Bystro job must be defined in the beanstalkd config, [config/beanstalk.clean.yml](https://github.com/bystrogenomics/bystro/blob/master/config/beanstalk.clean.yml). When Bystro is deployed on a server, this file should be renamed to `beanstalk.yml``, and the address of the beanstalk must be filled under the addresses field (more than 1 address is allowed):
 
 Here is the structure of the beanstalkd.clean.yml:
 
@@ -36,7 +35,7 @@ tubes:
     - submission: <submission tube name>
       - This is the tube that the producer uses to push a new job, that a worker will listen on. Upon picking up a new job message in this tube, the worker will do some processing on the job.
     - events: <events tube name>
-      - This is the tube that workers/consumers will push messages about the state of the job, and the final output of the job to. The producer will listen on this tube for updates about the job they earlier submitted on the `submission` tube.
+      - This is the tube to which workers/consumers will push messages about the state of the job, and the final output of the job. The producer will listen on this tube for updates about the job they submitted earlier on the `submission` tube.
 
 Let's take an example from the <b>bystro.search.index</b> python library:
 
@@ -71,7 +70,7 @@ def handler_fn(publisher: ProgressPublisher, beanstalkd_job_data: IndexJobData):
     ))
 ```
 
-The handler_fn takes a ` ProgressPublisher``, which is configured to publish event messages to the this job's  `event``tube, and`IndexJobData`, which is the `msgspec.Struct` that defines the JSON message the worker expects.
+The handler_fn takes a ` ProgressPublisher`, which is configured to publish event messages to the this job's `event`tube, and `IndexJobData`, which is the `msgspec.Struct` that defines the JSON message the worker expects.
 
 Let's take a look at [IndexJobData](https://github.com/bystrogenomics/bystro/blob/91934b83002694f46e34b0317fa398441e4293ed/python/python/bystro/search/utils/messages.py#L5):
 
@@ -106,7 +105,7 @@ https://github.com/bystrogenomics/bystro/blob/master/python/python/bystro/search
 
 The [submit_msg_fn](https://github.com/bystrogenomics/bystro/blob/master/python/python/bystro/search/index/listener.py#L71), or submit message function, defines what message is sent on this job types `events` tube upon successfully receiving a job message, parsing it's json, and validating that the JSON is of the expected shape/type (here `IndexJobData` as mentioned above)
 
-It is quite simple:
+Here is an example:
 
 ```yaml
 def submit_msg_fn(job_data: IndexJobData):
