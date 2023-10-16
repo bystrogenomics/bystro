@@ -4,7 +4,7 @@ Bystro uses [Beanstalkd](https://beanstalkd.github.io) for batch submissions, fo
 
 Briefly, Beanstalkd is a simple pub-sub protocol that features persistence and which has the performance of Redis. However, unlike Redis, it has useful features that make it approprirate for a job queue:
 
-- Exactly once delivery semantics: A message can be reserved by only a single beanstlakd client at a time.
+- Exactly once delivery semantics: A message can be reserved by only a single beanstalkd client at a time.
 - TTR: If a message is reserved for too long, it will be released back for further reservation, to guard against workers that lose connectivity
 
 Like Redis, it features multiple tubes/channels, which we can use to differentiate between job categories/types.
