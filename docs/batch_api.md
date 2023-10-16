@@ -35,7 +35,7 @@ tubes:
     - submission: <submission tube name>
       - This is the tube that the producer uses to push a new job, that a worker will listen on. Upon picking up a new job message in this tube, the worker will do some processing on the job.
     - events: <events tube name>
-      - This is the tube that workers/consumers will push messages about the state of the job, and the final output of the job to. The producer will listen on this tube for updates about the job they earlier submitted on the `submission` tube.
+      - This is the tube to which workers/consumers will push messages about the state of the job, and the final output of the job. The producer will listen on this tube for updates about the job they submitted earlier on the `submission` tube.
 
 Let's take an example from the <b>bystro.search.index</b> python library:
 
