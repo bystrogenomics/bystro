@@ -11,7 +11,7 @@ Like Redis, it features multiple tubes/channels, which we can use to differentia
 
 ## Submitting a job
 
-Every Bystro job must be defined in the beanstalkd config, [config/beanstlak.clean.yml](https://github.com/bystrogenomics/bystro/blob/master/config/beanstalk.clean.yml). When Bystro is deployed on a server, this file should be renamed to confi/beanstalk.yml, and the address of the beanstalk must be filled under the addresses field (more than 1 address allowed):
+Every Bystro job must be defined in the beanstalkd config, [config/beanstalk.clean.yml](https://github.com/bystrogenomics/bystro/blob/master/config/beanstalk.clean.yml). When Bystro is deployed on a server, this file should be renamed to `beanstalk.yml``, and the address of the beanstalk must be filled under the addresses field (more than 1 address allowed):
 
 Here is the structure of the beanstalkd.clean.yml:
 
@@ -30,13 +30,12 @@ tubes:
     events: annotation_events
 ```
 
-- `tubes` defines a dictionary of objects, each of which defines 2 tubes, 1 for the job submission, and the other for messages about that job that the clietn wishes to pass back to the user.
-  - The key of the object identifies it to the Python API
+- `tubes` defines a dictionary of objects, each of which defines 2 tubes for a single job category.type:
   - The object is composed of a `submission` tube and an `events` tube.
     - submission: <submission tube name>
+      - This is the tube that the producer uses to push a new job, that a worker will listen on. Upon picking up a new job message in this tube, the worker will do some processing on the job.
     - events: <events tube name>
-
-The `submission` tube is the tube the client that submits a job will submit it to. The `events`tube is the tube that the worker that picks up the job and processes it will process it on.
+      - This is the tube that workers/consumers will push messages about the state of the job, and the final output of the job to. The producer will listen on this tube for updates about the job they earlier submitted on the `submission` tube.
 
 Let's take an example from the <b>bystro.search.index</b> python library:
 
