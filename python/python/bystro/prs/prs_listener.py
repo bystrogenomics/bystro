@@ -12,6 +12,7 @@ from bystro.prs.prs_types import (
     PRSSubmission,
 )
 # TODO: Define PRS calculation and preprocess covariate, association files
+# (@cristinaetrv on 10/16/23)
 #from bystro.prs.prs_types import PRSResponse, PRSSubmission
 #from bystro.prs.calculate_prs import (
 #    _load_dosage_matrix,
@@ -22,10 +23,12 @@ from bystro.prs.prs_types import (
 
 # TODO: Define how we load vcf-like genotype matrix from annotation,
 # then generalize this process for other analyses
+# (@cristinaetrv on 10/16/23)
 #from bystro.prs.utils import load_vcf_from_annotation
 
 # TODO: Implement function to preprocess genotype data from annotation
 # into format suitable for PRS calculation
+# (@cristinaetrv on 10/16/23)
 #from bystro.prs.utils import preprocess_vcf_for_prs
 
 from ruamel.yaml import YAML
@@ -69,6 +72,7 @@ def handler_fn(publisher: ProgressPublisher, prs_job_data: PRSJobData) -> PRSRes
     logger.debug("loading genotype matrix %s", dosage_matrix_path)
     with Timer() as timer:
         # TODO: Load 3 files in
+        # (@cristinaetrv on 10/16/23)
         genotypes = _load_dosage_matrix(dosage_matrix_path)
         scores = _load_association_scores(association_scores_path)
         covariates = _load_covariates(covariate_path)
@@ -106,7 +110,7 @@ def main(covariate_file: Path, association_file: Path, queue_conf: QueueConf) ->
     logger.info("PRS worker is listening on addresses: %s, tube: %s...", queue_conf.addresses, PRS_TUBE)
     listen(
         job_data_type=PRSJobData,
-        handler_fn=prs_handler_fn,
+        handler_fn=handler_fn,
         submit_msg_fn=submit_msg_fn,
         completed_msg_fn=completed_msg_fn,
         queue_conf=QueueConf,
