@@ -35,7 +35,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger()
 
-PRS_TUBE = "prs_analysis"
+PRS_TUBE = "prs"
 
 
 class PRSJobData(BaseMessage, frozen=True):
