@@ -7,23 +7,26 @@ from pathlib import Path
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
 from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, get_progress_reporter, listen
 from bystro.utils.timer import Timer
-
-# TODO: Define PRS calculation and preprocess covariate, association files
-from bystro.prs.prs_types import PRSResponse, PRSSubmission
-from bystro.prs.calculate_prs import (
-    _load_dosage_matrix,
-    _load_association_scores,
-    _load_covariates,
-    calculate_prs_scores,
+from bystro.prs.prs_types import (
+    PRSResponse,
+    PRSSubmission,
 )
+# TODO: Define PRS calculation and preprocess covariate, association files
+#from bystro.prs.prs_types import PRSResponse, PRSSubmission
+#from bystro.prs.calculate_prs import (
+#    _load_dosage_matrix,
+#    _load_association_scores,
+#    _load_covariates,
+#    calculate_prs_scores,
+#)
 
 # TODO: Define how we load vcf-like genotype matrix from annotation,
 # then generalize this process for other analyses
-from bystro.prs.utils import load_vcf_from_annotation
+#from bystro.prs.utils import load_vcf_from_annotation
 
 # TODO: Implement function to preprocess genotype data from annotation
 # into format suitable for PRS calculation
-from bystro.prs.utils import preprocess_vcf_for_prs
+#from bystro.prs.utils import preprocess_vcf_for_prs
 
 from ruamel.yaml import YAML
 
@@ -97,7 +100,7 @@ def completed_msg_fn(prs_job_data: PRSJobData, prs_response: PRSResponse) -> PRS
     return PRSJobCompleteMessage(submissionID=prs_job_data.submissionID, results=prs_response)
 
 
-def main(beanstalk_host: str, beanstalk_port: int, covariate_file: Path, association_file: Path) -> None:
+def main(beanstalk_host: str, beanstalk_port: int, covariate_file: Path, association_file: Path, queue_conf: QueueConf) -> None:
     """Run PRS listener."""
     prs_handler_fn = handler_fn
     logger.info("PRS worker is listening on addresses: %s, tube: %s...", queue_conf.addresses, PRS_TUBE)
@@ -135,4 +138,4 @@ if __name__ == "__main__":
 
     queue_conf = _load_queue_conf(args.queue_conf)
 
-    main(args.beanstalk_host, args.beanstalk_port, args.covariate_file, args.association_file)
+    main(args.queue_conf, args.covariate_file, args.association_file)
