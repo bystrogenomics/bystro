@@ -100,17 +100,17 @@ def completed_msg_fn(prs_job_data: PRSJobData, prs_response: PRSResponse) -> PRS
     return PRSJobCompleteMessage(submissionID=prs_job_data.submissionID, results=prs_response)
 
 
-def main(beanstalk_host: str, beanstalk_port: int, covariate_file: Path, association_file: Path, queue_conf: QueueConf) -> None:
+def main(covariate_file: Path, association_file: Path, queue_conf: QueueConf) -> None:
     """Run PRS listener."""
     prs_handler_fn = handler_fn
     logger.info("PRS worker is listening on addresses: %s, tube: %s...", queue_conf.addresses, PRS_TUBE)
     listen(
-        PRSJobData,
-        prs_handler_fn,
-        submit_msg_fn,
-        completed_msg_fn,
-        queue_conf,
-        PRS_TUBE,
+        job_data_type=PRSJobData,
+        handler_fn=prs_handler_fn,
+        submit_msg_fn=submit_msg_fn,
+        completed_msg_fn=completed_msg_fn,
+        queue_conf=QueueConf,
+        tube=PRS_TUBE,
     )
 
 
