@@ -4,12 +4,13 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
+from msgspec import Struct
 import numpy as np
 import pandas as pd
 from bystro.utils.config import get_opensearch_config
 from opensearchpy import OpenSearch
 
-logger = logging.getLogger(__file__)
+# logger = logging.getLogger(__file__)
 
 OPENSEARCH_CONFIG = get_opensearch_config()
 HETEROZYGOTE_DOSAGE = 1
@@ -21,8 +22,7 @@ ONE_DAY = "1d"  # default keep_alive time for opensearch point in time index
 OUTPUT_FIELDS = ["refSeq.name2", "homozygotes", "heterozygotes", "missingGenos"]
 
 
-@dataclass
-class OpenSearchQueryConfig:
+class OpenSearchQueryConfig(Struct):
     """Represent parameters for configuring OpenSearch queries."""
 
     max_query_size: int = 10_000
@@ -40,12 +40,17 @@ def _flatten(xs: Any) -> list[Any]:  # noqa: ANN401 (`Any` is really correct her
     return sum([_flatten(x) for x in xs], [])
 
 
+def _extract_samples(samples):
+    return [sample[0] for sample in samples]
+
+
 def _get_samples_genes_dosages_from_hit(hit: dict[str, Any]) -> pd.DataFrame:
     """Given a document hit, return a dataframe of samples, genes and dosages."""
     source = hit["_source"]
     gene_names = _flatten(source["refSeq"]["name2"])
     # homozygotes, heterozygotes may not be present in response, so
     # represent them as empty lists if not.
+
     heterozygotes = _flatten(source.get("heterozygotes", []))
     homozygotes = _flatten(source.get("homozygotes", []))
     missing_genos = _flatten(source.get("missingGenos", []))
