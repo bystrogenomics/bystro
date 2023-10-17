@@ -2,8 +2,8 @@ use 5.10.0;
 use strict;
 use warnings;
 
-use Mouse 2;
 use Test::More;
+use Mouse 2;
 
 use Seq::Tracks::Base::Types;
 use Scalar::Util qw/looks_like_number/;
