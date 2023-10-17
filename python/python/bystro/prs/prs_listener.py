@@ -120,18 +120,6 @@ if __name__ == "__main__":
         required=True,
     )
     parser.add_argument(
-        "--beanstalk_host",
-        type=str,
-        default="localhost",
-        help="Beanstalkd server host (default: localhost)",
-    )
-    parser.add_argument(
-        "--beanstalk_port",
-        type=int,
-        default=11300,
-        help="Beanstalkd server port (default: 11300)",
-    )
-    parser.add_argument(
         "--covariate_file",
         type=Path,
         required=True,
