@@ -86,7 +86,6 @@ sub go {
             next;
         }
 
-        # my @fields = split(/\t/, $_);
         # If it's an INFO line
         if (/FREQ=/) {
             my @info_fields = split(/;/, $_);
