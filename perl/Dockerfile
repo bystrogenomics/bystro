@@ -25,7 +25,6 @@ ENV PATH="/app/bin:${PATH}"
 # Note: installing libmariadb-dev rather than libmysql-dev since the latter was removed
 RUN apt-get update \
   && apt-get install -y \
-  awscli \
   build-essential \
   bzip2 \
   git \
@@ -34,8 +33,6 @@ RUN apt-get update \
   libmariadb-dev \
   libssl-dev \
   lz4 \
-  nodejs \
-  npm \
   openssl \
   patch \
   pigz \
@@ -44,9 +41,6 @@ RUN apt-get update \
   wget \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
-
-# Install pm2
-RUN npm install -g pm2
 
 WORKDIR /app/liftOver
 
@@ -60,18 +54,21 @@ RUN rm -rf /app/liftOver
 # Change working directory to perl-deps
 WORKDIR /app/perl-deps
 
+# install cpm for faster installation of perl packages
+RUN curl -fsSL https://raw.githubusercontent.com/skaji/cpm/main/cpm | perl - install -g App::cpm
+
 # Install Dist::Zilla
-RUN cpanm --quiet Dist::Zilla Archive::Tar::Wrapper
+RUN cpm install -g Dist::Zilla Archive::Tar::Wrapper
 
 # Install one-off Bystro dependencies that require special installation
-RUN cpanm --quiet https://github.com/bystrogenomics/msgpack-perl.git
-RUN cpanm --quiet --notest MouseX::Getopt
+RUN cpm install -g https://github.com/bystrogenomics/msgpack-perl.git
+RUN cpm install -g --no-test MouseX::Getopt
 RUN git clone --depth 1 --recurse-submodules https://github.com/salortiz/LMDB_File.git \
   && cd LMDB_File \
   && cpanm --quiet .
 
 # Install workaround because default DBD::mysql, i.e. version >5.x, will not automatically install on ubuntu
-RUN cpanm --quiet DBD::mysql@4.051
+RUN cpm install -g DBD::mysql@4.051
 
 # Remove perl-deps directory
 RUN rm -rf /app/perl-deps
@@ -83,12 +80,12 @@ WORKDIR /app/bystro-perl
 COPY . /app/bystro-perl/
 
 # Install build dependencies
-RUN dzil authordeps --missing | cpanm --quiet
+RUN cpm install -g --show-build-log-on-failure $(dzil authordeps --missing)
 
 # install Bystro package dependencies
-RUN dzil listdeps --missing | cpanm --quiet
+RUN cpm install -g --show-build-log-on-failure $(dzil listdeps --missing)
 
-# Build Bystro package and
+# Test and Install Bystro
 RUN dzil install
 
 RUN rm -rf /app/perl-deps
