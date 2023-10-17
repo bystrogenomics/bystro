@@ -3,20 +3,22 @@ use strict;
 use warnings;
 
 use Test::More;
+use Path::Tiny;
+
 use Seq::Tracks::Base;
 use Seq::DBManager;
 use Seq::Output::Delimiters;
-use DDP;
-# use Path::Tiny qw/path/;
+
+# use DDP;
 # use Scalar::Util qw/looks_like_number/;
 # use YAML::XS qw/LoadFile/;
-# use DDP;
 # use Seq::Tracks::Gene::Site::SiteTypeMap;
 # use Seq::Tracks::Reference::MapBases;
 
 # my $baseMapper = Seq::Tracks::Reference::MapBases->new();
 # my $siteTypes = Seq::Tracks::Gene::Site::SiteTypeMap->new();
-Seq::DBManager::initialize( { databaseDir => './t/tracks/base/db/index', } );
+
+Seq::DBManager::initialize( { databaseDir => Path::Tiny->tempdir() } );
 
 my $seq = Seq::Tracks::Base->new(
   {
