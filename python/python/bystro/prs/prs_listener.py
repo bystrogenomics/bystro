@@ -2,6 +2,7 @@
 
 import argparse
 import logging
+import pandas as pd
 from pathlib import Path
 
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
@@ -73,15 +74,29 @@ def handler_fn(publisher: ProgressPublisher, prs_job_data: PRSJobData) -> PRSRes
     with Timer() as timer:
         # TODO: Load 3 files in
         # (@cristinaetrv on 10/16/23)
-        genotypes = _load_dosage_matrix(dosage_matrix_path)
-        scores = _load_association_scores(association_scores_path)
-        covariates = _load_covariates(covariate_path)
+        #genotypes = _load_dosage_matrix(dosage_matrix_path)
+        #scores = _load_association_scores(association_scores_path)
+        #covariates = _load_covariates(covariate_path)
         parameters = "default"
     logger.debug(
         "finished loading genotype matrix %s in %f seconds", dosage_matrix_path, timer.elapsed_time
     )
-    prs_calculation = calculate_prs_scores(scores, covariates, genotypes, parameters)
-    return prs_calculation
+    #TODO: Replace below dummy prs response with prs_calculation 
+    #when prs_calculation implentation is complete
+    # (@cristinaetrv on 10/16/23)
+    #prs_calculation = calculate_prs_scores(scores, covariates, genotypes, parameters)
+    #return prs_calculation
+    dummy_prs_data = {
+        "SampleID": ["Sample1", "Sample2", "Sample3"],
+        "PRS_Score": [0.9, 0.85, 0.78]
+    }
+    dummy_df = pd.DataFrame(dummy_prs_data)
+    dummy_prs_response = PRSResponse(
+        dosage_matrix_path=dosage_matrix_path, 
+        prs_calculation=dummy_df
+    )
+    return dummy_prs_response
+
 
 
 def submit_msg_fn(prs_job_data: PRSJobData) -> SubmittedJobMessage:
