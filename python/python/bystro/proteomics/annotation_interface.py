@@ -47,7 +47,7 @@ def _extract_samples(samples):
 def _get_samples_genes_dosages_from_hit(hit: dict[str, Any]) -> pd.DataFrame:
     """Given a document hit, return a dataframe of samples, genes and dosages."""
     source = hit["_source"]
-    gene_names = _flatten(source["refSeq"]["name2"])
+    unique_gene_names = set(_flatten(source["refSeq"]["name2"]))
     # homozygotes, heterozygotes may not be present in response, so
     # represent them as empty lists if not.
 
@@ -55,7 +55,7 @@ def _get_samples_genes_dosages_from_hit(hit: dict[str, Any]) -> pd.DataFrame:
     homozygotes = _flatten(source.get("homozygotes", []))
     missing_genos = _flatten(source.get("missingGenos", []))
     rows = []
-    for gene_name in gene_names:
+    for gene_name in unique_gene_names:
         for heterozygote in heterozygotes:
             rows.append(
                 {"sample_id": heterozygote, "gene_name": gene_name, "dosage": HETEROZYGOTE_DOSAGE}
