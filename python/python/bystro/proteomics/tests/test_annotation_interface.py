@@ -41,12 +41,12 @@ def test_get_samples_and_genes_from_query():
 
     mock_client = MockOpenSearch()
     samples_and_genes_df = get_samples_and_genes_from_query(user_query_string, index_name, mock_client)
-    assert 1231 == len(samples_and_genes_df)
+    assert (1610, 7) == samples_and_genes_df.shape
 
 
 def tests__process_response():
     ans = _process_response(TEST_RESPONSE)
-    assert len(ans) == 1231
+    assert (1610, 7) == ans.shape
     assert {"1805", "1847", "4805"} == set(ans.sample_id.unique())
     assert 689 == len(ans.gene_name.unique())
     # it's awkward to test for equality of NaN objects, so fill them

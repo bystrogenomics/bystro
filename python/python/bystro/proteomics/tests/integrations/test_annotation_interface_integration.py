@@ -16,7 +16,7 @@ def test_get_samples_and_genes_from_query_integration():
     # present, this test may fail for no fault of the tested code's own.
     index_name = "64c889415acb6d3b3e40e07b_63ddc9ce1e740e0020c39928"
     samples_genes_df = get_samples_and_genes_from_query(user_query_string, index_name, opensearch_client)
-    assert samples_genes_df.shape == (1231, 3)
+    assert samples_genes_df.shape == (1610, 7)
     assert {"1805", "1847", "4805"} == set(samples_genes_df.sample_id.unique())
     assert 689 == len(samples_genes_df.gene_name.unique())
     # it's awkward to test for equality of NaN objects, so fill them

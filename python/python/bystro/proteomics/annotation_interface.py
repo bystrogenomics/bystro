@@ -10,7 +10,7 @@ import pandas as pd
 from bystro.utils.config import get_opensearch_config
 from opensearchpy import OpenSearch
 
-# logger = logging.getLogger(__file__)
+logger = logging.getLogger(__file__)
 
 OPENSEARCH_CONFIG = get_opensearch_config()
 HETEROZYGOTE_DOSAGE = 1
@@ -19,7 +19,16 @@ MISSING_GENO_DOSAGE = np.nan
 ONE_DAY = "1d"  # default keep_alive time for opensearch point in time index
 
 # The fields to return for each variant matched by the query
-OUTPUT_FIELDS = ["refSeq.name2", "homozygotes", "heterozygotes", "missingGenos"]
+OUTPUT_FIELDS = [
+    "chrom",
+    "pos",
+    "ref",
+    "alt",
+    "refSeq.name2",
+    "homozygotes",
+    "heterozygotes",
+    "missingGenos",
+]
 
 
 class OpenSearchQueryConfig(Struct):
@@ -47,6 +56,10 @@ def _extract_samples(samples):
 def _get_samples_genes_dosages_from_hit(hit: dict[str, Any]) -> pd.DataFrame:
     """Given a document hit, return a dataframe of samples, genes and dosages."""
     source = hit["_source"]
+    chrom = _flatten(source["chrom"])[0]
+    pos = _flatten(source["pos"])[0]
+    ref = _flatten(source["ref"])[0]
+    alt = _flatten(source["alt"])[0]
     unique_gene_names = set(_flatten(source["refSeq"]["name2"]))
     # homozygotes, heterozygotes may not be present in response, so
     # represent them as empty lists if not.
@@ -58,13 +71,39 @@ def _get_samples_genes_dosages_from_hit(hit: dict[str, Any]) -> pd.DataFrame:
     for gene_name in unique_gene_names:
         for heterozygote in heterozygotes:
             rows.append(
-                {"sample_id": heterozygote, "gene_name": gene_name, "dosage": HETEROZYGOTE_DOSAGE}
+                {
+                    "sample_id": heterozygote,
+                    "chrom": chrom,
+                    "pos": pos,
+                    "ref": ref,
+                    "alt": alt,
+                    "gene_name": gene_name,
+                    "dosage": HETEROZYGOTE_DOSAGE,
+                }
             )
         for homozygote in homozygotes:
-            rows.append({"sample_id": homozygote, "gene_name": gene_name, "dosage": HOMOZYGOTE_DOSAGE})
+            rows.append(
+                {
+                    "sample_id": homozygote,
+                    "chrom": chrom,
+                    "pos": pos,
+                    "ref": ref,
+                    "alt": alt,
+                    "gene_name": gene_name,
+                    "dosage": HOMOZYGOTE_DOSAGE,
+                }
+            )
         for missing_geno in missing_genos:
             rows.append(
-                {"sample_id": missing_geno, "gene_name": gene_name, "dosage": MISSING_GENO_DOSAGE}
+                {
+                    "sample_id": missing_geno,
+                    "chrom": chrom,
+                    "pos": pos,
+                    "ref": ref,
+                    "alt": alt,
+                    "gene_name": gene_name,
+                    "dosage": MISSING_GENO_DOSAGE,
+                }
             )
 
     return pd.DataFrame(rows)
