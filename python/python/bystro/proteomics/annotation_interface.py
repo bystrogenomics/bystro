@@ -1,7 +1,6 @@
 """Query an annotation file and return a list of sample_ids and genes meeting the query criteria."""
 import logging
 import math
-from dataclasses import dataclass
 from typing import Any
 
 from msgspec import Struct
