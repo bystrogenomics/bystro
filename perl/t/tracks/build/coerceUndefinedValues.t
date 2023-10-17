@@ -3,18 +3,12 @@ use strict;
 use warnings;
 
 use Test::More;
+
 use Seq::Tracks::Build;
 use Seq::DBManager;
 use Seq::Output::Delimiters;
-use DDP;
-# use Path::Tiny qw/path/;
-# use Scalar::Util qw/looks_like_number/;
-# use YAML::XS qw/LoadFile/;
-# use DDP;
-# use Seq::Tracks::Gene::Site::SiteTypeMap;
-# use Seq::Tracks::Reference::MapBases;
 
-Seq::DBManager::initialize( { databaseDir => './t/tracks/build/db/index', } );
+Seq::DBManager::initialize( { databaseDir => Path::Tiny->tempdir(), } );
 
 my $seq = Seq::Tracks::Build->new(
   {
@@ -24,7 +18,7 @@ my $seq = Seq::Tracks::Build->new(
     assembly    => 'hg38',
     features    => [ 'someString', 'someInt: int', ],
     local_files => ['fake'],
-    files_dir   => './t/tracks/build/db/raw',
+    files_dir   => Path::Tiny->tempdir(),
   }
 );
 

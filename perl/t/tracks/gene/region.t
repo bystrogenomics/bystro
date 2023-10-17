@@ -11,10 +11,30 @@ extends 'Seq::Base';
 use Test::More;
 use Path::Tiny   qw/path/;
 use Scalar::Util qw/looks_like_number/;
-use YAML::XS     qw/LoadFile/;
-use DDP;
+use YAML::XS     qw/DumpFile/;
+
+use lib 't/lib';
+use TestUtils qw/ UpdateConfigAttrs /;
+
 use Seq::Tracks::Gene::Site::SiteTypeMap;
 use Seq::Tracks::Reference::MapBases;
+
+# create temp directories
+my $temp_dir_db   = Path::Tiny->tempdir();
+my $temp_dir_temp = Path::Tiny->tempdir();
+
+# update config to include temp directories
+my $test_config = UpdateConfigAttrs(
+  './t/tracks/gene/region.yml',
+  {
+    database_dir => $temp_dir_db->stringify,
+    temp_dir     => $temp_dir_db->stringify,
+  }
+);
+
+# write new test config to file
+my $test_config_file = Path::Tiny->tempfile();
+DumpFile( $test_config_file, $test_config );
 
 my $baseMapper = Seq::Tracks::Reference::MapBases->new();
 my $siteTypes  = Seq::Tracks::Gene::Site::SiteTypeMap->new();
@@ -27,8 +47,7 @@ my $siteTypes  = Seq::Tracks::Gene::Site::SiteTypeMap->new();
 # we removed the non-unique overlapping data, without first looking at the txEnd
 # and therefore had a smaller-than-expected maximum range
 my $seq =
-  MockBuilder->new_with_config(
-  { config => './t/tracks/gene/region.yml', debug => 1 } );
+  MockBuilder->new_with_config( { config => $test_config_file, debug => 1 } );
 my $tracks = $seq->tracksObj;
 
 my $dbPath = path( $seq->database_dir );
