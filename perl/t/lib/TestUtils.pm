@@ -5,14 +5,13 @@ use strict;
 use warnings;
 
 use Exporter 'import';
-use Path::Tiny;
-use YAML::XS qw/LoadFile/;
-
+use Path::Tiny            qw(path);
 use Type::Params          qw(compile);
-use Types::Standard       qw(HashRef);
 use Types::Common::String qw(NonEmptySimpleStr);
+use Types::Standard       qw(HashRef);
+use YAML::XS              qw(LoadFile);
 
-our @EXPORT_OK = qw/ CopyAll UpdateConfigAttrs /;
+our @EXPORT_OK = qw( CopyAll UpdateConfigAttrs );
 
 sub CopyAll {
   state $check = compile( NonEmptySimpleStr, NonEmptySimpleStr );
