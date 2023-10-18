@@ -3,8 +3,9 @@ use strict;
 use warnings;
 
 use Test::More;
-use Seq::Output;
+
 use Seq::Headers;
+use Seq::Output;
 
 my $head = Seq::Headers->new();
 
