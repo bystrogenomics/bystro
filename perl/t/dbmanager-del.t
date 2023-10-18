@@ -3,17 +3,20 @@ use strict;
 use warnings;
 
 package TestMe;
+
 use Test::More;
-use Seq::Tracks::Build;
-use Try::Tiny;
-use DDP;
+
 use Data::MessagePack;
+use Path::Tiny;
+use Try::Tiny;
+
+use Seq::Tracks::Build;
 
 my $mp = Data::MessagePack->new();
 
-system('rm -rf ./t/db/index-del');
+my $test_db_dir = Path::Tiny->tempdir();
 
-Seq::DBManager::initialize( { databaseDir => './t/db/index-del' } );
+Seq::DBManager::initialize( { databaseDir => $test_db_dir } );
 
 my $db = Seq::DBManager->new();
 
@@ -59,8 +62,6 @@ for my $pos ( 0 .. 100 ) {
     "deleting in middle doesn\'t impact 2nd preceding adjacent value" );
 }
 
-system('rm -rf ./t/db/index-del');
-
 $vals = [ 0, 1, [ 2, 3 ], undef, "end" ];
 
 # in the middle
@@ -102,7 +103,5 @@ for my $pos ( 0 .. 100 ) {
   );
   ok( $readV->[4] eq 'end', "deleting in middle doesn\'t impact next adjacent value" );
 }
-
-system('rm -rf ./t/db/index-del');
 
 done_testing();
