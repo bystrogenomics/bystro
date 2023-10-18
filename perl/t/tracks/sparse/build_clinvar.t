@@ -3,27 +3,41 @@ use strict;
 use warnings;
 
 package MockBuild;
+
 use Mouse 2;
+
 use Seq::Tracks::Build;
+
 extends "Seq::Base";
-#TODO: allow building just one track, identified by name
+
+# TODO: allow building just one track, identified by name
+
 has config => ( is => 'ro', isa => 'Str', required => 1 );
 
 package MockAnnotate;
+
 use Test::More;
-use DDP;
-use Seq::DBManager;
-use Seq;
-use YAML::XS qw/LoadFile/;
+use lib 't/lib';
+use TestUtils qw/ PrepareConfigWithTempdirs /;
+
 use Path::Tiny;
 
-my $config = LoadFile('./t/tracks/sparse/clinvar-test-config.yml');
-my $dbPath = path( $config->{database_dir} );
-$dbPath->remove_tree( { keep_root => 1 } );
+use Seq::DBManager;
+use Seq;
+
+# create temp directories
+my $dir = Path::Tiny->tempdir();
+
+# prepare temp directory and make test config file
+my $config_file = PrepareConfigWithTempdirs(
+  't/tracks/sparse/clinvar-test-config.yml',
+  't/tracks/sparse/raw', [ 'database_dir', 'files_dir', 'temp_dir' ],
+  'files_dir',           $dir->stringify
+);
 
 my $mock = MockBuild->new_with_config(
   {
-    config      => './t/tracks/sparse/clinvar-test-config.yml',
+    config      => $config_file,
     chromosomes => ['chrY'],
     verbose     => 0
   }
@@ -123,5 +137,4 @@ ok( $clinvarData[7] eq "G" );
 ok( $clinvarData[8] eq "C" );
 
 $db->cleanUp();
-$dbPath->remove_tree( { keep_root => 1 } );
 done_testing();

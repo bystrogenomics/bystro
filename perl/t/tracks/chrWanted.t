@@ -3,16 +3,18 @@ use strict;
 use warnings;
 
 use Test::More;
+
 use Seq::Tracks::Build;
-use DDP;
 
-system('rm -rf ./t/tracks/db/index');
+# create temp directories
+my $db_dir    = Path::Tiny->tempdir();
+my $files_dir = Path::Tiny->tempdir();
 
-Seq::DBManager::initialize( { databaseDir => './t/tracks/db/index' } );
+Seq::DBManager::initialize( { databaseDir => $db_dir } );
 
 my $t = Seq::Tracks::Build->new(
   {
-    files_dir   => './t/tracks/db/raw/',
+    files_dir   => $files_dir,
     name        => 'test',
     type        => 'sparse',
     chromosomes => [ 'chr1', '1', 'chr2', '2', '0' ],

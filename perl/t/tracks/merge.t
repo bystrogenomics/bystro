@@ -3,16 +3,18 @@ use strict;
 use warnings;
 
 use Test::More;
+
 use Seq::Tracks::Build;
-use DDP;
 
-system('rm -rf ./t/tracks/db/index');
+# create temp directories
+my $db_dir    = Path::Tiny->tempdir();
+my $files_dir = Path::Tiny->tempdir();
 
-Seq::DBManager::initialize( { databaseDir => './t/tracks/db/index' } );
+Seq::DBManager::initialize( { databaseDir => $db_dir } );
 
 my $t = Seq::Tracks::Build->new(
   {
-    files_dir   => './t/tracks/db/raw/',
+    files_dir   => $db_dir,
     name        => 'test',
     type        => 'sparse',
     chromosomes => ['testChr'],
@@ -42,9 +44,6 @@ ok( join( ',', @{ $result->[3] } ) eq join( ',', 35, 65 ) );
 # @testVals2 = ('short1', 'short2');
 # ($err, $result) = $mergeFunc->($chr, $pos, $result, \@testVals2);
 
-# p $result;
-
 $t->db->cleanUp();
-system('rm -rf ./t/tracks/db/index');
 
 done_testing();

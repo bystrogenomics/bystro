@@ -1,3 +1,5 @@
+# Test data note
+
 The file is fake at most sites over the 10 shown...the real hg38 data is mostly discordant in chr22.
 
 Have left 15927835 as discordant example (shouldn't make it into the database)
