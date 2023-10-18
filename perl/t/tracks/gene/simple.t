@@ -9,12 +9,12 @@ extends 'Seq::Base';
 1;
 
 use Test::More;
+use lib 't/lib';
+use TestUtils qw/ UpdateConfigAttrs /;
+
 use Path::Tiny   qw/path/;
 use Scalar::Util qw/looks_like_number/;
 use YAML::XS     qw/DumpFile/;
-
-use lib 't/lib';
-use TestUtils qw/ UpdateConfigAttrs /;
 
 use Seq::Tracks::Gene::Site::SiteTypeMap;
 use Seq::Tracks::Reference::MapBases;
