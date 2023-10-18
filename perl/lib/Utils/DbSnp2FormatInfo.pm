@@ -131,7 +131,6 @@ sub go {
     my $header_fh = $self->getWriteFh($output_header_path);
 
     # Write the updated header and VCF to output
-    # open($fh_out, "| gzip -c > $output_vcf") or die "Cannot open $output_vcf: $!";
     say $header_fh join("\n", @header_lines);
     close($header_fh);
 
