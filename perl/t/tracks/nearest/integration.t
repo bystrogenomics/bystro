@@ -3,15 +3,29 @@ use strict;
 use warnings;
 
 package MockBuilder;
+
 use Mouse;
 extends 'Seq::Base';
 
 1;
 
 use Test::More;
-use Path::Tiny   qw/path/;
+use lib 't/lib';
+use TestUtils qw/ PrepareConfigWithTempdirs /;
+
+use Path::Tiny;
 use Scalar::Util qw/looks_like_number/;
-use DDP;
+
+# create temp directories
+my $dir = Path::Tiny->tempdir();
+
+# prepare temp directory and make test config file
+my $config_file = PrepareConfigWithTempdirs(
+  't/tracks/nearest/test.yml',
+  't/tracks/nearest/db/hg19/raw',
+  [ 'database_dir', 'files_dir', 'temp_dir' ],
+  'files_dir', $dir->stringify
+);
 
 my $baseMapper = Seq::Tracks::Reference::MapBases->new();
 
@@ -22,20 +36,16 @@ my $baseMapper = Seq::Tracks::Reference::MapBases->new();
 # such as calculating the maximum range of the overlap: in previous code iterations
 # we removed the non-unique overlapping data, without first looking at the txEnd
 # and therefore had a smaller-than-expected maximum range
-my $seq = MockBuilder->new_with_config(
-  { config => path('./t/tracks/nearest/test.yml')->absolute, debug => 1 } );
-
-system( 'rm -rf ' . path( $seq->database_dir )->child('*') );
+my $seq = MockBuilder->new_with_config( { config => $config_file } );
 
 my $tracks            = $seq->tracksObj;
 my $refBuilder        = $tracks->getRefTrackBuilder();
 my $nearestTssBuilder = $tracks->getTrackBuilderByName('refSeq.nearestTss');
 my $nearestBuilder    = $tracks->getTrackBuilderByName('refSeq.nearest');
 my $geneBuilder       = $tracks->getTrackBuilderByName('refSeq.gene');
-
-my $nearestGetter    = $tracks->getTrackGetterByName('refSeq.nearest');
-my $nearestTssGetter = $tracks->getTrackGetterByName('refSeq.nearestTss');
-my $geneGetter       = $tracks->getTrackGetterByName('refSeq.gene');
+my $nearestGetter     = $tracks->getTrackGetterByName('refSeq.nearest');
+my $nearestTssGetter  = $tracks->getTrackGetterByName('refSeq.nearestTss');
+my $geneGetter        = $tracks->getTrackGetterByName('refSeq.gene');
 
 my $db = Seq::DBManager->new();
 
@@ -50,9 +60,8 @@ $geneBuilder->buildTrack();
 #NR_FAKE1  chrM  +        2000  2300
 #NR_FAKE2  chrM  +        2200  3400
 
-my $mainDbAref     = $db->dbReadAll('chrM');
-my $regionDataAref = $db->dbReadAll('refSeq.nearest/chrM');
-# p $mainDbAref;
+my $mainDbAref         = $db->dbReadAll('chrM');
+my $regionDataAref     = $db->dbReadAll('refSeq.nearest/chrM');
 my $hasNearestCount    = 0;
 my $hasNearestTssCount = 0;
 my $nearestDbName      = $nearestBuilder->dbName;

@@ -10,7 +10,7 @@ extends 'Seq::Base';
 
 use Test::More;
 use lib 't/lib';
-use TestUtils qw/ UpdateConfigAttrs /;
+use TestUtils qw/ PrepareConfigWithTempdirs /;
 
 use Path::Tiny   qw/path/;
 use Scalar::Util qw/looks_like_number/;
@@ -21,21 +21,13 @@ use Seq::Tracks::Reference::MapBases;
 use Seq::DBManager;
 
 # create temp directories
-my $temp_dir_db   = Path::Tiny->tempdir();
-my $temp_dir_temp = Path::Tiny->tempdir();
+my $dir = Path::Tiny->tempdir();
 
-# update config to include temp directories
-my $test_config = UpdateConfigAttrs(
-  './t/tracks/gene/ncrna.yml',
-  {
-    database_dir => $temp_dir_db->stringify,
-    temp_dir     => $temp_dir_db->stringify,
-  }
-);
-
-# write new test config to file
-my $test_config_file = Path::Tiny->tempfile();
-DumpFile( $test_config_file, $test_config );
+# prepare temp directory and make test config file
+my $config_file =
+  PrepareConfigWithTempdirs( 't/tracks/gene/ncrna.yml',
+  't/tracks/gene/db/raw', [ 'database_dir', 'files_dir', 'temp_dir' ],
+  'files_dir',            $dir->stringify );
 
 my $baseMapper  = Seq::Tracks::Reference::MapBases->new();
 my $siteTypeMap = Seq::Tracks::Gene::Site::SiteTypeMap->new();
@@ -47,12 +39,9 @@ my $siteTypeMap = Seq::Tracks::Gene::Site::SiteTypeMap->new();
 # such as calculating the maximum range of the overlap: in previous code iterations
 # we removed the non-unique overlapping data, without first looking at the txEnd
 # and therefore had a smaller-than-expected maximum range
-my $seq =
-  MockBuilder->new_with_config( { config => $test_config_file, debug => 1 } );
-my $tracks = $seq->tracksObj;
+my $seq = MockBuilder->new_with_config( { config => $config_file } );
 
-my $dbPath = path( $seq->database_dir );
-$dbPath->remove_tree( { keep_root => 1 } );
+my $tracks = $seq->tracksObj;
 
 ###### First make fake reference track, using the column of sequence data #####
 
@@ -218,6 +207,5 @@ for my $pos ( 0 .. 100000 ) {
 # ok($inGeneCount == $hasGeneCount, "We have a refSeq record for every position from txStart to txEnd");
 
 $db->cleanUp();
-$dbPath->remove_tree( { keep_root => 1 } );
 
 done_testing();
