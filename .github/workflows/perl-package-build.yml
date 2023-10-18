@@ -1,0 +1,42 @@
+name: Build Bystro Perl Package
+
+on: [push, pull_request]
+
+jobs:
+  test-perl-package:
+    runs-on: ubuntu-latest
+    container:
+      image: perldocker/perl-tester:latest
+
+    steps:
+      - name: Perl version
+        run: perl -V
+
+      - name: Install system dependencies
+        shell: bash
+        run: apt-get install --no-install-recommends -y lz4
+
+      - name: Install one-off Bystro dependencies
+        shell: bash
+        run: |
+          cpm install -g https://github.com/bystrogenomics/msgpack-perl.git
+          cpm install -g --no-test MouseX::Getopt
+          cpm install -g DBD::mysql@4.051
+          git clone --depth 1 --recurse-submodules https://github.com/salortiz/LMDB_File.git \
+            && cd LMDB_File \
+            && cpanm --quiet .
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Bystro dependencies
+        run: |
+          cd perl
+          cpm install -g --show-build-log-on-failure $(dzil authordeps --missing)
+          cpm install -g --show-build-log-on-failure $(dzil listdeps --missing)
+
+      - name: Test Bystro
+        run: cd perl && dzil test --all
+
+      - name: Build Bystro tarball
+        run: cd perl && dzil build

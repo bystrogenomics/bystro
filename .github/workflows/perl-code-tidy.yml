@@ -1,0 +1,33 @@
+name: Perl Tidy & Critic Check
+
+on:
+  push:
+    paths:
+    - '**.pl'
+    - '**.pm'
+    - '**.t'
+  pull_request:
+    paths:
+    - '**.pl'
+    - '**.pm'
+    - '**.t'
+
+jobs:
+  tidy-critic-check:
+    runs-on: ubuntu-latest
+    container:
+      image: perldocker/perl-tester:latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Run tidyall
+        shell: bash
+        run: |
+          cd perl
+          tidyall -a
+          if [[ $? != 0 ]]; then
+            echo "Perl code is not tidy or has critic violations"
+            exit 1
+          fi
