@@ -11,7 +11,7 @@
 <p style="margin-left: 40px"> Annotated output data is ordered in the same way as the original file. </p>
 
 Reserved characters for use as delimiters
-  - "!" ";" "|", ASCII UNIT SEPARATOR (ASCII character 31)
+  - ";" "|", ASCII UNIT SEPARATOR (ASCII character 31)
   - "/" will replace the ASCII UNIT SEPARATOR character 31
   - Any instances os these chracters in values to be inserted into the database at build time, will be replaced at build time with a ","
 <br/>
