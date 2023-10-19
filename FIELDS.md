@@ -6,16 +6,14 @@
 ### General output information:
 <p style="margin-left: 40px"> Missing data in the annotation is marked by <strong>'!'</strong>  </p>
 <p style="margin-left: 40px"> Multiple values for a single annotated position are separated by <strong>';'</strong> </p>
+<p style="margin-left: 40px"> Multiple values for a single annotated position that are nested within <strong>';'</strong> delimited values (e.g 2D values) are separated by <strong>ASCII UNIT SEPARATOR (ASCII code 31)</strong> </p>
 <p style="margin-left: 40px"> Multiple positions on a single annotation line (occurs with indels only) are separated by <strong>'|'</strong> </p>
 <p style="margin-left: 40px"> Annotated output data is ordered in the same way as the original file. </p>
 
-Reserved characters:
-  - "!" ";" "|" "/"
-  - "/" Will be used in a future release to denote overlapping data from a single track
-    - For instance if 2 different dbSNP records overlap, which often occurs with indels, or when two refSeq transcripts overlap at the same position
-    - Currently such sites are compressed to ";", but this loses information when a 1:1 relationship does not exist between a track's fields
-      - For instance dbSNP.alleles are in the form Major;Minor1;Minor2 and dbSNP.name may or may not be a single value, regardless of # of minor alleles
-      - When multiple dbSNP rows overlap, we store each field at that position in a 1D array, which loses the relationship between dbSNP.alleles and dbSNP.name
+Reserved characters for use as delimiters
+  - "!" ";" "|", ASCII UNIT SEPARATOR (ASCII character 31)
+  - "/" will replace the ASCII UNIT SEPARATOR character 31
+  - Any instances os these chracters in values to be inserted into the database at build time, will be replaced at build time with a ","
 <br/>
 
 ### Input fields
