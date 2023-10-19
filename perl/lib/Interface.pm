@@ -152,7 +152,8 @@ has publisher => (
   coerce        => 1,
   required      => 0,
   metaclass     => 'Getopt',
-  documentation => qq{Tell Bystro how to send messages to a plugged-in interface (such as a web interface)}
+  documentation =>
+    qq{Tell Bystro how to send messages to a plugged-in interface (such as a web interface)}
 );
 
 has ignore_unknown_chr => (
