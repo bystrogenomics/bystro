@@ -1,6 +1,6 @@
 """Utility functions for accessing project-level configuration files."""
 from pathlib import Path
-from typing import Dict, Union
+from typing import Dict, Literal, Union
 
 from ruamel.yaml import YAML
 
@@ -41,3 +41,17 @@ def get_opensearch_config() -> ConfigDict:
     with opensearch_config_filepath.open() as search_config_file:
         config_dict: ConfigDict = YAML(typ="safe").load(search_config_file)
     return config_dict
+
+
+REFERENCE_GENOMES = ["hg19", "hg38"]
+
+
+def get_mapping_config(reference_genome=Literal[REFERENCE_GENOMES]) -> ConfigDict:
+    if not reference_genome in REFERENCE_GENOMES:
+        err_msg = f"Reference genome: `{reference_genome}` must be one of: {REFERENCE_GENOMES}"
+        raise ValueError(err_msg)
+    base_name = f"{reference_genome}.mapping.yml"
+    mapping_config_filepath = BYSTRO_PROJECT_ROOT / "config" / base_name
+    with open(mapping_config_filepath, "r", encoding="utf-8") as f:
+        mapping_config = YAML(typ="safe").load(f)
+    return mapping_config
