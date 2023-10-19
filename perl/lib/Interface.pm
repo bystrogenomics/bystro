@@ -152,8 +152,7 @@ has publisher => (
   coerce        => 1,
   required      => 0,
   metaclass     => 'Getopt',
-  documentation => qq{Tell Bystro how to send messages to a plugged-in interface 
-      (such as a web interface) }
+  documentation => qq{Tell Bystro how to send messages to a plugged-in interface (such as a web interface)}
 );
 
 has ignore_unknown_chr => (
@@ -211,7 +210,7 @@ __PACKAGE__->meta->make_immutable;
 
 =item messanger
 
-Contains a hash reference (also accept json representation of hash) that 
+Contains a hash reference (also accept json representation of hash) that
 tells Bystro how to send data to a plugged interface.
 
 Example: {
