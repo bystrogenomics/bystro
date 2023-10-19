@@ -2,6 +2,7 @@
 use 5.10.0;
 use strict;
 use warnings;
+use DDP;
 
 # Take a DbSNP 2 VCF file, and for each row, split the INFO field's FREQ data into separate INFO fields for each population
 package Utils::DbSnp2FormatInfo;
@@ -45,21 +46,28 @@ sub go {
       return;
     }
 
+    my ( $err, $isCompressed, $in_fh ) = $self->getReadFh($input_vcf);
+
+    $isCompressed ||= $self->compress;
+
+    if ($err) {
+      $self->log('fatal', $err);
+      return;
+    }
+
     my $base_name = basename($input_vcf);
     $base_name =~ s/\.[^.]+$//;     # Remove last file extension (if present)
     $base_name =~ s/\.[^.]+$//;     # Remove another file extension if it's something like .vcf.gz
 
-    my $output_vcf_data = $base_name . "_vcf_data.vcf.gz";
-    my $output_vcf_header = $base_name . "_vcf_header.vcf.gz";
-    my $output_vcf = $base_name . "_processed.vcf.gz";
-
-    my $in_fh = $self->getReadFh($input_vcf);
+    my $output_vcf_data = $base_name . "_vcf_data.vcf" . ( $isCompressed ? ".gz" : "" );
+    my $output_vcf_header = $base_name . "_vcf_header.vcf" . ( $isCompressed ? ".gz" : "" );
+    my $output_vcf = $base_name . "_processed.vcf" . ( $isCompressed ? ".gz" : "" );
 
     $self->log( 'info', "Reading $input_vcf" );
 
-    my $output_header_path = path( $self->_localFilesDir )->child("$output_vcf_header")->stringify();
-    my $output_data_path = path( $self->_localFilesDir )->child("$output_vcf_data")->stringify();
-    my $output_path = path( $self->_localFilesDir )->child("$output_vcf")->stringify();
+    my $output_header_path = path( $self->_localFilesDir )->child($output_vcf_header)->stringify();
+    my $output_data_path = path( $self->_localFilesDir )->child($output_vcf_data)->stringify();
+    my $output_path = path( $self->_localFilesDir )->child($output_vcf)->stringify();
 
     if ( (-e $output_data_path || -e $output_header_path || -e $output_path) && !$self->overwrite ) {
       $self->log( 'fatal', "Temp files $output_data_path, $output_header_path, or final output path $output_path exist, and overwrite is not set" );
