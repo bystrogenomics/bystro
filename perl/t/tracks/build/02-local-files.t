@@ -2,9 +2,10 @@ use 5.10.0;
 use strict;
 use warnings;
 
-use Seq::Tracks::Build::LocalFilesPaths;
-use Path::Tiny;
 use Test::More;
+use Path::Tiny;
+
+use Seq::Tracks::Build::LocalFilesPaths;
 
 my $localPaths = Seq::Tracks::Build::LocalFilesPaths->new();
 

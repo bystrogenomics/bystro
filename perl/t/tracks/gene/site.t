@@ -5,9 +5,6 @@ use warnings;
 package Testing;
 
 use Test::More;
-use DDP;
-
-# plan tests => 13;
 
 use Seq::Tracks::Gene::Site;
 

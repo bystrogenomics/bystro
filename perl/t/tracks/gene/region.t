@@ -9,12 +9,24 @@ extends 'Seq::Base';
 1;
 
 use Test::More;
+use lib 't/lib';
+use TestUtils qw/ PrepareConfigWithTempdirs /;
+
 use Path::Tiny   qw/path/;
 use Scalar::Util qw/looks_like_number/;
-use YAML::XS     qw/LoadFile/;
-use DDP;
+use YAML::XS     qw/DumpFile/;
+
 use Seq::Tracks::Gene::Site::SiteTypeMap;
 use Seq::Tracks::Reference::MapBases;
+
+# create temp directories
+my $dir = Path::Tiny->tempdir();
+
+# prepare temp directory and make test config file
+my $config_file =
+  PrepareConfigWithTempdirs( 't/tracks/gene/region.yml',
+  't/tracks/gene/db/raw', [ 'database_dir', 'files_dir', 'temp_dir' ],
+  'files_dir',            $dir->stringify );
 
 my $baseMapper = Seq::Tracks::Reference::MapBases->new();
 my $siteTypes  = Seq::Tracks::Gene::Site::SiteTypeMap->new();
@@ -26,13 +38,9 @@ my $siteTypes  = Seq::Tracks::Gene::Site::SiteTypeMap->new();
 # such as calculating the maximum range of the overlap: in previous code iterations
 # we removed the non-unique overlapping data, without first looking at the txEnd
 # and therefore had a smaller-than-expected maximum range
-my $seq =
-  MockBuilder->new_with_config(
-  { config => './t/tracks/gene/region.yml', debug => 1 } );
-my $tracks = $seq->tracksObj;
+my $seq = MockBuilder->new_with_config( { config => $config_file } );
 
-my $dbPath = path( $seq->database_dir );
-$dbPath->remove_tree( { keep_root => 1 } );
+my $tracks = $seq->tracksObj;
 
 my $refBuilder  = $tracks->getRefTrackBuilder();
 my $geneBuilder = $tracks->getTrackBuilderByName('refSeq');
@@ -68,5 +76,4 @@ for my $regionEntry ( values @$regionDataAref ) {
   }
 }
 
-$dbPath->remove_tree( { keep_root => 1 } );
 done_testing();

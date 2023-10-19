@@ -3,7 +3,6 @@ use strict;
 use warnings;
 
 use Test::More;
-use DDP;
 
 use Data::MessagePack;
 

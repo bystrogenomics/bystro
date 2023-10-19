@@ -3,14 +3,16 @@ use strict;
 use warnings;
 
 package TestMe;
+
 use Test::More;
-use Seq::Tracks::Build;
+
 use Try::Tiny;
-use DDP;
 
-system('rm -rf ./t/db/index');
+use Seq::Tracks::Build;
 
-Seq::DBManager::initialize( { databaseDir => './t/db/index' } );
+my $test_db_dir = Path::Tiny->tempdir();
+
+Seq::DBManager::initialize( { databaseDir => $test_db_dir } );
 
 my $db = Seq::DBManager->new();
 

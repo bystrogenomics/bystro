@@ -4,12 +4,12 @@ use warnings;
 
 use Test::More;
 
-use DDP;
-use Utils::SqlWriter;
 use Path::Tiny;
 
-my $outDir = './t/utils/raw/sqlWriter';
-my $db     = 'hg19';
+use Utils::SqlWriter;
+
+my $out_dir = Path::Tiny->tempdir();
+my $db      = 'hg19';
 
 my %config = (
   sql => "SELECT r.*, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.kgID, '')) SEPARATOR
@@ -33,17 +33,15 @@ my %config = (
     user     => 'genome',
     port     => '3306'
   },
-  outputDir => './t/utils/raw/sqlWriter',
+  outputDir => $out_dir->stringify,
   compress  => 0,
 );
 
-path($outDir)->remove_tree();
-path($outDir)->mkpath();
-
 my $sqlWriter = Utils::SqlWriter->new( \%config );
+
 $sqlWriter->go();
 
-my $exp = path($outDir)->child("$db.kgXref.fetch.txt")->stringify;
+my $exp = $out_dir->child("$db.kgXref.fetch.txt")->stringify;
 
 open( my $fh, '<', $exp );
 
@@ -106,7 +104,7 @@ my @exp = sort { $a cmp $b } ( 'NM_019046', 'NM_001009943', 'NM_001009941' );
 
 ok( join( "\t", @tx ) eq join( "\t", @exp ), "Find expected tx" );
 
-path($outDir)->remove_tree();
+$out_dir->remove_tree();
 
 close $fh;
 
@@ -132,20 +130,17 @@ close $fh;
     user     => 'genome',
     port     => '3306'
   },
-  outputDir => './t/utils/raw/sqlWriter',
+  outputDir => $out_dir->stringify,
   compress  => 0,
 );
 
-path($outDir)->mkpath();
-
 $sqlWriter = Utils::SqlWriter->new( \%config );
+
 $sqlWriter->go();
 
-$exp = path($outDir)->child("$db.kgXref.fetch.txt")->stringify;
+$exp = $out_dir->child("$db.kgXref.fetch.txt")->stringify;
 
 ok( !-e $exp, "No file generated when empty query" );
-
-path($outDir)->remove_tree();
 
 done_testing();
 
