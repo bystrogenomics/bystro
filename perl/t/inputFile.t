@@ -2,9 +2,9 @@ use 5.10.0;
 use strict;
 use warnings;
 
-use Seq::InputFile;
 use Test::More;
-use DDP;
+
+use Seq::InputFile;
 
 my $inputter = Seq::InputFile->new();
 

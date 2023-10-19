@@ -1,11 +1,11 @@
-#!/usr/bin/env perl
 use 5.10.0;
 use strict;
 use warnings;
+
 use Test::More;
 use Mouse 2;
+
 use Seq::Tracks::Base::Types;
-use DDP;
 use Scalar::Util qw/looks_like_number/;
 
 my $converter = Seq::Tracks::Base::Types->new();

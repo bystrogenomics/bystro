@@ -1,9 +1,10 @@
 use 5.10.0;
 use strict;
 use warnings;
-use Seq::Tracks::Score::Build::Round;
+
 use Test::More;
-use DDP;
+
+use Seq::Tracks::Score::Build::Round;
 
 plan tests => 4;
 

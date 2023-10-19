@@ -3,31 +3,69 @@ use warnings;
 use 5.10.0;
 
 use Test::More;
-use DDP;
-use Path::Tiny qw/path/;
+use lib 't/lib';
+use TestUtils qw/ CopyAll /;
 
-use Utils::FilterCadd;
+use Path::Tiny;
+use YAML::XS qw/LoadFile DumpFile/;
+
 use Seq::DBManager;
 use Seq::Tracks::Cadd;
 use Seq::Tracks::Reference;
 use Seq::Tracks::Score::Build::Round;
+use Utils::FilterCadd;
 
-use YAML::XS qw/LoadFile Dump/;
+# create temp directories
+my $db_dir   = Path::Tiny->tempdir();
+my $base_dir = Path::Tiny->tempdir();
+my $raw_dir  = $base_dir->child('raw');
 
-my $config = LoadFile('./t/utils/filterCadd.yml');
+$raw_dir->mkpath;
+
+# Copy test contents to temporary directory
+CopyAll( 't/utils/raw', $raw_dir->stringify );
+
+my $config = {
+  'assembly'     => 'hg38',
+  'chromosomes'  => [ 'chr22', 'chr1', 'chr2' ],
+  'database_dir' => $db_dir->stringify,
+  'files_dir'    => $raw_dir->stringify,
+  'tracks'       => {
+    'tracks' => [
+      {
+        'assembly'    => 'hg38',
+        'chromosomes' => [ 'chr22', 'chr1', 'chr2' ],
+        'name'        => 'ref',
+        'type'        => 'reference'
+      },
+      {
+        'assembly'             => 'hg38',
+        'build_date'           => '2017-04-22T05:22:00',
+        'caddToBed_date'       => '2017-01-19T04:37:00',
+        'chromosomes'          => [ 'chr22', 'chr1', 'chr2' ],
+        'fetch_completed'      => '2023-10-17T21:55:00',
+        'filterCadd_completed' => '2023-05-26T14:05:00',
+        'filterCadd_date'      => '2017-09-12T19:18:00',
+        'local_files'          => [
+          'test.filterCadd.cadd.chr22.txt', 'test.filterCadd.cadd.chr1.txt.gz',
+          'test.filterCadd.cadd.chr2.txt'
+        ],
+        'name'          => 'cadd',
+        'sortCadd_date' => '2017-01-20T23:53:00',
+        'sorted'        => 1,
+        'type'          => 'cadd'
+      }
+    ]
+  }
+};
+
+# write temporary config file
+my $config_file = $base_dir->child('filterCadd.yml');
+DumpFile( $config_file, $config );
 
 Seq::DBManager::initialize( { databaseDir => $config->{database_dir}, } );
 
 my $db = Seq::DBManager->new();
-
-$config->{tracks}{tracks}[1]{local_files} = [
-  'test.filterCadd.cadd.chr22.txt', 'test.filterCadd.cadd.chr1.txt.gz',
-  'test.filterCadd.cadd.chr2.txt'
-];
-
-open( my $fh, '>', './t/utils/filterCadd.yml' );
-
-print $fh Dump($config);
 
 my $ref  = Seq::Tracks::Reference->new( $config->{tracks}{tracks}[0] );
 my $cadd = Seq::Tracks::Cadd->new( $config->{tracks}{tracks}[1] );
@@ -60,16 +98,9 @@ $db->dbPatch( 'chr2', $cadd->dbName, 10002,
 # $db->dbPatch('chr22', $ref->dbName, 10584992, 4);
 # $db->dbPatch('chr22', $ref->dbName, 10584993, 3);
 
-system(
-  'rm ./t/utils/raw/cadd/test.filterCadd.cadd.chr22.chr22.filtered.txt 2> /dev/null');
-system(
-  'rm ./t/utils/raw/cadd/test.filterCadd.cadd.chr2.chr2.filtered.txt 2> /dev/null');
-system(
-  'rm ./t/utils/raw/cadd/test.filterCadd.cadd.chr1.chr1.filtered.txt 2> /dev/null');
-
 my $filter = Utils::FilterCadd->new(
   {
-    config     => './t/utils/filterCadd.yml',
+    config     => $config_file,
     name       => 'cadd',
     maxThreads => 1,
     utilName   => 'fetch',
@@ -79,7 +110,8 @@ my $filter = Utils::FilterCadd->new(
 
 my $success = $filter->go();
 
-open( $fh, '<', './t/utils/raw/cadd/test.filterCadd.cadd.chr22.chr22.filtered.txt' );
+my $fh = $raw_dir->child('cadd/test.filterCadd.cadd.chr22.chr22.filtered.txt')
+  ->filehandle('<');
 
 my $header = <$fh>;
 $header .= <$fh>;
@@ -117,11 +149,12 @@ ok( $count == 5, "found expectd number of lines" );
 
 ok( $success == 1, "exited cleanly" );
 
-$config = LoadFile('./t/utils/filterCadd.yml');
+$config = LoadFile( $config_file->stringify );
 
 my $caddTrack = $config->{tracks}{tracks}[1];
 
-open( $fh, '<', './t/utils/raw/cadd/test.filterCadd.cadd.chr1.chr1.filtered.txt' );
+$fh = $raw_dir->child('cadd/test.filterCadd.cadd.chr1.chr1.filtered.txt')
+  ->filehandle('<');
 
 $header = <$fh>;
 $header .= <$fh>;
@@ -159,11 +192,12 @@ ok( $count == 5, "found expected number of lines" );
 
 ok( $success == 1, "exited cleanly" );
 
-$config = LoadFile('./t/utils/filterCadd.yml');
+$config = LoadFile( $config_file->stringify );
 
 $caddTrack = $config->{tracks}{tracks}[1];
 
-open( $fh, '<', './t/utils/raw/cadd/test.filterCadd.cadd.chr2.chr2.filtered.txt' );
+$fh = $raw_dir->child('cadd/test.filterCadd.cadd.chr2.chr2.filtered.txt')
+  ->filehandle('<');
 
 $header = <$fh>;
 $header .= <$fh>;
@@ -201,30 +235,20 @@ ok( $count == 5, "found expected number of lines" );
 
 ok( $success == 1, "exited cleanly" );
 
-$config = LoadFile('./t/utils/filterCadd.yml');
+$config = LoadFile( $config_file->stringify );
 
 $caddTrack = $config->{tracks}{tracks}[1];
 
-my @expectedPaths = (
-  path('./t/utils/raw/cadd/test.filterCadd.cadd.chr1.chr1.filtered.txt')
-    ->absolute->stringify(),
-  path('./t/utils/raw/cadd/test.filterCadd.cadd.chr2.chr2.filtered.txt')
-    ->absolute->stringify(),
-  path('./t/utils/raw/cadd/test.filterCadd.cadd.chr22.chr22.filtered.txt')
-    ->absolute->stringify(),
-);
-
-my $found = 0;
-for my $path ( @{ $caddTrack->{local_files} } ) {
-  for my $expected (@expectedPaths) {
-    if ( path('./t/utils/raw/cadd/')->child($path)->absolute->stringify() eq $expected )
-    {
-      $found++;
-    }
-  }
-}
-
-ok( $found == 3,                   "Found $found output files" );
 ok( $caddTrack->{filterCadd_date}, "has non-null filterCadd_date property" );
+
+is_deeply(
+  $caddTrack->{local_files},
+  [
+    "test.filterCadd.cadd.chr22.chr22.filtered.txt",
+    "test.filterCadd.cadd.chr1.chr1.filtered.txt",
+    "test.filterCadd.cadd.chr2.chr2.filtered.txt"
+  ],
+  "expected filtered CADD files."
+);
 
 done_testing();
