@@ -2,27 +2,11 @@
 use strict;
 use warnings;
 use Test::More;
-use File::Temp qw/tempdir/;
-use File::Copy;
-use DDP;
-### 
-
-use strict;
-use warnings;
-use 5.10.0;
-
-use Test::More;
-
-use Utils::DbSnp2FormatInfo;
 
 use Path::Tiny;
-use YAML::XS qw/LoadFile DumpFile/;
+use YAML::XS qw/DumpFile/;
 
-use Seq::DBManager;
-use Seq::Tracks::Cadd;
-use Seq::Tracks::Reference;
-use Seq::Tracks::Score::Build::Round;
-use Utils::FilterCadd;
+use Utils::DbSnp2FormatInfo;
 
 # create temp directories
 my $db_dir   = Path::Tiny->tempdir();
@@ -53,13 +37,9 @@ my $config = {
   }
 };
 
-my $config2 = LoadFile('/home/alexkotlar/bystro/config/hg19.yml');
-p $config2;
-
 # write temporary config file
 my $config_file = $raw_dir->child('filterCadd.yml');
 DumpFile( $config_file, $config );
-p $config;
 
 # Prepare a sample VCF for testing
 my $vcf_data = <<'END_VCF';
