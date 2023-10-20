@@ -1,7 +1,14 @@
 from unittest.mock import patch
 
 import pytest
-from bystro.utils.config import BYSTRO_PROJECT_ROOT, get_opensearch_config, _get_bystro_project_root
+
+from bystro.utils.config import (
+    BYSTRO_PROJECT_ROOT,
+    get_opensearch_config,
+    _get_bystro_project_root,
+    get_mapping_config,
+    ReferenceGenome,
+)
 
 
 def test_get_bystro_project_root():
@@ -20,3 +27,8 @@ def test_get_opensearch_config():
     opensearch_config = get_opensearch_config()
     expected_keys = {"connection", "auth"}
     assert expected_keys == set(opensearch_config.keys())
+
+
+def test_get_mapping_config():
+    assert 5 == len(get_mapping_config(ReferenceGenome.hg38))
+    assert 5 == len(get_mapping_config(ReferenceGenome.hg19))
