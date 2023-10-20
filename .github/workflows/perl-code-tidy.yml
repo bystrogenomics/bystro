@@ -26,8 +26,4 @@ jobs:
         shell: bash
         run: |
           cd perl
-          tidyall -a
-          if [[ $? != 0 ]]; then
-            echo "Perl code is not tidy or has critic violations"
-            exit 1
-          fi
+          tidyall --check-only --quiet --all
