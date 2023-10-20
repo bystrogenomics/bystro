@@ -46,12 +46,13 @@ def get_opensearch_config() -> ConfigDict:
 REFERENCE_GENOMES = ["hg19", "hg38"]
 
 
-def get_mapping_config(reference_genome=Literal[REFERENCE_GENOMES]) -> ConfigDict:
-    if not reference_genome in REFERENCE_GENOMES:
+def get_mapping_config(reference_genome: str = "hg38") -> ConfigDict:
+    """Load mapping config for given reference genome from YAML file."""
+    if reference_genome not in REFERENCE_GENOMES:
         err_msg = f"Reference genome: `{reference_genome}` must be one of: {REFERENCE_GENOMES}"
         raise ValueError(err_msg)
     base_name = f"{reference_genome}.mapping.yml"
     mapping_config_filepath = BYSTRO_PROJECT_ROOT / "config" / base_name
-    with open(mapping_config_filepath, "r", encoding="utf-8") as f:
+    with Path.open(mapping_config_filepath, encoding="utf-8") as f:
         mapping_config = YAML(typ="safe").load(f)
     return mapping_config
