@@ -49,6 +49,8 @@ def test_read_annotation_tarball():
         chunk_size=1,
     )
 
+    # In the expected data commented explanations that follow
+    # the overlap delimiter is considered to be "/"
     expected_data = [
         {
             "_index": "test_index",
