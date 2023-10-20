@@ -1,4 +1,5 @@
 """Utility functions for accessing project-level configuration files."""
+import typing
 from pathlib import Path
 from typing import Dict, Literal, Union
 
@@ -43,10 +44,13 @@ def get_opensearch_config() -> ConfigDict:
     return config_dict
 
 
-REFERENCE_GENOMES = ["hg19", "hg38"]
+# define the set of permissible reference genomes so that they're
+# available both statically and at runtime
+ReferenceGenome = Literal["hg19", "hg38"]
+REFERENCE_GENOMES = typing.get_args(ReferenceGenome)
 
 
-def get_mapping_config(reference_genome: str = "hg38") -> ConfigDict:
+def get_mapping_config(reference_genome: ReferenceGenome = "hg38") -> ConfigDict:
     """Load mapping config for given reference genome from YAML file."""
     if reference_genome not in REFERENCE_GENOMES:
         err_msg = f"Reference genome: `{reference_genome}` must be one of: {REFERENCE_GENOMES}"
