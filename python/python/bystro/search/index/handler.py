@@ -145,6 +145,8 @@ async def go(
         await indexer.close.remote()
 
     await client.indices.put_settings(index=index_name, body=post_index_settings)
+    await client.indices.refresh(index=index_name)
+
     await client.close()
 
     return data.get_header_fields()
