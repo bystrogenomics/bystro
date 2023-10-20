@@ -8,6 +8,7 @@ from bystro.utils.config import (
     get_opensearch_config,
     _get_bystro_project_root,
     get_mapping_config,
+    ReferenceGenome,
 )
 
 
@@ -30,8 +31,5 @@ def test_get_opensearch_config():
 
 
 def test_get_mapping_config():
-    assert 5 == len(get_mapping_config("hg38"))
-    assert 5 == len(get_mapping_config("hg19"))
-    err_msg = re.escape("Reference genome: `hg12345` must be one of: ['hg19', 'hg38']")
-    with pytest.raises(ValueError, match=err_msg):
-        get_mapping_config("hg12345")
+    assert 5 == len(get_mapping_config(ReferenceGenome.hg38))
+    assert 5 == len(get_mapping_config(ReferenceGenome.hg19))

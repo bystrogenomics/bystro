@@ -6,7 +6,12 @@ import pytest
 from bystro.proteomics.annotation_interface import get_samples_and_genes_from_query
 from bystro.search.index.handler import go as upload_and_index_vcf
 from bystro.search.utils.opensearch import gather_opensearch_args
-from bystro.utils.config import BYSTRO_PROJECT_ROOT, get_mapping_config, get_opensearch_config
+from bystro.utils.config import (
+    BYSTRO_PROJECT_ROOT,
+    get_mapping_config,
+    get_opensearch_config,
+    ReferenceGenome,
+)
 from flaky import flaky
 from opensearchpy import OpenSearch
 
@@ -27,7 +32,7 @@ def ensure_annotation_file_present(annotation_filename: str) -> None:
 
 
 def upload_test_annotation_file(annotation_filename: str) -> None:
-    mapping_config = get_mapping_config("hg38")
+    mapping_config = get_mapping_config(ReferenceGenome.hg38)
     tar_path = (
         BYSTRO_PROJECT_ROOT / "python/python/bystro/proteomics/tests/integrations/trio_trim_vep_vcf.tar"
     )
@@ -37,7 +42,9 @@ def upload_test_annotation_file(annotation_filename: str) -> None:
     )
     # after uploading, some additional time is required on the annotator's end before the results
     # are available to query.  Pause here for a few seconds in order to avoid prematurely querying
-    # the annotation file.
+    # the annotation file.  This workaround should become obsolete with the deployment of
+    # https://github.com/bystrogenomics/bystro/pull/310, at which point the time.sleep call can be
+    # deleted.
     time.sleep(3)
 
 

@@ -1,7 +1,7 @@
 """Utility functions for accessing project-level configuration files."""
-import typing
+from enum import Enum
 from pathlib import Path
-from typing import Dict, Literal, Union
+from typing import Dict, Union
 
 from ruamel.yaml import YAML
 
@@ -44,18 +44,24 @@ def get_opensearch_config() -> ConfigDict:
     return config_dict
 
 
-# define the set of permissible reference genomes so that they're
-# available both statically and at runtime
-ReferenceGenome = Literal["hg19", "hg38"]
-REFERENCE_GENOMES = typing.get_args(ReferenceGenome)
+class ReferenceGenome(Enum):
+    """The collection of valid reference genomes."""
+
+    ce11 = "ce11"
+    dm6 = "dm6"
+    hg19 = "hg19"
+    hg19_ensembl = "hg19_ensembl"
+    hg38 = "hg38"
+    mm10 = "mm10"
+    mm9 = "mm9"
+    rheMac8 = "rheMac8"  # noqa: N815  (mixed case is necessary here)
+    rn6 = "rn6"
+    sacCer3 = "sacCer3"  # noqa: N815
 
 
-def get_mapping_config(reference_genome: ReferenceGenome = "hg38") -> ConfigDict:
+def get_mapping_config(reference_genome: ReferenceGenome = ReferenceGenome.hg38) -> ConfigDict:
     """Load mapping config for given reference genome from YAML file."""
-    if reference_genome not in REFERENCE_GENOMES:
-        err_msg = f"Reference genome: `{reference_genome}` must be one of: {REFERENCE_GENOMES}"
-        raise ValueError(err_msg)
-    base_name = f"{reference_genome}.mapping.yml"
+    base_name = f"{reference_genome.name}.mapping.yml"
     mapping_config_filepath = BYSTRO_PROJECT_ROOT / "config" / base_name
     with Path.open(mapping_config_filepath, encoding="utf-8") as f:
         mapping_config = YAML(typ="safe").load(f)
