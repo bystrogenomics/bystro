@@ -28,15 +28,15 @@ def create_mock_tarball(annotation_content):
 
 def test_read_annotation_tarball():
     delims = get_delimiters()
-    dv = delims["value"]  # e.g. ;
-    df = delims["field"]  # e.g. \t
-    do = delims["overlap"]  # e.g. chr(31)
-    dp = delims["position"]  # e.g. |
+    delim_v = delims["value"]  # e.g. ;
+    delim_f = delims["field"]  # e.g. \t
+    delim_o = delims["overlap"]  # e.g. chr(31)
+    delim_p = delims["position"]  # e.g. |
 
-    header = f"field1{df}field2{df}field3\n"
-    field1val = f"value1a{dv}value1b{dp}value2aa{do}value2ab{dv}value2b{df}"
-    field2val = f"value3a{dv}value3b{df}"
-    field3val = f"value4a{dp}value4b\n"
+    header = f"field1{delim_f}field2{delim_f}field3\n"
+    field1val = f"value1a{delim_v}value1b{delim_p}value2aa{delim_o}value2ab{delim_v}value2b{delim_f}"
+    field2val = f"value3a{delim_v}value3b{delim_f}"
+    field3val = f"value4a{delim_p}value4b\n"
 
     annotation_content = header + field1val + field2val + field3val
 
