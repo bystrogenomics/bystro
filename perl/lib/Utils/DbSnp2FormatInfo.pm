@@ -51,26 +51,34 @@ sub go {
     $isCompressed ||= $self->compress;
 
     if ($err) {
-      $self->log('fatal', $err);
+      $self->log( 'fatal', $err );
       return;
     }
 
     my $base_name = basename($input_vcf);
-    $base_name =~ s/\.[^.]+$//;     # Remove last file extension (if present)
-    $base_name =~ s/\.[^.]+$//;     # Remove another file extension if it's something like .vcf.gz
+    $base_name =~ s/\.[^.]+$//; # Remove last file extension (if present)
+    $base_name
+      =~ s/\.[^.]+$//; # Remove another file extension if it's something like .vcf.gz
 
     my $output_vcf_data = $base_name . "_vcf_data.vcf" . ( $isCompressed ? ".gz" : "" );
-    my $output_vcf_header = $base_name . "_vcf_header.vcf" . ( $isCompressed ? ".gz" : "" );
+    my $output_vcf_header =
+      $base_name . "_vcf_header.vcf" . ( $isCompressed ? ".gz" : "" );
     my $output_vcf = $base_name . "_processed.vcf" . ( $isCompressed ? ".gz" : "" );
 
     $self->log( 'info', "Reading $input_vcf" );
 
-    my $output_header_path = path( $self->_localFilesDir )->child($output_vcf_header)->stringify();
-    my $output_data_path = path( $self->_localFilesDir )->child($output_vcf_data)->stringify();
+    my $output_header_path =
+      path( $self->_localFilesDir )->child($output_vcf_header)->stringify();
+    my $output_data_path =
+      path( $self->_localFilesDir )->child($output_vcf_data)->stringify();
     my $output_path = path( $self->_localFilesDir )->child($output_vcf)->stringify();
 
-    if ( (-e $output_data_path || -e $output_header_path || -e $output_path) && !$self->overwrite ) {
-      $self->log( 'fatal', "Temp files $output_data_path, $output_header_path, or final output path $output_path exist, and overwrite is not set" );
+    if ( ( -e $output_data_path || -e $output_header_path || -e $output_path )
+      && !$self->overwrite )
+    {
+      $self->log( 'fatal',
+        "Temp files $output_data_path, $output_header_path, or final output path $output_path exist, and overwrite is not set"
+      );
       return;
     }
 
@@ -83,46 +91,47 @@ sub go {
 
     my @header_lines;
     while (<$in_fh>) {
-        chomp;
-        
-        # If it's a header line
-        if (/^#/) {
-            push @header_lines, $_;
-            next;
+      chomp;
+
+      # If it's a header line
+      if (/^#/) {
+        push @header_lines, $_;
+        next;
+      }
+
+      # If it's an INFO line
+      if (/FREQ=/) {
+        my @info_fields = split( /;/, $_ );
+        my @new_info_fields;
+        my %freqs;
+
+        foreach my $info (@info_fields) {
+          if ( $info =~ /FREQ=(.+)/ ) {
+            my $freq_data = $1;
+            my @pops      = split( /\|/, $freq_data );
+
+            foreach my $pop (@pops) {
+              if ( $pop =~ /([^:]+):(.+)/ ) {
+                my $pop_name  = $1;
+                my @freq_vals = split( /,/, $2 );
+                shift @freq_vals; # Remove the reference allele freq
+                $freqs{$pop_name}       = join( ",", @freq_vals );
+                $populations{$pop_name} = 1;
+              }
+            }
+          }
+          else {
+            push @new_info_fields, $info; # Keep the existing INFO fields
+          }
         }
 
-        # If it's an INFO line
-        if (/FREQ=/) {
-            my @info_fields = split(/;/, $_);
-            my @new_info_fields;
-            my %freqs;
-
-            foreach my $info (@info_fields) {
-                if ($info =~ /FREQ=(.+)/) {
-                    my $freq_data = $1;
-                    my @pops = split(/\|/, $freq_data);
-                    
-                    foreach my $pop (@pops) {
-                        if ($pop =~ /([^:]+):(.+)/) {
-                            my $pop_name = $1;
-                            my @freq_vals = split(/,/, $2);
-                            shift @freq_vals; # Remove the reference allele freq
-                            $freqs{$pop_name} = join(",", @freq_vals);
-                            $populations{$pop_name} = 1;
-                        }
-                    }
-                } else {
-                    push @new_info_fields, $info; # Keep the existing INFO fields
-                }
-            }
-            
-            # Append the new frequency data to the INFO field
-            foreach my $pop_name (keys %freqs) {
-                push @new_info_fields, "$pop_name=$freqs{$pop_name}";
-            }
-
-            say $output_data_fh join(";", @new_info_fields);
+        # Append the new frequency data to the INFO field
+        foreach my $pop_name ( keys %freqs ) {
+          push @new_info_fields, "$pop_name=$freqs{$pop_name}";
         }
+
+        say $output_data_fh join( ";", @new_info_fields );
+      }
     }
 
     close($in_fh);
@@ -130,20 +139,23 @@ sub go {
 
     # Update the VCF header with new populations
     my @pop_lines;
-    foreach my $pop (keys %populations) {
-        push @pop_lines, "##INFO=<ID=$pop,Number=A,Type=Float,Description=\"Frequency for $pop\">";
+    foreach my $pop ( keys %populations ) {
+      push @pop_lines,
+        "##INFO=<ID=$pop,Number=A,Type=Float,Description=\"Frequency for $pop\">";
     }
 
-    splice(@header_lines, -1, 0, @pop_lines);
+    splice( @header_lines, -1, 0, @pop_lines );
 
     my $header_fh = $self->getWriteFh($output_header_path);
 
     # Write the updated header and VCF to output
-    say $header_fh join("\n", @header_lines);
+    say $header_fh join( "\n", @header_lines );
     close($header_fh);
 
-    system("cat $output_header_path $output_data_path > $output_path") == 0 or die "Failed to concatenate files: $?";
-    system("rm $output_header_path $output_data_path") == 0 or die "Failed to remove temporary files: $?";
+    system("cat $output_header_path $output_data_path > $output_path") == 0
+      or die "Failed to concatenate files: $?";
+    system("rm $output_header_path $output_data_path") == 0
+      or die "Failed to remove temporary files: $?";
 
     $self->log( 'info', "$input_vcf processing complete" );
 
