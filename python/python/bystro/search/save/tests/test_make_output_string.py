@@ -17,7 +17,7 @@ def test_basic_functionality():
                 [  # value values
                     ["gene1_mrna1", None, "gene1_mrna2"], # overlap values
                     # gene1 has 3 transcripts, 1 of which is non-coding and doens't have an mrna record
-                    "gene1",
+                    ["gene1"]
                 ],
                 # 2 value delimited values at the next position in the indel
                 ["position2a", "position2b"],
@@ -25,7 +25,7 @@ def test_basic_functionality():
             # column 2
             [  # position values
                 [
-                    "col2_scalar",
+                    ["col2_scalar"],
                 ]
             ],
         ],

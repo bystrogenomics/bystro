@@ -49,25 +49,21 @@ def test_read_annotation_tarball():
         chunk_size=1,
     )
 
-    # Expected data based on the given annotation_content
     expected_data = [
         {
             "_index": "test_index",
             "_id": 1,
             "_source": {
-                "field1": [  # position values
-                    ["value1a", "value1b"],
-                    [  # value values
-                        ["value2aa", "value2ab"],  # overlap values
-                        "value2b",
-                    ],
+                "field1": [
+                    # value1a;value1b|value2aa/value2ab;value2b
+                    [["value1a"], ["value1b"]], # value1a;value1b
+                    [["value2aa","value2ab"], ["value2b"]], # value2aa/value2ab;value2b
                 ],
-                "field2": [["value3a", "value3b"]],  # position values  # value values
-                "field3": [  # position values
-                    [
-                        "value4a",
-                    ],
-                    ["value4b"],  # value values
+                "field2": [
+                    [["value3a"], ["value3b"]]  #value3a;value3B
+                ],
+                "field3": [
+                    [["value4a"]], [["value4b"]],  #value4a|value4B
                 ],
             },
         }

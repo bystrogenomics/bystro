@@ -95,10 +95,7 @@ cdef class ReadAnnotationTarball:
 
                             overlap_values.append(overlap_value)
 
-                        if len(overlap_values) == 1:
-                            values.append(overlap_values[0])
-                        else:
-                            values.append(overlap_values)
+                        values.append(overlap_values)
 
                     position_values.append(values)
 
