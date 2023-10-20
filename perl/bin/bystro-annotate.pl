@@ -27,7 +27,7 @@ This program annotates an input file, using the Bystro database
 
 =head1 EXAMPLES
 
-  annotate_snpfile.pl --in </path/to/input> --out </path/to/output> --config config/hg19.yml 
+  annotate_snpfile.pl --in </path/to/input> --out </path/to/output> --config config/hg19.yml
 
 =head1 AUTHOR
 
