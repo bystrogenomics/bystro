@@ -99,16 +99,16 @@ def _make_output_string(rows: list, delims: dict):
 
                         if isinstance(sub, list):
                             inner_values.append(
-                                delims["value"].join(
+                                delims["overlap"].join(
                                     map(lambda x: str(x) if x is not None else empty_field_char, sub)
                                 )
                             )
                         else:
                             inner_values.append(str(sub))
 
-                    column[j] = delims["position"].join(inner_values)
+                    column[j] = delims["value"].join(inner_values)
 
-            row[i] = delims["overlap"].join(column)
+            row[i] = delims["position"].join(column)
 
         rows[row_idx] = delims["field"].join(row)
 

@@ -9,7 +9,7 @@ our $VERSION = '0.001';
 =head1 DESCRIPTION
 
   @class B<Seq::Gene>
-  
+
   A Region track that also calculates distance if the user wishes
   IE it pulls any requested features by a region reference (an in 0 to N-1)
   And then if "dist" is specified, calculates that based on the "from" and "to" features

@@ -38,7 +38,7 @@ my $config_file = PrepareConfigWithTempdirs(
 
 my $baseMapper = Seq::Tracks::Reference::MapBases->new();
 
-my $seq = MockBuilder->new_with_config( {config => $config_file} );
+my $seq = MockBuilder->new_with_config( { config => $config_file } );
 
 my $tracks     = $seq->tracksObj;
 my $refBuilder = $tracks->getRefTrackBuilder();
