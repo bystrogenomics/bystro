@@ -32,7 +32,8 @@ def test_basic_functionality():
         # row2
         [
             # column1
-            [
+            [   
+                # Retain backwards compat with scalar values in 2nd dimension
                 [
                     "row2_scalar"
                 ]
