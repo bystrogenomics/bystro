@@ -1,8 +1,7 @@
-import re
-
 from unittest.mock import patch
 
 import pytest
+
 from bystro.utils.config import (
     BYSTRO_PROJECT_ROOT,
     get_opensearch_config,
