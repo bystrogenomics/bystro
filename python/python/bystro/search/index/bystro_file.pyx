@@ -97,10 +97,7 @@ cdef class ReadAnnotationTarball:
 
                         values.append(overlap_values)
 
-                    if len(values_raw) > 1:
-                        position_values.append(values)
-                    else:
-                        position_values.append(values[0])
+                    position_values.append(values)
 
                 populate_hash_path(_source, self.paths[i], position_values)
 
