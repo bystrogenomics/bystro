@@ -37,8 +37,9 @@ def test_read_annotation_tarball():
     field1val = f"value1a{dv}value1b{dp}value2aa{do}value2ab{dv}value2b{df}"
     field2val = f"value3a{dv}value3b{df}"
     field3val = f"value4a{dp}value4b\n"
+
     annotation_content = header + field1val + field2val + field3val
-    print(annotation_content)
+
     mock_tarball_path = create_mock_tarball(annotation_content)
 
     reader = read_annotation_tarball(
@@ -73,7 +74,6 @@ def test_read_annotation_tarball():
     ]
 
     result_data = next(reader)
-    print(result_data)
     assert result_data == expected_data
 
     # Test the end of the data
