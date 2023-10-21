@@ -19,16 +19,23 @@ But there are a few one-off dependencies that require a slightly modified approa
 One-off dependencies can be installed as follows:
 
 ```bash
+# install msgpack fork
 cpanm --quiet https://github.com/bystrogenomics/msgpack-perl.git
+
+# install MouseX::Getopt despite some tests failing
 cpanm --quiet --notest MouseX::Getopt
+
+# install LMDB_File that comes with latest LMDB
 git clone --depth 1 --recurse-submodules https://github.com/salortiz/LMDB_File.git \
   && cd LMDB_File \
   && cpanm --quiet . \
   && cd .. \
   && rm -rf LMDB_File
+
+# install mysql driver
 # NOTE: you will need mysql_config to install this
 #       ubuntu 22.04 LTS => sudo apt install -y libmariadb-dev libmariadb-dev-compat
-#       amazon 2023 => sudo yum install -y <mariadb105>
+#       amazon 2023 => sudo yum install -y mariadb105-devel.x86_64
 cpanm --quiet DBD::mysql@4.051
 ```
 
@@ -65,11 +72,8 @@ cpm install -g DBD::mysql@4.051
 # clone bystro and change into perl package
 git clone git@github.com:bystrogenomics/bystro.git && cd bystro/perl
 
-# install dependencies
+# install dependencies (uses cpanfile)
 cpm install -g --with-develop
-
-# Install dzil build dependencies
-RUN cpm install -g $(dzil authordeps --missing)
 ```
 
 After installing dependencies, use `prove -lr t` to run tests.
@@ -84,15 +88,19 @@ This approach requires installing `Dist::Zilla` and author dependencies and one 
 ```bash
 # Install Dist::Zilla and Archive::Tar::Wrapper (to slightly speed up building)
 cpanm --quiet Dist::Zilla Archive::Tar::Wrapper
+# - or -
+cpm install -g Dist::Zilla Archive::Tar::Wrapper
 
 # Install build dependencies
 dzil authordeps --missing | cpanm --quiet
+# - or - 
+cpm install -g $(dzil authordeps --missing)
 
-# Install Bystro dependencies
-dzil listdeps --missing | cpanm --quiet
-
-# Install Bystro
+# Install Bystro Package
 dzil install
+
+# Test Bystro Package
+dzil test --all
 ```
 
 ## Coding style and tidying
