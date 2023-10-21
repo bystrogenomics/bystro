@@ -39,19 +39,23 @@ my $config_file = $raw_dir->child('filterCadd.yml');
 DumpFile( $config_file, $config );
 
 # Prepare a sample VCF for testing
-my $vcf_data = <<'END_VCF';
-##fileformat=VCFv4.1
-##INFO=<ID=RS,Number=1,Type=String,Description="dbSNP ID">
-##INFO=<ID=dbSNPBuildID,Number=1,Type=Integer,Description="dbSNP Build ID">
-##INFO=<ID=SSR,Number=0,Type=Flag,Description="Variant is a short tandem repeat">
-#CHROM  POS     ID      REF     ALT     QUAL    FILTER  INFO
-NC_000001.11    10001   rs1570391677    T       A,C     .       .       RS=1570391677;dbSNPBuildID=154;SSR=0;PSEUDOGENEINFO=DDX11L1:100287102;VC=SNV;R5;GNO;FREQ=KOREAN:0.9891,0.0109,.|SGDP_PRJ:0,1,.|dbGaP_PopFreq:1,.,0
-NC_000001.11    10002   rs1570391692    A       C       .       .       RS=1570391692;dbSNPBuildID=154;SSR=0;PSEUDOGENEINFO=DDX11L1:100287102;VC=SNV;R5;GNO;FREQ=KOREAN:0.9944,0.005597
-END_VCF
-
+my $vcf_data = "##fileformat=VCFv4.1\n";
+$vcf_data .= "##INFO=<ID=RS,Number=1,Type=String,Description=\"dbSNP ID\">\n";
+$vcf_data .=
+  "##INFO=<ID=dbSNPBuildID,Number=1,Type=Integer,Description=\"dbSNP Build ID\">\n";
+$vcf_data .=
+  "##INFO=<ID=SSR,Number=0,Type=Flag,Description=\"Variant is a short tandem repeat\">\n";
+$vcf_data .= "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n";
+$vcf_data .=
+  "NC_000001.11\t10001\trs1570391677\tT\tA,C\t.\t.\tRS=1570391677;dbSNPBuildID=154;SSR=0;PSEUDOGENEINFO=DDX11L1:100287102;VC=SNV;R5;GNO;FREQ=KOREAN:0.9891,0.0109,.|SGDP_PRJ:0,1,.|dbGaP_PopFreq:1,.,0\n";
+$vcf_data .=
+  "NC_000001.11\t10002\trs1570391692\tA\tC\t.\t.\tRS=1570391692;dbSNPBuildID=154;SSR=0;PSEUDOGENEINFO=DDX11L1:100287102;VC=SNV;R5;GNO;FREQ=KOREAN:0.9944,0.005597\n";
+# What happens if we get a field after the freq field?
+$vcf_data .=
+  "NC_000001.11\t10002\trs1570391692\tA\tC\t.\t.\tRS=1570391692;SSR=0;PSEUDOGENEINFO=DDX11L1:100287102;VC=SNV;R5;GNO;FREQ=SOMEOTHER:0.99,0.01;dbSNPBuildID=154";
 # Write sample VCF to a temporary file
 open my $fh, '>', $vcf_path or die "Could not open $vcf_path: $!";
-print $fh $vcf_data;
+say $fh $vcf_data;
 close $fh;
 
 # Initialize the utility and process the VCF
@@ -71,45 +75,57 @@ ok( -e $expected_output_vcf_path, "Processed VCF file exists" );
 # Read the processed file to check the INFO field
 $fh = path($expected_output_vcf_path)->openr;
 
-ok( <$fh> == "##fileformat=VCFv4.1", 'VCF fileformat is correctly processed' );
-ok( <$fh> == "##INFO=<ID=RS,Number=1,Type=String,Description=\"dbSNP ID\">",
+my @lines = <$fh>;
+
+ok( $lines[0] eq "##fileformat=VCFv4.1\n", 'VCF fileformat is correctly processed' );
+ok( $lines[1] eq "##INFO=<ID=RS,Number=1,Type=String,Description=\"dbSNP ID\">\n",
   'RS population is correctly processed' );
 ok(
-  <$fh>
-    == "##INFO=<ID=dbSNPBuildID,Number=1,Type=Integer,Description=\"dbSNP Build ID\">",
+  $lines[2] eq
+    "##INFO=<ID=dbSNPBuildID,Number=1,Type=Integer,Description=\"dbSNP Build ID\">\n",
   'dbSNPBuildID population is correctly processed'
 );
 ok(
-  <$fh>
-    == "##INFO=<ID=SSR,Number=0,Type=Flag,Description=\"Variant is a short tandem repeat\">",
+  $lines[3] eq
+    "##INFO=<ID=SSR,Number=0,Type=Flag,Description=\"Variant is a short tandem repeat\">\n",
   'SSR population is correctly processed'
 );
 ok(
-  <$fh>
-    == "##INFO=<ID=KOREAN,Number=A,Type=Float,Description=\"Frequency for KOREAN\">",
+  $lines[4] eq
+    "##INFO=<ID=KOREAN,Number=A,Type=Float,Description=\"Frequency for KOREAN\">\n",
   'KOREAN population is correctly processed'
 );
 ok(
-  <$fh>
-    == "##INFO=<ID=SGDP_PRJ,Number=A,Type=Float,Description=\"Frequency for SGDP_PRJ\">",
+  $lines[5] eq
+    "##INFO=<ID=SGDP_PRJ,Number=A,Type=Float,Description=\"Frequency for SGDP_PRJ\">\n",
   'SGDP_PRJ population is correctly processed'
 );
 ok(
-  <$fh>
-    == "##INFO=<ID=dbGaP_PopFreq,Number=A,Type=Float,Description=\"Frequency for dbGaP_PopFreq\">",
+  $lines[6] eq
+    "##INFO=<ID=dbGaP_PopFreq,Number=A,Type=Float,Description=\"Frequency for dbGaP_PopFreq\">\n",
   'dbGaP_PopFreq population is correctly processed'
 );
-ok( <$fh> == "#CHROM  POS     ID      REF     ALT     QUAL    FILTER  INFO" );
+ok(
+  $lines[7] eq
+    "##INFO=<ID=SOMEOTHER,Number=A,Type=Float,Description=\"Frequency for SOMEOTHER\">\n",
+  'SOMEOTHER population is correctly processed'
+);
+ok( $lines[8] eq "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n" );
 
 ok(
-  <$fh>
-    == "NC_000001.11    10001   rs1570391677    T       A,C     .       .       RS=1570391677;dbSNPBuildID=154;SSR=0;PSEUDOGENEINFO=DDX11L1:100287102;VC=SNV;R5;GNO;KOREAN=0.0109,.;SGDP_PRJ=0,.;dbGaP_PopFreq=.,0",
+  $lines[9] eq
+    "NC_000001.11\t10001\trs1570391677\tT\tA,C\t.\t.\tRS=1570391677;dbSNPBuildID=154;SSR=0;PSEUDOGENEINFO=DDX11L1:100287102;VC=SNV;R5;GNO;KOREAN=0.0109,.;SGDP_PRJ=1,.;dbGaP_PopFreq=.,0\n",
   '1st data row wiht KOREAN, SGDP_PRJ, dbGap freqs are correctly processed'
 );
 ok(
-  <$fh>
-    == "NC_000001.11    10002   rs1570391692    A       C       .       .       RS=1570391692;dbSNPBuildID=154;SSR=0;PSEUDOGENEINFO=DDX11L1:100287102;VC=SNV;R5;GNO;KOREAN=0.005597",
+  $lines[10] eq
+    "NC_000001.11\t10002\trs1570391692\tA\tC\t.\t.\tRS=1570391692;dbSNPBuildID=154;SSR=0;PSEUDOGENEINFO=DDX11L1:100287102;VC=SNV;R5;GNO;KOREAN=0.005597\n",
   '2nd data row with KOREAN freq is correctly processed'
+);
+ok(
+  $lines[11] eq
+    "NC_000001.11\t10002\trs1570391692\tA\tC\t.\t.\tRS=1570391692;SSR=0;PSEUDOGENEINFO=DDX11L1:100287102;VC=SNV;R5;GNO;SOMEOTHER=0.01;dbSNPBuildID=154\n",
+  '2nd data row with SOMEOTHER freq is correctly processed'
 );
 
 done_testing();

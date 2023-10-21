@@ -2,7 +2,6 @@
 use 5.10.0;
 use strict;
 use warnings;
-use DDP;
 
 # Take a DbSNP 2 VCF file, and for each row, split the INFO field's FREQ data into separate INFO fields for each population
 package Utils::DbSnp2FormatInfo;
@@ -20,6 +19,8 @@ use Seq::Tracks::Build::LocalFilesPaths;
 # Exports: _localFilesDir, _decodedConfig, compress, _wantedTrack, _setConfig, logPath, use_absolute_path
 extends 'Utils::Base';
 
+my $INFO_INDEX = 7;
+
 sub BUILD {
   my $self = shift;
 
@@ -34,60 +35,68 @@ sub BUILD {
   $self->{_localFiles} = $localFilesAref;
 }
 
-# TODO: error check opening of file handles, write tests
+sub _get_fh_paths {
+  my ( $self, $input_vcf ) = @_;
+
+  if ( !-e $input_vcf ) {
+    $self->log( 'fatal', "input file path $input_vcf doesn't exist" );
+    return;
+  }
+
+  my ( $err, $isCompressed, $in_fh ) = $self->getReadFh($input_vcf);
+
+  $isCompressed ||= $self->compress;
+
+  if ($err) {
+    $self->log( 'fatal', $err );
+    return;
+  }
+
+  my $base_name = basename($input_vcf);
+  $base_name =~ s/\.[^.]+$//; # Remove last file extension (if present)
+  $base_name
+    =~ s/\.[^.]+$//; # Remove another file extension if it's something like .vcf.gz
+
+  my $output_vcf_data = $base_name . "_vcf_data.vcf" . ( $isCompressed ? ".gz" : "" );
+  my $output_vcf_header =
+    $base_name . "_vcf_header.vcf" . ( $isCompressed ? ".gz" : "" );
+  my $output_vcf = $base_name . "_processed.vcf" . ( $isCompressed ? ".gz" : "" );
+
+  $self->log( 'info', "Reading $input_vcf" );
+
+  my $output_header_path =
+    path( $self->_localFilesDir )->child($output_vcf_header)->stringify();
+  my $output_data_path =
+    path( $self->_localFilesDir )->child($output_vcf_data)->stringify();
+  my $output_path = path( $self->_localFilesDir )->child($output_vcf)->stringify();
+
+  if ( ( -e $output_data_path || -e $output_header_path || -e $output_path )
+    && !$self->overwrite )
+  {
+    $self->log( 'fatal',
+      "Temp files $output_data_path, $output_header_path, or final output path $output_path exist, and overwrite is not set"
+    );
+    return;
+  }
+
+  return ( $in_fh, $output_data_path, $output_header_path, $output_path );
+}
+
 sub go {
   my $self = shift;
 
   my @output_paths;
 
   for my $input_vcf ( @{ $self->{_localFiles} } ) {
-    if ( !-e $input_vcf ) {
-      $self->log( 'fatal', "input file path $input_vcf doesn't exist" );
-      return;
-    }
-
-    my ( $err, $isCompressed, $in_fh ) = $self->getReadFh($input_vcf);
-
-    $isCompressed ||= $self->compress;
-
-    if ($err) {
-      $self->log( 'fatal', $err );
-      return;
-    }
-
-    my $base_name = basename($input_vcf);
-    $base_name =~ s/\.[^.]+$//; # Remove last file extension (if present)
-    $base_name
-      =~ s/\.[^.]+$//; # Remove another file extension if it's something like .vcf.gz
-
-    my $output_vcf_data = $base_name . "_vcf_data.vcf" . ( $isCompressed ? ".gz" : "" );
-    my $output_vcf_header =
-      $base_name . "_vcf_header.vcf" . ( $isCompressed ? ".gz" : "" );
-    my $output_vcf = $base_name . "_processed.vcf" . ( $isCompressed ? ".gz" : "" );
-
-    $self->log( 'info', "Reading $input_vcf" );
-
-    my $output_header_path =
-      path( $self->_localFilesDir )->child($output_vcf_header)->stringify();
-    my $output_data_path =
-      path( $self->_localFilesDir )->child($output_vcf_data)->stringify();
-    my $output_path = path( $self->_localFilesDir )->child($output_vcf)->stringify();
-
-    if ( ( -e $output_data_path || -e $output_header_path || -e $output_path )
-      && !$self->overwrite )
-    {
-      $self->log( 'fatal',
-        "Temp files $output_data_path, $output_header_path, or final output path $output_path exist, and overwrite is not set"
-      );
-      return;
-    }
+    my ( $in_fh, $output_data_path, $output_header_path, $output_path ) =
+      $self->_get_fh_paths($input_vcf);
 
     my $output_data_fh = $self->getWriteFh($output_data_path);
 
     $self->log( 'info', "Writing to $output_data_path" );
 
-    # Store populations seen across the VCF
     my %populations;
+    my @ordered_populations;
 
     my @header_lines;
     while (<$in_fh>) {
@@ -99,39 +108,67 @@ sub go {
         next;
       }
 
-      # If it's an INFO line
-      if (/FREQ=/) {
-        my @info_fields = split( /;/, $_ );
-        my @new_info_fields;
-        my %freqs;
+      my @fields = split( "\t", $_ );
 
-        foreach my $info (@info_fields) {
-          if ( $info =~ /FREQ=(.+)/ ) {
-            my $freq_data = $1;
-            my @pops      = split( /\|/, $freq_data );
+      if ( !@fields ) {
+        $self->log( "fatal", "No fields found in row: $_" );
+        return;
+      }
 
-            foreach my $pop (@pops) {
-              if ( $pop =~ /([^:]+):(.+)/ ) {
-                my $pop_name  = $1;
-                my @freq_vals = split( /,/, $2 );
-                shift @freq_vals; # Remove the reference allele freq
-                $freqs{$pop_name}       = join( ",", @freq_vals );
+      my @info_fields = split( ";", $fields[$INFO_INDEX] );
+
+      my @ordered_info_freqs;
+      my %seen_info_pops;
+
+      my $seen_freq = 0;
+      foreach my $info (@info_fields) {
+        if ( $info =~ /FREQ=(.+)/ ) {
+          if ( $seen_freq == 1 ) {
+            $self->log( "fatal", "FREQ seen twice in INFO field. Row: $_" );
+            return;
+          }
+
+          $seen_freq = 1;
+
+          my $freq_data = $1;
+          my @pops      = split( /\|/, $freq_data );
+
+          foreach my $pop (@pops) {
+            if ( $pop =~ /([^:]+):(.+)/ ) {
+              my $pop_name = $1;
+
+              if ( exists $seen_info_pops{$pop_name} ) {
+                self->log( "fatal", "Population $pop_name seen twice in INFO field. Row: $_" );
+                return;
+              }
+
+              my @freq_vals = split( /,/, $2 );
+              shift @freq_vals; # Remove the reference allele freq
+
+              push @ordered_info_freqs, [ $pop_name, join( ",", @freq_vals ) ];
+
+              if ( !exists $populations{$pop_name} ) {
+                push @ordered_populations, $pop_name;
                 $populations{$pop_name} = 1;
               }
             }
           }
-          else {
-            push @new_info_fields, $info; # Keep the existing INFO fields
+
+          # Append the new frequency data to the INFO field
+          my @new_info_fields;
+          for my $res (@ordered_info_freqs) {
+            my $name = $res->[0];
+            my $freq = $res->[1];
+            push @new_info_fields, "$name=$freq";
           }
-        }
 
-        # Append the new frequency data to the INFO field
-        foreach my $pop_name ( keys %freqs ) {
-          push @new_info_fields, "$pop_name=$freqs{$pop_name}";
+          $info = join( ";", @new_info_fields );
         }
-
-        say $output_data_fh join( ";", @new_info_fields );
       }
+
+      $fields[$INFO_INDEX] = join( ";", @info_fields );
+
+      say $output_data_fh join( "\t", @fields );
     }
 
     close($in_fh);
@@ -139,7 +176,7 @@ sub go {
 
     # Update the VCF header with new populations
     my @pop_lines;
-    foreach my $pop ( keys %populations ) {
+    foreach my $pop (@ordered_populations) {
       push @pop_lines,
         "##INFO=<ID=$pop,Number=A,Type=Float,Description=\"Frequency for $pop\">";
     }
