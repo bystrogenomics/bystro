@@ -8,7 +8,7 @@ import time
 from math import ceil
 
 import ray
-from opensearchpy._async import helpers as async_helpers
+from opensearchpy._async.helpers.actions import async_bulk
 from opensearchpy._async.client import AsyncOpenSearch
 from ruamel.yaml import YAML
 
@@ -43,7 +43,7 @@ class Indexer:
 
     async def index(self, data):
         """Index Bystro annotation data into Opensearch"""
-        resp = await async_helpers.async_bulk(self.client, iter(data), chunk_size=self.chunk_size)
+        resp = await async_bulk(self.client, iter(data), chunk_size=self.chunk_size)
         self.counter += resp[0]
 
         if self.counter >= self.reporter_batch:
@@ -145,6 +145,8 @@ async def go(
         await indexer.close.remote()
 
     await client.indices.put_settings(index=index_name, body=post_index_settings)
+    await client.indices.refresh(index=index_name)
+
     await client.close()
 
     return data.get_header_fields()
