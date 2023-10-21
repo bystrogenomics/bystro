@@ -115,7 +115,7 @@ ok( $lines[8] eq "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n" );
 ok(
   $lines[9] eq
     "NC_000001.11\t10001\trs1570391677\tT\tA,C\t.\t.\tRS=1570391677;dbSNPBuildID=154;SSR=0;PSEUDOGENEINFO=DDX11L1:100287102;VC=SNV;R5;GNO;KOREAN=0.0109,.;SGDP_PRJ=1,.;dbGaP_PopFreq=.,0\n",
-  '1st data row wiht KOREAN, SGDP_PRJ, dbGap freqs are correctly processed'
+  '1st data row with KOREAN, SGDP_PRJ, dbGap freqs are correctly processed'
 );
 ok(
   $lines[10] eq
