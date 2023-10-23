@@ -19,6 +19,7 @@ use Utils::SortCadd;
 use Utils::RenameTrack;
 use Utils::FilterCadd;
 use Utils::RefGeneXdbnsfp;
+use Utils::DbSnp2FormatInfo;
 
 use Seq::Build;
 

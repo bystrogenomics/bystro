@@ -76,7 +76,7 @@ sub go {
   for my $inPath (@$localFilesPathsAref) {
     $self->log( 'info', "Beginning to lift over $inPath" );
 
-    my ( undef, $isCompressed, $inFh ) = $self->getReadFh( $inPath, undef, 'fatal' );
+    my ( undef, $isCompressed, $inFh ) = $self->getReadFh( $inPath, 'fatal' );
 
     my $baseName = path($inPath)->basename;
 
