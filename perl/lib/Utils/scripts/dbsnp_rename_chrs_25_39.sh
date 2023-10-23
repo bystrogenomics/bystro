@@ -1,6 +1,9 @@
+#!/usr/bin/env bash
+set -e
+
 # Check if the correct number of arguments are provided
 if [ "$#" -ne 2 ]; then
-    echo "Usage: $0 <hg19_directory> <hg38_directory>"
+    echo -e "\nUsage: $0 <hg19_directory> <hg38_directory>\n"
     exit 1
 fi
 
@@ -19,8 +22,6 @@ for k in *assembly_report.txt
     out=$(echo $k | sed 's/.txt/.chrnames/')
     grep -e '^[^#]' $k | awk '{ print $7, $1 }' > $out
 done
-
-# TODO Take folder as argument
 
 bcftools annotate \
   --rename-chrs GCF_000001405.25_GRCh37.p13_assembly_report.chrnames \
