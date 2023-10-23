@@ -4,6 +4,9 @@ use strict;
 use warnings;
 
 # Take a DbSNP 2 VCF file, and for each row, split the INFO field's FREQ data into separate INFO fields for each population
+# NOTE: dbSNP VCF spec: https://www.ncbi.nlm.nih.gov/snp/docs/products/vcf/redesign/
+# NOTE: that dbSNP uses a '.' to represent a missing value and  first allele is the reference, which is not the standard use.
+
 package Utils::DbSnp2FormatInfo;
 
 our $VERSION = '0.001';
