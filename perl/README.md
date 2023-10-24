@@ -9,7 +9,7 @@ To build a docker image using the `Dockerfile`, run the following:
 docker build --tag bystro-cli .
 ```
 
-## Installing Bystro dependencies locally
+## Installing Bystro using `cpam`
 
 The instructions for installing Bystro locally uses [`cpanm`](https://metacpan.org/pod/App::cpanminus).
 
@@ -26,6 +26,9 @@ git clone --depth 1 --recurse-submodules https://github.com/salortiz/LMDB_File.g
   && cpanm --quiet . \
   && cd .. \
   && rm -rf LMDB_File
+# NOTE: you will need mysql_config to install this
+#       ubuntu 22.04 LTS => sudo apt install -y libmariadb-dev libmariadb-dev-compat
+#       amazon 2023 => sudo yum install -y <mariadb105>
 cpanm --quiet DBD::mysql@4.051
 ```
 
@@ -54,6 +57,40 @@ dzil listdeps --missing | cpanm --quiet
 
 # Install Bystro
 dzil install
+```
+
+## Install Bystro using `cpm`
+
+Install [cpm](https://metacpan.org/pod/App::cpm) with `curl -fsSL https://raw.githubusercontent.com/skaji/cpm/main/cpm | perl - install -g App::cpm`.
+
+```bash
+# install msgpack fork
+cpm https://github.com/bystrogenomics/msgpack-perl.git
+
+# install MouseX::Getopt despite some tests failing
+cpm --no-test MouseX::Getopt
+
+# install LMDB_File that comes with latest LMDB
+# NOTE: you will need mysql_config to install this
+#       ubuntu 22.04 LTS => sudo apt install -y libmariadb-dev libmariadb-dev-compat
+#       amazon 2023 => sudo yum install -y <mariadb105>
+git clone --depth 1 --recurse-submodules https://github.com/salortiz/LMDB_File.git \
+  && cd LMDB_File \
+  && cpanm . \
+  && cd .. \
+  && rm -rf LMDB_File
+
+# install mysql driver
+cpm DBD::mysql@4.051
+
+# clone bystro and change into perl package
+git clone git@github.com:bystrogenomics/bystro.git && cd bystro/perl
+
+# install dependencies
+cpm install -g --with-develop
+
+# Install dzil build dependencies
+RUN cpm install -g --show-build-log-on-failure $(dzil authordeps --missing)
 ```
 
 ## Coding style and tidying

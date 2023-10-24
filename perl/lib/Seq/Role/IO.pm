@@ -101,10 +101,10 @@ sub getReadArgs {
   return $outerCommand;
 }
 #@param {Path::Tiny} $file : the Path::Tiny object representing a single input file
-#@param {Str} $innerFile : if passed a tarball, we will want to stream a single file within
+#@param {Str} $errCode : what log level to use if we can't open the file
 #@return file handle
 sub getReadFh {
-  my ( $self, $file, $innerFile, $errCode ) = @_;
+  my ( $self, $file, $errCode ) = @_;
 
   # By default, we'll return an error, rather than die-ing with log
   # We wont be able to catch pipe errors however
@@ -122,53 +122,18 @@ sub getReadFh {
 
   my $outerCommand = $self->getReadArgs($filePath);
 
-  if ( !$innerFile ) {
-    my ( $err, $fh );
+  my ( $err, $fh );
 
-    if ($outerCommand) {
-      $err = $self->safeOpen( $fh, '-|', "$outerCommand", $errCode );
-    }
-    else {
-      $err = $self->safeOpen( $fh, '<', $filePath, $errCode );
-    }
-
-    my $compressed = !!$outerCommand;
-
-    return ( $err, $compressed, $fh );
+  if ($outerCommand) {
+    $err = $self->safeOpen( $fh, '-|', "$outerCommand", $errCode );
+  }
+  else {
+    $err = $self->safeOpen( $fh, '<', $filePath, $errCode );
   }
 
-  # TODO: Check that file exists again
-  # my $filePath;
-  # if($remoteCpCmd) {
-  #   $filePath =
-  #   if(ref $file ne 'Path::Tiny' ) {
-  #   $file = path($file)->absolute;
+  my $compressed = !!$outerCommand;
 
-  #   my $filePath = $file->stringify;
-  # }
-
-  # if (!$file->is_file) {
-  #   my $err = "$filePath does not exist for reading";
-  #   $self->log($errCode, $err);
-
-  #   return ($err, undef, undef);
-  # }
-
-  # TODO: FIX
-  # if($innerFile) {
-  #   my ($err, $compressed, $command) = $self->getInnerFileCommand($filePath, $innerFile, $errCode);
-
-  #   if($err) {
-  #     return ($err, undef, undef);
-  #   }
-
-  #   $err = $self->safeOpen(my $fh, '-|', $command, $errCode);
-
-  #   # If an innerFile is passed, we assume that $file is a path to a tarball
-
-  #   return ($err, $compressed, $fh);
-  # }
-
+  return ( $err, $compressed, $fh );
 }
 
 sub getRemoteProg {

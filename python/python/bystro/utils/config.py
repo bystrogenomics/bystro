@@ -1,4 +1,5 @@
 """Utility functions for accessing project-level configuration files."""
+from enum import Enum
 from pathlib import Path
 from typing import Dict, Union
 
@@ -41,3 +42,27 @@ def get_opensearch_config() -> ConfigDict:
     with opensearch_config_filepath.open() as search_config_file:
         config_dict: ConfigDict = YAML(typ="safe").load(search_config_file)
     return config_dict
+
+
+class ReferenceGenome(Enum):
+    """The collection of valid reference genomes."""
+
+    ce11 = "ce11"
+    dm6 = "dm6"
+    hg19 = "hg19"
+    hg19_ensembl = "hg19_ensembl"
+    hg38 = "hg38"
+    mm10 = "mm10"
+    mm9 = "mm9"
+    rheMac8 = "rheMac8"  # noqa: N815  (mixed case is necessary here)
+    rn6 = "rn6"
+    sacCer3 = "sacCer3"  # noqa: N815
+
+
+def get_mapping_config(reference_genome: ReferenceGenome = ReferenceGenome.hg38) -> ConfigDict:
+    """Load mapping config for given reference genome from YAML file."""
+    base_name = f"{reference_genome.name}.mapping.yml"
+    mapping_config_filepath = BYSTRO_PROJECT_ROOT / "config" / base_name
+    with Path.open(mapping_config_filepath, encoding="utf-8") as f:
+        mapping_config = YAML(typ="safe").load(f)
+    return mapping_config

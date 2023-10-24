@@ -3,9 +3,10 @@ use strict;
 use warnings;
 
 package TestMe;
+
 use Test::More;
+
 use Try::Tiny;
-use DDP;
 
 use Seq::Output::Delimiters;
 

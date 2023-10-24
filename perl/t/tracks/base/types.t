@@ -2,8 +2,9 @@ use 5.10.0;
 use strict;
 use warnings;
 
-use Seq::Tracks::Base::Types;
 use Test::More;
+
+use Seq::Tracks::Base::Types;
 
 my $rounder = Seq::Tracks::Base::Types->new();
 

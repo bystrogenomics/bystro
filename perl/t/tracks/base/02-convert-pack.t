@@ -3,7 +3,6 @@ use strict;
 use warnings;
 
 use Test::More;
-use DDP;
 
 use Data::MessagePack;
 use Seq::Tracks::Base::Types;
@@ -45,4 +44,3 @@ ok( length($packed) == 5,
   "The string -1.000000' + 0  takes 5 bytes in msgpack with prefer_float32" );
 
 done_testing();
-

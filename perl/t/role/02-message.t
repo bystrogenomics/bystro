@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 package Mock;
+
 use Mouse 2;
 
 with 'Seq::Role::Message', 'Seq::Role::IO';

@@ -3,27 +3,38 @@ use strict;
 use warnings;
 
 package MockBuilder;
+
 use Mouse;
+
 extends 'Seq::Base';
 
 1;
 
 use Test::More;
+use lib 't/lib';
+use TestUtils qw/ PrepareConfigWithTempdirs /;
+
 use Path::Tiny   qw/path/;
 use Scalar::Util qw/looks_like_number/;
+use YAML::XS     qw/LoadFile/;
+
+# create temp directories
+my $dir = Path::Tiny->tempdir();
+
+# prepare temp directory and make test config file
+my $config_file = PrepareConfigWithTempdirs(
+  't/tracks/score/integration.yml',
+  't/tracks/score/db/raw', [ 'database_dir', 'files_dir', 'temp_dir' ],
+  'files_dir',             $dir->stringify
+);
 
 use Seq::Tracks::Score::Build::Round;
-use YAML::XS qw/LoadFile/;
 
-my $config    = './t/tracks/score/integration.yml';
-my $runConfig = LoadFile($config);
+my $runConfig = LoadFile($config_file);
 
 my %wantedChr = map { $_ => 1 } @{ $runConfig->{chromosomes} };
 
-my $seq =
-  MockBuilder->new_with_config( { config => path($config)->absolute, debug => 1 } );
-
-path( $seq->database_dir )->remove_tree( { keep_root => 1 } );
+my $seq = MockBuilder->new_with_config( { config => $config_file } );
 
 my $tracks       = $seq->tracksObj;
 my $scoreBuilder = $tracks->getTrackBuilderByName('phastCons');
@@ -92,7 +103,5 @@ for my $file (@localFiles) {
     $pos += $step;
   }
 }
-
-path( $seq->database_dir )->remove_tree( { keep_root => 1 } );
 
 done_testing();
