@@ -3,6 +3,9 @@ import tarfile
 import io
 import gzip
 import tempfile
+
+import numpy as np
+
 from bystro.search.index.bystro_file import (  # type: ignore # pylint: disable=no-name-in-module,import-error  # noqa: E501
     read_annotation_tarball,
 )
@@ -58,21 +61,20 @@ def test_read_annotation_tarball():
             "_source": {
                 "field1": [
                     # value1a;value1b|value2aa/value2ab;value2b
-                    [["value1a"], ["value1b"]], # value1a;value1b
-                    [["value2aa","value2ab"], ["value2b"]], # value2aa/value2ab;value2b
+                    [["value1a"], ["value1b"]],  # value1a;value1b
+                    [["value2aa", "value2ab"], ["value2b"]],  # value2aa/value2ab;value2b
                 ],
-                "field2": [
-                    [["value3a"], ["value3b"]]  #value3a;value3B
-                ],
+                "field2": [[["value3a"], ["value3b"]]],  # value3a;value3B
                 "field3": [
-                    [["value4a"]], [["value4b"]],  #value4a|value4B
+                    [["value4a"]],
+                    [["value4b"]],  # value4a|value4B
                 ],
             },
         }
     ]
 
     result_data = next(reader)
-    assert result_data == expected_data
+    np.testing.assert_equal(result_data, expected_data)
 
     # Test the end of the data
     with pytest.raises(StopIteration):
