@@ -1,6 +1,7 @@
 """Provide functions to convert Uniprot IDs to gene names and vice versa."""
 
 import pandas as pd
+
 from bystro.utils.config import BYSTRO_PROJECT_ROOT
 
 CSV_FILENAME = (
