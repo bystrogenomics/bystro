@@ -202,7 +202,6 @@ class Statistics:
 
     @property
     def stdin_cli_stats_command(self) -> str:
-        # Placeholder logic for delimiters
         value_delim = self._delimiters.value
         field_delim = self._delimiters.field
         empty_field = self._delimiters.empty_field
