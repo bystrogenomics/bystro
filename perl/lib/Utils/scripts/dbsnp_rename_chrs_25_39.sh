@@ -44,10 +44,15 @@ wget -N "${report_dir}/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_a
 # X       assembled-molecule      X       Chromosome      CM000685.2      =       NC_000023.11    Primary Assembly        156040895       chrX
 # Y       assembled-molecule      Y       Chromosome      CM000686.2      =       NC_000024.10    Primary Assembly        57227415        chrY
 # MT      assembled-molecule      MT      Chromosome      J01415.2        =       NC_012920.1     Primary Assembly        16569           chrM
+
+# The 11th column contains UCSC-style contigs. Unfortunately, when using the UCSC-style-name column
+# not all contigs get values. For example, the contig "KI270728.1" is not present in the UCSC-style-name, for example
+# HG1459_PATCH    fix-patch       X       Chromosome      JH806600.2      =       NW_004070890.2  PATCHES 6530008 na
+# Therefore, to get a valid VCF we need to use the Sequence-Name column
 for k in *assembly_report.txt
   do
     out=$(echo $k | sed 's/.txt/.chrnames/')
-    grep -e '^[^#]' $k | awk '{ print $7, $10 }' > $out
+    grep -e '^[^#]' $k | awk '{ print $7, $1 }' > $out
 done
 
 bcftools annotate \
