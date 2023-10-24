@@ -261,6 +261,8 @@ def go(  # pylint:disable=invalid-name
 
         tarball_name = os.path.basename(outputs.archived)
 
+        # Webserver requires the output to have top-level statistics data,
+        # but annotation data will be too large to want to store 2 copies of
         ret = subprocess.call(
             f'cd {output_dir}; tar --exclude ".*" --exclude={tarball_name} -cf {tarball_name} * && rm {annotation_path}',  # noqa: E501
             shell=True,
