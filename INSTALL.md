@@ -127,3 +127,19 @@ The outputs will be:
 - Statistics JSON file `outPrefix.statistics.json`
 - Statistics tab-separated file: `outPrefix.statistics.tsv`
   - Removing the `--run_statistics` flag will skip the generation of `outPrefix.statistics.*` files
+
+
+## Setting up Python on Amazon Linux 2
+
+Install these beforehand:
+- openssl-devel
+   - sudo yum install openssl-devel
+- rustup
+   - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   - source ~/.bashrc
+   - rustc --version
+
+Install Anaconda (current version as of Oct 18, 2023)
+- wget https://repo.anaconda.com/archive/Anaconda3-2023.09-0-Linux-x86_64.sh
+- bash Anaconda3-2023.09-0-Linux-x86_64.sh 
+- source ~/.bashrc

@@ -1,8 +1,12 @@
 import argparse
 import datetime
 import os
+import sys
 
 import requests
+import psycopg2
+import yaml
+import json
 
 from msgspec import Struct, json as mjson
 
@@ -149,7 +153,7 @@ def load_state(state_dir: str) -> CachedAuth | None:
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
             return mjson.decode(f.read(), type=CachedAuth)
-
+    
     return None
 
 
@@ -464,6 +468,76 @@ def get_user(args: argparse.Namespace, print_result=True) -> UserProfile:
 
     return user_profile
 
+def query(args: argparse.Namespace) -> None:
+    """
+    Perform a query with the given arguments.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        The arguments passed to the command.
+    """
+
+    state, auth_header = authenticate(args)
+
+    with open(args.postgres_config, 'r') as file:
+        postgres_config = yaml.safe_load(file)
+
+    db_host = postgres_config['host']
+    db_port = postgres_config['port']
+    db_user = postgres_config['user']
+    db_password = postgres_config['password']
+    db_database = postgres_config['database']
+
+    conn = None
+
+    try:
+        conn = psycopg2.connect(
+            host=db_host,
+            port=db_port,
+            user=db_user,
+            password=db_password,
+            database=db_database
+        )
+        cursor = conn.cursor()
+
+        if args.experiment_name:
+            sql_query = """
+                SELECT sample_id, subject_id
+                FROM user_experiments
+                WHERE experiment_name = %s
+                LIMIT %s
+            """
+            cursor.execute(sql_query, (args.experiment_name, args.top_n))
+            
+            rows = cursor.fetchall()
+            if not rows:
+                print(f"\nExperiment name '{args.experiment_name}' does not exist.")
+                return
+            
+            sample_subject_mappings = {row[0]: row[1] for row in rows}
+            print("\nSample ID => Subject ID mappings for Experiment:", args.experiment_name)
+            print(json.dumps(sample_subject_mappings, indent=4))
+            return
+
+        sql_query = "SELECT sample_id, subject_id FROM user_experiments"
+        cursor.execute(sql_query)
+
+        sample_subject_mappings = {row[1]: row[0] for row in cursor.fetchall()}
+
+        if args.query:
+            modified_query = args.query
+            for subject_id, sample_id in sample_subject_mappings.items():
+                modified_query = modified_query.replace(subject_id, str(sample_id))
+
+            print("\nOriginal Query:", args.query)
+            print("Modified Query:", modified_query)
+
+    except psycopg2.Error as e:
+        sys.stderr.write(f"PostgreSQL connection or query failed: {e}\n")
+    finally:
+        if conn:
+            conn.close()
 
 def main():
     """
@@ -571,6 +645,14 @@ def main():
         "--dir", default=DEFAULT_DIR, help="Where Bystro API login state is saved"
     )
     jobs_parser.set_defaults(func=get_jobs)
+
+    query_parser = subparsers.add_parser("query", help="Perform a query")
+    query_parser.add_argument("--dir", default=DEFAULT_DIR, help="Where Bystro API login state is saved")
+    query_parser.add_argument("--query", required=True, help="Query properties")
+    query_parser.add_argument("--experiment_name", help="Optional experiment_name property")
+    query_parser.add_argument("--top_n", default=10, type=int, help="Optional top_n property (default: 10)")
+    query_parser.add_argument("--postgres_config", required=True, help="Path to PostgreSQL configuration YAML file")
+    query_parser.set_defaults(func=query)
 
     args = parser.parse_args()
     if hasattr(args, "func"):
