@@ -229,3 +229,22 @@ def get_samples_and_genes_from_query(
     query = _build_opensearch_query_from_query_string(user_query_string)
     samples_and_genes_df = _run_annotation_query(query, index_name, client)
     return samples_and_genes_df
+
+
+def join_annotation_results_to_proteomics(
+    query_result_df: pd.DataFrame, proteomics_df: pd.DataFrame
+) -> pd.DataFrame:
+    EXPECTED_QUERY_RESULT_COLUMNS = ["sample_id", "chrom", "pos", "ref", "alt", "gene_name", "dosage"]
+    if not query_result_df.columns.equals(pd.Index(EXPECTED_QUERY_RESULT_COLUMNS)):
+        err_msg = (
+            f"Expected query_result columns ({query_result_df.columns}) "
+            f"to equal: {EXPECTED_QUERY_RESULT_COLUMNS}"
+        )
+        raise ValueError(err_msg)
+    melted_proteomics_df = proteomics_df.melt(
+        ignore_index=False, var_name=["gene_name"]  # type: ignore[arg-type]
+    ).reset_index(names="sample_id")
+    joined_df = query_result_df.merge(
+        melted_proteomics_df, left_on=["sample_id", "gene_name"], right_on=["sample_id", "gene_name"]
+    )
+    return joined_df
