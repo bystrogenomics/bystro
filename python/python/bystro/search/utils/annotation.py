@@ -79,19 +79,23 @@ class AnnotationOutputs(Struct, frozen=True, forbid_unknown_fields=True):
         archived: str
             Basename of the archive
         annotation: str
-            Basename of the annotation TSV file, inside the archive
+            Basename of the annotation TSV file, found inside the archive only
         sampleList: Optional[str]
-            Basename of the sample list file, inside the archive
-        log: Basename of the log file, inside the archive
-        statistics: Optional[StatisticsOutputs]
-            Basenames of the statistics files, inside the archive
+            Basename of the sample list file, in the archive and output directory
+        log: str
+            Basename of the log file, in the archive and output directory
+        statistics: StatisticsOutputs
+            Basenames of the statistics files, in the archive and output directory
+        header: Optional[str]
+            Basename of the header file, in the archive and output directory
     """
 
     archived: str
     annotation: str
     sampleList: str
     log: str
-    statistics: StatisticsOutputs | None = None
+    statistics: StatisticsOutputs
+    header: str | None = None
 
     @staticmethod
     def from_path(
