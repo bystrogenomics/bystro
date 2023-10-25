@@ -6,8 +6,10 @@ from typing import Any
 from msgspec import Struct
 import numpy as np
 import pandas as pd
-from bystro.utils.config import get_opensearch_config
 from opensearchpy import OpenSearch
+
+from bystro.utils.config import get_opensearch_config
+from bystro.proteomics.fragpipe_tandem_mass_tag import TandemMassTagDataset
 
 logger = logging.getLogger(__file__)
 
@@ -227,24 +229,15 @@ def get_samples_and_genes_from_query(
 ) -> pd.DataFrame:
     """Given a query and index, return a dataframe of (sample_id, gene, dosage) rows matching query."""
     query = _build_opensearch_query_from_query_string(user_query_string)
-    samples_and_genes_df = _run_annotation_query(query, index_name, client)
-    return samples_and_genes_df
+    return _run_annotation_query(query, index_name, client)
 
 
 def join_annotation_results_to_proteomics(
-    query_result_df: pd.DataFrame, proteomics_df: pd.DataFrame
+    query_result_df: pd.DataFrame, tmt_dataset: TandemMassTagDataset
 ) -> pd.DataFrame:
-    EXPECTED_QUERY_RESULT_COLUMNS = ["sample_id", "chrom", "pos", "ref", "alt", "gene_name", "dosage"]
-    if not query_result_df.columns.equals(pd.Index(EXPECTED_QUERY_RESULT_COLUMNS)):
-        err_msg = (
-            f"Expected query_result columns ({query_result_df.columns}) "
-            f"to equal: {EXPECTED_QUERY_RESULT_COLUMNS}"
-        )
-        raise ValueError(err_msg)
-    melted_proteomics_df = proteomics_df.melt(
-        ignore_index=False, var_name=["gene_name"]  # type: ignore[arg-type]
-    ).reset_index(names="sample_id")
     joined_df = query_result_df.merge(
-        melted_proteomics_df, left_on=["sample_id", "gene_name"], right_on=["sample_id", "gene_name"]
+        tmt_dataset.get_melted_abundance_df(),
+        left_on=["sample_id", "gene_name"],
+        right_on=["sample_id", "gene_name"],
     )
     return joined_df

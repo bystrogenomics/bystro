@@ -1,17 +1,16 @@
 from pathlib import Path
-import re
 from typing import Any
 
 import msgspec
 import numpy as np
 import pandas as pd
-import pytest
 
 from bystro.proteomics.annotation_interface import (
     _process_response,
     join_annotation_results_to_proteomics,
     get_samples_and_genes_from_query,
 )
+from bystro.proteomics.fragpipe_tandem_mass_tag import ABUNDANCE_COLS, TandemMassTagDataset
 
 TEST_RESPONSE_FILENAME = Path(__file__).parent / "test_response.dat"
 
@@ -77,23 +76,14 @@ def test_join_annotation_results_to_proteomics():
     shared_proteomics_gene_names = sorted(set(query_result_df.gene_name))[:100]
     all_proteomics_gene_names = shared_proteomics_gene_names + [f"gene_name{i}" for i in range(10)]
 
-    proteomics_df = pd.DataFrame(
-        rng.random((len(all_proteomics_sample_ids), len(all_proteomics_gene_names))),
-        columns=all_proteomics_gene_names,
-        index=all_proteomics_sample_ids,
+    columns = ABUNDANCE_COLS[1:] + all_proteomics_sample_ids
+    abundance_df = pd.DataFrame(
+        rng.random((len(all_proteomics_gene_names), len(columns))),
+        columns=columns,
+        index=all_proteomics_gene_names,
     )
-    joined_df = join_annotation_results_to_proteomics(query_result_df, proteomics_df)
+    mock_tmt_dataset = TandemMassTagDataset(abundance_df=abundance_df, annotation_df=pd.DataFrame())
+    joined_df = join_annotation_results_to_proteomics(query_result_df, mock_tmt_dataset)
     assert (140, 8) == joined_df.shape
     assert set(shared_proteomics_sample_ids) == set(joined_df.sample_id)
     assert set(shared_proteomics_gene_names) == set(joined_df.gene_name)
-
-
-def test_join_annotation_results_to_proteomics_bad_query_result_df():
-    query_result_df = pd.DataFrame([{"A": 1, "B": 2, "C": 3}, {"A": 4, "B": 5, "C": 6}])
-    proteomics_df = pd.DataFrame([{"sample_id": "foo", "gene1": 0.5, "gene2": 1}])
-    err_msg = (
-        "Expected query_result columns (Index(['A', 'B', 'C'], dtype='object')) "
-        "to equal: ['sample_id', 'chrom', 'pos', 'ref', 'alt', 'gene_name', 'dosage']"
-    )
-    with pytest.raises(ValueError, match=re.escape(err_msg)):
-        _joined_df = join_annotation_results_to_proteomics(query_result_df, proteomics_df)
