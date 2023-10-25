@@ -7,11 +7,13 @@
 # TODO 2023-05-08: concatenate chunks in a different ray worker
 
 import gzip
+import logging
 import math
 import os
 import pathlib
 import subprocess
 import traceback
+from typing import Any
 
 import numpy as np
 import ray
@@ -19,10 +21,16 @@ import ray
 from opensearchpy import OpenSearch
 
 from bystro.beanstalkd.worker import ProgressPublisher, get_progress_reporter
-from bystro.search.utils.annotation import AnnotationOutputs, get_delimiters
+from bystro.search.utils.annotation import (
+    AnnotationOutputs,
+    DelimitersConfig,
+)
 from bystro.search.utils.messages import SaveJobData
 from bystro.search.utils.opensearch import gather_opensearch_args
 from bystro.utils.compress import GZIP_EXECUTABLE
+from bystro.utils.tar import GNU_TAR_EXECUTABLE_NAME
+
+logger = logging.getLogger(__name__)
 
 ray.init(ignore_reinit_error=True, address="auto")
 
@@ -58,8 +66,8 @@ def _get_header(field_names):
     return parents, children
 
 
-def _populate_data(field_path, data_for_end_of_path):
-    if not isinstance(field_path, list) or data_for_end_of_path is None:
+def _populate_data(field_path: list[str] | str, data_for_end_of_path: Any):
+    if not isinstance(data_for_end_of_path, dict):
         return data_for_end_of_path
 
     for child_field in field_path:
@@ -71,8 +79,8 @@ def _populate_data(field_path, data_for_end_of_path):
     return data_for_end_of_path
 
 
-def _make_output_string(rows: list, delims: dict):
-    empty_field_char = delims["empty_field"]
+def _make_output_string(rows: list, delims: DelimitersConfig):
+    empty_field_char = delims.empty_field
     for row_idx, row in enumerate(rows):  # pylint:disable=too-many-nested-blocks
         # Some fields may just be missing; we won't store even the alt/pos [[]] structure for those
         for i, column in enumerate(row):
@@ -100,7 +108,7 @@ def _make_output_string(rows: list, delims: dict):
 
                         if isinstance(sub, list):
                             inner_values.append(
-                                delims["overlap"].join(
+                                delims.overlap.join(
                                     map(
                                         lambda x: str(x)
                                         if x is not None
@@ -112,11 +120,11 @@ def _make_output_string(rows: list, delims: dict):
                         else:
                             inner_values.append(str(sub))
 
-                    column[j] = delims["value"].join(inner_values)
+                    column[j] = delims.value.join(inner_values)
 
-            row[i] = delims["position"].join(column)
+            row[i] = delims.position.join(column)
 
-        rows[row_idx] = delims["field"].join(row)
+        rows[row_idx] = delims.field.join(row)
 
     return bytes("\n".join(rows) + "\n", encoding="utf-8")
 
@@ -199,7 +207,7 @@ def go(  # pylint:disable=invalid-name
     output_dir = os.path.dirname(job_data.outputBasePath)
     basename = os.path.basename(job_data.outputBasePath)
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
-    outputs, stats = AnnotationOutputs.from_path(output_dir, basename, True)
+    outputs, stats = AnnotationOutputs.from_path(output_dir, basename, compress=True)
 
     written_chunks = [os.path.join(output_dir, f"{job_data.indexName}_header")]
 
@@ -235,7 +243,7 @@ def go(  # pylint:disable=invalid-name
                 job_data.fieldNames,
                 written_chunks[-1],
                 reporter,
-                get_delimiters(),
+                DelimitersConfig(),
             )
             reqs.append(res)
         results_processed = ray.get(reqs)
@@ -260,11 +268,10 @@ def go(  # pylint:disable=invalid-name
             raise IOError(f"Failed to write statistics for {annotation_path}")
 
         tarball_name = os.path.basename(outputs.archived)
-
         # Webserver requires the output to have top-level statistics data,
         # but annotation data will be too large to want to store 2 copies of
         ret = subprocess.call(
-            f'cd {output_dir}; tar --exclude ".*" --exclude={tarball_name} -cf {tarball_name} * && rm {annotation_path}',  # noqa: E501
+            f'cd {output_dir}; {GNU_TAR_EXECUTABLE_NAME} --exclude ".*" --exclude={tarball_name} -cf {tarball_name} * && rm {annotation_path}',  # noqa: E501
             shell=True,
         )
         if ret != 0:

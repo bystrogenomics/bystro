@@ -1,24 +1,27 @@
 import os
 from glob import glob
+import logging
 from os import path
 import shutil
 from typing import Optional, Any
 
 from msgspec import Struct
 
+logger = logging.getLogger(__name__)
 
-class FileProcessorsConfig(Struct, frozen=True):
+
+class FileProcessorsConfig(Struct, frozen=True, forbid_unknown_fields=True):
     args: str
     program: str
 
 
-class StatisticsOutputExtensions(Struct, frozen=True):
+class StatisticsOutputExtensions(Struct, frozen=True, forbid_unknown_fields=True):
     json: str = "statistics.json"
     tsv: str = "statistics.tsv"
     qc: str = "statistics.qc.tsv"
 
 
-class StatisticsConfig(Struct, frozen=True):
+class StatisticsConfig(Struct, frozen=True, forbid_unknown_fields=True):
     dbSNPnameField: str = "dbSNP.name"
     siteTypeField: str = "refSeq.siteType"
     exonicAlleleFunctionField: str = "refSeq.exonicAlleleFunction"
@@ -30,14 +33,14 @@ class StatisticsConfig(Struct, frozen=True):
     outputExtensions: StatisticsOutputExtensions = StatisticsOutputExtensions()
 
     @staticmethod
-    def from_dict(annotation_config: dict[str, Any] | None = None):
+    def from_dict(annotation_config: dict[str, Any]):
         """Get statistics config from a dictionary"""
-        if annotation_config is None:
-            return StatisticsConfig()
-
         stats_config: Optional[dict[str, Any]] = annotation_config.get("statistics")
 
         if stats_config is None:
+            logger.warning(
+                "No 'statistics' config found in supplied annotation config, using defaults"
+            )
             return StatisticsConfig()
 
         if "outputExtensions" in stats_config:
@@ -48,7 +51,7 @@ class StatisticsConfig(Struct, frozen=True):
         return StatisticsConfig(**stats_config)
 
 
-class StatisticsOutputs(Struct, frozen=True):
+class StatisticsOutputs(Struct, frozen=True, forbid_unknown_fields=True):
     """
     Paths to all possible Bystro statistics outputs
 
@@ -66,7 +69,7 @@ class StatisticsOutputs(Struct, frozen=True):
     qc: str
 
 
-class AnnotationOutputs(Struct, frozen=True):
+class AnnotationOutputs(Struct, frozen=True, forbid_unknown_fields=True):
     """
     Paths to all possible Bystro annotation outputs
 
@@ -122,16 +125,19 @@ class AnnotationOutputs(Struct, frozen=True):
             qc=f"{os.path.basename(stats.qc_output_path)}",
         )
 
-        return AnnotationOutputs(
-            annotation=annotation,
-            sampleList=sampleList,
-            statistics=statistics_tarball_members,
-            archived=archived,
-            log=log,
-        ), stats
+        return (
+            AnnotationOutputs(
+                annotation=annotation,
+                sampleList=sampleList,
+                statistics=statistics_tarball_members,
+                archived=archived,
+                log=log,
+            ),
+            stats,
+        )
 
 
-class DelimitersConfig(Struct, frozen=True):
+class DelimitersConfig(Struct, frozen=True, forbid_unknown_fields=True):
     field: str = "\t"
     position: str = "|"
     overlap: str = chr(31)
@@ -139,30 +145,17 @@ class DelimitersConfig(Struct, frozen=True):
     empty_field: str = "!"
 
     @staticmethod
-    def from_dict(annotation_config: dict[str, Any] | None = None):
+    def from_dict(annotation_config: dict[str, Any]):
         """Get delimiters from a dictionary"""
-        if annotation_config is None:
-            return DelimitersConfig()
-
         delim_config: Optional[dict[str, str]] = annotation_config.get("delimiters")
 
         if delim_config is None:
+            logger.warning(
+                "No 'delimiters' key found in supplied annotation config, using defaults"
+            )
             return DelimitersConfig()
 
         return DelimitersConfig(**delim_config)
-
-
-def get_delimiters(annotation_config: dict[str, Any] | None = None):
-    """Get delimiters from the annotation config"""
-    delims = DelimitersConfig.from_dict(annotation_config)
-
-    return {
-        "field": delims.field,
-        "position": delims.position,
-        "overlap": delims.overlap,
-        "value": delims.value,
-        "empty_field": delims.empty_field,
-    }
 
 
 def get_config_file_path(
@@ -183,9 +176,15 @@ def get_config_file_path(
 
 
 class Statistics:
-    def __init__(self, output_base_path: str, annotation_config: dict[str, Any] | None = None):
-        self._config = StatisticsConfig.from_dict(annotation_config)
-        self._delimiters = DelimitersConfig.from_dict(annotation_config)
+    def __init__(
+        self, output_base_path: str, annotation_config: dict[str, Any] | None = None
+    ):
+        if annotation_config is None:
+            self._config = StatisticsConfig()
+            self._delimiters = DelimitersConfig()
+        else:
+            self._config = StatisticsConfig.from_dict(annotation_config)
+            self._delimiters = DelimitersConfig.from_dict(annotation_config)
 
         program_path = shutil.which(self._config.programPath)
         if not program_path:

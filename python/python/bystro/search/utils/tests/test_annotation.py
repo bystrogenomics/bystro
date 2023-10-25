@@ -2,7 +2,6 @@ import pytest
 
 from bystro.search.utils.annotation import (
     DelimitersConfig,
-    get_delimiters,
     get_config_file_path,
     StatisticsConfig,
     StatisticsOutputExtensions,
@@ -18,23 +17,34 @@ def assert_defaults(config: DelimitersConfig):
     assert config.empty_field == "!"
 
 
-def test_default_values():
+def test_delimiters_default_values():
     config = DelimitersConfig()
     assert_defaults(config)
 
 
-def test_from_dict_no_arg():
-    config = DelimitersConfig.from_dict()
-    assert_defaults(config)
+def test_delimiters_from_dict_no_arg():
+    with pytest.raises(
+        TypeError, match=r"missing 1 required positional argument: 'annotation_config'"
+    ):
+        # Ignoring type checking because we're testing the error
+        DelimitersConfig.from_dict() # type: ignore
 
 
-def test_from_dict_no_delimiters_key():
+def test_delimiters_from_dict_no_delimiters_key():
     config_dict = {"random_key": "random_value"}
     config = DelimitersConfig.from_dict(config_dict)
     assert_defaults(config)
 
 
-def test_from_dict_with_delimiters_key():
+def test_delimiters_from_dict_unexpected_key():
+    annotation_config = {"delimiters": {"random_delim_key": "random_value"}}
+    with pytest.raises(
+        TypeError, match=r"Unexpected keyword argument 'random_delim_key'"
+    ):
+        DelimitersConfig.from_dict(annotation_config)
+
+
+def test_delimiters_from_dict_with_delimiters_key():
     config_dict = {
         "delimiters": {
             "field": "x",
@@ -52,7 +62,7 @@ def test_from_dict_with_delimiters_key():
     assert config.empty_field == "v"
 
 
-def test_from_dict_partial_delimiters_key():
+def test_delimiters_from_dict_partial_delimiters_key():
     config_dict = {"delimiters": {"field": "x", "position": "y"}}
     config = DelimitersConfig.from_dict(config_dict)
     assert config.field == "x"
@@ -62,64 +72,17 @@ def test_from_dict_partial_delimiters_key():
     assert config.empty_field == "!"  # default value
 
 
-def test_get_delimiters_default():
-    result = get_delimiters()
-    assert result == {
-        "field": "\t",
-        "position": "|",
-        "overlap": chr(31),
-        "value": ";",
-        "empty_field": "!",
-    }
-
-
-def test_get_delimiters_none_input():
-    result = get_delimiters(None)
-    assert result == {
-        "field": "\t",
-        "position": "|",
-        "overlap": chr(31),
-        "value": ";",
-        "empty_field": "!",
-    }
-
-
-def test_get_delimiters_with_input():
-    config_dict = {
-        "delimiters": {
-            "field": "x",
-            "position": "y",
-            "overlap": "z",
-            "value": "w",
-            "empty_field": "v",
-        }
-    }
-    result = get_delimiters(config_dict)
-    assert result == {
-        "field": "x",
-        "position": "y",
-        "overlap": "z",
-        "value": "w",
-        "empty_field": "v",
-    }
-
-
-def test_get_delimiters_partial_input():
-    config_dict = {"delimiters": {"field": "x", "position": "y"}}
-    result = get_delimiters(config_dict)
-    assert result == {
-        "field": "x",
-        "position": "y",
-        "overlap": chr(31),  # default value
-        "value": ";",  # default value
-        "empty_field": "!",  # default value
-    }
+def test_delimiters_unexpected_key():
+    with pytest.raises(
+        TypeError, match=r"Unexpected keyword argument 'random_delim_key2'"
+    ):
+         # Ignoring type checking because we're testing the error
+        DelimitersConfig(random_delim_key2= "random_value") # type: ignore
 
 
 def test_get_config_file_path_no_path_found(mocker):
-    mocker.patch(
-        "bystro.search.utils.annotation.glob", return_value=[]
-    )  # Change `your_module` to the actual module name
+    mocker.patch("bystro.search.utils.annotation.glob", return_value=[])
+
     with pytest.raises(ValueError, match=r"No config path found for the assembly"):
         get_config_file_path("/dummy/path", "dummy_assembly")
 
@@ -178,18 +141,33 @@ def test_statistics_config_defaults():
 
 
 def test_statistics_config_from_dict_none():
-    config = StatisticsConfig.from_dict()
-    assert (
-        config.dbSNPnameField == "dbSNP.name"
-    )  # Check one of the default values as a representative
+    with pytest.raises(
+        TypeError, match=r"missing 1 required positional argument: 'annotation_config'"
+    ):
+        # Ignoring type checking because we're testing the error
+        StatisticsConfig.from_dict() # type: ignore
 
 
 def test_statistics_config_from_dict_no_statistics_key():
     annotation_config = {"random_key": "random_value"}
     config = StatisticsConfig.from_dict(annotation_config)
+
     assert (
         config.dbSNPnameField == "dbSNP.name"
     )  # Again, just checking one representative default value
+
+
+def test_statistics_config_no_statistics_key():
+    with pytest.raises(
+        TypeError, match=r"Unexpected keyword argument 'random_stats_key2'"
+    ):
+        StatisticsConfig(random_stats_key2="random_value") # type: ignore
+
+
+def test_statistics_config_from_dict_unexpected_key():
+    annotation_config = {"statistics": {"random_key": "random_value"}}
+    with pytest.raises(TypeError, match=r"Unexpected keyword argument 'random_key'"):
+        StatisticsConfig.from_dict(annotation_config)
 
 
 def test_statistics_config_from_dict_with_statistics_key():
@@ -199,7 +177,7 @@ def test_statistics_config_from_dict_with_statistics_key():
             "siteTypeField": "new.refSeq.siteType",
             "outputExtensions": {
                 "json": ".new.json",
-                "tab": ".new.tsv",
+                "tsv": ".new.tsv",
                 "qc": ".new.qc.tsv",
             },
         }
