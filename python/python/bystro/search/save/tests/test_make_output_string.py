@@ -15,7 +15,6 @@ def test_populate_data():
     # Positive cases
     assert _populate_data(["a", "b", "c"], data) == "value"
     assert _populate_data(["a"], data) == {"b": {"c": "value"}}
-    print('_populate_data("a.b.c", data)', _populate_data("a.b.c", data))
 
     # Negative cases
     assert _populate_data(["a", "b", "d"], data) is None
