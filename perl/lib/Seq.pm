@@ -1,6 +1,7 @@
 use 5.10.0;
 use strict;
 use warnings;
+
 package Seq;
 
 our $VERSION = '0.001';
@@ -156,8 +157,13 @@ sub annotateFile {
   # Are the features that come from our database
   # Meaning, we can skip anything forwarded from the pre-processor
 
-  my $outputter =
-    Seq::Output->new( { header => $finalHeader, trackOutIndices => \@allOutIndices, refTrackName => $refTrackGetter->name } );
+  my $outputter = Seq::Output->new(
+    {
+      header          => $finalHeader,
+      trackOutIndices => \@allOutIndices,
+      refTrackName    => $refTrackGetter->name
+    }
+  );
   # my $outputFn;
   # if($self->outputJson) {
   #   $outputFn = \&encode_json;

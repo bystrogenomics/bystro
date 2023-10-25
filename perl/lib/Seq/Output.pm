@@ -24,8 +24,8 @@ has delimiters => (
 );
 
 has refTrackName => (
-  is      => 'ro',
-  isa     => 'Str',
+  is  => 'ro',
+  isa => 'Str',
 );
 
 sub BUILD {
@@ -56,7 +56,7 @@ sub BUILD {
 
     push @{ $self->{_trackOutIndices} }, $outIdx;
 
-    if($trackName eq $self->refTrackName) {
+    if ( $trackName eq $self->refTrackName ) {
       $self->{_refTrackIdx} = $outIdx;
       next;
     }
@@ -71,22 +71,23 @@ sub BUILD {
 }
 
 sub uniqueify {
-    my %count;
-    my $undefCount = 0;
+  my %count;
+  my $undefCount = 0;
 
-    foreach my $value (@{$_[0]}) {
-      if(!defined $value) {
-        $undefCount++;
-      } else {
-        $count{$value} = 1;
-      }
+  foreach my $value ( @{ $_[0] } ) {
+    if ( !defined $value ) {
+      $undefCount++;
     }
-
-    if($undefCount == @{$_[0]} || scalar keys %count == 1) {
-        return [$_[0]->[0]];
+    else {
+      $count{$value} = 1;
     }
+  }
 
-    return $_[0];
+  if ( $undefCount == @{ $_[0] } || scalar keys %count == 1 ) {
+    return [ $_[0]->[0] ];
+  }
+
+  return $_[0];
 }
 
 # ABSTRACT: Knows how to make an output string
@@ -113,8 +114,8 @@ sub makeOutputString {
     # info = [$outIdx, $numFeatures, $missingValue]
     # if $numFeatures == 0, this track has no features
     TRACK_LOOP: for my $oIdx ( @{ $self->{_trackOutIndices} } ) {
-      if($oIdx == $self->{_refTrackIdx}) {
-        $row->[$oIdx] = join '', @{$row->[$oIdx]};
+      if ( $oIdx == $self->{_refTrackIdx} ) {
+        $row->[$oIdx] = join '', @{ $row->[$oIdx] };
         next;
       }
 
@@ -137,7 +138,7 @@ sub makeOutputString {
           }
 
           if ( ref $row->[$oIdx][0] ) {
-            $row->[$oIdx] = join( $valDelim, @{uniqueify($row->[$oIdx][0])} );
+            $row->[$oIdx] = join( $valDelim, @{ uniqueify( $row->[$oIdx][0] ) } );
             next;
           }
 
@@ -160,13 +161,13 @@ sub makeOutputString {
               ref $_
               ?
                 # at this position this feature has multiple values
-                join( $valDelim, map { defined $_ ? $_ : $missChar } @{uniqueify($_)} )
+                join( $valDelim, map { defined $_ ? $_ : $missChar } @{ uniqueify($_) } )
               :
                 # at this position this feature has 1 value
                 $_
               )
               : $missChar
-          } @{ uniqueify($row->[$oIdx]) }
+          } @{ uniqueify( $row->[$oIdx] ) }
         );
 
         next;
@@ -199,25 +200,31 @@ sub makeOutputString {
 
           $row->[$oIdx][$featIdx] = join(
             $valDelim,
-            @{ uniqueify([map {
-              defined $_
-                ? (
-                ref $_
-                ?
-                  # at this position this feature has multiple values
-                  join( $overlapDelim, map { defined $_ ? $_ : $missChar } @{uniqueify($_)} )
-                :
-                  # at this position this feature has 1 value
-                  $_
-                )
-                : $missChar
-            } @{ $row->[$oIdx][$featIdx][0] } ]) }
+            @{
+              uniqueify(
+                [
+                  map {
+                    defined $_
+                      ? (
+                      ref $_
+                      ?
+                        # at this position this feature has multiple values
+                        join( $overlapDelim, map { defined $_ ? $_ : $missChar } @{ uniqueify($_) } )
+                      :
+                        # at this position this feature has 1 value
+                        $_
+                      )
+                      : $missChar
+                  } @{ $row->[$oIdx][$featIdx][0] }
+                ]
+              )
+            }
           );
 
           next;
         }
 
-        for my $posData ( @{ $row->[$oIdx][$featIdx]} ) {
+        for my $posData ( @{ $row->[$oIdx][$featIdx] } ) {
           if ( !defined $posData ) {
             $posData = $missChar;
 
@@ -239,23 +246,30 @@ sub makeOutputString {
           # t1;t2 \t t1_name1\\t1_name2;t2_onlyName
           $posData = join(
             $valDelim,
-            @{ uniqueify([ map {
-              defined $_
-                ? (
-                ref $_
-                ?
-                  # at this position this feature has multiple values
-                  join( $overlapDelim, map { defined $_ ? $_ : $missChar } @{uniqueify($_)} )
-                :
-                  # at this position this feature has 1 value
-                  $_
-                )
-                : $missChar
-            } @{ $posData } ]) }
+            @{
+              uniqueify(
+                [
+                  map {
+                    defined $_
+                      ? (
+                      ref $_
+                      ?
+                        # at this position this feature has multiple values
+                        join( $overlapDelim, map { defined $_ ? $_ : $missChar } @{ uniqueify($_) } )
+                      :
+                        # at this position this feature has 1 value
+                        $_
+                      )
+                      : $missChar
+                  } @{$posData}
+                ]
+              )
+            }
           );
         }
 
-        $row->[$oIdx][$featIdx] = join( $posDelim, @{ uniqueify($row->[$oIdx][$featIdx]) } );
+        $row->[$oIdx][$featIdx] =
+          join( $posDelim, @{ uniqueify( $row->[$oIdx][$featIdx] ) } );
       }
 
       # Fields are separated by something like tab
