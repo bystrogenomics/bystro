@@ -9,7 +9,6 @@ use List::Util qw/min max/;
 
 use Seq::Output::Delimiters;
 use Seq::Headers;
-use DDP;
 
 with 'Seq::Role::Message';
 
@@ -22,6 +21,11 @@ has delimiters => (
   default => sub {
     return Seq::Output::Delimiters->new();
   }
+);
+
+has refTrackName => (
+  is      => 'ro',
+  isa     => 'Str',
 );
 
 sub BUILD {
@@ -52,6 +56,11 @@ sub BUILD {
 
     push @{ $self->{_trackOutIndices} }, $outIdx;
 
+    if($trackName eq $self->refTrackName) {
+      $self->{_refTrackIdx} = $outIdx;
+      next;
+    }
+
     if ( ref $trackName ) {
       $self->{_trackFeatCounts}[$outIdx] = $#$trackName;
     }
@@ -61,8 +70,23 @@ sub BUILD {
   }
 }
 
-# TODO: will be singleton, configured once for all consumers
-sub initialize {
+sub uniqueify {
+    my %count;
+    my $undefCount = 0;
+
+    foreach my $value (@{$_[0]}) {
+      if(!defined $value) {
+        $undefCount++;
+      } else {
+        $count{$value} = 1;
+      }
+    }
+
+    if($undefCount == @{$_[0]} || scalar keys %count == 1) {
+        return [$_[0]->[0]];
+    }
+
+    return $_[0];
 }
 
 # ABSTRACT: Knows how to make an output string
@@ -89,6 +113,11 @@ sub makeOutputString {
     # info = [$outIdx, $numFeatures, $missingValue]
     # if $numFeatures == 0, this track has no features
     TRACK_LOOP: for my $oIdx ( @{ $self->{_trackOutIndices} } ) {
+      if($oIdx == $self->{_refTrackIdx}) {
+        $row->[$oIdx] = join '', @{$row->[$oIdx]};
+        next;
+      }
+
       # If this track has no features
       if ( $featCounts->[$oIdx] == 0 ) {
         # We always expect output, for any track
@@ -108,7 +137,7 @@ sub makeOutputString {
           }
 
           if ( ref $row->[$oIdx][0] ) {
-            $row->[$oIdx] = join( $valDelim, @{ $row->[$oIdx][0] } );
+            $row->[$oIdx] = join( $valDelim, @{uniqueify($row->[$oIdx][0])} );
             next;
           }
 
@@ -131,13 +160,13 @@ sub makeOutputString {
               ref $_
               ?
                 # at this position this feature has multiple values
-                join( $valDelim, map { defined $_ ? $_ : $missChar } @$_ )
+                join( $valDelim, map { defined $_ ? $_ : $missChar } @{uniqueify($_)} )
               :
                 # at this position this feature has 1 value
                 $_
               )
               : $missChar
-          } @{ $row->[$oIdx] }
+          } @{ uniqueify($row->[$oIdx]) }
         );
 
         next;
@@ -170,25 +199,25 @@ sub makeOutputString {
 
           $row->[$oIdx][$featIdx] = join(
             $valDelim,
-            map {
+            @{ uniqueify([map {
               defined $_
                 ? (
                 ref $_
                 ?
                   # at this position this feature has multiple values
-                  join( $overlapDelim, map { defined $_ ? $_ : $missChar } @$_ )
+                  join( $overlapDelim, map { defined $_ ? $_ : $missChar } @{uniqueify($_)} )
                 :
                   # at this position this feature has 1 value
                   $_
                 )
                 : $missChar
-            } @{ $row->[$oIdx][$featIdx][0] }
+            } @{ $row->[$oIdx][$featIdx][0] } ]) }
           );
 
           next;
         }
 
-        for my $posData ( @{ $row->[$oIdx][$featIdx] } ) {
+        for my $posData ( @{ $row->[$oIdx][$featIdx]} ) {
           if ( !defined $posData ) {
             $posData = $missChar;
 
@@ -210,23 +239,23 @@ sub makeOutputString {
           # t1;t2 \t t1_name1\\t1_name2;t2_onlyName
           $posData = join(
             $valDelim,
-            map {
+            @{ uniqueify([ map {
               defined $_
                 ? (
                 ref $_
                 ?
                   # at this position this feature has multiple values
-                  join( $overlapDelim, map { defined $_ ? $_ : $missChar } @$_ )
+                  join( $overlapDelim, map { defined $_ ? $_ : $missChar } @{uniqueify($_)} )
                 :
                   # at this position this feature has 1 value
                   $_
                 )
                 : $missChar
-            } @$posData
+            } @{ $posData } ]) }
           );
         }
 
-        $row->[$oIdx][$featIdx] = join( $posDelim, @{ $row->[$oIdx][$featIdx] } );
+        $row->[$oIdx][$featIdx] = join( $posDelim, @{ uniqueify($row->[$oIdx][$featIdx]) } );
       }
 
       # Fields are separated by something like tab
