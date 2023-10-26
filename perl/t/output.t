@@ -13,14 +13,16 @@ my $head = Seq::Headers->new();
 $head->addFeaturesToHeader('preProcessorHeader1');
 $head->addFeaturesToHeader( [ 'c1a', 'c1b', 'c1c' ], 'withFeaturesTrack1' );
 $head->addFeaturesToHeader('scalarTrack2');
-$head->addFeaturesToHeader( [ 'c2a', 'c2b', 'c2c_overlapped_vals' ], 'withFeaturesTrack3' );
-$head->addFeaturesToHeader( 'ref' );
+$head->addFeaturesToHeader( [ 'c2a', 'c2b', 'c2c_overlapped_vals' ],
+  'withFeaturesTrack3' );
+$head->addFeaturesToHeader('ref');
 
 # trackOutIndices simply tracks Seq features apart from those passed in by
 # a pre-processor
 # this allows us to skip iterating over very long feature arrays on which we do no work
 my $outputter =
-  Seq::Output->new( { header => $head, trackOutIndices => [ 1, 2, 3, 4 ], refTrackName => 'ref' } );
+  Seq::Output->new(
+  { header => $head, trackOutIndices => [ 1, 2, 3, 4 ], refTrackName => 'ref' } );
 
 my $delims = Seq::Output::Delimiters->new();
 my $header = $head->getOrderedHeader();
@@ -29,7 +31,7 @@ ok( @$header == 5,          "Output header matches # of tracks" );
 ok( @{ $header->[1] } == 3, "First package-defined track has 3 features" );
 ok( !ref $header->[2],      "Second track has no features, is itself a feature" );
 ok( @{ $header->[3] } == 3, "Third track has 2 features" );
-ok( !ref $header->[4], "Fourth track has no features, is itself a feature" );
+ok( !ref $header->[4],      "Fourth track has no features, is itself a feature" );
 
 my $hStr = $head->getString();
 
@@ -120,7 +122,7 @@ ok( @headFields == @rowFields,
   "Output string length matches flattened header length" );
 
 ########## Test value deduplication in makeOutputString ##########
-@row = ( "somePreProcessorVal", [], [], [], []);
+@row      = ( "somePreProcessorVal", [], [], [], [] );
 $expected = "somePreProcessorVal" . $delims->fieldSeparator;
 
 # Test all values duplicate
@@ -128,20 +130,25 @@ $row[1][0][0] = [ "t1_1a", "t1_1a" ];
 # When both values are duplicate in an inner array, we expect a single value, with no overlap delimiter
 $row[1][1][0] = [ [ "t1_2aa", "t1_2aa" ], [ "t1_2ba", "t1_2ba" ] ];
 # If all values are duplicate across delimiters, we expect a single value, with no overlap delimiter or value delimiter
-$row[1][2][0] = [ [ "t1_3aa", "t1_3aa"  ], [ "t1_3aa", "t1_3aa", "t1_3aa", "t1_3aa" ] ];
+$row[1][2][0] =
+  [ [ "t1_3aa", "t1_3aa" ], [ "t1_3aa", "t1_3aa", "t1_3aa", "t1_3aa" ] ];
 
 # Track 1 values
-$expected .= "t1_1a" .  $delims->fieldSeparator; #$row[1][0][0]
-$expected .= "t1_2aa" . $delims->valueDelimiter . "t1_2ba" . $delims->fieldSeparator; #$row[1][1][0]
+$expected .= "t1_1a" . $delims->fieldSeparator; #$row[1][0][0]
+$expected .=
+    "t1_2aa"
+  . $delims->valueDelimiter
+  . "t1_2ba"
+  . $delims->fieldSeparator;                    #$row[1][1][0]
 $expected .= "t1_3aa" . $delims->fieldSeparator; #$row[1][1][0]
 
 # We still handle scalar values just fine
-$row[2][0] = "blah";
+$row[2][0] = [ "blah", "blah", "blah" ];
 
 $expected .= "blah" . $delims->fieldSeparator;
 
 # If not all values deuplicated, we won't deduplcate anything
-$row[3][0][0] = [ "t3_1a", "t3_1a",  "t3_1b"];
+$row[3][0][0] = [ "t3_1a", "t3_1a", "t3_1b" ];
 # When not all values duplicated in inner array, we will not deduplicate
 $row[3][1][0] = [ [ "t3_2aa", 't3_2aa', 't3_2ab' ], [ "t3_2ba", 't3_2ba' ] ];
 # We will deduplicate values across position delimiters too
@@ -149,9 +156,14 @@ $row[3][2][0] = "t3_3a";
 $row[3][2][1] = "t3_3a";
 
 #$row[2][0][0]
-$expected .= join($delims->valueDelimiter, ("t3_1a", "t3_1a",  "t3_1b")) . $delims->fieldSeparator;
+$expected .= join( $delims->valueDelimiter, ( "t3_1a", "t3_1a", "t3_1b" ) )
+  . $delims->fieldSeparator;
 #$row[2][1][0]
-$expected .= join($delims->overlapDelimiter, ("t3_2aa", 't3_2aa', 't3_2ab')) . $delims->valueDelimiter . "t3_2ba" . $delims->fieldSeparator;
+$expected .=
+    join( $delims->overlapDelimiter, ( "t3_2aa", 't3_2aa', 't3_2ab' ) )
+  . $delims->valueDelimiter
+  . "t3_2ba"
+  . $delims->fieldSeparator;
 #$row[2][2][0] & $row[2][2][1] are collapsed into a single value since they are the same
 $expected .= "t3_3a" . $delims->fieldSeparator;
 
@@ -159,30 +171,30 @@ $row[4][0] = "T";
 
 $expected .= "T" . "\n";
 
-$str = $outputter->makeOutputString( [\@row] );
+$str = $outputter->makeOutputString( [ \@row ] );
 
 ok( $str eq $expected, "De-duplicates values" );
 
 ######### Test uniquefy  ##########
 # Test 1: All identical defined values
-my $result1 = Seq::Output::uniqueify( ['a', 'a', 'a'] );
-is_deeply($result1, ['a'], "All identical values");
+my $result1 = Seq::Output::uniqueify( [ 'a', 'a', 'a' ] );
+is_deeply( $result1, ['a'], "All identical values" );
 
 # Test 2: All undefined values
-my $result2 = Seq::Output::uniqueify( [undef, undef, undef] );
-is_deeply($result2, [undef], "All undefined values");
+my $result2 = Seq::Output::uniqueify( [ undef, undef, undef ] );
+is_deeply( $result2, [undef], "All undefined values" );
 
 # Test 3: Mix of undefined and defined values
-my $result3 = Seq::Output::uniqueify( ['b', undef, 'b'] );
-is_deeply($result3, ['b', undef, 'b'], "Mix of undefined and defined values");
+my $result3 = Seq::Output::uniqueify( [ 'b', undef, 'b' ] );
+is_deeply( $result3, [ 'b', undef, 'b' ], "Mix of undefined and defined values" );
 
 # Test 4: Multiple distinct defined values
-my $result4 = Seq::Output::uniqueify( ['c', 'd'] );
-is_deeply($result4, ['c', 'd'], "Multiple distinct values");
+my $result4 = Seq::Output::uniqueify( [ 'c', 'd' ] );
+is_deeply( $result4, [ 'c', 'd' ], "Multiple distinct values" );
 
 # Test 5: Empty array
 my $result5 = Seq::Output::uniqueify( [] );
-is_deeply($result5, [], "Empty array");
+is_deeply( $result5, [], "Empty array" );
 
 done_testing();
 1;

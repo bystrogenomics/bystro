@@ -76,8 +76,8 @@ sub uniqueify {
   my %count;
   my $undefCount = 0;
 
-  if (!@{ $_[0] }) {
-    return []
+  if ( !@{ $_[0] } ) {
+    return $_[0];
   }
 
   foreach my $value ( @{ $_[0] } ) {
@@ -182,12 +182,14 @@ sub makeOutputString {
         # It's an array, for instance, CADD scores are
         $row->[$oIdx] = join(
           $posDelim,
-          uniqueify(
-            [
-              map { !defined $_ ? $missChar : ref $_ ? $self->mungeRow($_) : $_ }
-                @{ $row->[$oIdx] }
-            ]
-          )
+          @{
+            uniqueify(
+              [
+                map { !defined $_ ? $missChar : ref $_ ? $self->mungeRow($_) : $_ }
+                  @{ $row->[$oIdx] }
+              ]
+            )
+          }
         );
 
         next;
