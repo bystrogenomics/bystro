@@ -7,8 +7,8 @@ import pandas as pd
 
 from bystro.proteomics.annotation_interface import (
     _process_response,
-    join_annotation_results_to_proteomics,
-    get_samples_and_genes_from_query,
+    join_annotation_result_to_proteomics_dataset,
+    get_annotation_result_from_query,
 )
 from bystro.proteomics.fragpipe_tandem_mass_tag import ABUNDANCE_COLS, TandemMassTagDataset
 
@@ -40,12 +40,12 @@ class MockOpenSearch:
         return
 
 
-def test_get_samples_and_genes_from_query():
+def test_get_annotation_results_from_query():
     user_query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
     index_name = "mock_index_name"
 
     mock_client = MockOpenSearch()
-    samples_and_genes_df = get_samples_and_genes_from_query(user_query_string, index_name, mock_client)
+    samples_and_genes_df = get_annotation_result_from_query(user_query_string, index_name, mock_client)
     assert (1610, 7) == samples_and_genes_df.shape
 
 
@@ -62,12 +62,12 @@ def tests__process_response():
     assert expected_dosage_values == actual_dosage_values
 
 
-def test_join_annotation_results_to_proteomics_dataset():
+def test_join_annotation_result_to_proteomics_dataset():
     # Step 1: Get an annotation query result
     user_query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
     index_name = None
     mock_client = MockOpenSearch()
-    query_result_df = get_samples_and_genes_from_query(user_query_string, index_name, mock_client)
+    query_result_df = get_annotation_result_from_query(user_query_string, index_name, mock_client)
 
     # Step 2: Construct a proteomics dataset with some shared sampled_ids and gene_names
     shared_proteomics_sample_ids = sorted(set(query_result_df.sample_id))[:2]
@@ -89,7 +89,7 @@ def test_join_annotation_results_to_proteomics_dataset():
     mock_tmt_dataset = TandemMassTagDataset(abundance_df=abundance_df, annotation_df=pd.DataFrame())
 
     # Step 3: join the two togoether
-    joined_df = join_annotation_results_to_proteomics(query_result_df, mock_tmt_dataset)
+    joined_df = join_annotation_result_to_proteomics_dataset(query_result_df, mock_tmt_dataset)
 
     # Step 4: Test the joined result
     assert (140, 8) == joined_df.shape

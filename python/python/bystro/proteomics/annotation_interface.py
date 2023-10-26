@@ -1,7 +1,7 @@
 """Query an annotation file and return a list of sample_ids and genes meeting the query criteria."""
 import logging
 import math
-from typing import Any
+from typing import Any, Callable
 
 from msgspec import Struct
 import numpy as np
@@ -222,21 +222,37 @@ def _build_opensearch_query_from_query_string(query_string: str) -> dict[str, An
     return base_query
 
 
-def get_samples_and_genes_from_query(
+def get_annotation_result_from_query(
     user_query_string: str,
     index_name: str,
     client: OpenSearch,
 ) -> pd.DataFrame:
-    """Given a query and index, return a dataframe of (sample_id, gene, dosage) rows matching query."""
+    """Given a query and index, return a dataframe of variant / sample_id records matching query."""
     query = _build_opensearch_query_from_query_string(user_query_string)
     return _run_annotation_query(query, index_name, client)
 
 
-def join_annotation_results_to_proteomics(
-    query_result_df: pd.DataFrame, tmt_dataset: TandemMassTagDataset
+def join_annotation_result_to_proteomics_dataset(
+    query_result_df: pd.DataFrame,
+    tmt_dataset: TandemMassTagDataset,
+    get_tracking_id_from_genomic_sample_id: Callable[[str], str] = (lambda x: x),
+    get_tracking_id_from_proteomic_sample_id: Callable[[str], str] = (lambda x: x),
 ) -> pd.DataFrame:
+    """
+    Args:
+      query_result_df: pd.DataFrame containing result from get_annotation_result_from_query
+      tmt_dataset: TamdemMassTagDataset
+      get_tracking_id_from_proteomic_sample_id: Callable mapping proteomic sample IDs to tracking IDs
+      get_tracking_id_from_genomic_sample_id: Callable mapping genomic sample IDs to tracking IDs
+    """
+    query_result_df = query_result_df.copy()
+    proteomics_df = tmt_dataset.get_melted_abundance_df()
+
+    query_result_df.sample_id = query_result_df.sample_id.apply(get_tracking_id_from_genomic_sample_id)
+    proteomics_df.sample_id = proteomics_df.sample_id.apply(get_tracking_id_from_proteomic_sample_id)
+
     joined_df = query_result_df.merge(
-        tmt_dataset.get_melted_abundance_df(),
+        proteomics_df,
         left_on=["sample_id", "gene_name"],
         right_on=["sample_id", "gene_name"],
     )
