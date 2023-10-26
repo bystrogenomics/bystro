@@ -14,6 +14,9 @@ logger = logging.getLogger(__file__)
 
 def get_uniprot_id_gene_name_mapping() -> pd.DataFrame:
     """Get a dataframe associating each uniprot id with its cognate gene names."""
+    # TODO: currently we only query for human proteins, but this
+    # should later to be expanded to include (at least) all the
+    # reference genomes supported in bystro/config.
     query_results = UniprotkbClient.search(
         query="(organism_name:homo)",
     )
@@ -24,8 +27,6 @@ def get_uniprot_id_gene_name_mapping() -> pd.DataFrame:
         for gene in genes:
             if (gene_name := gene.get("geneName")) and (value := gene_name.get("value")):
                 gene_names.append(value)
-        if not gene_names:
-            gene_names = [None]
         for gene_name in gene_names:
             uniprot_id_gene_name_mapping.append(
                 (record["primaryAccession"], gene_name)  # type: ignore[index]
