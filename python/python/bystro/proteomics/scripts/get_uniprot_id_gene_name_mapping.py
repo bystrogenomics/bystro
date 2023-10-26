@@ -22,15 +22,17 @@ def get_uniprot_id_gene_name_mapping() -> pd.DataFrame:
     )
     uniprot_id_gene_name_mapping = []
     for record in tqdm.tqdm(query_results.each_record()):
+        uniprot_id = record["primaryAccession"]
         genes = record.get("genes", [])  # type: ignore[attr-defined]
         gene_names = []
         for gene in genes:
             if (gene_name := gene.get("geneName")) and (value := gene_name.get("value")):
                 gene_names.append(value)
+        # TODO: if gene_names is empty here, we won't record the
+        # uniprot_id at all.  This is ok for now, but we may later
+        # wish to revise this decision.
         for gene_name in gene_names:
-            uniprot_id_gene_name_mapping.append(
-                (record["primaryAccession"], gene_name)  # type: ignore[index]
-            )
+            uniprot_id_gene_name_mapping.append((uniprot_id, gene_name))  # type: ignore[index]
     uniprot_id_gene_name_mapping_df = pd.DataFrame(
         uniprot_id_gene_name_mapping, columns=["uniprot_accession", "gene_name"]
     )
