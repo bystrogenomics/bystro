@@ -62,28 +62,36 @@ def tests__process_response():
     assert expected_dosage_values == actual_dosage_values
 
 
-def test_join_annotation_results_to_proteomics():
-    rng = np.random.default_rng(1337)
-
+def test_join_annotation_results_to_proteomics_dataset():
+    # Step 1: Get an annotation query result
     user_query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
     index_name = None
     mock_client = MockOpenSearch()
     query_result_df = get_samples_and_genes_from_query(user_query_string, index_name, mock_client)
 
+    # Step 2: Construct a proteomics dataset with some shared sampled_ids and gene_names
     shared_proteomics_sample_ids = sorted(set(query_result_df.sample_id))[:2]
     all_proteomics_sample_ids = shared_proteomics_sample_ids + [f"sample_id{i}" for i in range(10)]
 
     shared_proteomics_gene_names = sorted(set(query_result_df.gene_name))[:100]
     all_proteomics_gene_names = shared_proteomics_gene_names + [f"gene_name{i}" for i in range(10)]
 
-    columns = ABUNDANCE_COLS[1:] + all_proteomics_sample_ids
+    # we're constructing the abundance df directly as the
+    # TandemMassTagDataset expects it, and so need to drop the 'Index'
+    # column
+    final_abundance_cols = [col for col in ABUNDANCE_COLS if col != "Index"]
+    columns = final_abundance_cols + all_proteomics_sample_ids
     abundance_df = pd.DataFrame(
-        rng.random((len(all_proteomics_gene_names), len(columns))),
+        np.random.random((len(all_proteomics_gene_names), len(columns))),
         columns=columns,
         index=all_proteomics_gene_names,
     )
     mock_tmt_dataset = TandemMassTagDataset(abundance_df=abundance_df, annotation_df=pd.DataFrame())
+
+    # Step 3: join the two togoether
     joined_df = join_annotation_results_to_proteomics(query_result_df, mock_tmt_dataset)
+
+    # Step 4: Test the joined result
     assert (140, 8) == joined_df.shape
     assert set(shared_proteomics_sample_ids) == set(joined_df.sample_id)
     assert set(shared_proteomics_gene_names) == set(joined_df.gene_name)
