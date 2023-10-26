@@ -164,13 +164,6 @@ sub annotateFile {
       refTrackName    => $refTrackGetter->name
     }
   );
-  # my $outputFn;
-  # if($self->outputJson) {
-  #   $outputFn = \&encode_json;
-  # } else {
-  #   my $outputter = Seq::Output->new({header => $finalHeader, trackOutIndices => \@allOutIndices});
-  #   $outputFn = \$outputter->makeOutputString;
-  # }
 
   ###### Processes pre-processor output passed from file reader/producer #######
   my $refTrackOutIdx = $outIndicesMap->{ $refTrackGetter->name };
