@@ -4,11 +4,12 @@ import pandas as pd
 
 from bystro.utils.config import BYSTRO_PROJECT_ROOT
 
-CSV_FILENAME = (
+
+_MAPPING_FILENAME = (
     BYSTRO_PROJECT_ROOT / "python/python/bystro/proteomics" / "uniprot_id_gene_name_mapping.csv"
 )
 try:
-    _UNIPROT_ID_GENE_NAME_MAPPING = pd.read_csv(CSV_FILENAME)
+    _UNIPROT_ID_GENE_NAME_MAPPING = pd.read_csv(_MAPPING_FILENAME)
 except FileNotFoundError as e:
     err_msg = (
         "Uniprot ID / gene name mapping file not found: "
