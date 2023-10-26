@@ -6,7 +6,7 @@ import tempfile
 from bystro.search.index.bystro_file import (  # type: ignore # pylint: disable=no-name-in-module,import-error  # noqa: E501
     read_annotation_tarball,
 )
-from bystro.search.utils.annotation import get_delimiters
+from bystro.search.utils.annotation import DelimitersConfig
 
 
 def create_mock_tarball(annotation_content):
@@ -27,11 +27,11 @@ def create_mock_tarball(annotation_content):
 
 
 def test_read_annotation_tarball():
-    delims = get_delimiters()
-    delim_v = delims["value"]  # e.g. ;
-    delim_f = delims["field"]  # e.g. \t
-    delim_o = delims["overlap"]  # e.g. chr(31)
-    delim_p = delims["position"]  # e.g. |
+    delims = DelimitersConfig()
+    delim_v = delims.value  # e.g. ;
+    delim_f = delims.field  # e.g. \t
+    delim_o = delims.overlap  # e.g. chr(31)
+    delim_p = delims.position  # e.g. |
 
     header = f"field1{delim_f}field2{delim_f}field3\n"
     field1val = f"value1a{delim_v}value1b{delim_p}value2aa{delim_o}value2ab{delim_v}value2b{delim_f}"
@@ -70,9 +70,12 @@ def test_read_annotation_tarball():
             },
         }
     ]
-
+    import numpy as np
+    import json
     result_data = next(reader)
     assert result_data == expected_data
+    np.testing.assert_equal(result_data, expected_data)
+    print(json.dumps(expected_data, indent=4))
 
     # Test the end of the data
     with pytest.raises(StopIteration):
