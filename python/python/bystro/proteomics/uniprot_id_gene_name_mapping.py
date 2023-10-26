@@ -21,7 +21,7 @@ def get_gene_names_from_uniprot_id(uniprot_id: str) -> list[str]:
     """Return a list of gene names associated with the given Uniprot ID."""
     uniprot_idx = _UNIPROT_ID_GENE_NAME_MAPPING.uniprot_accession == uniprot_id
     if not uniprot_idx.sum():
-        err_msg = f"Couldn't find uniprot id {uniprot_id} in mapping"
+        err_msg = f"Couldn't find Uniprot ID {uniprot_id} in mapping"
         raise ValueError(err_msg)
     gene_names = _UNIPROT_ID_GENE_NAME_MAPPING[uniprot_idx].gene_name
     return [gene_name for gene_name in gene_names if pd.notna(gene_name)]
