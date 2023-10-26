@@ -119,7 +119,7 @@ my @rowFields = split( $delims->fieldSeparator, $str );
 ok( @headFields == @rowFields,
   "Output string length matches flattened header length" );
 
-# Test all values duplicate
+########## Test value deduplication in makeOutputString ##########
 @row = ( "somePreProcessorVal", [], [], [], []);
 $expected = "somePreProcessorVal" . $delims->fieldSeparator;
 
@@ -162,6 +162,27 @@ $expected .= "T" . "\n";
 $str = $outputter->makeOutputString( [\@row] );
 
 ok( $str eq $expected, "De-duplicates values" );
+
+######### Test uniquefy  ##########
+# Test 1: All identical defined values
+my $result1 = Seq::Output::uniqueify( ['a', 'a', 'a'] );
+is_deeply($result1, ['a'], "All identical values");
+
+# Test 2: All undefined values
+my $result2 = Seq::Output::uniqueify( [undef, undef, undef] );
+is_deeply($result2, [undef], "All undefined values");
+
+# Test 3: Mix of undefined and defined values
+my $result3 = Seq::Output::uniqueify( ['b', undef, 'b'] );
+is_deeply($result3, ['b', undef, 'b'], "Mix of undefined and defined values");
+
+# Test 4: Multiple distinct defined values
+my $result4 = Seq::Output::uniqueify( ['c', 'd'] );
+is_deeply($result4, ['c', 'd'], "Multiple distinct values");
+
+# Test 5: Empty array
+my $result5 = Seq::Output::uniqueify( [] );
+is_deeply($result5, [], "Empty array");
 
 done_testing();
 1;

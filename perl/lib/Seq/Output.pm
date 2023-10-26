@@ -76,6 +76,10 @@ sub uniqueify {
   my %count;
   my $undefCount = 0;
 
+  if (!@{ $_[0] }) {
+    return []
+  }
+
   foreach my $value ( @{ $_[0] } ) {
     if ( !defined $value ) {
       $undefCount++;
@@ -85,7 +89,11 @@ sub uniqueify {
     }
   }
 
-  if ( $undefCount == @{ $_[0] } || scalar keys %count == 1 ) {
+  if ( $undefCount == @{ $_[0] } ) {
+    return [ $_[0]->[0] ];
+  }
+
+  if ( $undefCount == 0 && scalar keys %count == 1 ) {
     return [ $_[0]->[0] ];
   }
 
