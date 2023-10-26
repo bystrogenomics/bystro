@@ -16,7 +16,7 @@ def get_uniprot_id_gene_name_mapping() -> pd.DataFrame:
         query="(organism_name:homo)",
     )
     uniprot_id_gene_name_mapping = []
-    for record in tqdm.trange(query_results.each_record(), total=APPROXIMATE_TOTAL_RECORDS):
+    for record in tqdm.tqdm(query_results.each_record(), total=APPROXIMATE_TOTAL_RECORDS):
         genes = record.get("genes", [])  # type: ignore[attr-defined]
         gene_names = []
         for gene in genes:
