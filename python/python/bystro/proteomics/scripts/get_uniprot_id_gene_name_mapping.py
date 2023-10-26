@@ -2,21 +2,23 @@
 
 """Download a list of uniprot_id / gene_name pairs from Uniprot and store the result on disk as csv."""
 
+import logging
 import pandas as pd
 import tqdm
 from unipressed import UniprotkbClient  # type: ignore[import]
 
 from bystro.utils.config import BYSTRO_PROJECT_ROOT
 
+logger = logging.getLogger(__file__)
+
 
 def get_uniprot_id_gene_name_mapping() -> pd.DataFrame:
     """Get a dataframe associating each uniprot id with its cognate gene names."""
-    APPROXIMATE_TOTAL_RECORDS = 240_000
     query_results = UniprotkbClient.search(
         query="(organism_name:homo)",
     )
     uniprot_id_gene_name_mapping = []
-    for record in tqdm.tqdm(query_results.each_record(), total=APPROXIMATE_TOTAL_RECORDS):
+    for record in tqdm.tqdm(query_results.each_record()):
         genes = record.get("genes", [])  # type: ignore[attr-defined]
         gene_names = []
         for gene in genes:
@@ -35,7 +37,9 @@ def get_uniprot_id_gene_name_mapping() -> pd.DataFrame:
 
 
 if __name__ == "__main__":
+    logger.info("Downloading Uniprot ID / gene name data...")
     uniprot_id_gene_name_mapping_df = get_uniprot_id_gene_name_mapping()
+    logger.info("Download complete")
     output_filename = (
         BYSTRO_PROJECT_ROOT / "python/python/bystro/proteomics" / "uniprot_id_gene_name_mapping.csv"
     )
