@@ -107,8 +107,8 @@
       build_date: 2018-09-07T19:32:00
       dist: true
       features:
-      - name2
       - name
+      - name2
       from: txStart
       local_files:
       - hg38.kgXref.chr*.with_dbnsfp.gz
@@ -120,8 +120,8 @@
       build_date: 2018-09-07T19:32:00
       dist: true
       features:
-      - name2
       - name
+      - name2
       from: txStart
       local_files:
       - hg38.kgXref.chr*.with_dbnsfp.gz
