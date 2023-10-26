@@ -5,6 +5,7 @@ import time
 import pytest
 from bystro.search.index.handler import go as upload_and_index_vcf
 from bystro.search.utils.opensearch import gather_opensearch_args
+from bystro.proteomics.annotation_interface import get_annotation_result_from_query
 from bystro.utils.config import (
     BYSTRO_PROJECT_ROOT,
     get_mapping_config,
@@ -53,9 +54,7 @@ def test_get_annotation_result_from_query_integration():
     index_name = "trio_trim_vep_annotation_for_integration_testing_purposes"
     ensure_annotation_file_present(index_name)
     user_query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
-    samples_genes_df = get_annotation_results_from_query(
-        user_query_string, index_name, opensearch_client
-    )
+    samples_genes_df = get_annotation_result_from_query(user_query_string, index_name, opensearch_client)
     assert samples_genes_df.shape == (1610, 7)
     assert {"1805", "1847", "4805"} == set(samples_genes_df.sample_id.unique())
     assert 689 == len(samples_genes_df.gene_name.unique())
