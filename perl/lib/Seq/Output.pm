@@ -35,8 +35,10 @@ sub BUILD {
   my $minIdx          = min(@trackOutIndices);
   my $maxIdx          = max(@trackOutIndices);
 
-  my $fieldSep = $self->delimiters->fieldSeparator;
-  my $missChar = $self->delimiters->emptyFieldChar;
+  # Cache delimiters to avoid method calls in hot loop
+  $self->{_emptyFieldChar} = $self->delimiters->emptyFieldChar;
+  $self->{_overlapDelim}   = $self->delimiters->overlapDelimiter;
+  $self->{_valDelim}       = $self->delimiters->valueDelimiter;
 
   $self->{_trackOutIndices} = [];
   $self->{_trackFeatCount}  = [];
@@ -90,6 +92,27 @@ sub uniqueify {
   return $_[0];
 }
 
+sub mungeRow {
+  # $_[0] = $self
+  # $_[1] = $row
+
+  for my $row ( @{ $_[1] } ) {
+    if ( !defined $row ) {
+      $row = $_[0]->{_emptyFieldChar};
+      next;
+    }
+
+    if ( ref $row ) {
+      $row = join(
+        $_[0]->{_overlapDelim},
+        map { defined $_ ? $_ : $_[0]->{_emptyFieldChar} } @{ uniqueify($row) }
+      );
+    }
+  }
+
+  return join $_[0]->{_valDelim}, @{ uniqueify( $_[1] ) };
+}
+
 # ABSTRACT: Knows how to make an output string
 # VERSION
 
@@ -102,12 +125,10 @@ sub makeOutputString {
 
   # Re-assigning these isn't a big deal beause makeOutputString
   # Called very few times; expected to be called every few thousand rows
-  my $missChar     = $self->delimiters->emptyFieldChar;
-  my $overlapDelim = $self->delimiters->overlapDelimiter;
-  my $posDelim     = $self->delimiters->positionDelimiter;
-  my $valDelim     = $self->delimiters->valueDelimiter;
-  my $fieldSep     = $self->delimiters->fieldSeparator;
-  my $featCounts   = $self->{_trackFeatCounts};
+  my $missChar   = $self->delimiters->emptyFieldChar;
+  my $posDelim   = $self->delimiters->positionDelimiter;
+  my $fieldSep   = $self->delimiters->fieldSeparator;
+  my $featCounts = $self->{_trackFeatCounts};
 
   for my $row (@$outputDataAref) {
     next if !$row;
@@ -133,17 +154,15 @@ sub makeOutputString {
         if ( @{ $row->[$oIdx] } == 1 ) {
           if ( !defined $row->[$oIdx][0] ) {
             $row->[$oIdx] = $missChar;
-
             next;
           }
 
           if ( ref $row->[$oIdx][0] ) {
-            $row->[$oIdx] = join( $valDelim, @{ uniqueify( $row->[$oIdx][0] ) } );
+            $row->[$oIdx] = $self->mungeRow( $row->[$oIdx][0] );
             next;
           }
 
           $row->[$oIdx] = $row->[$oIdx][0];
-
           next;
         }
 
@@ -155,19 +174,12 @@ sub makeOutputString {
         # It's an array, for instance, CADD scores are
         $row->[$oIdx] = join(
           $posDelim,
-          map {
-            defined $_
-              ? (
-              ref $_
-              ?
-                # at this position this feature has multiple values
-                join( $valDelim, map { defined $_ ? $_ : $missChar } @{ uniqueify($_) } )
-              :
-                # at this position this feature has 1 value
-                $_
-              )
-              : $missChar
-          } @{ uniqueify( $row->[$oIdx] ) }
+          uniqueify(
+            [
+              map { !defined $_ ? $missChar : ref $_ ? $self->mungeRow($_) : $_ }
+                @{ $row->[$oIdx] }
+            ]
+          )
         );
 
         next;
@@ -179,7 +191,6 @@ sub makeOutputString {
       for my $featIdx ( 0 .. $featCounts->[$oIdx] ) {
         if ( !defined $row->[$oIdx][$featIdx] ) {
           $row->[$oIdx][$featIdx] = $missChar;
-
           next;
         }
 
@@ -194,40 +205,16 @@ sub makeOutputString {
           # Typically we have a scalar
           if ( !ref $row->[$oIdx][$featIdx][0] ) {
             $row->[$oIdx][$featIdx] = $row->[$oIdx][$featIdx][0];
-
             next;
           }
 
-          $row->[$oIdx][$featIdx] = join(
-            $valDelim,
-            @{
-              uniqueify(
-                [
-                  map {
-                    defined $_
-                      ? (
-                      ref $_
-                      ?
-                        # at this position this feature has multiple values
-                        join( $overlapDelim, map { defined $_ ? $_ : $missChar } @{ uniqueify($_) } )
-                      :
-                        # at this position this feature has 1 value
-                        $_
-                      )
-                      : $missChar
-                  } @{ $row->[$oIdx][$featIdx][0] }
-                ]
-              )
-            }
-          );
-
+          $row->[$oIdx][$featIdx] = $self->mungeRow( $row->[$oIdx][$featIdx][0] );
           next;
         }
 
         for my $posData ( @{ $row->[$oIdx][$featIdx] } ) {
           if ( !defined $posData ) {
             $posData = $missChar;
-
             next;
           }
 
@@ -236,36 +223,7 @@ sub makeOutputString {
             next;
           }
 
-          # At this position, the feature is nested to some degree
-          # This is often seen where say one transcript
-          # has many descriptive values in one feature
-          # Say it has 2 names
-          # We want to nest those names, so that we can maintain name/transcript
-          # order, ala
-          # featureTranscrpipt \t featureTranscriptNames
-          # t1;t2 \t t1_name1\\t1_name2;t2_onlyName
-          $posData = join(
-            $valDelim,
-            @{
-              uniqueify(
-                [
-                  map {
-                    defined $_
-                      ? (
-                      ref $_
-                      ?
-                        # at this position this feature has multiple values
-                        join( $overlapDelim, map { defined $_ ? $_ : $missChar } @{ uniqueify($_) } )
-                      :
-                        # at this position this feature has 1 value
-                        $_
-                      )
-                      : $missChar
-                  } @{$posData}
-                ]
-              )
-            }
-          );
+          $posData = $self->mungeRow($posData);
         }
 
         $row->[$oIdx][$featIdx] =
