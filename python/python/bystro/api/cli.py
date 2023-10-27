@@ -5,7 +5,6 @@ import sys
 
 import requests
 import psycopg2
-import yaml
 import json
 
 from msgspec import Struct, json as mjson
