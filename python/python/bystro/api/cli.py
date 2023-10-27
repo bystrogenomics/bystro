@@ -480,64 +480,45 @@ def query(args: argparse.Namespace) -> None:
 
     state, auth_header = authenticate(args)
 
-    with open(args.postgres_config, 'r') as file:
-        postgres_config = yaml.safe_load(file)
-
-    db_host = postgres_config['host']
-    db_port = postgres_config['port']
-    db_user = postgres_config['user']
-    db_password = postgres_config['password']
-    db_database = postgres_config['database']
-
-    conn = None
-
     try:
-        conn = psycopg2.connect(
-            host=db_host,
-            port=db_port,
-            user=db_user,
-            password=db_password,
-            database=db_database
+        query_payload = {
+            "from": args.from_value,
+            "query": {
+                "bool": {
+                    "must": {
+                        "query_string": {
+                            "default_operator": "AND",
+                            "query": args.query,
+                            "lenient": True,
+                            "phrase_slop": 5,
+                            "tie_breaker": 0.3
+                        }
+                    }
+                }
+            },
+            "size": args.size
+        }
+
+        response = requests.post(
+            state.url + f"/api/jobs/{args.job_id}/search",
+            headers=auth_header,
+            json={
+                "id": args.job_id,
+                "searchBody": query_payload
+            },
+            timeout=30
         )
-        cursor = conn.cursor()
 
-        if args.experiment_name:
-            sql_query = """
-                SELECT sample_id, subject_id
-                FROM user_experiments
-                WHERE experiment_name = %s
-                LIMIT %s
-            """
-            cursor.execute(sql_query, (args.experiment_name, args.top_n))
-            
-            rows = cursor.fetchall()
-            if not rows:
-                print(f"\nExperiment name '{args.experiment_name}' does not exist.")
-                return
-            
-            sample_subject_mappings = {row[0]: row[1] for row in rows}
-            print("\nSample ID => Subject ID mappings for Experiment:", args.experiment_name)
-            print(json.dumps(sample_subject_mappings, indent=4))
-            return
+        if response.status_code != 200:
+            raise RuntimeError(f"Query failed with status: {response.status_code}. Error: \n{response.text}\n")
 
-        sql_query = "SELECT sample_id, subject_id FROM user_experiments"
-        cursor.execute(sql_query)
+        query_results = response.json()
 
-        sample_subject_mappings = {row[1]: row[0] for row in cursor.fetchall()}
+        print("\nQuery Results:")
+        print(json.dumps(query_results, indent=4))
 
-        if args.query:
-            modified_query = args.query
-            for subject_id, sample_id in sample_subject_mappings.items():
-                modified_query = modified_query.replace(subject_id, str(sample_id))
-
-            print("\nOriginal Query:", args.query)
-            print("Modified Query:", modified_query)
-
-    except psycopg2.Error as e:
-        sys.stderr.write(f"PostgreSQL connection or query failed: {e}\n")
-    finally:
-        if conn:
-            conn.close()
+    except Exception as e:
+        sys.stderr.write(f"Query failed: {e}\n")
 
 def main():
     """
@@ -649,9 +630,9 @@ def main():
     query_parser = subparsers.add_parser("query", help="Perform a query")
     query_parser.add_argument("--dir", default=DEFAULT_DIR, help="Where Bystro API login state is saved")
     query_parser.add_argument("--query", required=True, help="Query properties")
-    query_parser.add_argument("--experiment_name", help="Optional experiment_name property")
-    query_parser.add_argument("--top_n", default=10, type=int, help="Optional top_n property (default: 10)")
-    query_parser.add_argument("--postgres_config", required=True, help="Path to PostgreSQL configuration YAML file")
+    query_parser.add_argument("--size", default=10, type=int, help="How many records, max should be the maximum the server supports (default: 10)")
+    query_parser.add_argument("--from_value", default=0, type=int, help="From value from which record (default: 0)")
+    query_parser.add_argument("--job_id", required=True, type=str, help="The job the user wants to query")
     query_parser.set_defaults(func=query)
 
     args = parser.parse_args()
