@@ -17,3 +17,6 @@ beanstalkd:
     ancestry:
       submission: ancestry
       events: ancestry_events
+    proteomics:
+      submission: proteomics
+      events: proteomics_events

@@ -129,8 +129,8 @@
       build_date: 2019-09-22T04:22:00
       dist: true
       features:
-      - name2
       - name
+      - name2
       from: txStart
       local_files:
       - hg19.kgXref.chr*.with_dbnsfp.gz
@@ -142,8 +142,8 @@
       build_date: 2019-09-22T04:22:00
       dist: true
       features:
-      - name2
       - name
+      - name2
       from: txStart
       local_files:
       - hg19.kgXref.chr*.with_dbnsfp.gz
