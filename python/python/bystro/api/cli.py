@@ -152,7 +152,7 @@ def load_state(state_dir: str) -> CachedAuth | None:
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
             return mjson.decode(f.read(), type=CachedAuth)
-    
+
     return None
 
 
