@@ -157,36 +157,27 @@ sub annotateFile {
   # Are the features that come from our database
   # Meaning, we can skip anything forwarded from the pre-processor
 
-  my $outputter =
-    Seq::Output->new( { header => $finalHeader, trackOutIndices => \@allOutIndices } );
-  # my $outputFn;
-  # if($self->outputJson) {
-  #   $outputFn = \&encode_json;
-  # } else {
-  #   my $outputter = Seq::Output->new({header => $finalHeader, trackOutIndices => \@allOutIndices});
-  #   $outputFn = \$outputter->makeOutputString;
-  # }
+  my $outputter = Seq::Output->new(
+    {
+      header          => $finalHeader,
+      trackOutIndices => \@allOutIndices,
+      refTrackName    => $refTrackGetter->name
+    }
+  );
 
   ###### Processes pre-processor output passed from file reader/producer #######
   my $refTrackOutIdx = $outIndicesMap->{ $refTrackGetter->name };
 
+  #Accessors are amazingly slow; it takes as long to call ->name as track->get
+  #after accounting for the nubmer of calls to ->name
   my %wantedChromosomes = %{ $refTrackGetter->chromosomes };
   my $maxDel            = $self->maxDel;
 
-  #Accessors are amazingly slow; it takes as long to call ->name as track->get
-  #after accounting for the nubmer of calls to ->name
-  # my @trackNames = map { $_->name } @{$self->_tracks};
-
   my $outJson = $self->outputJson;
-
-  # TODO: don't annotate MT (GRCh37) if MT not explicitly specified
-  # to avoid issues between GRCh37 and hg19 chrM vs MT
-  # my %normalizedNames = %{$self->normalizedWantedChrs};
 
   mce_loop_f {
     #my ($mce, $slurp_ref, $chunk_id) = @_;
     #    $_[0], $_[1],     $_[2]
-    #open my $MEM_FH, '<', $slurp_ref; binmode $MEM_FH, ':raw';
     open my $MEM_FH, '<', $_[1];
     binmode $MEM_FH, ':raw';
 
@@ -246,7 +237,6 @@ sub annotateFile {
             # Note that position_1_based - (negativeDelLength + 2) == position_0_based + (delLength - 1)
             if ( $fields[4] < $maxDel ) {
               @indelDbData = ( $fields[1] .. $fields[1] - ( $maxDel + 2 ) );
-              # $self->log('info', "$fields[0]:$fields[1]: long deletion. Annotating up to $maxDel");
             }
             else {
               @indelDbData = ( $fields[1] .. $fields[1] - ( $fields[4] + 2 ) );
