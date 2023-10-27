@@ -1,5 +1,0 @@
-db_host: <postgres_ip_address>
-db_port: <postgres_port>
-db_name: <progres_db_name>
-db_user: <postgres_user>
-db_password: <postgres_password>
