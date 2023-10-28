@@ -28,11 +28,16 @@ class IndexJobCompleteMessage(CompletedJobMessage, frozen=True, kw_only=True):
 
 
 class BinomialMafFilter(
-    Struct, frozen=True, tag="binomMaf", tag_field="key", forbid_unknown_fields=True
+    Struct,
+    frozen=True,
+    tag="binomMaf",
+    tag_field="key",
+    forbid_unknown_fields=True,
+    rename="camel",
 ):
     """
     Filter out rows that are extreme outliers, comparing the in-sample estimate of allele frequency,
-    the `sampleMaf` from the indexed annotation, to the "true" population allele freuqency estimate
+    the `sampleMaf` from the indexed annotation, to the "true" population allele frequency estimate
     from the `estimates` parameter.
 
     This filters operates on the assumption that the alleles are binomially distributed,
@@ -42,30 +47,39 @@ class BinomialMafFilter(
     rejection region. A 2 tailed test is used.
 
     Since very rare mutations we may have unreliable population estimates, if the in-sample
-    allele frequency `sampelMaf` is less than the `privateMaf` threshold,
+    allele frequency `sampleMaf` is less than the `privateMaf` threshold,
     we retain the variant regardless of whether it is an outlier.
 
     Parameters
     ----------
-    privateMaf : float
+    private_maf : float
         The rare frequency threshold. If the sampleMaf is less than this value, the variant is retained
-    snpOnly : bool
+    snp_only : bool
         Whether or not only single nucleotide variants (SNPs) should be considered
-    numSamples : int
+    num_samples : int
         The number of samples in the population
     estimates : list[str]
         The names of the columns that contain the population allele frequency estimates
+    crit_value : float, optional
+        The critical value defining the rejection region. A 2 tail test is used,
+        so the rejection region is `1-(critValue*2)`.
+        Default: 0.025
     """
 
-    privateMaf: float
-    snpOnly: bool
-    numSamples: int
+    private_maf: float
+    snp_only: bool
+    num_samples: int
     estimates: list[str]
-    critValue: float | None = 0.05
+    crit_value: float | None = 0.025
 
 
 class HWEFilter(
-    Struct, frozen=True, tag="hwe", tag_field="key", forbid_unknown_fields=True
+    Struct,
+    frozen=True,
+    tag="hwe",
+    tag_field="key",
+    forbid_unknown_fields=True,
+    rename="camel",
 ):
     """
     A Hardy-Weinberg Equilibrium (HWE) filter,
@@ -73,15 +87,15 @@ class HWEFilter(
 
     Parameters
     ----------
-    numSamples : int
+    num_samples : int
         Number of samples in the population
-    critValue : float, optional
+    crit_value : float, optional
         The critical value for the chi-squared test.
-        Default: 0.05
+        Default: 0.025
     """
 
-    numSamples: int
-    critValue: float | None = 0.05
+    num_samples: int
+    crit_value: float | None = 0.025
 
 
 class SaveJobData(BaseMessage, frozen=True):
