@@ -31,8 +31,30 @@ class BinomialMafFilter(
     Struct, frozen=True, tag="binomMaf", tag_field="key", forbid_unknown_fields=True
 ):
     """
-    Example: {'critValue': '.05', 'estimates': ['gnomad.genomes.af', 'gnomad.exomes.af'],
-             'privateMaf': 0.0001, 'snpOnly': True, 'numSamples': 3, 'key': 'binomialMaf'}
+    Filter out rows that are extreme outliers, comparing the in-sample estimate of allele frequency,
+    the `sampleMaf` from the indexed annotation, to the "true" population allele freuqency estimate
+    from the `estimates` parameter.
+
+    This filters operates on the assumption that the alleles are binomially distributed,
+    and uses the normal approximation to the binomial distribution to identify outliers.
+
+    A variant is considered an outlier if the `sampleMaf` is outside the `1-(critValue*2)`
+    rejection region. A 2 tailed test is used.
+
+    Since very rare mutations we may have unreliable population estimates, if the in-sample
+    allele frequency `sampelMaf` is less than the `privateMaf` threshold,
+    we retain the variant regardless of whether it is an outlier.
+
+    Parameters
+    ----------
+    privateMaf : float
+        The rare frequency threshold. If the sampleMaf is less than this value, the variant is retained
+    snpOnly : bool
+        Whether or not only single nucleotide variants (SNPs) should be considered
+    numSamples : int
+        The number of samples in the population
+    estimates : list[str]
+        The names of the columns that contain the population allele frequency estimates
     """
 
     privateMaf: float
@@ -46,7 +68,16 @@ class HWEFilter(
     Struct, frozen=True, tag="hwe", tag_field="key", forbid_unknown_fields=True
 ):
     """
-    Example: {'critValue': '.05', 'numSamples': 3, 'key': 'hwe'}
+    A Hardy-Weinberg Equilibrium (HWE) filter,
+    which filters out variants that are not in HWE.
+
+    Parameters
+    ----------
+    numSamples : int
+        Number of samples in the population
+    critValue : float, optional
+        The critical value for the chi-squared test.
+        Default: 0.05
     """
 
     numSamples: int
