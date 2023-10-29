@@ -15,7 +15,7 @@ sort:
       refresh_interval: -1
       number_of_replicas: 0
       number_of_shards: 6
-      codec: best_compression
+      codec: zstd
     analysis:
       normalizer:
         lowercase_normalizer:
