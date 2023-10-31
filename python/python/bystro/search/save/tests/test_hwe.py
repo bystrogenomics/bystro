@@ -17,14 +17,17 @@ def test_out_of_hwe_proportions():
     }
 
     # Expected proportions based on 0.5 maf:
-    #  expect_hets = 2 * p * (1 - p) * n = 2 * 0.5 * (1 - 0.5) * 100 = 50
-    #  expect_homozygotes_ref = (p**2) * n = (0.5**2) * 100 = 25
-    #  expect_homozygotes_alt = n - (expect_hets + expect_homozygotes_ref) = 100 - (50 + 25) = 25
+    #  expected hets are:  2 * p * (1 - p) * n = 50
+    #  expected homozygous reference = (p**2) * n = (0.5**2) * 100 = 25
+    #  expected homozygous alternate =  100 - (50 + 25) = 25 # noqa: ERA001
 
     # With 100 samples and .9999 heterozygosity, we have 99 hets, 1 homozygote, and no reference
     # our chi2 test statistic is:
-    # (((99 - 50) ** 2) / 50) + (((1 - 25) ** 2) / 25) + (((0 - 25) ** 2) / 25) = 96.06
-    # which is greater than our critical value of 3.84, so we should fail the row (fail_filter(doc) is True)
+    # (((99 - 50) ** 2) / 50) +
+    # (((1 - 25) ** 2) / 25) +
+    # (((0 - 25) ** 2) / 25) # noqa: ERA001
+    # = 96.06
+    # which is greater than our critical value of 3.84, so we should fail the row
 
     res = fails_filter(doc)
     assert res.size == 1
@@ -43,12 +46,8 @@ def test_in_hwe_proportions():
         "homozygosity": [[0.25]],
     }
 
-    # Expected proportions based on 0.5 maf:
-    #  expect_hets = 2 * p * (1 - p) * n = 2 * 0.5 * (1 - 0.5) * 100 = 50
-    #  expect_homozygotes_ref = (p**2) * n = (0.5**2) * 100 = 25
-    #  expect_homozygotes_alt = n - (expect_hets + expect_homozygotes_ref) = 100 - (50 + 25) = 25
-
-    # With heterozygosity at .25, we have 25 hets, 25 homozygotes, and 50 reference, which is the expected proportino, so we shouldn't fail
+    # With heterozygosity at .25, we have 25 hets, 25 homozygotes, and 50 reference,
+    # which is the expected proportion, so we shouldn't fail
 
     res = fails_filter(doc)
     assert res.size == 1
