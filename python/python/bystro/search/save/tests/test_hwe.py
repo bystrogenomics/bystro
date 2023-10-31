@@ -30,8 +30,8 @@ def test_out_of_hwe_proportions():
     # which is greater than our critical value of 3.84, so we should fail the row
 
     res = fails_filter(doc)
-    assert res.size == 1
-    assert bool(res) is True
+
+    assert res is True
 
 
 def test_in_hwe_proportions():
@@ -50,8 +50,8 @@ def test_in_hwe_proportions():
     # which is the expected proportion, so we shouldn't fail
 
     res = fails_filter(doc)
-    assert res.size == 1
-    assert bool(res) is False
+
+    assert res is False
 
 
 def test_makeHweFilter_sampleMaf_zero():
@@ -68,8 +68,8 @@ def test_makeHweFilter_sampleMaf_zero():
 
     # When sampleMaf is 0, we skip the site
     res = fails_filter(doc)
-    assert res.size == 1
-    assert bool(res) is False
+
+    assert res is False
 
 
 @patch("bystro.search.save.hwe.logger.warning")
