@@ -474,7 +474,7 @@ def query(args: argparse.Namespace) -> None:
     ----------
     args : argparse.Namespace
         The arguments passed to the command.
-    dir : str, optional 
+    dir : str, optional
         The directory where the Bystro API login state is saved.
     query : str, required
         The search query string to be used for fetching data.
@@ -484,11 +484,11 @@ def query(args: argparse.Namespace) -> None:
         The record offset from which to start retrieval in the query.
     job_id : str, required
         The unique identifier of the job to query.
-    
+
     Returns
     -------
     QueryResults
-        The queried results 
+        The queried results
     """
 
     state, auth_header = authenticate(args)
@@ -642,9 +642,9 @@ def main():
 
     query_parser = subparsers.add_parser("query", help="The OpenSearch query string query, e.g. (cadd: >= 20)")
     query_parser.add_argument("--dir", default=DEFAULT_DIR, help="Where Bystro API login state is saved")
-    query_parser.add_argument("--query", required=True, help="Query properties")
+    query_parser.add_argument("--query", required=True, help="The OpenSearch query string query, e.g. (cadd: >= 20)")
     query_parser.add_argument("--size", default=10, type=int, help="How many records (default: 10)")
-    query_parser.add_argument("--from_", default=0, type=int, help="From value from which record (default: 0)")
+    query_parser.add_argument("--from_", default=0, type=int, help="The first record to return from the matching results. Used for pagination.")
     query_parser.add_argument("--job_id", required=True, type=str, help="The job id to query")
     query_parser.set_defaults(func=query)
 
