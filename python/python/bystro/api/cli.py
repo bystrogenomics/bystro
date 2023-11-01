@@ -182,7 +182,9 @@ def save_state(data: CachedAuth, state_dir: str, print_result=True) -> None:
         f.write(encoded_data)
 
     if print_result:
-        print(f"\nSaved auth credentials to {save_path}:\n{mjson.format(encoded_data, indent=4)}")
+        print(
+            f"\nSaved auth credentials to {save_path}:\n{mjson.format(encoded_data, indent=4)}"
+        )
 
 
 def signup(args: argparse.Namespace, print_result=True) -> CachedAuth:
@@ -299,6 +301,7 @@ def authenticate(args) -> tuple[CachedAuth, dict]:
 
     header = {"Authorization": f"Bearer {state.access_token}"}
     return state, header
+
 
 def get_jobs(
     args: argparse.Namespace, print_result=True
@@ -466,6 +469,7 @@ def get_user(args: argparse.Namespace, print_result=True) -> UserProfile:
 
     return user_profile
 
+
 def query(args: argparse.Namespace) -> None:
     """
     Performs a query search within the specified job with the given arguments.
@@ -504,26 +508,26 @@ def query(args: argparse.Namespace) -> None:
                             "query": args.query,
                             "lenient": True,
                             "phrase_slop": 5,
-                            "tie_breaker": 0.3
+                            "tie_breaker": 0.3,
                         }
                     }
                 }
             },
-            "size": args.size
+            "size": args.size,
         }
 
         response = requests.post(
             state.url + f"/api/jobs/{args.job_id}/search",
             headers=auth_header,
-            json={
-                "id": args.job_id,
-                "searchBody": query_payload
-            },
-            timeout=30
+            json={"id": args.job_id, "searchBody": query_payload},
+            timeout=30,
         )
 
         if response.status_code != 200:
-            raise RuntimeError(f"Query failed with status: {response.status_code}. Error: \n{response.text}\n")
+            raise RuntimeError(
+                (f"Query failed with status: {response.status_code}. "
+                f"Error: \n{response.text}\n")
+            )
 
         query_results = response.json()
 
@@ -532,6 +536,7 @@ def query(args: argparse.Namespace) -> None:
 
     except Exception as e:
         sys.stderr.write(f"Query failed: {e}\n")
+
 
 def main():
     """
@@ -640,12 +645,29 @@ def main():
     )
     jobs_parser.set_defaults(func=get_jobs)
 
-    query_parser = subparsers.add_parser("query", help="The OpenSearch query string query, e.g. (cadd: >= 20)")
-    query_parser.add_argument("--dir", default=DEFAULT_DIR, help="Where Bystro API login state is saved")
-    query_parser.add_argument("--query", required=True, help="The OpenSearch query string query, e.g. (cadd: >= 20)")
-    query_parser.add_argument("--size", default=10, type=int, help="How many records (default: 10)")
-    query_parser.add_argument("--from_", default=0, type=int, help="The first record to return from the matching results. Used for pagination.")
-    query_parser.add_argument("--job_id", required=True, type=str, help="The job id to query")
+    query_parser = subparsers.add_parser(
+        "query", help="The OpenSearch query string query, e.g. (cadd: >= 20)"
+    )
+    query_parser.add_argument(
+        "--dir", default=DEFAULT_DIR, help="Where Bystro API login state is saved"
+    )
+    query_parser.add_argument(
+        "--query",
+        required=True,
+        help="The OpenSearch query string query, e.g. (cadd: >= 20)",
+    )
+    query_parser.add_argument(
+        "--size", default=10, type=int, help="How many records (default: 10)"
+    )
+    query_parser.add_argument(
+        "--from_",
+        default=0,
+        type=int,
+        help="The first record to return from the matching results. Used for pagination",
+    )
+    query_parser.add_argument(
+        "--job_id", required=True, type=str, help="The job id to query"
+    )
     query_parser.set_defaults(func=query)
 
     args = parser.parse_args()
