@@ -44,6 +44,14 @@ from bystro.covariance._base_covariance import (  # type: ignore
     _entropy,  # type: ignore
     _entropy_subset,  # type: ignore
     _mutual_information,  # type: ignore
+    inv_sherman_woodbury_fa,  # type: ignore
+    _get_conditional_parameters_sherman_woodbury,  # type: ignore
+    _conditional_score_sherman_woodbury,  # type: ignore
+    _conditional_score_samples_sherman_woodbury,  # type: ignore
+    _marginal_score_sherman_woodbury,  # type: ignore
+    _marginal_score_samples_sherman_woodbury,  # type: ignore
+    _score_sherman_woodbury,  # type: ignore
+    _score_samples_sherman_woodbury,  # type: ignore
 )  # type: ignore
 from numpy import linalg as la
 from datetime import datetime as dt
@@ -104,7 +112,22 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
             The covariance matrix
         """
 
-    def get_precision(self):
+    @abstractmethod
+    def get_noise(self):
+        """
+        Returns the observational noise as a diagnoal matrix
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        Lambda : np.array-like(p,p)
+            The observational noise
+        """
+
+    def get_precision(self, sherman_woodbury=False):
         """
         Gets the precision matrix defined as the inverse of the covariance
 
@@ -117,8 +140,11 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         precision : np.array-like(p,p)
             The inverse of the covariance matrix
         """
-        covariance = self.get_covariance()
-        precision = la.inv(covariance)
+        if sherman_woodbury is False:
+            covariance = self.get_covariance()
+            precision = la.inv(covariance)
+        else:
+            precision = inv_sherman_woodbury_fa(self.get_noise(), self.W)
         return precision
 
     def get_stable_rank(self):
@@ -140,13 +166,13 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         srank = _get_stable_rank(covariance)
         return srank
 
-    def transform(self, X):
+    def transform(self, X, sherman_woodbury=False):
         """
         This returns the latent variable estimates given X
 
         Parameters
         ----------
-        X : np array-like,(N_samples,p
+        X : np array-like,(N_samples,p)
             The data to transform.
 
         Returns
@@ -154,8 +180,49 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         S : np.array-like,(N_samples,n_components)
             The factor estimates
         """
-        prec = self.get_precision()
-        coefs = np.dot(self.W_, prec)
+        if sherman_woodbury is False:
+            prec = self.get_precision()
+            coefs = np.dot(self.W_, prec)
+        else:
+            Lambda = self.get_noise()
+            A = la.solve(Lambda, self.W_)
+            B = np.dot(A, self.W_.T)
+            IpB = np.eye(self.n_components) + B
+            end = la.solve(IpB, A)
+            coefs = A - np.dot(B, end)
+
+        S = np.dot(X, coefs.T)
+        return S
+
+    def transform_subset(
+        self, X, observed_feature_idxs, sherman_woodbury=False
+    ):
+        """
+        This returns the latent variable estimates given partial observations
+        contained in X
+
+        Parameters
+        ----------
+        X : np array-like,(N_samples,sum(observed_feature_idxs))
+            The data to transform.
+
+        observed_feature_idxs: np.array-like,(sum(p),)
+            The observation locations
+
+        Returns
+        -------
+        S : np.array-like,(N_samples,n_components)
+            The factor estimates
+        """
+        if sherman_woodbury is False:
+            prec = self.get_precision()
+            coefs = np.dot(self.W_, prec)
+        else:
+            Lambda = self.get_noise()
+            coefs, _ = _get_conditional_parameters_sherman_woodbury(
+                Lambda, self.W_, observed_feature_idxs
+            )
+
         S = np.dot(X, coefs.T)
         return S
 
@@ -189,8 +256,11 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
                 covariance, X, observed_feature_idxs, weights=weights
             )
         else:
-            raise NotImplementedError(
-                "Sherman-Woodbury matrix inversion not implemented yet"
+            avg_score = _conditional_score_sherman_woodbury(
+                self.get_noise(),
+                self.W_,
+                observed_feature_idxs,
+                weights=weights,
             )
         return avg_score
 
@@ -210,6 +280,9 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         observed_feature_idxs: np.array-like,(p,)
             The observation locations
 
+        sherman_woodbury : bool,default=False
+            Whether to use the sherman_woodbury matrix identity
+
         Returns
         -------
         scores : float
@@ -221,8 +294,8 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
                 covariance, X, observed_feature_idxs
             )
         else:
-            raise NotImplementedError(
-                "Sherman-Woodbury matrix inversion not implemented yet"
+            scores = _conditional_score_samples_sherman_woodbury(
+                self.get_noise(), self.W_, X, observed_feature_idxs
             )
         return scores
 
@@ -254,8 +327,12 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
                 covariance, X, observed_feature_idxs, weights=weights
             )
         else:
-            raise NotImplementedError(
-                "Sherman-Woodbury matrix inversion not implemented yet"
+            avg_score = _marginal_score_sherman_woodbury(
+                self.get_noise(),
+                self.W_,
+                X,
+                observed_feature_idxs,
+                weights=weights,
             )
         return avg_score
 
@@ -284,8 +361,8 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
                 covariance, X, observed_feature_idxs
             )
         else:
-            raise NotImplementedError(
-                "Sherman-Woodbury matrix inversion not implemented yet"
+            scores = _marginal_score_samples_sherman_woodbury(
+                self.get_noise(), self.W_, X, observed_feature_idxs
             )
         return scores
 
@@ -310,8 +387,8 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
             covariance = self.get_covariance()
             avg_score = _score(covariance, X, weights=weights)
         else:
-            raise NotImplementedError(
-                "Sherman-Woodbury matrix inversion not implemented yet"
+            avg_score = _score_sherman_woodbury(
+                self.get_noise(), self.W_, X, weights=weights
             )
         return avg_score
 
@@ -333,8 +410,8 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
             covariance = self.get_covariance()
             scores = _score_samples(covariance, X)
         else:
-            raise NotImplementedError(
-                "Sherman-Woodbury matrix inversion not implemented yet"
+            scores = _score_samples_sherman_woodbury(
+                self.get_noise(), self.W_, X
             )
         return scores
 

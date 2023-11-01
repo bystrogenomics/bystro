@@ -1,7 +1,14 @@
 import numpy as np
 import numpy.linalg as la
 import scipy.stats as st  # type: ignore
-from bystro.covariance._base_covariance import BaseCovariance, _score_samples
+from bystro.covariance._base_covariance import (
+    BaseCovariance,
+    _score_samples,
+    inv_sherman_woodbury_fa,
+    inv_sherman_woodbury_full,
+    ldet_sherman_woodbury_fa,
+    ldet_sherman_woodbury_full,
+)
 
 
 def test_get_stable_rank():
@@ -162,3 +169,55 @@ def test_mutual_information():
     _, ldet = la.slogdet(model.covariance)
     mi_est = 0.5 * (ldet1 + ldet2 - ldet)
     assert np.abs(mi_est - mi) < 1e-5
+
+
+def test_inv_sherman_woodbury_fa():
+    rng = np.random.default_rng(2021)
+    p = 20
+    Lambda = np.diag(rng.gamma(1, 1, size=p))
+    W = rng.normal(size=(3, p))
+    Sigma = Lambda + np.dot(W.T, W)
+    Sigma_inv = la.inv(Sigma)
+    Sigma_inv_woodbury = inv_sherman_woodbury_fa(Lambda, W)
+    assert np.sum(np.abs(Sigma_inv - Sigma_inv_woodbury)) < 1e-5
+
+
+def test_inv_sherman_woodbury_full():
+    rng = np.random.default_rng(2021)
+    p = 20
+    L = 4
+    A = rng.normal(size=(p, p))
+    U = rng.normal(size=(p, L))
+    B = rng.normal(size=(L, L))
+    V = rng.normal(size=(L, p))
+    UBV = np.dot(np.dot(U, B), V)
+    AUBV = A + UBV
+    AUBVi = la.inv(AUBV)
+    AUBVi_woodbury = inv_sherman_woodbury_full(A, U, B, V)
+    assert np.sum(np.abs(AUBVi - AUBVi_woodbury)) < 1e-5
+
+
+def test_ldet_sherman_woodbury_fa():
+    rng = np.random.default_rng(2021)
+    p = 20
+    Lambda = np.diag(rng.gamma(1, 1, size=p))
+    W = rng.normal(size=(3, p))
+    Sigma = Lambda + np.dot(W.T, W)
+    _, ldet = la.slogdet(Sigma)
+    ldet_woodbury = ldet_sherman_woodbury_fa(Lambda, W)
+    assert np.abs(ldet - ldet_woodbury) < 1e-5
+
+
+def test_ldet_sherman_woodbury_full():
+    rng = np.random.default_rng(2021)
+    p = 20
+    L = 4
+    A = rng.normal(size=(p, p))
+    U = rng.normal(size=(p, L))
+    B = rng.normal(size=(L, L))
+    V = rng.normal(size=(L, p))
+    UBV = np.dot(np.dot(U, B), V)
+    AUBV = A + UBV
+    _, ldet = la.slogdet(AUBV)
+    ldet_woodbury = ldet_sherman_woodbury_full(A, U, B, V)
+    assert np.abs(ldet - ldet_woodbury) < 1e-5
