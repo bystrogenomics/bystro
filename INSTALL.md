@@ -1,3 +1,17 @@
+# Table of Contents
+
+1. [Installing Bystro Using Docker](#installing-bystro-using-docker)
+   - [Building the Latest Version of Bystro in Docker](#building-the-latest-version-of-bystro-in-docker)
+2. [Direct (Non-Docker) Installation](#direct-non-docker-installation)
+   - [Installing the Bystro Annotator (Perl/CLI)](#installing-the-bystro-annotator-perlcli)
+     - [For RPM-based Distros (Fedora, Red Hat, CentOS, etc.)](#fedora-redhat-centos-opensuse-mandriva)
+     - [For MacOS (Tested on High Sierra)](#macos-tested-on-highsierra-interactive)
+     - [For Ubuntu](#ubuntu)
+   - [Installing Bystro Python Libraries and CLI Tools](#installing-the-bystro-python-libraries-and-cli-tools)
+3. [Configuring the Bystro Annotator](#configuring-the-bystro-annotator)
+4. [Databases](#databases)
+5. [Running Your First Annotation](#running-your-first-annotation)
+
 For most users, we recommend not installing the software, and using https://bystro.io, where the software is hosted
 
 The web app provides full functionality for any size experiment, a convenient search interface, and excellent performance
@@ -127,19 +141,3 @@ The outputs will be:
 - Statistics JSON file `outPrefix.statistics.json`
 - Statistics tab-separated file: `outPrefix.statistics.tsv`
   - Removing the `--run_statistics` flag will skip the generation of `outPrefix.statistics.*` files
-
-
-## Setting up Python on Amazon Linux 2
-
-Install these beforehand:
-- openssl-devel
-   - sudo yum install openssl-devel
-- rustup
-   - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-   - source ~/.bashrc
-   - rustc --version
-
-Install Anaconda (current version as of Oct 18, 2023)
-- wget https://repo.anaconda.com/archive/Anaconda3-2023.09-0-Linux-x86_64.sh
-- bash Anaconda3-2023.09-0-Linux-x86_64.sh 
-- source ~/.bashrc
