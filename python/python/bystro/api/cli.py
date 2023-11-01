@@ -4,7 +4,6 @@ import os
 import sys
 
 import requests
-import psycopg2
 import json
 
 from msgspec import Struct, json as mjson
@@ -469,19 +468,34 @@ def get_user(args: argparse.Namespace, print_result=True) -> UserProfile:
 
 def query(args: argparse.Namespace) -> None:
     """
-    Perform a query with the given arguments.
+    Performs a query search within the specified job with the given arguments.
 
     Parameters
     ----------
     args : argparse.Namespace
         The arguments passed to the command.
+    dir : str, optional 
+        The directory where the Bystro API login state is saved.
+    query : str, required
+        The search query string to be used for fetching data.
+    size : int, optional
+        The number of records to retrieve in the query response.
+    from_ : int, optional
+        The record offset from which to start retrieval in the query.
+    job_id : str, required
+        The unique identifier of the job to query.
+    
+    Returns
+    -------
+    QueryResults
+        The queried results 
     """
 
     state, auth_header = authenticate(args)
 
     try:
         query_payload = {
-            "from": args.from_value,
+            "from": args.from_,
             "query": {
                 "bool": {
                     "must": {
@@ -626,12 +640,12 @@ def main():
     )
     jobs_parser.set_defaults(func=get_jobs)
 
-    query_parser = subparsers.add_parser("query", help="Perform a query")
+    query_parser = subparsers.add_parser("query", help="The OpenSearch query string query, e.g. (cadd: >= 20)")
     query_parser.add_argument("--dir", default=DEFAULT_DIR, help="Where Bystro API login state is saved")
     query_parser.add_argument("--query", required=True, help="Query properties")
-    query_parser.add_argument("--size", default=10, type=int, help="How many records, max should be the maximum the server supports (default: 10)")
-    query_parser.add_argument("--from_value", default=0, type=int, help="From value from which record (default: 0)")
-    query_parser.add_argument("--job_id", required=True, type=str, help="The job the user wants to query")
+    query_parser.add_argument("--size", default=10, type=int, help="How many records (default: 10)")
+    query_parser.add_argument("--from_", default=0, type=int, help="From value from which record (default: 0)")
+    query_parser.add_argument("--job_id", required=True, type=str, help="The job id to query")
     query_parser.set_defaults(func=query)
 
     args = parser.parse_args()
