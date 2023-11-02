@@ -269,6 +269,42 @@ def _conditional_score(covariance, X, idxs, weights=None):
     )
     return avg_score
 
+def _conditional_score_sherman_woodbury(Lambda, W, X, idxs, weights=None):
+    """
+    Returns the predictive log-likelihood of a subset of data.
+
+    mean(log p(X[idx==1]|X[idx==0],covariance))
+
+    Parameters
+    ----------
+    Lambda : np.array-like,(p,p)
+        The diagonal noise matrix
+
+    W : np.array-like,(L,p)
+        The low rank component
+
+    X : np.array-like,(N,sum(idxs))
+        The centered data
+
+    idxs: np.array-like,(sum(p),)
+        The observation locations
+
+    weights : np.array-like,(N,),default=None
+        The optional weights on the samples. Don't have negative values.
+        Average value forced to 1.
+
+    Returns
+    -------
+    avg_score : float
+        Average log likelihood
+    """
+    weights = (
+        np.ones(X.shape[0]) if weights is None else weights / np.mean(weights)
+    )
+    avg_score = np.mean(
+        weights * _conditional_score_samples_sherman_woodbury(Lambda, W, X, idxs)
+    )
+    return avg_score
 
 def _conditional_score_samples(covariance, X, idxs):
     """
@@ -310,6 +346,33 @@ def _conditional_score_samples(covariance, X, idxs):
 
     return scores
 
+def _conditional_score_samples_sherman_woodbury(Lambda, W, X, idxs):
+    """
+    Return the conditional log likelihood of each sample, that is
+
+    log p(X[idx==1]|X[idx==0],covariance) = N(Sigma_10Sigma_00^{-1}x_0,
+                                    Sigma_11-Sigma_10Sigma_00^{-1}Sigma_01)
+
+    Parameters
+    ----------
+    Lambda : np.array-like,(p,p)
+        The diagonal noise matrix
+
+    W : np.array-like,(L,p)
+        The low rank component
+
+    X : np.array-like,(N,p)
+        The centered data
+
+    idxs: np.array-like,(p,)
+        The observation locations
+
+    Returns
+    -------
+    scores : float
+        Log likelihood for each sample
+    """
+
 
 def _get_conditional_parameters(covariance, idxs):
     """
@@ -350,8 +413,11 @@ def _get_conditional_parameters_sherman_woodbury(Lambda, W, idxs):
 
     Parameters
     ----------
-    covariance : np.array-like,(p,p)
-        The covariance matrix
+    Lambda : np.array-like,(p,p)
+        The diagonal noise matrix
+
+    W : np.array-like,(L,p)
+        The low rank component
 
     idxs: np.array-like,(p,)
         The observed covariates
@@ -402,6 +468,12 @@ def _marginal_score_sherman_woodbury(Lambda, W, X, idxs, weights=None):
 
     Parameters
     ----------
+    Lambda : np.array-like,(p,p)
+        The diagonal noise matrix
+
+    W : np.array-like,(L,p)
+        The low rank component
+
     X : np.array-like,(N,sum(idxs))
         The centered data
 
@@ -458,6 +530,12 @@ def _marginal_score_samples_sherman_woodbury(Lambda, W, X, idxs):
 
     Parameters
     ----------
+    Lambda : np.array-like,(p,p)
+        The diagonal noise matrix
+
+    W : np.array-like,(L,p)
+        The low rank component
+
     X : np.array-like,(N,sum(idxs))
         The centered data
 
@@ -508,6 +586,12 @@ def _score_sherman_woodbury(Lambda, W, X, weights=None):
 
     Parameters
     ----------
+    Lambda : np.array-like,(p,p)
+        The diagonal noise matrix
+
+    W : np.array-like,(L,p)
+        The low rank component
+
     X : np.array-like,(N,sum(p))
         The centered data
 
@@ -562,6 +646,12 @@ def _score_samples_sherman_woodbury(Lambda, W, X):
 
     Parameters
     ----------
+    Lambda : np.array-like,(p,p)
+        The diagonal noise matrix
+
+    W : np.array-like,(L,p)
+        The low rank component
+
     X : np.array-like,(N,sum(p))
         The centered data
 
@@ -570,6 +660,22 @@ def _score_samples_sherman_woodbury(Lambda, W, X):
     scores : float
         Log likelihood for each sample
     """
+    p = Lambda.shape[1]
+    I_L = np.eye(W.shape[0])
+    term1 = -p/2 * np.log(2*np.pi)
+    term2 = -0.5 * ldet_sherman_woodbury_fa(Lambda,W)
+
+    Li = la.inv(Lambda)
+    C = np.dot(Li,W.T)
+    CtW = np.dot(C.T,W)
+    middle = I_L + CtW
+    end = la.solve(middle,C.T) #(I + WLiW^T)^{-1}WLi
+    quad_init = la.solve(Li - np.dot(C,end),X)
+    difference = X * np.transpose(quad_init)
+    term3 = np.sum(difference,axis=1)
+
+    scores = term1 + term2 + 0.5 * term3
+    return scores
 
 
 def _entropy(covariance):

@@ -4,6 +4,12 @@ import scipy.stats as st  # type: ignore
 from bystro.covariance._base_covariance import (
     BaseCovariance,
     _score_samples,
+    _conditional_score_sherman_woodbury,
+    _conditional_score_samples_sherman_woodbury,
+    _marginal_score_sherman_woodbury,
+    _marginal_score_samples_sherman_woodbury,
+    _score_sherman_woodbury,
+    _score_samples_sherman_woodbury,
     inv_sherman_woodbury_fa,
     inv_sherman_woodbury_full,
     ldet_sherman_woodbury_fa,
@@ -62,6 +68,23 @@ def test_conditional_score_samples():
     assert np.all(np.abs(score_samples - score_samples2) < 1e-8)
 
 
+def test_conditional_score_samples_sherman_woodbury():
+    rng = np.random.default_rng(2021)
+    X = rng.normal(size=(1000, 10))
+    W = rng.normal(size=(3, 10))
+    Lambda = np.diag(np.abs(rng.normal(size=10)))
+    cov = Lambda + np.dot(W.T, W)
+    model = BaseCovariance()
+    model.covariance = cov
+    idxs = np.ones(10)
+    idxs[8:] = 0
+    score_samples = model.conditional_score_samples(X, idxs)
+    score_samples_sw = _conditional_score_samples_sherman_woodbury(
+        Lambda, W, X, idxs
+    )
+    assert np.all(np.abs(score_samples - score_samples_sw) < 1e-5)
+
+
 def test_conditional_score():
     rng = np.random.default_rng(2021)
     X = rng.normal(size=(1000, 10))
@@ -84,6 +107,21 @@ def test_conditional_score():
     assert np.abs(np.mean(score_samples2) - score) < 1e-8
 
 
+def test_conditional_score_sherman_woodbury():
+    rng = np.random.default_rng(2021)
+    X = rng.normal(size=(1000, 10))
+    W = rng.normal(size=(3, 10))
+    Lambda = np.diag(np.abs(rng.normal(size=10)))
+    cov = Lambda + np.dot(W.T, W)
+    model = BaseCovariance()
+    model.covariance = cov
+    idxs = np.ones(10)
+    idxs[8:] = 0
+    score = model.conditional_score(X, idxs)
+    score_sw = _conditional_score_sherman_woodbury(Lambda, W, X, idxs)
+    assert np.abs(score_sw - score) < 1e-8
+
+
 def test_marginal_score_samples():
     rng = np.random.default_rng(2021)
     X = rng.normal(size=(150, 10))
@@ -95,6 +133,22 @@ def test_marginal_score_samples():
     mvn = st.multivariate_normal(mean=np.zeros(8), cov=model.covariance[:8, :8])
     logpdf = mvn.logpdf(X[:, :8])
     assert np.all(np.abs(logpdf - score_samples) < 1e-8)
+
+
+def test_marginal_score_samples_sherman_woodbury():
+    rng = np.random.default_rng(2021)
+    X = rng.normal(size=(150, 10))
+    W = rng.normal(size=(3, 10))
+    Lambda = np.diag(np.abs(rng.normal(size=10)))
+    model = BaseCovariance()
+    model.covariance = Lambda + np.dot(W.T, W)
+    idxs = np.ones(10)
+    idxs[8:] = 0
+    score_samples = model.marginal_score_samples(X[:, idxs == 1], idxs)
+    score_samples_sw = _marginal_score_samples_sherman_woodbury(
+        Lambda, W, X[:, idxs == 1], idxs
+    )
+    assert np.all(np.abs(score_samples_sw - score_samples) < 1e-8)
 
 
 def test_marginal_score():
@@ -110,6 +164,22 @@ def test_marginal_score():
     assert np.mean(logpdf) == score
 
 
+def test_marginal_score_sherman_woodbury():
+    rng = np.random.default_rng(2021)
+    X = rng.normal(size=(150, 10))
+    W = rng.normal(size=(3, 10))
+    Lambda = np.diag(np.abs(rng.normal(size=10)))
+    model = BaseCovariance()
+    model.covariance = Lambda + np.dot(W.T, W)
+    idxs = np.ones(10)
+    idxs[8:] = 0
+    score = model.marginal_score(X[:, idxs == 1], idxs)
+    score_sw = _marginal_score_sherman_woodbury(
+        Lambda, W, X[:, idxs == 1], idxs
+    )
+    assert np.abs(score - score_sw) < 1e-6
+
+
 def test_score():
     rng = np.random.default_rng(2021)
     X = rng.normal(size=(1000, 10))
@@ -121,6 +191,19 @@ def test_score():
     assert np.mean(logpdf) == score
 
 
+def test_score_sherman_woodbury():
+    rng = np.random.default_rng(2021)
+    X = rng.normal(size=(1000, 10))
+    W = rng.normal(size=(3, 10))
+    Lambda = np.diag(np.abs(rng.normal(size=10)))
+    model = BaseCovariance()
+    model.covariance = Lambda + np.dot(W.T, W)
+    weights = 1.0 * np.ones(1000)
+    score = model.score(X, weights=weights)
+    score_sw = _score_sherman_woodbury(Lambda, W, X, weights=weights)
+    assert np.abs(score - score_sw) < 1e-6
+
+
 def test_score_samples():
     rng = np.random.default_rng(2021)
     X = rng.normal(size=(1000, 10))
@@ -130,6 +213,18 @@ def test_score_samples():
     mvn = st.multivariate_normal(mean=np.zeros(10), cov=model.covariance)
     logpdf = mvn.logpdf(X)
     assert np.all(np.abs(logpdf - score_samples) < 1e-8)
+
+
+def test_score_samples_sherman_woodbury():
+    rng = np.random.default_rng(2021)
+    X = rng.normal(size=(1000, 10))
+    W = rng.normal(size=(3, 10))
+    Lambda = np.diag(np.abs(rng.normal(size=10)))
+    model = BaseCovariance()
+    model.covariance = Lambda + np.dot(W.T, W)
+    score_samples = model.score_samples(X)
+    score_samples_sw = _score_samples_sherman_woodbury(Lambda, W, X)
+    assert np.all(np.abs(score_samples_sw - score_samples) < 1e-8)
 
 
 def test_entropy():
