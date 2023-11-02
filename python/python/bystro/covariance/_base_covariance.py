@@ -269,6 +269,7 @@ def _conditional_score(covariance, X, idxs, weights=None):
     )
     return avg_score
 
+
 def _conditional_score_sherman_woodbury(Lambda, W, X, idxs, weights=None):
     """
     Returns the predictive log-likelihood of a subset of data.
@@ -302,9 +303,11 @@ def _conditional_score_sherman_woodbury(Lambda, W, X, idxs, weights=None):
         np.ones(X.shape[0]) if weights is None else weights / np.mean(weights)
     )
     avg_score = np.mean(
-        weights * _conditional_score_samples_sherman_woodbury(Lambda, W, X, idxs)
+        weights
+        * _conditional_score_samples_sherman_woodbury(Lambda, W, X, idxs)
     )
     return avg_score
+
 
 def _conditional_score_samples(covariance, X, idxs):
     """
@@ -346,6 +349,7 @@ def _conditional_score_samples(covariance, X, idxs):
 
     return scores
 
+
 def _conditional_score_samples_sherman_woodbury(Lambda, W, X, idxs):
     """
     Return the conditional log likelihood of each sample, that is
@@ -372,6 +376,30 @@ def _conditional_score_samples_sherman_woodbury(Lambda, W, X, idxs):
     scores : float
         Log likelihood for each sample
     """
+    I_L = np.eye(W.shape[0])
+    X_obs = X[:, idxs == 1]
+    X_miss = X[:, idxs == 0]
+    W_obs = W[:, idxs == 1]
+    W_miss = W[:, idxs == 0]
+    Lo = Lambda[np.ix_(idxs == 1, idxs == 1)]
+    Lm = Lambda[np.ix_(idxs == 0, idxs == 0)]
+
+    Wmo = np.dot(W_miss.T, W_obs)
+    B = np.dot(W_obs, np.dot(la.inv(Lo), W_obs.T))
+    IpB = I_L + B
+    Wmo = np.dot(W_miss.T, W_obs)
+    coef = la.solve(IpB, Wmo)
+    mu_ = np.dot(X_obs, coef)
+
+    WmtB = np.dot(W_miss.T, B)
+    BWm = np.dot(B, W_miss)
+    end = la.solve(IpB, BWm)
+    term3 = np.dot(WmtB, end)
+
+    covariance_bar = Lm + np.dot(W_miss.T, W_miss) - term3
+
+    scores = _score_samples(covariance_bar, X_miss - mu_)
+    return scores
 
 
 def _get_conditional_parameters(covariance, idxs):
@@ -430,6 +458,26 @@ def _get_conditional_parameters_sherman_woodbury(Lambda, W, idxs):
     covariance_bar : array-like
         Conditional covariance
     """
+    I_L = np.eye(W.shape[0])
+    W_obs = W[:, idxs == 1]
+    W_miss = W[:, idxs == 0]
+    Lo = Lambda[np.ix_(idxs == 1, idxs == 1)]
+    Lm = Lambda[np.ix_(idxs == 0, idxs == 0)]
+
+    Wmo = np.dot(W_miss.T, W_obs)
+    B = np.dot(W_obs, np.dot(la.inv(Lo), W_obs.T))
+    IpB = I_L + B
+    Wmo = np.dot(W_miss.T, W_obs)
+    beta_bar = la.solve(IpB, Wmo)
+
+    WmtB = np.dot(W_miss.T, B)
+    BWm = np.dot(B, W_miss)
+    end = la.solve(IpB, BWm)
+    term3 = np.dot(WmtB, end)
+
+    covariance_bar = Lm + np.dot(W_miss.T, W_miss) - term3
+
+    return beta_bar, covariance_bar
 
 
 def _marginal_score(covariance, X, idxs, weights=None):
@@ -549,7 +597,7 @@ def _marginal_score_samples_sherman_woodbury(Lambda, W, X, idxs):
     """
     Lambda_sub = Lambda[idxs == 1, idxs == 1]
     W_sub = W[:, idxs == 1]
-    scores = _score_samples_sherman_woodbury(Lambda_sub, W_sub)
+    scores = _score_samples_sherman_woodbury(Lambda_sub, W_sub, X)
     return scores
 
 
@@ -662,17 +710,17 @@ def _score_samples_sherman_woodbury(Lambda, W, X):
     """
     p = Lambda.shape[1]
     I_L = np.eye(W.shape[0])
-    term1 = -p/2 * np.log(2*np.pi)
-    term2 = -0.5 * ldet_sherman_woodbury_fa(Lambda,W)
+    term1 = -p / 2 * np.log(2 * np.pi)
+    term2 = -0.5 * ldet_sherman_woodbury_fa(Lambda, W)
 
     Li = la.inv(Lambda)
-    C = np.dot(Li,W.T)
-    CtW = np.dot(C.T,W)
+    C = np.dot(Li, W.T)
+    CtW = np.dot(C.T, W)
     middle = I_L + CtW
-    end = la.solve(middle,C.T) #(I + WLiW^T)^{-1}WLi
-    quad_init = la.solve(Li - np.dot(C,end),X)
+    end = la.solve(middle, C.T)  # (I + WLiW^T)^{-1}WLi
+    quad_init = la.solve(Li - np.dot(C, end), X)
     difference = X * np.transpose(quad_init)
-    term3 = np.sum(difference,axis=1)
+    term3 = np.sum(difference, axis=1)
 
     scores = term1 + term2 + 0.5 * term3
     return scores
