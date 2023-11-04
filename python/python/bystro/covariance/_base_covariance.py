@@ -591,7 +591,6 @@ def _marginal_score_samples_sherman_woodbury(Lambda, W, X, idxs):
         Average log likelihood
     """
     Lambda_sub = Lambda[np.ix_(idxs == 1, idxs == 1)]
-    # Lambda_sub = Lambda[idxs == 1, idxs == 1]
     W_sub = W[:, idxs == 1]
     scores = _score_samples_sherman_woodbury(Lambda_sub, W_sub, X)
     return scores
