@@ -1,7 +1,7 @@
 import numpy as np
 import numpy.linalg as la
 import scipy.stats as st  # type: ignore
-from bystro.covariance._base_covariance import (
+from _base_covariance import (
     BaseCovariance,
     _score_samples,
     _conditional_score_sherman_woodbury,
@@ -14,6 +14,8 @@ from bystro.covariance._base_covariance import (
     inv_sherman_woodbury_full,
     ldet_sherman_woodbury_fa,
     ldet_sherman_woodbury_full,
+    _get_conditional_parameters_sherman_woodbury,
+    _get_conditional_parameters,
 )
 
 
@@ -316,3 +318,16 @@ def test_ldet_sherman_woodbury_full():
     _, ldet = la.slogdet(AUBV)
     ldet_woodbury = ldet_sherman_woodbury_full(A, U, B, V)
     assert np.abs(ldet - ldet_woodbury) < 1e-5
+
+
+def test_get_conditional_parameters_sherman_woodbury():
+    rng = np.random.default_rng(2021)
+    W = rng.normal(size=(3, 10))
+    Lambda = np.diag(np.abs(rng.normal(size=10)))
+    covariance = Lambda + np.dot(W.T, W)
+    idxs = np.ones(10)
+    idxs[5:] = 0
+    bb, cb = _get_conditional_parameters(covariance, idxs)
+    bw, cw = _get_conditional_parameters_sherman_woodbury(Lambda, W, idxs)
+    assert np.sum(np.abs(bb - bw)) < 1e-8
+    assert np.sum(np.abs(cb - cw)) < 1e-8

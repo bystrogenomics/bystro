@@ -225,10 +225,8 @@ def _predict(covariance, Xobs, idxs):
     preds : np.array-like,(N_samples,p-\\sum idxs)
         The predicted values
     """
-    covariance_sub = covariance[idxs == 1]
-    covariance_22 = covariance_sub[:, idxs == 1]
-    covariance_21 = covariance_sub[:, idxs == 0]
-
+    covariance_22 = covariance[np.ix_(idxs == 1, idxs == 1)]
+    covariance_21 = covariance[np.ix_(idxs == 1, idxs == 0)]
     beta_bar = la.solve(covariance_22, covariance_21)
 
     preds = np.dot(Xobs[:, idxs == 1], beta_bar)
@@ -332,12 +330,9 @@ def _conditional_score_samples(covariance, X, idxs):
     scores : float
         Log likelihood for each sample
     """
-    covariance_sub = covariance[idxs == 1]
-    covariance_22 = covariance_sub[:, idxs == 1]
-    covariance_21 = covariance_sub[:, idxs == 0]
-
-    covariance_nonsub = covariance[idxs == 0]
-    covariance_11 = covariance_nonsub[:, idxs == 0]
+    covariance_22 = covariance[np.ix_(idxs == 1, idxs == 1)]
+    covariance_21 = covariance[np.ix_(idxs == 1, idxs == 0)]
+    covariance_11 = covariance[np.ix_(idxs == 0, idxs == 0)]
 
     beta_bar = la.solve(covariance_22, covariance_21)
     Second_part = np.dot(covariance_21.T, beta_bar)
@@ -384,20 +379,20 @@ def _conditional_score_samples_sherman_woodbury(Lambda, W, X, idxs):
     Lo = Lambda[np.ix_(idxs == 1, idxs == 1)]
     Lm = Lambda[np.ix_(idxs == 0, idxs == 0)]
 
-    Wmo = np.dot(W_miss.T, W_obs)
-    B = np.dot(W_obs, np.dot(la.inv(Lo), W_obs.T))
+    C = np.dot(W_obs, la.inv(Lo))
+    B = np.dot(C, W_obs.T)
+
     IpB = I_L + B
-    Wmo = np.dot(W_miss.T, W_obs)
-    coef = la.solve(IpB, Wmo)
-    mu_ = np.dot(X_obs, coef)
+    back = la.solve(IpB, C)
+    second = C - np.dot(B, back)
+    coef = np.dot(W_miss.T, second)
 
-    WmtB = np.dot(W_miss.T, B)
-    BWm = np.dot(B, W_miss)
-    end = la.solve(IpB, BWm)
-    term3 = np.dot(WmtB, end)
+    mu_ = np.dot(X_obs, coef.T)
+    middle = B - np.dot(B, la.solve(IpB, B))
+    term2 = np.dot(W_miss.T, np.dot(middle, W_miss))
 
-    covariance_bar = Lm + np.dot(W_miss.T, W_miss) - term3
-
+    covariance11 = Lm + np.dot(W_miss.T, W_miss)
+    covariance_bar = covariance11 - term2
     scores = _score_samples(covariance_bar, X_miss - mu_)
     return scores
 
@@ -464,20 +459,20 @@ def _get_conditional_parameters_sherman_woodbury(Lambda, W, idxs):
     Lo = Lambda[np.ix_(idxs == 1, idxs == 1)]
     Lm = Lambda[np.ix_(idxs == 0, idxs == 0)]
 
-    Wmo = np.dot(W_miss.T, W_obs)
-    B = np.dot(W_obs, np.dot(la.inv(Lo), W_obs.T))
+    C = np.dot(W_obs, la.inv(Lo))
+    B = np.dot(C, W_obs.T)
+
     IpB = I_L + B
-    Wmo = np.dot(W_miss.T, W_obs)
-    beta_bar = la.solve(IpB, Wmo)
+    back = la.solve(IpB, C)
+    second = C - np.dot(B, back)
+    coef = np.dot(W_miss.T, second)
 
-    WmtB = np.dot(W_miss.T, B)
-    BWm = np.dot(B, W_miss)
-    end = la.solve(IpB, BWm)
-    term3 = np.dot(WmtB, end)
+    middle = B - np.dot(B, la.solve(IpB, B))
+    term2 = np.dot(W_miss.T, np.dot(middle, W_miss))
 
-    covariance_bar = Lm + np.dot(W_miss.T, W_miss) - term3
-
-    return beta_bar, covariance_bar
+    covariance11 = Lm + np.dot(W_miss.T, W_miss)
+    covariance_bar = covariance11 - term2
+    return coef, covariance_bar
 
 
 def _marginal_score(covariance, X, idxs, weights=None):
@@ -595,7 +590,8 @@ def _marginal_score_samples_sherman_woodbury(Lambda, W, X, idxs):
     scores : float
         Average log likelihood
     """
-    Lambda_sub = Lambda[idxs == 1, idxs == 1]
+    Lambda_sub = Lambda[np.ix_(idxs == 1, idxs == 1)]
+    # Lambda_sub = Lambda[idxs == 1, idxs == 1]
     W_sub = W[:, idxs == 1]
     scores = _score_samples_sherman_woodbury(Lambda_sub, W_sub, X)
     return scores
@@ -715,14 +711,16 @@ def _score_samples_sherman_woodbury(Lambda, W, X):
 
     Li = la.inv(Lambda)
     C = np.dot(Li, W.T)
-    CtW = np.dot(C.T, W)
+    CtW = np.dot(C.T, W.T)
     middle = I_L + CtW
     end = la.solve(middle, C.T)  # (I + WLiW^T)^{-1}WLi
-    quad_init = la.solve(Li - np.dot(C, end), X)
+    prod = np.dot(C, end)
+    Lip = Li - prod
+    quad_init = np.dot(Lip, X.T)
     difference = X * np.transpose(quad_init)
     term3 = np.sum(difference, axis=1)
 
-    scores = term1 + term2 + 0.5 * term3
+    scores = term1 + term2 - 0.5 * term3
     return scores
 
 
@@ -821,8 +819,8 @@ def ldet_sherman_woodbury_fa(Lambda, W):
         The log determinant of the covariance matrix
     """
     _, ldetL = la.slogdet(Lambda)
-    LiW = la.solve(Lambda, W)
-    WtLiW = np.dot(W.T, LiW)
+    LiW = la.solve(Lambda, W.T)
+    WtLiW = np.dot(W, LiW)
     IWtLiW = np.eye(W.shape[0]) + WtLiW
     _, ldetP = la.slogdet(IWtLiW)
     log_determinant = ldetP + ldetL
@@ -842,7 +840,7 @@ def ldet_sherman_woodbury_full(A, U, B, V):
     """
     _, ldetA = la.slogdet(A)
     _, ldetB = la.slogdet(B)
-    term2 = np.dot(V.T, la.solve(A, U))
+    term2 = np.dot(V, la.solve(A, U))
     term1 = la.inv(B)
     _, ldetProd = la.slogdet(term1 + term2)
     log_determinant = ldetA + ldetB + ldetProd
@@ -870,7 +868,7 @@ def inv_sherman_woodbury_fa(Lambda, W):
     I_L = np.eye(W.shape[0])
     I_p = np.eye(W.shape[1])
     Lambda_inv = la.inv(Lambda)
-    WLi = la.solve(W, Lambda)
+    WLi = np.dot(W, Lambda_inv)
     inner = I_L + np.dot(WLi, W.T)
     inner_inv = la.inv(inner)
     end = np.dot(inner_inv, WLi)
