@@ -1,7 +1,7 @@
 import numpy as np  # type: ignore
 import numpy.linalg as la  # type: ignore
 import scipy.stats as st  # type: ignore
-from _base_covariance import (
+from bystro.covariance._base_covariance import (
     BaseCovariance,  # type: ignore
     _score_samples,  # type: ignore
     _conditional_score_sherman_woodbury,  # type: ignore
