@@ -33,6 +33,10 @@ None
 from abc import abstractmethod, ABC
 
 import numpy as np
+from numpy import linalg as la
+from numpy.typing import NDArray
+from typing import Optional
+
 from bystro.covariance._base_covariance import (  # type: ignore
     _get_stable_rank,  # type: ignore
     _conditional_score,  # type: ignore
@@ -53,7 +57,6 @@ from bystro.covariance._base_covariance import (  # type: ignore
     _score_sherman_woodbury,  # type: ignore
     _score_samples_sherman_woodbury,  # type: ignore
 )  # type: ignore
-from numpy import linalg as la
 from datetime import datetime as dt
 import pytz  # type: ignore
 from bystro._template_sgd_np import BaseSGDModel  # type: ignore
@@ -76,6 +79,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
             The date/time that the object was created
         """
         self.n_components = int(n_components)
+        self.W_ = None
         self.creationDate = dt.now(pytz.utc)
 
     @abstractmethod
@@ -127,7 +131,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
             The observational noise
         """
 
-    def get_precision(self, sherman_woodbury=False):
+    def get_precision(self, sherman_woodbury: bool = False):
         """
         Gets the precision matrix defined as the inverse of the covariance
 
@@ -144,7 +148,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
             covariance = self.get_covariance()
             precision = la.inv(covariance)
         else:
-            precision = inv_sherman_woodbury_fa(self.get_noise(), self.W)
+            precision = inv_sherman_woodbury_fa(self.get_noise(), self.W_)
         return precision
 
     def get_stable_rank(self):
@@ -166,7 +170,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         srank = _get_stable_rank(covariance)
         return srank
 
-    def transform(self, X, sherman_woodbury=False):
+    def transform(self, X: NDArray, sherman_woodbury: bool = False):
         """
         This returns the latent variable estimates given X
 
@@ -195,7 +199,10 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         return S
 
     def transform_subset(
-        self, X, observed_feature_idxs, sherman_woodbury=False
+        self,
+        X: NDArray,
+        observed_feature_idxs: NDArray,
+        sherman_woodbury: bool = False,
     ):
         """
         This returns the latent variable estimates given partial observations
@@ -227,7 +234,11 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         return S
 
     def conditional_score(
-        self, X, observed_feature_idxs, weights=None, sherman_woodbury=False
+        self,
+        X: NDArray,
+        observed_feature_idxs: NDArray,
+        weights: Optional[NDArray] = None,
+        sherman_woodbury: bool = False,
     ):
         """
         Returns the predictive log-likelihood of a subset of data.
@@ -259,13 +270,17 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
             avg_score = _conditional_score_sherman_woodbury(
                 self.get_noise(),
                 self.W_,
+                X,
                 observed_feature_idxs,
                 weights=weights,
             )
         return avg_score
 
     def conditional_score_samples(
-        self, X, observed_feature_idxs, sherman_woodbury=False
+        self,
+        X: NDArray,
+        observed_feature_idxs: NDArray,
+        sherman_woodbury: bool = False,
     ):
         """
         Return the conditional log likelihood of each sample, that is
@@ -300,7 +315,11 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         return scores
 
     def marginal_score(
-        self, X, observed_feature_idxs, weights=None, sherman_woodbury=False
+        self,
+        X: NDArray,
+        observed_feature_idxs: NDArray,
+        weights: Optional[NDArray] = None,
+        sherman_woodbury: bool = False,
     ):
         """
         Returns the marginal log-likelihood of a subset of data
@@ -337,7 +356,10 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         return avg_score
 
     def marginal_score_samples(
-        self, X, observed_feature_idxs, sherman_woodbury=False
+        self,
+        X: NDArray,
+        observed_feature_idxs: NDArray,
+        sherman_woodbury: bool = False,
     ):
         """
         Returns the marginal log-likelihood of a subset of data
@@ -366,7 +388,12 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
             )
         return scores
 
-    def score(self, X, weights=None, sherman_woodbury=False):
+    def score(
+        self,
+        X: NDArray,
+        weights: Optional[NDArray] = None,
+        sherman_woodbury: bool = False,
+    ):
         """
         Returns the average log liklihood of data.
 
@@ -392,7 +419,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
             )
         return avg_score
 
-    def score_samples(self, X, sherman_woodbury=False):
+    def score_samples(self, X: NDArray, sherman_woodbury: bool = False):
         """
         Return the log likelihood of each sample
 
@@ -433,7 +460,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         entropy = _entropy(covariance)
         return entropy
 
-    def get_entropy_subset(self, observed_feature_idxs):
+    def get_entropy_subset(self, observed_feature_idxs: NDArray):
         """
         Computes the entropy of a subset of the Gaussian distribution
         parameterized by covariance.
@@ -453,7 +480,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         return entropy
 
     def mutual_information(
-        self, observed_feature_idxs1, observed_feature_idxs2
+        self, observed_feature_idxs1: NDArray, observed_feature_idxs2: NDArray
     ):
         """
         This computes the mutual information bewteen the two sets of

@@ -42,10 +42,10 @@ import numpy as np
 
 from sklearn.decomposition import PCA  # type: ignore
 from tqdm import trange  # type: ignore
-import torch # type: ignore
-from torch import nn # type: ignore
-from torch.distributions.multivariate_normal import MultivariateNormal # type: ignore
-from torch.distributions.gamma import Gamma # type: ignore
+import torch  # type: ignore
+from torch import nn  # type: ignore
+from torch.distributions.multivariate_normal import MultivariateNormal  # type: ignore
+from torch.distributions.gamma import Gamma  # type: ignore
 
 from bystro.supervised_ppca._misc_np import softplus_inverse_np
 from bystro.supervised_ppca._base import BasePCASGDModel
@@ -404,10 +404,7 @@ class SPCA(BasePCASGDModel):
                 for k in range(self.n_groups)
             ]
 
-            sigma = torch.sum(
-                list_covs,
-                dim=0,
-            )
+            sigma = torch.sum(list_covs, dim=0,)
             WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
             Sigma = WWT + torch.diag(sigma)
 

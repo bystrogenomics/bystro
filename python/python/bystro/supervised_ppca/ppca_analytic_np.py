@@ -15,6 +15,7 @@ None
 """
 import numpy as np
 import numpy.linalg as la
+
 from bystro.supervised_ppca._base import BaseGaussianFactorModel
 
 
@@ -28,7 +29,7 @@ class PPCAanalytic(BaseGaussianFactorModel):
         The latent dimensionality
     """
 
-    def __init__(self, n_components=2):
+    def __init__(self, n_components: int = 2):
         super().__init__(n_components=n_components)
 
     def __repr__(self):
@@ -40,7 +41,7 @@ class PPCAanalytic(BaseGaussianFactorModel):
 
         Parameters
         ----------
-        X : np.array-like,(n_samples,n_covariates)
+        X : NDArray,(n_samples,n_covariates)
             The data
 
         Returns
@@ -52,7 +53,7 @@ class PPCAanalytic(BaseGaussianFactorModel):
         L, p = self.n_components, self.p
 
         U, s, V = la.svd(X, full_matrices=False)
-        eigenvals = s**2 / (N - 1)
+        eigenvals = s ** 2 / (N - 1)
 
         var = 1.0 / (p - L) * (np.sum(eigenvals) - np.sum(eigenvals[:L]))
 
@@ -72,7 +73,7 @@ class PPCAanalytic(BaseGaussianFactorModel):
 
         Returns
         -------
-        covariance : np.array-like(p,p)
+        covariance : NDArray,(p,p)
             The covariance matrix
         """
         covariance = np.dot(self.W_.T, self.W_) + self.sigma2_ * np.eye(self.p)
@@ -88,13 +89,13 @@ class PPCAanalytic(BaseGaussianFactorModel):
 
         Returns
         -------
-        Lambda : np.array-like,(p,p)
+        Lambda : NDArray,(p,p)
             The observational noise
         """
         Lambda = self.sigma2_ * np.eye(self.p)
         return Lambda
 
-    def _store_instance_variables(self, trainable_variables):
+    def _store_instance_variables(self, trainable_variables: dict):
         """
         Saves the learned variables
 
@@ -105,7 +106,7 @@ class PPCAanalytic(BaseGaussianFactorModel):
 
         Sets
         ----
-        W_ : np.array-like,(n_components,p)
+        W_ : NDArray,(n_components,p)
             The loadings
 
         sigma2_ : float

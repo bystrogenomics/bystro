@@ -33,9 +33,9 @@ None
 import numpy as np
 
 from tqdm import trange
-import torch # type: ignore
-from torch import nn # type: ignore
-from torch.distributions.multivariate_normal import MultivariateNormal # type: ignore
+import torch  # type: ignore
+from torch import nn  # type: ignore
+from torch.distributions.multivariate_normal import MultivariateNormal  # type: ignore
 from sklearn.decomposition import PCA  # type: ignore
 
 from bystro.supervised_ppca._misc_np import softplus_inverse_np
