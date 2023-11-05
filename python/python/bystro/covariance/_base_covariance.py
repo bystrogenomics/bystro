@@ -90,10 +90,10 @@ _entropy_subset(covariance,idxs)
 _mutual_information(covariance,idxs1,idxs2):
 
 """
-import numpy as np # type: ignore
-from numpy import linalg as la # type: ignore
-from datetime import datetime as dt # type: ignore
-import pytz # type: ignore
+import numpy as np
+from numpy import linalg as la
+from datetime import datetime as dt
+import pytz
 
 
 class BaseCovariance(object):

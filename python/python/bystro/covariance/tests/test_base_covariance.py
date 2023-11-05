@@ -1,22 +1,22 @@
-import numpy as np  # type: ignore
-import numpy.linalg as la  # type: ignore
-import scipy.stats as st  # type: ignore
-from _base_covariance import (
-    BaseCovariance,  # type: ignore
-    _score_samples,  # type: ignore
-    _conditional_score_sherman_woodbury,  # type: ignore
-    _conditional_score_samples_sherman_woodbury,  # type: ignore
-    _marginal_score_sherman_woodbury,  # type: ignore
-    _marginal_score_samples_sherman_woodbury,  # type: ignore
-    _score_sherman_woodbury,  # type: ignore
-    _score_samples_sherman_woodbury,  # type: ignore
-    inv_sherman_woodbury_fa,  # type: ignore
-    inv_sherman_woodbury_full,  # type: ignore
-    ldet_sherman_woodbury_fa,  # type: ignore
-    ldet_sherman_woodbury_full,  # type: ignore
-    _get_conditional_parameters_sherman_woodbury,  # type: ignore
-    _get_conditional_parameters,  # type: ignore
-)  # type: ignore
+import numpy as np
+import numpy.linalg as la
+import scipy.stats as st
+from bystro.covariance._base_covariance import (
+    BaseCovariance,
+    _score_samples,
+    _conditional_score_sherman_woodbury,
+    _conditional_score_samples_sherman_woodbury,
+    _marginal_score_sherman_woodbury,
+    _marginal_score_samples_sherman_woodbury,
+    _score_sherman_woodbury,
+    _score_samples_sherman_woodbury,
+    inv_sherman_woodbury_fa,
+    inv_sherman_woodbury_full,
+    ldet_sherman_woodbury_fa,
+    ldet_sherman_woodbury_full,
+    _get_conditional_parameters_sherman_woodbury,
+    _get_conditional_parameters,
+)
 
 
 def test_get_stable_rank():
