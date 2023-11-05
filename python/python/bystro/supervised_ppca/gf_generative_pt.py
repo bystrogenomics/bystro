@@ -39,6 +39,8 @@ Methods
 None
 """
 import numpy as np
+from numpy.typing import NDArray
+from typing import Dict, List, Optional
 
 from sklearn.decomposition import PCA  # type: ignore
 from tqdm import trange  # type: ignore
@@ -53,7 +55,10 @@ from bystro.supervised_ppca._base import BasePCASGDModel
 
 class PPCA(BasePCASGDModel):
     def __init__(
-        self, n_components=2, prior_options=None, training_options=None
+        self,
+        n_components: int = 2,
+        prior_options: Optional[dict] = None,
+        training_options: Optional[dict] = None,
     ):
         """
         This implements probabilistic PCA with stochastic gradient descent.
@@ -212,7 +217,7 @@ class PPCA(BasePCASGDModel):
 
         return log_prior
 
-    def _initialize_variables(self, X):
+    def _initialize_variables(self, X: NDArray):
         """
         Initializes the variables of the model. Right now fits a PCA model
         in sklearn, uses the loadings and sets sigma^2 to be unexplained
@@ -266,7 +271,7 @@ class PPCA(BasePCASGDModel):
             self.losses_prior[i] = log_prior
         self.losses_posterior[i] = log_posterior.detach().numpy()
 
-    def _store_instance_variables(self, trainable_variables):
+    def _store_instance_variables(self, trainable_variables: List):
         """
         Saves the learned variables
 
@@ -295,7 +300,7 @@ class PPCA(BasePCASGDModel):
         if self.training_options["batch_size"] > X.shape[0]:
             raise ValueError("Batch size exceeds number of samples")
 
-    def _fill_prior_options(self, prior_options):
+    def _fill_prior_options(self, prior_options: Dict):
         """
         Fills in options for prior parameters
 
@@ -311,7 +316,10 @@ class PPCA(BasePCASGDModel):
 
 class SPCA(BasePCASGDModel):
     def __init__(
-        self, n_components=2, prior_options=None, training_options=None
+        self,
+        n_components: int = 2,
+        prior_options: Optional[dict] = None,
+        training_options: Optional[dict] = None,
     ):
         """
         This implements supervised probabilistic component analysis. Unlike
@@ -484,7 +492,7 @@ class SPCA(BasePCASGDModel):
 
         return log_prior
 
-    def _fill_prior_options(self, prior_options):
+    def _fill_prior_options(self, prior_options: Dict):
         """
         Fills in options for prior parameters
 
@@ -497,7 +505,7 @@ class SPCA(BasePCASGDModel):
         new_dict = {**default_dict, **prior_options}
         return new_dict
 
-    def _initialize_variables(self, X):
+    def _initialize_variables(self, X: NDArray):
         """
         Initializes the variables of the model. Right now fits a PCA model
         in sklearn, uses the loadings and sets sigma^2 to be unexplained
@@ -528,7 +536,7 @@ class SPCA(BasePCASGDModel):
         ]
         return W_, sigmal_
 
-    def _store_instance_variables(self, trainable_variables):
+    def _store_instance_variables(self, trainable_variables: List):
         """
         Saves the learned variables
 
@@ -567,7 +575,10 @@ class SPCA(BasePCASGDModel):
 
 class FactorAnalysis(BasePCASGDModel):
     def __init__(
-        self, n_components=2, prior_options=None, training_options=None
+        self,
+        n_components=2,
+        prior_options: Optional[dict] = None,
+        training_options: Optional[dict] = None,
     ):
         """
         This implements factor analysis which allows for each covariate to
@@ -715,7 +726,7 @@ class FactorAnalysis(BasePCASGDModel):
 
         return log_prior
 
-    def _fill_prior_options(self, prior_options):
+    def _fill_prior_options(self, prior_options: Dict):
         """
         Fills in options for prior parameters
 
@@ -728,7 +739,7 @@ class FactorAnalysis(BasePCASGDModel):
         new_dict = {**default_dict, **prior_options}
         return new_dict
 
-    def _initialize_variables(self, X):
+    def _initialize_variables(self, X: NDArray):
         """
         Initializes the variables of the model by fitting PCA model in
         sklearn and using those loadings
@@ -758,7 +769,7 @@ class FactorAnalysis(BasePCASGDModel):
         )
         return W_, sigmal_
 
-    def _store_instance_variables(self, trainable_variables):
+    def _store_instance_variables(self, trainable_variables: Dict):
         """
         Saves the learned variables
 
