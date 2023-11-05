@@ -54,9 +54,9 @@ Methods
 -------
 _get_covariance(covariance)
 """
-from datetime import datetime as dt
-
+from numpy.typing import NDArray
 from numpy import linalg as la
+from datetime import datetime as dt
 import pytz
 
 from bystro.covariance._base_covariance import BaseCovariance
@@ -69,6 +69,7 @@ class BasePrecision(BaseCovariance):
     """
 
     def __init__(self):
+        self.precision = None
         self.creationDate = dt.now(pytz.timezone("US/Pacific"))
 
     #################
@@ -82,7 +83,7 @@ class BasePrecision(BaseCovariance):
             self.covariance = la.inv(self.precision)
         return super(BasePrecision, self).get_stable_rank()
 
-    def predict(self, Xobs, idxs):
+    def predict(self, Xobs: NDArray, idxs: NDArray):
         if not hasattr(self, "covariance"):
             self.covariance = la.inv(self.precision)
         return super(BasePrecision, self).predict(Xobs, idxs)
@@ -90,36 +91,36 @@ class BasePrecision(BaseCovariance):
     #####################################
     # Gaussian Likelihood-based methods #
     #####################################
-    def conditional_score(self, X, idxs, weights=None):
+    def conditional_score(self, X: NDArray, idxs: NDArray, weights=None):
         if not hasattr(self, "covariance"):
             self.covariance = la.inv(self.precision)
         return super(BasePrecision, self).conditional_score(
             X, idxs, weights=weights
         )
 
-    def conditional_score_samples(self, X, idxs):
+    def conditional_score_samples(self, X: NDArray, idxs: NDArray):
         if not hasattr(self, "covariance"):
             self.covariance = la.inv(self.precision)
         return super(BasePrecision, self).conditional_score_samples(X, idxs)
 
-    def marginal_score(self, X, idxs, weights=None):
+    def marginal_score(self, X: NDArray, idxs: NDArray, weights=None):
         if not hasattr(self, "covariance"):
             self.covariance = la.inv(self.precision)
         return super(BasePrecision, self).marginal_score(
             X, idxs, weights=weights
         )
 
-    def marginal_score_samples(self, X, idxs):
+    def marginal_score_samples(self, X: NDArray, idxs: NDArray):
         if not hasattr(self, "covariance"):
             self.covariance = la.inv(self.precision)
         return super(BasePrecision, self).marginal_score_samples(X, idxs)
 
-    def score(self, X, weights=None):
+    def score(self, X: NDArray, weights=None):
         if not hasattr(self, "covariance"):
             self.covariance = la.inv(self.precision)
         return super(BasePrecision, self).score(X, weights=weights)
 
-    def score_samples(self, X):
+    def score_samples(self, X: NDArray):
         if not hasattr(self, "covariance"):
             self.covariance = la.inv(self.precision)
         return super(BasePrecision, self).score_samples(X)
@@ -132,29 +133,29 @@ class BasePrecision(BaseCovariance):
             self.covariance = la.inv(self.precision)
         return super(BasePrecision, self).entropy()
 
-    def entropy_subset(self, idxs):
+    def entropy_subset(self, idxs: NDArray):
         if not hasattr(self, "covariance"):
             self.covariance = la.inv(self.precision)
         return super(BasePrecision, self).entropy_subset(idxs)
 
-    def mutual_information(self, idxs1, idxs2):
+    def mutual_information(self, idxs1: NDArray, idxs2: NDArray):
         if not hasattr(self, "covariance"):
             self.covariance = la.inv(self.precision)
         return super(BasePrecision, self).mutual_information(idxs1, idxs2)
 
 
-def _get_covariance(precision):
+def _get_covariance(precision: NDArray):
     """
     Gets the covariance matrix defined as the inverse of the precision
 
     Parameters
     ----------
-    precision : np.array-like(p,p)
+    precision : NDArray,(p,p)
         The precision matrix
 
     Returns
     -------
-    covariance : np.array-like(sum(p),sum(p))
+    covariance : NDArray,(sum(p),sum(p))
         The inverse of the precision matrix
     """
     covariance = la.inv(precision)

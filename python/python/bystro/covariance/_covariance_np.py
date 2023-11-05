@@ -14,6 +14,7 @@ BayesianCovariance(BaseCovariance):
     user-defined priors.
 """
 import numpy as np
+from numpy.typing import NDArray
 from bystro.covariance._base_covariance import BaseCovariance
 
 
@@ -25,7 +26,7 @@ class EmpiricalCovariance(BaseCovariance):
         """
         super().__init__()
 
-    def fit(self, X):
+    def fit(self, X: NDArray):
         """
         This fits a covariance matrix using samples X.
 
@@ -50,7 +51,7 @@ class BayesianCovariance(BaseCovariance):
             prior_options = {}
         self.prior_options = self._fill_prior_options(prior_options)
 
-    def fit(self, X):
+    def fit(self, X: NDArray):
         """
         This fits a covariance matrix using samples X with MAP estimation.
 

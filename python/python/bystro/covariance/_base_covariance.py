@@ -91,6 +91,7 @@ _mutual_information(covariance,idxs1,idxs2):
 
 """
 import numpy as np
+from numpy.typing import NDArray
 from numpy import linalg as la
 from datetime import datetime as dt
 import pytz
@@ -104,6 +105,7 @@ class BaseCovariance(object):
 
     def __init__(self):
         self.creationDate = dt.now(pytz.timezone("US/Pacific"))
+        self.covariance = None
 
     #################
     # Miscellaneous #
@@ -114,28 +116,28 @@ class BaseCovariance(object):
     def get_stable_rank(self):
         return _get_stable_rank(self.covariance)
 
-    def predict(self, Xobs, idxs):
+    def predict(self, Xobs: NDArray, idxs: NDArray):
         return _predict(self.covariance, Xobs, idxs)
 
     #####################################
     # Gaussian Likelihood-based methods #
     #####################################
-    def conditional_score(self, X, idxs, weights=None):
+    def conditional_score(self, X: NDArray, idxs: NDArray, weights=None):
         return _conditional_score(self.covariance, X, idxs, weights=weights)
 
-    def conditional_score_samples(self, X, idxs):
+    def conditional_score_samples(self, X: NDArray, idxs: NDArray):
         return _conditional_score_samples(self.covariance, X, idxs)
 
-    def marginal_score(self, X, idxs, weights=None):
+    def marginal_score(self, X: NDArray, idxs: NDArray, weights=None):
         return _marginal_score(self.covariance, X, idxs, weights=weights)
 
-    def marginal_score_samples(self, X, idxs):
+    def marginal_score_samples(self, X: NDArray, idxs: NDArray):
         return _marginal_score_samples(self.covariance, X, idxs)
 
-    def score(self, X, weights=None):
+    def score(self, X: NDArray, weights=None):
         return _score(self.covariance, X, weights=weights)
 
-    def score_samples(self, X):
+    def score_samples(self, X: NDArray):
         return _score_samples(self.covariance, X)
 
     #################################
@@ -144,10 +146,10 @@ class BaseCovariance(object):
     def entropy(self):
         return _entropy(self.covariance)
 
-    def entropy_subset(self, idxs):
+    def entropy_subset(self, idxs: NDArray):
         return _entropy_subset(self.covariance, idxs)
 
-    def mutual_information(self, idxs1, idxs2):
+    def mutual_information(self, idxs1: NDArray, idxs2: NDArray):
         return _mutual_information(self.covariance, idxs1, idxs2)
 
 
@@ -164,32 +166,32 @@ class BaseCovariance(object):
 ###########################################
 
 
-def _get_precision(covariance):
+def _get_precision(covariance: NDArray):
     """
     Gets the precision matrix defined as the inverse of the covariance
 
     Parameters
     ----------
-    covariance : np.array-like(p,p)
+    covariance : NDArray,(p,p)
         The covariance matrix
 
     Returns
     -------
-    precision : np.array-like(sum(p),sum(p))
+    precision : NDArray,(sum(p),sum(p))
         The inverse of the covariance matrix
     """
     precision = la.inv(covariance)
     return precision
 
 
-def _get_stable_rank(covariance):
+def _get_stable_rank(covariance: NDArray):
     """
     Returns the stable rank defined as
     ||A||_F^2/||A||^2
 
     Parameters
     ----------
-    covariance : np.array-like(p,p)
+    covariance : NDArray,(p,p)
         The covariance matrix
 
     Returns
@@ -203,7 +205,7 @@ def _get_stable_rank(covariance):
     return srank
 
 
-def _predict(covariance, Xobs, idxs):
+def _predict(covariance: NDArray, Xobs: NDArray, idxs: NDArray):
     """
     Predicts missing data using observed data. This uses the conditional
     Gaussian formula (see wikipedia multivariate gaussian). Solve allows
@@ -211,18 +213,18 @@ def _predict(covariance, Xobs, idxs):
 
     Parameters
     ----------
-    covariance : np.array-like(p,p)
+    covariance : NDArray,(p,p)
         The covariance matrix
 
-    Xobs : np array-like,(N_samples,\\sum idxs)
+    Xobs : NDArray,(N_samples,\\sum idxs)
         The observed data
 
-    idxs: np.array-like,(sum(p),)
+    idxs: NDArray,(sum(p),)
         The observation locations
 
     Returns
     -------
-    preds : np.array-like,(N_samples,p-\\sum idxs)
+    preds : NDArray,(N_samples,p-\\sum idxs)
         The predicted values
     """
     covariance_22 = covariance[np.ix_(idxs == 1, idxs == 1)]
@@ -233,7 +235,9 @@ def _predict(covariance, Xobs, idxs):
     return preds
 
 
-def _conditional_score(covariance, X, idxs, weights=None):
+def _conditional_score(
+    covariance: NDArray, X: NDArray, idxs: NDArray, weights=None
+):
     """
     Returns the predictive log-likelihood of a subset of data.
 
@@ -241,16 +245,16 @@ def _conditional_score(covariance, X, idxs, weights=None):
 
     Parameters
     ----------
-    covariance : np.array-like(p,p)
+    covariance : NDArray,(p,p)
         The covariance matrix
 
-    X : np.array-like,(N,sum(idxs))
+    X : NDArray,(N,sum(idxs))
         The centered data
 
-    idxs: np.array-like,(sum(p),)
+    idxs: NDArray,(sum(p),)
         The observation locations
 
-    weights : np.array-like,(N,),default=None
+    weights : NDArray,(N,),default=None
         The optional weights on the samples. Don't have negative values.
         Average value forced to 1.
 
@@ -268,7 +272,9 @@ def _conditional_score(covariance, X, idxs, weights=None):
     return avg_score
 
 
-def _conditional_score_sherman_woodbury(Lambda, W, X, idxs, weights=None):
+def _conditional_score_sherman_woodbury(
+    Lambda: NDArray, W: NDArray, X: NDArray, idxs: NDArray, weights=None
+):
     """
     Returns the predictive log-likelihood of a subset of data.
 
@@ -276,19 +282,19 @@ def _conditional_score_sherman_woodbury(Lambda, W, X, idxs, weights=None):
 
     Parameters
     ----------
-    Lambda : np.array-like,(p,p)
+    Lambda : NDArray,(p,p)
         The diagonal noise matrix
 
-    W : np.array-like,(L,p)
+    W : NDArray,(L,p)
         The low rank component
 
-    X : np.array-like,(N,sum(idxs))
+    X : NDArray,(N,sum(idxs))
         The centered data
 
-    idxs: np.array-like,(sum(p),)
+    idxs: NDArray,(sum(p),)
         The observation locations
 
-    weights : np.array-like,(N,),default=None
+    weights : NDArray,(N,),default=None
         The optional weights on the samples. Don't have negative values.
         Average value forced to 1.
 
@@ -307,7 +313,7 @@ def _conditional_score_sherman_woodbury(Lambda, W, X, idxs, weights=None):
     return avg_score
 
 
-def _conditional_score_samples(covariance, X, idxs):
+def _conditional_score_samples(covariance: NDArray, X: NDArray, idxs: NDArray):
     """
     Return the conditional log likelihood of each sample, that is
 
@@ -316,13 +322,13 @@ def _conditional_score_samples(covariance, X, idxs):
 
     Parameters
     ----------
-    covariance : np.array-like(p,p)
+    covariance : NDArray,(p,p)
         The covariance matrix
 
-    X : np.array-like,(N,p)
+    X : NDArray,(N,p)
         The centered data
 
-    idxs: np.array-like,(p,)
+    idxs: NDArray,(p,)
         The observation locations
 
     Returns
@@ -345,7 +351,9 @@ def _conditional_score_samples(covariance, X, idxs):
     return scores
 
 
-def _conditional_score_samples_sherman_woodbury(Lambda, W, X, idxs):
+def _conditional_score_samples_sherman_woodbury(
+    Lambda: NDArray, W: NDArray, X: NDArray, idxs: NDArray
+):
     """
     Return the conditional log likelihood of each sample, that is
 
@@ -354,16 +362,16 @@ def _conditional_score_samples_sherman_woodbury(Lambda, W, X, idxs):
 
     Parameters
     ----------
-    Lambda : np.array-like,(p,p)
+    Lambda : NDArray,(p,p)
         The diagonal noise matrix
 
-    W : np.array-like,(L,p)
+    W : NDArray,(L,p)
         The low rank component
 
-    X : np.array-like,(N,p)
+    X : NDArray,(N,p)
         The centered data
 
-    idxs: np.array-like,(p,)
+    idxs: NDArray,(p,)
         The observation locations
 
     Returns
@@ -397,16 +405,16 @@ def _conditional_score_samples_sherman_woodbury(Lambda, W, X, idxs):
     return scores
 
 
-def _get_conditional_parameters(covariance, idxs):
+def _get_conditional_parameters(covariance: NDArray, idxs: NDArray):
     """
     Computes the distribution parameters p(X_miss|X_obs)
 
     Parameters
     ----------
-    covariance : np.array-like,(p,p)
+    covariance : NDArray,(p,p)
         The covariance matrix
 
-    idxs: np.array-like,(p,)
+    idxs: NDArray,(p,)
         The observed covariates
 
     Returns
@@ -429,20 +437,22 @@ def _get_conditional_parameters(covariance, idxs):
     return beta_bar.T, covariance_bar
 
 
-def _get_conditional_parameters_sherman_woodbury(Lambda, W, idxs):
+def _get_conditional_parameters_sherman_woodbury(
+    Lambda: NDArray, W: NDArray, idxs: NDArray
+):
     """
     Computes the distribution parameters p(X_miss|X_obs)
     given that Sigma = WWT + Lambda
 
     Parameters
     ----------
-    Lambda : np.array-like,(p,p)
+    Lambda : NDArray,(p,p)
         The diagonal noise matrix
 
-    W : np.array-like,(L,p)
+    W : NDArray,(L,p)
         The low rank component
 
-    idxs: np.array-like,(p,)
+    idxs: NDArray,(p,)
         The observed covariates
 
     Returns
@@ -475,22 +485,24 @@ def _get_conditional_parameters_sherman_woodbury(Lambda, W, idxs):
     return coef, covariance_bar
 
 
-def _marginal_score(covariance, X, idxs, weights=None):
+def _marginal_score(
+    covariance: NDArray, X: NDArray, idxs: NDArray, weights=None
+):
     """
     Returns the marginal log-likelihood of a subset of data
 
     Parameters
     ----------
-    covariance : np.array-like(p,p)
+    covariance : NDArray,(p,p)
         The covariance matrix
 
-    X : np.array-like,(N,sum(idxs))
+    X : NDArray,(N,sum(idxs))
         The centered data
 
-    idxs: np.array-like,(sum(p),)
+    idxs: NDArray,(sum(p),)
         The observation locations
 
-    weights : np.array-like,(N,),default=None
+    weights : NDArray,(N,),default=None
         The optional weights on the samples
 
     Returns
@@ -504,26 +516,28 @@ def _marginal_score(covariance, X, idxs, weights=None):
     return avg_score
 
 
-def _marginal_score_sherman_woodbury(Lambda, W, X, idxs, weights=None):
+def _marginal_score_sherman_woodbury(
+    Lambda: NDArray, W: NDArray, X: NDArray, idxs: NDArray, weights=None
+):
     """
     Returns the marginal log-likelihood of a subset of data
     given that Sigma = WWT + Lambda
 
     Parameters
     ----------
-    Lambda : np.array-like,(p,p)
+    Lambda : NDArray,(p,p)
         The diagonal noise matrix
 
-    W : np.array-like,(L,p)
+    W : NDArray,(L,p)
         The low rank component
 
-    X : np.array-like,(N,sum(idxs))
+    X : NDArray,(N,sum(idxs))
         The centered data
 
-    idxs: np.array-like,(sum(p),)
+    idxs: NDArray,(sum(p),)
         The observation locations
 
-    weights : np.array-like,(N,),default=None
+    weights : NDArray,(N,),default=None
         The optional weights on the samples
 
     Returns
@@ -539,20 +553,20 @@ def _marginal_score_sherman_woodbury(Lambda, W, X, idxs, weights=None):
     return avg_score
 
 
-def _marginal_score_samples(covariance, X, idxs):
+def _marginal_score_samples(covariance: NDArray, X: NDArray, idxs: NDArray):
     """
     Returns the marginal log-likelihood of a subset of data
     per window
 
     Parameters
     ----------
-    covariance : np.array-like(p,p)
+    covariance : NDArray,(p,p)
         The covariance matrix
 
-    X : np.array-like,(N,sum(idxs))
+    X : NDArray,(N,sum(idxs))
         The centered data
 
-    idxs: np.array-like,(sum(p),)
+    idxs: NDArray,(sum(p),)
         The observation locations
 
     Returns
@@ -566,23 +580,25 @@ def _marginal_score_samples(covariance, X, idxs):
     return scores
 
 
-def _marginal_score_samples_sherman_woodbury(Lambda, W, X, idxs):
+def _marginal_score_samples_sherman_woodbury(
+    Lambda: NDArray, W: NDArray, X: NDArray, idxs: NDArray
+):
     """
     Returns the marginal log-likelihood of a subset of data
     per window given that Sigma = WWT + Lambda
 
     Parameters
     ----------
-    Lambda : np.array-like,(p,p)
+    Lambda : NDArray,(p,p)
         The diagonal noise matrix
 
-    W : np.array-like,(L,p)
+    W : NDArray,(L,p)
         The low rank component
 
-    X : np.array-like,(N,sum(idxs))
+    X : NDArray,(N,sum(idxs))
         The centered data
 
-    idxs: np.array-like,(sum(p),)
+    idxs: NDArray,(sum(p),)
         The observation locations
 
     Returns
@@ -596,19 +612,19 @@ def _marginal_score_samples_sherman_woodbury(Lambda, W, X, idxs):
     return scores
 
 
-def _score(covariance, X, weights=None):
+def _score(covariance: NDArray, X: NDArray, weights=None):
     """
     Returns the average log liklihood of data.
 
     Parameters
     ----------
-    covariance : np.array-like(p,p)
+    covariance : NDArray,(p,p)
         The covariance matrix
 
-    X : np.array-like,(N,sum(p))
+    X : NDArray,(N,sum(p))
         The centered data
 
-    weights : np.array-like,(N,),default=None
+    weights : NDArray,(N,),default=None
         The optional weights on the samples
 
     Returns
@@ -622,23 +638,25 @@ def _score(covariance, X, weights=None):
     return avg_score
 
 
-def _score_sherman_woodbury(Lambda, W, X, weights=None):
+def _score_sherman_woodbury(
+    Lambda: NDArray, W: NDArray, X: NDArray, weights=None
+):
     """
     Returns the average log liklihood of data
     window given that Sigma = WWT + Lambda
 
     Parameters
     ----------
-    Lambda : np.array-like,(p,p)
+    Lambda : NDArray,(p,p)
         The diagonal noise matrix
 
-    W : np.array-like,(L,p)
+    W : NDArray,(L,p)
         The low rank component
 
-    X : np.array-like,(N,sum(p))
+    X : NDArray,(N,sum(p))
         The centered data
 
-    weights : np.array-like,(N,),default=None
+    weights : NDArray,(N,),default=None
         The optional weights on the samples
 
     Returns
@@ -652,16 +670,16 @@ def _score_sherman_woodbury(Lambda, W, X, weights=None):
     return avg_score
 
 
-def _score_samples(covariance, X):
+def _score_samples(covariance: NDArray, X: NDArray):
     """
     Return the log likelihood of each sample
 
     Parameters
     ----------
-    covariance : np.array-like(p,p)
+    covariance : NDArray,(p,p)
         The covariance matrix
 
-    X : np.array-like,(N,sum(p))
+    X : NDArray,(N,sum(p))
         The centered data
 
     Returns
@@ -683,19 +701,19 @@ def _score_samples(covariance, X):
     return scores
 
 
-def _score_samples_sherman_woodbury(Lambda, W, X):
+def _score_samples_sherman_woodbury(Lambda: NDArray, W: NDArray, X: NDArray):
     """
     Return the log likelihood of each sample
 
     Parameters
     ----------
-    Lambda : np.array-like,(p,p)
+    Lambda : NDArray,(p,p)
         The diagonal noise matrix
 
-    W : np.array-like,(L,p)
+    W : NDArray,(L,p)
         The low rank component
 
-    X : np.array-like,(N,sum(p))
+    X : NDArray,(N,sum(p))
         The centered data
 
     Returns
@@ -723,14 +741,14 @@ def _score_samples_sherman_woodbury(Lambda, W, X):
     return scores
 
 
-def _entropy(covariance):
+def _entropy(covariance: NDArray):
     """
     Computes the entropy of a Gaussian distribution parameterized by
     covariance.
 
     Parameters
     ----------
-    covariance : np.array-like(p,p)
+    covariance : NDArray,(p,p)
         The covariance matrix
 
     Returns
@@ -744,17 +762,17 @@ def _entropy(covariance):
     return entropy
 
 
-def _entropy_subset(covariance, idxs):
+def _entropy_subset(covariance: NDArray, idxs: NDArray):
     """
     Computes the entropy of a subset of the Gaussian distribution
     parameterized by covariance.
 
     Parameters
     ----------
-    covariance : np.array-like(p,p)
+    covariance : NDArray,(p,p)
         The covariance matrix
 
-    idxs: np.array-like,(sum(p),)
+    idxs: NDArray,(sum(p),)
         The observation locations
 
     Returns
@@ -768,17 +786,17 @@ def _entropy_subset(covariance, idxs):
     return entropy
 
 
-def _mutual_information(covariance, idxs1, idxs2):
+def _mutual_information(covariance: NDArray, idxs1: NDArray, idxs2: NDArray):
     """
     This computes the mutual information bewteen the two sets of
     covariates based on the model.
 
     Parameters
     ----------
-    idxs1 : np.array-like,(p,)
+    idxs1 : NDArray,(p,)
         First group of variables
 
-    idxs2 : np.array-like,(p,)
+    idxs2 : NDArray,(p,)
         Second group of variables
 
     Returns
@@ -799,7 +817,7 @@ def _mutual_information(covariance, idxs1, idxs2):
     return mutual_information
 
 
-def ldet_sherman_woodbury_fa(Lambda, W):
+def ldet_sherman_woodbury_fa(Lambda: NDArray, W: NDArray):
     """
     This converts the log determinant of a matrix Lambda + W^TW where
     Lambda is diagonal. Fa for factor analysis
@@ -809,7 +827,7 @@ def ldet_sherman_woodbury_fa(Lambda, W):
     W : np.array(n_components,p)
         The PCA loadings matrix
 
-    Lambda : np.array-like,(p,p)
+    Lambda : NDArray,(p,p)
         An easy to invert (diagonal) noise matrix
 
     Returns
@@ -826,11 +844,24 @@ def ldet_sherman_woodbury_fa(Lambda, W):
     return log_determinant
 
 
-def ldet_sherman_woodbury_full(A, U, B, V):
+def ldet_sherman_woodbury_full(A: NDArray, U: NDArray, B: NDArray, V: NDArray):
     """
+    The value log|A+ UBV|. Useful when A and B are simple to invert and UBV
+    is low rank
 
     Parameters
     ----------
+    A : NDArray,(p,p)
+        The first square matrix
+
+    U :  NDArray,(p,L)
+        The wide matrix 
+
+    B : NDArray,(L,L) 
+        The tiny square matrix
+
+    V : NDArray,(L,p)
+        Tall matrix
 
     Returns
     -------
@@ -846,7 +877,7 @@ def ldet_sherman_woodbury_full(A, U, B, V):
     return log_determinant
 
 
-def inv_sherman_woodbury_fa(Lambda, W):
+def inv_sherman_woodbury_fa(Lambda: NDArray, W: NDArray):
     """
     This converts the inverse of a matrix Lambda + W^TW where
     Lambda is diagonal. Fa for factor analysis
@@ -856,12 +887,12 @@ def inv_sherman_woodbury_fa(Lambda, W):
     W : np.array(n_components,p)
         The PCA loadings matrix
 
-    Lambda : np.array-like,(p,p)
+    Lambda : NDArray,(p,p)
         An easy to invert (diagonal) noise matrix
 
     Returns
     -------
-    Sigma_inv : np.array-like,(p,p)
+    Sigma_inv : NDArray,(p,p)
         The inverse of the covariance matrix
     """
     I_L = np.eye(W.shape[0])
@@ -877,23 +908,28 @@ def inv_sherman_woodbury_fa(Lambda, W):
     return Sigma_inv
 
 
-def inv_sherman_woodbury_full(A, U, B, V):
+def inv_sherman_woodbury_full(A: NDArray, U: NDArray, B: NDArray, V: NDArray):
     """
-    This converts the inverse of a matrix (A +UBV)
+    This converts the inverse of a matrix (A + UBV)
 
     Parameters
     ----------
-    A :
+    A : NDArray,(p,p)
+        The first square matrix
 
-    U :
+    U :  NDArray,(p,L)
+        The wide matrix 
 
-    B
+    B : NDArray,(L,L) 
+        The tiny square matrix
 
-    V
+    V : NDArray,(L,p)
+        Tall matrix
 
     Returns
     -------
-
+    Sigma_inv : NDArray,(p,p)
+        The inverse of the matrix (A + UBV)
     """
     Ainv = la.inv(A)  # Needed explicitly anyways
     AiU = np.dot(Ainv, U)
