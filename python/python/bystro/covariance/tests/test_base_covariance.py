@@ -1,6 +1,6 @@
 import numpy as np
 import numpy.linalg as la
-import scipy.stats as st
+import scipy.stats as st # type: ignore
 from bystro.covariance._base_covariance import (
     BaseCovariance,
     _score_samples,
