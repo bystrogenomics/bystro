@@ -96,7 +96,7 @@ class PPCA(BasePCASGDModel):
 
         Parameters
         ----------
-        X : np.array-like,(n_samples,n_covariates)
+        X : NDArray,(n_samples,n_covariates)
             The data
 
         progress_bar : bool,default=True
@@ -170,7 +170,7 @@ class PPCA(BasePCASGDModel):
 
         Returns
         -------
-        covariance : np.array-like(p,p)
+        covariance : NDArray(p,p)
             The covariance matrix
         """
         covariance = np.dot(self.W_.T, self.W_) + self.sigma2_ * np.eye(self.p)
@@ -186,7 +186,7 @@ class PPCA(BasePCASGDModel):
 
         Returns
         -------
-        Lambda : np.array-like,(p,p)
+        Lambda : NDArray,(p,p)
             The observational noise
         """
         Lambda = self.sigma2_ * np.eye(self.p)
@@ -225,7 +225,7 @@ class PPCA(BasePCASGDModel):
 
         Parameters
         ----------
-        X : np.array-like,(n_samples,p)
+        X : NDArray,(n_samples,p)
             The data
 
         Returns
@@ -282,7 +282,7 @@ class PPCA(BasePCASGDModel):
 
         Sets
         ----
-        W_ : np.array-like,(n_components,p)
+        W_ : NDArray,(n_components,p)
             The loadings
 
         sigma2_ : float
@@ -359,10 +359,10 @@ class SPCA(BasePCASGDModel):
 
         Parameters
         ----------
-        X : np.array-like,(n_samples,n_covariates)
+        X : NDArray,(n_samples,n_covariates)
             The data
 
-        groups : np.array-like,(n_covariates,)
+        groups : NDArray,(n_covariates,)
             Divide the covariates into groups with different isotropic noise
 
         Returns
@@ -445,7 +445,7 @@ class SPCA(BasePCASGDModel):
 
         Returns
         -------
-        covariance : np.array-like(p,p)
+        covariance : NDArray(p,p)
             The covariance matrix
         """
         covariance = np.dot(self.W_.T, self.W_) + np.diag(self.sigmas_)
@@ -461,7 +461,7 @@ class SPCA(BasePCASGDModel):
 
         Returns
         -------
-        Lambda : np.array-like,(p,p)
+        Lambda : NDArray,(p,p)
             The observational noise
         """
         Lambda = np.diag(self.sigmas_)
@@ -513,7 +513,7 @@ class SPCA(BasePCASGDModel):
 
         Parameters
         ----------
-        X : np.array-like,(n_samples,p)
+        X : NDArray,(n_samples,p)
             The data
 
         Returns
@@ -547,10 +547,10 @@ class SPCA(BasePCASGDModel):
 
         Sets
         ----
-        W_ : np.array-like,(n_components,p)
+        W_ : NDArray,(n_components,p)
             The loadings
 
-        sigmas_ : np.array-like,(p,)
+        sigmas_ : NDArray,(p,)
             The diagonal variances
         """
         self.W_ = trainable_variables[0].detach().numpy()
@@ -612,7 +612,7 @@ class FactorAnalysis(BasePCASGDModel):
 
         Parameters
         ----------
-        X : np.array-like,(n_samples,n_covariates)
+        X : NDArray,(n_samples,n_covariates)
             The data
 
         Returns
@@ -683,7 +683,7 @@ class FactorAnalysis(BasePCASGDModel):
 
         Returns
         -------
-        covariance : np.array-like(p,p)
+        covariance : NDArray(p,p)
             The covariance matrix
         """
         covariance = np.dot(self.W_.T, self.W_) + np.diag(self.sigmas_)
@@ -699,7 +699,7 @@ class FactorAnalysis(BasePCASGDModel):
 
         Returns
         -------
-        Lambda : np.array-like,(p,p)
+        Lambda : NDArray,(p,p)
             The observational noise
         """
         Lambda = np.diag(self.sigmas_)
@@ -746,7 +746,7 @@ class FactorAnalysis(BasePCASGDModel):
 
         Parameters
         ----------
-        X : np.array-like,(n_samples,p)
+        X : NDArray,(n_samples,p)
             The data
 
         Returns
@@ -780,10 +780,10 @@ class FactorAnalysis(BasePCASGDModel):
 
         Sets
         ----
-        W_ : np.array-like,(n_components,p)
+        W_ : NDArray,(n_components,p)
             The loadings
 
-        sigmas_ : np.array-like,(n_components,p)
+        sigmas_ : NDArray,(n_components,p)
             The diagonal variances
         """
         self.W_ = trainable_variables[0].detach().numpy()

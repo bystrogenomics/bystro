@@ -31,6 +31,8 @@ Methods
 None
 """
 import numpy as np
+from numpy.typing import NDArray
+from typing import Dict, List, Optional
 
 from tqdm import trange
 import torch  # type: ignore
@@ -106,13 +108,13 @@ class PPCADropout(PPCA):
 
     def __init__(
         self,
-        n_components=2,
-        n_supervised=1,
-        prior_options=None,
-        mu=1.0,
-        gamma=10.0,
-        delta=5.0,
-        training_options=None,
+        n_components:int=2,
+        n_supervised:int=1,
+        prior_options:Optional[dict]=None,
+        mu:float=1.0,
+        gamma:float=10.0,
+        delta:float=5.0,
+        training_options:Optional[dict]=None,
     ):
         self.mu = float(mu)
         self.gamma = float(gamma)
@@ -138,10 +140,10 @@ class PPCADropout(PPCA):
 
         Parameters
         ----------
-        X : np.array-like,(n_samples,n_covariates)
+        X : NDArray,(n_samples,n_covariates)
             The data
 
-        y : np.array-like,(n_samples,n_prediction)
+        y : NDArray,(n_samples,n_prediction)
             Covariates we wish to predict. For now lazy and assuming
             logistic regression.
 
@@ -243,7 +245,7 @@ class PPCADropout(PPCA):
         self._store_instance_variables(trainable_variables)
         return self
 
-    def _store_instance_variables(self, trainable_variables):
+    def _store_instance_variables(self, trainable_variables: List):
         """
         Saves the learned variables
 
@@ -254,7 +256,7 @@ class PPCADropout(PPCA):
 
         Sets
         ----
-        W_ : np.array-like,(n_components,p)
+        W_ : NDArray,(n_components,p)
             The loadings
 
         sigma2_ : float
@@ -267,7 +269,7 @@ class PPCADropout(PPCA):
         self.sigma2_ = nn.Softplus()(trainable_variables[1]).detach().numpy()
         self.B_ = trainable_variables[2].detach().numpy()
 
-    def _initialize_variables(self, X):
+    def _initialize_variables(self, X: NDArray):
         """
         Initializes the variables of the model. Right now fits a PCA model
         in sklearn, uses the loadings and sets sigma^2 to be unexplained
@@ -275,7 +277,7 @@ class PPCADropout(PPCA):
 
         Parameters
         ----------
-        X : np.array-like,(n_samples,p)
+        X : NDArray,(n_samples,p)
             The data
 
         Returns
