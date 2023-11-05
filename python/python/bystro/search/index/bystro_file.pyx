@@ -30,14 +30,14 @@ cdef class ReadAnnotationTarball:
         list paths
         int id
 
-    def __cinit__(self, str index_name,  dict delimiters, str tar_path, str annotation_name = 'annotation.tsv.gz', int chunk_size=500):
+    def __cinit__(self, str index_name, object delimiters, str tar_path, str annotation_name = 'annotation.tsv.gz', int chunk_size=500):
         self.index_name = index_name
         self.chunk_size = chunk_size
-        self.field_separator = delimiters['field']
-        self.position_delimiter = delimiters['position']
-        self.overlap_delimiter = delimiters['overlap']
-        self.value_delimiter = delimiters['value']
-        self.empty_field_char = delimiters['empty_field']
+        self.field_separator = delimiters.field
+        self.position_delimiter = delimiters.position
+        self.overlap_delimiter = delimiters.overlap
+        self.value_delimiter = delimiters.value
+        self.empty_field_char = delimiters.empty_field
 
         t = tarfile.open(tar_path)
         for member in t.getmembers():
@@ -97,10 +97,7 @@ cdef class ReadAnnotationTarball:
 
                         values.append(overlap_values)
 
-                    if len(values_raw) > 1:
-                        position_values.append(values)
-                    else:
-                        position_values.append(values[0])
+                    position_values.append(values)
 
                 populate_hash_path(_source, self.paths[i], position_values)
 
@@ -120,5 +117,5 @@ cdef class ReadAnnotationTarball:
     def get_header_fields(self):
         return self.header_fields
 
-cpdef ReadAnnotationTarball read_annotation_tarball(str index_name,  dict delimiters, str tar_path, str annotation_name = 'annotation.tsv.gz', int chunk_size=500):
+cpdef ReadAnnotationTarball read_annotation_tarball(str index_name,  object delimiters, str tar_path, str annotation_name = 'annotation.tsv.gz', int chunk_size=500):
     return ReadAnnotationTarball(index_name, delimiters, tar_path, annotation_name, chunk_size)

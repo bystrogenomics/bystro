@@ -42,10 +42,10 @@ import numpy as np
 
 from sklearn.decomposition import PCA  # type: ignore
 from tqdm import trange  # type: ignore
-import torch
-from torch import nn
-from torch.distributions.multivariate_normal import MultivariateNormal
-from torch.distributions.gamma import Gamma
+import torch # type: ignore
+from torch import nn # type: ignore
+from torch.distributions.multivariate_normal import MultivariateNormal # type: ignore
+from torch.distributions.gamma import Gamma # type: ignore
 
 from bystro.supervised_ppca._misc_np import softplus_inverse_np
 from bystro.supervised_ppca._base import BasePCASGDModel
@@ -170,6 +170,22 @@ class PPCA(BasePCASGDModel):
         """
         covariance = np.dot(self.W_.T, self.W_) + self.sigma2_ * np.eye(self.p)
         return covariance
+
+    def get_noise(self):
+        """
+        Returns the observational noise as a diagonal matrix
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        Lambda : np.array-like,(p,p)
+            The observational noise
+        """
+        Lambda = self.sigma2_ * np.eye(self.p)
+        return Lambda
 
     def _create_prior(self):
         """
@@ -331,7 +347,7 @@ class SPCA(BasePCASGDModel):
 
     def fit(self, X, groups, progress_bar=True, seed=2021):
         """
-        Fits a model given covariates X 
+        Fits a model given covariates X
 
         Parameters
         ----------
@@ -388,7 +404,10 @@ class SPCA(BasePCASGDModel):
                 for k in range(self.n_groups)
             ]
 
-            sigma = torch.sum(list_covs, dim=0,)
+            sigma = torch.sum(
+                list_covs,
+                dim=0,
+            )
             WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
             Sigma = WWT + torch.diag(sigma)
 
@@ -426,6 +445,22 @@ class SPCA(BasePCASGDModel):
         """
         covariance = np.dot(self.W_.T, self.W_) + np.diag(self.sigmas_)
         return covariance
+
+    def get_noise(self):
+        """
+        Returns the observational noise as a diagonal matrix
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        Lambda : np.array-like,(p,p)
+            The observational noise
+        """
+        Lambda = np.diag(self.sigmas_)
+        return Lambda
 
     def _create_prior(self):
         """
@@ -565,7 +600,7 @@ class FactorAnalysis(BasePCASGDModel):
 
     def fit(self, X, progress_bar=True, seed=2021):
         """
-        Fits a model given covariates X 
+        Fits a model given covariates X
 
         Parameters
         ----------
@@ -646,6 +681,22 @@ class FactorAnalysis(BasePCASGDModel):
         covariance = np.dot(self.W_.T, self.W_) + np.diag(self.sigmas_)
         return covariance
 
+    def get_noise(self):
+        """
+        Returns the observational noise as a diagonal matrix
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        Lambda : np.array-like,(p,p)
+            The observational noise
+        """
+        Lambda = np.diag(self.sigmas_)
+        return Lambda
+
     def _create_prior(self):
         """
         This creates the function representing prior on pararmeters
@@ -682,7 +733,7 @@ class FactorAnalysis(BasePCASGDModel):
 
     def _initialize_variables(self, X):
         """
-        Initializes the variables of the model by fitting PCA model in 
+        Initializes the variables of the model by fitting PCA model in
         sklearn and using those loadings
 
         Parameters

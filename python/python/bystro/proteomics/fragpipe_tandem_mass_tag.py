@@ -15,6 +15,25 @@ class TandemMassTagDataset:
     abundance_df: pd.DataFrame
     annotation_df: pd.DataFrame
 
+    def __post_init__(self) -> None:
+        try:
+            check_df_starts_with_cols(self.abundance_df, ABUNDANCE_COLS[1:])
+        except ValueError as e:
+            err_msg = "Received abundance_df with unexpected columns"
+            raise ValueError(err_msg) from e
+
+    def get_melted_abundance_df(self) -> pd.DataFrame:
+        """Return a melted abundance df with columns [gene_name, sample_id, value]"""
+        abundance_df = self.abundance_df
+        columns_to_drop = ["NumberPSM", "ProteinID", "MaxPepProb", "ReferenceIntensity"]
+        final_column_ordering = ["sample_id", "gene_name", "value"]
+        melted_df_with_unsorted_columns = (
+            abundance_df.drop(columns=columns_to_drop)
+            .melt(var_name=["sample_id"], ignore_index=False)  # type: ignore[arg-type]
+            .reset_index(names="gene_name")
+        )
+        return melted_df_with_unsorted_columns[final_column_ordering]
+
 
 def _prep_abundance_df(abundance_df: pd.DataFrame) -> pd.DataFrame:
     """Prep abundance_df, setting index and normalizing abundances by ReferenceIntensity."""

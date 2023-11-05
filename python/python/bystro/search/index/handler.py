@@ -8,15 +8,15 @@ import time
 from math import ceil
 
 import ray
-from opensearchpy._async import helpers as async_helpers
+from opensearchpy._async.helpers.actions import async_bulk
 from opensearchpy._async.client import AsyncOpenSearch
 from ruamel.yaml import YAML
 
 from bystro.beanstalkd.worker import ProgressPublisher, get_progress_reporter
 from bystro.search.index.bystro_file import (  # type: ignore # pylint: disable=no-name-in-module,import-error  # noqa: E501
-    read_annotation_tarball, 
+    read_annotation_tarball,
 )
-from bystro.search.utils.annotation import get_delimiters
+from bystro.search.utils.annotation import DelimitersConfig
 from bystro.search.utils.opensearch import gather_opensearch_args
 
 ray.init(ignore_reinit_error=True, address="auto")
@@ -43,11 +43,13 @@ class Indexer:
 
     async def index(self, data):
         """Index Bystro annotation data into Opensearch"""
-        resp = await async_helpers.async_bulk(self.client, iter(data), chunk_size=self.chunk_size)
+        resp = await async_bulk(self.client, iter(data), chunk_size=self.chunk_size)
         self.counter += resp[0]
 
         if self.counter >= self.reporter_batch:
-            await asyncio.to_thread(self.progress_tracker.increment.remote, self.counter)
+            await asyncio.to_thread(
+                self.progress_tracker.increment.remote, self.counter
+            )
             self.counter = 0
 
         return resp
@@ -96,7 +98,9 @@ async def go(
 
     if not index_body["settings"].get("number_of_shards"):
         file_size = os.path.getsize(tar_path)
-        index_body["settings"]["number_of_shards"] = ceil(float(file_size) / float(1e10))
+        index_body["settings"]["number_of_shards"] = ceil(
+            float(file_size) / float(1e10)
+        )
 
     try:
         await client.indices.create(index_name, body=index_body)
@@ -106,7 +110,7 @@ async def go(
     data = read_annotation_tarball(
         index_name=index_name,
         tar_path=tar_path,
-        delimiters=get_delimiters(),
+        delimiters=DelimitersConfig(),
         chunk_size=paralleleism_chunk_size,
     )
 
@@ -145,6 +149,8 @@ async def go(
         await indexer.close.remote()
 
     await client.indices.put_settings(index=index_name, body=post_index_settings)
+    await client.indices.refresh(index=index_name)
+
     await client.close()
 
     return data.get_header_fields()
@@ -152,7 +158,9 @@ async def go(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process some config files.")
-    parser.add_argument("--tar", type=str, help="Path to the tarball containing the annotation")
+    parser.add_argument(
+        "--tar", type=str, help="Path to the tarball containing the annotation"
+    )
 
     parser.add_argument(
         "--search_conf",

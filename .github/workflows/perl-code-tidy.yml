@@ -1,0 +1,29 @@
+name: Perl Tidy & Critic Check
+
+on:
+  push:
+    paths:
+    - '**.pl'
+    - '**.pm'
+    - '**.t'
+  pull_request:
+    paths:
+    - '**.pl'
+    - '**.pm'
+    - '**.t'
+
+jobs:
+  tidy-critic-check:
+    runs-on: ubuntu-latest
+    container:
+      image: perldocker/perl-tester:latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Run tidyall
+        shell: bash
+        run: |
+          cd perl
+          tidyall --check-only --quiet --all

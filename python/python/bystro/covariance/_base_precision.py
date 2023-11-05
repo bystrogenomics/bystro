@@ -54,10 +54,12 @@ Methods
 -------
 _get_covariance(covariance)
 """
-from numpy import linalg as la
 from datetime import datetime as dt
-from ._base_covariance import BaseCovariance
+
+from numpy import linalg as la
 import pytz
+
+from bystro.covariance._base_covariance import BaseCovariance
 
 
 class BasePrecision(BaseCovariance):
