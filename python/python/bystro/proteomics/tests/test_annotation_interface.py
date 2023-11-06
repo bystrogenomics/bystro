@@ -10,7 +10,10 @@ from bystro.proteomics.annotation_interface import (
     join_annotation_result_to_proteomics_dataset,
     get_annotation_result_from_query,
 )
-from bystro.proteomics.fragpipe_tandem_mass_tag import ABUNDANCE_COLS, TandemMassTagDataset
+from bystro.proteomics.fragpipe_tandem_mass_tag import (
+    ABUNDANCE_COLS,
+    TandemMassTagDataset,
+)
 
 TEST_RESPONSE_FILENAME = Path(__file__).parent / "test_response.dat"
 
@@ -45,7 +48,7 @@ def test_get_annotation_results_from_query():
     index_name = "mock_index_name"
 
     mock_client = MockOpenSearch()
-    samples_and_genes_df = get_annotation_result_from_query(user_query_string, index_name, mock_client)
+    samples_and_genes_df = get_annotation_result_from_query(user_query_string, index_name, mock_client)  # type: ignore
     assert (1610, 7) == samples_and_genes_df.shape
 
 
@@ -67,14 +70,20 @@ def test_join_annotation_result_to_proteomics_dataset():
     user_query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
     index_name = None
     mock_client = MockOpenSearch()
-    query_result_df = get_annotation_result_from_query(user_query_string, index_name, mock_client)
+    query_result_df = get_annotation_result_from_query(
+        user_query_string, index_name, mock_client # type: ignore
+    )
 
     # Step 2: Construct a proteomics dataset with some shared sampled_ids and gene_names
     shared_proteomics_sample_ids = sorted(set(query_result_df.sample_id))[:2]
-    all_proteomics_sample_ids = shared_proteomics_sample_ids + [f"sample_id{i}" for i in range(10)]
+    all_proteomics_sample_ids = shared_proteomics_sample_ids + [
+        f"sample_id{i}" for i in range(10)
+    ]
 
     shared_proteomics_gene_names = sorted(set(query_result_df.gene_name))[:100]
-    all_proteomics_gene_names = shared_proteomics_gene_names + [f"gene_name{i}" for i in range(10)]
+    all_proteomics_gene_names = shared_proteomics_gene_names + [
+        f"gene_name{i}" for i in range(10)
+    ]
 
     # we're constructing the abundance df directly as the
     # TandemMassTagDataset expects it, and so need to drop the 'Index'
@@ -86,10 +95,14 @@ def test_join_annotation_result_to_proteomics_dataset():
         columns=columns,
         index=all_proteomics_gene_names,
     )
-    mock_tmt_dataset = TandemMassTagDataset(abundance_df=abundance_df, annotation_df=pd.DataFrame())
+    mock_tmt_dataset = TandemMassTagDataset(
+        abundance_df=abundance_df, annotation_df=pd.DataFrame()
+    )
 
     # Step 3: join the two togoether
-    joined_df = join_annotation_result_to_proteomics_dataset(query_result_df, mock_tmt_dataset)
+    joined_df = join_annotation_result_to_proteomics_dataset(
+        query_result_df, mock_tmt_dataset
+    )
 
     # Step 4: Test the joined result
     assert (140, 8) == joined_df.shape

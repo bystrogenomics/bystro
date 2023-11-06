@@ -101,6 +101,6 @@ def test_basic_functionality():
 
 
 def test_empty_list():
-    rows = []
+    rows: list = []
     expected = b"\n"
     assert _make_output_string(rows, delims) == expected

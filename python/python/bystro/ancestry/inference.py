@@ -63,7 +63,7 @@ def _fill_missing_data(genotypes: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series
 
 
 def _package_ancestry_response_from_pop_probs(
-    vcf_path: Path, pop_probs_df: pd.DataFrame, missingnesses: pd.Series
+    vcf_path: Path | str, pop_probs_df: pd.DataFrame, missingnesses: pd.Series
 ) -> AncestryResponse:
     """Fill out AncestryResponse using filepath, numerical model output and sample-wise missingnesses."""
     superpop_probs_df = _superpop_probs_from_pop_probs(pop_probs_df)
@@ -103,7 +103,7 @@ def _package_ancestry_response_from_pop_probs(
 
 # TODO: implement with ray
 def infer_ancestry(
-    ancestry_model: AncestryModel, genotypes: pd.DataFrame, vcf_path: Path
+    ancestry_model: AncestryModel, genotypes: pd.DataFrame, vcf_path: Path | str
 ) -> AncestryResponse:
     """Run an ancestry job."""
     # TODO: main ancestry model logic goes here.  Just stubbing out for now.

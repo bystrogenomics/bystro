@@ -13,6 +13,9 @@ def test_empirical_covariance():
     model = EmpiricalCovariance()
     model.fit(X)
 
+    assert model.covariance is not None 
+    assert model.covariance.shape == (10, 10)
+
     s_vals = la.svd(model.covariance, compute_uv=False)
     assert np.abs(1 - s_vals[0]) <= 5e-2
 
@@ -23,6 +26,9 @@ def test_bayesian_covariance():
 
     model = BayesianCovariance()
     model.fit(X)
+
+    assert model.covariance is not None
+    assert model.covariance.shape == (10, 10)
 
     s_vals = la.svd(model.covariance, compute_uv=False)
     assert np.abs(1 - s_vals[0]) <= 5e-2
