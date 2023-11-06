@@ -254,7 +254,7 @@ class PPCADropout(PPCA):
         Parameters
         ----------
         trainable_variables : list
-            List of saved loadings of type Tensor
+            List of saved variables of type Tensor
 
         Sets
         ----
