@@ -40,7 +40,7 @@ from numpy.typing import NDArray
 
 import pytz
 import torch
-from torch import tensor, Tensor
+from torch import Tensor
 
 from bystro.covariance._base_covariance import (
     _get_stable_rank,
