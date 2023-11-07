@@ -12,6 +12,7 @@ Methods
 None
 """
 import abc
+from typing import Any
 import cloudpickle  # type: ignore
 
 
@@ -83,6 +84,28 @@ class BaseSGDModel(abc.ABC):
         training_opts = {**default_options, **training_options}
         return training_opts
 
+    def _fill_prior_options(self, prior_options: dict[str, Any]) -> dict[str, Any]:
+        """
+        This sets the prior options for our inference scheme
+
+        Parameters
+        ----------
+        prior_options : dict
+            The original prior options passed as a dictionary
+
+        Options
+        -------
+        TBD
+
+        Returns
+        -------
+        prior_options : dict
+            The prior options with defaults filled in
+
+        """
+        default_options: dict[str, Any] = {}
+        return {**default_options, **prior_options}
+
     @abc.abstractmethod
     def _store_instance_variables(self, trainable_variables):
         """
@@ -105,7 +128,7 @@ class BaseSGDModel(abc.ABC):
         """
 
     @abc.abstractmethod
-    def _save_losses(self, *args):
+    def _save_losses(self, *args, **kwargs):
         """
         This saves the respective losses at each iteration
 
@@ -114,7 +137,7 @@ class BaseSGDModel(abc.ABC):
         """
 
     @abc.abstractmethod
-    def _test_inputs(self, *args):
+    def _test_inputs(self, *args, **kwargs):
         """
         This performs error checking on inputs for fit
 
@@ -123,7 +146,7 @@ class BaseSGDModel(abc.ABC):
         """
 
     @abc.abstractmethod
-    def _transform_training_data(self, *args):
+    def _transform_training_data(self, *args, **kwargs):
         """
         This converts training data to adequate format
 
