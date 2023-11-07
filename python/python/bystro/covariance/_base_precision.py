@@ -54,13 +54,10 @@ Methods
 -------
 _get_covariance(covariance)
 """
-from datetime import datetime as dt
-
 import numpy as np
 from numpy import linalg as la
 from numpy.typing import NDArray
 
-import pytz
 
 from bystro.covariance._base_covariance import BaseCovariance
 

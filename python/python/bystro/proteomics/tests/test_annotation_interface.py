@@ -18,7 +18,9 @@ from bystro.proteomics.fragpipe_tandem_mass_tag import (
 TEST_RESPONSE_FILENAME = Path(__file__).parent / "test_response.dat"
 
 with TEST_RESPONSE_FILENAME.open("rb") as f:
-    TEST_RESPONSE = msgspec.msgpack.decode(f.read())  # noqa: S301 (data is safe)
+    TEST_RESPONSE = msgspec.msgpack.decode(
+        f.read()
+    )  # noqa: S301 (data is safe)
 
 
 class MockOpenSearch:
@@ -44,7 +46,9 @@ class MockOpenSearch:
 
 
 def test_get_annotation_results_from_query():
-    user_query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
+    user_query_string = (
+        "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
+    )
     index_name = "mock_index_name"
 
     mock_client = MockOpenSearch()
@@ -67,11 +71,13 @@ def tests__process_response():
 
 def test_join_annotation_result_to_proteomics_dataset():
     # Step 1: Get an annotation query result
-    user_query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
+    user_query_string = (
+        "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
+    )
     index_name = None
     mock_client = MockOpenSearch()
     query_result_df = get_annotation_result_from_query(
-        user_query_string, index_name, mock_client # type: ignore
+        user_query_string, index_name, mock_client  # type: ignore
     )
 
     # Step 2: Construct a proteomics dataset with some shared sampled_ids and gene_names
