@@ -1,3 +1,5 @@
+from typing import Callable
+
 from bystro.beanstalkd.messages import (
     BaseMessage,
     SubmittedJobMessage,
@@ -5,6 +7,7 @@ from bystro.beanstalkd.messages import (
     Struct,
 )
 from bystro.search.utils.annotation import AnnotationOutputs
+from bystro.search.save.hwe import HWEFilter
 
 
 class IndexJobData(BaseMessage, frozen=True):
@@ -72,31 +75,11 @@ class BinomialMafFilter(
     estimates: list[str]
     crit_value: float | None = 0.025
 
+    def make_filter() -> Callable[[dict], bool] | None:
+        pass
 
-class HWEFilter(
-    Struct,
-    frozen=True,
-    tag="hwe",
-    tag_field="key",
-    forbid_unknown_fields=True,
-    rename="camel",
-):
-    """
-    A Hardy-Weinberg Equilibrium (HWE) filter,
-    which filters out variants that are not in HWE.
 
-    Parameters
-    ----------
-    num_samples : int
-        Number of samples in the population
-    crit_value : float, optional
-        The critical value for the chi-squared test.
-        Default: 0.025
-    """
-
-    num_samples: int
-    crit_value: float | None = 0.025
-
+PipelineType = list[BinomialMafFilter | HWEFilter] | None
 
 class SaveJobData(BaseMessage, frozen=True):
     """Data for SaveFromQuery jobs received from beanstalkd"""
@@ -106,7 +89,7 @@ class SaveJobData(BaseMessage, frozen=True):
     indexName: str
     outputBasePath: str
     fieldNames: list[str]
-    pipeline: list[BinomialMafFilter | HWEFilter] | None = None
+    pipeline: PipelineType = None
 
 
 class SaveJobSubmitMessage(SubmittedJobMessage, frozen=True, kw_only=True):

@@ -7,6 +7,8 @@ from bystro.search.save.c_hwe import drop_row_if_out_of_hwe
 
 logger = logging.getLogger(__name__)
 
+FilterFunctionType = Callable[[dict], bool]
+
 class HWEFilter(
     Struct,
     frozen=True,
@@ -30,10 +32,9 @@ class HWEFilter(
 
     num_samples: int
     crit_value: float | None = 0.025
-
     def make_filter(
         self,
-    ) -> Callable[[object], bool] | None:
+    ) -> FilterFunctionType | None:
         if self.num_samples <= 0:
             logger.warning(
                 "To perform the HWE filter, number of samples must be greater than 0, got %s",
@@ -41,18 +42,24 @@ class HWEFilter(
             )
             return None
 
-        chi2_crit = chi2.isf(self.crit_value, 1)
+        if self.crit_value is None:
+            logger.warning(
+                "No critical value supplied for HWE filter, using default of 0.025"
+            )
+            chi2_crit = chi2.isf(0.025, 1)
+        else:
+            chi2_crit = chi2.isf(self.crit_value, 1)
 
         n_samples = float(self.num_samples)
 
-        def filter_function(doc: object):
+        def filter_function(doc: dict) -> bool:
             return drop_row_if_out_of_hwe(
                 chi2_crit=chi2_crit,
                 n=n_samples,
-                missingness=doc["missingness"][0][0],
-                sampleMaf=doc["sampleMaf"][0][0],
-                heterozygosity=doc["heterozygosity"][0][0],
-                homozygosity=doc["homozygosity"][0][0],
+                missingness=float(doc["missingness"][0][0][0]),
+                sampleMaf=float(doc["sampleMaf"][0][0][0]),
+                heterozygosity=float(doc["heterozygosity"][0][0][0]),
+                homozygosity=float(doc["homozygosity"][0][0][0])
             )
 
         return filter_function

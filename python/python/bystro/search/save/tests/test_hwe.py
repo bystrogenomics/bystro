@@ -10,10 +10,10 @@ def test_out_of_hwe_proportions():
 
     # A dummy doc
     doc = {
-        "sampleMaf": [[0.5]],
-        "missingness": [[0]],
-        "heterozygosity": [[0.99]],
-        "homozygosity": [[0.01]],
+        "sampleMaf": [[[0.5]]],
+        "missingness": [[[0]]],
+        "heterozygosity": [[[0.99]]],
+        "homozygosity": [[[0.01]]],
     }
 
     # Expected proportions based on 0.5 maf:
@@ -40,10 +40,10 @@ def test_in_hwe_proportions():
     assert fails_filter is not None
 
     doc = {
-        "sampleMaf": [[0.5]],
-        "missingness": [[0]],
-        "heterozygosity": [[0.5]],
-        "homozygosity": [[0.25]],
+        "sampleMaf": [[[0.5]]],
+        "missingness": [[[0]]],
+        "heterozygosity": [[[0.5]]],
+        "homozygosity": [[[0.25]]],
     }
 
     # With heterozygosity at .25, we have 25 hets, 25 homozygotes, and 50 reference,
@@ -60,10 +60,10 @@ def test_makeHweFilter_sampleMaf_zero():
     assert fails_filter is not None
 
     doc = {
-        "sampleMaf": [[0]],
-        "missingness": [[0]],
-        "heterozygosity": [[0.1]],
-        "homozygosity": [[0.2]],
+        "sampleMaf": [[[0]]],
+        "missingness": [[[0]]],
+        "heterozygosity": [[[0.1]]],
+        "homozygosity": [[[0.2]]],
     }
 
     # When sampleMaf is 0, we skip the site
