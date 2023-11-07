@@ -10,7 +10,10 @@ from bystro.proteomics.annotation_interface import (
     join_annotation_result_to_proteomics_dataset,
     get_annotation_result_from_query,
 )
-from bystro.proteomics.fragpipe_tandem_mass_tag import ABUNDANCE_COLS, TandemMassTagDataset
+from bystro.proteomics.fragpipe_tandem_mass_tag import (
+    ABUNDANCE_COLS,
+    TandemMassTagDataset,
+)
 
 TEST_RESPONSE_FILENAME = Path(__file__).parent / "test_response.dat"
 
@@ -45,7 +48,9 @@ def test_get_annotation_results_from_query():
     index_name = "mock_index_name"
 
     mock_client = MockOpenSearch()
-    samples_and_genes_df = get_annotation_result_from_query(user_query_string, index_name, mock_client)
+    samples_and_genes_df = get_annotation_result_from_query(
+        user_query_string, index_name, mock_client # type: ignore
+    )
     assert (1610, 7) == samples_and_genes_df.shape
 
 
@@ -67,7 +72,9 @@ def test_join_annotation_result_to_proteomics_dataset():
     user_query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
     index_name = None
     mock_client = MockOpenSearch()
-    query_result_df = get_annotation_result_from_query(user_query_string, index_name, mock_client)
+    query_result_df = get_annotation_result_from_query(
+        user_query_string, index_name, mock_client  # type: ignore
+    )
 
     # Step 2: Construct a proteomics dataset with some shared sampled_ids and gene_names
     shared_proteomics_sample_ids = sorted(set(query_result_df.sample_id))[:2]

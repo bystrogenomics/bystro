@@ -129,6 +129,8 @@ def test_marginal_score_samples():
     X = rng.normal(size=(150, 10))
     model = BaseCovariance()
     model.covariance = 1 / X.shape[0] * np.dot(X.T, X)
+    assert model.covariance is not None
+
     idxs = np.ones(10)
     idxs[8:] = 0
     score_samples = model.marginal_score_samples(X[:, idxs == 1], idxs)
@@ -144,6 +146,8 @@ def test_marginal_score_samples_sherman_woodbury():
     Lambda = np.diag(np.abs(rng.normal(size=10)))
     model = BaseCovariance()
     model.covariance = Lambda + np.dot(W.T, W)
+    assert model.covariance is not None
+
     idxs = np.ones(10)
     idxs[8:] = 0
     score_samples = model.marginal_score_samples(X[:, idxs == 1], idxs)
@@ -158,6 +162,8 @@ def test_marginal_score():
     X = rng.normal(size=(15, 10))
     model = BaseCovariance()
     model.covariance = 1 / X.shape[0] * np.dot(X.T, X)
+    assert model.covariance is not None
+
     idxs = np.ones(10)
     idxs[8:] = 0
     score = model.marginal_score(X[:, idxs == 1], idxs)
@@ -243,6 +249,8 @@ def test_entropy_subset():
     X = rng.normal(size=(1000, 10))
     model = BaseCovariance()
     model.covariance = 1 / X.shape[0] * np.dot(X.T, X)
+    assert model.covariance is not None
+
     idxs = np.ones(10)
     idxs[8:] = 0
     ent_sub = model.entropy_subset(idxs)
@@ -256,6 +264,8 @@ def test_mutual_information():
     X = rng.normal(size=(1000, 10))
     model = BaseCovariance()
     model.covariance = 1 / X.shape[0] * np.dot(X.T, X)
+    assert model.covariance is not None
+
     idxs1 = np.ones(10)
     idxs2 = np.ones(10)
     idxs1[5:] = 0

@@ -41,6 +41,8 @@ class BaseNumpyroModel(abc.ABC):
         self.mcmc_options = self._fill_mcmc_options(mcmc_options)
         self.hp_options = self._fill_hp_options(hp_options)
         self.samples = None
+        self._model = None
+        self.model_kwargs = None
 
     @abc.abstractmethod
     def fit(self, *args):
@@ -124,7 +126,7 @@ class BaseNumpyroModel(abc.ABC):
     def _fill_hp_options(self, hp_options):
         """
         This fills in default hyperparameters of the model. Since these are
-        not conserved between models we leave this as an abstract method 
+        not conserved between models we leave this as an abstract method
         to be filled in per model.
 
         Parameters
