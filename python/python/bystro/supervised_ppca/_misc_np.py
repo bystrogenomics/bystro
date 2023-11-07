@@ -28,7 +28,7 @@ def softplus_inverse_np(y):
     x : np.array
         Transformed array
     """
-    min_threshold = 10 ** -15
+    min_threshold = 10**-15
     max_threshold = 500
     safe_y = np.clip(
         y, min_threshold, max_threshold

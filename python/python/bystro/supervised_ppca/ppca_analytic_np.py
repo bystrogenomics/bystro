@@ -52,7 +52,7 @@ class PPCAanalytic(BaseGaussianFactorModel):
         L, p = self.n_components, self.p
 
         U, s, V = la.svd(X, full_matrices=False)
-        eigenvals = s ** 2 / (N - 1)
+        eigenvals = s**2 / (N - 1)
 
         var = 1.0 / (p - L) * (np.sum(eigenvals) - np.sum(eigenvals[:L]))
 
@@ -77,6 +77,22 @@ class PPCAanalytic(BaseGaussianFactorModel):
         """
         covariance = np.dot(self.W_.T, self.W_) + self.sigma2_ * np.eye(self.p)
         return covariance
+
+    def get_noise(self):
+        """
+        Returns the observational noise as a diagonal matrix
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        Lambda : np.array-like,(p,p)
+            The observational noise
+        """
+        Lambda = self.sigma2_ * np.eye(self.p)
+        return Lambda
 
     def _store_instance_variables(self, trainable_variables):
         """

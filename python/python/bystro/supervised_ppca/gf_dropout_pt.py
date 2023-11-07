@@ -33,9 +33,9 @@ None
 import numpy as np
 
 from tqdm import trange
-import torch
-from torch import nn
-from torch.distributions.multivariate_normal import MultivariateNormal
+import torch # type: ignore
+from torch import nn # type: ignore
+from torch.distributions.multivariate_normal import MultivariateNormal # type: ignore
 from sklearn.decomposition import PCA  # type: ignore
 
 from bystro.supervised_ppca._misc_np import softplus_inverse_np
@@ -77,11 +77,11 @@ def _get_projection_matrix(W_, sigma_):
 
 class PPCADropout(PPCA):
     """
-    This implements supervised PPCA according to the paper draft in 
+    This implements supervised PPCA according to the paper draft in
     prepration (Talbot et al, 2023), robust variational inference with
-    variational objectivesThat is the generative mechanism matches 
-    probabilistic PCA with  isotropic variance. However, a variational 
-    lower bound ona predictive objective is used to ensure that a subset 
+    variational objectivesThat is the generative mechanism matches
+    probabilistic PCA with  isotropic variance. However, a variational
+    lower bound ona predictive objective is used to ensure that a subset
     of latent variables are predictive of an auxiliary task.
 
     Parameters
@@ -91,7 +91,7 @@ class PPCADropout(PPCA):
 
     n_supervised : int
         The number of predictive latent variables
-            
+
     prior_options : dict
         The hyperparameters for the prior on the parameters
 
@@ -100,7 +100,7 @@ class PPCADropout(PPCA):
     gamma : float,default=10.0
 
     delta : 5.0
-        
+
 
     """
 
@@ -174,9 +174,7 @@ class PPCADropout(PPCA):
         elif task == "regression":
             supervision_loss = nn.MSELoss()
         else:
-            err_msg = (
-                f"unrecognized_task {task}, must be regression or classification"
-            )
+            err_msg = f"unrecognized_task {task}, must be regression or classification"
             raise ValueError(err_msg)
 
         trainable_variables = [W_, sigmal_, B_]
@@ -233,7 +231,7 @@ class PPCADropout(PPCA):
             loss_i = torch.linalg.matrix_norm(off_diag)
 
             posterior = like_gen + 1 / N * like_prior
-            loss = -1 * posterior + self.mu * loss_y + self.gamma*loss_i
+            loss = -1 * posterior + self.mu * loss_y + self.gamma * loss_i
 
             optimizer.zero_grad()
             loss.backward()
