@@ -2,8 +2,8 @@ import logging
 from typing import Callable
 
 from msgspec import Struct
-from scipy.stats import chi2
-from bystro.search.save.c_hwe import drop_row_if_out_of_hwe
+from scipy.stats import chi2 # type: ignore
+from bystro.search.save.c_hwe import drop_row_if_out_of_hwe # type: ignore
 
 logger = logging.getLogger(__name__)
 

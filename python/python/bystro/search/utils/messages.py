@@ -75,7 +75,7 @@ class BinomialMafFilter(
     estimates: list[str]
     crit_value: float | None = 0.025
 
-    def make_filter() -> Callable[[dict], bool] | None:
+    def make_filter(self) -> Callable[[dict], bool] | None:
         pass
 
 
