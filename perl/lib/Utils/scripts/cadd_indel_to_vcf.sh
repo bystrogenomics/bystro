@@ -59,8 +59,8 @@ cat <<EOF
 ##reference=GRCh37
 ##INFO=<ID=RawScore,Number=1,Type=Float,Description="Raw CADD score">
 ##INFO=<ID=PHRED,Number=1,Type=Float,Description="CADD PHRED-like score">
-#CHROM POS ID REF ALT QUAL FILTER INFO
 EOF
+echo -e "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO"
 
 # Process the file or stdin and convert it to VCF format using awk
 if [[ $input_file == "-" ]]; then
