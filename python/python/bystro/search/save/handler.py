@@ -149,24 +149,28 @@ def _process_query(
     parent_fields, child_fields = _get_header(field_names)
 
     discordant_idx = field_names.index("discordant")
-    assert discordant_idx > -1
 
-    # Each sliced scroll chunk should get all records for that chunk
-    assert len(resp["hits"]["hits"]) == resp["hits"]["total"]["value"]
+    if discordant_idx == -1:
+        raise ValueError("discordant field not found in field names")
 
-    for doc in resp["hits"]["hits"]:
-        row = np.empty(len(field_names), dtype=object)
-        for y in range(len(field_names)):
-            row[y] = _populate_data(
-                child_fields[y], doc["_source"].get(parent_fields[y])
-            )
+    try:
+        for doc in resp["hits"]["hits"]:
+            row = np.empty(len(field_names), dtype=object)
+            for y in range(len(field_names)):
+                row[y] = _populate_data(
+                    child_fields[y], doc["_source"].get(parent_fields[y])
+                )
 
-        if row[discordant_idx][0][0] is False:
-            row[discordant_idx][0][0] = 0
-        elif row[discordant_idx][0][0] is True:
-            row[discordant_idx][0][0] = 1
+            if row[discordant_idx][0][0] is False:
+                row[discordant_idx][0][0] = 0
+            elif row[discordant_idx][0][0] is True:
+                row[discordant_idx][0][0] = 1
 
-        rows.append(row)
+            rows.append(row)
+    except Exception as err:
+        logger.error(err)
+        traceback.print_exc()
+        return -1
 
     try:
         with gzip.open(chunk_output_name, "wb") as fw:
@@ -200,7 +204,7 @@ def go(  # pylint:disable=invalid-name
     search_conf: dict,
     publisher: ProgressPublisher,
     max_query_size: int = 10_000,
-    max_slices=1024,
+    max_slices=128,
     keep_alive="1d",
 ) -> AnnotationOutputs:
     """Main function for running the query and writing the output"""
