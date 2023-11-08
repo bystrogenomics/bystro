@@ -52,8 +52,8 @@ def _clean_query(input_query_body: dict):
 
 
 def _get_header(field_names) -> tuple[list[str], list[str]]:
-    children: list[str] = [""] * len(field_names)
-    parents: list[str] = children.copy()
+    children = [""] * len(field_names)
+    parents = children.copy()
 
     for i, field in enumerate(field_names):
         if "." in field:
