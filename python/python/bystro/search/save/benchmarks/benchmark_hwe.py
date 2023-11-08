@@ -67,6 +67,8 @@ def test_drop_row_hwe(benchmark):
     filter_fn = HWEFilter(num_samples=N, crit_value=0.025).make_filter()
 
     def loop():
+        assert filter_fn is not None
+
         for doc in docs:
             res = filter_fn(doc)
 
