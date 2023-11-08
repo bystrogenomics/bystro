@@ -251,7 +251,7 @@ def test_get_job(mocker):
     response = get_jobs(args, print_result=False)
 
     parsed_job = EXAMPLE_JOB.copy()
-    parsed_job["config"] = json.decode(parsed_job["config"])
+    parsed_job["config"] = json.decode(parsed_job["config"]) # type: ignore
 
     assert response == parsed_job
 
