@@ -52,11 +52,61 @@ while [[ "$#" -gt 0 ]]; do
     esac
 done
 
-# VCF Header
+
+# Function to extract the reference genome, CADD version, and check headers
+check_headers_and_extract_details() {
+    local input=$1
+    local line_no=0
+    local ref_genome=""
+    local cadd_version=""
+
+    cadd_header_regex='^## CADD (GRCh[0-9]+)-v([0-9.]+)'
+    cadd_header_line_two="^#Chrom\s+Pos\s+Ref\s+Alt\s+RawScore\s+PHRED"
+
+    while IFS= read -r line; do
+        ((line_no++))
+        if [ $line_no -eq 1 ]; then
+            if [[ $line =~ $cadd_header_regex ]]; then
+                ref_genome=${BASH_REMATCH[1]}
+                cadd_version=${BASH_REMATCH[2]}
+            else
+                echo "Error: Invalid header line or reference genome and CADD version not found." >&2
+                exit 1
+            fi
+        elif [ $line_no -eq 2 ]; then
+            if ! [[ "$line" =~ $cadd_header_line_two ]]; then
+                echo "Error: Second header line does not match expected format." >&2
+                exit 1
+            fi
+            break
+        fi
+    done < "$input"
+
+    echo "$ref_genome $cadd_version"
+}
+
+# Check input and extract reference genome and CADD version
+if [[ $input_file == "-" ]]; then
+    read ref_genome cadd_version <<< $(check_headers_and_extract_details /dev/stdin)
+else
+    if [[ ! -f $input_file ]]; then
+        echo "Error: File does not exist." >&2
+        exit 1
+    fi
+    read ref_genome cadd_version <<< $(check_headers_and_extract_details "$input_file")
+fi
+
+# Check if the ref_genome and cadd_version were properly extracted
+if [ -z "$ref_genome" ] || [ -z "$cadd_version" ]; then
+    echo "Error: Unable to extract reference genome and CADD version." >&2
+    exit 1
+fi
+
+# Output VCF Header
 cat <<EOF
 ##fileformat=VCFv4.2
-##source=CADD_GRCh37-v1.6
-##reference=GRCh37
+##source=CADD_${ref_genome}-v${cadd_version}
+##reference=${ref_genome}
 ##INFO=<ID=RawScore,Number=1,Type=Float,Description="Raw CADD score">
 ##INFO=<ID=PHRED,Number=1,Type=Float,Description="CADD PHRED-like score">
 EOF
