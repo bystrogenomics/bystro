@@ -34,7 +34,7 @@ def test_AncestrySubmission_accepts_valid_vcf_paths():
 
 def test_AncestrySubmission_rejects_bad_vcf_paths():
     with pytest.raises(AttrValidationError):
-        AncestrySubmission(3)
+        AncestrySubmission(3) # type: ignore
     with pytest.raises(AttrValidationError):
         AncestrySubmission("foo.txt")
     with pytest.raises(AttrValidationError):
@@ -48,7 +48,7 @@ def test_AncestrySubmission_rejects_bad_vcf_paths():
 def test_AncestrySubmission_is_frozen():
     ancestry_submission = AncestrySubmission("foo.vcf")
     with pytest.raises(FrozenInstanceError):
-        ancestry_submission.vcf_path = "bar.vcf"
+        ancestry_submission.vcf_path = "bar.vcf" #type: ignore
 
 
 prob_int = ProbabilityInterval(lower_bound=0.0, upper_bound=1.0)

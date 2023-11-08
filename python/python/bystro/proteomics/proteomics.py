@@ -2,6 +2,7 @@
 
 
 from collections.abc import Sequence
+from io import StringIO
 from pathlib import Path
 from typing import TypeVar
 
@@ -10,16 +11,15 @@ import pandas as pd
 T = TypeVar("T")
 
 
-def load_fragpipe_dataset(fname: str | Path) -> pd.DataFrame:
+def load_fragpipe_dataset(fname: str | Path | StringIO) -> pd.DataFrame:
     """Load a fragpipe dataset and prep it according to type of dataset."""
-    fragpipe_dataset = _load_fragpipe_tsv(fname)
-    return _prep_fragpipe_dataset(fragpipe_dataset)
+    return _prep_fragpipe_dataset(_load_fragpipe_tsv(fname))
 
 
 # ------------------------------- END PUBLIC API -------------------------------
 
 
-def _load_fragpipe_tsv(fname: str | Path) -> pd.DataFrame:
+def _load_fragpipe_tsv(fname: str | Path | StringIO) -> pd.DataFrame:
     """Read a fragpipe dataset from disk."""
     return pd.read_csv(fname, sep="\t", index_col="Index")
 

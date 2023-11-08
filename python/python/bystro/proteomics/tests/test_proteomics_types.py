@@ -14,7 +14,7 @@ def test_ProteomicsSubmission():
 
 def test_ProteomicsSubmission_bad_input():
     with pytest.raises(TypeError, match="must be of type str"):
-        ProteomicsSubmission(3)
+        ProteomicsSubmission(3) # type: ignore
 
     with pytest.raises(ValueError, match="must be of extension `.tsv`"):
         ProteomicsSubmission("foo.docx")

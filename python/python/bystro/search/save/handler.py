@@ -25,10 +25,11 @@ from bystro.search.utils.annotation import (
     AnnotationOutputs,
     DelimitersConfig,
 )
-from bystro.search.utils.messages import SaveJobData
+from bystro.search.utils.messages import SaveJobData, PipelineType
 from bystro.search.utils.opensearch import gather_opensearch_args
 from bystro.utils.compress import GZIP_EXECUTABLE
 from bystro.utils.tar import GNU_TAR_EXECUTABLE_NAME
+from bystro.search.save.hwe import FilterFunctionType
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +51,9 @@ def _clean_query(input_query_body: dict):
     return input_query_body
 
 
-def _get_header(field_names):
-    children = [None] * len(field_names)
-    parents = [None] * len(field_names)
+def _get_header(field_names) -> tuple[list[str], list[str]]:
+    children: list[str] = [""] * len(field_names)
+    parents: list[str] = children.copy()
 
     for i, field in enumerate(field_names):
         if "." in field:
@@ -134,12 +135,22 @@ def _process_query(
     query_args: dict,
     search_client_args: dict,
     field_names: list,
+    pipeline: PipelineType,
     chunk_output_name: str,
     reporter,
     delimiters,
 ):
     client = OpenSearch(**search_client_args)
     resp = client.search(**query_args)
+
+    filters: list[FilterFunctionType] | None = None
+    if pipeline is not None:
+        filters = []
+        for filter_msg in pipeline:
+            filter_fn = filter_msg.make_filter()
+
+            if filter_fn is not None:
+                filters.append(filter_fn)
 
     if resp["hits"]["total"]["value"] == 0:
         return 0
@@ -155,6 +166,11 @@ def _process_query(
 
     try:
         for doc in resp["hits"]["hits"]:
+            if filters is not None:
+                for filter_fn in filters:
+                    if filter_fn(doc["_source"]):
+                        continue
+
             row = np.empty(len(field_names), dtype=object)
             for y in range(len(field_names)):
                 row[y] = _populate_data(
@@ -245,6 +261,7 @@ def go(  # pylint:disable=invalid-name
                 {"body": body},
                 search_client_args,
                 job_data.fieldNames,
+                job_data.pipeline,
                 written_chunks[-1],
                 reporter,
                 DelimitersConfig(),

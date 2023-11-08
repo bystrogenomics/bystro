@@ -87,8 +87,8 @@ expected_annotation_df.index.name = "sample"
 
 
 def test_load_tandem_mass_tag_dataset():
-    abundance_handle = StringIO(raw_abundance_df.to_csv(index=None, sep="\t"))
-    annotation_handle = StringIO(raw_annotation_df.to_csv(index=None, sep="\t"))
+    abundance_handle = StringIO(raw_abundance_df.to_csv(index=False, sep="\t"))
+    annotation_handle = StringIO(raw_annotation_df.to_csv(index=False, sep="\t"))
     tandem_mass_tag_dataset = load_tandem_mass_tag_dataset(abundance_handle, annotation_handle)
     assert_frame_equal(expected_abundance_df, tandem_mass_tag_dataset.abundance_df)
     assert_frame_equal(expected_annotation_df, tandem_mass_tag_dataset.annotation_df)

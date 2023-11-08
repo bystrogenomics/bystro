@@ -1,6 +1,7 @@
 """Load and prep fragpipe tandem mass Tag datasets."""
 
 from dataclasses import dataclass
+from io import StringIO
 
 import pandas as pd
 from bystro.proteomics.fragpipe_utils import check_df_starts_with_cols, prep_annotation_df
@@ -47,7 +48,7 @@ def _prep_abundance_df(abundance_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_tandem_mass_tag_dataset(
-    abundance_filename: str, annotation_filename: str
+    abundance_filename: str | StringIO, annotation_filename: str | StringIO
 ) -> TandemMassTagDataset:
     """Load and prep Fragpipe tandem mass tag datasets."""
     raw_abundance_df = pd.read_csv(abundance_filename, sep="\t")
