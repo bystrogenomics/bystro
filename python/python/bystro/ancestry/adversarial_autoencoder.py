@@ -166,7 +166,7 @@ class AdversarialAutoencoder:
             real_loss = adversarial_loss(descriminator(real_z), ones)
             fake_loss = adversarial_loss(descriminator(Z), zeros)
 
-            D_loss = 0.5(real_loss + fake_loss)
+            D_loss = 0.5*(real_loss + fake_loss)
             D_loss.backward()
             optimizer_D.step()
 
