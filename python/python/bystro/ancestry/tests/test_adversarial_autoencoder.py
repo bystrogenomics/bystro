@@ -1,5 +1,5 @@
 import numpy as np
-import scipy.stats as st
+import scipy.stats as st # type: ignore
 from bystro.ancestry.adversarial_autoencoder import AdversarialAutoencoder
 
 
