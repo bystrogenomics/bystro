@@ -1,11 +1,14 @@
 import numpy as np
 
 import torch
+from torch import tensor
 import torch.nn as nn
 from torch.autograd import Variable
 from itertools import chain
 
 from tqdm import trange
+
+from typing import Any
 
 Tensor = torch.FloatTensor
 
@@ -86,7 +89,7 @@ class AdversarialAutoencoder:
         self.encoder: Encoder | None = None
         self.decoder: Decoder | None = None
 
-        self.training_options = {
+        self.training_options: dict[str, float | int] = {
             "learning_rate": 1e-3,
             "n_iterations": 1000,
             "b1": 0.5,
@@ -98,8 +101,11 @@ class AdversarialAutoencoder:
     def fit(self, X, seed=2021):
         N, self.p = X.shape
         rng = np.random.default_rng(int(seed))
-        X_ = torch.tensor(X, dtype=torch.float)
+        X_ = tensor(X, dtype=torch.float)
         lamb = self.training_options["lambda"]
+
+        n_iterations = int(self.training_options["n_iterations"])
+        batch_size = int(self.training_options["batch_size"])
 
         encoder = Encoder(self.p, self.n_components)
         decoder = Decoder(self.p, self.n_components)
@@ -124,22 +130,20 @@ class AdversarialAutoencoder:
         )
 
         ones = Variable(
-            Tensor(self.training_options["batch_size"], 1).fill_(1.0),
+            Tensor(batch_size, 1).fill_(1.0),
             requires_grad=False,
         )
         zeros = Variable(
-            Tensor(self.training_options["batch_size"], 1).fill_(0.0),
+            Tensor(batch_size, 1).fill_(0.0),
             requires_grad=False,
         )
 
-        self.losses_generative = np.zeros(self.training_options["n_iterations"])
-        self.losses_discriminative = np.zeros(
-            self.training_options["n_iterations"]
-        )
+        self.losses_generative = np.zeros(n_iterations)
+        self.losses_discriminative = np.zeros(n_iterations)
 
-        for i in trange(self.training_options["n_iterations"]):
-            idx = rng.choice(N, size=self.training_options["batch_size"], replace=False)
-            X_batch = X_[idx]
+        for i in trange(n_iterations):
+            idx = rng.choice(N, size=batch_size, replace=False)
+            X_batch = X_[tensor(idx)]
             Z = encoder(X_batch)
             X_recon = decoder(Z)
 
@@ -153,7 +157,7 @@ class AdversarialAutoencoder:
             G_loss.backward()
             optimizer_G.step()
 
-            real_z = Variable(torch.randn(self.training_options["batch_size"], self.n_components))
+            real_z = Variable(torch.randn(batch_size, self.n_components))
 
             real_loss = adversarial_loss(discriminator(real_z), ones)
             fake_loss = adversarial_loss(discriminator(Z.detach()), zeros)
