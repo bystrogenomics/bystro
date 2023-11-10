@@ -1,4 +1,59 @@
+"""
+Background
+----------
+Adversarial autoencoders (AAEs) represent a novel approach to 
+unsupervised learning by combining the principles of autoencoders 
+with adversarial networks. Traditional autoencoders aim to compress 
+input data into a lower-dimensional latent space and then reconstruct 
+the original input from this compressed representation. AAEs introduce 
+an adversarial training component by incorporating a generative 
+adversarial network (GAN) into the autoencoder architecture. The 
+adversarial network's role is to discriminate between the encoded 
+latent representations and samples drawn from a predefined distribution. 
+This adversarial process encourages the autoencoder to produce latent 
+representations that closely resemble samples from the specified 
+distribution, thereby promoting the learning of a more structured and 
+meaningful latent space.
+
+The adversarial component in AAEs helps overcome some limitations of 
+standard autoencoders, such as mode collapse and lack of diversity in 
+the generated samples. By introducing adversarial training, AAEs can 
+learn a more robust and continuous latent space that captures the 
+underlying structure of the input data. This combination of autoencoder 
+and GAN principles makes adversarial autoencoders a powerful tool for 
+tasks like data generation, anomaly detection, and representation 
+learning, where learning a meaningful and compact latent representation 
+is crucial for effective performance.
+
+This implements an adversarial encoder and the objects
+
+Objects
+-------
+Encoder(nn.Module)
+    This provides a deterministic function
+    latent variables = encoder(data)
+
+Decoder(nn.Module)
+    This provides a deterministic function
+    reconstructed data = decoder(latent_variables)
+
+Discriminator(nn.Module)
+    This defines a neural network that distinguishes
+    latent variables computed from our encoder on observed
+    data and data from a synthetic distribution
+
+
+AdversarialAutoencoder
+    This fits an adversarial autoencoder given data
+
+
+Methods
+-------
+None
+"""
+from typing import Any
 import numpy as np
+from numpy.typing import NDArray
 
 import torch
 import torch.nn as nn
@@ -6,6 +61,8 @@ from torch.autograd import Variable
 from itertools import chain
 
 from tqdm import trange
+
+from sklearn.mixture import GaussianMixture
 
 Tensor = torch.FloatTensor
 
@@ -21,16 +78,17 @@ class Encoder(nn.Module):
     due to the adversarial loss with training
     """
 
-    def __init__(self, observation_dimension, n_components):
+    def __init__(self, observation_dimension, n_components, encoder_options):
         super().__init__()
+        eo = encoder_options
 
         self.layers = nn.Sequential(
-            nn.Linear(observation_dimension, 512),
+            nn.Linear(observation_dimension, eo["n_nodes"]),
             nn.LeakyReLU(0.2),
-            nn.Linear(512, 512),
-            nn.BatchNorm1d(512),
+            nn.Linear(eo["n_nodes"], eo["n_nodes"]),
+            nn.BatchNorm1d(eo["n_nodes"]),
             nn.LeakyReLU(0.2),
-            nn.Linear(512, n_components),
+            nn.Linear(eo["n_nodes"], n_components),
         )
 
     def forward(self, x):
@@ -39,16 +97,23 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, observation_dimension, n_components):
+    """
+    This provides a deterministic function
+
+    reconstructed data = decoder(latent_variables)
+    """
+
+    def __init__(self, observation_dimension, n_components, decoder_options):
         super().__init__()
+        do = decoder_options
 
         self.model = nn.Sequential(
-            nn.Linear(n_components, 512),
+            nn.Linear(n_components, do["n_nodes"]),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(512, 512),
-            nn.BatchNorm1d(512),
+            nn.Linear(do["n_nodes"], do["n_nodes"]),
+            nn.BatchNorm1d(do["n_nodes"]),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(512, observation_dimension),
+            nn.Linear(do["n_nodes"], observation_dimension),
             nn.Tanh(),
         )
 
@@ -58,15 +123,22 @@ class Decoder(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, n_components):
+    """
+    This defines a neural network that distinguishes
+    latent variables computed from our encoder on observed
+    data and data from a synthetic distribution
+    """
+
+    def __init__(self, n_components, discriminator_options):
         super().__init__()
+        do = discriminator_options
 
         self.model = nn.Sequential(
-            nn.Linear(n_components, 512),
+            nn.Linear(n_components, do["n_nodes"]),
             nn.LeakyReLU(0.2),
-            nn.Linear(512, 256),
+            nn.Linear(do["n_nodes"], do["n_nodes2"]),
             nn.LeakyReLU(0.2),
-            nn.Linear(256, 1),
+            nn.Linear(do["n_nodes2"], 1),
             nn.Sigmoid(),
         )
 
@@ -80,20 +152,38 @@ class AdversarialAutoencoder:
     This implements an adversarial autoencoder
     """
 
-    def __init__(self, n_components):
+    def __init__(
+        self,
+        n_components,
+        training_options: dict[str, Any] | None = None,
+        latent_distribution_options: dict[str, Any] | None = None,
+        encoder_options: dict[str, Any] | None = None,
+        decoder_options: dict[str, Any] | None = None,
+        discriminator_options: dict[str, Any] | None = None,
+    ):
         self.n_components = int(n_components)
 
         self.encoder: Encoder | None = None
         self.decoder: Decoder | None = None
 
-        self.training_options = {
-            "learning_rate": 1e-3,
-            "n_iterations": 1000,
-            "b1": 0.5,
-            "b2": 0.999,
-            "batch_size": 200,
-            "lambda": 0.01,
-        }
+        if training_options is None:
+            training_options = {}
+        if encoder_options is None:
+            encoder_options = {}
+        if decoder_options is None:
+            decoder_options = {}
+        if discriminator_options is None:
+            discriminator_options = {}
+        if latent_distribution_options is None:
+            latent_distribution_options = {}
+
+        self._fill_training_options(training_options)
+        self._fill_model_options(
+            latent_distribution_options,
+            encoder_options,
+            decoder_options,
+            discriminator_options,
+        )
 
     def fit(self, X, seed=2021):
         N, self.p = X.shape
@@ -101,15 +191,19 @@ class AdversarialAutoencoder:
         X_ = torch.tensor(X, dtype=torch.float)
         lamb = self.training_options["lambda"]
 
-        encoder = Encoder(self.p, self.n_components)
-        decoder = Decoder(self.p, self.n_components)
-        discriminator = Discriminator(self.n_components)  # Spelling corrected
+        encoder = Encoder(self.p, self.n_components, self.encoder_options)
+        decoder = Decoder(self.p, self.n_components, self.decoder_options)
+        discriminator = Discriminator(
+            self.n_components, self.discriminator_options
+        )
 
         adversarial_loss = nn.BCELoss()
         generative_loss = nn.MSELoss()
 
         # Using chain to combine parameters from both models
-        trainable_variables_g = chain(encoder.parameters(), decoder.parameters())
+        trainable_variables_g = chain(
+            encoder.parameters(), decoder.parameters()
+        )
         trainable_variables_d = discriminator.parameters()
 
         optimizer_G = torch.optim.Adam(
@@ -137,8 +231,17 @@ class AdversarialAutoencoder:
             self.training_options["n_iterations"]
         )
 
+        XX = rng.normal(scale=.3,size=(10000,self.n_components))
+        XX[:3300,0] += 5
+        XX[3300:6600,0] += -5
+        gmm = GaussianMixture(3)
+        gmm.fit(XX)
+
+
         for i in trange(self.training_options["n_iterations"]):
-            idx = rng.choice(N, size=self.training_options["batch_size"], replace=False)
+            idx = rng.choice(
+                N, size=self.training_options["batch_size"], replace=False
+            )
             X_batch = X_[idx]
             Z = encoder(X_batch)
             X_recon = decoder(Z)
@@ -153,7 +256,8 @@ class AdversarialAutoencoder:
             G_loss.backward()
             optimizer_G.step()
 
-            real_z = Variable(torch.randn(self.training_options["batch_size"], self.n_components))
+            samples,_ = gmm.sample(n_samples=self.training_options["batch_size"])
+            real_z = Variable(torch.tensor(samples.astype(np.float32)))
 
             real_loss = adversarial_loss(discriminator(real_z), ones)
             fake_loss = adversarial_loss(discriminator(Z.detach()), zeros)
@@ -169,3 +273,138 @@ class AdversarialAutoencoder:
         self.encoder = encoder
         self.decoder = decoder
         self.discriminator = discriminator
+        return self
+
+    def transform(self, X) -> NDArray[np.float_]:
+        """
+        This returns the latent variable estimates given X
+
+        Parameters
+        ----------
+        X : np array-like,(N_samples,p)
+            The data to transform.
+
+        Returns
+        -------
+        S : NDArray,(N_samples,n_components)
+            The factor estimates
+        """
+        X_ = torch.tensor(X)
+        S_ = self.encoder(X_)
+        S = S_.detach().numpy()
+        return S
+
+    def inverse_transform(self, S) -> NDArray[np.float_]:
+        """
+        This returns the reconstruction given latent variables
+
+        Parameters
+        ----------
+        S : NDArray,(N_samples,n_components)
+            The factor estimates
+
+        Returns
+        -------
+        X_recon : np array-like,(N_samples,p)
+            The reconstruction
+        """
+        S_ = torch.tensor(S)
+        X_ = self.decoder(S_)
+        X_recon = X_.detach().numpy()
+        return X_recon
+
+    def _fill_training_options(self, training_options: dict[str, Any]) -> None:
+        """
+        This sets the default parameters for stochastic gradient descent,
+        our inference strategy for the model.
+
+        Parameters
+        ----------
+        training_options : dict
+            The original options set by the user passed as a dictionary
+
+        Options
+        -------
+        n_iterations : int, default=3000
+            Number of iterations to train using stochastic gradient descent
+
+        learning_rate : float, default=1e-4
+            Learning rate of gradient descent
+
+        batch_size : int, default=None
+            The number of observations to use at each iteration. If none
+            corresponds to batch learning
+        """
+        default_options = {
+            "n_iterations": 3000,
+            "learning_rate": 1e-2,
+            "batch_size": 100,
+            "b1": 0.5,
+            "b2": 0.999,
+            "lambda": 0.1,
+        }
+        tops = {**default_options, **training_options}
+
+        default_keys = set(default_options.keys())
+        final_keys = set(tops.keys())
+
+        expected_but_missing_keys = default_keys - final_keys
+        unexpected_but_present_keys = final_keys - default_keys
+        if expected_but_missing_keys:
+            raise ValueError(
+                "the following training options were expected but not found..."
+            )
+        if unexpected_but_present_keys:
+            raise ValueError(
+                "the following training options were unrecognized but provided..."
+            )
+
+        self.training_options = tops
+
+    def _fill_model_options(
+        self,
+        latent_distribution_options: dict[str, Any],
+        encoder_options: dict[str, Any],
+        decoder_options: dict[str, Any],
+        discriminator_options: dict[str, Any],
+    ) -> None:
+        """
+        This sets the default parameters for our encoder, decoder and discriminator
+
+        Parameters
+        ----------
+        latent_distribution_options: dict[str, Any]
+            Latent distribution options
+
+        encoder_options: dict[str, Any]
+            Encoder parameters
+
+        decoder_options: dict[str, Any]
+            Decoder parameters
+
+        discriminator_options: dict[str, Any]
+            Discriminator parameters
+        """
+        default_latent_distribution_options = {
+            "n_iterations": 3000,
+        }
+        default_encoder_options = {
+            "n_nodes": 128,
+        }
+        default_decoder_options = {
+            "n_nodes": 128,
+        }
+        default_discriminator_options = {
+            "n_nodes": 64,
+            "n_nodes2": 16,
+        }
+        self.latent_distribution_options = {
+            **default_latent_distribution_options,
+            **latent_distribution_options,
+        }
+        self.encoder_options = {**default_encoder_options, **encoder_options}
+        self.decoder_options = {**default_decoder_options, **decoder_options}
+        self.discriminator_options = {
+            **default_discriminator_options,
+            **discriminator_options,
+        }
