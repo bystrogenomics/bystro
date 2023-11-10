@@ -56,6 +56,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 import torch
+from torch import tensor
 import torch.nn as nn
 from torch.autograd import Variable
 from itertools import chain
@@ -188,8 +189,11 @@ class AdversarialAutoencoder:
     def fit(self, X, seed=2021):
         N, self.p = X.shape
         rng = np.random.default_rng(int(seed))
-        X_ = torch.tensor(X, dtype=torch.float)
+        X_ = tensor(X, dtype=torch.float)
         lamb = self.training_options["lambda"]
+
+        n_iterations = int(self.training_options["n_iterations"])
+        batch_size = int(self.training_options["batch_size"])
 
         encoder = Encoder(self.p, self.n_components, self.encoder_options)
         decoder = Decoder(self.p, self.n_components, self.decoder_options)
@@ -218,18 +222,16 @@ class AdversarialAutoencoder:
         )
 
         ones = Variable(
-            Tensor(self.training_options["batch_size"], 1).fill_(1.0),
+            Tensor(batch_size, 1).fill_(1.0),
             requires_grad=False,
         )
         zeros = Variable(
-            Tensor(self.training_options["batch_size"], 1).fill_(0.0),
+            Tensor(batch_size, 1).fill_(0.0),
             requires_grad=False,
         )
 
-        self.losses_generative = np.zeros(self.training_options["n_iterations"])
-        self.losses_discriminative = np.zeros(
-            self.training_options["n_iterations"]
-        )
+        self.losses_generative = np.zeros(n_iterations)
+        self.losses_discriminative = np.zeros(n_iterations)
 
         XX = rng.normal(scale=.3,size=(10000,self.n_components))
         XX[:3300,0] += 5
@@ -237,12 +239,11 @@ class AdversarialAutoencoder:
         gmm = GaussianMixture(3)
         gmm.fit(XX)
 
-
-        for i in trange(self.training_options["n_iterations"]):
+        for i in trange(n_iterations):
             idx = rng.choice(
-                N, size=self.training_options["batch_size"], replace=False
+                N, size=batch_size, replace=False
             )
-            X_batch = X_[idx]
+            X_batch = X_[tensor(idx)]
             Z = encoder(X_batch)
             X_recon = decoder(Z)
 
@@ -256,8 +257,8 @@ class AdversarialAutoencoder:
             G_loss.backward()
             optimizer_G.step()
 
-            samples,_ = gmm.sample(n_samples=self.training_options["batch_size"])
-            real_z = Variable(torch.tensor(samples.astype(np.float32)))
+            samples,_ = gmm.sample(n_samples=batch_size)
+            real_z = Variable(tensor(samples.astype(np.float32)))
 
             real_loss = adversarial_loss(discriminator(real_z), ones)
             fake_loss = adversarial_loss(discriminator(Z.detach()), zeros)
@@ -273,15 +274,16 @@ class AdversarialAutoencoder:
         self.encoder = encoder
         self.decoder = decoder
         self.discriminator = discriminator
+
         return self
 
-    def transform(self, X) -> NDArray[np.float_]:
+    def transform(self, X: NDArray) -> NDArray[np.float_]:
         """
         This returns the latent variable estimates given X
 
         Parameters
         ----------
-        X : np array-like,(N_samples,p)
+        X : NDArray,(N_samples,p)
             The data to transform.
 
         Returns
@@ -289,12 +291,15 @@ class AdversarialAutoencoder:
         S : NDArray,(N_samples,n_components)
             The factor estimates
         """
-        X_ = torch.tensor(X)
+        if self.encoder is None:
+            raise ValueError("The model has not been fit yet")
+
+        X_ = tensor(X)
         S_ = self.encoder(X_)
         S = S_.detach().numpy()
         return S
 
-    def inverse_transform(self, S) -> NDArray[np.float_]:
+    def inverse_transform(self, S: NDArray) -> NDArray[np.float_]:
         """
         This returns the reconstruction given latent variables
 
@@ -308,9 +313,13 @@ class AdversarialAutoencoder:
         X_recon : np array-like,(N_samples,p)
             The reconstruction
         """
-        S_ = torch.tensor(S)
+        if self.decoder is None:
+            raise ValueError("The model has not been fit yet")
+
+        S_ = tensor(S)
         X_ = self.decoder(S_)
         X_recon = X_.detach().numpy()
+
         return X_recon
 
     def _fill_training_options(self, training_options: dict[str, Any]) -> None:
