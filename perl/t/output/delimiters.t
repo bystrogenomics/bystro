@@ -16,7 +16,7 @@ my $oD = $delims->overlapDelimiter;
 
 my $line = "Stuff;1;2;3/.dasf_)," . "4\t5/6|7";
 
-my $expected = "Stuff,1,2,3,.dasf_),4\t5/6,7";
+my $expected = "Stuff,1,2,3,.dasf_),4\t5,6,7";
 
 $delims->cleanDelims->($line);
 
