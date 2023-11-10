@@ -29,7 +29,7 @@ my $overlap = "/";
 my $str =
   '1: Homo sapiens BRCA1/BRCA2-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
 my $expected =
-  '1: Homo sapiens BRCA1/BRCA2-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
+  '1: Homo sapiens BRCA1,BRCA2-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
 my $res = $seq->coerceFeatureType( 'someString', $str );
 
 #modifies passed string, and also returns the modified value
@@ -43,7 +43,7 @@ $expected =
   '2: Homo sapiens BRCA1,BRCA2-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
 $res = $seq->coerceFeatureType( 'someString', $str );
 
-ok( $res eq $str && $str eq $expected, 'Can clean string containing /' );
+ok( $res eq $str && $str eq $expected, 'Can clean string containing / followed by a-zA-Z' );
 
 $str =
     '3: Homo sapiens BRCA1'
