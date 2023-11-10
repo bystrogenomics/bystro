@@ -24,7 +24,7 @@ has positionDelimiter => ( is => 'ro', isa => 'Str', default => '|' );
 # ASII 254 (extended) "small black square" works well too
 # ASCII 31: UNIT Separator; intended for the same purpose of tab, may be more broadly supported
 # than other non-printable characters
-has overlapDelimiter => ( is => 'ro', isa => 'Str', default => chr(31) );
+has overlapDelimiter => ( is => 'ro', isa => 'Str', default => '/' );
 
 has fieldSeparator => ( is => 'ro', isa => 'Str', default => "\t" );
 
