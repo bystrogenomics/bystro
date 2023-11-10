@@ -2,6 +2,7 @@ import numpy as np
 import scipy.stats as st
 from bystro.ancestry.adversarial_autoencoder import AdversarialAutoencoder
 
+
 def generate_data():
     rng = np.random.default_rng(2021)
     N = 10000
@@ -19,14 +20,16 @@ def generate_data():
     X_train = X_hat + X_noise
     return W, sigma, X_train, S_train
 
+
 def test_adversarial_autoencoder():
-    W,sigma, X,S_train = generate_data()
+    W, sigma, X, S_train = generate_data()
     model = AdversarialAutoencoder(3)
     model.fit(X)
 
     S_est = model.transform(X.astype(np.float32))
-    plt.scatter(S_est[:,0],S_est[:,1])
+    X_recon = model.inverse_transform(S_est.astype(np.float32))
+    assert X_recon is not None
 
-	
+
 if __name__ == "__main__":
     test_adversarial_autoencoder()
