@@ -20,8 +20,7 @@ my $expected = "Stuff,1,2,3,.dasf_),4\t5,6,7";
 
 $delims->cleanDelims->($line);
 
-ok( $line eq $expected,
-  "Clean all delimiters, including / by default" );
+ok( $line eq $expected, "Clean all delimiters, including / by default" );
 
 my @parts = split( '\t', $line );
 
