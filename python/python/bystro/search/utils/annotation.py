@@ -146,7 +146,7 @@ class DelimitersConfig(Struct, frozen=True, forbid_unknown_fields=True):
     position: str = "|"
     overlap: str = chr(31)
     value: str = ";"
-    empty_field: str = "!"
+    empty_field: str = "NA"
 
     @staticmethod
     def from_dict(annotation_config: dict[str, Any]):

@@ -14,7 +14,7 @@ def assert_defaults(config: DelimitersConfig):
     assert config.position == "|"
     assert config.overlap == chr(31)
     assert config.value == ";"
-    assert config.empty_field == "!"
+    assert config.empty_field == "NA"
 
 
 def test_delimiters_default_values():
@@ -69,7 +69,7 @@ def test_delimiters_from_dict_partial_delimiters_key():
     assert config.position == "y"
     assert config.overlap == chr(31)  # default value
     assert config.value == ";"  # default value
-    assert config.empty_field == "!"  # default value
+    assert config.empty_field == "NA"  # default value
 
 
 def test_delimiters_unexpected_key():
@@ -210,7 +210,7 @@ def test_statistics_get_stats_arguments(mocker):
         "-outQcTabPath /dummy/output_base_path.statistics.qc.tsv "
         "-refColumn ref -altColumn alt -homozygotesColumn homozygotes "
         "-heterozygotesColumn heterozygotes -siteTypeColumn refSeq.siteType "
-        "-dbSnpNameColumn dbSNP.name -emptyField '!' "
+        "-dbSnpNameColumn dbSNP.name -emptyField NA "
         "-exonicAlleleFunctionColumn refSeq.exonicAlleleFunction "
         "-primaryDelimiter ';' -fieldSeparator '\t'"
     )
