@@ -16,7 +16,7 @@ use Mouse::Util::TypeConstraints;
 use File::Which qw(which);
 use File::Basename;
 use List::MoreUtils qw(firstidx);
-use List::Util qw( max );
+use List::Util      qw( max );
 
 use namespace::autoclean;
 
