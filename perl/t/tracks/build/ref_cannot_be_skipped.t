@@ -30,6 +30,8 @@ my $config_file = PrepareConfigWithTempdirs(
 
 my $config = YAML::XS::LoadFile($config_file);
 
-throws_ok { Seq::Build->new_with_config( { config => $config_file } ) } qr/Reference track is marked as no_build, but must be built/, 'Reference tracks must be built';
+throws_ok { Seq::Build->new_with_config( { config => $config_file } ) }
+qr/Reference track is marked as no_build, but must be built/,
+  'Reference tracks must be built';
 
 done_testing();
