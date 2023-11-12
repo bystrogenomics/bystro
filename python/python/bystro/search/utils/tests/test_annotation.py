@@ -12,7 +12,7 @@ from bystro.search.utils.annotation import (
 def assert_defaults(config: DelimitersConfig):
     assert config.field == "\t"
     assert config.position == "|"
-    assert config.overlap == chr(31)
+    assert config.overlap == "/"
     assert config.value == ";"
     assert config.empty_field == "!"
 
@@ -67,7 +67,7 @@ def test_delimiters_from_dict_partial_delimiters_key():
     config = DelimitersConfig.from_dict(config_dict)
     assert config.field == "x"
     assert config.position == "y"
-    assert config.overlap == chr(31)  # default value
+    assert config.overlap == "/"  # default value
     assert config.value == ";"  # default value
     assert config.empty_field == "!"  # default value
 

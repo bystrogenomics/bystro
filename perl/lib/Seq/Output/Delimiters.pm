@@ -18,12 +18,6 @@ has positionDelimiter => ( is => 'ro', isa => 'Str', default => '|' );
 # need rs1;rs2 allele1_a/allele1_b;allele2_a/allele2_b to keep the order
 # of rs1 => [allele1_a, allele1_b] rs2 => [allele2_a,allele2_b]
 # So in short is expected to be used for the 3rd dimension of a 3D array (3-tensor)
-# Using \ is difficult, and while ASCII provides non-printable separators (28, 29, 30, 31)
-# Excel may take issue with them.
-# Options "control" instead (ASCII 1)
-# ASII 254 (extended) "small black square" works well too
-# ASCII 31: UNIT Separator; intended for the same purpose of tab, may be more broadly supported
-# than other non-printable characters
 has overlapDelimiter => ( is => 'ro', isa => 'Str', default => '/' );
 
 has fieldSeparator => ( is => 'ro', isa => 'Str', default => "\t" );
