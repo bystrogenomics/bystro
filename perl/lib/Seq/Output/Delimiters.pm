@@ -4,7 +4,7 @@ use warnings;
 
 package Seq::Output::Delimiters;
 use Mouse 2;
-use DDP;
+
 with 'Seq::Role::Message';
 
 # TODO: initialize as singleton
