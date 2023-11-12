@@ -12,7 +12,6 @@ our $VERSION = '0.001';
 use Mouse 2;
 use MouseX::NativeTraits;
 
-use DDP;
 use List::Util qw/first/;
 
 use Seq::Tracks::Base::MapTrackNames;

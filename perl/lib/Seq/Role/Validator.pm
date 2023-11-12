@@ -9,8 +9,6 @@ use namespace::autoclean;
 #also prrovides ->is_file function
 use Types::Path::Tiny qw/File AbsFile AbsPath AbsDir/;
 
-use DDP;
-
 use Path::Tiny;
 use Cwd 'abs_path';
 

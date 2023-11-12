@@ -13,7 +13,6 @@ use Mouse 2;
 use MouseX::NativeTraits;
 use namespace::autoclean;
 use Scalar::Util qw/looks_like_number/;
-use DDP;
 
 use Seq::DBManager;
 use Seq::Tracks::Build::CompletionMeta;
@@ -41,6 +40,9 @@ has db => (
     return Seq::DBManager->new();
   }
 );
+
+# Don't actually build, used if we want a track to serve as a join track
+has no_build => ( is => 'ro', isa => 'Bool', default => 0);
 
 # Allows consumers to record track completion, skipping chromosomes that have
 # already been built
@@ -156,7 +158,6 @@ sub BUILD {
   my $d = Seq::Output::Delimiters->new();
   $self->{_cleanDelims} = $d->cleanDelims;
   $self->{_missChar}    = $d->emptyFieldChar;
-  $self->{_replChar}    = $d->globalReplaceChar;
   # Commit, sync, and remove any databases opened
   # This is useful because locking may occur if there is an open transaction
   # before fork(), and to make sure that any database meta data is properly

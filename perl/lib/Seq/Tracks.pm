@@ -22,7 +22,7 @@ package Seq::Tracks;
 use 5.10.0;
 use strict;
 use warnings;
-use DDP;
+
 use Clone 'clone';
 
 use Mouse 2;
@@ -272,7 +272,12 @@ sub _buildTrackGetters {
     my $i      = 0;
     for my $name ( @{ $self->outputOrder } ) {
       if ( !defined $tracks{$name} ) {
-        $self->log( 'fatal', "Uknown track $name specified in 'outputOrder'" );
+        $self->log( 'fatal', "Uknown track $name specified in `outputOrder`" );
+      }
+      elsif ( $tracks{$name}{no_build} ) {
+        $self->log( 'fatal',
+          "Track $name specified in `outputOrder` has `no_build` set, which means this track cannot be built, and is likely used only as a 'join' track, joined onto another track."
+        );
       }
 
       $trackOrder{$name} = $i;
@@ -280,10 +285,15 @@ sub _buildTrackGetters {
     }
 
     if ( $i < @$trackConfigurationAref ) {
-      my @notSeen = map { exists $trackOrder{ $_->{name} } ? () : $_->{name} }
+      my @notSeen =
+        map { exists $trackOrder{ $_->{name} } || $_->{no_build} ? () : $_->{name} }
         @$trackConfigurationAref;
-      $self->log( 'fatal',
-        "When using 'outputOrder', specify all tracks, missing: " . join( ',', @notSeen ) );
+
+      if ( @notSeen > 0 ) {
+        $self->log( 'fatal',
+          "When using `outputOrder`, specify all tracks, unless they have `no_build: true`, missing: "
+            . join( ',', @notSeen ) );
+      }
     }
   }
 

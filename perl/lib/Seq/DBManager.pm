@@ -19,7 +19,7 @@ with 'Seq::Role::Message';
 use Data::MessagePack;
 use LMDB_File         qw(:all);
 use Types::Path::Tiny qw/AbsPath/;
-use DDP;
+
 use Hash::Merge::Simple qw/ merge /;
 use Path::Tiny;
 use Scalar::Util qw/looks_like_number/;

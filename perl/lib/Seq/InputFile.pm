@@ -16,9 +16,9 @@ use Mouse::Util::TypeConstraints;
 use File::Which qw(which);
 use File::Basename;
 use List::MoreUtils qw(firstidx);
-use namespace::autoclean;
-use DDP;
 use List::Util qw( max );
+
+use namespace::autoclean;
 
 with 'Seq::Role::Message';
 
