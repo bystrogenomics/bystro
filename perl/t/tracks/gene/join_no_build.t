@@ -31,7 +31,6 @@ my $config_file = PrepareConfigWithTempdirs(
 
 my $config = YAML::XS::LoadFile($config_file);
 
-
 my $dbPath = path( $config->{database_dir} );
 $dbPath->remove_tree( { keep_root => 1 } );
 
