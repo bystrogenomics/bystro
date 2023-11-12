@@ -39,7 +39,7 @@ sub parse_vcf_header {
   my @types;
 
   foreach my $line ( split /\n/, $header ) {
-    if ( $line =~ /^##INFO=<ID=([^,]+(AN|AF|nhomalt)[^,]+)/ ) {
+    if ( $line =~ /^##INFO=<ID=([^,]*(AN|AF|nhomalt)[^,]*)/ ) {
       push @types, "- $1: number";
     }
   }
