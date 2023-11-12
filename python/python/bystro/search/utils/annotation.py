@@ -226,7 +226,7 @@ class Statistics:
             f"-outQcTabPath {self.qc_output_path} -refColumn {ref_field} "
             f"-altColumn {alt_field} -homozygotesColumn {hom_field} "
             f"-heterozygotesColumn {het_field} -siteTypeColumn {site_type_field} "
-            f"{dbSNPpart} -emptyField '{empty_field}' "
+            f"{dbSNPpart} -emptyField {empty_field} "
             f"-exonicAlleleFunctionColumn {ea_fun_field} "
             f"-primaryDelimiter '{value_delim}' -fieldSeparator '{field_delim}'"
         )
