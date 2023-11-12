@@ -82,7 +82,7 @@ my @expected = (
   "- control_AF_nfe: number"
 );
 my @types = parse_vcf_header( read_vcf_header($temp_vcf) );
-is_deeply( @types, @expected, "AN type extracted" );
+is_deeply( \@types, \@expected, "AN type extracted" );
 
 @types = parse_vcf_header( read_vcf_header($temp_vcf_gz) );
-is_deeply( @types, @expected, "AN type extracted from gzipped file" );
+is_deeply( \@types, \@expected, "AN type extracted from gzipped file" );
