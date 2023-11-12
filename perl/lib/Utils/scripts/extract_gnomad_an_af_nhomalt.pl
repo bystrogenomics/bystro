@@ -47,8 +47,12 @@ sub parse_vcf_header {
   return @types;
 }
 
-my @types = parse_vcf_header( read_vcf_header( $ARGV[0] ) );
+unless (caller) {
+  my @types = parse_vcf_header( read_vcf_header( $ARGV[0] ) );
 
-for my $type (@types) {
-  print "$type\n";
+  for my $type (@types) {
+    print "$type\n";
+  }
 }
+
+1;
