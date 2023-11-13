@@ -2,7 +2,7 @@ from typing import Callable
 import math
 
 from msgspec import Struct
-from scipy.stats import norm
+from scipy.stats import norm # type: ignore
 
 
 class BinomialMafFilter(
@@ -77,7 +77,7 @@ class BinomialMafFilter(
         if private_maf < min_possible_estimate:
             private_maf = min_possible_estimate
 
-        estimates = [e.split(".") for e in estimates]
+        document_paths = [e.split(".") for e in estimates]
 
         def binom_filter(doc):
             if snp_only and len(doc["alt"][0][0][0]) > 1:
@@ -93,7 +93,7 @@ class BinomialMafFilter(
 
             tested = 0
 
-            for path in estimates:
+            for path in document_paths:
                 try:
                     if len(path) == 3:
                         p = doc[path[0]][path[1]][path[2]]
