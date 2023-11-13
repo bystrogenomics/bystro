@@ -28,7 +28,7 @@ has overlapDelimiter => ( is => 'ro', isa => 'Str', default => chr(31) );
 
 has fieldSeparator => ( is => 'ro', isa => 'Str', default => "\t" );
 
-has emptyFieldChar => ( is => 'ro', isa => 'Str', default => '!' );
+has emptyFieldChar => ( is => 'ro', isa => 'Str', default => "NA" );
 
 # What to replace the flagged characters with if found in a string
 has globalReplaceChar => ( is => 'ro', isa => 'Str', default => ',' );
