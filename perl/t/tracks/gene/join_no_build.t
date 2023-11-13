@@ -17,7 +17,6 @@ use YAML::XS     qw/DumpFile/;
 use Seq::Build;
 use Seq::Tracks::Gene::Site::SiteTypeMap;
 use Seq::Tracks::Reference::MapBases;
-use DDP;
 
 # create temp directories
 my $dir = Path::Tiny->tempdir();
@@ -37,6 +36,13 @@ $dbPath->remove_tree( { keep_root => 1 } );
 my $builder = Seq::Build->new_with_config( { config => $config_file } );
 
 my $tracks = $builder->tracksObj;
+
+my $clinvarBuilder = $tracks->getTrackBuilderByName('clinvar');
+
+for my $chr ( @{ $config->{chromosomes} } ) {
+  ok( !$clinvarBuilder->completionMeta->_isCompleted('chrM'),
+    'Clinvar track is not built' );
+}
 
 my $baseMapper = Seq::Tracks::Reference::MapBases->new();
 my $siteTypes  = Seq::Tracks::Gene::Site::SiteTypeMap->new();
@@ -59,6 +65,8 @@ my $header     = Seq::Headers->new();
 my $features = $header->getParentFeatures('refSeq');
 
 my ( $siteTypeIdx, $funcIdx, $alleleIdIdx );
+
+my $expectedNumberOfTracks = @{ $config->{tracks}->{tracks} } - 1;
 
 # Check that join track successfully built
 for ( my $i = 0; $i < @$features; $i++ ) {
@@ -84,17 +92,14 @@ my $inGeneCount  = 0;
 
 # We still reserve an index for all specified tracks, even if they are not built
 # Therefore, to minimize database space, such tracks should be specified last
-ok( defined $clinvarGetter->dbName,
-  'clinvar track has dbName despite not being built' );
+ok( !defined $clinvarGetter, 'clinvar track getter does not exist' );
 
 for my $pos ( 0 .. $#$mainDbAref ) {
   my $dbData = $mainDbAref->[$pos];
 
   ok( defined $dbData, 'We have data for position ' . $pos );
-  ok(
-    !defined $dbData->[ $clinvarGetter->dbName ],
-    'No clinvar data built for position ' . $pos
-  );
+  ok( @$dbData <= $expectedNumberOfTracks,
+    'We don\'t have a clinvar record in database for position ' . $pos );
 
   my @out;
   # not an indel

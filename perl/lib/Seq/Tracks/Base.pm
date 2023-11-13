@@ -30,6 +30,16 @@ with 'Seq::Role::Message';
 # Not worth complexity of Maybe[Type], default => undef,
 has dbName => ( is => 'ro', init_arg => undef, writer => '_setDbName' );
 
+# Don't actually build, used if we want a track to serve as a join track
+# Where the track must exist in the tracks list, so that the "join" property of a different track can reference it
+# but we don't want to build it
+# An example of this is clinvar. We don't want to build the actual track, because it only allows for position-wise
+# matching, rather than allele-wise, but it contains large structural variations which we want to capture
+# where they overlap with genes.
+# So we join this clinvar data on refSeq data, capturing larger variation, but don't build a clinvar track
+# using this data; instead we build a clinvar track using the VCF dataset, and call that clinvarVcf
+has no_build => ( is => 'ro', isa => 'Bool', default => 0 );
+
 # TODO: Evaluate removing joinTracks in favor of utilities
 # or otherwise make them more flexible (array of them)
 has joinTrackFeatures => (

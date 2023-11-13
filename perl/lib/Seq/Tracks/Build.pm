@@ -41,9 +41,6 @@ has db => (
   }
 );
 
-# Don't actually build, used if we want a track to serve as a join track
-has no_build => ( is => 'ro', isa => 'Bool', default => 0 );
-
 # Allows consumers to record track completion, skipping chromosomes that have
 # already been built
 has completionMeta => (

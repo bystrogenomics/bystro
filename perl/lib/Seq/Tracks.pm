@@ -297,9 +297,6 @@ sub _buildTrackGetters {
     }
   }
 
-  # allow us to place tracks at specific indices
-  $#$orderedTrackGettersAref = $#$trackConfigurationAref;
-
   # Iterate over the original order
   # This is important, because otherwise we may accidentally set the
   # tracks database order based on the output order
@@ -310,18 +307,26 @@ sub _buildTrackGetters {
       $trackHref->{ref} = $trackBuildersByName->{ $trackHref->{ref} };
     }
 
-    #class
-    my $className = $self->_toTrackGetterClass( $trackHref->{type} );
-
-    my $track = $className->new($trackHref);
-
     if ( !$seenRef ) {
       $seenRef = $trackHref->{type} eq $types->refType;
+
+      if ( $seenRef && $trackHref->{no_build} ) {
+        $self->log( 'fatal', "Reference track cannot have `no_build` set" );
+      }
     }
     elsif ( $trackHref->{type} eq $types->refType ) {
       $self->log( 'fatal', "Only one reference track allowed, found at least 2" );
-      return;
     }
+
+    # If we don't build the track, we also can't fetch data from the track
+    # In the rest of the body of this loop we define the track getters
+    if ( $trackHref->{no_build} ) {
+      next;
+    }
+
+    my $className = $self->_toTrackGetterClass( $trackHref->{type} );
+
+    my $track = $className->new($trackHref);
 
     if ( exists $seenTrackNames{ $track->{name} } ) {
       $self->log(
@@ -378,17 +383,20 @@ sub _buildTrackBuilders {
     if ( $trackHref->{ref} ) {
       $trackHref->{ref} = $trackBuildersByName->{ $trackHref->{ref} };
     }
-    #class
+
     my $className = $self->_toTrackBuilderClass( $trackHref->{type} );
 
     my $track = $className->new($trackHref);
 
     if ( !$seenRef ) {
       $seenRef = $track->{type} eq $types->refType;
+
+      if ( $track->{no_build} ) {
+        $self->log( 'fatal', "Reference track cannot have `no_build` set" );
+      }
     }
     elsif ( $track->{type} eq $types->refType ) {
       $self->log( 'fatal', "Only one reference track allowed, found at least 2" );
-      return;
     }
 
     #we use the track name rather than the trackHref name
