@@ -51,7 +51,7 @@ unless (caller) {
   my @types = parse_vcf_header( read_vcf_header( $ARGV[0] ) );
 
   for my $type (@types) {
-    print "$type\n";
+    print "\t$type\n";
   }
 }
 
