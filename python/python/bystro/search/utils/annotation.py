@@ -144,7 +144,7 @@ class AnnotationOutputs(Struct, frozen=True, forbid_unknown_fields=True):
 class DelimitersConfig(Struct, frozen=True, forbid_unknown_fields=True):
     field: str = "\t"
     position: str = "|"
-    overlap: str = chr(31)
+    overlap: str = "/"
     value: str = ";"
     empty_field: str = "NA"
 
