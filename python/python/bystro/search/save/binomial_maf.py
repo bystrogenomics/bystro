@@ -83,13 +83,13 @@ class BinomialMafFilter(
             if snp_only and len(doc["alt"][0][0][0]) > 1:
                 return False
 
-            n = total_alleles * (1 - doc["missingness"][0][0][0])
+            n = total_alleles * (1.0 - float(doc["missingness"][0][0][0]))
 
             if n == 0:
                 return True
 
-            k = n * doc["sampleMaf"][0][0][0]
-            is_rare = doc["sampleMaf"][0][0][0] <= private_maf or (n == total_alleles and k < 1.5)
+            k = n * float(doc["sampleMaf"][0][0][0])
+            is_rare = float(doc["sampleMaf"][0][0][0]) <= private_maf or (n == total_alleles and k < 1.5)
 
             tested = 0
 
@@ -108,7 +108,7 @@ class BinomialMafFilter(
                 except KeyError:
                     continue
 
-                p = p[0][0][0]
+                p = float(p[0][0][0])
 
                 if (p == 1 and not is_rare) or (p <= private_maf and is_rare):
                     return False
