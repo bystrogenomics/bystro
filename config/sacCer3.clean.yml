@@ -33,61 +33,61 @@ statistics:
 temp_dir: "~"
 fileProcessors:
   snp:
-    args: --emptyField ! --minGq .95
+    args: --emptyField NA --minGq .95
     program: bystro-snp
   vcf:
-    args: --emptyField ! --keepId --keepPos
+    args: --emptyField NA --keepId --keepPos
     program: bystro-vcf
 tracks:
-- name: ref
-  remote_dir: http://hgdownload.soe.ucsc.edu/goldenPath/sacCer3/chromosomes/
-  remote_files:
-  - chrI.fa.gz
-  - chrII.fa.gz
-  - chrIII.fa.gz
-  - chrIV.fa.gz
-  - chrIX.fa.gz
-  - chrM.fa.gz
-  - chrV.fa.gz
-  - chrVI.fa.gz
-  - chrVII.fa.gz
-  - chrVIII.fa.gz
-  - chrX.fa.gz
-  - chrXI.fa.gz
-  - chrXII.fa.gz
-  - chrXIII.fa.gz
-  - chrXIV.fa.gz
-  - chrXV.fa.gz
-  - chrXVI.fa.gz
-  type: reference
-- features:
-  - name
-  - type
-  - description
-  - proteinID
-  name: sgd
-  sql_statement: SELECT sgdGene.name,chrom,strand,txStart,txEnd,cdsStart,cdsEnd,exonCount,exonStarts,exonEnds,proteinID,type,description
-    FROM sacCer3.sgdGene LEFT JOIN sgdDescription ON sgdGene.name = sgdDescription.name
-  type: gene
-- name: phastCons
-  remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/sacCer3/phastCons7way/
-  remote_files:
-  - sacCer3.chrI.wigFixed.gz
-  - sacCer3.chrII.wigFixed.gz
-  - sacCer3.chrIII.wigFixed.gz
-  - sacCer3.chrIV.wigFixed.gz
-  - sacCer3.chrIX.wigFixed.gz
-  - sacCer3.chrM.wigFixed.gz
-  - sacCer3.chrV.wigFixed.gz
-  - sacCer3.chrVI.wigFixed.gz
-  - sacCer3.chrVII.wigFixed.gz
-  - sacCer3.chrVIII.wigFixed.gz
-  - sacCer3.chrX.wigFixed.gz
-  - sacCer3.chrXI.wigFixed.gz
-  - sacCer3.chrXII.wigFixed.gz
-  - sacCer3.chrXIII.wigFixed.gz
-  - sacCer3.chrXIV.wigFixed.gz
-  - sacCer3.chrXV.wigFixed.gz
-  - sacCer3.chrXVI.wigFixed.gz
-  type: score
-
+  - name: ref
+    remote_dir: http://hgdownload.soe.ucsc.edu/goldenPath/sacCer3/chromosomes/
+    remote_files:
+      - chrI.fa.gz
+      - chrII.fa.gz
+      - chrIII.fa.gz
+      - chrIV.fa.gz
+      - chrIX.fa.gz
+      - chrM.fa.gz
+      - chrV.fa.gz
+      - chrVI.fa.gz
+      - chrVII.fa.gz
+      - chrVIII.fa.gz
+      - chrX.fa.gz
+      - chrXI.fa.gz
+      - chrXII.fa.gz
+      - chrXIII.fa.gz
+      - chrXIV.fa.gz
+      - chrXV.fa.gz
+      - chrXVI.fa.gz
+    type: reference
+  - features:
+      - name
+      - type
+      - description
+      - proteinID
+    name: sgd
+    sql_statement:
+      SELECT sgdGene.name,chrom,strand,txStart,txEnd,cdsStart,cdsEnd,exonCount,exonStarts,exonEnds,proteinID,type,description
+      FROM sacCer3.sgdGene LEFT JOIN sgdDescription ON sgdGene.name = sgdDescription.name
+    type: gene
+  - name: phastCons
+    remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/sacCer3/phastCons7way/
+    remote_files:
+      - sacCer3.chrI.wigFixed.gz
+      - sacCer3.chrII.wigFixed.gz
+      - sacCer3.chrIII.wigFixed.gz
+      - sacCer3.chrIV.wigFixed.gz
+      - sacCer3.chrIX.wigFixed.gz
+      - sacCer3.chrM.wigFixed.gz
+      - sacCer3.chrV.wigFixed.gz
+      - sacCer3.chrVI.wigFixed.gz
+      - sacCer3.chrVII.wigFixed.gz
+      - sacCer3.chrVIII.wigFixed.gz
+      - sacCer3.chrX.wigFixed.gz
+      - sacCer3.chrXI.wigFixed.gz
+      - sacCer3.chrXII.wigFixed.gz
+      - sacCer3.chrXIII.wigFixed.gz
+      - sacCer3.chrXIV.wigFixed.gz
+      - sacCer3.chrXV.wigFixed.gz
+      - sacCer3.chrXVI.wigFixed.gz
+    type: score
