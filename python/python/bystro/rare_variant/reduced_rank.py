@@ -13,9 +13,12 @@ of relevant genes and that related disorders have related predictors.
 
 Objects
 -------
+BaseReducedRank(BaseSGDModel, ABC)
+    This is the base class of the model. Will never be called directly
 
 Methods
 -------
+None
 
 """
 from abc import ABC
@@ -28,7 +31,7 @@ import torch
 from torch import Tensor, nn
 
 from bystro._template_sgd_np import BaseSGDModel
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression  # type: ignore
 
 
 class BaseReducedRank(BaseSGDModel, ABC):
@@ -63,6 +66,8 @@ class BaseReducedRank(BaseSGDModel, ABC):
         scores : ndarray of shape (n_samples,n_classes ) 
             Confidence scores per `(n_samples,n_classes )` combination. 
         """
+        Y_hat = np.dot(X, self.B_) + self.alpha_
+        return Y_hat
 
     def predict(self, X: NDArray[np.float_]):
         """
@@ -78,34 +83,17 @@ class BaseReducedRank(BaseSGDModel, ABC):
         Y_hat : np.array-like,shape=(N,q)
             The predicted values
         """
-        Y_hat = np.dot(X, self.B_)
+        scores = self.decision_function(X)
+        Y_hat = 1.0 * (scores > 0)
         return Y_hat
-
-    def predict_log_proba(self, X: NDArray[np.float_]):
-        """
-        Predict logarithm of probability estimates.
-
-        The returned estimates for all classes are ordered by the
-        label of classes.
-
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Vector to be scored, where `n_samples` is the number of samples and
-            `n_features` is the number of features.
-
-        Returns
-        -------
-        T : array-like of shape (n_samples, n_classes)
-            Returns the log-probability of the sample for each class in the
-            model, where classes are ordered as they are in ``self.classes_``.
-        """
 
 
 class ReducedRankML(BaseReducedRank):
     """
-    This fits a reduced rank model 
-
+    This fits a reduced rank model using MAP estimation with stochastic
+    gradient descent. This is a convex problem so a large batch size 
+    is fine for avoiding overfitting, the option is left for stochstic
+    merely to accomodate large data sets
     """
 
     def __init__(
@@ -118,8 +106,19 @@ class ReducedRankML(BaseReducedRank):
 
         Parameters
         ----------
+        lamb_sparsity : float,default=1.0
+            The sparsity penalty on the coefficients
+
+        lamb_rank : float,default=1.0
+            The nuclear norm penalty on the coefficients
+
+        training_options : dict,default={}
+            The options for gradient descent
 
         """
+        super().__init__(training_options=training_options)
+        self.lamb_sparsity = lamb_sparsity
+        self.lamb_rank = lamb_rank
 
     def fit(
         self,
