@@ -8,7 +8,7 @@ fi
 
 echo -e "\n\nInstalling Go\n"
 
-GOFILE=go1.13.5.darwin-amd64.pkg
+GOFILE=go1.21.4.darwin-amd64.pkg
 wget https://dl.google.com/go/$GOFILE;
 tar -xf $GOFILE;
 echo "Deleting go in /usr/local"

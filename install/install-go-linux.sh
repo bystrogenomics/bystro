@@ -16,7 +16,7 @@ fi
 echo -e "\n\nInstalling Go in /usr/local\n"
 
 # Clean in case somethign left over from old installation
-GOFILE=go1.19.1.linux-amd64.tar.gz
+GOFILE=go1.21.4.linux-amd64.tar.gz
 wget https://dl.google.com/go/$GOFILE;
 tar -xf $GOFILE;
 echo "Deleting go in /usr/local"
