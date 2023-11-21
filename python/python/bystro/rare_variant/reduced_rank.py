@@ -49,6 +49,11 @@ class BaseReducedRank(BaseSGDModel, ABC):
         The date/time that the object was created
     """
 
+    def __init__(self,training_options=None):
+        super().__init__(training_options=training_options)
+        self.B_ = None
+        self.alpha_ = None
+
     def decision_function(self, X: NDArray[np.float_]):
         """
         Predict confidence scores for samples.
@@ -119,6 +124,7 @@ class ReducedRankML(BaseReducedRank):
         super().__init__(training_options=training_options)
         self.lamb_sparsity = lamb_sparsity
         self.lamb_rank = lamb_rank
+
 
     def fit(
         self,
@@ -240,7 +246,7 @@ class ReducedRankML(BaseReducedRank):
         losses_sparsity : np.array,size=(td['n_iterations'],)
             The L1 loss 
         """
-        n_iterations = self.training_dict["n_iterations"]
+        n_iterations = self.training_options["n_iterations"]
         self.losses = np.zeros(n_iterations)
         self.losses_recon = np.zeros(n_iterations)
         self.losses_nuclear = np.zeros(n_iterations)
