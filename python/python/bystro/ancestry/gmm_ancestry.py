@@ -22,10 +22,11 @@ Methods
 None
 """
 import numpy as np
+from numpy.typing import NDArray
 import numpy.linalg as la
 
-from sklearn.decomposition import PCA # type: ignore 
-from sklearn.mixture import GaussianMixture # type: ignore 
+from sklearn.decomposition import PCA  # type: ignore
+from sklearn.mixture import GaussianMixture  # type: ignore
 
 import torch
 from torch import nn
@@ -375,13 +376,13 @@ class GaussianMixturePPCA(BaseSGDModel):
             self.mu_[i] = trainable_variables[3 + i].detach().numpy()
 
     def _test_inputs(self, X: NDArray[np.float_]) -> None:
-    """
-    Just tests to make sure data is numpy array
-    """
-    if not isinstance(X, np.ndarray):
-        raise ValueError("Data is numpy array")
-    if self.training_options["batch_size"] > X.shape[0]:
-        raise ValueError("Batch size exceeds number of samples")
+        """
+        Just tests to make sure data is numpy array
+        """
+        if not isinstance(X, np.ndarray):
+            raise ValueError("Data is numpy array")
+        if self.training_options["batch_size"] > X.shape[0]:
+            raise ValueError("Batch size exceeds number of samples")
 
     def _transform_training_data(self, *args):
         """
