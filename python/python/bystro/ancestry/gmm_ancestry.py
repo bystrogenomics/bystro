@@ -149,7 +149,7 @@ class GaussianMixturePPCA(BaseSGDModel):
 
         W_, sigmal_, pi_logits, mu_list = self._initialize_variables(X)
 
-        X = self._transform_training_data(X)
+        X = self._transform_training_data(X)[0]
 
         trainable_variables = [W_, sigmal_, pi_logits] + mu_list
 
