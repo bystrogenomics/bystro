@@ -46,6 +46,7 @@ def test_score(mrf_model):
     X = rng.normal(size=(n_samples, n_covariates))
 
     # Ensure the score method runs without errors
+    mrf_model.fit(X, progress_bar=False)
     score = mrf_model.score(X)
 
     # Add more specific assertions based on the expected behavior of your code
@@ -60,6 +61,7 @@ def test_score_samples(mrf_model):
     X = rng.normal(size=(n_samples, n_covariates))
 
     # Ensure the score_samples method runs without errors
+    mrf_model.fit(X, progress_bar=False)
     sample_scores = mrf_model.score_samples(X)
 
     # Add more specific assertions based on the expected behavior of your code
