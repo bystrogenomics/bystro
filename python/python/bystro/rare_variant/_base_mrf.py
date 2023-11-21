@@ -60,9 +60,9 @@ class BaseMarkovRandomField(BaseSGDModel):
 
         self.p = 0
         self._initialize_save_losses()
-        self.Phi_: NDArray[np.float_] | None = None
-        self.Theta_: NDArray[np.float_] | None = None
-        self.log_z_: NDArray[np.float_] | None = None
+        self.Phi_ = np.empty((2,2))
+        self.Theta_ = np.empty((2,2))
+        self.log_z_ = np.empty((2,2))
 
     @abstractmethod
     def fit(
