@@ -1,6 +1,6 @@
 import pytest # type: ignore
 import numpy as np
-from bystro.rare_variant.markov_random_field import MarkovRandomFieldNCE
+from bystro.rare_variant.markov_random_field import MarkovRandomFieldNCE # type: ignore
 
 
 @pytest.fixture
