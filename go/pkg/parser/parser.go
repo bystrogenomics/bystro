@@ -7,7 +7,7 @@ import (
 )
 
 // Parse takes the file content and converts it into an array of nested maps.
-func Parse(content []byte, headerPaths [][]string) {
+func Parse(content []byte, headerPaths [][]string) []map[string]interface{} {
 	lines := strings.Split(string(content), "\n")
 	var result []map[string]interface{}
 
@@ -27,9 +27,9 @@ func Parse(content []byte, headerPaths [][]string) {
 
 	// fmt.Println("result:", result)
 
-	clear(result)
+	// clear(result)
 
-	// return result
+	return result
 }
 
 // buildNestedMap constructs a nested map based on the headers and values.

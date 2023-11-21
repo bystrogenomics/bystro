@@ -3,13 +3,16 @@ package main
 import (
 	"archive/tar"
 	"bystro/pkg/parser"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 
 	"github.com/biogo/hts/bgzf"
+	"github.com/opensearch-project/opensearch-go"
 )
 
 // readNextChunk reads bytes from a BGZF file until it reaches a newline.
@@ -44,6 +47,19 @@ func processChunk(chunk []byte, headerPaths [][]string) {
 }
 
 func main() {
+	client, err := opensearch.NewClient(opensearch.Config{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+		Addresses:     []string{"http://10.98.135.70:9200"},
+		MaxRetries:    5,
+		RetryOnStatus: []int{502, 503, 504},
+	})
+
+	client.IndicesCreateRequest{
+		Index: "go-test-index1",
+		// Body:  settings,
+	}
 	// Open the tar archive
 	archive, err := os.Open("/seqant/user-data/63ddc9ce1e740e0020c39928/6556f106f71022dc49c8e560/output/all_chr1_phase3_shapeit2_mvncall_integrated_v5b_20130502_genotypes_vcf.tar")
 	if err != nil {
@@ -114,14 +130,14 @@ func main() {
 	}
 	// bytesRead := 0
 	// Example usage
-	buf = make([]byte, 1024*1024)
+	buf = make([]byte, 16*1024)
 	// fmt.Println("Size of buffer:", len(buf))
 	for {
 		// chunk := readNextChunk(file)
 		// if len(chunk) == 0 {
 		// 	break // No more data to process
 		// }
-		buf = make([]byte, 4*1024)
+		buf = make([]byte, 16*1024)
 		bytesRead, err := b.Read(buf)
 		if err != nil {
 			if err == io.EOF {
