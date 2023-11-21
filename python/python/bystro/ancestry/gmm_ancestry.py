@@ -139,6 +139,7 @@ class GaussianMixturePPCA(BaseSGDModel):
         self : object
             The model
         """
+        self._test_inputs(X)
         training_options = self.training_options
         N, p = X.shape
         self.p = p
@@ -223,7 +224,7 @@ class GaussianMixturePPCA(BaseSGDModel):
         covariance : np.array-like(p,p)
             The covariance matrix
         """
-        covariance = np.dot(self.W_.T, self.W_) + np.diag(self.sigmas_)
+        covariance = np.dot(self.W_.T, self.W_) + np.diag(self.sigma2_)
         return covariance
 
     def get_precision(self):
@@ -368,10 +369,19 @@ class GaussianMixturePPCA(BaseSGDModel):
         """
         self.W_ = trainable_variables[0].detach().numpy()
         self.sigma2_ = nn.Softplus()(trainable_variables[1]).detach().numpy()
-        self.pi_ = nn.Softmax(trainable_variables[2]).detach().numpy()
+        self.pi_ = nn.Softmax()(trainable_variables[2]).detach().numpy()
         self.mu_ = np.zeros((self.n_clusters, self.n_components))
         for i in range(self.n_clusters):
             self.mu_[i] = trainable_variables[3 + i].detach().numpy()
+
+    def _test_inputs(self, X: NDArray[np.float_]) -> None:
+    """
+    Just tests to make sure data is numpy array
+    """
+    if not isinstance(X, np.ndarray):
+        raise ValueError("Data is numpy array")
+    if self.training_options["batch_size"] > X.shape[0]:
+        raise ValueError("Batch size exceeds number of samples")
 
     def _transform_training_data(self, *args):
         """
