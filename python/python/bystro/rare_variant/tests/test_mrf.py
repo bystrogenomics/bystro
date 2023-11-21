@@ -27,7 +27,7 @@ def test_fit(mrf_model):
     rng = np.random.default_rng(2021)
     n_samples = 50
     n_covariates = 10
-    X = rng.normal(size=(n_samples, n_covariates))
+    X = rng.binomial(1,.1,size=(n_samples, n_covariates))
 
     # Ensure the fit method runs without errors
     mrf_model.fit(X, progress_bar=False)
@@ -43,7 +43,7 @@ def test_score(mrf_model):
     rng = np.random.default_rng(2021)
     n_samples = 50
     n_covariates = 10
-    X = rng.normal(size=(n_samples, n_covariates))
+    X = rng.binomial(1,.1,size=(n_samples, n_covariates))
 
     # Ensure the score method runs without errors
     mrf_model.fit(X, progress_bar=False)
@@ -58,7 +58,7 @@ def test_score_samples(mrf_model):
     rng = np.random.default_rng(2021)
     n_samples = 50
     n_covariates = 10
-    X = rng.normal(size=(n_samples, n_covariates))
+    X = rng.binomial(1,.1,size=(n_samples, n_covariates))
 
     # Ensure the score_samples method runs without errors
     mrf_model.fit(X, progress_bar=False)

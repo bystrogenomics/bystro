@@ -60,9 +60,9 @@ class BaseMarkovRandomField(BaseSGDModel):
 
         self.p = 0
         self._initialize_save_losses()
-        self.Phi_ = np.empty((2,2))
-        self.Theta_ = np.empty((2,2))
-        self.log_z_ = np.empty((2,2))
+        self.Phi_ = np.empty((2, 2))
+        self.Theta_ = np.empty((2, 2))
+        self.log_z_ = np.empty((2, 2))
 
     @abstractmethod
     def fit(
@@ -221,6 +221,9 @@ class BaseMarkovRandomField(BaseSGDModel):
             raise ValueError("Data is numpy array")
         if self.training_options["batch_size"] > X.shape[0]:
             raise ValueError("Batch size exceeds number of samples")
+        list_unique = np.unique(X)
+        if len(list_unique) != 2:
+            print("Valid values are 0 and 1")
 
     def _transform_training_data(self, *args: NDArray) -> list[Tensor]:
         """ 
