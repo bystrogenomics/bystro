@@ -7,22 +7,24 @@ import (
 )
 
 // Parse takes the file content and converts it into an array of nested maps.
-func Parse(content []byte, headerPaths [][]string) []map[string]interface{} {
+func Parse(content []byte, headerFields []string) []map[string]interface{} {
 	lines := strings.Split(string(content), "\n")
 	var result []map[string]interface{}
 
+	var row map[string]interface{}
 	for _, line := range lines {
 		if line == "" {
 			continue
 		}
 		fields := strings.Split(line, "\t")
-		if len(fields) != len(headerPaths) {
+		if len(fields) != len(headerFields) {
 			fmt.Println("fields:", fields)
-			fmt.Println("headerPaths:", headerPaths)
+			fmt.Println("headerPaths:", headerFields)
 			panic("fields and headerPaths are not the same length")
 		}
-		nestedMap := buildNestedMap(headerPaths, fields)
-		result = append(result, nestedMap)
+		row = buildFlatMap(headerFields, fields)
+		// nestedMap := buildNestedMap(headerPaths, fields)
+		result = append(result, row)
 	}
 
 	// fmt.Println("result:", result)
@@ -30,6 +32,16 @@ func Parse(content []byte, headerPaths [][]string) []map[string]interface{} {
 	// clear(result)
 
 	return result
+}
+
+func buildFlatMap(headerFields []string, values []string) map[string]interface{} {
+	row := make(map[string]interface{})
+	// fmt.Println("len(headerPaths)", len(headerPaths))
+	for i, fieldName := range headerFields {
+		row[fieldName] = ensure3DArray(values[i])
+	}
+
+	return row
 }
 
 // buildNestedMap constructs a nested map based on the headers and values.

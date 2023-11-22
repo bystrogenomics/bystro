@@ -1,18 +1,18 @@
 package main
 
 import (
-	"archive/tar"
+	// "archive/tar"
 	"bystro/pkg/parser"
-	"crypto/tls"
+	// "crypto/tls"
 	"fmt"
 	"io"
 	"log"
-	"net/http"
+	// "net/http"
 	"os"
 	"strings"
 
 	"github.com/biogo/hts/bgzf"
-	"github.com/opensearch-project/opensearch-go"
+	// "github.com/opensearch-project/opensearch-go"
 )
 
 // readNextChunk reads bytes from a BGZF file until it reaches a newline.
@@ -47,57 +47,56 @@ func processChunk(chunk []byte, headerPaths [][]string) {
 }
 
 func main() {
-	client, err := opensearch.NewClient(opensearch.Config{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-		Addresses:     []string{"http://10.98.135.70:9200"},
-		MaxRetries:    5,
-		RetryOnStatus: []int{502, 503, 504},
-	})
+	// client, err := opensearch.NewClient(opensearch.Config{
+	// 	Transport: &http.Transport{
+	// 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	// 	},
+	// 	Addresses:     []string{"http://10.98.135.70:9200"},
+	// 	MaxRetries:    5,
+	// 	RetryOnStatus: []int{502, 503, 504},
+	// })
 
-	client.IndicesCreateRequest{
-		Index: "go-test-index1",
-		// Body:  settings,
-	}
-	// Open the tar archive
-	archive, err := os.Open("/seqant/user-data/63ddc9ce1e740e0020c39928/6556f106f71022dc49c8e560/output/all_chr1_phase3_shapeit2_mvncall_integrated_v5b_20130502_genotypes_vcf.tar")
-	if err != nil {
-		panic(err)
-	}
-	defer archive.Close()
-
-	tarReader := tar.NewReader(archive)
-
-	var b *bgzf.Reader
-	for {
-		header, err := tarReader.Next()
-		if err != nil {
-			if err == io.EOF {
-				break // End of archive
-			}
-			panic(err) // Handle other errors
-		}
-
-		if strings.HasSuffix(header.Name, "annotation.tsv.gz") {
-			// Process this file
-			// processCompressedFile(tarReader)
-			b, err = bgzf.NewReader(tarReader, 0)
-			if err != nil {
-				log.Fatal(err)
-			}
-			break
-		}
-	}
-
-	// file, err := os.Open("/home/ubuntu/bystro/rust/index_annotation/all_chr1_phase3_shapeit2_mvncall_integrated_v5b_20130502_genotypes_vcf.annotation.tsv.gz")
-	// if err != nil {
-	// 	log.Fatal(err)
+	// client.IndicesCreateRequest{
+	// 	Index: "go-test-index1",
+	// 	// Body:  settings,
 	// }
-	// defer file.Close()
+	// // Open the tar archive
+	// archive, err := os.Open("/seqant/user-data/63ddc9ce1e740e0020c39928/6556f106f71022dc49c8e560/output/all_chr1_phase3_shapeit2_mvncall_integrated_v5b_20130502_genotypes_vcf.tar")
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// defer archive.Close()
 
-	//
-	// b, err := bgzf.NewReader(file, 0)
+	// tarReader := tar.NewReader(archive)
+
+	// var b *bgzf.Reader
+	// for {
+	// 	header, err := tarReader.Next()
+	// 	if err != nil {
+	// 		if err == io.EOF {
+	// 			break // End of archive
+	// 		}
+	// 		panic(err) // Handle other errors
+	// 	}
+
+	// 	if strings.HasSuffix(header.Name, "annotation.tsv.gz") {
+	// 		// Process this file
+	// 		// processCompressedFile(tarReader)
+	// 		b, err = bgzf.NewReader(tarReader, 0)
+	// 		if err != nil {
+	// 			log.Fatal(err)
+	// 		}
+	// 		break
+	// 	}
+	// }
+
+	file, err := os.Open("/home/ubuntu/bystro/rust/index_annotation/all_chr1_phase3_shapeit2_mvncall_integrated_v5b_20130502_genotypes_vcf.annotation.500klines.tsv.gz")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	b, err := bgzf.NewReader(file, 0)
 	buf := make([]byte, 0, 1024*1024)
 	bytesRead := 0
 	for {
