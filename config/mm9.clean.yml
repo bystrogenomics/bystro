@@ -1,30 +1,30 @@
 ---
 assembly: mm9
 chromosomes:
-- chr1
-- chr2
-- chr3
-- chr4
-- chr5
-- chr6
-- chr7
-- chr8
-- chr9
-- chr10
-- chr11
-- chr12
-- chr13
-- chr14
-- chr15
-- chr16
-- chr17
-- chr18
-- chr19
-- chrM
-- chrX
-- chrY
-database_dir: '~'
-files: '~'
+  - chr1
+  - chr2
+  - chr3
+  - chr4
+  - chr5
+  - chr6
+  - chr7
+  - chr8
+  - chr9
+  - chr10
+  - chr11
+  - chr12
+  - chr13
+  - chr14
+  - chr15
+  - chr16
+  - chr17
+  - chr18
+  - chr19
+  - chrM
+  - chrX
+  - chrY
+database_dir: "~"
+files: "~"
 files_dir: ~
 statistics:
   dbSNPnameField: dbSNP.name
@@ -36,119 +36,119 @@ statistics:
   refTrackField: ref
   siteTypeField: refSeq.siteType
   programPath: bystro-stats
-temp_dir: '~'
+temp_dir: "~"
 fileProcessors:
   snp:
-    args: --emptyField ! --minGq .95
+    args: --emptyField NA --minGq .95
     program: bystro-snp
   vcf:
-    args: --emptyField ! --keepId --keepPos
+    args: --emptyField NA --keepId --keepPos
     program: bystro-vcf
 tracks:
-- name: ref
-  remote_dir: http://hgdownload.soe.ucsc.edu/goldenPath/mm9/chromosomes/
-  remote_files:
-  - chr1.fa.gz
-  - chr2.fa.gz
-  - chr3.fa.gz
-  - chr4.fa.gz
-  - chr5.fa.gz
-  - chr6.fa.gz
-  - chr7.fa.gz
-  - chr8.fa.gz
-  - chr9.fa.gz
-  - chr10.fa.gz
-  - chr11.fa.gz
-  - chr12.fa.gz
-  - chr13.fa.gz
-  - chr14.fa.gz
-  - chr15.fa.gz
-  - chr16.fa.gz
-  - chr17.fa.gz
-  - chr18.fa.gz
-  - chr19.fa.gz
-  - chrM.fa.gz
-  - chrX.fa.gz
-  - chrY.fa.gz
-  type: reference
-- features:
-  - kgID
-  - mRNA
-  - spID
-  - spDisplayID
-  - refseq
-  - protAcc
-  - description
-  - name
-  - name2
-  name: refSeq
-  sql_statement: SELECT * FROM mm9.refGene LEFT JOIN mm9.kgXref ON mm9.kgXref.refseq
-    = mm9.refGene.name
-  type: gene
-- name: phastCons
-  remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/mm9/phastCons30way/vertebrate/
-  remote_files:
-  - chr1.data.gz
-  - chr2.data.gz
-  - chr3.data.gz
-  - chr4.data.gz
-  - chr5.data.gz
-  - chr6.data.gz
-  - chr7.data.gz
-  - chr8.data.gz
-  - chr9.data.gz
-  - chr10.data.gz
-  - chr11.data.gz
-  - chr12.data.gz
-  - chr13.data.gz
-  - chr14.data.gz
-  - chr15.data.gz
-  - chr16.data.gz
-  - chr17.data.gz
-  - chr18.data.gz
-  - chr19.data.gz
-  - chrX.data.gz
-  - chrY.data.gz
-  - chrM.data.gz
-  type: score
-- name: phyloP
-  remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/mm9/phyloP30way/vertebrate/
-  remote_files:
-  - chr1.phyloP30way.wigFix.gz
-  - chr2.phyloP30way.wigFix.gz
-  - chr3.phyloP30way.wigFix.gz
-  - chr4.phyloP30way.wigFix.gz
-  - chr5.phyloP30way.wigFix.gz
-  - chr6.phyloP30way.wigFix.gz
-  - chr7.phyloP30way.wigFix.gz
-  - chr8.phyloP30way.wigFix.gz
-  - chr9.phyloP30way.wigFix.gz
-  - chr10.phyloP30way.wigFix.gz
-  - chr11.phyloP30way.wigFix.gz
-  - chr12.phyloP30way.wigFix.gz
-  - chr13.phyloP30way.wigFix.gz
-  - chr14.phyloP30way.wigFix.gz
-  - chr15.phyloP30way.wigFix.gz
-  - chr16.phyloP30way.wigFix.gz
-  - chr17.phyloP30way.wigFix.gz
-  - chr18.phyloP30way.wigFix.gz
-  - chr19.phyloP30way.wigFix.gz
-  - chrX.phyloP30way.wigFix.gz
-  - chrY.phyloP30way.wigFix.gz
-  - chrM.phyloP30way.wigFix.gz
-  type: score
-- build_field_transformations:
-    func: split [,]
-    observed: split [\/]
-  features:
-  - name
-  - strand
-  - observed
-  - class
-  - func
-  - avHet: number
-  - avHetSE: number
-  name: dbSNP
-  sql_statement: SELECT * FROM mm9.snp128
-  type: sparse
-
+  - name: ref
+    remote_dir: http://hgdownload.soe.ucsc.edu/goldenPath/mm9/chromosomes/
+    remote_files:
+      - chr1.fa.gz
+      - chr2.fa.gz
+      - chr3.fa.gz
+      - chr4.fa.gz
+      - chr5.fa.gz
+      - chr6.fa.gz
+      - chr7.fa.gz
+      - chr8.fa.gz
+      - chr9.fa.gz
+      - chr10.fa.gz
+      - chr11.fa.gz
+      - chr12.fa.gz
+      - chr13.fa.gz
+      - chr14.fa.gz
+      - chr15.fa.gz
+      - chr16.fa.gz
+      - chr17.fa.gz
+      - chr18.fa.gz
+      - chr19.fa.gz
+      - chrM.fa.gz
+      - chrX.fa.gz
+      - chrY.fa.gz
+    type: reference
+  - features:
+      - kgID
+      - mRNA
+      - spID
+      - spDisplayID
+      - refseq
+      - protAcc
+      - description
+      - name
+      - name2
+    name: refSeq
+    sql_statement:
+      SELECT * FROM mm9.refGene LEFT JOIN mm9.kgXref ON mm9.kgXref.refseq
+      = mm9.refGene.name
+    type: gene
+  - name: phastCons
+    remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/mm9/phastCons30way/vertebrate/
+    remote_files:
+      - chr1.data.gz
+      - chr2.data.gz
+      - chr3.data.gz
+      - chr4.data.gz
+      - chr5.data.gz
+      - chr6.data.gz
+      - chr7.data.gz
+      - chr8.data.gz
+      - chr9.data.gz
+      - chr10.data.gz
+      - chr11.data.gz
+      - chr12.data.gz
+      - chr13.data.gz
+      - chr14.data.gz
+      - chr15.data.gz
+      - chr16.data.gz
+      - chr17.data.gz
+      - chr18.data.gz
+      - chr19.data.gz
+      - chrX.data.gz
+      - chrY.data.gz
+      - chrM.data.gz
+    type: score
+  - name: phyloP
+    remote_dir: http://hgdownload.cse.ucsc.edu/goldenPath/mm9/phyloP30way/vertebrate/
+    remote_files:
+      - chr1.phyloP30way.wigFix.gz
+      - chr2.phyloP30way.wigFix.gz
+      - chr3.phyloP30way.wigFix.gz
+      - chr4.phyloP30way.wigFix.gz
+      - chr5.phyloP30way.wigFix.gz
+      - chr6.phyloP30way.wigFix.gz
+      - chr7.phyloP30way.wigFix.gz
+      - chr8.phyloP30way.wigFix.gz
+      - chr9.phyloP30way.wigFix.gz
+      - chr10.phyloP30way.wigFix.gz
+      - chr11.phyloP30way.wigFix.gz
+      - chr12.phyloP30way.wigFix.gz
+      - chr13.phyloP30way.wigFix.gz
+      - chr14.phyloP30way.wigFix.gz
+      - chr15.phyloP30way.wigFix.gz
+      - chr16.phyloP30way.wigFix.gz
+      - chr17.phyloP30way.wigFix.gz
+      - chr18.phyloP30way.wigFix.gz
+      - chr19.phyloP30way.wigFix.gz
+      - chrX.phyloP30way.wigFix.gz
+      - chrY.phyloP30way.wigFix.gz
+      - chrM.phyloP30way.wigFix.gz
+    type: score
+  - build_field_transformations:
+      func: split [,]
+      observed: split [\/]
+    features:
+      - name
+      - strand
+      - observed
+      - class
+      - func
+      - avHet: number
+      - avHetSE: number
+    name: dbSNP
+    sql_statement: SELECT * FROM mm9.snp128
+    type: sparse
