@@ -9,7 +9,7 @@ To build a docker image using the `Dockerfile`, run the following:
 docker build --tag bystro-cli .
 ```
 
-## Installing Bystro using `cpam`
+## Installing Bystro using `cpanm`
 
 The instructions for installing Bystro locally uses [`cpanm`](https://metacpan.org/pod/App::cpanminus).
 
@@ -19,16 +19,23 @@ But there are a few one-off dependencies that require a slightly modified approa
 One-off dependencies can be installed as follows:
 
 ```bash
+# install msgpack fork
 cpanm --quiet https://github.com/bystrogenomics/msgpack-perl.git
+
+# install MouseX::Getopt despite some tests failing
 cpanm --quiet --notest MouseX::Getopt
+
+# install LMDB_File that comes with latest LMDB
 git clone --depth 1 --recurse-submodules https://github.com/salortiz/LMDB_File.git \
   && cd LMDB_File \
   && cpanm --quiet . \
   && cd .. \
   && rm -rf LMDB_File
+
+# install mysql driver
 # NOTE: you will need mysql_config to install this
 #       ubuntu 22.04 LTS => sudo apt install -y libmariadb-dev libmariadb-dev-compat
-#       amazon 2023 => sudo yum install -y <mariadb105>
+#       amazon 2023 => sudo yum install -y mariadb105-devel.x86_64
 cpanm --quiet DBD::mysql@4.051
 ```
 
@@ -38,42 +45,18 @@ The remaining dependencies are installed like this:
 cpanm --installdeps .
 ```
 
-After installing dependencies, use `prove -lr t` to run tests.
-
-## Installing Bystro locally using dzil
-
-Bystro uses [`Dist::Zilla`](https://github.com/rjbs/dist-zilla) for packaging and is configured with `dist.ini`.
-This approach requires installing `Dist::Zilla` and author dependencies and one off-dependencies described in the  above.
-
-```bash
-# Install Dist::Zilla and Archive::Tar::Wrapper (to slightly speed up building)
-cpanm --quiet Dist::Zilla Archive::Tar::Wrapper
-
-# Install build dependencies
-dzil authordeps --missing | cpanm --quiet
-
-# Install Bystro dependencies
-dzil listdeps --missing | cpanm --quiet
-
-# Install Bystro
-dzil install
-```
-
 ## Install Bystro using `cpm`
 
 Install [cpm](https://metacpan.org/pod/App::cpm) with `curl -fsSL https://raw.githubusercontent.com/skaji/cpm/main/cpm | perl - install -g App::cpm`.
 
 ```bash
 # install msgpack fork
-cpm https://github.com/bystrogenomics/msgpack-perl.git
+cpm install -g https://github.com/bystrogenomics/msgpack-perl.git
 
 # install MouseX::Getopt despite some tests failing
-cpm --no-test MouseX::Getopt
+cpm install -g --no-test MouseX::Getopt
 
 # install LMDB_File that comes with latest LMDB
-# NOTE: you will need mysql_config to install this
-#       ubuntu 22.04 LTS => sudo apt install -y libmariadb-dev libmariadb-dev-compat
-#       amazon 2023 => sudo yum install -y <mariadb105>
 git clone --depth 1 --recurse-submodules https://github.com/salortiz/LMDB_File.git \
   && cd LMDB_File \
   && cpanm . \
@@ -81,16 +64,43 @@ git clone --depth 1 --recurse-submodules https://github.com/salortiz/LMDB_File.g
   && rm -rf LMDB_File
 
 # install mysql driver
-cpm DBD::mysql@4.051
+# NOTE: you will need mysql_config to install this
+#       ubuntu 22.04 LTS => sudo apt install -y libmariadb-dev libmariadb-dev-compat
+#       amazon 2023 => sudo yum install -y mariadb105-devel.x86_64
+cpm install -g DBD::mysql@4.051
 
 # clone bystro and change into perl package
 git clone git@github.com:bystrogenomics/bystro.git && cd bystro/perl
 
-# install dependencies
+# install dependencies (uses cpanfile)
 cpm install -g --with-develop
+```
 
-# Install dzil build dependencies
-RUN cpm install -g --show-build-log-on-failure $(dzil authordeps --missing)
+After installing dependencies, use `prove -lr t` to run tests.
+
+## Installing development tools
+
+These are tools needed for packaging and releasing Bystro's Perl package, which are not needed for normal testing or development.
+
+Bystro uses [`Dist::Zilla`](https://github.com/rjbs/dist-zilla) for packaging and is configured with `dist.ini`.
+This approach requires installing `Dist::Zilla` and author dependencies and one off-dependencies described in the  above.
+
+```bash
+# Install Dist::Zilla and Archive::Tar::Wrapper (to slightly speed up building)
+cpanm --quiet Dist::Zilla Archive::Tar::Wrapper
+# - or -
+cpm install -g Dist::Zilla Archive::Tar::Wrapper
+
+# Install build dependencies
+dzil authordeps --missing | cpanm --quiet
+# - or - 
+cpm install -g $(dzil authordeps --missing)
+
+# Install Bystro Package
+dzil install
+
+# Test Bystro Package
+dzil test --all
 ```
 
 ## Coding style and tidying
