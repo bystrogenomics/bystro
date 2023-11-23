@@ -37,6 +37,12 @@ GetOptions(
   'maxThreads=i'         => \$maxThreads,
 );
 
+if ( !($queueConfigPath && $connectionConfigPath) ) {
+  # Generate a help strings that shows the arguments
+  say "\nUsage: perl $0 -q <queueConfigPath> -c <connectionConfigPath> --maxThreads <maxThreads>\n";
+  exit 1;
+}
+
 my $type = 'annotation';
 
 my $PROGRESS  = "progress";
@@ -85,8 +91,6 @@ my $beanstalkEvents = Beanstalk::Client->new(
     decoder         => sub { @{ decode_json(shift) } },
   }
 );
-
-my $events = $conf->{beanstalkd}{events};
 
 while ( my $job = $beanstalk->reserve ) {
   # Parallel ForkManager used only to throttle number of jobs run in parallel

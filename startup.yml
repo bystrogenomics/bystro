@@ -9,10 +9,10 @@ apps:
     args:
       --conf_dir config --queue_conf config/beanstalk.yml --search_conf config/elastic-config2.yml
   - name: BystroIndexServer
-    script: bystro-index-worker
-    interpreter: 'python'
+    script: perl/bin/bystro-index-server.pl
+    interpreter: 'perl '
     args:
-      --conf_dir config --queue_conf config/beanstalk.yml --search_conf config/elastic-config2.yml
+      -q config/beanstalk.yml -c config/elastic-config2.yml
   - name: BystroAncestryServer
     script: python/python/bystro/ancestry/listener.py
     interpreter: 'python'

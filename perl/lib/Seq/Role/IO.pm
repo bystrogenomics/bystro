@@ -136,6 +136,62 @@ sub getReadFh {
   return ( $err, $compressed, $fh );
 }
 
+
+# Get a filehandle from within a tarball
+sub getTarballInnerFh {
+  my ( $self, $file, $innerFile) = @_;
+  my $fh;
+
+  if(ref $file ne 'Path::Tiny' ) {
+    $file = path($file)->absolute;
+  }
+
+  my $filePath = $file->stringify;
+
+  if (!$file->is_file) {
+    $self->log('fatal', "$filePath does not exist for reading");
+    die;
+  }
+
+  my $compressed = 0;
+  my $err;
+  if($innerFile) {
+    $compressed = $innerFile =~ /\.gz$/ || $innerFile =~ /\.bgz$/ || $innerFile =~ /\.zip$/;
+
+    my $innerCommand = $compressed ? "\"$innerFile\" | $gzip $gzipDcmpArgs -" : "\"$innerFile\"";
+    # We do this because we have not built in error handling from opening streams
+
+    my $command;
+    my $outerCompressed;
+    if($filePath =~ /\.tar.gz$/) {
+      $outerCompressed = 1;
+      $command = "$tarCompressedGzip -O -xf \"$filePath\" $innerCommand";
+    } elsif($filePath =~ /\.tar$/) {
+      $command = "$tar -O -xf \"$filePath\" $innerCommand";
+    } else {
+      $self->log('fatal', "When inner file provided, must provde a parent file.tar or file.tar.gz");
+      die;
+    }
+
+    open ($fh, '-|', $command) or $self->log('fatal', "Failed to open $filePath ($innerFile) due to $!");
+
+    # From a size standpoint a tarball and a tar file whose inner annotation is compressed are similar
+    # since the annotation dominate
+    $compressed = $compressed || $outerCompressed;
+    # If an innerFile is passed, we assume that $file is a path to a tarball
+  } elsif($filePath =~ /\.gz$/ || $filePath =~ /\.bgz$/ || $filePath =~ /\.zip$/) {
+    $compressed = 1;
+    #PerlIO::gzip doesn't seem to play nicely with MCE, reads random number of lines
+    #and then exits, so use gunzip, standard on linux, and faster
+    open ($fh, '-|', "$gzip $gzipDcmpArgs \"$filePath\"") or $self->log('fatal', "Failed to open $filePath due to $!");
+  } else {
+    open ($fh, '-|', "cat \"$filePath\"") or $self->log('fatal', "Failed to open $filePath due to $!");
+  };
+
+  # TODO: return errors, rather than dying
+  return ($err, $compressed, $fh);
+}
+
 sub getRemoteProg {
   my ( $self, $filePath ) = @_;
 
