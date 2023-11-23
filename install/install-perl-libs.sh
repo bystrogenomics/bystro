@@ -22,6 +22,7 @@ cpanm install Cpanel::JSON::XS
 cpanm install Mouse::Meta::Attribute::Custom::Trait::Array
 cpanm install Net::HTTP
 cpanm install Math::SigFigs
+cpanm install Search::Elasticsearch@7.713
 # For now we use our own library
 # Avoid issues with system liblmdb
 env ALIEN_INSTALL_TYPE=share cpanm Alien::LMDB
