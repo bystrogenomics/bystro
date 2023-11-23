@@ -12,6 +12,7 @@ use List::MoreUtils qw/first_index/;
 use Sys::CpuAffinity;
 use POSIX qw/ceil/;
 use DDP;
+use Scalar::Util qw/looks_like_number/;
 
 our $VERSION = '0.001';
 
@@ -259,16 +260,15 @@ sub go {
           $posIdx = 0;
           $overlapIdx = 0;
             POS_LOOP: for my $posValue ( split("\\$positionDelimiter", $field) ) {
-              if ($posValue eq $emptyFieldChar || $posValue eq "!") {
+              if ($posValue eq $emptyFieldChar) {
                 $out[$posIdx] = [[undef]];
 
                 $posIdx++;
                 next;
               }
 
-              # ES since > 5.2 deprecates lenient boolean
               for my $value ( split("\\$valueDelimiter", $posValue) ) {
-                if($value eq $emptyFieldChar || $value eq "!") {
+                if($value eq $emptyFieldChar) {
                   $out[$posIdx][$valueIdx]= [undef];
 
                   $valueIdx++;
@@ -276,14 +276,14 @@ sub go {
                 }
                 
                 for my $allele ( split("\\$overlapDelimiter", $value) ) {
-                  if($allele eq $emptyFieldChar || $allele eq "!") {
+                  if($allele eq $emptyFieldChar) {
                     $out[$posIdx][$valueIdx][$overlapIdx] = undef;
 
                     $overlapIdx++;
                     next;
                   }
 
-                  $out[$posIdx][$valueIdx][$overlapIdx] = $allele;
+                  $out[$posIdx][$valueIdx][$overlapIdx] = looks_like_number($allele) ? $allele + 0 : $allele;
                   $overlapIdx++;
                 }
 
