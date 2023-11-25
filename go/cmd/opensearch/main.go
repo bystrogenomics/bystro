@@ -3,7 +3,6 @@ package main
 import (
 	// "archive/tar"
 
-	"archive/tar"
 	"bystro/pkg/parser"
 	"context"
 	"crypto/tls"
@@ -177,10 +176,9 @@ func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 	_, ok := osearchMapConfig.Settings["index"]["number_of_shards"]
 
 	if !ok {
+		// No more than 10GB per shard
 		osearchMapConfig.Settings["index"]["number_of_shards"] = math.Ceil(float64(fileSize) / float64(1e10))
 	}
-
-	fmt.Println("number of shards", osearchMapConfig.Settings["index"]["number_of_shards"])
 
 	settings := osearchMapConfig.Settings
 	indexSettings, err := sonic.Marshal(settings)
@@ -247,8 +245,8 @@ func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 	return osConfig, client, osearchMapConfig
 }
 
-func readLine(r *bgzf.Reader) ([]byte, error) {
-	tx := r.Begin()
+// Read a line up to the next newline character, and return the line excluding the newline character
+func _readLine(r *bgzf.Reader) ([]byte, error) {
 	var (
 		data []byte
 		b    byte
@@ -259,13 +257,41 @@ func readLine(r *bgzf.Reader) ([]byte, error) {
 		if err != nil {
 			break
 		}
-		data = append(data, b)
 		if b == '\n' {
 			break
 		}
+		data = append(data, b)
 	}
+	return data, err
+}
+
+func readLine(r *bgzf.Reader) ([]byte, error) {
+	tx := r.Begin()
+	data, err := _readLine(r)
 	tx.End()
 	return data, err
+}
+
+func readLines(b *bgzf.Reader) ([]byte, error) {
+	buf := make([]byte, 64*1024*8) // 8 bgzip blocks at a time
+
+	tx := b.Begin()
+	defer tx.End()
+
+	bytesRead, err := b.Read(buf)
+
+	if err != nil {
+		fmt.Println("err ", err, " lines read", bytesRead)
+
+		return buf[:bytesRead], err
+	}
+
+	if buf[len(buf)-1] != '\n' {
+		remainder, err := _readLine(b)
+		return append(buf, remainder...), err
+	}
+	// last byte is newline
+	return buf[:bytesRead-1], err
 }
 
 func TestUse(bConfig BeanstalkdConfig) {
@@ -300,88 +326,102 @@ func main() {
 	concurrency := runtime.NumCPU() * 8
 
 	//Open the tar archive
-	archive, err := os.Open(cliargs.annotationTarballPath)
+	// archive, err := os.Open(cliargs.annotationTarballPath)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer archive.Close()
+
+	// tarReader := tar.NewReader(archive)
+
+	// var b *bgzf.Reader
+	// for {
+	// 	header, err := tarReader.Next()
+	// 	if err != nil {
+	// 		if err == io.EOF {
+	// 			break // End of archive
+	// 		}
+	// 		log.Fatal(err) // Handle other errors
+	// 	}
+
+	// 	if strings.HasSuffix(header.Name, "annotation.tsv.gz") {
+	// 		b, err = bgzf.NewReader(tarReader, 0)
+	// 		if err != nil {
+	// 			log.Fatal(err)
+	// 		}
+	// 		break
+	// 	}
+	// }
+	file, err := os.Open("/home/ubuntu/bystro/rust/index_annotation/all_chr1_phase3_shapeit2_mvncall_integrated_v5b_20130502_genotypes_vcf.annotation.tsv.gz") //os.Open("/home/ubuntu/bystro/rust/index_annotation/all_chr1_phase3_shapeit2_mvncall_integrated_v5b_20130502_genotypes_vcf.annotation.500klines.tsv.gz")
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer archive.Close()
 
-	tarReader := tar.NewReader(archive)
+	defer file.Close()
 
-	var b *bgzf.Reader
-	for {
-		header, err := tarReader.Next()
-		if err != nil {
-			if err == io.EOF {
-				break // End of archive
-			}
-			log.Fatal(err) // Handle other errors
-		}
-
-		if strings.HasSuffix(header.Name, "annotation.tsv.gz") {
-			b, err = bgzf.NewReader(tarReader, 0)
-			if err != nil {
-				log.Fatal(err)
-			}
-			break
-		}
-	}
-	// file, err := os.Open("/home/ubuntu/bystro/rust/index_annotation/all_chr1_phase3_shapeit2_mvncall_integrated_v5b_20130502_genotypes_vcf.annotation.500klines.tsv.gz")
-	// defer file.Close()
-
-	// b, err := bgzf.NewReader(file, 0)
+	b, err := bgzf.NewReader(file, 0)
 
 	// TODO @akotlar 2023-11-24: Get the file size of just the file being indexed; though the tar archive is about the same size as the file, it's not exactly the same
-	fileStats, err := archive.Stat()
+	// fileStats, err := archive.Stat()
+	fileStats, err := file.Stat()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	workQueue := make(chan parser.Job)
+	workQueue := make(chan parser.Job, 500)
 	complete := make(chan bool)
 
 	headerPaths := getHeaderPaths(b)
+
+	if len(headerPaths) == 0 {
+		log.Fatal("No header paths found")
+	}
 
 	osConfig, client, osearchMapConfig := createIndex(cliargs.osConnectionConfigPath, cliargs.osIndexConfigPath, cliargs.indexName, fileStats.Size())
 
 	// Spawn threads
 	for i := 0; i < concurrency; i++ {
-		go parser.Parse(headerPaths, indexName, osConfig, workQueue, complete)
+		go parser.Parse(headerPaths, indexName, osConfig, workQueue, complete, i)
 	}
 
 	// c, err := beanstalk.Dial("tcp", "127.0.0.1:11300")
 	// id, err := c.Put([]byte("hello"), 1, 0, 120*time.Second)
 
 	chunkStart := 0
-	var lines [][]byte
-	n := 0
+	var lines []string
+
 	for {
-		line, err := readLine(b)
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			log.Fatal(err)
-		}
+		// line, err := readLine(b)
 
-		lines = append(lines, line)
+		rawLines, err := readLines(b)
+		lines = strings.Split(string(rawLines), "\n")
 
-		if len(lines) >= 100 {
+		if len(lines) > 0 {
 			workQueue <- parser.Job{Lines: lines, Start: chunkStart}
 
 			chunkStart += len(lines)
 			lines = nil
 		}
 
-		n++
+		// fmt.Println(line)
+		if err != nil {
+			if err == io.EOF {
+				fmt.Println("EOF", len(lines))
+				break
+			}
+			log.Fatal(err)
+		}
 	}
 
 	if len(lines) > 0 {
+		fmt.Println("More lines remaining", len(lines), " chunkStart ", chunkStart)
 		workQueue <- parser.Job{Lines: lines, Start: chunkStart}
+
+		chunkStart += len(lines)
 		lines = nil
 	}
 
-	fmt.Println("Processed this many lines: ", chunkStart, n)
+	fmt.Println("Processed this many lines: ", chunkStart)
 	// Indicate to all processing threads that no more work remains
 	close(workQueue)
 

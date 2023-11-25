@@ -2,6 +2,7 @@ package parser
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -11,7 +12,7 @@ import (
 )
 
 type Job struct {
-	Lines [][]byte
+	Lines []string
 	Start int
 }
 
@@ -25,7 +26,7 @@ const (
 )
 
 // Parse takes the file content and converts it into an array of nested maps.
-func Parse(headerPaths [][]string, indexName string, osConfig opensearch.Config, workQueue chan Job, done chan bool) {
+func Parse(headerPaths [][]string, indexName string, osConfig opensearch.Config, workQueue chan Job, done chan bool, channelId int) {
 	client, err := opensearch.NewClient(osConfig)
 
 	if err != nil {
@@ -41,13 +42,11 @@ func Parse(headerPaths [][]string, indexName string, osConfig opensearch.Config,
 
 	for job := range workQueue {
 		lines := job.Lines
-		chunkStart := job.Start
-
-		id := chunkStart - 1
+		id := job.Start - 1
 		for _, line := range lines {
 			id += 1
 
-			fields := strings.Split(string(line), FIELD_DELIMITER)
+			fields := strings.Split(line, FIELD_DELIMITER)
 			if len(fields) != len(headerPaths) {
 				log.Fatal("fields and headerPaths are not the same length")
 			}
@@ -73,6 +72,8 @@ func Parse(headerPaths [][]string, indexName string, osConfig opensearch.Config,
 
 		res.Body.Close()
 		w.Reset()
+
+		fmt.Println("Channel id:", channelId, "Processed from ", job.Start, " to ", id, " with ", len(lines), " lines")
 	}
 
 	done <- true
