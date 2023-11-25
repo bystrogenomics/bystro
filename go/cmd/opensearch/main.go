@@ -11,7 +11,6 @@ import (
 	"math"
 	"net/http"
 	"runtime"
-	"time"
 
 	// "crypto/tls"
 	"fmt"
@@ -22,7 +21,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/beanstalkd/go-beanstalk"
 	"github.com/biogo/hts/bgzf"
 	"github.com/bytedance/sonic"
 	"github.com/opensearch-project/opensearch-go"
@@ -85,6 +83,25 @@ type ProgressPublisher struct {
 	message ProgressMessage
 }
 
+// Expected beanstalkd format
+//
+//	addresses:
+//	  - <host1>:<port1>
+//	tubes:
+//	  index:
+//	    submission: index
+//	    events: index_events
+//	  ...
+type BeanstalkdConfig struct {
+	Addresses []string `yaml:"addresses"`
+	Tubes     struct {
+		Index struct {
+			Submission string `yaml:"submission"`
+			Events     string `yaml:"events"`
+		} `yaml:"index"`
+	} `yaml:"tubes"`
+}
+
 func createAddresses(config OpensearchConnectionConfig) []string {
 	var addresses []string
 
@@ -115,22 +132,12 @@ func setup(args []string) *CLIArgs {
 }
 
 func getHeaderPaths(b *bgzf.Reader) [][]string {
-	buf := make([]byte, 0, 1024*1024)
-	bytesRead := 0
-	for {
-		extraByte, err := b.ReadByte()
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		buf = append(buf, extraByte)
-		bytesRead++
-		if extraByte == '\n' {
-			fmt.Println("found newline", extraByte)
-			break
-		}
+	line, err := readLine(b)
+	if err != nil {
+		log.Fatal(err)
 	}
-	headers := strings.Fields(string(buf[:bytesRead]))
+
+	headers := strings.Fields(string(line))
 
 	headerPaths := [][]string{}
 
@@ -261,6 +268,29 @@ func readLine(r *bgzf.Reader) ([]byte, error) {
 	return data, err
 }
 
+func TestUse(bConfig BeanstalkdConfig) {
+	// c, err := beanstalk.Dial("tcp", "127.0.0.1:11300")
+	// func Dial(network, addr string) (*Conn, error) {
+	// 	return DialTimeout(network, addr, DefaultDialTimeout)
+	// }
+
+	// c := NewConn(mock(
+	// 	"use foo\r\nput 0 0 0 5\r\nhello\r\n",
+	// 	"USING foo\r\nINSERTED 1\r\n",
+	// ))
+	// tube := NewTube(c, "foo")
+	// id, err := tube.Put([]byte("hello"), 0, 0, 0)
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
+	// if id != 1 {
+	// 	t.Fatal("expected 1, got", id)
+	// }
+	// if err = c.Close(); err != nil {
+	// 	t.Fatal(err)
+	// }
+}
+
 func main() {
 	cliargs := setup(nil)
 
@@ -319,8 +349,8 @@ func main() {
 		go parser.Parse(headerPaths, indexName, osConfig, workQueue, complete)
 	}
 
-	c, err := beanstalk.Dial("tcp", "127.0.0.1:11300")
-	id, err := c.Put([]byte("hello"), 1, 0, 120*time.Second)
+	// c, err := beanstalk.Dial("tcp", "127.0.0.1:11300")
+	// id, err := c.Put([]byte("hello"), 1, 0, 120*time.Second)
 
 	chunkStart := 0
 	var lines [][]byte
@@ -385,6 +415,7 @@ func main() {
 		// readBuffer = nil
 		lines = nil
 	}
+
 	fmt.Println("Processed this many lines: ", chunkStart, n)
 	// Indicate to all processing threads that no more work remains
 	close(workQueue)
