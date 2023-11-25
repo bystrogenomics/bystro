@@ -11,6 +11,7 @@ import (
 	"math"
 	"net/http"
 	"runtime"
+	"time"
 
 	// "crypto/tls"
 	"fmt"
@@ -21,6 +22,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/beanstalkd/go-beanstalk"
 	"github.com/biogo/hts/bgzf"
 	"github.com/bytedance/sonic"
 	"github.com/opensearch-project/opensearch-go"
@@ -65,6 +67,24 @@ type OpensearchMappingConfig struct {
 	Mappings          map[string]map[string]any `yaml:"mappings" json:"mappings"`
 }
 
+type ProgressData struct {
+	progress int
+	skipped  int
+}
+
+type ProgressMessage struct {
+	submissionID string
+	data         ProgressData
+	event        string `default:"progress"`
+}
+
+type ProgressPublisher struct {
+	host    string
+	port    int
+	queue   string
+	message ProgressMessage
+}
+
 func createAddresses(config OpensearchConnectionConfig) []string {
 	var addresses []string
 
@@ -92,32 +112,6 @@ func setup(args []string) *CLIArgs {
 	flag.CommandLine.Parse(a)
 
 	return cliargs
-}
-
-// readNextChunk reads bytes from a BGZF file until it reaches a newline.
-// It returns a chunk aligned on a newline boundary.
-func readNextChunk(file *bgzf.Reader) []byte {
-	const maxChunkSize = 1024 // Define a suitable chunk size
-
-	buf := make([]byte, 0, maxChunkSize)
-	temp := make([]byte, 1)
-
-	for len(buf) < maxChunkSize {
-		_, err := file.Read(temp)
-		if err != nil {
-			if err == io.EOF {
-				break // End of file reached
-			}
-			log.Fatal(err) // Handle other errors
-		}
-
-		buf = append(buf, temp[0])
-		if temp[0] == '\n' {
-			break // Newline boundary reached
-		}
-	}
-
-	return buf
 }
 
 func getHeaderPaths(b *bgzf.Reader) [][]string {
@@ -167,7 +161,7 @@ func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 	if err != nil {
 		log.Fatalf("Couldn't read: %s due to: %s", opensearchIndexConfigPath, err)
 	}
-	// fmt.Println(string(index_config))
+
 	err = yaml.Unmarshal(indexConfig, &osearchMapConfig)
 	if err != nil {
 		log.Fatalf("Unmarshal failed: %v", err)
@@ -230,7 +224,6 @@ func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 		}
 	}
 
-	// ctx := context.Background()
 	createIndex := opensearchapi.IndicesCreateRequest{
 		Index: indexName,
 		Body:  strings.NewReader(requestBody),
@@ -238,7 +231,6 @@ func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 
 	createResp, err := createIndex.Do(context.Background(), client)
 
-	// createResp, err := client.Indices.Create(createIndex)
 	if err != nil || createResp.IsError() {
 		log.Fatalf("Error creating index: %s", err)
 	}
@@ -273,8 +265,6 @@ func main() {
 	cliargs := setup(nil)
 
 	indexName := cliargs.indexName
-
-	fmt.Println("indexName", indexName)
 
 	// From testing, performance seems maximized at 32 threads for a 4 vCPU AWS instance
 	concurrency := runtime.NumCPU() * 8
@@ -328,6 +318,9 @@ func main() {
 	for i := 0; i < concurrency; i++ {
 		go parser.Parse(headerPaths, indexName, osConfig, workQueue, complete)
 	}
+
+	c, err := beanstalk.Dial("tcp", "127.0.0.1:11300")
+	id, err := c.Put([]byte("hello"), 1, 0, 120*time.Second)
 
 	chunkStart := 0
 	var lines [][]byte
