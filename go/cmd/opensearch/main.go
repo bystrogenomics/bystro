@@ -354,44 +354,8 @@ func main() {
 
 	chunkStart := 0
 	var lines [][]byte
-	// var readBuffer []byte
-	// var bufRead []byte
 	n := 0
 	for {
-		// readBuffer = make([]byte, 1024*1024)
-		// bytesRead, err := b.Read(readBuffer)
-		// if err != nil {
-		// 	if err == io.EOF {
-		// 		break
-		// 	}
-		// 	log.Fatal(err)
-		// }
-
-		// // fmt.Println((buf))
-		// bufRead = readBuffer[:bytesRead]
-		// if bufRead[len(bufRead)-1] != '\n' {
-		// 	if err != nil {
-		// 		if err == io.EOF {
-		// 			break
-		// 		}
-		// 		log.Fatal(err)
-		// 	}
-
-		// 	// If the last byte isn't a newline, read until newline is found
-		// 	// for buf[bytesRead-1] != '\n' {
-		// 	for {
-		// 		extraByte, err := b.ReadByte()
-		// 		if err != nil {
-		// 			break
-		// 		}
-		// 		bufRead = append(bufRead, extraByte)
-		// 		bytesRead++
-		// 		if extraByte == '\n' {
-		// 			break
-		// 		}
-		// 	}
-		// }
-		n++
 		line, err := readLine(b)
 		if err != nil {
 			if err == io.EOF {
@@ -408,11 +372,12 @@ func main() {
 			chunkStart += len(lines)
 			lines = nil
 		}
+
+		n++
 	}
 
 	if len(lines) > 0 {
 		workQueue <- parser.Job{Lines: lines, Start: chunkStart}
-		// readBuffer = nil
 		lines = nil
 	}
 
