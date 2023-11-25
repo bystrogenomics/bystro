@@ -2,7 +2,6 @@ package parser
 
 import (
 	"bytes"
-	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -48,7 +47,7 @@ func Parse(headerPaths [][]string, indexName string, osConfig opensearch.Config,
 
 			fields := strings.Split(line, FIELD_DELIMITER)
 			if len(fields) != len(headerPaths) {
-				log.Fatal("fields and headerPaths are not the same length")
+				log.Fatalf("Fields and headerPaths are not the same length: field length %d != header length %d\n", len(fields), len(headerPaths))
 			}
 
 			nestedMap := buildNestedMap(headerPaths, fields)
@@ -72,8 +71,6 @@ func Parse(headerPaths [][]string, indexName string, osConfig opensearch.Config,
 
 		res.Body.Close()
 		w.Reset()
-
-		fmt.Println("Channel id:", channelId, "Processed from ", job.Start, " to ", id, " with ", len(lines), " lines")
 	}
 
 	done <- true
