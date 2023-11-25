@@ -1,41 +1,81 @@
 package parser
 
 import (
+	"bytes"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
+
+	"github.com/bytedance/sonic"
+	"github.com/opensearch-project/opensearch-go"
 )
 
-// Parse takes the file content and converts it into an array of nested maps.
-func Parse(content []byte, headerFields []string) []map[string]interface{} {
-	lines := strings.Split(string(content), "\n")
-	var result []map[string]interface{}
-
-	var row map[string]interface{}
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-		fields := strings.Split(line, "\t")
-		if len(fields) != len(headerFields) {
-			fmt.Println("fields:", fields)
-			fmt.Println("headerPaths:", headerFields)
-			panic("fields and headerPaths are not the same length")
-		}
-		row = buildFlatMap(headerFields, fields)
-		// nestedMap := buildNestedMap(headerPaths, fields)
-		result = append(result, row)
-	}
-
-	// fmt.Println("result:", result)
-
-	// clear(result)
-
-	return result
+type Job struct {
+	Lines []string
+	Start int
 }
 
-func buildFlatMap(headerFields []string, values []string) map[string]interface{} {
-	row := make(map[string]interface{})
+// Parse takes the file content and converts it into an array of nested maps.
+func Parse(headerPaths [][]string, indexName string, osConfig opensearch.Config, workQueue chan Job, done chan bool) {
+	client, err := opensearch.NewClient(osConfig)
+
+	if err != nil {
+		panic(err)
+	}
+
+	var w = bytes.NewBuffer(nil)
+	var enc = sonic.ConfigDefault.NewEncoder(w)
+
+	outerMap := make(map[string]map[string]string)
+	innerMap1 := make(map[string]string)
+	outerMap["index"] = innerMap1
+	for job := range workQueue {
+		lines := job.Lines
+		chunkStart := job.Start
+
+		id := chunkStart - 1
+		for _, line := range lines {
+			id += 1
+			if line == "" {
+				continue
+			}
+
+			fields := strings.Split(line, "\t")
+			if len(fields) != len(headerPaths) {
+				fmt.Println("fields:", fields)
+				fmt.Println("headerPaths:", headerPaths)
+				panic("fields and headerPaths are not the same length")
+			}
+
+			nestedMap := buildNestedMap(headerPaths, fields)
+
+			innerMap1["_index"] = indexName
+			innerMap1["_id"] = strconv.Itoa(id)
+
+			enc.Encode(outerMap)
+			enc.Encode(nestedMap)
+		}
+
+		res, err := client.Bulk(strings.NewReader(w.String()))
+
+		if err != nil || res.IsError() {
+			log.Fatal(err, res.StatusCode)
+		}
+
+		if err != nil || res.IsError() {
+			log.Fatal(err, res.StatusCode)
+		}
+
+		res.Body.Close()
+		w.Reset()
+	}
+
+	done <- true
+}
+
+func buildFlatMap(headerFields []string, values []string) map[string]any {
+	row := make(map[string]any)
 	// fmt.Println("len(headerPaths)", len(headerPaths))
 	for i, fieldName := range headerFields {
 		row[fieldName] = ensure3DArray(values[i])
@@ -45,8 +85,8 @@ func buildFlatMap(headerFields []string, values []string) map[string]interface{}
 }
 
 // buildNestedMap constructs a nested map based on the headers and values.
-func buildNestedMap(headerPaths [][]string, values []string) map[string]interface{} {
-	nestedMap := make(map[string]interface{})
+func buildNestedMap(headerPaths [][]string, values []string) map[string]any {
+	nestedMap := make(map[string]any)
 	// fmt.Println("len(headerPaths)", len(headerPaths))
 	for i, headerPath := range headerPaths {
 		currentMap := nestedMap
@@ -58,9 +98,9 @@ func buildNestedMap(headerPaths [][]string, values []string) map[string]interfac
 				currentMap[node] = ensure3DArray(values[i])
 			} else {
 				if _, exists := currentMap[node]; !exists {
-					currentMap[node] = make(map[string]interface{})
+					currentMap[node] = make(map[string]any)
 				}
-				currentMap = currentMap[node].(map[string]interface{})
+				currentMap = currentMap[node].(map[string]any)
 			}
 		}
 	}
@@ -69,18 +109,18 @@ func buildNestedMap(headerPaths [][]string, values []string) map[string]interfac
 }
 
 // ensure3DArray ensures that the value is converted to a 3D array.
-func ensure3DArray(value string) interface{} {
-	var outerArray [][][]interface{}
+func ensure3DArray(value string) any {
+	var outerArray [][][]any
 
 	for _, positionValues := range strings.Split(value, "|") {
-		var middleArray [][]interface{}
+		var middleArray [][]any
 
 		for _, valueValues := range strings.Split(positionValues, ";") {
-			var innerArray []interface{}
+			var innerArray []any
 
 			if !strings.Contains(valueValues, "/") {
 				item := processItem(valueValues)
-				slice := []interface{}{item}
+				slice := []any{item}
 
 				middleArray = append(middleArray, slice)
 				continue
@@ -100,7 +140,7 @@ func ensure3DArray(value string) interface{} {
 }
 
 // processItem interprets the given item as per the specified rules.
-func processItem(item string) interface{} {
+func processItem(item string) any {
 	trimmedItem := strings.TrimSpace(item)
 
 	// Check for "NA" and return nil

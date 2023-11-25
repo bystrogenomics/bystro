@@ -45,34 +45,34 @@ index_settings:
         language: light_english
       search_synonym_filter:
         type: synonym
-        synonyms_path: "analysis/search-synonyms.txt"
+        synonyms_path: analysis/search-synonyms.txt
       amino_synonym_filter:
         type: synonym
-        synonyms_path: "analysis/amino-synonyms.txt"
+        synonyms_path: analysis/amino-synonyms.txt
       type_synonym_filter:
         type: synonym
-        synonyms_path: "analysis/type-synonyms.txt"
+        synonyms_path: analysis/type-synonyms.txt
       dbSNP_func_synonyms:
         type: synonym
-        synonyms_path: "analysis/dbsnp-func-synonyms.txt"
+        synonyms_path: analysis/dbsnp-func-synonyms.txt
       dbSNP_class_synonyms:
         type: synonym
-        synonyms_path: "analysis/dbsnp-class-synonyms.txt"
+        synonyms_path: analysis/dbsnp-class-synonyms.txt
       exonic_allele_function_search_synonyms:
         type: synonym
-        synonyms_path: "analysis/exonic-allele-function-search-synonyms.txt"
+        synonyms_path: analysis/exonic-allele-function-search-synonyms.txt
       site_type_synonym_filter:
         type: synonym
-        synonyms_path: "analysis/site-type-synonyms.txt"
+        synonyms_path: analysis/site-type-synonyms.txt
       codon_map_synonym_filter:
         type: synonym
-        synonyms_path: "analysis/codon-map-synonyms.txt"
+        synonyms_path: analysis/codon-map-synonyms.txt
       description_synonyms:
         type: synonym
-        synonyms_path: "analysis/refseq-description-synonyms.txt"
+        synonyms_path: analysis/refseq-description-synonyms.txt
       disease_synonyms:
         type: synonym
-        synonyms_path: "analysis/disease-synonyms.txt"
+        synonyms_path: analysis/disease-synonyms.txt
       autocomplete_filter:
         type: edge_ngram
         min_gram: 1
