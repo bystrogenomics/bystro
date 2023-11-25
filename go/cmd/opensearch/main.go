@@ -251,9 +251,9 @@ func main() {
 	concurrency := runtime.NumCPU() * 8
 
 	// Open the tar archive
-	archive, err := os.Open("/seqant/user-data/63ddc9ce1e740e0020c39928/6556f106f71022dc49c8e560/output/all_chr1_phase3_shapeit2_mvncall_integrated_v5b_20130502_genotypes_vcf.tar")
+	archive, err := os.Open(cliargs.annotationTarballPath) //os.Open("/seqant/user-data/63ddc9ce1e740e0020c39928/6556f106f71022dc49c8e560/output/all_chr1_phase3_shapeit2_mvncall_integrated_v5b_20130502_genotypes_vcf.tar")
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	defer archive.Close()
 
@@ -266,12 +266,10 @@ func main() {
 			if err == io.EOF {
 				break // End of archive
 			}
-			panic(err) // Handle other errors
+			log.Fatal(err) // Handle other errors
 		}
 
 		if strings.HasSuffix(header.Name, "annotation.tsv.gz") {
-			// Process this file
-			// processCompressedFile(tarReader)
 			b, err = bgzf.NewReader(tarReader, 0)
 			if err != nil {
 				log.Fatal(err)
@@ -280,11 +278,11 @@ func main() {
 		}
 	}
 
-	// file, err := os.Open("/home/ubuntu/bystro/rust/index_annotation/all_chr1_phase3_shapeit2_mvncall_integrated_v5b_20130502_genotypes_vcf.annotation.500klines.tsv.gz")
-	// defer file.Close()
-
 	// TODO @akotlar 2023-11-24: Get the file size of just the file being indexed; though the tar archive is about the same size as the file, it's not exactly the same
 	fileStats, err := archive.Stat()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	workQueue := make(chan parser.Job)
 	complete := make(chan bool)
@@ -309,7 +307,7 @@ func main() {
 			if err == io.EOF {
 				break
 			}
-			panic(err)
+			log.Fatal(err)
 		}
 
 		// fmt.Println((buf))
@@ -319,7 +317,7 @@ func main() {
 				if err == io.EOF {
 					break
 				}
-				panic(err)
+				log.Fatal(err)
 			}
 
 			// If the last byte isn't a newline, read until newline is found
