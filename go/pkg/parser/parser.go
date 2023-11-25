@@ -2,7 +2,6 @@ package parser
 
 import (
 	"bytes"
-	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -12,16 +11,25 @@ import (
 )
 
 type Job struct {
-	Lines []string
+	Lines [][]byte
 	Start int
 }
+
+const (
+	LINE_DELIMITER      = "\n"
+	FIELD_DELIMITER     = "\t"
+	OVERLAP_DELIMITER   = "/"
+	POSITION_DELIMITER  = "|"
+	VALUE_DELIMITER     = ";"
+	MISSING_FIELD_VALUE = "NA"
+)
 
 // Parse takes the file content and converts it into an array of nested maps.
 func Parse(headerPaths [][]string, indexName string, osConfig opensearch.Config, workQueue chan Job, done chan bool) {
 	client, err := opensearch.NewClient(osConfig)
 
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	var w = bytes.NewBuffer(nil)
@@ -30,6 +38,7 @@ func Parse(headerPaths [][]string, indexName string, osConfig opensearch.Config,
 	outerMap := make(map[string]map[string]string)
 	innerMap1 := make(map[string]string)
 	outerMap["index"] = innerMap1
+
 	for job := range workQueue {
 		lines := job.Lines
 		chunkStart := job.Start
@@ -37,15 +46,10 @@ func Parse(headerPaths [][]string, indexName string, osConfig opensearch.Config,
 		id := chunkStart - 1
 		for _, line := range lines {
 			id += 1
-			if line == "" {
-				continue
-			}
 
-			fields := strings.Split(line, "\t")
+			fields := strings.Split(string(line), FIELD_DELIMITER)
 			if len(fields) != len(headerPaths) {
-				fmt.Println("fields:", fields)
-				fmt.Println("headerPaths:", headerPaths)
-				panic("fields and headerPaths are not the same length")
+				log.Fatal("fields and headerPaths are not the same length")
 			}
 
 			nestedMap := buildNestedMap(headerPaths, fields)
@@ -87,13 +91,9 @@ func buildFlatMap(headerFields []string, values []string) map[string]any {
 // buildNestedMap constructs a nested map based on the headers and values.
 func buildNestedMap(headerPaths [][]string, values []string) map[string]any {
 	nestedMap := make(map[string]any)
-	// fmt.Println("len(headerPaths)", len(headerPaths))
 	for i, headerPath := range headerPaths {
 		currentMap := nestedMap
-		// fmt.Println("headerPath", headerPath)
-		// fmt.Println("headerPath", headerPath, len(headerPath))
 		for j, node := range headerPath {
-			// fmt.Println("node", node, len(node))
 			if j == len(headerPath)-1 {
 				currentMap[node] = ensure3DArray(values[i])
 			} else {
@@ -112,13 +112,13 @@ func buildNestedMap(headerPaths [][]string, values []string) map[string]any {
 func ensure3DArray(value string) any {
 	var outerArray [][][]any
 
-	for _, positionValues := range strings.Split(value, "|") {
+	for _, positionValues := range strings.Split(value, POSITION_DELIMITER) {
 		var middleArray [][]any
 
-		for _, valueValues := range strings.Split(positionValues, ";") {
+		for _, valueValues := range strings.Split(positionValues, VALUE_DELIMITER) {
 			var innerArray []any
 
-			if !strings.Contains(valueValues, "/") {
+			if !strings.Contains(valueValues, OVERLAP_DELIMITER) {
 				item := processItem(valueValues)
 				slice := []any{item}
 
@@ -126,7 +126,7 @@ func ensure3DArray(value string) any {
 				continue
 			}
 
-			for _, thirdPart := range strings.Split(valueValues, "/") {
+			for _, thirdPart := range strings.Split(valueValues, OVERLAP_DELIMITER) {
 				innerArray = append(innerArray, processItem(thirdPart))
 			}
 
@@ -144,7 +144,7 @@ func processItem(item string) any {
 	trimmedItem := strings.TrimSpace(item)
 
 	// Check for "NA" and return nil
-	if trimmedItem == "NA" {
+	if trimmedItem == MISSING_FIELD_VALUE {
 		return nil
 	}
 

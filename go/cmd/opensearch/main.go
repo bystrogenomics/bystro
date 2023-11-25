@@ -2,6 +2,7 @@ package main
 
 import (
 	// "archive/tar"
+
 	"archive/tar"
 	"bystro/pkg/parser"
 	"context"
@@ -25,12 +26,12 @@ import (
 	"github.com/opensearch-project/opensearch-go"
 	"github.com/opensearch-project/opensearch-go/opensearchapi"
 	"gopkg.in/yaml.v3"
-	// "github.com/opensearch-project/opensearch-go"
 )
 
 type CLIArgs struct {
 	annotationTarballPath  string
 	osIndexConfigPath      string
+	beanstalkConfigPath    string
 	osConnectionConfigPath string
 	indexName              string
 	allowHTTP              bool
@@ -77,9 +78,10 @@ func createAddresses(config OpensearchConnectionConfig) []string {
 
 func setup(args []string) *CLIArgs {
 	cliargs := &CLIArgs{}
-	flag.StringVar(&cliargs.annotationTarballPath, "in", "example.tar", "The path to the input tarball")
+	flag.StringVar(&cliargs.annotationTarballPath, "in", "/seqant/user-data/63ddc9ce1e740e0020c39928/6556f106f71022dc49c8e560/output/all_chr1_phase3_shapeit2_mvncall_integrated_v5b_20130502_genotypes_vcf.tar", "The path to the input tarball")
 	flag.StringVar(&cliargs.osIndexConfigPath, "index", "/home/ubuntu/bystro/config/hg19.mapping.yml", "The path to the OpenSearch mapping and index definition (e.g. hg19.mapping.yml)")
-	flag.StringVar(&cliargs.osConnectionConfigPath, "connection", "/home/ubuntu/bystro/config/elastic-config2.yml", "The path to the OpenSearch connection config (e.g. config/elasticsearch.yml)")
+	flag.StringVar(&cliargs.osConnectionConfigPath, "search", "/home/ubuntu/bystro/config/elastic-config2.yml", "The path to the OpenSearch connection config (e.g. config/elasticsearch.yml)")
+	flag.StringVar(&cliargs.beanstalkConfigPath, "queue", "/home/ubuntu/bystro/config/beanstalk.yml", "The path to the Beanstalkd queue connection config (e.g. config/beanstalk.yml)")
 	flag.StringVar(&cliargs.indexName, "name", "test2", "The index name")
 	flag.BoolVar(&cliargs.allowHTTP, "http", false, "Allow http connections (else forces https)")
 
@@ -147,13 +149,13 @@ func getHeaderPaths(b *bgzf.Reader) [][]string {
 	return headerPaths
 }
 
-func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPath string, indexName string, fileSize int64) opensearch.Config {
+func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPath string, indexName string, fileSize int64) (opensearch.Config, *opensearch.Client, OpensearchMappingConfig) {
 	var osearchConnConfig OpensearchConnectionConfig
 	var osearchMapConfig OpensearchMappingConfig
 
 	connectionSettings, err := os.ReadFile(opensearchConnectionConfigPath)
 	if err != nil {
-		log.Fatalf("Coudln't read: %s due to: %s", opensearchConnectionConfigPath, err)
+		log.Fatalf("Couldn't read: %s due to: %s", opensearchConnectionConfigPath, err)
 	}
 
 	err = yaml.Unmarshal(connectionSettings, &osearchConnConfig)
@@ -163,7 +165,7 @@ func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 
 	indexConfig, err := os.ReadFile(opensearchIndexConfigPath)
 	if err != nil {
-		log.Fatalf("Coudln't read: %s due to: %s", opensearchIndexConfigPath, err)
+		log.Fatalf("Couldn't read: %s due to: %s", opensearchIndexConfigPath, err)
 	}
 	// fmt.Println(string(index_config))
 	err = yaml.Unmarshal(indexConfig, &osearchMapConfig)
@@ -214,6 +216,8 @@ func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 		log.Fatalf("Error deleting index: %s", err)
 	}
 
+	defer resp.Body.Close()
+
 	if resp.StatusCode == 200 {
 		deleteIndex := opensearchapi.IndicesDeleteRequest{
 			Index: []string{indexName},
@@ -239,7 +243,30 @@ func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 		log.Fatalf("Error creating index: %s", err)
 	}
 
-	return osConfig
+	defer createResp.Body.Close()
+
+	return osConfig, client, osearchMapConfig
+}
+
+func readLine(r *bgzf.Reader) ([]byte, error) {
+	tx := r.Begin()
+	var (
+		data []byte
+		b    byte
+		err  error
+	)
+	for {
+		b, err = r.ReadByte()
+		if err != nil {
+			break
+		}
+		data = append(data, b)
+		if b == '\n' {
+			break
+		}
+	}
+	tx.End()
+	return data, err
 }
 
 func main() {
@@ -247,11 +274,13 @@ func main() {
 
 	indexName := cliargs.indexName
 
+	fmt.Println("indexName", indexName)
+
 	// From testing, performance seems maximized at 32 threads for a 4 vCPU AWS instance
 	concurrency := runtime.NumCPU() * 8
 
-	// Open the tar archive
-	archive, err := os.Open(cliargs.annotationTarballPath) //os.Open("/seqant/user-data/63ddc9ce1e740e0020c39928/6556f106f71022dc49c8e560/output/all_chr1_phase3_shapeit2_mvncall_integrated_v5b_20130502_genotypes_vcf.tar")
+	//Open the tar archive
+	archive, err := os.Open(cliargs.annotationTarballPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -277,6 +306,10 @@ func main() {
 			break
 		}
 	}
+	// file, err := os.Open("/home/ubuntu/bystro/rust/index_annotation/all_chr1_phase3_shapeit2_mvncall_integrated_v5b_20130502_genotypes_vcf.annotation.500klines.tsv.gz")
+	// defer file.Close()
+
+	// b, err := bgzf.NewReader(file, 0)
 
 	// TODO @akotlar 2023-11-24: Get the file size of just the file being indexed; though the tar archive is about the same size as the file, it's not exactly the same
 	fileStats, err := archive.Stat()
@@ -289,7 +322,7 @@ func main() {
 
 	headerPaths := getHeaderPaths(b)
 
-	osConfig := createIndex(cliargs.osConnectionConfigPath, cliargs.osIndexConfigPath, cliargs.indexName, fileStats.Size())
+	osConfig, client, osearchMapConfig := createIndex(cliargs.osConnectionConfigPath, cliargs.osIndexConfigPath, cliargs.indexName, fileStats.Size())
 
 	// Spawn threads
 	for i := 0; i < concurrency; i++ {
@@ -297,12 +330,46 @@ func main() {
 	}
 
 	chunkStart := 0
-	var lines []string
-	var readBuffer []byte
-	var bufRead []byte
+	var lines [][]byte
+	// var readBuffer []byte
+	// var bufRead []byte
+	n := 0
 	for {
-		readBuffer = make([]byte, 1024*1024)
-		bytesRead, err := b.Read(readBuffer)
+		// readBuffer = make([]byte, 1024*1024)
+		// bytesRead, err := b.Read(readBuffer)
+		// if err != nil {
+		// 	if err == io.EOF {
+		// 		break
+		// 	}
+		// 	log.Fatal(err)
+		// }
+
+		// // fmt.Println((buf))
+		// bufRead = readBuffer[:bytesRead]
+		// if bufRead[len(bufRead)-1] != '\n' {
+		// 	if err != nil {
+		// 		if err == io.EOF {
+		// 			break
+		// 		}
+		// 		log.Fatal(err)
+		// 	}
+
+		// 	// If the last byte isn't a newline, read until newline is found
+		// 	// for buf[bytesRead-1] != '\n' {
+		// 	for {
+		// 		extraByte, err := b.ReadByte()
+		// 		if err != nil {
+		// 			break
+		// 		}
+		// 		bufRead = append(bufRead, extraByte)
+		// 		bytesRead++
+		// 		if extraByte == '\n' {
+		// 			break
+		// 		}
+		// 	}
+		// }
+		n++
+		line, err := readLine(b)
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -310,32 +377,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		// fmt.Println((buf))
-		bufRead = readBuffer[:bytesRead]
-		if bufRead[len(bufRead)-1] != '\n' {
-			if err != nil {
-				if err == io.EOF {
-					break
-				}
-				log.Fatal(err)
-			}
-
-			// If the last byte isn't a newline, read until newline is found
-			// for buf[bytesRead-1] != '\n' {
-			for {
-				extraByte, err := b.ReadByte()
-				if err != nil {
-					break
-				}
-				bufRead = append(bufRead, extraByte)
-				bytesRead++
-				if extraByte == '\n' {
-					break
-				}
-			}
-		}
-
-		lines = append(lines, strings.Split(string(bufRead), "\n")...)
+		lines = append(lines, line)
 
 		if len(lines) >= 100 {
 			workQueue <- parser.Job{Lines: lines, Start: chunkStart}
@@ -347,10 +389,10 @@ func main() {
 
 	if len(lines) > 0 {
 		workQueue <- parser.Job{Lines: lines, Start: chunkStart}
-		readBuffer = nil
+		// readBuffer = nil
 		lines = nil
 	}
-
+	fmt.Println("Processed this many lines: ", chunkStart, n)
 	// Indicate to all processing threads that no more work remains
 	close(workQueue)
 
@@ -361,6 +403,33 @@ func main() {
 
 	fmt.Println("Processed this many lines: ", chunkStart)
 
-	// Update the index settings with post_index_settings and refresh the index
+	postIndexSettings, err := sonic.Marshal(osearchMapConfig.PostIndexSettings)
+	fmt.Println("postIndexSettings", string(postIndexSettings))
+	if err != nil {
+		log.Fatalf("Marshaling failed of post index settings: %v", err)
+	}
 
+	postIndexRequestBody := fmt.Sprintf(`{
+		"settings": %s
+	}`, string(postIndexSettings))
+
+	req := opensearchapi.IndicesPutSettingsRequest{
+		Index: []string{indexName},
+		Body:  strings.NewReader(postIndexRequestBody),
+	}
+
+	res, err := req.Do(context.Background(), client)
+	if err != nil {
+		log.Fatalf("Error updating index settings: %s", err)
+	}
+	defer res.Body.Close()
+
+	refreshRes, err := client.Indices.Refresh(
+		client.Indices.Refresh.WithIndex(indexName),
+	)
+	if err != nil {
+		log.Printf("error occurred: [%s]", err.Error())
+	}
+
+	refreshRes.Body.Close()
 }
