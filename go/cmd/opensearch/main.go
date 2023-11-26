@@ -419,16 +419,6 @@ func main() {
 
 		if err != nil {
 			if err == io.EOF {
-				log.Println("EOF, remaining length: ", len(lines), len(rawLines))
-				log.Println("Len of last line: ", len(string(lines[len(lines)-1])))
-				log.Println("Last line from lines array: ", lines[len(lines)-1])
-				// parser.ParseDirect(headerPaths, indexName, osConfig, lines, 0)
-				// chunkStart += len(lines)
-				log.Print("Last lines:\n", strings.Join(lines, "\n"))
-				log.Println("is the last line empty? ", len(lines[len(lines)-1]) == 0)
-				log.Println("is the last line a newline? ", lines[len(lines)-1] == "\n")
-				// writer.Flush()
-
 				if len(lines) > 0 {
 					workQueue <- parser.Job{Lines: lines, Start: chunkStart}
 					chunkStart += len(lines)
@@ -468,7 +458,7 @@ func main() {
 		<-complete
 	}
 
-	log.Print("Processed this many lines: ", chunkStart)
+	fmt.Printf("Indexed %d lines\n", chunkStart)
 
 	postIndexSettings, err := sonic.Marshal(osearchMapConfig.PostIndexSettings)
 
