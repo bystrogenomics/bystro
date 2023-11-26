@@ -1,7 +1,6 @@
 package main
 
 import (
-	"archive/tar"
 	"bystro/pkg/parser"
 	"context"
 	"crypto/tls"
@@ -19,8 +18,8 @@ import (
 
 	"github.com/biogo/hts/bgzf"
 	"github.com/bytedance/sonic"
-	"github.com/opensearch-project/opensearch-go"
-	"github.com/opensearch-project/opensearch-go/opensearchapi"
+	opensearch "github.com/opensearch-project/opensearch-go/v2"
+	opensearchapi "github.com/opensearch-project/opensearch-go/v2/opensearchapi"
 	"gopkg.in/yaml.v3"
 )
 
@@ -127,7 +126,7 @@ func setup(args []string) *CLIArgs {
 	return cliargs
 }
 
-func getHeaderPaths(b *bgzf.Reader) [][]string {
+func getHeaderPaths(b *bgzf.Reader) ([][]string, []string) {
 	line, err := readLine(b)
 	if err != nil {
 		log.Fatalf("Error reading header line: [%s]\n", err)
@@ -143,7 +142,7 @@ func getHeaderPaths(b *bgzf.Reader) [][]string {
 		headerPaths = append(headerPaths, path)
 	}
 
-	return headerPaths
+	return headerPaths, headers
 }
 
 func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPath string, indexName string, fileSize int64) (opensearch.Config, *opensearch.Client, OpensearchMappingConfig) {
@@ -239,6 +238,21 @@ func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 
 	defer createResp.Body.Close()
 
+	// JSON body to update the index settings
+	body := `{
+        "index.mapping.total_fields.limit": 10000 
+    }`
+
+	// Update index settings
+	res, err := client.Indices.PutSettings(
+		strings.NewReader(body),
+		client.Indices.PutSettings.WithIndex(indexName), // Replace with your index name
+	)
+	if err != nil {
+		panic(err)
+	}
+	defer res.Body.Close()
+
 	return osConfig, client, osearchMapConfig
 }
 
@@ -270,20 +284,16 @@ func readLine(r *bgzf.Reader) ([]byte, error) {
 }
 
 func readLines(b *bgzf.Reader) ([]byte, error) {
-	buf := make([]byte, 64*1024*8) // 8 bgzip blocks at a time
+	buf := make([]byte, 64*1024*4) // 4 bgzip blocks at a time
 
 	tx := b.Begin()
 	defer tx.End()
 
 	bytesRead, err := b.Read(buf)
 
-	if err != nil {
-		return buf[:bytesRead], err
-	}
-
-	if buf[len(buf)-1] != '\n' {
+	if buf[bytesRead-1] != '\n' {
 		remainder, err := _readLine(b)
-		return append(buf, remainder...), err
+		return append(buf[:bytesRead], remainder...), err
 	}
 	// last byte is newline
 	return buf[:bytesRead-1], err
@@ -318,54 +328,71 @@ func main() {
 	indexName := cliargs.indexName
 
 	// From testing, performance seems maximized at 32 threads for a 4 vCPU AWS instance
-	concurrency := runtime.NumCPU() * 8
+	concurrency := runtime.NumCPU() * 4
 
 	//Open the tar archive
-	archive, err := os.Open(cliargs.annotationTarballPath)
+	// archive, err := os.Open(cliargs.annotationTarballPath)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer archive.Close()
+
+	// tarReader := tar.NewReader(archive)
+
+	// var b *bgzf.Reader
+	// for {
+	// 	header, err := tarReader.Next()
+	// 	if err != nil {
+	// 		if err == io.EOF {
+	// 			break // End of archive
+	// 		}
+	// 		log.Fatal(err) // Handle other errors
+	// 	}
+
+	// 	// TODO @akotlar 2023-11-24: Take the expected file name from the information submitted in the beanstalkd queue message
+	// 	if strings.HasSuffix(header.Name, "annotation.tsv.gz") {
+	// 		b, err = bgzf.NewReader(tarReader, 0)
+	// 		if err != nil {
+	// 			log.Fatal(err)
+	// 		}
+	// 		break
+	// 	}
+	// }
+
+	// // TODO @akotlar 2023-11-24: Get the file size of just the file being indexed; though the tar archive is about the same size as the file, it's not exactly the same
+	// fileStats, err := archive.Stat()
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	file, err := os.Open("/home/ubuntu/bystro/rust/index_annotation/all_chr1_phase3_shapeit2_mvncall_integrated_v5b_20130502_genotypes_vcf.annotation.500klines.tsv.gz")
+
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer archive.Close()
+	defer file.Close()
 
-	tarReader := tar.NewReader(archive)
-
-	var b *bgzf.Reader
-	for {
-		header, err := tarReader.Next()
-		if err != nil {
-			if err == io.EOF {
-				break // End of archive
-			}
-			log.Fatal(err) // Handle other errors
-		}
-
-		// TODO @akotlar 2023-11-24: Take the expected file name from the information submitted in the beanstalkd queue message
-		if strings.HasSuffix(header.Name, "annotation.tsv.gz") {
-			b, err = bgzf.NewReader(tarReader, 0)
-			if err != nil {
-				log.Fatal(err)
-			}
-			break
-		}
-	}
-
-	// TODO @akotlar 2023-11-24: Get the file size of just the file being indexed; though the tar archive is about the same size as the file, it's not exactly the same
-	fileStats, err := archive.Stat()
+	fileStats, err := file.Stat()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	workQueue := make(chan parser.Job, 500)
+	b, err := bgzf.NewReader(file, 0)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	workQueue := make(chan parser.Job)
 	complete := make(chan bool)
 
-	headerPaths := getHeaderPaths(b)
+	headerPaths, _ := getHeaderPaths(b)
 
 	if len(headerPaths) == 0 {
 		log.Fatal("No header paths found")
 	}
 
 	osConfig, client, osearchMapConfig := createIndex(cliargs.osConnectionConfigPath, cliargs.osIndexConfigPath, cliargs.indexName, fileStats.Size())
-
+	// client.
 	// Spawn threads
 	for i := 0; i < concurrency; i++ {
 		go parser.Parse(headerPaths, indexName, osConfig, workQueue, complete, i)
@@ -377,41 +404,71 @@ func main() {
 	chunkStart := 0
 	var lines []string
 
+	// outFh := os.Stdout
+	// writer := bufio.NewWriterSize(outFh, 48*1024*1024)
+
+	// writer.WriteString(strings.Join(header, "\t"))
+
 	for {
 		rawLines, err := readLines(b)
-		lines = strings.Split(string(rawLines), parser.LINE_DELIMITER)
+		// line, err := readLine(b)
 
-		if len(lines) > 0 {
-			workQueue <- parser.Job{Lines: lines, Start: chunkStart}
-
-			chunkStart += len(lines)
-			lines = nil
+		if len(rawLines) > 0 {
+			lines = strings.Split(string(rawLines), parser.LINE_DELIMITER)
 		}
 
 		if err != nil {
 			if err == io.EOF {
+				log.Println("EOF, remaining length: ", len(lines), len(rawLines))
+				log.Println("Len of last line: ", len(string(lines[len(lines)-1])))
+				log.Println("Last line from lines array: ", lines[len(lines)-1])
+				// parser.ParseDirect(headerPaths, indexName, osConfig, lines, 0)
+				// chunkStart += len(lines)
+				log.Print("Last lines:\n", strings.Join(lines, "\n"))
+				log.Println("is the last line empty? ", len(lines[len(lines)-1]) == 0)
+				log.Println("is the last line a newline? ", lines[len(lines)-1] == "\n")
+				// writer.Flush()
+
+				if len(lines) > 0 {
+					workQueue <- parser.Job{Lines: lines, Start: chunkStart}
+					chunkStart += len(lines)
+					lines = nil
+				}
 				break
 			}
 			log.Fatal(err)
 		}
+
+		// lines = strings.Split(string(rawLines), parser.LINE_DELIMITER)
+		// lines = append(lines, string(line))
+		// go parser.ParseDirect(headerPaths, indexName, osConfig, lines, 0)
+		// workQueue <- parser.Job{Lines: lines, Start: chunkStart}
+
+		if len(lines) > 0 {
+			workQueue <- parser.Job{Lines: lines, Start: chunkStart}
+			// fmt.Println(strings.Join(lines, "\n"))
+
+			chunkStart += len(lines)
+			lines = nil
+		}
 	}
 
-	if len(lines) > 0 {
-		workQueue <- parser.Job{Lines: lines, Start: chunkStart}
+	// if len(lines) > 0 {
+	// 	fmt.Println(strings.Join(lines, "\n"))
 
-		chunkStart += len(lines)
-		lines = nil
-	}
+	// 	chunkStart += len(lines)
+	// 	lines = nil
+	// }
 
 	// Indicate to all processing threads that no more work remains
 	close(workQueue)
 
-	// Wait for everyone to finish.
+	// // Wait for everyone to finish.
 	for i := 0; i < concurrency; i++ {
 		<-complete
 	}
 
-	fmt.Println("Processed this many lines: ", chunkStart)
+	log.Print("Processed this many lines: ", chunkStart)
 
 	postIndexSettings, err := sonic.Marshal(osearchMapConfig.PostIndexSettings)
 
@@ -434,8 +491,15 @@ func main() {
 	}
 	defer res.Body.Close()
 
+	res, err = client.Indices.Flush(
+		client.Indices.Flush.WithIndex(indexName),
+	)
+	if err != nil || res.IsError() {
+		log.Fatal(err, res.StatusCode)
+	}
+
 	refreshRes, err := client.Indices.Refresh(client.Indices.Refresh.WithIndex(indexName))
-	if err != nil {
+	if err != nil || refreshRes.IsError() {
 		log.Fatalf("Error refreshing index: [%s]\n", err.Error())
 	}
 

@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/bytedance/sonic"
-	"github.com/opensearch-project/opensearch-go"
+	"github.com/opensearch-project/opensearch-go/v2"
 )
 
 type Job struct {
@@ -51,6 +51,22 @@ func Parse(headerPaths [][]string, indexName string, osConfig opensearch.Config,
 			}
 
 			nestedMap := buildNestedMap(headerPaths, fields)
+			// data, err := sonic.Marshal(nestedMap)
+			// if err != nil {
+			// 	log.Fatal(err)
+			// }
+
+			// log.Print("data: ", string(data))
+
+			// req := opensearchapi.IndexRequest{
+			// 	Index:      indexName,
+			// 	DocumentID: strconv.Itoa(id),
+			// 	Body:       strings.NewReader(string(data)),
+			// }
+			// insertResponse, err := req.Do(context.Background(), client)
+			// if err != nil || insertResponse.IsError() {
+			// 	log.Fatal(err, insertResponse)
+			// }
 
 			innerMap1["_index"] = indexName
 			innerMap1["_id"] = strconv.Itoa(id)
@@ -59,21 +75,79 @@ func Parse(headerPaths [][]string, indexName string, osConfig opensearch.Config,
 			enc.Encode(nestedMap)
 		}
 
+		// bulkIndexRequest := w.String()
+		// // log.Println("bulkIndexRequest: ", bulkIndexRequest)
 		res, err := client.Bulk(strings.NewReader(w.String()))
-
+		log.Printf("Channel %d processed from %d to %d, res: [%v]\n", channelId, job.Start, id, res)
 		if err != nil || res.IsError() {
 			log.Fatal(err, res.StatusCode)
 		}
 
-		if err != nil || res.IsError() {
-			log.Fatal(err, res.StatusCode)
-		}
-
+		// if err != nil || res.IsError() {
+		// 	log.Fatal(err, res.StatusCode)
+		// }
+		// fmt.Printf("Channel %d processed from %d to %d\n", channelId, job.Start, id)
 		res.Body.Close()
 		w.Reset()
 	}
 
+	res, err := client.Indices.Flush(
+		client.Indices.Flush.WithIndex(indexName),
+	)
+	if err != nil || res.IsError() {
+		log.Fatal(err, res.StatusCode)
+	}
+
+	res, err = client.Indices.Refresh(
+		client.Indices.Refresh.WithIndex(indexName),
+	)
+	if err != nil || res.IsError() {
+		log.Fatal(err, res.StatusCode)
+	}
 	done <- true
+}
+
+func ParseDirect(headerPaths [][]string, indexName string, osConfig opensearch.Config, lines []string, channelId int) {
+	client, err := opensearch.NewClient(osConfig)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var w = bytes.NewBuffer(nil)
+	var enc = sonic.ConfigDefault.NewEncoder(w)
+
+	outerMap := make(map[string]map[string]string)
+	innerMap1 := make(map[string]string)
+	outerMap["index"] = innerMap1
+
+	for _, line := range lines {
+		fields := strings.Split(line, FIELD_DELIMITER)
+		if len(fields) != len(headerPaths) {
+			log.Fatalf("Fields and headerPaths are not the same length: field length %d != header length %d\n", len(fields), len(headerPaths))
+		}
+
+		nestedMap := buildNestedMap(headerPaths, fields)
+
+		innerMap1["_index"] = indexName
+		// innerMap1["_id"] = strconv.Itoa(id)
+
+		enc.Encode(outerMap)
+		enc.Encode(nestedMap)
+	}
+
+	res, err := client.Bulk(strings.NewReader(w.String()))
+
+	if err != nil || res.IsError() {
+		log.Fatal(err, res.StatusCode)
+	}
+
+	if err != nil || res.IsError() {
+		log.Fatal(err, res.StatusCode)
+	}
+	// fmt.Printf("Channel %d processed from %d to %d\n", channelId, job.Start, id)
+	res.Body.Close()
+
 }
 
 func buildFlatMap(headerFields []string, values []string) map[string]any {
@@ -146,15 +220,15 @@ func processItem(item string) any {
 		return nil
 	}
 
-	// Try to parse as an integer
-	if intVal, err := strconv.Atoi(trimmedItem); err == nil {
-		return intVal
-	}
+	// // Try to parse as an integer
+	// if intVal, err := strconv.Atoi(trimmedItem); err == nil {
+	// 	return intVal
+	// }
 
-	// Try to parse as a float
-	if floatVal, err := strconv.ParseFloat(trimmedItem, 64); err == nil {
-		return floatVal
-	}
+	// // Try to parse as a float
+	// if floatVal, err := strconv.ParseFloat(trimmedItem, 64); err == nil {
+	// 	return floatVal
+	// }
 
 	// Default to treating as a string
 	return trimmedItem
