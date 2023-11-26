@@ -221,15 +221,15 @@ func processItem(item string) any {
 		return nil
 	}
 
-	// // Try to parse as an integer
-	// if intVal, err := strconv.Atoi(trimmedItem); err == nil {
-	// 	return intVal
-	// }
+	// Try to parse as an integer
+	if intVal, err := strconv.Atoi(trimmedItem); err == nil {
+		return intVal
+	}
 
-	// // Try to parse as a float
-	// if floatVal, err := strconv.ParseFloat(trimmedItem, 64); err == nil {
-	// 	return floatVal
-	// }
+	// Try to parse as a float
+	if floatVal, err := strconv.ParseFloat(trimmedItem, 64); err == nil {
+		return floatVal
+	}
 
 	// Default to treating as a string
 	return trimmedItem
