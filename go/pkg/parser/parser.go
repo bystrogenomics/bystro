@@ -2,6 +2,7 @@ package parser
 
 import (
 	"bytes"
+	"io"
 	"log"
 	"strconv"
 	"strings"
@@ -23,6 +24,71 @@ const (
 	VALUE_DELIMITER     = ";"
 	MISSING_FIELD_VALUE = "NA"
 )
+
+// Define the structure for the JSON response
+type BulkResponse struct {
+	Took   int  `json:"took"`
+	Errors bool `json:"errors"`
+	Items  []map[string]struct {
+		Index  string      `json:"_index"`
+		ID     string      `json:"_id"`
+		Status int         `json:"status"`
+		Error  *ErrorField `json:"error"`
+	} `json:"items"`
+}
+
+type ErrorField struct {
+	Type   string `json:"type"`
+	Reason string `json:"reason"`
+}
+
+func parseBulkResponse(responseBody io.ReadCloser) string {
+	// var bulkResponse BulkResponse
+	// err := sonic.Unmarshal(responseBody, &bulkResponse)
+	// if err != nil {
+	// 	log.Fatalf("Error unmarshalling the JSON response: %s", err)
+	// }
+
+	res, err := io.ReadAll(responseBody)
+	if err != nil {
+		log.Fatalf("Error reading the response body: %s", err)
+	}
+
+	// return bulkResponse
+	var bulkResp BulkResponse
+	err = sonic.Unmarshal(res, &bulkResp)
+	if err != nil {
+		log.Fatalf("Error reading the response body: %s", err)
+	}
+
+	// According to opensearch API documentation, the top-level errors function will always be true
+	// if any document request in the bulk request had an error
+	// https://opensearch.org/docs/latest/api-reference/document-apis/bulk/
+	if !bulkResp.Errors {
+		return ""
+	}
+
+	// Set for unique error messages
+	errorSet := make(map[string]struct{})
+
+	for _, item := range bulkResp.Items {
+		for _, v := range item {
+			if v.Error != nil {
+				errorSet[v.Error.Reason] = struct{}{}
+			}
+		}
+	}
+
+	// Slice to store keys
+	var keys []string
+
+	// Extracting keys from the map
+	for key := range errorSet {
+		keys = append(keys, key)
+	}
+
+	return strings.Join(keys, ", ")
+}
 
 // Parse takes the file content and converts it into an array of nested maps.
 func Parse(headerPaths [][]string, indexName string, osConfig opensearch.Config, workQueue chan Job, done chan bool, channelId int) {
@@ -51,22 +117,6 @@ func Parse(headerPaths [][]string, indexName string, osConfig opensearch.Config,
 			}
 
 			nestedMap := buildNestedMap(headerPaths, fields)
-			// data, err := sonic.Marshal(nestedMap)
-			// if err != nil {
-			// 	log.Fatal(err)
-			// }
-
-			// log.Print("data: ", string(data))
-
-			// req := opensearchapi.IndexRequest{
-			// 	Index:      indexName,
-			// 	DocumentID: strconv.Itoa(id),
-			// 	Body:       strings.NewReader(string(data)),
-			// }
-			// insertResponse, err := req.Do(context.Background(), client)
-			// if err != nil || insertResponse.IsError() {
-			// 	log.Fatal(err, insertResponse)
-			// }
 
 			innerMap1["_index"] = indexName
 			innerMap1["_id"] = strconv.Itoa(id)
@@ -75,19 +125,18 @@ func Parse(headerPaths [][]string, indexName string, osConfig opensearch.Config,
 			enc.Encode(nestedMap)
 		}
 
-		// bulkIndexRequest := w.String()
-		// // log.Println("bulkIndexRequest: ", bulkIndexRequest)
 		res, err := client.Bulk(strings.NewReader(w.String()))
-		// log.Printf("Channel %d processed from %d to %d, res: [%v]\n", channelId, job.Start, id, res)
 
 		if err != nil || res.IsError() {
-			log.Fatal(err, res.StatusCode)
+			log.Fatalf("Bulk insert failed with the following error: [%s]. Res status: [%s]", err.Error(), res.Status())
 		}
 
-		// if err != nil || res.IsError() {
-		// 	log.Fatal(err, res.StatusCode)
-		// }
-		// fmt.Printf("Channel %d processed from %d to %d\n", channelId, job.Start, id)
+		bulkErrors := parseBulkResponse(res.Body)
+
+		if len(bulkErrors) > 0 {
+			log.Fatalf("Bulk insert failed with the following errors: [%v]", bulkErrors)
+		}
+
 		res.Body.Close()
 		w.Reset()
 	}
@@ -106,49 +155,6 @@ func Parse(headerPaths [][]string, indexName string, osConfig opensearch.Config,
 		log.Fatal(err, res.StatusCode)
 	}
 	done <- true
-}
-
-func ParseDirect(headerPaths [][]string, indexName string, osConfig opensearch.Config, lines []string, channelId int) {
-	client, err := opensearch.NewClient(osConfig)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var w = bytes.NewBuffer(nil)
-	var enc = sonic.ConfigDefault.NewEncoder(w)
-
-	outerMap := make(map[string]map[string]string)
-	innerMap1 := make(map[string]string)
-	outerMap["index"] = innerMap1
-
-	for _, line := range lines {
-		fields := strings.Split(line, FIELD_DELIMITER)
-		if len(fields) != len(headerPaths) {
-			log.Fatalf("Fields and headerPaths are not the same length: field length %d != header length %d\n", len(fields), len(headerPaths))
-		}
-
-		nestedMap := buildNestedMap(headerPaths, fields)
-
-		innerMap1["_index"] = indexName
-		// innerMap1["_id"] = strconv.Itoa(id)
-
-		enc.Encode(outerMap)
-		enc.Encode(nestedMap)
-	}
-
-	res, err := client.Bulk(strings.NewReader(w.String()))
-
-	if err != nil || res.IsError() {
-		log.Fatal(err, res.StatusCode)
-	}
-
-	if err != nil || res.IsError() {
-		log.Fatal(err, res.StatusCode)
-	}
-	// fmt.Printf("Channel %d processed from %d to %d\n", channelId, job.Start, id)
-	res.Body.Close()
-
 }
 
 func buildFlatMap(headerFields []string, values []string) map[string]any {

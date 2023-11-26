@@ -24,6 +24,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const EXPECTED_ANNOTATION_FILE_SUFFIX = "annotation.tsv.gz"
+
 type CLIArgs struct {
 	annotationTarballPath  string
 	osIndexConfigPath      string
@@ -275,25 +277,10 @@ func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 	createResp, err := createIndex.Do(context.Background(), client)
 
 	if err != nil || createResp.IsError() {
-		log.Fatalf("Error creating index due to: [%s]\n", err)
+		log.Fatalf("Error creating index due to: [%s], status: [%s]\n", err.Error(), createResp.Status())
 	}
 
-	defer createResp.Body.Close()
-
-	// JSON body to update the index settings
-	body := `{
-        "index.mapping.total_fields.limit": 10000
-    }`
-
-	// Update index settings
-	res, err := client.Indices.PutSettings(
-		strings.NewReader(body),
-		client.Indices.PutSettings.WithIndex(indexName), // Replace with your index name
-	)
-	if err != nil {
-		panic(err)
-	}
-	defer res.Body.Close()
+	createResp.Body.Close()
 
 	return osConfig, client, osearchMapConfig
 }
@@ -396,7 +383,7 @@ func main() {
 		}
 
 		// TODO @akotlar 2023-11-24: Take the expected file name from the information submitted in the beanstalkd queue message
-		if strings.HasSuffix(header.Name, "annotation.tsv.gz") {
+		if strings.HasSuffix(header.Name, EXPECTED_ANNOTATION_FILE_SUFFIX) {
 			b, err = bgzf.NewReader(tarReader, 0)
 			if err != nil {
 				log.Fatal(err)
@@ -410,23 +397,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// file, err := os.Open("/home/ubuntu/bystro/rust/index_annotation/all_chr1_phase3_shapeit2_mvncall_integrated_v5b_20130502_genotypes_vcf.annotation.500klines.tsv.gz")
-
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// defer file.Close()
-
-	// fileStats, err := file.Stat()
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	// b, err := bgzf.NewReader(file, 0)
-
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
 
 	workQueue := make(chan parser.Job)
 	complete := make(chan bool)
@@ -434,11 +404,11 @@ func main() {
 	headerPaths, _ := getHeaderPaths(b)
 
 	if len(headerPaths) == 0 {
-		log.Fatal("No header paths found")
+		log.Fatal("No header found")
 	}
 
 	osConfig, client, osearchMapConfig := createIndex(cliargs.osConnectionConfigPath, cliargs.osIndexConfigPath, cliargs.indexName, fileStats.Size())
-	// client.
+
 	// Spawn threads
 	for i := 0; i < concurrency; i++ {
 		go parser.Parse(headerPaths, indexName, osConfig, workQueue, complete, i)
@@ -449,11 +419,6 @@ func main() {
 
 	chunkStart := 0
 	var lines []string
-
-	// outFh := os.Stdout
-	// writer := bufio.NewWriterSize(outFh, 48*1024*1024)
-
-	// writer.WriteString(strings.Join(header, "\t"))
 
 	for {
 		rawLines, err := readLines(b)
