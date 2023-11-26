@@ -30,7 +30,7 @@ type CLIArgs struct {
 	beanstalkConfigPath    string
 	osConnectionConfigPath string
 	indexName              string
-	allowHTTP              bool
+	jobSubmissionID        string
 }
 
 type OpensearchNode struct {
@@ -111,20 +111,61 @@ func createAddresses(config OpensearchConnectionConfig) []string {
 
 func setup(args []string) *CLIArgs {
 	cliargs := &CLIArgs{}
-	flag.StringVar(&cliargs.annotationTarballPath, "in", "/seqant/user-data/63ddc9ce1e740e0020c39928/6556f106f71022dc49c8e560/output/all_chr1_phase3_shapeit2_mvncall_integrated_v5b_20130502_genotypes_vcf.tar", "The path to the input tarball")
-	flag.StringVar(&cliargs.osIndexConfigPath, "index", "/home/ubuntu/bystro/config/hg19.mapping.yml", "The path to the OpenSearch mapping and index definition (e.g. hg19.mapping.yml)")
-	flag.StringVar(&cliargs.osConnectionConfigPath, "search", "/home/ubuntu/bystro/config/elastic-config2.yml", "The path to the OpenSearch connection config (e.g. config/elasticsearch.yml)")
-	flag.StringVar(&cliargs.beanstalkConfigPath, "queue", "/home/ubuntu/bystro/config/beanstalk.yml", "The path to the Beanstalkd queue connection config (e.g. config/beanstalk.yml)")
-	flag.StringVar(&cliargs.indexName, "name", "test2", "The index name")
-	flag.BoolVar(&cliargs.allowHTTP, "http", false, "Allow http connections (else forces https)")
+	flag.StringVar(&cliargs.annotationTarballPath, "annotation-tarball-path", "", "The path to the input tarball")
+	flag.StringVar(&cliargs.annotationTarballPath, "a", "", "The path to the input tarball (short form)")
+	flag.StringVar(&cliargs.osIndexConfigPath, "mapping-config", "", "The path to the OpenSearch mapping and index definition (e.g. hg19.mapping.yml)")
+	flag.StringVar(&cliargs.osIndexConfigPath, "m", "", "The path to the OpenSearch mapping and index definition (short form)")
+	flag.StringVar(&cliargs.osConnectionConfigPath, "opensearch-config", "", "The path to the OpenSearch connection config (e.g. config/elasticsearch.yml)")
+	flag.StringVar(&cliargs.osConnectionConfigPath, "o", "", "The path to the OpenSearch connection config (short form)")
+	flag.StringVar(&cliargs.beanstalkConfigPath, "queue-config", "", "The path to the Beanstalkd queue connection config (e.g. config/beanstalk.yml)")
+	flag.StringVar(&cliargs.beanstalkConfigPath, "q", "", "The path to the Beanstalkd queue connection config (short form)")
+	flag.StringVar(&cliargs.indexName, "index-name", "", "The index name")
+	flag.StringVar(&cliargs.indexName, "i", "", "The index name (short form)")
+	flag.StringVar(&cliargs.jobSubmissionID, "job-submission-id", "", "The job submission ID")
+	flag.StringVar(&cliargs.jobSubmissionID, "j", "", "The job submission ID (short form)")
 
 	a := os.Args[1:]
 	if args != nil {
 		a = args
 	}
+
 	flag.CommandLine.Parse(a)
 
+	if err := validateArgs(cliargs); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		flag.Usage()
+		os.Exit(1)
+	}
+
 	return cliargs
+}
+
+func validateArgs(args *CLIArgs) error {
+	var missing []string
+	v := *args
+	if v.annotationTarballPath == "" {
+		missing = append(missing, "annotation-tarball-path")
+	}
+	if v.osIndexConfigPath == "" {
+		missing = append(missing, "os-index-config-path")
+	}
+	if v.osConnectionConfigPath == "" {
+		missing = append(missing, "os-connection-config-path")
+	}
+	if v.beanstalkConfigPath == "" {
+		missing = append(missing, "beanstalk-config-path")
+	}
+	if v.indexName == "" {
+		missing = append(missing, "index-name")
+	}
+	if v.jobSubmissionID == "" {
+		missing = append(missing, "job-submission-id")
+	}
+
+	if len(missing) > 0 {
+		return fmt.Errorf("missing required arguments: %s", strings.Join(missing, ", "))
+	}
+	return nil
 }
 
 func getHeaderPaths(b *bgzf.Reader) ([][]string, []string) {
