@@ -2,12 +2,16 @@ package parser
 
 import (
 	"bytes"
+	"context"
 	"log"
 	"strconv"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/bytedance/sonic"
 	"github.com/opensearch-project/opensearch-go/v2"
+	"github.com/opensearch-project/opensearch-go/v2/opensearchutil"
 )
 
 type Job struct {
@@ -32,13 +36,27 @@ func Parse(headerPaths [][]string, indexName string, osConfig opensearch.Config,
 		log.Fatal(err)
 	}
 
-	var w = bytes.NewBuffer(nil)
-	var enc = sonic.ConfigDefault.NewEncoder(w)
+	// var w = bytes.NewBuffer(nil)
+	// var enc = sonic.ConfigDefault.NewEncoder(w)
 
 	outerMap := make(map[string]map[string]string)
 	innerMap1 := make(map[string]string)
 	outerMap["index"] = innerMap1
 
+	bi, err := opensearchutil.NewBulkIndexer(opensearchutil.BulkIndexerConfig{
+		Index:         indexName,        // The default index name
+		Client:        client,           // The Elasticsearch client
+		NumWorkers:    1,                // The number of worker goroutines
+		FlushBytes:    int(1e7),         // The flush threshold in bytes
+		FlushInterval: 30 * time.Second, // The periodic flush interval
+	})
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var countSuccessful uint64 = 0
+	var countFailures uint64 = 0
 	for job := range workQueue {
 		lines := job.Lines
 		id := job.Start - 1
@@ -51,10 +69,10 @@ func Parse(headerPaths [][]string, indexName string, osConfig opensearch.Config,
 			}
 
 			nestedMap := buildNestedMap(headerPaths, fields)
-			// data, err := sonic.Marshal(nestedMap)
-			// if err != nil {
-			// 	log.Fatal(err)
-			// }
+			data, err := sonic.Marshal(nestedMap)
+			if err != nil {
+				log.Fatal(err)
+			}
 
 			// log.Print("data: ", string(data))
 
@@ -68,27 +86,71 @@ func Parse(headerPaths [][]string, indexName string, osConfig opensearch.Config,
 			// 	log.Fatal(err, insertResponse)
 			// }
 
-			innerMap1["_index"] = indexName
-			innerMap1["_id"] = strconv.Itoa(id)
+			// innerMap1["_index"] = indexName
+			// innerMap1["_id"] = strconv.Itoa(id)
 
-			enc.Encode(outerMap)
-			enc.Encode(nestedMap)
+			// enc.Encode(outerMap)
+			// enc.Encode(nestedMap)
+			err = bi.Add(
+				context.Background(),
+				opensearchutil.BulkIndexerItem{
+					// Action field configures the operation to perform (index, create, delete, update)
+					Action: "index",
+
+					// DocumentID is the (optional) document ID
+					DocumentID: strconv.Itoa(id),
+
+					// Body is an `io.Reader` with the payload
+					Body: bytes.NewReader(data),
+
+					// OnSuccess is called for each successful operation
+					OnSuccess: func(ctx context.Context, item opensearchutil.BulkIndexerItem, res opensearchutil.BulkIndexerResponseItem) {
+						atomic.AddUint64(&countSuccessful, 1)
+					},
+
+					// OnFailure is called for each failed operation
+					OnFailure: func(ctx context.Context, item opensearchutil.BulkIndexerItem, res opensearchutil.BulkIndexerResponseItem, err error) {
+						if err != nil {
+							log.Printf("ERROR: %s", err)
+						} else {
+							log.Printf("ERROR: %s: %s", res.Error.Type, res.Error.Reason)
+						}
+						atomic.AddUint64(&countFailures, 1)
+					},
+				},
+			)
+			if err != nil {
+				log.Fatalf("Unexpected error: %s", err)
+			}
 		}
 
 		// bulkIndexRequest := w.String()
 		// // log.Println("bulkIndexRequest: ", bulkIndexRequest)
-		res, err := client.Bulk(strings.NewReader(w.String()))
-		log.Printf("Channel %d processed from %d to %d, res: [%v]\n", channelId, job.Start, id, res)
-		if err != nil || res.IsError() {
-			log.Fatal(err, res.StatusCode)
-		}
+		// res, err := client.Bulk(strings.NewReader(w.String()))
+
+		// if err != nil || res.IsError() {
+		// 	log.Fatal(err, res.StatusCode)
+		// }
+		// log.Printf("Channel %d processed from %d to %d, res: [%v]\n", channelId, job.Start, id, res)
+
+		// bodyRead, err := res.Body.Read
+
+		// fmt.Println("res body", res.Body.Read())
+
+		// // var resJson interface{}
+		// // err = sonic.Unmarshal([]byte(res.String()), resJson)
+		// if err != nil {
+		// 	log.Fatal(err)
+		// }
+
+		// fmt.Println(resJson)
 
 		// if err != nil || res.IsError() {
 		// 	log.Fatal(err, res.StatusCode)
 		// }
 		// fmt.Printf("Channel %d processed from %d to %d\n", channelId, job.Start, id)
-		res.Body.Close()
-		w.Reset()
+		// res.Body.Close()
+		// w.Reset()
 	}
 
 	res, err := client.Indices.Flush(
@@ -104,6 +166,8 @@ func Parse(headerPaths [][]string, indexName string, osConfig opensearch.Config,
 	if err != nil || res.IsError() {
 		log.Fatal(err, res.StatusCode)
 	}
+
+	log.Printf("Channel %d failures: %d", channelId, countFailures)
 	done <- true
 }
 

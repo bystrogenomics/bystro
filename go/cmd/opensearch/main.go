@@ -240,7 +240,7 @@ func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 
 	// JSON body to update the index settings
 	body := `{
-        "index.mapping.total_fields.limit": 10000 
+        "index.mapping.total_fields.limit": 10000
     }`
 
 	// Update index settings
@@ -284,7 +284,7 @@ func readLine(r *bgzf.Reader) ([]byte, error) {
 }
 
 func readLines(b *bgzf.Reader) ([]byte, error) {
-	buf := make([]byte, 64*1024*4) // 4 bgzip blocks at a time
+	buf := make([]byte, 64*1024*8) // 8 bgzip blocks at a time
 
 	tx := b.Begin()
 	defer tx.End()
@@ -328,7 +328,7 @@ func main() {
 	indexName := cliargs.indexName
 
 	// From testing, performance seems maximized at 32 threads for a 4 vCPU AWS instance
-	concurrency := runtime.NumCPU() * 4
+	concurrency := runtime.NumCPU() * 8
 
 	//Open the tar archive
 	// archive, err := os.Open(cliargs.annotationTarballPath)
