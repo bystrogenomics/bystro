@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/tls"
 	"flag"
+	"io/fs"
 	"math"
 	"net/http"
 	"runtime"
@@ -173,7 +174,7 @@ func validateArgs(args *CLIArgs) error {
 func getHeaderPaths(b *bgzf.Reader) ([][]string, []string) {
 	line, err := readLine(b)
 	if err != nil {
-		log.Fatalf("Error reading header line: [%s]\n", err)
+		log.Fatalf("Error reading header line due to: [%s]\n", err.Error())
 	}
 
 	headers := strings.Fields(string(line))
@@ -195,22 +196,22 @@ func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 
 	connectionSettings, err := os.ReadFile(opensearchConnectionConfigPath)
 	if err != nil {
-		log.Fatalf("Couldn't read connection settings due to: [%s]\n", err)
+		log.Fatalf("Couldn't read connection settings due to: [%s]\n", err.Error())
 	}
 
 	err = yaml.Unmarshal(connectionSettings, &osearchConnConfig)
 	if err != nil {
-		log.Fatalf("Failed to unmarshal search configuration: [%s]\n", err)
+		log.Fatalf("Failed to unmarshal search configuration: [%s]\n", err.Error())
 	}
 
 	indexConfig, err := os.ReadFile(opensearchIndexConfigPath)
 	if err != nil {
-		log.Fatalf("Couldn't read index configuration due to: [%s]\n", err)
+		log.Fatalf("Couldn't read index configuration due to: [%s]\n", err.Error())
 	}
 
 	err = yaml.Unmarshal(indexConfig, &osearchMapConfig)
 	if err != nil {
-		log.Fatalf("Unmarshal failed due to: [%s]\n", err)
+		log.Fatalf("Unmarshal failed due to: [%s]\n", err.Error())
 	}
 
 	_, ok := osearchMapConfig.Settings["index"]["number_of_shards"]
@@ -223,12 +224,12 @@ func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 	settings := osearchMapConfig.Settings
 	indexSettings, err := sonic.Marshal(settings)
 	if err != nil {
-		log.Fatalf("Marshaling failed of index settings due to: [%s]\n", err)
+		log.Fatalf("Marshaling failed of index settings due to: [%s]\n", err.Error())
 	}
 
 	indexMapping, err := sonic.Marshal(osearchMapConfig.Mappings)
 	if err != nil {
-		log.Fatalf("Marshaling failed of mappings failed due to: [%s]\n", err)
+		log.Fatalf("Marshaling failed of mappings failed due to: [%s]\n", err.Error())
 	}
 
 	requestBody := fmt.Sprintf(`{
@@ -252,7 +253,7 @@ func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 	}.Do(context.Background(), client)
 
 	if err != nil {
-		log.Fatalf("Error deleting index due to: [%s]\n", err)
+		log.Fatalf("Error deleting index due to: [%s]\n", err.Error())
 	}
 
 	defer resp.Body.Close()
@@ -265,7 +266,7 @@ func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 		deleteIndexResponse, err := deleteIndex.Do(context.Background(), client)
 
 		if err != nil || deleteIndexResponse.IsError() {
-			log.Fatalf("Error deleting index due to: [%s]\n", err)
+			log.Fatalf("Error deleting index due to: [%s]\n", err.Error())
 		}
 	}
 
@@ -355,20 +356,11 @@ func TestUse(bConfig BeanstalkdConfig) {
 	// }
 }
 
-func main() {
-	cliargs := setup(nil)
-
-	indexName := cliargs.indexName
-
-	// From testing, performance seems maximized at 32 threads for a 4 vCPU AWS instance
-	concurrency := runtime.NumCPU() * 8
-
-	//Open the tar archive
-	archive, err := os.Open(cliargs.annotationTarballPath)
+func getAnnotationFhFromTarArchive(archive *os.File) (*bgzf.Reader, fs.FileInfo, error) {
+	fileStats, err := archive.Stat()
 	if err != nil {
-		log.Fatal(err)
+		return nil, nil, err
 	}
-	defer archive.Close()
 
 	tarReader := tar.NewReader(archive)
 
@@ -379,29 +371,46 @@ func main() {
 			if err == io.EOF {
 				break // End of archive
 			}
-			log.Fatal(err) // Handle other errors
+			return nil, nil, err
 		}
 
 		// TODO @akotlar 2023-11-24: Take the expected file name from the information submitted in the beanstalkd queue message
 		if strings.HasSuffix(header.Name, EXPECTED_ANNOTATION_FILE_SUFFIX) {
 			b, err = bgzf.NewReader(tarReader, 0)
 			if err != nil {
-				log.Fatal(err)
+				return nil, nil, err
 			}
 			break
 		}
 	}
 
-	// TODO @akotlar 2023-11-24: Get the file size of just the file being indexed; though the tar archive is about the same size as the file, it's not exactly the same
-	fileStats, err := archive.Stat()
-	if err != nil {
-		log.Fatal(err)
-	}
+	return b, fileStats, err
+}
+
+func main() {
+	cliargs := setup(nil)
+
+	indexName := cliargs.indexName
+
+	// From testing, performance seems maximized at 32 threads for a 4 vCPU AWS instance
+	concurrency := runtime.NumCPU() * 8
 
 	workQueue := make(chan parser.Job)
 	complete := make(chan bool)
 
-	headerPaths, _ := getHeaderPaths(b)
+	archive, err := os.Open(cliargs.annotationTarballPath)
+	if err != nil {
+		log.Fatalf("Couldn't open tarball due to: [%s]\n", err.Error())
+	}
+	defer archive.Close()
+
+	reader, fileStats, err := getAnnotationFhFromTarArchive(archive)
+
+	if err != nil {
+		log.Fatalf("Couldn't get annotation file handle due to: [%s]\n", err.Error())
+	}
+
+	headerPaths, _ := getHeaderPaths(reader)
 
 	if len(headerPaths) == 0 {
 		log.Fatal("No header found")
@@ -421,8 +430,7 @@ func main() {
 	var lines []string
 
 	for {
-		rawLines, err := readLines(b)
-		// line, err := readLine(b)
+		rawLines, err := readLines(reader)
 
 		if len(rawLines) > 0 {
 			lines = strings.Split(string(rawLines), parser.LINE_DELIMITER)
@@ -437,13 +445,8 @@ func main() {
 				}
 				break
 			}
-			log.Fatal(err)
+			log.Fatalf("Error reading lines: [%s]\n", err.Error())
 		}
-
-		// lines = strings.Split(string(rawLines), parser.LINE_DELIMITER)
-		// lines = append(lines, string(line))
-		// go parser.ParseDirect(headerPaths, indexName, osConfig, lines, 0)
-		// workQueue <- parser.Job{Lines: lines, Start: chunkStart}
 
 		if len(lines) > 0 {
 			workQueue <- parser.Job{Lines: lines, Start: chunkStart}
@@ -452,13 +455,6 @@ func main() {
 			lines = nil
 		}
 	}
-
-	// if len(lines) > 0 {
-	// 	fmt.Println(strings.Join(lines, "\n"))
-
-	// 	chunkStart += len(lines)
-	// 	lines = nil
-	// }
 
 	// Indicate to all processing threads that no more work remains
 	close(workQueue)
@@ -473,7 +469,7 @@ func main() {
 	postIndexSettings, err := sonic.Marshal(osearchMapConfig.PostIndexSettings)
 
 	if err != nil {
-		log.Fatalf("Marshaling failed of post index settings: [%s]\n", err)
+		log.Fatalf("Marshaling failed of post index settings: [%s]\n", err.Error())
 	}
 
 	postIndexRequestBody := fmt.Sprintf(`{
@@ -487,7 +483,7 @@ func main() {
 
 	res, err := req.Do(context.Background(), client)
 	if err != nil {
-		log.Fatalf("Error updating index settings: [%s]\n", err)
+		log.Fatalf("Error updating index settings: [%s]\n", err.Error())
 	}
 	defer res.Body.Close()
 

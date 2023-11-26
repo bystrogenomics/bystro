@@ -43,25 +43,19 @@ type ErrorField struct {
 }
 
 func parseBulkResponse(responseBody io.ReadCloser) string {
-	// var bulkResponse BulkResponse
-	// err := sonic.Unmarshal(responseBody, &bulkResponse)
-	// if err != nil {
-	// 	log.Fatalf("Error unmarshalling the JSON response: %s", err)
-	// }
-
 	res, err := io.ReadAll(responseBody)
 	if err != nil {
-		log.Fatalf("Error reading the response body: %s", err)
+		log.Fatalf("Error reading the response body due to: %s", err.Error())
 	}
 
 	// return bulkResponse
 	var bulkResp BulkResponse
 	err = sonic.Unmarshal(res, &bulkResp)
 	if err != nil {
-		log.Fatalf("Error reading the response body: %s", err)
+		log.Fatalf("Error reading the response body due to: %s", err.Error())
 	}
 
-	// According to opensearch API documentation, the top-level errors function will always be true
+	// According to OpenSearch API documentation, the top-level errors function will always be true
 	// if any document request in the bulk request had an error
 	// https://opensearch.org/docs/latest/api-reference/document-apis/bulk/
 	if !bulkResp.Errors {
@@ -95,7 +89,7 @@ func Parse(headerPaths [][]string, indexName string, osConfig opensearch.Config,
 	client, err := opensearch.NewClient(osConfig)
 
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error creating the client due to: %s", err.Error())
 	}
 
 	var w = bytes.NewBuffer(nil)
