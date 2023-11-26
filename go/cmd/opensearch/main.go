@@ -111,8 +111,8 @@ func createAddresses(config OpensearchConnectionConfig) []string {
 
 func setup(args []string) *CLIArgs {
 	cliargs := &CLIArgs{}
-	flag.StringVar(&cliargs.annotationTarballPath, "annotation-tarball-path", "", "The path to the input tarball")
-	flag.StringVar(&cliargs.annotationTarballPath, "a", "", "The path to the input tarball (short form)")
+	flag.StringVar(&cliargs.annotationTarballPath, "tarball-path", "", "The path to the input tarball")
+	flag.StringVar(&cliargs.annotationTarballPath, "t", "", "The path to the input tarball (short form)")
 	flag.StringVar(&cliargs.osIndexConfigPath, "mapping-config", "", "The path to the OpenSearch mapping and index definition (e.g. hg19.mapping.yml)")
 	flag.StringVar(&cliargs.osIndexConfigPath, "m", "", "The path to the OpenSearch mapping and index definition (short form)")
 	flag.StringVar(&cliargs.osConnectionConfigPath, "opensearch-config", "", "The path to the OpenSearch connection config (e.g. config/elasticsearch.yml)")
