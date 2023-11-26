@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/tar"
 	"bystro/pkg/parser"
 	"context"
 	"crypto/tls"
@@ -291,6 +292,10 @@ func readLines(b *bgzf.Reader) ([]byte, error) {
 
 	bytesRead, err := b.Read(buf)
 
+	if bytesRead == 0 {
+		return nil, err
+	}
+
 	if buf[bytesRead-1] != '\n' {
 		remainder, err := _readLine(b)
 		return append(buf[:bytesRead], remainder...), err
@@ -331,56 +336,56 @@ func main() {
 	concurrency := runtime.NumCPU() * 8
 
 	//Open the tar archive
-	// archive, err := os.Open(cliargs.annotationTarballPath)
+	archive, err := os.Open(cliargs.annotationTarballPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer archive.Close()
+
+	tarReader := tar.NewReader(archive)
+
+	var b *bgzf.Reader
+	for {
+		header, err := tarReader.Next()
+		if err != nil {
+			if err == io.EOF {
+				break // End of archive
+			}
+			log.Fatal(err) // Handle other errors
+		}
+
+		// TODO @akotlar 2023-11-24: Take the expected file name from the information submitted in the beanstalkd queue message
+		if strings.HasSuffix(header.Name, "annotation.tsv.gz") {
+			b, err = bgzf.NewReader(tarReader, 0)
+			if err != nil {
+				log.Fatal(err)
+			}
+			break
+		}
+	}
+
+	// TODO @akotlar 2023-11-24: Get the file size of just the file being indexed; though the tar archive is about the same size as the file, it's not exactly the same
+	fileStats, err := archive.Stat()
+	if err != nil {
+		log.Fatal(err)
+	}
+	// file, err := os.Open("/home/ubuntu/bystro/rust/index_annotation/all_chr1_phase3_shapeit2_mvncall_integrated_v5b_20130502_genotypes_vcf.annotation.500klines.tsv.gz")
+
 	// if err != nil {
 	// 	log.Fatal(err)
 	// }
-	// defer archive.Close()
+	// defer file.Close()
 
-	// tarReader := tar.NewReader(archive)
-
-	// var b *bgzf.Reader
-	// for {
-	// 	header, err := tarReader.Next()
-	// 	if err != nil {
-	// 		if err == io.EOF {
-	// 			break // End of archive
-	// 		}
-	// 		log.Fatal(err) // Handle other errors
-	// 	}
-
-	// 	// TODO @akotlar 2023-11-24: Take the expected file name from the information submitted in the beanstalkd queue message
-	// 	if strings.HasSuffix(header.Name, "annotation.tsv.gz") {
-	// 		b, err = bgzf.NewReader(tarReader, 0)
-	// 		if err != nil {
-	// 			log.Fatal(err)
-	// 		}
-	// 		break
-	// 	}
-	// }
-
-	// // TODO @akotlar 2023-11-24: Get the file size of just the file being indexed; though the tar archive is about the same size as the file, it's not exactly the same
-	// fileStats, err := archive.Stat()
+	// fileStats, err := file.Stat()
 	// if err != nil {
 	// 	log.Fatal(err)
 	// }
-	file, err := os.Open("/home/ubuntu/bystro/rust/index_annotation/all_chr1_phase3_shapeit2_mvncall_integrated_v5b_20130502_genotypes_vcf.annotation.500klines.tsv.gz")
 
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
+	// b, err := bgzf.NewReader(file, 0)
 
-	fileStats, err := file.Stat()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	b, err := bgzf.NewReader(file, 0)
-
-	if err != nil {
-		log.Fatal(err)
-	}
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
 	workQueue := make(chan parser.Job)
 	complete := make(chan bool)
@@ -436,7 +441,6 @@ func main() {
 
 		if len(lines) > 0 {
 			workQueue <- parser.Job{Lines: lines, Start: chunkStart}
-			// fmt.Println(strings.Join(lines, "\n"))
 
 			chunkStart += len(lines)
 			lines = nil

@@ -1,7 +1,7 @@
 # Bystro Perl package
 
 
-## Installing Bystro using docker
+## Installing Bystro using Docker
 
 To build a docker image using the `Dockerfile`, run the following:
 
@@ -9,9 +9,11 @@ To build a docker image using the `Dockerfile`, run the following:
 docker build --tag bystro-cli .
 ```
 
-## Installing Bystro using `cpam`
+## Installing `cpm`
 
-The instructions for installing Bystro locally uses [`cpanm`](https://metacpan.org/pod/App::cpanminus).
+The instructions for installing Bystro locally uses `cpm`. To install it, run `curl -fsSL https://raw.githubusercontent.com/skaji/cpm/main/cpm | sudo perl - install -g App::cpm`.
+
+## Installing Bystro locally without Dist::Zilla
 
 Assuming that you've cloned the repository and are working on it locally, then the dependencies can mostly be installed with cpanm.
 But there are a few one-off dependencies that require a slightly modified approach.
@@ -19,23 +21,24 @@ But there are a few one-off dependencies that require a slightly modified approa
 One-off dependencies can be installed as follows:
 
 ```bash
-cpanm --quiet https://github.com/bystrogenomics/msgpack-perl.git
-cpanm --quiet --notest MouseX::Getopt
+cpm install https://github.com/bystrogenomics/msgpack-perl.git
+cpm install --no-test MouseX::Getopt
 git clone --depth 1 --recurse-submodules https://github.com/salortiz/LMDB_File.git \
   && cd LMDB_File \
-  && cpanm --quiet . \
+  && git reset --hard 328a572c5db9c8edfa40e7269bd8d1fdf738b377 && git clean -df \
+  && perl Makefile.PL && make && make test && make install \
   && cd .. \
   && rm -rf LMDB_File
 # NOTE: you will need mysql_config to install this
 #       ubuntu 22.04 LTS => sudo apt install -y libmariadb-dev libmariadb-dev-compat
 #       amazon 2023 => sudo yum install -y <mariadb105>
-cpanm --quiet DBD::mysql@4.051
+cpm install DBD::mysql@4.051
 ```
 
 The remaining dependencies are installed like this:
 
 ```bash
-cpanm --installdeps .
+cpm --installdeps .
 ```
 
 After installing dependencies, use `prove -lr t` to run tests.
@@ -47,13 +50,13 @@ This approach requires installing `Dist::Zilla` and author dependencies and one 
 
 ```bash
 # Install Dist::Zilla and Archive::Tar::Wrapper (to slightly speed up building)
-cpanm --quiet Dist::Zilla Archive::Tar::Wrapper
+cpm --quiet Dist::Zilla Archive::Tar::Wrapper
 
 # Install build dependencies
-dzil authordeps --missing | cpanm --quiet
+dzil authordeps --missing | cpm --quiet
 
 # Install Bystro dependencies
-dzil listdeps --missing | cpanm --quiet
+dzil listdeps --missing | cpm --quiet
 
 # Install Bystro
 dzil install
@@ -65,7 +68,7 @@ Install [cpm](https://metacpan.org/pod/App::cpm) with `curl -fsSL https://raw.gi
 
 ```bash
 # install msgpack fork
-cpm https://github.com/bystrogenomics/msgpack-perl.git
+cpm install https://github.com/bystrogenomics/msgpack-perl.git
 
 # install MouseX::Getopt despite some tests failing
 cpm --no-test MouseX::Getopt
