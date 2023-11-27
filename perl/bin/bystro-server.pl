@@ -30,10 +30,10 @@ use Path::Tiny qw/path/;
 my ( $verbose, $queueConfigPath, $maxThreads, $debug );
 
 GetOptions(
-  'v|verbose=i'          => \$verbose,
-  'd|debug'              => \$debug,
-  'q|queueConfig=s'      => \$queueConfigPath,
-  'maxThreads=i'         => \$maxThreads,
+  'v|verbose=i'     => \$verbose,
+  'd|debug'         => \$debug,
+  'q|queueConfig=s' => \$queueConfigPath,
+  'maxThreads=i'    => \$maxThreads,
 );
 
 if ( !($queueConfigPath) ) {
