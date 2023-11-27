@@ -11,7 +11,7 @@ from bystro.search.save.hwe import HWEFilter
 
 
 class IndexJobData(BaseMessage, frozen=True):
-    """Data for SaveFromQuery jobs received from beanstalkd"""
+    """Data for Indexing jobs received from beanstalkd"""
 
     inputDir: str
     inputFileNames: AnnotationOutputs

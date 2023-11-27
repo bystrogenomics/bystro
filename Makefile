@@ -4,6 +4,7 @@ build:
 	cd python && maturin build --release && cd ../
 
 develop:
+	cd go/cmd/opensearch && go build && cd ../../../
 	cd python && maturin develop && cd ../
 
 # Ray must be started with make serve-dev

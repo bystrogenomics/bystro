@@ -2,7 +2,7 @@
 # Follow https://docs.conda.io/en/latest/miniconda.html to install miniconda
 # Call this using "source .initialize_conda_env.sh"
 # Ray 2.4.0 on Mac OS (arm64) does not have stable 3.11 support, see https://docs.ray.io/en/latest/ray-overview/installation.html
-version="3.10.11"
+version="3.11"
 
 source $(conda info --base)/etc/profile.d/conda.sh ; conda activate ; conda activate
 
