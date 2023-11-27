@@ -36,6 +36,8 @@ type CLIArgs struct {
 	osConnectionConfigPath string
 	indexName              string
 	jobSubmissionID        string
+	noBeanstalkd           bool
+	progressFrequency      int
 }
 
 type OpensearchNode struct {
@@ -125,6 +127,10 @@ func setup(args []string) *CLIArgs {
 	flag.StringVar(&cliargs.indexName, "i", "", "The index name (short form)")
 	flag.StringVar(&cliargs.jobSubmissionID, "job-submission-id", "", "The job submission ID")
 	flag.StringVar(&cliargs.jobSubmissionID, "j", "", "The job submission ID (short form)")
+	flag.BoolVar(&cliargs.noBeanstalkd, "no-beanstalkd", false, "Disable beanstalkd progress events")
+	flag.BoolVar(&cliargs.noBeanstalkd, "n", false, "Disable beanstalkd progress events (short form)")
+	flag.IntVar(&cliargs.progressFrequency, "progress-frequency", 5e3, "Print progress every N variants processed")
+	flag.IntVar(&cliargs.progressFrequency, "p", 5e3, "Print progress every N variants processed (short form)")
 
 	a := os.Args[1:]
 	if args != nil {
@@ -379,7 +385,12 @@ func getAnnotationFhFromTarArchive(archive *os.File) (*bgzf.Reader, fs.FileInfo,
 	return b, fileStats, err
 }
 
-func sendEvent(message ProgressMessage, eventTube *beanstalk.Tube) {
+func sendEvent(message ProgressMessage, eventTube *beanstalk.Tube, noBeanstalkd bool) {
+	if noBeanstalkd {
+		fmt.Printf("Indexed %d annotated variants\n", message.Data.Progress)
+		return
+	}
+
 	messageJson, err := sonic.Marshal(message)
 	if err != nil {
 		log.Fatalf("Marshaling failed of progress message: [%s]\n", err.Error())
@@ -447,8 +458,7 @@ func main() {
 		},
 	}
 
-	go sendEvent(message, eventTube)
-
+	progressUpdate := 0
 	chunkStart := 0
 	var lines []string
 
@@ -467,7 +477,7 @@ func main() {
 					lines = nil
 
 					message.Data.Progress = chunkStart
-					sendEvent(message, eventTube)
+					sendEvent(message, eventTube, cliargs.noBeanstalkd)
 				}
 				break
 			}
@@ -478,12 +488,14 @@ func main() {
 			workQueue <- parser.Job{Lines: lines, Start: chunkStart}
 
 			chunkStart += len(lines)
+			progressUpdate += len(lines)
 			lines = nil
 		}
 
-		if chunkStart%5e3 == 0 {
+		if progressUpdate >= cliargs.progressFrequency {
 			message.Data.Progress = chunkStart
-			sendEvent(message, eventTube)
+			go sendEvent(message, eventTube, cliargs.noBeanstalkd)
+			progressUpdate = 0
 		}
 	}
 
@@ -496,7 +508,7 @@ func main() {
 	}
 
 	message.Data.Progress = chunkStart
-	sendEvent(message, eventTube)
+	sendEvent(message, eventTube, cliargs.noBeanstalkd)
 
 	fmt.Printf("Indexed %d lines\n", chunkStart)
 
