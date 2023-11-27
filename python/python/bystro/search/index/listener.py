@@ -3,7 +3,6 @@
     and indexes submitted data in Opensearch
 """
 import argparse
-import asyncio
 import os
 import subprocess
 
@@ -14,6 +13,8 @@ from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, listen
 from bystro.search.utils.annotation import get_config_file_path
 from bystro.search.utils.messages import IndexJobCompleteMessage, IndexJobData, IndexJobResults
 from bystro.utils.config import _get_bystro_project_root
+
+from msgspec import json
 
 TUBE = "index"
 
@@ -40,7 +41,7 @@ def get_go_handler_binary_path() -> str:
     return _GO_HANDLER_BINARY_PATH
 
 
-def run_binary_with_args(binary_path, args):
+def run_binary_with_args(binary_path: str, args: list[str]) -> list[str]:
     """
     Run the binary with specified arguments and handle errors.
     :param binary_path: Path to the binary file.
@@ -51,12 +52,15 @@ def run_binary_with_args(binary_path, args):
     command = [binary_path] + args
 
     # Run the command and capture stderr
-    process = subprocess.Popen(command, stderr=subprocess.PIPE)
-    _, stderr = process.communicate()
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = process.communicate()
 
-    # Check for errors
     if process.returncode != 0 or stderr:
         raise Exception(f"Binary execution failed: {stderr.decode('utf-8')}")
+
+    headerFieldsStr = stdout.decode("utf-8")
+
+    return json.decode(headerFieldsStr, type=list[str])
 
 
 def main():
@@ -89,7 +93,7 @@ def main():
     with open(args.queue_conf, "r", encoding="utf-8") as queue_config_file:
         queue_conf_deserialized = YAML(typ="safe").load(queue_config_file)
 
-    def handler_fn(_: ProgressPublisher, beanstalkd_job_data: IndexJobData):
+    def handler_fn(_: ProgressPublisher, beanstalkd_job_data: IndexJobData) -> list[str]:
         inputs = beanstalkd_job_data.inputFileNames
 
         if not inputs.archived:
@@ -114,10 +118,10 @@ def main():
             tar_path,
         ]
 
-        try:
-            run_binary_with_args(binary_path, args)
-        except Exception as e:
-            print(f"Error: {e}")
+        header_fields = run_binary_with_args(binary_path, args)
+
+        return header_fields
+
 
     def submit_msg_fn(job_data: IndexJobData):
         return SubmittedJobMessage(job_data.submissionID)

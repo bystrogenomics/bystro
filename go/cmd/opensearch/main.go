@@ -69,14 +69,14 @@ type OpensearchMappingConfig struct {
 }
 
 type ProgressData struct {
-	Progress int
-	Skipped  int
+	Progress int `json:"progress"`
+	Skipped  int `json:"skipped"`
 }
 
 type ProgressMessage struct {
-	SubmissionID string
-	Data         ProgressData
-	Event        string
+	SubmissionID string       `json:"submissionID"`
+	Data         ProgressData `json:"data"`
+	Event        string       `json:"event"`
 }
 
 // Expected beanstalkd format
@@ -396,8 +396,6 @@ func sendEvent(message ProgressMessage, eventTube *beanstalk.Tube, noBeanstalkd 
 		log.Fatalf("Marshaling failed of progress message: [%s]\n", err.Error())
 	}
 
-	fmt.Printf("\nmessageJson: %s of len: %d\n", string(messageJson), len(string(messageJson)))
-
 	eventTube.Put(messageJson, 0, 0, 0)
 }
 
@@ -429,7 +427,7 @@ func main() {
 		log.Fatalf("Couldn't get annotation file handle due to: [%s]\n", err.Error())
 	}
 
-	headerPaths, _ := getHeaderPaths(reader)
+	headerPaths, headerFields := getHeaderPaths(reader)
 
 	if len(headerPaths) == 0 {
 		log.Fatal("No header found")
@@ -510,8 +508,6 @@ func main() {
 	message.Data.Progress = chunkStart
 	sendEvent(message, eventTube, cliargs.noBeanstalkd)
 
-	fmt.Printf("Indexed %d lines\n", chunkStart)
-
 	postIndexSettings, err := sonic.Marshal(osearchMapConfig.PostIndexSettings)
 
 	if err != nil {
@@ -546,4 +542,11 @@ func main() {
 	}
 
 	refreshRes.Body.Close()
+
+	marshalledHeaderFields, err := sonic.Marshal(headerFields)
+	if err != nil {
+		log.Fatalf("Marshaling failed of header fields: [%s]\n", err.Error())
+	}
+
+	fmt.Print(string(marshalledHeaderFields))
 }
