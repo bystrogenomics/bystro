@@ -1,7 +1,7 @@
 # Bystro Perl package
 
 
-## Installing Bystro using Docker
+## Installing Bystro using docker
 
 To build a docker image using the `Dockerfile`, run the following:
 
@@ -9,11 +9,9 @@ To build a docker image using the `Dockerfile`, run the following:
 docker build --tag bystro-cli .
 ```
 
-## Installing `cpm`
+## Installing Bystro using `cpam`
 
-The instructions for installing Bystro locally uses `cpm`. To install it, run `curl -fsSL https://raw.githubusercontent.com/skaji/cpm/main/cpm | sudo perl - install -g App::cpm`.
-
-## Installing Bystro locally without Dist::Zilla
+The instructions for installing Bystro locally uses [`cpanm`](https://metacpan.org/pod/App::cpanminus).
 
 Assuming that you've cloned the repository and are working on it locally, then the dependencies can mostly be installed with cpanm.
 But there are a few one-off dependencies that require a slightly modified approach.
@@ -21,24 +19,23 @@ But there are a few one-off dependencies that require a slightly modified approa
 One-off dependencies can be installed as follows:
 
 ```bash
-cpm install https://github.com/bystrogenomics/msgpack-perl.git
-cpm install --no-test MouseX::Getopt
+cpanm --quiet https://github.com/bystrogenomics/msgpack-perl.git
+cpanm --quiet --notest MouseX::Getopt
 git clone --depth 1 --recurse-submodules https://github.com/salortiz/LMDB_File.git \
   && cd LMDB_File \
-  && git reset --hard 328a572c5db9c8edfa40e7269bd8d1fdf738b377 && git clean -df \
-  && perl Makefile.PL && make && make test && make install \
+  && cpanm --quiet . \
   && cd .. \
   && rm -rf LMDB_File
 # NOTE: you will need mysql_config to install this
 #       ubuntu 22.04 LTS => sudo apt install -y libmariadb-dev libmariadb-dev-compat
 #       amazon 2023 => sudo yum install -y <mariadb105>
-cpm install DBD::mysql@4.051
+cpanm --quiet DBD::mysql@4.051
 ```
 
 The remaining dependencies are installed like this:
 
 ```bash
-cpm --installdeps .
+cpanm --installdeps .
 ```
 
 After installing dependencies, use `prove -lr t` to run tests.
@@ -50,13 +47,13 @@ This approach requires installing `Dist::Zilla` and author dependencies and one 
 
 ```bash
 # Install Dist::Zilla and Archive::Tar::Wrapper (to slightly speed up building)
-cpm --quiet Dist::Zilla Archive::Tar::Wrapper
+cpanm --quiet Dist::Zilla Archive::Tar::Wrapper
 
 # Install build dependencies
-dzil authordeps --missing | cpm --quiet
+dzil authordeps --missing | cpanm --quiet
 
 # Install Bystro dependencies
-dzil listdeps --missing | cpm --quiet
+dzil listdeps --missing | cpanm --quiet
 
 # Install Bystro
 dzil install
@@ -71,7 +68,7 @@ Install [cpm](https://metacpan.org/pod/App::cpm) with `curl -fsSL https://raw.gi
 cpm install https://github.com/bystrogenomics/msgpack-perl.git
 
 # install MouseX::Getopt despite some tests failing
-cpm --no-test MouseX::Getopt
+cpm install --no-test MouseX::Getopt
 
 # install LMDB_File that comes with latest LMDB
 # NOTE: you will need mysql_config to install this
@@ -84,7 +81,7 @@ git clone --depth 1 --recurse-submodules https://github.com/salortiz/LMDB_File.g
   && rm -rf LMDB_File
 
 # install mysql driver
-cpm DBD::mysql@4.051
+cpm install DBD::mysql@4.051
 
 # clone bystro and change into perl package
 git clone git@github.com:bystrogenomics/bystro.git && cd bystro/perl
