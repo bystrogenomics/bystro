@@ -6,7 +6,7 @@
 # TODO 2023-05-08: get max_slices from opensearch index settings
 # TODO 2023-05-08: concatenate chunks in a different ray worker
 
-import gzip
+from Bio import bgzf
 import logging
 import math
 import os
@@ -189,7 +189,7 @@ def _process_query(
         return -1
 
     try:
-        with gzip.open(chunk_output_name, "wb") as fw:
+        with bgzf.BgzfWriter(chunk_output_name, "wb") as fw:
             fw.write(_make_output_string(rows, delimiters))  # type: ignore
         reporter.increment.remote(resp["hits"]["total"]["value"])
     except Exception:
@@ -232,7 +232,7 @@ def go(  # pylint:disable=invalid-name
     written_chunks = [os.path.join(output_dir, f"{job_data.indexName}_header")]
 
     header = bytes("\t".join(job_data.fieldNames) + "\n", encoding="utf-8")
-    with gzip.open(written_chunks[-1], "wb") as fw:
+    with bgzf.BgzfWriter(written_chunks[-1], "wb") as fw:
         fw.write(header)  # type: ignore
 
     search_client_args = gather_opensearch_args(search_conf)
