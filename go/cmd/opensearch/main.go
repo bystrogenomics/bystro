@@ -18,6 +18,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/beanstalkd/go-beanstalk"
 	"github.com/biogo/hts/bgzf"
 	"github.com/bytedance/sonic"
 	opensearch "github.com/opensearch-project/opensearch-go/v2"
@@ -26,6 +27,7 @@ import (
 )
 
 const EXPECTED_ANNOTATION_FILE_SUFFIX = "annotation.tsv.gz"
+const PROGRESS_EVENT = "progress"
 
 type CLIArgs struct {
 	annotationTarballPath  string
@@ -65,21 +67,14 @@ type OpensearchMappingConfig struct {
 }
 
 type ProgressData struct {
-	progress int
-	skipped  int
+	Progress int
+	Skipped  int
 }
 
 type ProgressMessage struct {
-	submissionID string
-	data         ProgressData
-	event        string `default:"progress"`
-}
-
-type ProgressPublisher struct {
-	host    string
-	port    int
-	queue   string
-	message ProgressMessage
+	SubmissionID string
+	Data         ProgressData
+	Event        string
 }
 
 // Expected beanstalkd format
@@ -99,6 +94,10 @@ type BeanstalkdConfig struct {
 			Events     string `yaml:"events"`
 		} `yaml:"index"`
 	} `yaml:"tubes"`
+}
+
+type BeanstalkdYAML struct {
+	Beanstalkd BeanstalkdConfig `yaml:"beanstalkd"`
 }
 
 func createAddresses(config OpensearchConnectionConfig) []string {
@@ -286,6 +285,22 @@ func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 	return osConfig, client, osearchMapConfig
 }
 
+func createBeanstalkdConfig(beanstalkConfigPath string) (BeanstalkdConfig, error) {
+	var bConfig BeanstalkdYAML
+
+	beanstalkConfig, err := os.ReadFile(beanstalkConfigPath)
+	if err != nil {
+		return BeanstalkdConfig{}, err
+	}
+
+	err = yaml.Unmarshal(beanstalkConfig, &bConfig)
+	if err != nil {
+		return BeanstalkdConfig{}, err
+	}
+
+	return bConfig.Beanstalkd, nil
+}
+
 // Read a line up to the next newline character, and return the line excluding the newline character
 func _readLine(r *bgzf.Reader) ([]byte, error) {
 	var (
@@ -333,29 +348,6 @@ func readLines(b *bgzf.Reader) ([]byte, error) {
 	return buf[:bytesRead-1], err
 }
 
-func TestUse(bConfig BeanstalkdConfig) {
-	// c, err := beanstalk.Dial("tcp", "127.0.0.1:11300")
-	// func Dial(network, addr string) (*Conn, error) {
-	// 	return DialTimeout(network, addr, DefaultDialTimeout)
-	// }
-
-	// c := NewConn(mock(
-	// 	"use foo\r\nput 0 0 0 5\r\nhello\r\n",
-	// 	"USING foo\r\nINSERTED 1\r\n",
-	// ))
-	// tube := NewTube(c, "foo")
-	// id, err := tube.Put([]byte("hello"), 0, 0, 0)
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
-	// if id != 1 {
-	// 	t.Fatal("expected 1, got", id)
-	// }
-	// if err = c.Close(); err != nil {
-	// 	t.Fatal(err)
-	// }
-}
-
 func getAnnotationFhFromTarArchive(archive *os.File) (*bgzf.Reader, fs.FileInfo, error) {
 	fileStats, err := archive.Stat()
 	if err != nil {
@@ -387,8 +379,24 @@ func getAnnotationFhFromTarArchive(archive *os.File) (*bgzf.Reader, fs.FileInfo,
 	return b, fileStats, err
 }
 
+func sendEvent(message ProgressMessage, eventTube *beanstalk.Tube) {
+	messageJson, err := sonic.Marshal(message)
+	if err != nil {
+		log.Fatalf("Marshaling failed of progress message: [%s]\n", err.Error())
+	}
+
+	fmt.Printf("\nmessageJson: %s of len: %d\n", string(messageJson), len(string(messageJson)))
+
+	eventTube.Put(messageJson, 0, 0, 0)
+}
+
 func main() {
 	cliargs := setup(nil)
+
+	beanstalkdConfig, err := createBeanstalkdConfig(cliargs.beanstalkConfigPath)
+	if err != nil {
+		log.Fatalf("Couldn't create beanstalkd config due to: [%s]\n", err.Error())
+	}
 
 	indexName := cliargs.indexName
 
@@ -423,8 +431,23 @@ func main() {
 		go parser.Parse(headerPaths, indexName, osConfig, workQueue, complete, i)
 	}
 
-	// c, err := beanstalk.Dial("tcp", "127.0.0.1:11300")
-	// id, err := c.Put([]byte("hello"), 1, 0, 120*time.Second)
+	beanstalkConnection, err := beanstalk.Dial("tcp", beanstalkdConfig.Addresses[0])
+	if err != nil {
+		log.Fatalf("Couldn't connect to beanstalkd due to: [%s]\n", err.Error())
+	}
+	defer beanstalkConnection.Close()
+	eventTube := beanstalk.NewTube(beanstalkConnection, beanstalkdConfig.Tubes.Index.Events)
+
+	message := ProgressMessage{
+		SubmissionID: cliargs.jobSubmissionID,
+		Event:        PROGRESS_EVENT,
+		Data: ProgressData{
+			Progress: 0,
+			Skipped:  0,
+		},
+	}
+
+	go sendEvent(message, eventTube)
 
 	chunkStart := 0
 	var lines []string
@@ -442,6 +465,9 @@ func main() {
 					workQueue <- parser.Job{Lines: lines, Start: chunkStart}
 					chunkStart += len(lines)
 					lines = nil
+
+					message.Data.Progress = chunkStart
+					sendEvent(message, eventTube)
 				}
 				break
 			}
@@ -454,6 +480,11 @@ func main() {
 			chunkStart += len(lines)
 			lines = nil
 		}
+
+		if chunkStart%5e3 == 0 {
+			message.Data.Progress = chunkStart
+			sendEvent(message, eventTube)
+		}
 	}
 
 	// Indicate to all processing threads that no more work remains
@@ -463,6 +494,9 @@ func main() {
 	for i := 0; i < concurrency; i++ {
 		<-complete
 	}
+
+	message.Data.Progress = chunkStart
+	sendEvent(message, eventTube)
 
 	fmt.Printf("Indexed %d lines\n", chunkStart)
 
