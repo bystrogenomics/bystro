@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import time
 
@@ -10,7 +9,6 @@ from bystro.utils.config import (
     BYSTRO_PROJECT_ROOT,
     BYSTRO_CONFIG_DIR,
     OPENSEARCH_CONFIG_PATH,
-    get_mapping_config,
     get_opensearch_config,
     ReferenceGenome,
 )
@@ -42,7 +40,7 @@ def index_test_annotation_file(index_name: str) -> None:
     run_handler_with_config(
         index_name=index_name,
         mapping_config=mapping_config,
-        opensearch_config=OPENSEARCH_CONFIG_PATH,
+        opensearch_config=str(OPENSEARCH_CONFIG_PATH),
         tar_path=str(tar_path),
         no_queue=True,
     )
