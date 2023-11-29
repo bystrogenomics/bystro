@@ -294,7 +294,7 @@ func validateArgs(args *CLIArgs) error {
 func getHeaderPaths(b BystroReader) ([][]string, []string) {
 	line, err := b.readLine()
 	if err != nil {
-		log.Fatalf("Error reading header line due to: [%s]\n", err.Error())
+		log.Fatalf("Error reading header line due to: [%s]\n", err)
 	}
 
 	headers := strings.Fields(string(line))
@@ -316,22 +316,22 @@ func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 
 	connectionSettings, err := os.ReadFile(opensearchConnectionConfigPath)
 	if err != nil {
-		log.Fatalf("Couldn't read connection settings due to: [%s]\n", err.Error())
+		log.Fatalf("Couldn't read connection settings due to: [%s]\n", err)
 	}
 
 	err = yaml.Unmarshal(connectionSettings, &osearchConnConfig)
 	if err != nil {
-		log.Fatalf("Failed to unmarshal search configuration: [%s]\n", err.Error())
+		log.Fatalf("Failed to unmarshal search configuration: [%s]\n", err)
 	}
 
 	indexConfig, err := os.ReadFile(opensearchIndexConfigPath)
 	if err != nil {
-		log.Fatalf("Couldn't read index configuration due to: [%s]\n", err.Error())
+		log.Fatalf("Couldn't read index configuration due to: [%s]\n", err)
 	}
 
 	err = yaml.Unmarshal(indexConfig, &osearchMapConfig)
 	if err != nil {
-		log.Fatalf("Unmarshal failed due to: [%s]\n", err.Error())
+		log.Fatalf("Unmarshal failed due to: [%s]\n", err)
 	}
 
 	_, ok := osearchMapConfig.Settings["index"]["number_of_shards"]
@@ -344,12 +344,12 @@ func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 	settings := osearchMapConfig.Settings
 	indexSettings, err := sonic.Marshal(settings)
 	if err != nil {
-		log.Fatalf("Marshaling failed of index settings due to: [%s]\n", err.Error())
+		log.Fatalf("Marshaling failed of index settings due to: [%s]\n", err)
 	}
 
 	indexMapping, err := sonic.Marshal(osearchMapConfig.Mappings)
 	if err != nil {
-		log.Fatalf("Marshaling failed of mappings failed due to: [%s]\n", err.Error())
+		log.Fatalf("Marshaling failed of mappings failed due to: [%s]\n", err)
 	}
 
 	requestBody := fmt.Sprintf(`{
@@ -373,7 +373,7 @@ func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 	}.Do(context.Background(), client)
 
 	if err != nil {
-		log.Fatalf("Error deleting index due to: [%s]\n", err.Error())
+		log.Fatalf("Error deleting index due to: [%s]\n", err)
 	}
 
 	defer resp.Body.Close()
@@ -386,10 +386,11 @@ func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 		deleteIndexResponse, err := deleteIndex.Do(context.Background(), client)
 
 		if err != nil || deleteIndexResponse.IsError() {
-			log.Fatalf("Error deleting index due to: [%s]\n", err.Error())
+			log.Fatalf("Error deleting index due to: [%s]\n", err)
 		}
 	}
 
+	fmt.Println("About to create index")
 	createIndex := opensearchapi.IndicesCreateRequest{
 		Index: indexName,
 		Body:  strings.NewReader(requestBody),
@@ -398,7 +399,12 @@ func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 	createResp, err := createIndex.Do(context.Background(), client)
 
 	if err != nil || createResp.IsError() {
-		log.Fatalf("Error creating index due to: [%s], status: [%s]\n", err.Error(), createResp.Status())
+		createRespBody, err := io.ReadAll(createResp.Body)
+		if err != nil {
+			log.Fatalf("Error reading the response body due to: %s", err)
+		}
+
+		log.Fatalf("Error creating index due to: [%s], status: [%s], response: [%s]\n", err, createResp.Status(), createRespBody)
 	}
 
 	createResp.Body.Close()
@@ -487,7 +493,7 @@ func sendEvent(message ProgressMessage, eventTube *beanstalk.Tube, noBeanstalkd 
 
 	messageJson, err := sonic.Marshal(message)
 	if err != nil {
-		log.Fatalf("Marshaling failed of progress message: [%s]\n", err.Error())
+		log.Fatalf("Marshaling failed of progress message: [%s]\n", err)
 	}
 
 	eventTube.Put(messageJson, 0, 0, 0)
@@ -506,14 +512,14 @@ func main() {
 
 	archive, err := os.Open(cliargs.annotationTarballPath)
 	if err != nil {
-		log.Fatalf("Couldn't open tarball due to: [%s]\n", err.Error())
+		log.Fatalf("Couldn't open tarball due to: [%s]\n", err)
 	}
 	defer archive.Close()
 
 	reader, fileStats, err := getAnnotationFhFromTarArchive(archive)
 
 	if err != nil {
-		log.Fatalf("Couldn't get annotation file handle due to: [%s]\n", err.Error())
+		log.Fatalf("Couldn't get annotation file handle due to: [%s]\n", err)
 	}
 
 	headerPaths, headerFields := getHeaderPaths(reader)
@@ -536,11 +542,11 @@ func main() {
 	if !cliargs.noBeanstalkd {
 		beanstalkdConfig, err = createBeanstalkdConfig(cliargs.beanstalkConfigPath)
 		if err != nil {
-			log.Fatalf("Couldn't create beanstalkd config due to: [%s]\n", err.Error())
+			log.Fatalf("Couldn't create beanstalkd config due to: [%s]\n", err)
 		}
 		beanstalkConnection, err := beanstalk.Dial("tcp", beanstalkdConfig.Addresses[0])
 		if err != nil {
-			log.Fatalf("Couldn't connect to beanstalkd due to: [%s]\n", err.Error())
+			log.Fatalf("Couldn't connect to beanstalkd due to: [%s]\n", err)
 		}
 		defer beanstalkConnection.Close()
 		eventTube = beanstalk.NewTube(beanstalkConnection, beanstalkdConfig.Tubes.Index.Events)
@@ -578,7 +584,7 @@ func main() {
 				}
 				break
 			}
-			log.Fatalf("Error reading lines: [%s]\n", err.Error())
+			log.Fatalf("Error reading lines: [%s]\n", err)
 		}
 
 		if len(lines) > 0 {
@@ -610,7 +616,7 @@ func main() {
 	postIndexSettings, err := sonic.Marshal(osearchMapConfig.PostIndexSettings)
 
 	if err != nil {
-		log.Fatalf("Marshaling failed of post index settings: [%s]\n", err.Error())
+		log.Fatalf("Marshaling failed of post index settings: [%s]\n", err)
 	}
 
 	postIndexRequestBody := fmt.Sprintf(`{
@@ -624,7 +630,7 @@ func main() {
 
 	res, err := req.Do(context.Background(), client)
 	if err != nil {
-		log.Fatalf("Error updating index settings: [%s]\n", err.Error())
+		log.Fatalf("Error updating index settings: [%s]\n", err)
 	}
 	defer res.Body.Close()
 
@@ -637,14 +643,14 @@ func main() {
 
 	refreshRes, err := client.Indices.Refresh(client.Indices.Refresh.WithIndex(indexName))
 	if err != nil || refreshRes.IsError() {
-		log.Fatalf("Error refreshing index: [%s]\n", err.Error())
+		log.Fatalf("Error refreshing index: [%s]\n", err)
 	}
 
 	refreshRes.Body.Close()
 
 	marshalledHeaderFields, err := sonic.Marshal(headerFields)
 	if err != nil {
-		log.Fatalf("Marshaling failed of header fields: [%s]\n", err.Error())
+		log.Fatalf("Marshaling failed of header fields: [%s]\n", err)
 	}
 
 	fmt.Print(string(marshalledHeaderFields))

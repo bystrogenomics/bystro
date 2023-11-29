@@ -45,14 +45,14 @@ type ErrorField struct {
 func parseBulkResponse(responseBody io.ReadCloser) string {
 	res, err := io.ReadAll(responseBody)
 	if err != nil {
-		log.Fatalf("Error reading the response body due to: %s", err.Error())
+		log.Fatalf("Error reading the response body due to: %s", err)
 	}
 
 	// return bulkResponse
 	var bulkResp BulkResponse
 	err = sonic.Unmarshal(res, &bulkResp)
 	if err != nil {
-		log.Fatalf("Error reading the response body due to: %s", err.Error())
+		log.Fatalf("Error reading the response body due to: %s", err)
 	}
 
 	// According to OpenSearch API documentation, the top-level errors function will always be true
@@ -89,7 +89,7 @@ func Parse(headerPaths [][]string, indexName string, osConfig opensearch.Config,
 	client, err := opensearch.NewClient(osConfig)
 
 	if err != nil {
-		log.Fatalf("Error creating the client due to: %s", err.Error())
+		log.Fatalf("Error creating the client due to: %s", err)
 	}
 
 	var w = bytes.NewBuffer(nil)
@@ -122,7 +122,7 @@ func Parse(headerPaths [][]string, indexName string, osConfig opensearch.Config,
 		res, err := client.Bulk(strings.NewReader(w.String()))
 
 		if err != nil || res.IsError() {
-			log.Fatalf("Bulk insert failed with the following error: [%s]. Res status: [%s]", err.Error(), res.Status())
+			log.Fatalf("Bulk insert failed with the following error: [%s]. Res status: [%s]", err, res.Status())
 		}
 
 		bulkErrors := parseBulkResponse(res.Body)

@@ -86,7 +86,7 @@ index_settings:
     analyzer:
       autocomplete_english:
         type: custom
-        tokenizer: whitespace
+        tokenizer: standard
         filter:
           - lowercase
           - asciifolding
@@ -94,7 +94,7 @@ index_settings:
           - autocomplete_filter
       autocomplete_english_split:
         type: custom
-        tokenizer: whitespace
+        tokenizer: standard
         filter:
           - lowercase
           - asciifolding
@@ -102,7 +102,7 @@ index_settings:
           - autocomplete_filter
       search_english:
         type: custom
-        tokenizer: whitespace
+        tokenizer: standard
         filter:
           - lowercase
           - asciifolding
@@ -110,7 +110,7 @@ index_settings:
           - search_synonym_filter
       search_english_split:
         type: custom
-        tokenizer: whitespace
+        tokenizer: standard
         filter:
           - lowercase
           - asciifolding
@@ -118,7 +118,7 @@ index_settings:
           - search_synonym_filter
       search_english_type:
         type: custom
-        tokenizer: whitespace
+        tokenizer: standard
         filter:
           - lowercase
           - asciifolding
@@ -127,7 +127,7 @@ index_settings:
           - dbSNP_class_synonyms
       search_english_description_synonyms:
         type: custom
-        tokenizer: whitespace
+        tokenizer: standard
         filter:
           - lowercase
           - asciifolding
@@ -136,7 +136,7 @@ index_settings:
           - disease_synonyms
       search_english_class:
         type: custom
-        tokenizer: whitespace
+        tokenizer: standard
         filter:
           - lowercase
           - asciifolding
@@ -144,7 +144,7 @@ index_settings:
           - dbSNP_class_synonyms
       search_english_func:
         type: custom
-        tokenizer: whitespace
+        tokenizer: standard
         filter:
           - lowercase
           - asciifolding
@@ -429,6 +429,14 @@ mappings:
           normalizer: lowercase_normalizer
         RS:
           type: keyword
+          normalizer: lowercase_normalizer
+        CLNVCSO:
+          type: keyword
+          normalizer: lowercase_normalizer
+        CLNSIGCONF:
+          type: text
+          analyzer: autocomplete_english_split
+          search_analyzer: search_english_split
     dbSNP:
       properties:
         alt:
