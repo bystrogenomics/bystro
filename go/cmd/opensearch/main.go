@@ -240,7 +240,7 @@ func setup(args []string) *CLIArgs {
 	flag.StringVar(&cliargs.indexName, "i", "", "The index name (short form)")
 	flag.StringVar(&cliargs.jobSubmissionID, "job-submission-id", "", "The job submission ID")
 	flag.StringVar(&cliargs.jobSubmissionID, "j", "", "The job submission ID (short form)")
-	flag.BoolVar(&cliargs.noBeanstalkd, "no-beanstalkd", false, "Disable beanstalkd progress events")
+	flag.BoolVar(&cliargs.noBeanstalkd, "no-queue", false, "Disable beanstalkd progress events")
 	flag.BoolVar(&cliargs.noBeanstalkd, "n", false, "Disable beanstalkd progress events (short form)")
 	flag.IntVar(&cliargs.progressFrequency, "progress-frequency", 5e3, "Print progress every N variants processed")
 	flag.IntVar(&cliargs.progressFrequency, "p", 5e3, "Print progress every N variants processed (short form)")
@@ -274,7 +274,9 @@ func validateArgs(args *CLIArgs) error {
 		missing = append(missing, "os-connection-config-path")
 	}
 	if v.beanstalkConfigPath == "" {
-		missing = append(missing, "beanstalk-config-path")
+		if !v.noBeanstalkd {
+			missing = append(missing, "beanstalk-config-path")
+		}
 	}
 	if v.indexName == "" {
 		missing = append(missing, "index-name")
@@ -494,11 +496,6 @@ func sendEvent(message ProgressMessage, eventTube *beanstalk.Tube, noBeanstalkd 
 func main() {
 	cliargs := setup(nil)
 
-	beanstalkdConfig, err := createBeanstalkdConfig(cliargs.beanstalkConfigPath)
-	if err != nil {
-		log.Fatalf("Couldn't create beanstalkd config due to: [%s]\n", err.Error())
-	}
-
 	indexName := cliargs.indexName
 
 	// From testing, performance seems maximized at 32 threads for a 4 vCPU AWS instance
@@ -532,20 +529,30 @@ func main() {
 		go parser.Parse(headerPaths, indexName, osConfig, workQueue, complete, i)
 	}
 
-	beanstalkConnection, err := beanstalk.Dial("tcp", beanstalkdConfig.Addresses[0])
-	if err != nil {
-		log.Fatalf("Couldn't connect to beanstalkd due to: [%s]\n", err.Error())
-	}
-	defer beanstalkConnection.Close()
-	eventTube := beanstalk.NewTube(beanstalkConnection, beanstalkdConfig.Tubes.Index.Events)
+	var beanstalkdConfig BeanstalkdConfig
+	var eventTube *beanstalk.Tube
+	var message ProgressMessage
 
-	message := ProgressMessage{
-		SubmissionID: cliargs.jobSubmissionID,
-		Event:        PROGRESS_EVENT,
-		Data: ProgressData{
-			Progress: 0,
-			Skipped:  0,
-		},
+	if !cliargs.noBeanstalkd {
+		beanstalkdConfig, err = createBeanstalkdConfig(cliargs.beanstalkConfigPath)
+		if err != nil {
+			log.Fatalf("Couldn't create beanstalkd config due to: [%s]\n", err.Error())
+		}
+		beanstalkConnection, err := beanstalk.Dial("tcp", beanstalkdConfig.Addresses[0])
+		if err != nil {
+			log.Fatalf("Couldn't connect to beanstalkd due to: [%s]\n", err.Error())
+		}
+		defer beanstalkConnection.Close()
+		eventTube = beanstalk.NewTube(beanstalkConnection, beanstalkdConfig.Tubes.Index.Events)
+
+		message = ProgressMessage{
+			SubmissionID: cliargs.jobSubmissionID,
+			Event:        PROGRESS_EVENT,
+			Data: ProgressData{
+				Progress: 0,
+				Skipped:  0,
+			},
+		}
 	}
 
 	progressUpdate := 0

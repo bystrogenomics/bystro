@@ -2,6 +2,7 @@
 from enum import Enum
 from pathlib import Path
 from typing import Dict, Union
+from bystro.proteomics.annotation_interface import OPENSEARCH_CONFIG
 
 from ruamel.yaml import YAML
 
@@ -34,15 +35,15 @@ def _get_bystro_project_root() -> Path:
 
 
 BYSTRO_PROJECT_ROOT = _get_bystro_project_root()
+BYSTRO_CONFIG_DIR = BYSTRO_PROJECT_ROOT / "config"
+OPENSEARCH_CONFIG_PATH = BYSTRO_CONFIG_DIR / "opensearch.yml"
 
 
 def get_opensearch_config() -> ConfigDict:
     """Read opensearch config and return parsed YAML."""
-    opensearch_config_filepath = BYSTRO_PROJECT_ROOT / "config/opensearch.yml"
-    with opensearch_config_filepath.open() as search_config_file:
+    with OPENSEARCH_CONFIG_PATH.open() as search_config_file:
         config_dict: ConfigDict = YAML(typ="safe").load(search_config_file)
     return config_dict
-
 
 class ReferenceGenome(Enum):
     """The collection of valid reference genomes."""
@@ -62,7 +63,7 @@ class ReferenceGenome(Enum):
 def get_mapping_config(reference_genome: ReferenceGenome = ReferenceGenome.hg38) -> ConfigDict:
     """Load mapping config for given reference genome from YAML file."""
     base_name = f"{reference_genome.name}.mapping.yml"
-    mapping_config_filepath = BYSTRO_PROJECT_ROOT / "config" / base_name
+    mapping_config_filepath = BYSTRO_CONFIG_DIR / base_name
     with Path.open(mapping_config_filepath, encoding="utf-8") as f:
         mapping_config = YAML(typ="safe").load(f)
     return mapping_config

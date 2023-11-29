@@ -8,7 +8,7 @@ import subprocess
 
 from ruamel.yaml import YAML
 
-from bystro.beanstalkd.messages import SubmittedJobMessage
+from bystro.beanstalkd.messages import SubmissionID, SubmittedJobMessage
 from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, listen
 from bystro.search.utils.annotation import get_config_file_path
 from bystro.search.utils.messages import IndexJobCompleteMessage, IndexJobData, IndexJobResults
@@ -61,6 +61,44 @@ def run_binary_with_args(binary_path: str, args: list[str]) -> list[str]:
     headerFieldsStr = stdout.decode("utf-8")
 
     return json.decode(headerFieldsStr, type=list[str])
+
+
+def run_handler_with_config(
+    index_name: str,
+    mapping_config: str,
+    opensearch_config: str,
+    tar_path: str,
+    no_queue: bool = False,
+    submission_id: SubmissionID | None = None,
+    queue_config: str | None = None
+) -> list[str]:
+    binary_path = get_go_handler_binary_path()
+    args = [
+        "--index-name",
+        index_name,
+        "--mapping-config",
+        mapping_config,
+        "--opensearch-config",
+        opensearch_config,
+        "--tarball-path",
+        tar_path,
+    ]
+
+    if no_queue:
+        args.append("--no-queue")
+    else:
+        if submission_id is None or queue_config is None:
+            raise ValueError("submission_id and queue_config must be specified when no_queue is not False")
+
+        args.append("--queue-config")
+        args.append(queue_config)
+
+        args.append("--job-submission-id")
+        args.append(str(submission_id))
+
+    header_fields = run_binary_with_args(binary_path, args)
+
+    return header_fields
 
 
 def main():
@@ -118,10 +156,17 @@ def main():
             tar_path,
         ]
 
+        header_fields = run_handler_with_config(
+            index_name=beanstalkd_job_data.indexName,
+            submission_id=beanstalkd_job_data.submissionID,
+            mapping_config=m_path,
+            opensearch_config=search_conf,
+            queue_config=queue_conf,
+            tar_path=tar_path,
+        )
+
         header_fields = run_binary_with_args(binary_path, args)
-
         return header_fields
-
 
     def submit_msg_fn(job_data: IndexJobData):
         return SubmittedJobMessage(job_data.submissionID)
