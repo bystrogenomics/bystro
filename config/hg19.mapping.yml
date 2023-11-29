@@ -83,15 +83,42 @@ index_settings:
         token_chars:
           - letter
           - digit
+          - punctuation
+    tokenizer:
+      edge_ngram_tokenizer:
+        type: edge_ngram
+        min_gram: 1
+        max_gram: 30
+        token_chars:
+          - letter
+          - digit
+          - punctuation
     analyzer:
       autocomplete_english:
         type: custom
-        tokenizer: standard
+        tokenizer: classic
         filter:
           - lowercase
           - asciifolding
           - english_stemmer
           - autocomplete_filter
+      autocomplete_english_graph:
+        type: custom
+        tokenizer: keyword
+        filter:
+          - word_delimiter_graph
+          - lowercase
+          - asciifolding
+          - english_stemmer
+          - autocomplete_filter
+      english_graph:
+        type: custom
+        tokenizer: keyword
+        filter:
+          - word_delimiter_graph
+          - lowercase
+          - asciifolding
+          - english_stemmer
       autocomplete_english_split:
         type: custom
         tokenizer: standard
@@ -110,7 +137,7 @@ index_settings:
           - autocomplete_filter
       search_english:
         type: custom
-        tokenizer: standard
+        tokenizer: classic
         filter:
           - lowercase
           - asciifolding
@@ -443,29 +470,46 @@ mappings:
         id:
           type: keyword
           normalizer: lowercase_normalizer
+        ALLELEID:
+          type: keyword
+          normalizer: lowercase_normalizer
         RS:
           type: keyword
           normalizer: lowercase_normalizer
+        AF_ESP:
+          type: half_float
+        AF_EXAC:
+          type: half_float
+        AF_TGP:
+          type: half_float
         CLNVCSO:
           type: keyword
           normalizer: lowercase_normalizer
         CLNSIG:
           type: text
-          analyzer: autocomplete_english_split
-          search_analyzer: search_english_split
+          analyzer: autocomplete_english_graph
         CLNSIGCONF:
           type: text
-          analyzer: autocomplete_english_letter
-          search_analyzer: search_english_split_letter
+          analyzer: autocomplete_english_graph
         CLNREVSTAT:
           type: text
-          analyzer: autocomplete_english_split
-          search_analyzer: search_english_split
+          analyzer: english_graph
         CLNDN:
           type: text
-          analyzer: autocomplete_english_split
-          search_analyzer: search_english_split
+          analyzer: autocomplete_english_graph
+        CLNDNINCL:
+          type: text
+          analyzer: autocomplete_english_graph
         CLNHGVS:
+          type: text
+          analyzer: english_graph
+        DBVARID:
+          type: keyword
+          normalizer: lowercase_normalizer
+        ORIGIN:
+          type: keyword
+          normalizer: lowercase_normalizer
+        SSR:
           type: keyword
           normalizer: lowercase_normalizer
     dbSNP:

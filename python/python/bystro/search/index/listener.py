@@ -167,7 +167,6 @@ def main():
             tar_path=tar_path,
         )
 
-        header_fields = run_binary_with_args(binary_path, args)
         return header_fields
 
     def submit_msg_fn(job_data: IndexJobData):
