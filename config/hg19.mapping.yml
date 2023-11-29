@@ -100,6 +100,14 @@ index_settings:
           - asciifolding
           - english_stemmer
           - autocomplete_filter
+      autocomplete_english_letter:
+        type: custom
+        tokenizer: letter
+        filter:
+          - lowercase
+          - asciifolding
+          - english_stemmer
+          - autocomplete_filter
       search_english:
         type: custom
         tokenizer: standard
@@ -111,6 +119,14 @@ index_settings:
       search_english_split:
         type: custom
         tokenizer: standard
+        filter:
+          - lowercase
+          - asciifolding
+          - english_stemmer
+          - search_synonym_filter
+      search_english_split_letter:
+        type: custom
+        tokenizer: letter
         filter:
           - lowercase
           - asciifolding
@@ -433,10 +449,25 @@ mappings:
         CLNVCSO:
           type: keyword
           normalizer: lowercase_normalizer
-        CLNSIGCONF:
+        CLNSIG:
           type: text
           analyzer: autocomplete_english_split
           search_analyzer: search_english_split
+        CLNSIGCONF:
+          type: text
+          analyzer: autocomplete_english_letter
+          search_analyzer: search_english_split_letter
+        CLNREVSTAT:
+          type: text
+          analyzer: autocomplete_english_split
+          search_analyzer: search_english_split
+        CLNDN:
+          type: text
+          analyzer: autocomplete_english_split
+          search_analyzer: search_english_split
+        CLNHGVS:
+          type: keyword
+          normalizer: lowercase_normalizer
     dbSNP:
       properties:
         alt:
