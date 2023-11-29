@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/tar"
+	"bufio"
 	"bystro/pkg/parser"
 	"context"
 	"crypto/tls"
@@ -21,6 +22,7 @@ import (
 	"github.com/beanstalkd/go-beanstalk"
 	"github.com/biogo/hts/bgzf"
 	"github.com/bytedance/sonic"
+	gzip "github.com/klauspost/pgzip"
 	opensearch "github.com/opensearch-project/opensearch-go/v2"
 	opensearchapi "github.com/opensearch-project/opensearch-go/v2/opensearchapi"
 	"gopkg.in/yaml.v3"
@@ -28,6 +30,117 @@ import (
 
 const EXPECTED_ANNOTATION_FILE_SUFFIX = "annotation.tsv.gz"
 const PROGRESS_EVENT = "progress"
+
+type BystroReader interface {
+	readLines() ([]byte, error)
+	readLine() ([]byte, error)
+}
+
+type BzfBystroReader struct {
+	Reader *bgzf.Reader
+}
+
+type BufioBystroReader struct {
+	Reader *bufio.Reader
+}
+
+// Read a line up to the next newline character, and return the line excluding the newline character
+func _readLineBgzip(r *bgzf.Reader) ([]byte, error) {
+	var (
+		data []byte
+		b    byte
+		err  error
+	)
+	for {
+		b, err = r.ReadByte()
+		if err != nil {
+			break
+		}
+		if b == '\n' {
+			break
+		}
+		data = append(data, b)
+	}
+	return data, err
+}
+
+func readLineBgzip(r *bgzf.Reader) ([]byte, error) {
+	tx := r.Begin()
+	data, err := _readLineBgzip(r)
+	tx.End()
+	return data, err
+}
+
+func readLinesBgzip(r *bgzf.Reader) ([]byte, error) {
+	buf := make([]byte, 64*1024*8) // 8 bgzip blocks at a time
+
+	tx := r.Begin()
+	defer tx.End()
+
+	bytesRead, err := r.Read(buf)
+
+	if bytesRead == 0 {
+		return nil, err
+	}
+
+	if buf[bytesRead-1] != '\n' {
+		remainder, err := _readLineBgzip(r)
+		return append(buf[:bytesRead], remainder...), err
+	}
+	// last byte is newline
+	return buf[:bytesRead-1], err
+}
+
+func readLine(r *bufio.Reader) ([]byte, error) {
+	var (
+		data []byte
+		b    byte
+		err  error
+	)
+	for {
+		b, err = r.ReadByte()
+		if err != nil {
+			break
+		}
+		if b == '\n' {
+			break
+		}
+		data = append(data, b)
+	}
+	return data, err
+}
+
+func readLines(r *bufio.Reader) ([]byte, error) {
+	buf := make([]byte, 64*1024*8) // 8 bgzip blocks at a time
+
+	bytesRead, err := r.Read(buf)
+
+	if bytesRead == 0 {
+		return nil, err
+	}
+
+	if buf[bytesRead-1] != '\n' {
+		remainder, err := readLine(r)
+		return append(buf[:bytesRead], remainder...), err
+	}
+	// last byte is newline
+	return buf[:bytesRead-1], err
+}
+
+func (r BzfBystroReader) readLines() ([]byte, error) {
+	return readLinesBgzip(r.Reader)
+}
+
+func (r BzfBystroReader) readLine() ([]byte, error) {
+	return readLineBgzip(r.Reader)
+}
+
+func (r BufioBystroReader) readLines() ([]byte, error) {
+	return readLines(r.Reader)
+}
+func (r BufioBystroReader) readLine() ([]byte, error) {
+	return r.Reader.ReadBytes('\n')
+}
 
 type CLIArgs struct {
 	annotationTarballPath  string
@@ -176,8 +289,8 @@ func validateArgs(args *CLIArgs) error {
 	return nil
 }
 
-func getHeaderPaths(b *bgzf.Reader) ([][]string, []string) {
-	line, err := readLine(b)
+func getHeaderPaths(b BystroReader) ([][]string, []string) {
+	line, err := b.readLine()
 	if err != nil {
 		log.Fatalf("Error reading header line due to: [%s]\n", err.Error())
 	}
@@ -307,54 +420,7 @@ func createBeanstalkdConfig(beanstalkConfigPath string) (BeanstalkdConfig, error
 	return bConfig.Beanstalkd, nil
 }
 
-// Read a line up to the next newline character, and return the line excluding the newline character
-func _readLine(r *bgzf.Reader) ([]byte, error) {
-	var (
-		data []byte
-		b    byte
-		err  error
-	)
-	for {
-		b, err = r.ReadByte()
-		if err != nil {
-			break
-		}
-		if b == '\n' {
-			break
-		}
-		data = append(data, b)
-	}
-	return data, err
-}
-
-func readLine(r *bgzf.Reader) ([]byte, error) {
-	tx := r.Begin()
-	data, err := _readLine(r)
-	tx.End()
-	return data, err
-}
-
-func readLines(b *bgzf.Reader) ([]byte, error) {
-	buf := make([]byte, 64*1024*8) // 8 bgzip blocks at a time
-
-	tx := b.Begin()
-	defer tx.End()
-
-	bytesRead, err := b.Read(buf)
-
-	if bytesRead == 0 {
-		return nil, err
-	}
-
-	if buf[bytesRead-1] != '\n' {
-		remainder, err := _readLine(b)
-		return append(buf[:bytesRead], remainder...), err
-	}
-	// last byte is newline
-	return buf[:bytesRead-1], err
-}
-
-func getAnnotationFhFromTarArchive(archive *os.File) (*bgzf.Reader, fs.FileInfo, error) {
+func _getAnnotationFhFromTarArchive(archive *os.File) (*tar.Reader, fs.FileInfo, error) {
 	fileStats, err := archive.Stat()
 	if err != nil {
 		return nil, nil, err
@@ -362,7 +428,6 @@ func getAnnotationFhFromTarArchive(archive *os.File) (*bgzf.Reader, fs.FileInfo,
 
 	tarReader := tar.NewReader(archive)
 
-	var b *bgzf.Reader
 	for {
 		header, err := tarReader.Next()
 		if err != nil {
@@ -374,15 +439,42 @@ func getAnnotationFhFromTarArchive(archive *os.File) (*bgzf.Reader, fs.FileInfo,
 
 		// TODO @akotlar 2023-11-24: Take the expected file name from the information submitted in the beanstalkd queue message
 		if strings.HasSuffix(header.Name, EXPECTED_ANNOTATION_FILE_SUFFIX) {
-			b, err = bgzf.NewReader(tarReader, 0)
-			if err != nil {
-				return nil, nil, err
-			}
-			break
+			return tarReader, fileStats, nil
 		}
 	}
 
-	return b, fileStats, err
+	return nil, nil, fmt.Errorf("couldn't find annotation file in tarball")
+}
+
+func getAnnotationFhFromTarArchive(archive *os.File) (BystroReader, fs.FileInfo, error) {
+	tarReader, fileStats, err := _getAnnotationFhFromTarArchive(archive)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	b, err := bgzf.NewReader(tarReader, 0)
+	if err != nil {
+		archive.Seek(0, 0)
+
+		tarReader, fileStats, err := _getAnnotationFhFromTarArchive(archive)
+
+		if err != nil {
+			return nil, nil, err
+		}
+
+		b, err := gzip.NewReader(tarReader)
+
+		if err != nil {
+			return nil, nil, err
+		}
+
+		bufioReader := bufio.NewReader(b)
+
+		return BufioBystroReader{Reader: bufioReader}, fileStats, nil
+	}
+
+	return BzfBystroReader{Reader: b}, fileStats, err
 }
 
 func sendEvent(message ProgressMessage, eventTube *beanstalk.Tube, noBeanstalkd bool) {
@@ -461,7 +553,7 @@ func main() {
 	var lines []string
 
 	for {
-		rawLines, err := readLines(reader)
+		rawLines, err := reader.readLines()
 
 		if len(rawLines) > 0 {
 			lines = strings.Split(string(rawLines), parser.LINE_DELIMITER)

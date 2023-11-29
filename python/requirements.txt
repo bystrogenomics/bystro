@@ -16,4 +16,3 @@ skops==0.7.post0
 tqdm==4.65.0
 cloudpickle==3.0.0
 torch==2.1.0
-biopython==1.81
