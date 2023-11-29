@@ -2,7 +2,6 @@
 from enum import Enum
 from pathlib import Path
 from typing import Dict, Union
-from bystro.proteomics.annotation_interface import OPENSEARCH_CONFIG
 
 from ruamel.yaml import YAML
 
