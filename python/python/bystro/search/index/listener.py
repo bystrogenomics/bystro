@@ -70,7 +70,7 @@ def run_handler_with_config(
     tar_path: str,
     no_queue: bool = False,
     submission_id: SubmissionID | None = None,
-    queue_config: str | None = None
+    queue_config: str | None = None,
 ) -> list[str]:
     binary_path = get_go_handler_binary_path()
     args = [
@@ -88,7 +88,9 @@ def run_handler_with_config(
         args.append("--no-queue")
     else:
         if submission_id is None or queue_config is None:
-            raise ValueError("submission_id and queue_config must be specified when no_queue is not False")
+            raise ValueError(
+                "submission_id and queue_config must be specified when no_queue is not False"
+            )
 
         args.append("--queue-config")
         args.append(queue_config)
