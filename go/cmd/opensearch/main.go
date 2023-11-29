@@ -390,7 +390,6 @@ func createIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 		}
 	}
 
-	fmt.Println("About to create index")
 	createIndex := opensearchapi.IndicesCreateRequest{
 		Index: indexName,
 		Body:  strings.NewReader(requestBody),
