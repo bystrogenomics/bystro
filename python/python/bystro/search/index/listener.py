@@ -142,22 +142,6 @@ def main():
         tar_path = os.path.join(beanstalkd_job_data.inputDir, inputs.archived)
         m_path = get_config_file_path(conf_dir, beanstalkd_job_data.assembly, ".mapping.y*ml")
 
-        binary_path = get_go_handler_binary_path()
-        args = [
-            "--index-name",
-            beanstalkd_job_data.indexName,
-            "--job-submission-id",
-            beanstalkd_job_data.submissionID,
-            "--mapping-config",
-            m_path,
-            "--opensearch-config",
-            search_conf,
-            "--queue-config",
-            queue_conf,
-            "--tarball-path",
-            tar_path,
-        ]
-
         header_fields = run_handler_with_config(
             index_name=beanstalkd_job_data.indexName,
             submission_id=beanstalkd_job_data.submissionID,
