@@ -142,7 +142,7 @@ for my $file (@localFiles) {
   ok( !defined $vcf_style_del_skipped->[0] );
   ok( @{$vcf_style_del_skipped} == 1 );
 
-  # We don't currently support VCF style insertions (e.g. ref: A, alt: ACTG), but we should still return undef
+  # We don't currently support VCF style insertions (e.g. ref: A, alt: ACTG)
   my $vcf_style_ins_skipped =
     $caddGetter->get( $firstData, $firstChr, $firstRef, $firstRef . "CTG", 0, [] );
 
