@@ -29,10 +29,6 @@ my $config_file = PrepareConfigWithTempdirs(
   'files_dir',        $dir->stringify
 );
 
-p $config_file;
-
-# use Seq::Tracks::Score::Build::Round;
-
 my $runConfig = LoadFile($config_file);
 p $runConfig;
 
@@ -139,14 +135,14 @@ for my $file (@localFiles) {
     $pos += 1;
   }
 
-  # We don't currently support VCF style deletions, but we should still return undef
+  # We don't currently support VCF style deletions (e.g. ref: ACTG, alt: A)
   my $vcf_style_del_skipped =
     $caddGetter->get( $firstData, $firstChr, $firstRef . "CTG", $firstRef, 0, [] );
 
   ok( !defined $vcf_style_del_skipped->[0] );
   ok( @{$vcf_style_del_skipped} == 1 );
 
-  # We don't currently support VCF style insertions, but we should still return undef
+  # We don't currently support VCF style insertions (e.g. ref: A, alt: ACTG), but we should still return undef
   my $vcf_style_ins_skipped =
     $caddGetter->get( $firstData, $firstChr, $firstRef, $firstRef . "CTG", 0, [] );
 
