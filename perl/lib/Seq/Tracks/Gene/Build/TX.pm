@@ -231,18 +231,11 @@ sub _buildTranscript {
 
     my $exonPosHref = [ $exonStarts[$i] .. $exonEnds[$i] - 1 ];
 
-    # say "exon start was " . $exonStarts[$i];
-    # say "exon end was " . ($exonEnds[$i] - 1);
-    # say "from that we got exonPosHref";
-    # p $exonPosHref;
     #limitation of the below API; we need to copy $posHref
     #thankfully, we needed to do this anyway.
     #we push them in order, so the first position in the
     #https://ideone.com/wq0YJO (dereferencing not strictly necessary, but I think clearer)
     push @sequencePositions, @$exonPosHref;
-
-    # say "sequence positions are";
-    # p @sequencePositions;
 
     # As a result of modifying the reference, each position in exonPosHref
     # now has database data, or undefined
@@ -258,11 +251,6 @@ sub _buildTranscript {
     #Ref tracks always return a scalar, a single base, since that's the only
     #thing that they could return
 
-    #This doesn't work for some reason.
-    #https://ideone.com/1sJC69
-    #$txSequence .= reduce { ref $a ? $refTrack->get($a) : $a . $refTrack->get($b) } @$dAref (@$exonPosHref)
-    # say "length is " . scalar @$dAref (@$exonPosHref);
-    # exit;
     for ( my $y = 0; $y < scalar @$exonPosHref; $y++ ) {
       my $refBase = $refTrack->get( $exonPosHref->[$y] );
 

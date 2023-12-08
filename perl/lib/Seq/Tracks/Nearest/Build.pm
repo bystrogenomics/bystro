@@ -28,7 +28,7 @@ use namespace::autoclean;
 
 use Parallel::ForkManager;
 use Scalar::Util qw/looks_like_number/;
-use DDP;
+
 use List::Util qw/max min/;
 # http://fastcompression.blogspot.com/2014/07/xxhash-wider-64-bits.html
 # much faster than md5, no cryptographic guarantee should suffice for our use

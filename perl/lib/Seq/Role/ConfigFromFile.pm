@@ -34,7 +34,6 @@ use Type::Params    qw/ compile /;
 use Types::Standard qw/ :types /;
 use Scalar::Util    qw/ reftype /;
 use YAML::XS        qw/ LoadFile /;
-use DDP;
 
 with 'Seq::Role::IO', 'MouseX::Getopt';
 

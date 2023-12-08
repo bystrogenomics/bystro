@@ -8,7 +8,7 @@ package Seq::Tracks::Get;
 our $VERSION = '0.001';
 
 use Mouse 2;
-use DDP;
+
 extends 'Seq::Tracks::Base';
 
 use Seq::Headers;

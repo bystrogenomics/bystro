@@ -15,7 +15,7 @@ use Mouse::Util::TypeConstraints;
 use namespace::autoclean;
 use Scalar::Util  qw/looks_like_number/;
 use Math::SigFigs qw(:all);
-use DDP;
+
 #What the types must be called in the config file
 # TODO: build these track maps automatically
 # by title casing the "type" field
