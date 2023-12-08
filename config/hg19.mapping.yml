@@ -1,17 +1,3 @@
-numericalFields:
-  - cadd
-  - phastCons
-  - phyloP
-  - pos
-  - dbSNP.alleleNs
-  - dbSNP.alleleFreqs
-  - refSeq.codonNumber
-  - refSeq.codonPosition
-  - clinvar.alleleID
-  - refSeq.clinvar.alleleID
-  - refSeq.clinvar.chromStart
-  - refSeq.clinvar.numberSubmitters
-  - clinvar.numberSubmitters
 sort:
   cadd: avg
   dbSNP.alleleNs: avg
@@ -339,57 +325,6 @@ mappings:
         name:
           type: keyword
           normalizer: uppercase_normalizer
-        gene:
-          properties:
-            name2:
-              type: keyword
-            pLi:
-              type: half_float
-            pRec:
-              type: half_float
-            pNull:
-              type: half_float
-            lofTool:
-              type: half_float
-            lofFdr:
-              type: half_float
-            pHi:
-              type: half_float
-            nonTCGA:
-              properties:
-                pRec:
-                  type: half_float
-                pNull:
-                  type: half_float
-                pLi:
-                  type: half_float
-            nonPsych:
-              properties:
-                pRec:
-                  type: half_float
-                pNull:
-                  type: half_float
-                pLi:
-                  type: half_float
-            # this is a percentile; we don't need much precision
-            gdi:
-              type: scaled_float
-              scaling_factor: 100
-            cnvScore:
-              type: half_float
-            cnvFlag:
-              type: keyword
-            uniprot:
-              properties:
-                func:
-                  type: text
-                  analyzer: autocomplete_english_split
-                  search_analyzer: search_english_description_synonyms
-            pmid:
-              type: integer
-            rvis:
-              type: scaled_float
-              scaling_factor: 100
         clinvar:
           properties:
             alleleID:
@@ -1774,35 +1709,3 @@ mappings:
               type: half_float
             non_topmed_nhomalt_nfe_seu:
               type: integer
-    cosmic:
-      properties:
-        coding:
-          properties:
-            id:
-              type: keyword
-              normalizer: uppercase_normalizer
-            cnt:
-              type: integer
-            cds:
-              type: keyword
-              normalizer: uppercase_normalizer
-            gene:
-              type: keyword
-              normalizer: uppercase_normalizer
-            strand:
-              type: keyword
-        nonCoding:
-          properties:
-            id:
-              type: keyword
-              normalizer: uppercase_normalizer
-            cnt:
-              type: integer
-            cds:
-              type: keyword
-              normalizer: uppercase_normalizer
-            gene:
-              type: keyword
-              normalizer: uppercase_normalizer
-            strand:
-              type: keyword
