@@ -36,7 +36,7 @@ sub get {
   # $_[1] == <ArrayRef> $href : the database data, with each top-level index corresponding to a track
   # $_[2] == <String> $chr  : the chromosome
   # $_[3] == <String> $refBase : ACTG
-  # $_[4] == <String> $allele  : the allele (ACTG or -N / +ACTG)
+  # $_[4] == <String> $allele  : the allele (ACTG or -<length of deletion> / +ACTG)
   # $_[5] == <Int> $positionIdx : the position in the indel, if any
   # $_[6] == <ArrayRef> $outAccum : a reference to the output, which we mutate
 
@@ -45,7 +45,28 @@ sub get {
   # Alternatively the CADD data for this position may be missing (not defined)
   # It's slightly faster to check for truthiness, rather than definition
   # Since we always either store undef or an array, truthiness is sufficient
+
+  # Similar to VCF tracks, we only return exact matches
+  # So we do not tile across the entire deleted / inserted region
+  # We return only the first result
+  # In the case of a SNP there is only 1 result
+  # In the case of an indel, we return undef only once
+  if ( $_[5] > 0 ) {
+    return $_[6];
+  }
+
   if ( !defined $_[1]->[ $_[0]->{_dbName} ] ) {
+    $_[6][ $_[5] ] = undef;
+
+    return $_[6];
+  }
+
+  # For indels, we return undef
+  # Bystro always left-normalizes alleles, so the ref is always length 1
+  # and alleles are always longer than 1 for indels
+  # In the case of deletions, it is -<length of deletion>
+  # In the case of insertions, it is +<inserted sequence>
+  if ( length( $_[4] ) > 1 ) {
     $_[6][ $_[5] ] = undef;
 
     return $_[6];
@@ -67,14 +88,7 @@ sub get {
     return $_[6];
   }
 
-  # For indels, which will be the least frequent, return it all
-  if ( length( $_[4] ) > 1 ) {
-    $_[6][ $_[5] ] = [ map { $_ / $_[0]->{_s} } @{ $_[1]->[ $_[0]->{_dbName} ] } ];
-
-    return $_[6];
-  }
-
-  # Allele isn't an indel, but !defined $order->{ $refBase }{ $altAlleles }
+  # We match on exact allele
   $_[6][ $_[5] ] = undef;
 
   return $_[6];
