@@ -144,9 +144,9 @@ class AnnotationOutputs(Struct, frozen=True, forbid_unknown_fields=True):
 class DelimitersConfig(Struct, frozen=True, forbid_unknown_fields=True):
     field: str = "\t"
     position: str = "|"
-    overlap: str = chr(31)
+    overlap: str = "/"
     value: str = ";"
-    empty_field: str = "!"
+    empty_field: str = "NA"
 
     @staticmethod
     def from_dict(annotation_config: dict[str, Any]):
@@ -226,7 +226,7 @@ class Statistics:
             f"-outQcTabPath {self.qc_output_path} -refColumn {ref_field} "
             f"-altColumn {alt_field} -homozygotesColumn {hom_field} "
             f"-heterozygotesColumn {het_field} -siteTypeColumn {site_type_field} "
-            f"{dbSNPpart} -emptyField '{empty_field}' "
+            f"{dbSNPpart} -emptyField {empty_field} "
             f"-exonicAlleleFunctionColumn {ea_fun_field} "
             f"-primaryDelimiter '{value_delim}' -fieldSeparator '{field_delim}'"
         )

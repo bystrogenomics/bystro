@@ -30,7 +30,6 @@ use Scalar::Util qw/looks_like_number/;
 use Seq::Output::Delimiters;
 use Seq::Tracks::Base::Types;
 use Scalar::Util qw/looks_like_number/;
-use DDP;
 
 use Seq::Tracks;
 extends 'Seq::Tracks::Build';

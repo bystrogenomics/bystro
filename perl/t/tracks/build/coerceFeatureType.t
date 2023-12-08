@@ -24,12 +24,12 @@ my $seq = Seq::Tracks::Build->new(
 );
 
 # unit separator
-my $overlap = "\x1f";
+my $overlap = "/";
 
 my $str =
   '1: Homo sapiens BRCA1/BRCA2-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
 my $expected =
-  '1: Homo sapiens BRCA1/BRCA2-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
+  '1: Homo sapiens BRCA1,BRCA2-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
 my $res = $seq->coerceFeatureType( 'someString', $str );
 
 #modifies passed string, and also returns the modified value
@@ -43,7 +43,8 @@ $expected =
   '2: Homo sapiens BRCA1,BRCA2-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
 $res = $seq->coerceFeatureType( 'someString', $str );
 
-ok( $res eq $str && $str eq $expected, 'Can clean string containing \x1f' );
+ok( $res eq $str && $str eq $expected,
+  'Can clean string containing / followed by a-zA-Z' );
 
 $str =
     '3: Homo sapiens BRCA1'
@@ -53,7 +54,8 @@ $expected =
   '3: Homo sapiens BRCA1,BRCA2-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
 $res = $seq->coerceFeatureType( 'someString', $str );
 
-ok( $res eq $str && $str eq $expected, 'Can clean string containing 2 \x1f' );
+ok( $res eq $str && $str eq $expected,
+  'Can clean string containing 2 / folloed by a a-zA-Z' );
 
 $str =
     '4: Homo sapiens BRCA1'
@@ -63,7 +65,8 @@ $expected =
   '4: Homo sapiens BRCA1,(BRCA2)-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
 $res = $seq->coerceFeatureType( 'someString', $str );
 
-ok( $res eq $str && $str eq $expected, 'Can clean string containing \x1f(' );
+ok( $res eq $str && $str eq $expected,
+  'Can clean string containing / followed by a special character, a parenthsis' );
 
 $str =
     '5: Homo sapiens BRCA1'
@@ -73,7 +76,8 @@ $expected =
   '5: Homo sapiens BRCA1,.(BRCA2)-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
 $res = $seq->coerceFeatureType( 'someString', $str );
 
-ok( $res eq $str && $str eq $expected, 'Can clean string containing \x1f.(' );
+ok( $res eq $str && $str eq $expected,
+  'Can clean string containing / followed by a special character, a period' );
 
 $str =
   '6: Homo sapiens BRCA1|(BRCA2)-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
@@ -89,7 +93,8 @@ $expected =
   '6: Homo sapiens BRCA1,BRCA2-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
 $res = $seq->coerceFeatureType( 'someString', $str );
 
-ok( $res eq $str && $str eq $expected, 'Can clean string containing |' );
+ok( $res eq $str && $str eq $expected,
+  'Can clean string containing | followed by a a-zA-Z' );
 
 $str =
   '7: Homo sapiens BRCA1;BRCA2-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
@@ -97,7 +102,8 @@ $expected =
   '7: Homo sapiens BRCA1,BRCA2-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
 $res = $seq->coerceFeatureType( 'someString', $str );
 
-ok( $res eq $str && $str eq $expected, 'Can clean string containing ;' );
+ok( $res eq $str && $str eq $expected,
+  'Can clean string containing ; followed by a a-zA-Z' );
 
 $str =
   '8: Homo sapiens BRCA1;.BRCA2-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
@@ -105,7 +111,8 @@ $expected =
   '8: Homo sapiens BRCA1,.BRCA2-containing complex subunit 3 (BRCC3), transcript variant 2, mRNA. (from RefSeq NM_001018055)';
 $res = $seq->coerceFeatureType( 'someString', $str );
 
-ok( $res eq $str && $str eq $expected, 'Can clean string containing ;.' );
+ok( $res eq $str && $str eq $expected,
+  'Can clean string containing ; followed by a period' );
 
 my $test = 'NA';
 $res = $seq->coerceFeatureType( 'someString', $test );

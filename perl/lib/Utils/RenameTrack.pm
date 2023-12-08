@@ -12,8 +12,6 @@ use Mouse 2;
 use namespace::autoclean;
 use Path::Tiny qw/path/;
 
-use DDP;
-
 use Seq::Tracks::Build::LocalFilesPaths;
 use Seq::Tracks::Base::MapTrackNames;
 use List::MoreUtils qw/first_index/;
