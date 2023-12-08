@@ -1,3 +1,6 @@
+# This test demonstrates that we can join a track that is not built
+# Here, we join the "clinvar" track's data on refSeq, but don't build the individual clinvar track
+
 use 5.10.0;
 use strict;
 use warnings;
@@ -18,10 +21,8 @@ use Seq::Build;
 use Seq::Tracks::Gene::Site::SiteTypeMap;
 use Seq::Tracks::Reference::MapBases;
 
-# create temp directories
 my $dir = Path::Tiny->tempdir();
 
-# prepare temp directory and make test config file
 my $config_file = PrepareConfigWithTempdirs(
   't/tracks/gene/join_no_build.yml',
   't/tracks/gene/db/raw', [ 'database_dir', 'files_dir', 'temp_dir' ],
