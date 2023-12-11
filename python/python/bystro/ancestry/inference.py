@@ -49,7 +49,7 @@ class AncestryModel:
         logger.debug("computing RFC classification")
         with Timer() as timer:
             probs = self.rfc.predict_proba(Xpc)
-        logger.debug("finished computing RFC classification in %f seconds", timer.elapsed_time)
+        logger.debug("finished computing RFC classification in %f seconds", timer.elapsed_time)    
         return pd.DataFrame(probs, index=genotypes.index, columns=POPS)
 
 

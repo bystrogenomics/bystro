@@ -174,6 +174,7 @@ class AncestryResponse:
 
     vcf_path: str = field(validator=_vcf_validator)
     results: list[AncestryResult] = field(validator=instance_of(list))
+    pcs: dict[str, list[float]]
 
     @results.validator
     def _is_list_of_unique_ancestry_results(
