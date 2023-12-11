@@ -157,6 +157,7 @@ class AncestryResult:
     """
 
     sample_id: str = field(validator=instance_of(str))
+    top_hit: tuple = field(validator=instance_of(tuple))
     populations: PopulationVector = field(validator=instance_of(PopulationVector))
     superpops: SuperpopVector = field(validator=instance_of(SuperpopVector))
     # needs to be literal float for msgspec

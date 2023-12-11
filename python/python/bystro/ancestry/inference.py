@@ -50,7 +50,8 @@ class AncestryModel:
         with Timer() as timer:
             probs = self.rfc.predict_proba(Xpc)
         logger.debug("finished computing RFC classification in %f seconds", timer.elapsed_time)
-        return Xpc, pd.DataFrame(probs, index=genotypes.index, columns=POPS)
+        Xpc_dict = Xpc.T.to_dict(orient='list')
+        return Xpc_dict, pd.DataFrame(probs, index=genotypes.index, columns=POPS)
 
 
 def _fill_missing_data(genotypes: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
