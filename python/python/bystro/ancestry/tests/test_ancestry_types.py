@@ -182,6 +182,7 @@ def test_AncestryResult_rejects_invalid_missingness() -> None:
 def test_AncestryResult_is_frozen() -> None:
     ancestry_result = AncestryResult(
         sample_id="my_sample_id",
+        top_hit = (0.6, ["SAS"]),
         populations=PopulationVector(**pop_kwargs),
         superpops=SuperpopVector(**superpop_kwargs),
         missingness=0.1,
@@ -216,6 +217,11 @@ def test_AncestryResponse_accepts_valid_args() -> None:
                 missingness=0.5,
             ),
         ],
+        pcs = {
+            "SampleID1": [0.1, 0.2, 0.3],
+            "SampleID2": [0.4, 0.5, 0.6],
+            "SampleID3": [0.7, 0.8, 0.9]
+        }
     )
 
 
@@ -233,7 +239,7 @@ def test_AncestryResponse_rejects_bad_results_type() -> None:
 
 
 def test_AncestryResponse_is_frozen() -> None:
-    ancestry_response = AncestryResponse(vcf_path="foo.vcf", results=[])
+    ancestry_response = AncestryResponse(vcf_path="foo.vcf", results=[], pcs={})
     with pytest.raises(FrozenInstanceError):
         ancestry_response.vcf_path = "bar.vcf"  # type: ignore [misc]
 
@@ -247,21 +253,29 @@ def test_AncestryResponse_rejects_duplicate_sample_ids() -> None:
             results=[
                 AncestryResult(
                     sample_id="foo",
+                    top_hit = (0.6, ["EAS"]),
                     populations=PopulationVector(**pop_kwargs),
                     superpops=SuperpopVector(**superpop_kwargs),
                     missingness=0.5,
                 ),
                 AncestryResult(
                     sample_id="foo",
+                    top_hit = (0.6, ["EAS"]),
                     populations=PopulationVector(**pop_kwargs),
                     superpops=SuperpopVector(**superpop_kwargs),
                     missingness=0.5,
                 ),
                 AncestryResult(
                     sample_id="bar",
+                    top_hit = (0.7, ["EUR"]),
                     populations=PopulationVector(**pop_kwargs),
                     superpops=SuperpopVector(**superpop_kwargs),
                     missingness=0.5,
                 ),
             ],
+            pcs = {
+                "SampleID1": [0.1, 0.2, 0.3],
+                "SampleID2": [0.4, 0.5, 0.6],
+                "SampleID3": [0.7, 0.8, 0.9]
+            }
         )
