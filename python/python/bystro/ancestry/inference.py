@@ -40,7 +40,7 @@ class AncestryModel:
             raise ValueError(err_msg)
         return self
 
-    def predict_proba(self, genotypes: pd.DataFrame) -> pd.DataFrame:
+    def predict_proba(self, genotypes: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Predict population probabilities from dosage matrix."""
         logger.debug("computing PCA transformation")
         with Timer() as timer:
@@ -49,8 +49,8 @@ class AncestryModel:
         logger.debug("computing RFC classification")
         with Timer() as timer:
             probs = self.rfc.predict_proba(Xpc)
-        logger.debug("finished computing RFC classification in %f seconds", timer.elapsed_time)    
-        return pd.DataFrame(probs, index=genotypes.index, columns=POPS)
+        logger.debug("finished computing RFC classification in %f seconds", timer.elapsed_time)
+        return Xpc, pd.DataFrame(probs, index=genotypes.index, columns=POPS)
 
 
 def _fill_missing_data(genotypes: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
@@ -63,7 +63,7 @@ def _fill_missing_data(genotypes: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series
 
 
 def _package_ancestry_response_from_pop_probs(
-    vcf_path: Path | str, pop_probs_df: pd.DataFrame, missingnesses: pd.Series
+    vcf_path: Path | str, pcs_for_plotting: pd.DataFrame, pop_probs_df: pd.DataFrame, missingnesses: pd.Series
 ) -> AncestryResponse:
     """Fill out AncestryResponse using filepath, numerical model output and sample-wise missingnesses."""
     superpop_probs_df = _superpop_probs_from_pop_probs(pop_probs_df)
@@ -78,6 +78,11 @@ def _package_ancestry_response_from_pop_probs(
                 f"Expected sample_id of type str, got {sample_id} of type({type(sample_id)}) instead"
             )
             raise TypeError(err_msg)
+        
+        pop_probs_dict = dict(sample_pop_probs)
+        max_value = max(pop_probs_dict.values())
+        top_pops = [pop for pop, value in pop_probs_dict.items() if value == max_value]
+        
         pop_vector = PopulationVector(
             **{
                 pop: _make_trivial_probability_interval(value)
@@ -93,12 +98,13 @@ def _package_ancestry_response_from_pop_probs(
         ancestry_results.append(
             AncestryResult(
                 sample_id=sample_id,
+                top_hit=(max_value, top_pops),
                 populations=pop_vector,
                 superpops=superpop_vector,
                 missingness=missingnesses[sample_id],
             )
         )
-    return AncestryResponse(vcf_path=str(vcf_path), results=ancestry_results)
+    return AncestryResponse(vcf_path=str(vcf_path), results=ancestry_results, pcs=pcs_for_plotting)
 
 
 # TODO: implement with ray
@@ -112,8 +118,8 @@ def infer_ancestry(
     with Timer() as timer:
         imputed_genotypes, missingnesses = _fill_missing_data(genotypes)
     logger.debug("Finished filling missing data for VCF in %f seconds", timer.elapsed_time)
-    pop_probs_df = ancestry_model.predict_proba(imputed_genotypes)
-    return _package_ancestry_response_from_pop_probs(vcf_path, pop_probs_df, missingnesses)
+    pcs_for_plotting, pop_probs_df = ancestry_model.predict_proba(imputed_genotypes)
+    return _package_ancestry_response_from_pop_probs(vcf_path, pcs_for_plotting, pop_probs_df, missingnesses)
 
 
 def _superpop_probs_from_pop_probs(pop_probs: pd.DataFrame) -> pd.DataFrame:

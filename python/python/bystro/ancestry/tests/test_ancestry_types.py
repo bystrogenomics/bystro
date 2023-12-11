@@ -160,6 +160,7 @@ def test_SuperpopVector_is_frozen() -> None:
 def test_AncestryResult_accepts_valid_args() -> None:
     ancestry_result = AncestryResult(
         sample_id="my_sample_id",
+        top_hit = (0.6, ["SAS"]),
         populations=PopulationVector(**pop_kwargs),
         superpops=SuperpopVector(**superpop_kwargs),
         missingness=0.5,
@@ -171,6 +172,7 @@ def test_AncestryResult_rejects_invalid_missingness() -> None:
     with pytest.raises(AttrValidationError):
         AncestryResult(
             sample_id="my_sample_id",
+            top_hit = (0.6, ["SAS"]),
             populations=PopulationVector(**pop_kwargs),
             superpops=SuperpopVector(**superpop_kwargs),
             missingness=1.1,
@@ -194,18 +196,21 @@ def test_AncestryResponse_accepts_valid_args() -> None:
         results=[
             AncestryResult(
                 sample_id="foo",
+                top_hit = (0.6, ["EAS"]),
                 populations=PopulationVector(**pop_kwargs),
                 superpops=SuperpopVector(**superpop_kwargs),
                 missingness=0.5,
             ),
             AncestryResult(
                 sample_id="bar",
+                top_hit = (0.7, ["EUR"]),
                 populations=PopulationVector(**pop_kwargs),
                 superpops=SuperpopVector(**superpop_kwargs),
                 missingness=0.5,
             ),
             AncestryResult(
                 sample_id="baz",
+                top_hit = (0.5, ["AFR","AMR"]),
                 populations=PopulationVector(**pop_kwargs),
                 superpops=SuperpopVector(**superpop_kwargs),
                 missingness=0.5,
