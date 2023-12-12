@@ -1,7 +1,6 @@
 """Classify genotypes at inference time."""
 import logging
 from dataclasses import dataclass
-from typing import Dict, List
 from pathlib import Path
 
 import numpy as np
@@ -41,7 +40,7 @@ class AncestryModel:
             raise ValueError(err_msg)
         return self
 
-    def predict_proba(self, genotypes: pd.DataFrame) -> tuple[Dict[str, List[float]], pd.DataFrame]:
+    def predict_proba(self, genotypes: pd.DataFrame) -> tuple[dict[str, list[float]], pd.DataFrame]:
         """Predict population probabilities from dosage matrix."""
         logger.debug("computing PCA transformation")
         with Timer() as timer:
@@ -66,7 +65,7 @@ def _fill_missing_data(genotypes: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series
 
 def _package_ancestry_response_from_pop_probs(
     vcf_path: Path | str,
-    pcs_for_plotting: Dict[str, List[float]],
+    pcs_for_plotting: dict[str, list[float]],
     pop_probs_df: pd.DataFrame,
     missingnesses: pd.Series,
 ) -> AncestryResponse:
