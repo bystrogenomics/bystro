@@ -1,5 +1,6 @@
 """Test ancestry_types.py."""
 import pytest
+import msgspec
 from attrs.exceptions import FrozenInstanceError
 
 from bystro.ancestry.ancestry_types import (
@@ -192,7 +193,7 @@ def test_AncestryResult_is_frozen() -> None:
 
 
 def test_AncestryResponse_accepts_valid_args() -> None:
-    AncestryResponse(
+    ancestry_response = AncestryResponse(
         vcf_path="myfile.vcf",
         results=[
             AncestryResult(
@@ -219,6 +220,27 @@ def test_AncestryResponse_accepts_valid_args() -> None:
         ],
         pcs={"SampleID1": [0.1, 0.2, 0.3], "SampleID2": [0.4, 0.5, 0.6], "SampleID3": [0.7, 0.8, 0.9]},
     )
+    ancestry_response_json = msgspec.json.encode(ancestry_response)
+    msgspec.json.decode(ancestry_response_json, type=AncestryResponse)
+
+
+def test_AncestryResponse_rejects_invalid_pcs() -> None:
+    with pytest.raises(msgspec.ValidationError, match=r"Expected `object`, got `array`"):
+        ancestry_response = AncestryResponse(
+            vcf_path="myfile.vcf",
+            results=[
+                AncestryResult(
+                    sample_id="foo",
+                    top_hit=(0.6, ["EAS"]),
+                    populations=PopulationVector(**pop_kwargs),
+                    superpops=SuperpopVector(**superpop_kwargs),
+                    missingness=0.5,
+                ),
+            ],
+            pcs=({"SampleID1": [0.1]}, {"SampleID2": [0.4]}, {"SampleID3": [0.7]}),  # type: ignore
+        )
+        ancestry_response_json = msgspec.json.encode(ancestry_response)
+        msgspec.json.decode(ancestry_response_json, type=AncestryResponse)
 
 
 def test_AncestryResponse_rejects_bad_vcf_path() -> None:
