@@ -180,6 +180,17 @@ def test_AncestryResult_rejects_invalid_missingness() -> None:
         )
 
 
+def test_AncestryResponse_rejects_bad_tophit_type() -> None:
+    with pytest.raises(AttrValidationError):
+        AncestryResult(
+            sample_id="foo",
+            top_hit=(0.5),  # type: ignore
+            populations=PopulationVector(**pop_kwargs),
+            superpops=SuperpopVector(**superpop_kwargs),
+            missingness=0.5,
+        )
+
+
 def test_AncestryResult_is_frozen() -> None:
     ancestry_result = AncestryResult(
         sample_id="my_sample_id",
