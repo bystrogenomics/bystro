@@ -31,7 +31,7 @@ ANCESTRY_MODEL = _make_ancestry_model()
 
 
 def test_Ancestry_Model():
-    pop_probs = ANCESTRY_MODEL.predict_proba(FAKE_GENOTYPES)
+    pcs_for_plotting, pop_probs = ANCESTRY_MODEL.predict_proba(FAKE_GENOTYPES)
     assert (pop_probs.index == SAMPLES).all()
     assert (pop_probs.columns == POPS).all()
 

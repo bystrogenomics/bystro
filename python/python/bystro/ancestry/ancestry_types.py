@@ -157,6 +157,7 @@ class AncestryResult:
     """
 
     sample_id: str = field(validator=instance_of(str))
+    top_hit: tuple = field(validator=instance_of(tuple))
     populations: PopulationVector = field(validator=instance_of(PopulationVector))
     superpops: SuperpopVector = field(validator=instance_of(SuperpopVector))
     # needs to be literal float for msgspec
@@ -174,6 +175,7 @@ class AncestryResponse:
 
     vcf_path: str = field(validator=_vcf_validator)
     results: list[AncestryResult] = field(validator=instance_of(list))
+    pcs: dict[str, list[float]]
 
     @results.validator
     def _is_list_of_unique_ancestry_results(
