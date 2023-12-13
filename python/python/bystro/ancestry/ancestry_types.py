@@ -145,6 +145,14 @@ class SuperpopVector:
     EUR: ProbabilityInterval = field(validator=ProbIntValidator)
     SAS: ProbabilityInterval = field(validator=ProbIntValidator)
 
+@attrs.frozen(kw_only=True)
+class AncestryTopHit:
+    """
+    The top hit for a sample, with the max value (a probability) and the population(s) corresponding
+    """
+
+    probability: float = field(validator=unit_float_validator)
+    populations: list[str] = field(validator=instance_of(list))
 
 @attrs.frozen(kw_only=True)
 class AncestryResult:
@@ -157,7 +165,7 @@ class AncestryResult:
     """
 
     sample_id: str = field(validator=instance_of(str))
-    top_hit: tuple = field(validator=instance_of(tuple))
+    top_hit: AncestryTopHit = field(validator=instance_of(AncestryTopHit))
     populations: PopulationVector = field(validator=instance_of(PopulationVector))
     superpops: SuperpopVector = field(validator=instance_of(SuperpopVector))
     # needs to be literal float for msgspec
