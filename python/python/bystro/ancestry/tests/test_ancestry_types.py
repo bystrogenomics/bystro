@@ -1,7 +1,9 @@
 """Test ancestry_types.py."""
-import pytest
-import msgspec
+
 from attrs.exceptions import FrozenInstanceError
+import msgspec
+import numpy as np
+import pytest
 
 from bystro.ancestry.ancestry_types import (
     AncestryResponse,
@@ -194,7 +196,16 @@ def test_AncestryResponse_rejects_bad_tophit_type() -> None:
     with pytest.raises(AttrValidationError):
         AncestryResult(
             sample_id="foo",
-            top_hit=AncestryTopHit(probability=0.5), # type: ignore
+            top_hit=AncestryTopHit(probability=0.5),  # type: ignore
+            populations=PopulationVector(**pop_kwargs),
+            superpops=SuperpopVector(**superpop_kwargs),
+            missingness=0.5,
+        )
+
+    with pytest.raises(AttrValidationError):
+        AncestryResult(
+            sample_id="foo",
+            top_hit=AncestryTopHit(probability=np.float64(0.5), populations=["SAS"]),  # type: ignore
             populations=PopulationVector(**pop_kwargs),
             superpops=SuperpopVector(**superpop_kwargs),
             missingness=0.5,

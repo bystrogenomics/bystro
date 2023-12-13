@@ -97,7 +97,9 @@ def make_dummy_ancestry_response(vcf_path: str) -> AncestryResponse:
             ),
             AncestryResult(
                 sample_id="baz",
-                top_hit=AncestryTopHit(probability=0.75, populations=["AFR", "AMR", "EAS", "EUR", "SAS"]),
+                top_hit=AncestryTopHit(
+                    probability=0.75, populations=["AFR", "AMR", "EAS", "EUR", "SAS"]
+                ),
                 populations=PopulationVector(
                     ACB=ProbabilityInterval(lower_bound=0.5, upper_bound=1.0),
                     ASW=ProbabilityInterval(lower_bound=0.5, upper_bound=1.0),
