@@ -1,12 +1,15 @@
 """Test ancestry_types.py."""
-import pytest
-import msgspec
+
 from attrs.exceptions import FrozenInstanceError
+import msgspec
+import numpy as np
+import pytest
 
 from bystro.ancestry.ancestry_types import (
     AncestryResponse,
     AncestryResult,
     AncestrySubmission,
+    AncestryTopHit,
     AttrValidationError,
     PopulationVector,
     ProbabilityInterval,
@@ -161,7 +164,7 @@ def test_SuperpopVector_is_frozen() -> None:
 def test_AncestryResult_accepts_valid_args() -> None:
     ancestry_result = AncestryResult(
         sample_id="my_sample_id",
-        top_hit=(0.6, ["SAS"]),
+        top_hit=AncestryTopHit(probability=0.6, populations=["SAS"]),
         populations=PopulationVector(**pop_kwargs),
         superpops=SuperpopVector(**superpop_kwargs),
         missingness=0.5,
@@ -173,7 +176,7 @@ def test_AncestryResult_rejects_invalid_missingness() -> None:
     with pytest.raises(AttrValidationError):
         AncestryResult(
             sample_id="my_sample_id",
-            top_hit=(0.6, ["SAS"]),
+            top_hit=AncestryTopHit(probability=0.6, populations=["SAS"]),
             populations=PopulationVector(**pop_kwargs),
             superpops=SuperpopVector(**superpop_kwargs),
             missingness=1.1,
@@ -190,11 +193,29 @@ def test_AncestryResponse_rejects_bad_tophit_type() -> None:
             missingness=0.5,
         )
 
+    with pytest.raises(AttrValidationError):
+        AncestryResult(
+            sample_id="foo",
+            top_hit=AncestryTopHit(probability=0.5),  # type: ignore
+            populations=PopulationVector(**pop_kwargs),
+            superpops=SuperpopVector(**superpop_kwargs),
+            missingness=0.5,
+        )
+
+    with pytest.raises(AttrValidationError):
+        AncestryResult(
+            sample_id="foo",
+            top_hit=AncestryTopHit(probability=np.float64(0.5), populations=["SAS"]),  # type: ignore
+            populations=PopulationVector(**pop_kwargs),
+            superpops=SuperpopVector(**superpop_kwargs),
+            missingness=0.5,
+        )
+
 
 def test_AncestryResult_is_frozen() -> None:
     ancestry_result = AncestryResult(
         sample_id="my_sample_id",
-        top_hit=(0.6, ["SAS"]),
+        top_hit=AncestryTopHit(probability=0.6, populations=["SAS"]),
         populations=PopulationVector(**pop_kwargs),
         superpops=SuperpopVector(**superpop_kwargs),
         missingness=0.1,
@@ -209,21 +230,21 @@ def test_AncestryResponse_accepts_valid_args() -> None:
         results=[
             AncestryResult(
                 sample_id="foo",
-                top_hit=(0.6, ["EAS"]),
+                top_hit=AncestryTopHit(probability=0.6, populations=["EAS"]),
                 populations=PopulationVector(**pop_kwargs),
                 superpops=SuperpopVector(**superpop_kwargs),
                 missingness=0.5,
             ),
             AncestryResult(
                 sample_id="bar",
-                top_hit=(0.7, ["EUR"]),
+                top_hit=AncestryTopHit(probability=0.7, populations=["EUR"]),
                 populations=PopulationVector(**pop_kwargs),
                 superpops=SuperpopVector(**superpop_kwargs),
                 missingness=0.5,
             ),
             AncestryResult(
                 sample_id="baz",
-                top_hit=(0.5, ["AFR", "AMR"]),
+                top_hit=AncestryTopHit(probability=0.5, populations=["AFR", "AMR"]),
                 populations=PopulationVector(**pop_kwargs),
                 superpops=SuperpopVector(**superpop_kwargs),
                 missingness=0.5,
@@ -242,7 +263,7 @@ def test_AncestryResponse_rejects_invalid_pcs() -> None:
             results=[
                 AncestryResult(
                     sample_id="foo",
-                    top_hit=(0.6, ["EAS"]),
+                    top_hit=AncestryTopHit(probability=0.6, populations=["EAS"]),
                     populations=PopulationVector(**pop_kwargs),
                     superpops=SuperpopVector(**superpop_kwargs),
                     missingness=0.5,
@@ -295,21 +316,21 @@ def test_AncestryResponse_rejects_duplicate_sample_ids() -> None:
             results=[
                 AncestryResult(
                     sample_id="foo",
-                    top_hit=(0.6, ["EAS"]),
+                    top_hit=AncestryTopHit(probability=0.6, populations=["EAS"]),
                     populations=PopulationVector(**pop_kwargs),
                     superpops=SuperpopVector(**superpop_kwargs),
                     missingness=0.5,
                 ),
                 AncestryResult(
                     sample_id="foo",
-                    top_hit=(0.6, ["EAS"]),
+                    top_hit=AncestryTopHit(probability=0.6, populations=["EAS"]),
                     populations=PopulationVector(**pop_kwargs),
                     superpops=SuperpopVector(**superpop_kwargs),
                     missingness=0.5,
                 ),
                 AncestryResult(
                     sample_id="bar",
-                    top_hit=(0.7, ["EUR"]),
+                    top_hit=AncestryTopHit(probability=0.7, populations=["EUR"]),
                     populations=PopulationVector(**pop_kwargs),
                     superpops=SuperpopVector(**superpop_kwargs),
                     missingness=0.5,

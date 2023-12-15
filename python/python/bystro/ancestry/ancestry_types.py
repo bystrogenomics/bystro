@@ -7,6 +7,7 @@ from typing import TypeVar
 import attrs
 from attrs import field
 from attrs.validators import ge, instance_of, le
+import numpy as np
 
 # Attr classes can throw either TypeError or ValueError upon receipt
 # of bad data.  Generally we won't care which, so define the union of
@@ -56,6 +57,19 @@ unit_float_validator = [
     ge(0.0),
     le(1.0),
 ]
+
+unit_float_validator = [
+    instance_of(float),
+    ge(0.0),
+    le(1.0),
+]
+
+def is_python_unit_float(_, attribute, value):
+    if not isinstance(value, float) or isinstance(value, np.floating):
+        raise TypeError(f"{attribute.name} must be a Python float, not {type(value)}")
+
+    if value < 0.0 or value > 1.0:
+        raise TypeError(f"{attribute.name} must be between 0.0 and 1.0, not {value}")
 
 
 @attrs.frozen()
@@ -145,6 +159,14 @@ class SuperpopVector:
     EUR: ProbabilityInterval = field(validator=ProbIntValidator)
     SAS: ProbabilityInterval = field(validator=ProbIntValidator)
 
+@attrs.frozen(kw_only=True)
+class AncestryTopHit:
+    """
+    The top hit for a sample, with the max value (a probability) and the population(s) corresponding
+    """
+
+    probability: float = field(validator=is_python_unit_float)
+    populations: list[str] = field(validator=instance_of(list))
 
 @attrs.frozen(kw_only=True)
 class AncestryResult:
@@ -157,7 +179,7 @@ class AncestryResult:
     """
 
     sample_id: str = field(validator=instance_of(str))
-    top_hit: tuple = field(validator=instance_of(tuple))
+    top_hit: AncestryTopHit = field(validator=instance_of(AncestryTopHit))
     populations: PopulationVector = field(validator=instance_of(PopulationVector))
     superpops: SuperpopVector = field(validator=instance_of(SuperpopVector))
     # needs to be literal float for msgspec
