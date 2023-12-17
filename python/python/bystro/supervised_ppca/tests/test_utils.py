@@ -1,10 +1,5 @@
 import numpy as np
-import numpy.linalg as la
-import scipy.stats as st  # type: ignore
 from bystro.supervised_ppca._misc_np import classify_missingness
-
-import numpy as np
-import pytest
 
 def test_classify_missingness():
     # Test Case 1
@@ -23,8 +18,4 @@ def test_classify_missingness():
 
     assert len(matrices_list_1) == 5
     assert len(vectors_list_1) == 5
-
-# Run the tests
-if __name__ == "__main__":
-    pytest.main()
 

@@ -1,5 +1,3 @@
-import numpy as np
-import pytest
 from numpy.random import default_rng
 from bystro.supervised_ppca.gf_generative_pt import PPCAM
 
