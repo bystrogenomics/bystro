@@ -5,7 +5,7 @@ use warnings;
 package Seq::Tracks::Build::LocalFilesPaths;
 
 use Mouse 2;
-use DDP;
+
 use Path::Tiny qw/path/;
 use File::Glob ':bsd_glob';
 

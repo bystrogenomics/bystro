@@ -3,6 +3,7 @@
 from bystro.ancestry.ancestry_types import (
     AncestryResponse,
     AncestryResult,
+    AncestryTopHit,
     PopulationVector,
     ProbabilityInterval,
     SuperpopVector,
@@ -16,6 +17,7 @@ def make_dummy_ancestry_response(vcf_path: str) -> AncestryResponse:
         results=[
             AncestryResult(
                 sample_id="foo",
+                top_hit=AncestryTopHit(probability=0.5, populations=["AFR", "AMR", "EAS", "EUR", "SAS"]),
                 populations=PopulationVector(
                     ACB=ProbabilityInterval(lower_bound=0.0, upper_bound=0.5),
                     ASW=ProbabilityInterval(lower_bound=0.0, upper_bound=0.5),
@@ -55,6 +57,7 @@ def make_dummy_ancestry_response(vcf_path: str) -> AncestryResponse:
             ),
             AncestryResult(
                 sample_id="bar",
+                top_hit=AncestryTopHit(probability=1.0, populations=["AFR", "AMR", "EAS", "EUR", "SAS"]),
                 populations=PopulationVector(
                     ACB=ProbabilityInterval(lower_bound=0.0, upper_bound=1.0),
                     ASW=ProbabilityInterval(lower_bound=0.0, upper_bound=1.0),
@@ -94,6 +97,9 @@ def make_dummy_ancestry_response(vcf_path: str) -> AncestryResponse:
             ),
             AncestryResult(
                 sample_id="baz",
+                top_hit=AncestryTopHit(
+                    probability=0.75, populations=["AFR", "AMR", "EAS", "EUR", "SAS"]
+                ),
                 populations=PopulationVector(
                     ACB=ProbabilityInterval(lower_bound=0.5, upper_bound=1.0),
                     ASW=ProbabilityInterval(lower_bound=0.5, upper_bound=1.0),
@@ -132,4 +138,5 @@ def make_dummy_ancestry_response(vcf_path: str) -> AncestryResponse:
                 missingness=0.75,
             ),
         ],
+        pcs={"foo": [0.1, 0.2, 0.3], "bar": [0.4, 0.5, 0.6], "baz": [0.7, 0.8, 0.9]},
     )
