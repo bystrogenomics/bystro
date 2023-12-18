@@ -5,7 +5,7 @@ use warnings;
 package Seq::Definition;
 use Mouse::Role 2;
 use Path::Tiny;
-use DDP;
+
 use Types::Path::Tiny qw/AbsPath AbsFile AbsDir/;
 use List::MoreUtils   qw/first_index/;
 use Mouse::Util::TypeConstraints;

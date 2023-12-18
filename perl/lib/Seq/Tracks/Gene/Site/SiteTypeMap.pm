@@ -6,7 +6,6 @@ package Seq::Tracks::Gene::Site::SiteTypeMap;
 
 use Mouse 2;
 use Mouse::Util::TypeConstraints;
-use DDP;
 # Define allowable types
 
 # Safe for use when instantiated to static variable; no set - able properties

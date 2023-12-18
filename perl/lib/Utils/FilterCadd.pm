@@ -16,7 +16,6 @@ use Scalar::Util      qw/looks_like_number/;
 
 use Seq::Tracks::Build::LocalFilesPaths;
 
-use DDP;
 use Parallel::ForkManager;
 
 use Seq::DBManager;
@@ -71,8 +70,6 @@ sub go {
   $trackConfig{assembly}    = $self->_decodedConfig->{assembly};
   $trackConfig{chromosomes} = $self->_decodedConfig->{chromosomes};
 
-  # p %trackConfig;
-  # exit;
   my $caddGetter = Seq::Tracks::Cadd->new( \%trackConfig );
 
   my $rounder = Seq::Tracks::Score::Build::Round->new(

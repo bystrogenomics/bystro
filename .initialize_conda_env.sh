@@ -11,7 +11,7 @@ if { conda env list | grep 'bystro'; } >/dev/null 2>&1; then
     conda activate bystro
     conda install python=$version -y -q
 else
-    echo -e "\n====                Creating Bystro environemnt with Python $version                  ====\n"
+    echo -e "\n====                Creating Bystro environment with Python $version                  ====\n"
     conda create --name bystro python=$version -y -q
     conda activate bystro
 fi
