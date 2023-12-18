@@ -2,7 +2,7 @@ from bystro.search.save.handler import _make_output_string, _populate_data
 from bystro.search.utils.annotation import DelimitersConfig
 
 delims = DelimitersConfig(
-    empty_field="!",
+    empty_field="NA",
     overlap="/",
     value=";",
     position="|",
@@ -95,12 +95,12 @@ def test_basic_functionality():
         ],
     ]
 
-    expected = b"gene1_mrna1/!/gene1_mrna2;gene1|position2a;position2b\tcol2_scalar\nrow2_scalar\n"
+    expected = b"gene1_mrna1/NA/gene1_mrna2;gene1|position2a;position2b\tcol2_scalar\nrow2_scalar\n"
 
     assert _make_output_string(rows, delims) == expected
 
 
 def test_empty_list():
-    rows = []
+    rows: list = []
     expected = b"\n"
     assert _make_output_string(rows, delims) == expected

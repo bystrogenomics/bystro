@@ -18,14 +18,13 @@ require bytes;
 use Seq::DBManager;
 use Scalar::Util qw/looks_like_number/;
 use Data::Float;
-# my $seq = MockBuilder->new_with_config({config => './config/hg19.yml', debug => 1});
+
 Seq::DBManager::initialize(
   databaseDir => '/mnt/annotator/bystro-dev/hg19/index',
   readOnly    => 1,
 );
 my $db = Seq::DBManager->new();
-# my $stuff = $db->dbReadOne('chr21', 49e6, 0 , 1);
-# p $stuff;
+
 my $nobless;
 
 my $mpt = Data::MessagePack->new()->prefer_float32();

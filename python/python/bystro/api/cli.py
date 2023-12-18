@@ -1,8 +1,10 @@
 import argparse
 import datetime
 import os
+import sys
 
 import requests
+import json
 
 from msgspec import Struct, json as mjson
 
@@ -180,7 +182,9 @@ def save_state(data: CachedAuth, state_dir: str, print_result=True) -> None:
         f.write(encoded_data)
 
     if print_result:
-        print(f"\nSaved auth credentials to {save_path}:\n{mjson.format(encoded_data, indent=4)}")
+        print(
+            f"\nSaved auth credentials to {save_path}:\n{mjson.format(encoded_data, indent=4)}"
+        )
 
 
 def signup(args: argparse.Namespace, print_result=True) -> CachedAuth:
@@ -297,6 +301,7 @@ def authenticate(args) -> tuple[CachedAuth, dict]:
 
     header = {"Authorization": f"Bearer {state.access_token}"}
     return state, header
+
 
 def get_jobs(
     args: argparse.Namespace, print_result=True
@@ -465,6 +470,74 @@ def get_user(args: argparse.Namespace, print_result=True) -> UserProfile:
     return user_profile
 
 
+def query(args: argparse.Namespace) -> None:
+    """
+    Performs a query search within the specified job with the given arguments.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        The arguments passed to the command.
+    dir : str, optional
+        The directory where the Bystro API login state is saved.
+    query : str, required
+        The search query string to be used for fetching data.
+    size : int, optional
+        The number of records to retrieve in the query response.
+    from_ : int, optional
+        The record offset from which to start retrieval in the query.
+    job_id : str, required
+        The unique identifier of the job to query.
+
+    Returns
+    -------
+    QueryResults
+        The queried results
+    """
+
+    state, auth_header = authenticate(args)
+
+    try:
+        query_payload = {
+            "from": args.from_,
+            "query": {
+                "bool": {
+                    "must": {
+                        "query_string": {
+                            "default_operator": "AND",
+                            "query": args.query,
+                            "lenient": True,
+                            "phrase_slop": 5,
+                            "tie_breaker": 0.3,
+                        }
+                    }
+                }
+            },
+            "size": args.size,
+        }
+
+        response = requests.post(
+            state.url + f"/api/jobs/{args.job_id}/search",
+            headers=auth_header,
+            json={"id": args.job_id, "searchBody": query_payload},
+            timeout=30,
+        )
+
+        if response.status_code != 200:
+            raise RuntimeError(
+                (f"Query failed with status: {response.status_code}. "
+                f"Error: \n{response.text}\n")
+            )
+
+        query_results = response.json()
+
+        print("\nQuery Results:")
+        print(json.dumps(query_results, indent=4))
+
+    except Exception as e:
+        sys.stderr.write(f"Query failed: {e}\n")
+
+
 def main():
     """
     The main function for the CLI tool.
@@ -571,6 +644,31 @@ def main():
         "--dir", default=DEFAULT_DIR, help="Where Bystro API login state is saved"
     )
     jobs_parser.set_defaults(func=get_jobs)
+
+    query_parser = subparsers.add_parser(
+        "query", help="The OpenSearch query string query, e.g. (cadd: >= 20)"
+    )
+    query_parser.add_argument(
+        "--dir", default=DEFAULT_DIR, help="Where Bystro API login state is saved"
+    )
+    query_parser.add_argument(
+        "--query",
+        required=True,
+        help="The OpenSearch query string query, e.g. (cadd: >= 20)",
+    )
+    query_parser.add_argument(
+        "--size", default=10, type=int, help="How many records (default: 10)"
+    )
+    query_parser.add_argument(
+        "--from_",
+        default=0,
+        type=int,
+        help="The first record to return from the matching results. Used for pagination",
+    )
+    query_parser.add_argument(
+        "--job_id", required=True, type=str, help="The job id to query"
+    )
+    query_parser.set_defaults(func=query)
 
     args = parser.parse_args()
     if hasattr(args, "func"):

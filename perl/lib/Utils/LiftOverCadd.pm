@@ -16,7 +16,6 @@ use Path::Tiny        qw/path/;
 
 use Seq::Tracks::Build::LocalFilesPaths;
 
-use DDP;
 use Parallel::ForkManager;
 
 # Exports: _localFilesDir, _decodedConfig, compress, _wantedTrack, _setConfig, logPath, use_absolute_path

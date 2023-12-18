@@ -3,10 +3,10 @@ build_author: ec2-user
 build_date: 2017-08-08T03:49:00
 fileProcessors:
   snp:
-    args: --emptyField ! --minGq .95
+    args: --emptyField NA --minGq .95
     program: bystro-snp
   vcf:
-    args: --emptyField !
+    args: --emptyField NA
     program: bystro-vcf
 chromosomes:
   - chr1

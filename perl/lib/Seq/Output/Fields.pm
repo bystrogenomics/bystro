@@ -8,6 +8,7 @@ use Mouse::Role 2;
 has chromField          => ( is => 'ro', default => 'chrom',          lazy => 1 );
 has posField            => ( is => 'ro', default => 'pos',            lazy => 1 );
 has typeField           => ( is => 'ro', default => 'type',           lazy => 1 );
+has inputRefField       => ( is => 'ro', default => 'inputRef',       lazy => 1 );
 has discordantField     => ( is => 'ro', default => 'discordant',     lazy => 1 );
 has altField            => ( is => 'ro', default => 'alt',            lazy => 1 );
 has trTvField           => ( is => 'ro', default => 'trTv',           lazy => 1 );

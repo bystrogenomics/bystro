@@ -39,11 +39,13 @@ Methods
 None
 """
 import numpy as np
+from numpy.typing import NDArray
+from typing import Any, Callable
 
-from sklearn.decomposition import PCA  # type: ignore
-from tqdm import trange  # type: ignore
+from sklearn.decomposition import PCA
+from tqdm import trange
 import torch
-from torch import nn
+from torch import Tensor, nn
 from torch.distributions.multivariate_normal import MultivariateNormal
 from torch.distributions.gamma import Gamma
 
@@ -53,7 +55,10 @@ from bystro.supervised_ppca._base import BasePCASGDModel
 
 class PPCA(BasePCASGDModel):
     def __init__(
-        self, n_components=2, prior_options=None, training_options=None
+        self,
+        n_components: int = 2,
+        prior_options: dict | None = None,
+        training_options: dict | None = None,
     ):
         """
         This implements probabilistic PCA with stochastic gradient descent.
@@ -74,6 +79,7 @@ class PPCA(BasePCASGDModel):
         prior_options : dict,default={}
             The options for priors on model parameters
         """
+
         super().__init__(
             n_components=n_components,
             prior_options=prior_options,
@@ -81,17 +87,27 @@ class PPCA(BasePCASGDModel):
         )
         self._initialize_save_losses()
 
+        self.W_: NDArray[np.float_] | None = None
+        self.sigmas_: NDArray[np.float_] | None = None
+        self.sigma2_: np.float_ | None = None
+        self.p: int | None = None
+
     def __repr__(self):
         return f"PPCApt(n_components={self.n_components})"
 
-    def fit(self, X, progress_bar=True, seed=2021):
+    def fit(
+        self,
+        X: NDArray[np.float_],
+        progress_bar: bool = True,
+        seed: int = 2021,
+    ) -> "PPCA":
         """
         Fits a model given covariates X as well as option labels y in the
         supervised methods
 
         Parameters
         ----------
-        X : np.array-like,(n_samples,n_covariates)
+        X : NDArray,(n_samples,n_covariates)
             The data
 
         progress_bar : bool,default=True
@@ -99,7 +115,7 @@ class PPCA(BasePCASGDModel):
 
         Returns
         -------
-        self : object
+        self : PPCA
             The model
         """
         self._test_inputs(X)
@@ -110,7 +126,7 @@ class PPCA(BasePCASGDModel):
 
         W_, sigmal_ = self._initialize_variables(X)
 
-        X = self._transform_training_data(X)[0]
+        X_tensor = self._transform_training_data(X)[0]
 
         trainable_variables = [W_, sigmal_]
 
@@ -124,13 +140,11 @@ class PPCA(BasePCASGDModel):
 
         _prior = self._create_prior()
 
-        myrange = trange if progress_bar else range
-
-        for i in myrange(training_options["n_iterations"]):
+        for i in trange(training_options["n_iterations"], disable=not progress_bar):
             idx = rng.choice(
-                X.shape[0], size=training_options["batch_size"], replace=False
+                X_tensor.shape[0], size=training_options["batch_size"], replace=False
             )
-            X_batch = X[idx]
+            X_batch = X_tensor[idx]
 
             sigma = softplus(sigmal_)
             WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
@@ -165,11 +179,31 @@ class PPCA(BasePCASGDModel):
 
         Returns
         -------
-        covariance : np.array-like(p,p)
+        covariance : NDArray(p,p)
             The covariance matrix
         """
-        covariance = np.dot(self.W_.T, self.W_) + self.sigma2_ * np.eye(self.p)
-        return covariance
+        if self.W_ is None or self.sigma2_ is None or self.p is None:
+            raise ValueError("Fit model first")
+
+        return np.dot(self.W_.T, self.W_) + self.sigma2_ * np.eye(self.p)
+
+    def get_noise(self):
+        """
+        Returns the observational noise as a diagonal matrix
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        Lambda : NDArray,(p,p)
+            The observational noise
+        """
+        if self.sigma2_ is None or self.p is None:
+            raise ValueError("Fit model first")
+
+        return self.sigma2_ * np.eye(self.p)
 
     def _create_prior(self):
         """
@@ -182,21 +216,19 @@ class PPCA(BasePCASGDModel):
         """
         prior_options = self.prior_options
 
-        def log_prior(trainable_variables):
+        def log_prior(trainable_variables: list[Tensor]):
             W_ = trainable_variables[0]
             sigma_ = trainable_variables[1]
-            part1 = (
-                -1 * prior_options["weight_W"] * torch.mean(torch.square(W_))
+            part1 = -1 * prior_options["weight_W"] * torch.mean(torch.square(W_))
+            part2 = Gamma(prior_options["alpha"], prior_options["beta"]).log_prob(
+                sigma_
             )
-            part2 = Gamma(
-                prior_options["alpha"], prior_options["beta"]
-            ).log_prob(sigma_)
             out = torch.mean(part1 + part2)
             return out
 
         return log_prior
 
-    def _initialize_variables(self, X):
+    def _initialize_variables(self, X: NDArray[np.float_]) -> tuple[Tensor, Tensor]:
         """
         Initializes the variables of the model. Right now fits a PCA model
         in sklearn, uses the loadings and sets sigma^2 to be unexplained
@@ -204,7 +236,7 @@ class PPCA(BasePCASGDModel):
 
         Parameters
         ----------
-        X : np.array-like,(n_samples,p)
+        X : NDArray,(n_samples,p)
             The data
 
         Returns
@@ -225,7 +257,13 @@ class PPCA(BasePCASGDModel):
         sigmal_ = torch.tensor(sinv, requires_grad=True)
         return W_, sigmal_
 
-    def _save_losses(self, i, log_likelihood, log_prior, log_posterior):
+    def _save_losses(
+        self,
+        i,
+        log_likelihood: Tensor,
+        log_prior: NDArray[np.float_] | Tensor,
+        log_posterior,
+    ) -> None:
         """
         Saves the values of the losses at each iteration
 
@@ -234,43 +272,43 @@ class PPCA(BasePCASGDModel):
         i : int
             Current training iteration
 
-        losses_likelihood : torch.tensor
+        losses_likelihood : Tensor
             The log likelihood
 
-        losses_prior : torch.tensor
+        losses_prior : NDArray[np.float_] | Tensor
             The log prior
 
-        losses_posterior : torch.tensor
+        losses_posterior : Tensor
             The log posterior
         """
         self.losses_likelihood[i] = log_likelihood.detach().numpy()
-        if torch.is_tensor(log_prior):
+        if isinstance(log_prior, Tensor):
             self.losses_prior[i] = log_prior.detach().numpy()
         else:
             self.losses_prior[i] = log_prior
         self.losses_posterior[i] = log_posterior.detach().numpy()
 
-    def _store_instance_variables(self, trainable_variables):
+    def _store_instance_variables(self, trainable_variables: list[Tensor]) -> None:
         """
         Saves the learned variables
 
         Parameters
         ----------
-        trainable_variables : list
+        trainable_variables : list[Tensor]
             List of tensorflow variables saved
 
         Sets
         ----
-        W_ : np.array-like,(n_components,p)
+        W_ : NDArray,(n_components,p)
             The loadings
 
-        sigma2_ : float
+        sigma2_ : np.float_
             The isotropic variance
         """
         self.W_ = trainable_variables[0].detach().numpy()
         self.sigma2_ = nn.Softplus()(trainable_variables[1]).detach().numpy()
 
-    def _test_inputs(self, X):
+    def _test_inputs(self, X: NDArray[np.float_]) -> None:
         """
         Just tests to make sure data is numpy array
         """
@@ -279,7 +317,7 @@ class PPCA(BasePCASGDModel):
         if self.training_options["batch_size"] > X.shape[0]:
             raise ValueError("Batch size exceeds number of samples")
 
-    def _fill_prior_options(self, prior_options):
+    def _fill_prior_options(self, prior_options: dict[str, Any]) -> dict[str, Any]:
         """
         Fills in options for prior parameters
 
@@ -289,14 +327,17 @@ class PPCA(BasePCASGDModel):
             The prior parameters used to specify the prior
         """
         default_dict = {"weight_W": 0.01, "alpha": 3.0, "beta": 3.0}
-        new_dict = {**default_dict, **prior_options}
-        return new_dict
+
+        return {**default_dict, **prior_options}
 
 
 class SPCA(BasePCASGDModel):
     def __init__(
-        self, n_components=2, prior_options=None, training_options=None
-    ):
+        self,
+        n_components: int = 2,
+        prior_options: dict[str, Any] | None = None,
+        training_options: dict[str, Any] | None = None,
+    ) -> None:
         """
         This implements supervised probabilistic component analysis. Unlike
         PPCA there are no analytic solutions for this model. While the
@@ -324,26 +365,33 @@ class SPCA(BasePCASGDModel):
             prior_options=prior_options,
             training_options=training_options,
         )
+
         self._initialize_save_losses()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"SPCApt(n_components={self.n_components})"
 
-    def fit(self, X, groups, progress_bar=True, seed=2021):
+    def fit(
+        self,
+        X: NDArray[np.float_],
+        groups: NDArray[np.float_],
+        progress_bar: bool = True,
+        seed: int = 2021,
+    ) -> "SPCA":
         """
-        Fits a model given covariates X 
+        Fits a model given covariates X
 
         Parameters
         ----------
-        X : np.array-like,(n_samples,n_covariates)
+        X : NDArray,(n_samples,n_covariates)
             The data
 
-        groups : np.array-like,(n_covariates,)
+        groups : NDArray,(n_covariates,)
             Divide the covariates into groups with different isotropic noise
 
         Returns
         -------
-        self : object
+        self : SPCA
             The model
         """
         self._test_inputs(X, groups)
@@ -355,7 +403,7 @@ class SPCA(BasePCASGDModel):
 
         W_, sigmals_ = self._initialize_variables(X)
 
-        X = self._transform_training_data(X)[0]
+        X_ = self._transform_training_data(X)[0]
 
         self.groups = groups
         list_constants = []
@@ -375,20 +423,23 @@ class SPCA(BasePCASGDModel):
 
         _prior = self._create_prior()
 
-        myrange = trange if progress_bar else range
-
-        for i in myrange(training_options["n_iterations"]):
+        for i in trange(training_options["n_iterations"], disable=not progress_bar):
             idx = rng.choice(
-                X.shape[0], size=training_options["batch_size"], replace=False
+                X_.shape[0], size=training_options["batch_size"], replace=False
             )
-            X_batch = X[idx]
+            X_batch = X_[idx]
 
-            list_covs = [
-                softplus(sigmals_[k]) * list_constants[k]
-                for k in range(self.n_groups)
-            ]
+            list_covs = torch.tensor(
+                [
+                    softplus(sigmals_[k]) * list_constants[k]
+                    for k in range(self.n_groups)
+                ]
+            )
 
-            sigma = torch.sum(list_covs, dim=0,)
+            sigma = torch.sum(
+                list_covs,
+                dim=0,
+            )
             WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
             Sigma = WWT + torch.diag(sigma)
 
@@ -421,11 +472,33 @@ class SPCA(BasePCASGDModel):
 
         Returns
         -------
-        covariance : np.array-like(p,p)
+        covariance : NDArray(p,p)
             The covariance matrix
         """
+        if self.W_ is None or self.sigmas_ is None:
+            raise ValueError("Fit model first")
+
         covariance = np.dot(self.W_.T, self.W_) + np.diag(self.sigmas_)
         return covariance
+
+    def get_noise(self):
+        """
+        Returns the observational noise as a diagonal matrix
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        Lambda : NDArray,(p,p)
+            The observational noise
+        """
+        if self.sigmas_ is None:
+            raise ValueError("Fit model first")
+
+        Lambda = np.diag(self.sigmas_)
+        return Lambda
 
     def _create_prior(self):
         """
@@ -440,19 +513,18 @@ class SPCA(BasePCASGDModel):
 
         def log_prior(trainable_variables):
             list_gamma_log_probs = []
-            for k in self.n_groups:
+            for k in range(self.n_groups):
                 list_gamma_log_probs.append(
-                    Gamma(
-                        prior_options["alpha"], prior_options["beta"]
-                    ).log_prob(trainable_variables[k + 1])
+                    Gamma(prior_options["alpha"], prior_options["beta"]).log_prob(
+                        trainable_variables[k + 1]
+                    )
                 )
 
-            gamma_log_probs = torch.stack(list_gamma_log_probs)
-            return torch.mean(gamma_log_probs)
+            return torch.mean(torch.stack(list_gamma_log_probs))
 
         return log_prior
 
-    def _fill_prior_options(self, prior_options):
+    def _fill_prior_options(self, prior_options: dict[str, Any]):
         """
         Fills in options for prior parameters
 
@@ -462,10 +534,10 @@ class SPCA(BasePCASGDModel):
             The prior parameters used to specify the prior
         """
         default_dict = {"alpha": 3.0, "beta": 3.0}
-        new_dict = {**default_dict, **prior_options}
-        return new_dict
 
-    def _initialize_variables(self, X):
+        return {**default_dict, **prior_options}
+
+    def _initialize_variables(self, X: NDArray):
         """
         Initializes the variables of the model. Right now fits a PCA model
         in sklearn, uses the loadings and sets sigma^2 to be unexplained
@@ -473,7 +545,7 @@ class SPCA(BasePCASGDModel):
 
         Parameters
         ----------
-        X : np.array-like,(n_samples,p)
+        X : NDArray,(n_samples,p)
             The data
 
         Returns
@@ -491,42 +563,41 @@ class SPCA(BasePCASGDModel):
         X_recon = np.dot(S_hat, W_init)
         diff = np.mean((X - X_recon) ** 2)
         sinv = softplus_inverse_np(diff * np.ones(1).astype(np.float32))
-        sigmal_ = [
-            torch.tensor(sinv, requires_grad=True) for i in range(self.n_groups)
-        ]
+        sigmal_ = [torch.tensor(sinv, requires_grad=True) for i in range(self.n_groups)]
         return W_, sigmal_
 
-    def _store_instance_variables(self, trainable_variables):
+    def _store_instance_variables(self, trainable_variables: list[Tensor]) -> None:
         """
         Saves the learned variables
 
         Parameters
         ----------
-        trainable_variables : list
+        trainable_variables : list[Tensor]
             List of variables learned by pytorch
 
         Sets
         ----
-        W_ : np.array-like,(n_components,p)
+        W_ : NDArray,(n_components,p)
             The loadings
 
-        sigmas_ : np.array-like,(p,)
+        sigmas_ : NDArray,(p,)
             The diagonal variances
         """
         self.W_ = trainable_variables[0].detach().numpy()
         self.sigmas_ = np.zeros(self.p)
+
         for k in range(self.n_groups):
             sigma2 = nn.Softplus()(trainable_variables[k + 1])
             self.sigmas_[self.groups == k] = sigma2
 
-    def _test_inputs(self, X, groups):
+    def _test_inputs(self, X: NDArray[np.float_], groups: NDArray[np.float_]):
         """
         Just tests to make sure data is numpy array
         """
         if not isinstance(X, np.ndarray):
-            raise ValueError("X is numpy array")
+            raise ValueError("X must be a Numpy array")
         if not isinstance(groups, np.ndarray):
-            raise ValueError("groups is numpy array")
+            raise ValueError("groups must be a Numpy array")
         if X.shape[1] != len(groups):
             raise ValueError("Dimensions do not match")
         if self.training_options["batch_size"] > X.shape[0]:
@@ -535,7 +606,10 @@ class SPCA(BasePCASGDModel):
 
 class FactorAnalysis(BasePCASGDModel):
     def __init__(
-        self, n_components=2, prior_options=None, training_options=None
+        self,
+        n_components=2,
+        prior_options: dict | None = None,
+        training_options: dict | None = None,
     ):
         """
         This implements factor analysis which allows for each covariate to
@@ -559,33 +633,40 @@ class FactorAnalysis(BasePCASGDModel):
             training_options=training_options,
         )
         self._initialize_save_losses()
+        self.p: int | None = None
+        self.W_: NDArray[np.float_] | None = None
+        self.sigmas_: NDArray[np.float_] | None = None
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"FactorAnalysispt(n_components={self.n_components})"
 
-    def fit(self, X, progress_bar=True, seed=2021):
+    def fit(
+        self, X: NDArray[np.float_], progress_bar: bool = True, seed: int = 2021
+    ) -> "FactorAnalysis":
         """
-        Fits a model given covariates X 
+        Fits a model given covariates X
 
         Parameters
         ----------
-        X : np.array-like,(n_samples,n_covariates)
+        X : NDArray,(n_samples,n_covariates)
             The data
 
         Returns
         -------
-        self : object
+        self : FactorAnalysis
             The model
         """
         self._test_inputs(X)
         training_options = self.training_options
+
         N, p = X.shape
         self.p = p
+
         rng = np.random.default_rng(int(seed))
 
         W_, sigmal_ = self._initialize_variables(X)
 
-        X = self._transform_training_data(X)[0]
+        X_ = self._transform_training_data(X)[0]
 
         trainable_variables = [W_, sigmal_]
 
@@ -598,13 +679,11 @@ class FactorAnalysis(BasePCASGDModel):
 
         _prior = self._create_prior()
 
-        myrange = trange if progress_bar else range
-
-        for i in myrange(training_options["n_iterations"]):
+        for i in trange(training_options["n_iterations"], disable=not progress_bar):
             idx = rng.choice(
-                X.shape[0], size=training_options["batch_size"], replace=False
+                X_.shape[0], size=training_options["batch_size"], replace=False
             )
-            X_batch = X[idx]
+            X_batch = X_[idx]
 
             sigmas = softplus(sigmal_)
             WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
@@ -628,7 +707,7 @@ class FactorAnalysis(BasePCASGDModel):
 
         return self
 
-    def get_covariance(self):
+    def get_covariance(self) -> NDArray[np.float_]:
         """
         Gets the covariance matrix
 
@@ -640,13 +719,33 @@ class FactorAnalysis(BasePCASGDModel):
 
         Returns
         -------
-        covariance : np.array-like(p,p)
+        covariance : NDArray(p,p)
             The covariance matrix
         """
-        covariance = np.dot(self.W_.T, self.W_) + np.diag(self.sigmas_)
-        return covariance
+        if self.W_ is None or self.sigmas_ is None:
+            raise ValueError("Fit model first")
 
-    def _create_prior(self):
+        return np.dot(self.W_.T, self.W_) + np.diag(self.sigmas_)
+
+    def get_noise(self) -> NDArray[np.float_]:
+        """
+        Returns the observational noise as a diagonal matrix
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        Lambda : NDArray,(p,p)
+            The observational noise
+        """
+        if self.sigmas_ is None:
+            raise ValueError("Fit model first")
+
+        return np.diag(self.sigmas_)
+
+    def _create_prior(self) -> Callable[[list[Tensor]], Tensor]:
         """
         This creates the function representing prior on pararmeters
 
@@ -655,19 +754,18 @@ class FactorAnalysis(BasePCASGDModel):
         log_prior : function
             The function representing the negative log density of the prior
         """
-        prior_options = self.prior_options
 
-        def log_prior(trainable_variables):
+        def log_prior(trainable_variables: list[Tensor]) -> Tensor:
             sigma_ = nn.Softmax()(trainable_variables[1])
             return torch.mean(
-                Gamma(prior_options["alpha"], prior_options["beta"]).log_prob(
+                Gamma(self.prior_options["alpha"], self.prior_options["beta"]).log_prob(
                     sigma_
                 )
             )
 
         return log_prior
 
-    def _fill_prior_options(self, prior_options):
+    def _fill_prior_options(self, prior_options: dict[str, Any]) -> dict[str, Any]:
         """
         Fills in options for prior parameters
 
@@ -677,17 +775,16 @@ class FactorAnalysis(BasePCASGDModel):
             The prior parameters used to specify the prior
         """
         default_dict = {"alpha": 3.0, "beta": 3.0}
-        new_dict = {**default_dict, **prior_options}
-        return new_dict
+        return {**default_dict, **prior_options}
 
-    def _initialize_variables(self, X):
+    def _initialize_variables(self, X: NDArray[np.float_]):
         """
-        Initializes the variables of the model by fitting PCA model in 
+        Initializes the variables of the model by fitting PCA model in
         sklearn and using those loadings
 
         Parameters
         ----------
-        X : np.array-like,(n_samples,p)
+        X : NDArray,(n_samples,p)
             The data
 
         Returns
@@ -698,6 +795,9 @@ class FactorAnalysis(BasePCASGDModel):
         sigmal_ : torch.tensor,(p,)
             The noise of each covariate, unrectified
         """
+        if self.p is None:
+            raise ValueError("Fit model first")
+
         model = PCA(self.n_components)
         S_hat = model.fit_transform(X)
         W_init = model.components_.astype(np.float32)
@@ -708,9 +808,10 @@ class FactorAnalysis(BasePCASGDModel):
         sigmal_ = torch.tensor(
             sinv[0] * np.ones(self.p).astype(np.float32), requires_grad=True
         )
+
         return W_, sigmal_
 
-    def _store_instance_variables(self, trainable_variables):
+    def _store_instance_variables(self, trainable_variables: list[Tensor]) -> None:
         """
         Saves the learned variables
 
@@ -721,16 +822,16 @@ class FactorAnalysis(BasePCASGDModel):
 
         Sets
         ----
-        W_ : np.array-like,(n_components,p)
+        W_ : NDArray,(n_components,p)
             The loadings
 
-        sigmas_ : np.array-like,(n_components,p)
+        sigmas_ : NDArray,(n_components,p)
             The diagonal variances
         """
         self.W_ = trainable_variables[0].detach().numpy()
         self.sigmas_ = nn.Softplus()(trainable_variables[1]).detach().numpy()
 
-    def _test_inputs(self, X):
+    def _test_inputs(self, X: NDArray[np.float_]):
         """
         Just tests to make sure data is numpy array
         """

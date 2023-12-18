@@ -21,7 +21,6 @@ our $VERSION = '0.001';
 use Mouse 2;
 
 use namespace::autoclean;
-use DDP;
 
 use Seq::Tracks::Gene::Site;
 use Seq::Tracks::Gene::Site::SiteTypeMap;

@@ -5,7 +5,6 @@ use warnings;
 package Seq;
 
 our $VERSION = '0.001';
-
 # ABSTRACT: Annotate a snp file
 
 # TODO: make temp_dir handling more transparent
@@ -145,6 +144,7 @@ sub annotateFile {
   my @trackIndicesExceptReference = 0 .. $#trackGettersExceptReference;
 
   my $outIndicesMap = $finalHeader->getParentIndices();
+
   my @outIndicesExceptReference =
     map { $outIndicesMap->{ $_->name } } @trackGettersExceptReference;
 
@@ -166,6 +166,7 @@ sub annotateFile {
   );
 
   ###### Processes pre-processor output passed from file reader/producer #######
+  my $discordantIdx  = $outIndicesMap->{ $self->discordantField };
   my $refTrackOutIdx = $outIndicesMap->{ $refTrackGetter->name };
 
   #Accessors are amazingly slow; it takes as long to call ->name as track->get
@@ -303,7 +304,8 @@ sub annotateFile {
       }
 
       # 3 holds the input reference, we'll replace this with the discordant status
-      $fields[3] = $refTrackGetter->get($dataFromDbAref) ne $fields[3] ? 1 : 0;
+      $fields[$discordantIdx] =
+        $refTrackGetter->get($dataFromDbAref) ne $fields[3] ? 1 : 0;
 
       push @lines, \@fields;
     }
@@ -513,7 +515,7 @@ sub _getFinalHeader {
   # idx 1: position
   # idx 3: the reference (we rename this to discordant)
   # idx 4: the alternate allele
-  # idx 5: variable: anything the preprocessor provides
+  # idx 5 on: variable: anything the preprocessor provides
   my $numberSplitFields;
   my @headerFields;
   if ( $self->outputJson ) {
@@ -521,9 +523,15 @@ sub _getFinalHeader {
     $numberSplitFields = @headerFields;
   }
   else {
+    # Avoid unnecessary work splitting parts of the file we will not be extracting individual fields from
     $numberSplitFields = 5 + 1;
     @headerFields      = split( '\t', $header, $numberSplitFields );
   }
+
+  # We need to ensure that the ref field of the pre-processor is renamed
+  # so to not conflict with the ref field of the reference track
+  # because we store field names in a hash
+  $headerFields[3] = $self->inputRefField;
 
   # Our header class checks the name of each feature
   # It may be, more than likely, that the pre-processor names the 4th column 'ref'
@@ -531,7 +539,7 @@ sub _getFinalHeader {
   # This not only now reflects its actual function
   # but prevents name collision issues resulting in the wrong header idx
   # being generated for the ref track
-  $headerFields[3] = $self->discordantField;
+  push @headerFields, $self->discordantField;
 
   # Prepend all of the headers created by the pre-processor
   $finalHeader->addFeaturesToHeader( \@headerFields, undef, 1 );

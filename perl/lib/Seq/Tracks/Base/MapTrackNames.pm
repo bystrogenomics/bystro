@@ -11,7 +11,7 @@ use warnings;
 package Seq::Tracks::Base::MapTrackNames;
 use Mouse 2;
 use List::Util qw/max/;
-use DDP;
+
 use Seq::DBManager;
 
 with 'Seq::Role::Message';

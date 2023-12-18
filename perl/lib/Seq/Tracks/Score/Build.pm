@@ -13,7 +13,6 @@ use Mouse 2;
 
 use namespace::autoclean;
 use Parallel::ForkManager;
-use DDP;
 
 extends 'Seq::Tracks::Build';
 
