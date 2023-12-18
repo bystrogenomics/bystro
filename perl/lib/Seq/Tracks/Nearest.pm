@@ -21,7 +21,6 @@ our $VERSION = '0.001';
 use Mouse 2;
 
 use namespace::autoclean;
-use DDP;
 
 extends 'Seq::Tracks::Base';
 with 'Seq::Tracks::Region::RegionTrackPath';

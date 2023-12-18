@@ -5,7 +5,6 @@ use warnings;
 package Seq::Build;
 our $VERSION = '0.001';
 
-use DDP;
 # ABSTRACT: A class for building all files associated with a genome assembly
 # VERSION
 
@@ -109,10 +108,19 @@ sub BUILD {
     }
   }
 
+  if ( $tracks->getRefTrackBuilder()->no_build ) {
+    $self->log( 'fatal', "Reference track is marked as no_build, but must be built" );
+  }
+
   #TODO: return error codes from the rest of the buildTrack methods
   my $decodedConfig = LoadFile( $self->config );
 
   for my $builder (@builders) {
+    if ( $builder->no_build ) {
+      $self->log( 'info', "Marked as no_build, skipping: " . $builder->name . "\n" );
+      next;
+    }
+
     $self->log( 'info', "Started building " . $builder->name . "\n" );
 
     #TODO: implement errors for all tracks
