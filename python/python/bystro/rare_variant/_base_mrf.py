@@ -159,7 +159,8 @@ class BaseMarkovRandomField(BaseSGDModel):
         p_marginal = np.mean(X, axis=0)
         Phi_ = torch.tensor(np.log(p_marginal) - 1.0, requires_grad=True)
         L_l = torch.tensor(
-            1 / self.p * np.ones((self.p, self.p)), requires_grad=True
+            1 / self.p * np.ones((self.p, self.p)).astype(np.float32),
+            requires_grad=True,
         )
         log_z_ = torch.tensor(0.0, requires_grad=True)
 

@@ -130,7 +130,7 @@ class MarkovRandomFieldNCE(BaseMarkovRandomField):
         Phi_, L_l, log_z = self._initialize_variables(X)
         trainable_variables = [Phi_, L_l, log_z]
 
-        X_tensor = self._transform_training_data(X)[0]
+        X_tensor = self._transform_training_data(X.astype(np.float32))[0]
 
         optimizer = torch.optim.Adam(
             trainable_variables, lr=training_options["learning_rate"]
@@ -145,6 +145,8 @@ class MarkovRandomFieldNCE(BaseMarkovRandomField):
         m_L = nn.MSELoss()
         zeros = torch.zeros(p, p)
 
+        mp = torch.tensor(marginal_probs.astype(np.float32))
+
         for i in trange(
             training_options["n_iterations"], disable=not progress_bar
         ):
@@ -155,7 +157,7 @@ class MarkovRandomFieldNCE(BaseMarkovRandomField):
             )
             X_batch = X_tensor[idx]
             Y_gen = rng.binomial(1, marginal_probs, size=(n_noise, p))
-            Y_batch = torch.tensor(Y_gen)
+            Y_batch = torch.tensor(Y_gen.astype(np.float32))
 
             L = torch.tril(relu(L_l), diagonal=-1)
             Theta = 0.5 * (L + torch.transpose(L, 0, 1))
@@ -167,8 +169,8 @@ class MarkovRandomFieldNCE(BaseMarkovRandomField):
             vec_x = torch.matmul(X_batch, Phi_)
             nll_x = quad_x + vec_x
             log_p_m_x = -1 * nll_x + log_prior
-            log_p_n_x_point = marginal_probs*X_batch + (1-marginal_probs)*(1-X_batch)
-            log_p_n_x = torch.sum(log_p_n_x_point,dim=1)
+            log_p_n_x_point = mp * X_batch + (1 - mp) * (1 - X_batch)
+            log_p_n_x = torch.sum(log_p_n_x_point, dim=1)
             G_x = log_p_m_x - log_p_n_x
             h_x = 1 / (1 + training_options["nu"] * torch.exp(-G_x))
 
@@ -177,8 +179,8 @@ class MarkovRandomFieldNCE(BaseMarkovRandomField):
             vec_y = torch.matmul(Y_batch, Phi_)
             nll_y = quad_y + vec_y
             log_p_m_y = -1 * nll_y + log_prior
-            log_p_n_y_point = marginal_probs*Y_batch + (1-marginal_probs)*(1-Y_batch)
-            log_p_n_y = torch.sum(log_p_n_y_point,dim=1)
+            log_p_n_y_point = mp * Y_batch + (1 - mp) * (1 - Y_batch)
+            log_p_n_y = torch.sum(log_p_n_y_point, dim=1)
             G_y = log_p_m_y - log_p_n_y
             h_y = 1 / (1 + training_options["nu"] * torch.exp(-G_y))
 
