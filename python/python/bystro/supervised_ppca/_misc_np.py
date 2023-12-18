@@ -60,6 +60,7 @@ def subset_square_matrix_np(Sigma, idxs):
     Sigma_sub = Sigma[np.ix_(idxs == 1, idxs == 1)]
     return Sigma_sub
 
+
 def classify_missingness(matrix):
     # Find unique patterns of missing values
     unique_patterns = []
@@ -77,6 +78,6 @@ def classify_missingness(matrix):
     matrices_list = [matrix[indices] for indices in pattern_indices]
 
     # Create lists of vectors indicating missingness
-    vectors_list = [np.isnan(matrix[0])==False for matrix in matrices_list]
+    vectors_list = [~np.isnan(matrix[0]) for matrix in matrices_list]
 
     return matrices_list, vectors_list

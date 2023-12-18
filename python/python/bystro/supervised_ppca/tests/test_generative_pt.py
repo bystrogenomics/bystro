@@ -61,7 +61,7 @@ def generate_data_factorAnalysis():
     W_ = np.transpose(W_.T * lamb)
     W_ = 2 * W_
     ig = st.invgamma(alpha, 0, beta)
-    phi = ig.rvs(p)  
+    phi = ig.rvs(p)
     X_noise = rng.normal(size=(N, p)) * phi
     X_hat = np.dot(S, W_)
     X = X_hat + X_noise

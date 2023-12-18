@@ -78,11 +78,7 @@ class PPCAM(BasePCASGDModel):
     def __repr__(self):
         return f"PPCAM(n_components={self.n_components})"
 
-    def fit(
-        self,
-        X: NDArray[np.float_],
-        progress_bar: bool = True,
-    ) -> "PPCAM":
+    def fit(self, X: NDArray[np.float_], progress_bar: bool = True,) -> "PPCAM":
         """
         Fits a model given covariates X as well as option labels y in the
         supervised methods
@@ -211,13 +207,13 @@ class PPCAM(BasePCASGDModel):
 
         def log_prior(trainable_variables: list[Tensor]):
             W_ = trainable_variables[0]
-            sigma_ = trainable_variables[1]
+            sigmal_ = trainable_variables[1]
             part1 = (
                 -1 * prior_options["weight_W"] * torch.mean(torch.square(W_))
             )
             part2 = Gamma(
                 prior_options["alpha"], prior_options["beta"]
-            ).log_prob(sigma_)
+            ).log_prob(nn.Softplus()(sigmal_))
             out = torch.mean(part1 + part2)
             return out
 
