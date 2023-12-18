@@ -22,6 +22,7 @@ None
 
 """
 from abc import ABC
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -49,10 +50,60 @@ class BaseReducedRank(BaseSGDModel, ABC):
         The date/time that the object was created
     """
 
-    def __init__(self,training_options=None):
+    def __init__(self, training_options=None):
         super().__init__(training_options=training_options)
         self.B_ = None
         self.alpha_ = None
+
+    def _fill_training_options(
+        self, training_options: dict[str, Any]
+    ) -> dict[str, Any]:
+        """
+        This sets the default parameters for stochastic gradient descent,
+        our inference strategy for the model.
+
+        Parameters
+        ----------
+        training_options : dict
+            The original options set by the user passed as a dictionary
+
+        Options
+        -------
+        n_iterations : int, default=3000
+            Number of iterations to train using stochastic gradient descent
+
+        learning_rate : float, default=1e-4
+            Learning rate of gradient descent
+
+        method : string {'Nadam'}, default='Nadam'
+            The learning algorithm
+
+        batch_size : int, default=None
+            The number of observations to use at each iteration. If none
+            corresponds to batch learning
+
+        gpu_memory : int, default=1024
+            The amount of memory you wish to use during training
+        """
+        default_options = {
+            "n_iterations": 3000,
+            "learning_rate": 1e-2,
+            "batch_size": 100,
+            "momentum": 0.9,
+        }
+        tops = {**default_options, **training_options}
+
+        default_keys = set(default_options.keys())
+        final_keys = set(tops.keys())
+
+        expected_but_missing_keys = default_keys - final_keys
+        unexpected_but_present_keys = final_keys - default_keys
+        if expected_but_missing_keys:
+            raise ValueError("Missing keys")
+        if unexpected_but_present_keys:
+            raise ValueError("Unexpected keys")
+
+        return tops
 
     def decision_function(self, X: NDArray[np.float_]):
         """
@@ -125,6 +176,7 @@ class ReducedRankML(BaseReducedRank):
         self.lamb_sparsity = lamb_sparsity
         self.lamb_rank = lamb_rank
 
+        self._initialize_save_losses()
 
     def fit(
         self,
@@ -161,7 +213,9 @@ class ReducedRankML(BaseReducedRank):
 
         B_, alpha_ = self._initialize_variables(X, Y)
         trainable_variables = [B_, alpha_]
-        X_tensor, Y_tensor = self._transform_training_data(X, Y)
+        X_tensor, Y_tensor = self._transform_training_data(
+            X.astype(np.float32), Y.astype(np.float32)
+        )
 
         optimizer = torch.optim.SGD(
             trainable_variables,
@@ -276,10 +330,17 @@ class ReducedRankML(BaseReducedRank):
         alpha_ : torch.tensor,shape=(q,)
             The intercepts
         """
-        model = LogisticRegression()
-        model.fit(X, Y)
-        B_ = torch.tensor(model.coef_, requires_grad=True)
-        alpha_ = torch.tensor(model.intercept_, requires_grad=True)
+        q = Y.shape[1]
+        p = X.shape[1]
+        B = np.zeros((p, q))
+        alpha = np.zeros(q)
+        for i in range(q):
+            model = LogisticRegression()
+            model.fit(X, Y[:, i])
+            B[:, i] = np.squeeze(model.coef_)
+            alpha[i] = model.intercept_
+        B_ = torch.tensor(B.astype(np.float32), requires_grad=True)
+        alpha_ = torch.tensor(alpha.astype(np.float32), requires_grad=True)
         return B_, alpha_
 
     def _save_losses(
@@ -327,8 +388,6 @@ class ReducedRankML(BaseReducedRank):
             raise ValueError("Data is numpy array")
         if X.shape[0] != Y.shape[0]:
             raise ValueError("Different observation numbers in X and Y")
-        if self.training_options["batch_size"] > X.shape[0]:
-            raise ValueError("Batch size exceeds number of samples")
 
     def _transform_training_data(self, *args: NDArray) -> list[Tensor]:
         """ 

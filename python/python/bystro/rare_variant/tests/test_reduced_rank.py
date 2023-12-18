@@ -1,8 +1,6 @@
 import numpy as np
 from bystro.rare_variant.reduced_rank import ReducedRankML
 
-# Initialize data and model parameters for testing
-
 rng = np.random.default_rng(2021)
 X = rng.normal(size=(100, 10))
 Y = rng.binomial(1, 0.5, size=(100, 5))
