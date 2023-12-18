@@ -114,14 +114,23 @@ class GaussianMixturePPCA(BaseSGDModel):
         expected_but_missing_keys = default_keys - final_keys
         unexpected_but_present_keys = final_keys - default_keys
         if expected_but_missing_keys:
-            raise ValueError(
-                "the following training options were expected but not found..."
-            )
+            raise ValueError("Missing keys")
         if unexpected_but_present_keys:
-            raise ValueError(
-                "the following training options were unrecognized but provided..."
-            )
+            raise ValueError("Extra keys")
         return tops
+
+    def _fill_prior_options(self, prior_options):
+        """
+        Fills in options for prior parameters
+
+        Paramters
+        ---------
+        new_dict : dictionary
+            The prior parameters used to specify the prior
+        """
+        default_dict = {"mu_l2": 1.0}
+        new_dict = {**default_dict, **prior_options}
+        return new_dict
 
     def fit(self, X, progress_bar=True, seed=2021):
         """
@@ -140,6 +149,7 @@ class GaussianMixturePPCA(BaseSGDModel):
         self : object
             The model
         """
+        X = X.astype(np.float32)
         self._test_inputs(X)
         training_options = self.training_options
         N, p = X.shape
@@ -176,7 +186,7 @@ class GaussianMixturePPCA(BaseSGDModel):
 
             sigma2 = softplus(sigmal_)
 
-            X_each = [X_batch - torch.matmul(W_, mu_list[k]) for k in range(K)]
+            X_each = [X_batch - torch.matmul(mu_list[k], W_) for k in range(K)]
 
             Sigma = torch.matmul(torch.transpose(W_, 0, 1), W_) + sigma2 * eye
 
@@ -316,7 +326,8 @@ class GaussianMixturePPCA(BaseSGDModel):
         sigmal_ = torch.tensor(sinv, requires_grad=True)
 
         pi_logits = torch.tensor(
-            np.log(model_gmm.weights_ + 1e-3), requires_grad=True
+            np.log(model_gmm.weights_ + 1e-3).astype(np.float32),
+            requires_grad=True,
         )
         mean_list = [
             torch.tensor(
@@ -412,7 +423,7 @@ def softplus_inverse_np(y):
     x : np.array
         Transformed array
     """
-    min_threshold = 10**-15
+    min_threshold = 10 ** -15
     max_threshold = 500
     safe_y = np.clip(
         y, min_threshold, max_threshold
