@@ -121,7 +121,7 @@ class GaussianMixturePPCA(BaseSGDModel):
 
     def _fill_prior_options(self, prior_options):
         """
-        Fills in options for prior parameters
+        Fills in options for prior parameters on latent space
 
         Paramters
         ---------
