@@ -1,11 +1,15 @@
 """Test ancestry_types.py."""
-import pytest
+
 from attrs.exceptions import FrozenInstanceError
+import msgspec
+import numpy as np
+import pytest
 
 from bystro.ancestry.ancestry_types import (
     AncestryResponse,
     AncestryResult,
     AncestrySubmission,
+    AncestryTopHit,
     AttrValidationError,
     PopulationVector,
     ProbabilityInterval,
@@ -34,7 +38,7 @@ def test_AncestrySubmission_accepts_valid_vcf_paths():
 
 def test_AncestrySubmission_rejects_bad_vcf_paths():
     with pytest.raises(AttrValidationError):
-        AncestrySubmission(3)
+        AncestrySubmission(3)  # type: ignore
     with pytest.raises(AttrValidationError):
         AncestrySubmission("foo.txt")
     with pytest.raises(AttrValidationError):
@@ -48,7 +52,7 @@ def test_AncestrySubmission_rejects_bad_vcf_paths():
 def test_AncestrySubmission_is_frozen():
     ancestry_submission = AncestrySubmission("foo.vcf")
     with pytest.raises(FrozenInstanceError):
-        ancestry_submission.vcf_path = "bar.vcf"
+        ancestry_submission.vcf_path = "bar.vcf"  # type: ignore
 
 
 prob_int = ProbabilityInterval(lower_bound=0.0, upper_bound=1.0)
@@ -160,6 +164,7 @@ def test_SuperpopVector_is_frozen() -> None:
 def test_AncestryResult_accepts_valid_args() -> None:
     ancestry_result = AncestryResult(
         sample_id="my_sample_id",
+        top_hit=AncestryTopHit(probability=0.6, populations=["SAS"]),
         populations=PopulationVector(**pop_kwargs),
         superpops=SuperpopVector(**superpop_kwargs),
         missingness=0.5,
@@ -171,15 +176,46 @@ def test_AncestryResult_rejects_invalid_missingness() -> None:
     with pytest.raises(AttrValidationError):
         AncestryResult(
             sample_id="my_sample_id",
+            top_hit=AncestryTopHit(probability=0.6, populations=["SAS"]),
             populations=PopulationVector(**pop_kwargs),
             superpops=SuperpopVector(**superpop_kwargs),
             missingness=1.1,
         )
 
 
+def test_AncestryResponse_rejects_bad_tophit_type() -> None:
+    with pytest.raises(AttrValidationError):
+        AncestryResult(
+            sample_id="foo",
+            top_hit=(0.5),  # type: ignore
+            populations=PopulationVector(**pop_kwargs),
+            superpops=SuperpopVector(**superpop_kwargs),
+            missingness=0.5,
+        )
+
+    with pytest.raises(AttrValidationError):
+        AncestryResult(
+            sample_id="foo",
+            top_hit=AncestryTopHit(probability=0.5),  # type: ignore
+            populations=PopulationVector(**pop_kwargs),
+            superpops=SuperpopVector(**superpop_kwargs),
+            missingness=0.5,
+        )
+
+    with pytest.raises(AttrValidationError):
+        AncestryResult(
+            sample_id="foo",
+            top_hit=AncestryTopHit(probability=np.float64(0.5), populations=["SAS"]),  # type: ignore
+            populations=PopulationVector(**pop_kwargs),
+            superpops=SuperpopVector(**superpop_kwargs),
+            missingness=0.5,
+        )
+
+
 def test_AncestryResult_is_frozen() -> None:
     ancestry_result = AncestryResult(
         sample_id="my_sample_id",
+        top_hit=AncestryTopHit(probability=0.6, populations=["SAS"]),
         populations=PopulationVector(**pop_kwargs),
         superpops=SuperpopVector(**superpop_kwargs),
         missingness=0.1,
@@ -189,34 +225,67 @@ def test_AncestryResult_is_frozen() -> None:
 
 
 def test_AncestryResponse_accepts_valid_args() -> None:
-    AncestryResponse(
+    ancestry_response = AncestryResponse(
         vcf_path="myfile.vcf",
         results=[
             AncestryResult(
                 sample_id="foo",
+                top_hit=AncestryTopHit(probability=0.6, populations=["EAS"]),
                 populations=PopulationVector(**pop_kwargs),
                 superpops=SuperpopVector(**superpop_kwargs),
                 missingness=0.5,
             ),
             AncestryResult(
                 sample_id="bar",
+                top_hit=AncestryTopHit(probability=0.7, populations=["EUR"]),
                 populations=PopulationVector(**pop_kwargs),
                 superpops=SuperpopVector(**superpop_kwargs),
                 missingness=0.5,
             ),
             AncestryResult(
                 sample_id="baz",
+                top_hit=AncestryTopHit(probability=0.5, populations=["AFR", "AMR"]),
                 populations=PopulationVector(**pop_kwargs),
                 superpops=SuperpopVector(**superpop_kwargs),
                 missingness=0.5,
             ),
         ],
+        pcs={"SampleID1": [0.1, 0.2, 0.3], "SampleID2": [0.4, 0.5, 0.6], "SampleID3": [0.7, 0.8, 0.9]},
     )
+    ancestry_response_json = msgspec.json.encode(ancestry_response)
+    msgspec.json.decode(ancestry_response_json, type=AncestryResponse)
+
+
+def test_AncestryResponse_rejects_invalid_pcs() -> None:
+    with pytest.raises(msgspec.ValidationError, match=r"Expected `object`, got `array`"):
+        ancestry_response = AncestryResponse(
+            vcf_path="myfile.vcf",
+            results=[
+                AncestryResult(
+                    sample_id="foo",
+                    top_hit=AncestryTopHit(probability=0.6, populations=["EAS"]),
+                    populations=PopulationVector(**pop_kwargs),
+                    superpops=SuperpopVector(**superpop_kwargs),
+                    missingness=0.5,
+                ),
+            ],
+            pcs=({"SampleID1": [0.1]}, {"SampleID2": [0.4]}, {"SampleID3": [0.7]}),  # type: ignore
+        )
+        ancestry_response_json = msgspec.json.encode(ancestry_response)
+        msgspec.json.decode(ancestry_response_json, type=AncestryResponse)
 
 
 def test_AncestryResponse_rejects_bad_vcf_path() -> None:
     with pytest.raises(AttrValidationError):
-        AncestryResponse(vcf_path="foo.txt", results=[])
+        AncestryResponse(
+            vcf_path="foo.txt",
+            results=[],
+            pcs={
+                "SampleID1": [0.1, 0.2, 0.3],
+                "SampleID2": [0.4, 0.5, 0.6],
+                "SampleID3": [0.7, 0.8, 0.9],
+            },
+        )
 
 
 def test_AncestryResponse_rejects_bad_results_type() -> None:
@@ -224,11 +293,16 @@ def test_AncestryResponse_rejects_bad_results_type() -> None:
         AncestryResponse(
             vcf_path="myfile.vcf",
             results=[3, 4, 5],  # type: ignore [list-item]
+            pcs={
+                "SampleID1": [0.1, 0.2, 0.3],
+                "SampleID2": [0.4, 0.5, 0.6],
+                "SampleID3": [0.7, 0.8, 0.9],
+            },
         )
 
 
 def test_AncestryResponse_is_frozen() -> None:
-    ancestry_response = AncestryResponse(vcf_path="foo.vcf", results=[])
+    ancestry_response = AncestryResponse(vcf_path="foo.vcf", results=[], pcs={})
     with pytest.raises(FrozenInstanceError):
         ancestry_response.vcf_path = "bar.vcf"  # type: ignore [misc]
 
@@ -242,21 +316,29 @@ def test_AncestryResponse_rejects_duplicate_sample_ids() -> None:
             results=[
                 AncestryResult(
                     sample_id="foo",
+                    top_hit=AncestryTopHit(probability=0.6, populations=["EAS"]),
                     populations=PopulationVector(**pop_kwargs),
                     superpops=SuperpopVector(**superpop_kwargs),
                     missingness=0.5,
                 ),
                 AncestryResult(
                     sample_id="foo",
+                    top_hit=AncestryTopHit(probability=0.6, populations=["EAS"]),
                     populations=PopulationVector(**pop_kwargs),
                     superpops=SuperpopVector(**superpop_kwargs),
                     missingness=0.5,
                 ),
                 AncestryResult(
                     sample_id="bar",
+                    top_hit=AncestryTopHit(probability=0.7, populations=["EUR"]),
                     populations=PopulationVector(**pop_kwargs),
                     superpops=SuperpopVector(**superpop_kwargs),
                     missingness=0.5,
                 ),
             ],
+            pcs={
+                "SampleID1": [0.1, 0.2, 0.3],
+                "SampleID2": [0.4, 0.5, 0.6],
+                "SampleID3": [0.7, 0.8, 0.9],
+            },
         )

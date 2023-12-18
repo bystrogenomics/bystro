@@ -15,7 +15,9 @@ None
 """
 import numpy as np
 import numpy.linalg as la
+
 from bystro.supervised_ppca._base import BaseGaussianFactorModel
+from numpy.typing import NDArray
 
 
 class PPCAanalytic(BaseGaussianFactorModel):
@@ -28,39 +30,44 @@ class PPCAanalytic(BaseGaussianFactorModel):
         The latent dimensionality
     """
 
-    def __init__(self, n_components=2):
+    def __init__(self, n_components: int = 2):
         super().__init__(n_components=n_components)
+        self.W_: NDArray[np.float_] | None = None
+        self.p: int | None = None
+        self.sigma2_: np.float_ | None = None
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"PPCAAnalytic(n_components={self.n_components})"
 
-    def fit(self, X):
+    def fit(self, X: NDArray[np.float_]) -> "PPCAanalytic":
         """
         Fits a model given covariates X
 
         Parameters
         ----------
-        X : np.array-like,(n_samples,n_covariates)
+        X : NDArray,(n_samples,n_covariates)
             The data
 
         Returns
         -------
-        self : object
+        self : PPCAanalytic
             The model
         """
         N, self.p = X.shape
         L, p = self.n_components, self.p
 
         U, s, V = la.svd(X, full_matrices=False)
-        eigenvals = s ** 2 / (N - 1)
+        eigenvals = s**2 / (N - 1)
 
         var = 1.0 / (p - L) * (np.sum(eigenvals) - np.sum(eigenvals[:L]))
 
         L_m = np.diag((eigenvals[:L] - np.ones(L) * var) ** 0.5)
-        W = np.dot(V[:L].T, L_m)
-        self._store_instance_variables([W, var])
+        W: NDArray[np.float_] = np.dot(V[:L].T, L_m)
+        self._store_instance_variables((W, var))
 
-    def get_covariance(self):
+        return self
+
+    def get_covariance(self) -> NDArray[np.float_]:
         """
         Gets the covariance matrix
 
@@ -72,13 +79,35 @@ class PPCAanalytic(BaseGaussianFactorModel):
 
         Returns
         -------
-        covariance : np.array-like(p,p)
+        covariance : NDArray,(p,p)
             The covariance matrix
         """
-        covariance = np.dot(self.W_.T, self.W_) + self.sigma2_ * np.eye(self.p)
-        return covariance
+        if self.W_ is None or self.sigma2_ is None or self.p is None:
+            raise ValueError("Model has not been fit yet")
 
-    def _store_instance_variables(self, trainable_variables):
+        return np.dot(self.W_.T, self.W_) + self.sigma2_ * np.eye(self.p)
+
+    def get_noise(self):
+        """
+        Returns the observational noise as a diagonal matrix
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        Lambda : NDArray,(p,p)
+            The observational noise
+        """
+        if self.sigma2_ is None or self.p is None:
+            raise ValueError("Model has not been fit yet")
+
+        return self.sigma2_ * np.eye(self.p)
+
+    def _store_instance_variables(
+        self, trainable_variables: tuple[NDArray[np.float_], np.float_]
+    ) -> None:
         """
         Saves the learned variables
 
@@ -89,7 +118,7 @@ class PPCAanalytic(BaseGaussianFactorModel):
 
         Sets
         ----
-        W_ : np.array-like,(n_components,p)
+        W_ : NDArray,(n_components,p)
             The loadings
 
         sigma2_ : float

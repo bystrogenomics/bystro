@@ -1,6 +1,6 @@
 """
 This provides the base class for covariance estimation in terms of the 
-precision matrix. While in the futre I'll rewrite separate methods for some
+precision matrix. While in the future I'll rewrite separate methods for some
 of these to take advantage of the fact that we estimated the precision 
 matrix rather than covariance matrix, for now I just invert precision and 
 use the covariance matrix methods. Yuck right?
@@ -54,10 +54,12 @@ Methods
 -------
 _get_covariance(covariance)
 """
+import numpy as np
 from numpy import linalg as la
-from datetime import datetime as dt
-from ._base_covariance import BaseCovariance
-import pytz
+from numpy.typing import NDArray
+
+
+from bystro.covariance._base_covariance import BaseCovariance
 
 
 class BasePrecision(BaseCovariance):
@@ -67,93 +69,111 @@ class BasePrecision(BaseCovariance):
     """
 
     def __init__(self):
-        self.creationDate = dt.now(pytz.timezone("US/Pacific"))
+        super().__init__()
+        self.precision: NDArray | None = None
+
+    def _set_covariance_if_none(self):
+        if self.covariance is None:
+            self.covariance = self.get_covariance()
 
     #################
     # Miscellaneous #
     #################
     def get_covariance(self):
+        if self.precision is None:
+            raise ValueError(
+                "You need to fit the model first before you can get the "
+                "covariance matrix"
+            )
+
         return _get_covariance(self.precision)
 
     def get_stable_rank(self):
-        if not hasattr(self, "covariance"):
-            self.covariance = la.inv(self.precision)
+        self._set_covariance_if_none()
+
         return super(BasePrecision, self).get_stable_rank()
 
-    def predict(self, Xobs, idxs):
-        if not hasattr(self, "covariance"):
-            self.covariance = la.inv(self.precision)
+    def predict(self, Xobs: NDArray[np.float_], idxs: NDArray[np.float_]):
+        self._set_covariance_if_none()
+
         return super(BasePrecision, self).predict(Xobs, idxs)
 
     #####################################
     # Gaussian Likelihood-based methods #
     #####################################
-    def conditional_score(self, X, idxs, weights=None):
-        if not hasattr(self, "covariance"):
-            self.covariance = la.inv(self.precision)
-        return super(BasePrecision, self).conditional_score(
-            X, idxs, weights=weights
-        )
+    def conditional_score(
+        self,
+        X: NDArray[np.float_],
+        idxs: NDArray[np.float_],
+        weights: NDArray[np.float_] | None = None,
+    ):
+        self._set_covariance_if_none()
 
-    def conditional_score_samples(self, X, idxs):
-        if not hasattr(self, "covariance"):
-            self.covariance = la.inv(self.precision)
+        return super(BasePrecision, self).conditional_score(X, idxs, weights=weights)
+
+    def conditional_score_samples(
+        self, X: NDArray[np.float_], idxs: NDArray[np.float_]
+    ):
+        self._set_covariance_if_none()
+
         return super(BasePrecision, self).conditional_score_samples(X, idxs)
 
-    def marginal_score(self, X, idxs, weights=None):
-        if not hasattr(self, "covariance"):
-            self.covariance = la.inv(self.precision)
-        return super(BasePrecision, self).marginal_score(
-            X, idxs, weights=weights
-        )
+    def marginal_score(
+        self,
+        X: NDArray[np.float_],
+        idxs: NDArray[np.float_],
+        weights: NDArray[np.float_] | None = None,
+    ):
+        self._set_covariance_if_none()
 
-    def marginal_score_samples(self, X, idxs):
-        if not hasattr(self, "covariance"):
-            self.covariance = la.inv(self.precision)
+        return super(BasePrecision, self).marginal_score(X, idxs, weights=weights)
+
+    def marginal_score_samples(self, X: NDArray[np.float_], idxs: NDArray[np.float_]):
+        self._set_covariance_if_none()
+
         return super(BasePrecision, self).marginal_score_samples(X, idxs)
 
-    def score(self, X, weights=None):
-        if not hasattr(self, "covariance"):
-            self.covariance = la.inv(self.precision)
+    def score(self, X: NDArray[np.float_], weights: NDArray[np.float_] | None = None):
+        self._set_covariance_if_none()
+
         return super(BasePrecision, self).score(X, weights=weights)
 
-    def score_samples(self, X):
-        if not hasattr(self, "covariance"):
-            self.covariance = la.inv(self.precision)
+    def score_samples(self, X: NDArray[np.float_]):
+        self._set_covariance_if_none()
+
         return super(BasePrecision, self).score_samples(X)
 
     #################################
     # Information-theoretic methods #
     #################################
     def entropy(self):
-        if not hasattr(self, "covariance"):
-            self.covariance = la.inv(self.precision)
+        self._set_covariance_if_none()
+
         return super(BasePrecision, self).entropy()
 
-    def entropy_subset(self, idxs):
-        if not hasattr(self, "covariance"):
-            self.covariance = la.inv(self.precision)
+    def entropy_subset(self, idxs: NDArray[np.float_]):
+        self._set_covariance_if_none()
+
         return super(BasePrecision, self).entropy_subset(idxs)
 
-    def mutual_information(self, idxs1, idxs2):
-        if not hasattr(self, "covariance"):
-            self.covariance = la.inv(self.precision)
+    def mutual_information(self, idxs1: NDArray[np.float_], idxs2: NDArray[np.float_]):
+        self._set_covariance_if_none()
+
         return super(BasePrecision, self).mutual_information(idxs1, idxs2)
 
 
-def _get_covariance(precision):
+def _get_covariance(precision: NDArray[np.float_]) -> NDArray[np.float_]:
     """
     Gets the covariance matrix defined as the inverse of the precision
 
     Parameters
     ----------
-    precision : np.array-like(p,p)
+    precision : NDArray,(p,p)
         The precision matrix
 
     Returns
     -------
-    covariance : np.array-like(sum(p),sum(p))
+    covariance : NDArray,(sum(p),sum(p))
         The inverse of the precision matrix
     """
-    covariance = la.inv(precision)
-    return covariance
+    return la.inv(precision)

@@ -31,18 +31,19 @@ Methods
 None
 """
 import numpy as np
+from numpy.typing import NDArray
 
 from tqdm import trange
 import torch
-from torch import nn
+from torch import Tensor, nn
 from torch.distributions.multivariate_normal import MultivariateNormal
-from sklearn.decomposition import PCA  # type: ignore
+from sklearn.decomposition import PCA
 
 from bystro.supervised_ppca._misc_np import softplus_inverse_np
 from bystro.supervised_ppca.gf_generative_pt import PPCA
 
 
-def _get_projection_matrix(W_, sigma_):
+def _get_projection_matrix(W_: Tensor, sigma_: Tensor):
     """
     This is currently just implemented for PPCA due to nicer formula. Will
     modify for broader application later.
@@ -53,18 +54,18 @@ def _get_projection_matrix(W_, sigma_):
 
     Parameters
     ----------
-    W_ : pt.Tensor(n_components,p)
+    W_ : Tensor(n_components,p)
         The loadings
 
-    sigma_ : pt.tensor
+    sigma_ : Tensor
         Isotropic noise
 
     Returns
     -------
-    Proj_X : pt.tensor(n_components,p)
+    Proj_X : Tensor(n_components,p)
         Beta such that np.dot(Proj_X, X) = E[S|X]
 
-    Cov : pt.tensor(n_components,n_components)
+    Cov : Tensor(n_components,n_components)
         Var(S|X)
     """
     n_components = int(W_.shape[0])
@@ -77,11 +78,11 @@ def _get_projection_matrix(W_, sigma_):
 
 class PPCADropout(PPCA):
     """
-    This implements supervised PPCA according to the paper draft in 
+    This implements supervised PPCA according to the paper draft in
     prepration (Talbot et al, 2023), robust variational inference with
-    variational objectivesThat is the generative mechanism matches 
-    probabilistic PCA with  isotropic variance. However, a variational 
-    lower bound ona predictive objective is used to ensure that a subset 
+    variational objectivesThat is the generative mechanism matches
+    probabilistic PCA with  isotropic variance. However, a variational
+    lower bound ona predictive objective is used to ensure that a subset
     of latent variables are predictive of an auxiliary task.
 
     Parameters
@@ -91,7 +92,7 @@ class PPCADropout(PPCA):
 
     n_supervised : int
         The number of predictive latent variables
-            
+
     prior_options : dict
         The hyperparameters for the prior on the parameters
 
@@ -100,19 +101,19 @@ class PPCADropout(PPCA):
     gamma : float,default=10.0
 
     delta : 5.0
-        
+
 
     """
 
     def __init__(
         self,
-        n_components=2,
-        n_supervised=1,
-        prior_options=None,
-        mu=1.0,
-        gamma=10.0,
-        delta=5.0,
-        training_options=None,
+        n_components: int = 2,
+        n_supervised: int = 1,
+        prior_options: dict | None = None,
+        mu: float = 1.0,
+        gamma: float = 10.0,
+        delta: float = 5.0,
+        training_options: dict | None = None,
     ):
         self.mu = float(mu)
         self.gamma = float(gamma)
@@ -124,24 +125,27 @@ class PPCADropout(PPCA):
             training_options=training_options,
         )
         self._initialize_save_losses()
-        self.losses_supervision = np.empty(
-            self.training_options["n_iterations"]
-        )
-        self.W_ = None
-        self.sigma2_ = None
-        self.B_ = None
+        self.losses_supervision = np.empty(self.training_options["n_iterations"])
 
-    def fit(self, X, y, task="classification", progress_bar=True, seed=2021):
+    # override needed for mypy to ignore the non-optional `y` argument
+    def fit(  # type: ignore[override] 
+        self,
+        X: NDArray[np.float_],
+        y: NDArray[np.float_],
+        task: str = "classification",
+        progress_bar: bool = True,
+        seed: int = 2021,
+    ) -> "PPCADropout":
         """
         Fits a model given covariates X as well as option labels y in the
         supervised methods
 
         Parameters
         ----------
-        X : np.array-like,(n_samples,n_covariates)
+        X : NDArray,(n_samples,n_covariates)
             The data
 
-        y : np.array-like,(n_samples,n_prediction)
+        y : NDArray,(n_samples,n_prediction)
             Covariates we wish to predict. For now lazy and assuming
             logistic regression.
 
@@ -156,7 +160,7 @@ class PPCADropout(PPCA):
 
         Returns
         -------
-        self : object
+        self : PPCADropout
             The model
         """
         self._test_inputs(X, y)
@@ -166,17 +170,15 @@ class PPCADropout(PPCA):
         self.p = p
 
         W_, sigmal_, B_ = self._initialize_variables(X)
-        X, y = self._transform_training_data(X, 1.0 * y)
+        X_, y_ = self._transform_training_data(X, 1.0 * y)
 
         if task == "classification":
             sigm = nn.Sigmoid()
-            supervision_loss = nn.BCELoss()
+            supervision_loss: nn.BCELoss | nn.MSELoss = nn.BCELoss()
         elif task == "regression":
             supervision_loss = nn.MSELoss()
         else:
-            err_msg = (
-                f"unrecognized_task {task}, must be regression or classification"
-            )
+            err_msg = f"unrecognized_task {task}, must be regression or classification"
             raise ValueError(err_msg)
 
         trainable_variables = [W_, sigmal_, B_]
@@ -192,14 +194,14 @@ class PPCADropout(PPCA):
 
         _prior = self._create_prior()
 
-        myrange = trange if progress_bar else range
-
-        for i in myrange(training_options["n_iterations"]):
+        for i in trange(
+            int(training_options["n_iterations"]), disable=not progress_bar
+        ):
             idx = rng.choice(
-                X.shape[0], size=training_options["batch_size"], replace=False
+                X_.shape[0], size=training_options["batch_size"], replace=False
             )
-            X_batch = X[idx]
-            y_batch = y[idx]
+            X_batch = X_[idx]
+            y_batch = y_[idx]
 
             sigma = softplus(sigmal_)
             WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
@@ -219,9 +221,7 @@ class PPCADropout(PPCA):
             z_samples = mean_z + torch.matmul(eps, C1_2)
 
             y_hat = (
-                self.delta
-                * torch.matmul(z_samples[:, : self.n_supervised], one_s)
-                + B_
+                self.delta * torch.matmul(z_samples[:, : self.n_supervised], one_s) + B_
             )
             if task == "regression":
                 loss_y = supervision_loss(y_hat, y_batch)
@@ -233,7 +233,7 @@ class PPCADropout(PPCA):
             loss_i = torch.linalg.matrix_norm(off_diag)
 
             posterior = like_gen + 1 / N * like_prior
-            loss = -1 * posterior + self.mu * loss_y + self.gamma*loss_i
+            loss = -1 * posterior + self.mu * loss_y + self.gamma * loss_i
 
             optimizer.zero_grad()
             loss.backward()
@@ -243,20 +243,21 @@ class PPCADropout(PPCA):
             self.losses_supervision[i] = loss_y.detach().numpy()
 
         self._store_instance_variables(trainable_variables)
+
         return self
 
-    def _store_instance_variables(self, trainable_variables):
+    def _store_instance_variables(self, trainable_variables: list[Tensor]):
         """
         Saves the learned variables
 
         Parameters
         ----------
         trainable_variables : list
-            List of tensorflow variables saved
+            List of saved variables of type Tensor
 
         Sets
         ----
-        W_ : np.array-like,(n_components,p)
+        W_ : NDArray,(n_components,p)
             The loadings
 
         sigma2_ : float
@@ -269,7 +270,7 @@ class PPCADropout(PPCA):
         self.sigma2_ = nn.Softplus()(trainable_variables[1]).detach().numpy()
         self.B_ = trainable_variables[2].detach().numpy()
 
-    def _initialize_variables(self, X):
+    def _initialize_variables(self, X: NDArray):
         """
         Initializes the variables of the model. Right now fits a PCA model
         in sklearn, uses the loadings and sets sigma^2 to be unexplained
@@ -277,7 +278,7 @@ class PPCADropout(PPCA):
 
         Parameters
         ----------
-        X : np.array-like,(n_samples,p)
+        X : NDArray,(n_samples,p)
             The data
 
         Returns

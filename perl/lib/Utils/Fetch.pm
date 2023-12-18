@@ -21,8 +21,6 @@ use YAML::XS qw/Dump/;
 
 use Utils::SqlWriter;
 
-use DDP;
-
 # The sql connection config
 has sql         => ( is => 'ro', isa => 'Maybe[Str]' );
 has remoteFiles => ( is => 'ro', isa => 'Maybe[ArrayRef]' );

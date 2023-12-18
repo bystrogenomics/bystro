@@ -1,6 +1,8 @@
 """Load and prep fragpipe data-indepdent analysis (DIA) datasets."""
 
 from dataclasses import dataclass
+from io import StringIO
+from pathlib import Path
 
 import pandas as pd
 from bystro.proteomics.fragpipe_utils import check_df_starts_with_cols, prep_annotation_df
@@ -27,7 +29,7 @@ def _prep_pg_matrix_df(pg_matrix_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_data_independent_analysis_dataset(
-    pg_matrix_filename: str, annotation_filename: str
+    pg_matrix_filename: Path | str | StringIO, annotation_filename: Path | str | StringIO
 ) -> DataIndependentAnalysisDataset:
     """Load and prep Fragpipe tandem mass tag datasets."""
     raw_pg_matrix_df = pd.read_csv(pg_matrix_filename, sep="\t")

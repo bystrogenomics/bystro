@@ -37,7 +37,7 @@ class InheritedT(T):
     c: str
 
 
-class TestYourModule(unittest.TestCase):
+class ModuleTests(unittest.TestCase):
     def test_struct(self):
         t = T(a=1, b="test")
         self.assertEqual(t.a, 1)
@@ -45,13 +45,13 @@ class TestYourModule(unittest.TestCase):
 
         t_immutable = ImmutableT(a=1, b="test")
         with self.assertRaisesRegex(AttributeError, "immutable type: 'ImmutableT'"):
-            t_immutable.a = 2
+            t_immutable.a = 2 # type: ignore
 
         t_default = DefaultT(a=1)
         self.assertEqual(t_default.b, "test")
 
         with self.assertRaisesRegex(TypeError, "Missing required argument 'c'"):
-            InheritedT(a=5, b="test")
+            InheritedT(a=5, b="test") # type: ignore
 
     def test_event_enum(self):
         self.assertTrue(issubclass(Event, Enum))
@@ -71,7 +71,7 @@ class TestYourModule(unittest.TestCase):
         self.assertEqual(types["submissionID"], SubmissionID)
 
         with self.assertRaisesRegex(AttributeError, "immutable type: 'BaseMessage'"):
-            t.submissionID = "test2"
+            t.submissionID = "test2" # type: ignore
 
     def test_submitted_job_message(self):
         self.assertTrue(issubclass(SubmittedJobMessage, BaseMessage))
@@ -85,10 +85,10 @@ class TestYourModule(unittest.TestCase):
         self.assertEqual(types["event"], Event)
 
         with self.assertRaisesRegex(AttributeError, "immutable type: 'SubmittedJobMessage'"):
-            t.submissionID = "test2"
+            t.submissionID = "test2" # type: ignore
 
         with self.assertRaisesRegex(AttributeError, "immutable type: 'SubmittedJobMessage'"):
-            t.event = "test2"
+            t.event = Event.PROGRESS # type: ignore
 
     def test_completed_job_message(self):
         self.assertTrue(issubclass(CompletedJobMessage, BaseMessage))
@@ -102,16 +102,16 @@ class TestYourModule(unittest.TestCase):
         self.assertEqual(types["event"], Event)
 
         with self.assertRaisesRegex(AttributeError, "immutable type: 'CompletedJobMessage'"):
-            t.submissionID = "test2"
+            t.submissionID = "test2" # type: ignore
 
         with self.assertRaisesRegex(AttributeError, "immutable type: 'CompletedJobMessage'"):
-            t.event = "test2"
+            t.event = Event.PROGRESS # type: ignore
 
     def test_failed_job_message(self):
         self.assertTrue(issubclass(FailedJobMessage, BaseMessage))
 
         with self.assertRaisesRegex(TypeError, "Missing required argument 'reason'"):
-            t = FailedJobMessage(submissionID="test")
+            t = FailedJobMessage(submissionID="test") # type: ignore
 
         t = FailedJobMessage(submissionID="test", reason="foo")
         types = FailedJobMessage.keys_with_types()
@@ -123,16 +123,16 @@ class TestYourModule(unittest.TestCase):
         self.assertEqual(types["reason"], str)
 
         with self.assertRaisesRegex(AttributeError, "immutable type: 'FailedJobMessage'"):
-            t.event = "test2"
+            t.event = "test2" # type: ignore
 
     def test_invalid_job_message(self):
         self.assertTrue(issubclass(InvalidJobMessage, Struct))
         self.assertTrue(not issubclass(InvalidJobMessage, BaseMessage))
 
         with self.assertRaisesRegex(TypeError, "Missing required argument 'reason'"):
-            t = InvalidJobMessage(queueID="test")
+            t = InvalidJobMessage(queueID="test") # type: ignore
 
-        t = InvalidJobMessage(queueID="test", reason="foo")
+        t = InvalidJobMessage(queueID=1, reason="foo")
         types = InvalidJobMessage.keys_with_types()
 
         self.assertEqual(t.event, Event.FAILED)
@@ -142,12 +142,12 @@ class TestYourModule(unittest.TestCase):
         self.assertEqual(types["reason"], str)
 
         with self.assertRaisesRegex(AttributeError, "immutable type: 'InvalidJobMessage'"):
-            t.event = "test2"
+            t.event = "test2" # type: ignore
 
     def test_progress_data(self):
         self.assertTrue(issubclass(ProgressData, Struct))
 
-        types = list(type_info(ProgressData).fields)
+        types = list(type_info(ProgressData).fields) # type: ignore
 
         expected_types = [
             Field(
@@ -180,7 +180,7 @@ class TestYourModule(unittest.TestCase):
         self.assertTrue(issubclass(ProgressMessage, BaseMessage))
 
         with self.assertRaisesRegex(TypeError, "Missing required argument 'submissionID'"):
-            t = ProgressMessage()
+            t = ProgressMessage() # type: ignore
 
         t = ProgressMessage(submissionID="test")
         types = ProgressMessage.keys_with_types()
@@ -192,7 +192,7 @@ class TestYourModule(unittest.TestCase):
         self.assertEqual(types["data"], ProgressData)
 
         with self.assertRaisesRegex(AttributeError, "immutable type: 'ProgressMessage'"):
-            t.submissionID = "test2"
+            t.submissionID = "test2" # type: ignore
 
         t.data.progress = 1
         t.data.skipped = 2

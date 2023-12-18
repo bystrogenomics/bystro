@@ -24,10 +24,10 @@ statistics:
 temp_dir: "~"
 fileProcessors:
   snp:
-    args: --emptyField ! --minGq .95
+    args: --emptyField NA --minGq .95
     program: bystro-snp
   vcf:
-    args: --emptyField ! --keepId --keepPos
+    args: --emptyField NA --keepId --keepPos
     program: bystro-vcf
 tracks:
   - build_author: ec2-user

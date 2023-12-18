@@ -74,8 +74,11 @@ def test_parse_data_independent_analysis_dataset():
     )
     expected_pg_matrix_df.index.name = "Protein.Ids"
 
-    pg_matrix_handle = StringIO(raw_pg_matrix_df.to_csv(index=None, sep="\t"))
-    annotation_handle = StringIO(raw_annotation_df.to_csv(index=None, sep="\t"))
+    assert raw_pg_matrix_df is not None
+    assert raw_annotation_df is not None
+
+    pg_matrix_handle = StringIO(raw_pg_matrix_df.to_csv(index=False, sep="\t"))
+    annotation_handle = StringIO(raw_annotation_df.to_csv(index=False, sep="\t"))
     dia_dataset = load_data_independent_analysis_dataset(pg_matrix_handle, annotation_handle)
     assert_frame_equal(expected_annotation_df, dia_dataset.annotation_df)
     assert_frame_equal(expected_pg_matrix_df, dia_dataset.pg_matrix_df)

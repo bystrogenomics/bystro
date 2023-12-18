@@ -25,10 +25,11 @@ from bystro.search.utils.annotation import (
     AnnotationOutputs,
     DelimitersConfig,
 )
-from bystro.search.utils.messages import SaveJobData
+from bystro.search.utils.messages import SaveJobData, PipelineType
 from bystro.search.utils.opensearch import gather_opensearch_args
 from bystro.utils.compress import GZIP_EXECUTABLE
 from bystro.utils.tar import GNU_TAR_EXECUTABLE_NAME
+from bystro.search.save.hwe import FilterFunctionType
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +51,9 @@ def _clean_query(input_query_body: dict):
     return input_query_body
 
 
-def _get_header(field_names):
-    children = [None] * len(field_names)
-    parents = [None] * len(field_names)
+def _get_header(field_names) -> tuple[list[str], list[str]]:
+    children = [""] * len(field_names)
+    parents = children.copy()
 
     for i, field in enumerate(field_names):
         if "." in field:
@@ -134,12 +135,22 @@ def _process_query(
     query_args: dict,
     search_client_args: dict,
     field_names: list,
+    pipeline: PipelineType,
     chunk_output_name: str,
     reporter,
     delimiters,
 ):
     client = OpenSearch(**search_client_args)
     resp = client.search(**query_args)
+
+    filters: list[FilterFunctionType] | None = None
+    if pipeline is not None:
+        filters = []
+        for filter_msg in pipeline:
+            filter_fn = filter_msg.make_filter()
+
+            if filter_fn is not None:
+                filters.append(filter_fn)
 
     if resp["hits"]["total"]["value"] == 0:
         return 0
@@ -149,24 +160,33 @@ def _process_query(
     parent_fields, child_fields = _get_header(field_names)
 
     discordant_idx = field_names.index("discordant")
-    assert discordant_idx > -1
 
-    # Each sliced scroll chunk should get all records for that chunk
-    assert len(resp["hits"]["hits"]) == resp["hits"]["total"]["value"]
+    if discordant_idx == -1:
+        raise ValueError("discordant field not found in field names")
 
-    for doc in resp["hits"]["hits"]:
-        row = np.empty(len(field_names), dtype=object)
-        for y in range(len(field_names)):
-            row[y] = _populate_data(
-                child_fields[y], doc["_source"].get(parent_fields[y])
-            )
+    try:
+        for doc in resp["hits"]["hits"]:
+            if filters is not None:
+                for filter_fn in filters:
+                    if filter_fn(doc["_source"]):
+                        continue
 
-        if row[discordant_idx][0][0] is False:
-            row[discordant_idx][0][0] = 0
-        elif row[discordant_idx][0][0] is True:
-            row[discordant_idx][0][0] = 1
+            row = np.empty(len(field_names), dtype=object)
+            for y in range(len(field_names)):
+                row[y] = _populate_data(
+                    child_fields[y], doc["_source"].get(parent_fields[y])
+                )
 
-        rows.append(row)
+            if row[discordant_idx][0][0] is False:
+                row[discordant_idx][0][0] = 0
+            elif row[discordant_idx][0][0] is True:
+                row[discordant_idx][0][0] = 1
+
+            rows.append(row)
+    except Exception as err:
+        logger.error(err)
+        traceback.print_exc()
+        return -1
 
     try:
         with gzip.open(chunk_output_name, "wb") as fw:
@@ -200,7 +220,7 @@ def go(  # pylint:disable=invalid-name
     search_conf: dict,
     publisher: ProgressPublisher,
     max_query_size: int = 10_000,
-    max_slices=1024,
+    max_slices=128,
     keep_alive="1d",
 ) -> AnnotationOutputs:
     """Main function for running the query and writing the output"""
@@ -241,6 +261,7 @@ def go(  # pylint:disable=invalid-name
                 {"body": body},
                 search_client_args,
                 job_data.fieldNames,
+                job_data.pipeline,
                 written_chunks[-1],
                 reporter,
                 DelimitersConfig(),

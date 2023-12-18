@@ -8,7 +8,6 @@ package Seq::Tracks::Build::CompletionMeta;
 # TODO: better error handling, not sure how w/ present LMDB API without perf loss
 use Mouse 2;
 use namespace::autoclean;
-use DDP;
 
 with 'Seq::Role::Message';
 

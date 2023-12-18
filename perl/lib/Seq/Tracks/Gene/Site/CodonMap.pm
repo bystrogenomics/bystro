@@ -7,7 +7,7 @@ use warnings;
 
 # Safe for use when instantiated to static variable; no set - able properties
 package Seq::Tracks::Gene::Site::CodonMap;
-use DDP;
+
 use Mouse 2;
 use namespace::autoclean;
 
