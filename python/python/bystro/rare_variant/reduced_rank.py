@@ -44,16 +44,16 @@ class BaseReducedRank(BaseSGDModel, ABC):
     n_components : int,default=2
         The latent dimensionality
 
-    Sets
+    ParaSets
     ----
     creationDate : datetime
         The date/time that the object was created
     """
 
-    def __init__(self, training_options=None):
+    def __init__(self, training_options=None) -> None:
         super().__init__(training_options=training_options)
-        self.B_ = None
-        self.alpha_ = None
+        self.B_:  Tensor | None = None
+        self.alpha_: Tensor | None = None
 
     def _fill_training_options(
         self, training_options: dict[str, Any]
@@ -119,9 +119,12 @@ class BaseReducedRank(BaseSGDModel, ABC):
 
         Returns
         -------
-        scores : ndarray of shape (n_samples,n_classes ) 
+        scores : np.ndarray(shape=n_samples,n_classes))
             Confidence scores per `(n_samples,n_classes )` combination. 
         """
+        if self.B_ is None:
+            raise ValueError("Model not fit")
+
         Y_hat = np.dot(X, self.B_) + self.alpha_
         return Y_hat
 
@@ -191,7 +194,7 @@ class ReducedRankML(BaseReducedRank):
 
         Parameters
         ----------
-        X : NDArray,(n_samples,n_covariates)
+        X : np.ndarray(shape=(n_samples,n_covariates))
             The data
 
         progress_bar : bool,default=True
@@ -264,20 +267,20 @@ class ReducedRankML(BaseReducedRank):
 
     def _store_instance_variables(self, trainable_variables):
         """
-        Saves the learned variables
+       Saves the learned PyTorch variables as instance variables.
 
         Parameters
         ----------
-        trainable_variables : list[Tensor]
-            List of pytorch variables saved
+        trainable_variables : list[torch.Tensor]
+            A list of PyTorch tensors representing trainable variables.
 
-        Sets
-        ----
-        B_ : NDArray,(p,q)
-            The regression coefficients
+        Attributes Set
+        ---------------
+        B_ : torch.Tensor of shape (p, q)
+            The regression coefficients tensor. 
 
-        alpha_ : NDArray,(p,q)
-            The intercepts
+        alpha_ : torch.Tensor of shape (p, q)
+            The intercepts tensor.
         """
         self.B_ = trainable_variables[0].detach().numpy()
         self.alpha_ = trainable_variables[1].detach().numpy()
@@ -288,16 +291,16 @@ class ReducedRankML(BaseReducedRank):
 
         Attributes
         ----------
-        losses : np.array,size=(td['n_iterations'],)
+        losses : np.ndarray(shape=(td['n_iterations'],))
             Total loss including regularization terms
 
-        losses_recon : np.array,size=(td['n_iterations'],)
+        losses_recon : np.ndarray(shape=td['n_iterations'],))
             Prediction loss
 
-        losses_nuclear : np.array,size=(td['n_iterations'],)
+        losses_nuclear : np.ndarray(shape=td['n_iterations'],))
             The nuclear loss
 
-        losses_sparsity : np.array,size=(td['n_iterations'],)
+        losses_sparsity : np.ndarray(shape=td['n_iterations'],))
             The L1 loss 
         """
         n_iterations = self.training_options["n_iterations"]
@@ -316,18 +319,18 @@ class ReducedRankML(BaseReducedRank):
 
         Parameters
         ----------
-        X : NDArray,(n_samples,p)
+        X : np.ndarray(shape=(n_samples,p))
             The explanatory data
 
-        X : NDArray,(n_samples,q)
+        X : np.ndarray(shape=(n_samples,q))
             The response variables
 
         Returns
         -------
-        B_ : torch.tensor,shape=(p,q)
+        B_ : torch.Tensor,shape=(p,q)
             The regression coefficients
 
-        alpha_ : torch.tensor,shape=(q,)
+        alpha_ : torch.Tensor,shape=(q,)
             The intercepts
         """
         q = Y.shape[1]
