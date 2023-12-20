@@ -30,7 +30,7 @@ def test_read_annotation_tarball():
     delims = DelimitersConfig()
     delim_v = delims.value  # e.g. ;
     delim_f = delims.field  # e.g. \t
-    delim_o = delims.overlap  # e.g. chr(31)
+    delim_o = delims.overlap  # e.g. /
     delim_p = delims.position  # e.g. |
 
     header = f"field1{delim_f}field2{delim_f}field3\n"

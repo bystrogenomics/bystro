@@ -13,8 +13,6 @@ use Mouse::Util::TypeConstraints;
 
 use namespace::autoclean;
 
-use DDP;
-
 use YAML::XS qw/LoadFile/;
 
 use Getopt::Long::Descriptive;

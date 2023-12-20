@@ -51,6 +51,7 @@ cpanm install Hash::Merge::Simple
 cpanm install Module::Build::XSUtil
 cpanm install Test::LeakTrace
 cpanm install Test::Pod
+cpanm install Test::Exception
 
 cpanm install Log::Any::Adapter
 

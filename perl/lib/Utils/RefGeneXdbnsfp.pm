@@ -14,7 +14,7 @@ use Parallel::ForkManager;
 use Seq::Role::IO;
 use Seq::Output::Delimiters;
 use Seq::Tracks::Build::LocalFilesPaths;
-use DDP;
+
 use List::Util qw/uniq/;
 
 # Exports: _localFilesDir, _decodedConfig, compress, _wantedTrack, _setConfig, logPath, use_absolute_path
@@ -40,8 +40,6 @@ sub BUILD {
   if ( !@{ $self->{_localFiles} } ) {
     $self->log( 'fatal', "Require some local files" );
   }
-
-  p $self->{_localFiles};
 }
 
 # TODO: error check opening of file handles, write tests
