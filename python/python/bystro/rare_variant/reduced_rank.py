@@ -44,7 +44,7 @@ class BaseReducedRank(BaseSGDModel, ABC):
     n_components : int,default=2
         The latent dimensionality
 
-    ParaSets
+    Sets
     ----
     creationDate : datetime
         The date/time that the object was created
@@ -274,12 +274,12 @@ class ReducedRankML(BaseReducedRank):
         trainable_variables : list[torch.Tensor]
             A list of PyTorch tensors representing trainable variables.
 
-        Attributes Set
+        Sets
         ---------------
-        B_ : torch.Tensor of shape (p, q)
+        B_ : torch.Tensor,shape=(p,q)
             The regression coefficients tensor. 
 
-        alpha_ : torch.Tensor of shape (p, q)
+        alpha_ : torch.Tensor,shape=(p,q)
             The intercepts tensor.
         """
         self.B_ = trainable_variables[0].detach().numpy()
