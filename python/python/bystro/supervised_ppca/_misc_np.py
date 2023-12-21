@@ -70,10 +70,10 @@ def classify_missingness(matrix):
         # Using a hashable representation of the NaN pattern
         pattern = tuple(np.isnan(row))
 
-    if pattern not in pattern_dict:
-        pattern_dict[pattern] = [i]
-    else:
-        pattern_dict[pattern].append(i)
+        if pattern not in pattern_dict:
+            pattern_dict[pattern] = [i]
+        else:
+            pattern_dict[pattern].append(i)
 
     for indices in pattern_dict.values():
         sub_matrix = matrix[indices]
