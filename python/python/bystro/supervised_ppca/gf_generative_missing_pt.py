@@ -128,19 +128,16 @@ class PPCAM(BasePCASGDModel):
             WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
             Sigma = WWT + sigma * eye
 
-            Sigma_list = [
-                Sigma[miss_pat[i]][:, miss_pat[i]] for i in range(n_groups)
-            ]
+            like_marginal = []
+            for y in range(n_groups):
+                sigma = Sigma[miss_pat[y]][:, miss_pat[y]]
+                mvn = MultivariateNormal(torch.zeros(p_list[y]), sigma)
+                like_marginal.append( torch.sum(mvn.log_prob(Xt_list[y])) )
 
-            m_list = [
-                MultivariateNormal(torch.zeros(p_list[i]), Sigma_list[i])
-                for i in range(n_groups)
-            ]
-            like_marg = [
-                torch.sum(m_list[i].log_prob(Xt_list[i]))
-                for i in range(n_groups)
-            ]
-            like_tot = torch.sum(torch.stack(like_marg)) / N
+            like_tot = torch.sum(torch.stack(like_marginal)) / N
+            like_prior = _prior(trainable_variables)
+            posterior = like_tot + like_prior / N
+            loss = -1 * posterior
 
             like_prior = _prior(trainable_variables)
             posterior = like_tot + like_prior / N
