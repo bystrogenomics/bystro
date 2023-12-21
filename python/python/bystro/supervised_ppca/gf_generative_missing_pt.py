@@ -132,7 +132,7 @@ class PPCAM(BasePCASGDModel):
             for y in range(n_groups):
                 sigma = Sigma[miss_pat[y]][:, miss_pat[y]]
                 mvn = MultivariateNormal(torch.zeros(p_list[y]), sigma)
-                like_marginal.append( torch.sum(mvn.log_prob(Xt_list[y])) )
+                like_marginal.append(torch.sum(mvn.log_prob(Xt_list[y])))
 
             like_tot = torch.sum(torch.stack(like_marginal)) / N
             like_prior = _prior(trainable_variables)
