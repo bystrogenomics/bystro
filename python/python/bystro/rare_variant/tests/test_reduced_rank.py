@@ -2,8 +2,8 @@ import numpy as np
 from bystro.rare_variant.reduced_rank import ReducedRankML
 
 rng = np.random.default_rng(2021)
-X = rng.normal(size=(100, 10))
-Y = rng.binomial(1, 0.5, size=(100, 5))
+X = np.array(rng.normal(size=(100, 10)))
+Y = np.array(rng.binomial(1, 0.5, size=(100, 5)))
 
 
 def test_fit():
@@ -11,8 +11,8 @@ def test_fit():
     model.fit(X, Y)
 
     # Check if the model has been trained
-    assert hasattr(model, "B_")
-    assert hasattr(model, "alpha_")
+    assert hasattr(model, "B_") and model.B_ is not None
+    assert hasattr(model, "alpha_") and model.alpha_ is not None
 
 
 def test_predict():
