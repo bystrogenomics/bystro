@@ -57,7 +57,7 @@ class PPCAanalytic(BaseGaussianFactorModel):
         L, p = self.n_components, self.p
 
         U, s, V = la.svd(X, full_matrices=False)
-        eigenvals = s**2 / (N - 1)
+        eigenvals = s ** 2 / (N - 1)
 
         var = 1.0 / (p - L) * (np.sum(eigenvals) - np.sum(eigenvals[:L]))
 
