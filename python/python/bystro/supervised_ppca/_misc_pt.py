@@ -279,7 +279,7 @@ def mvn_log_prob_sw(X, mu, Lambda, W, I_l=None):
     end = middle @ X_demeaned.T
 
     quad = -1 * X_demeaned.T * end
-    term3 = torch.sum(quad, axis=0)
+    term3 = torch.sum(quad, axis=0) # type: ignore
 
     log_prob_window = term1 + term2 + term3 / 2
     log_prob = torch.mean(log_prob_window)
