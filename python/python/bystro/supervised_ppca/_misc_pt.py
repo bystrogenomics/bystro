@@ -274,8 +274,6 @@ def mvn_log_prob_sw(X, mu, Lambda, W, I_l=None):
     ldet_E2 = torch.logdet(E2)
     term2 = -0.5 * (ldet_L + ldet_E2)
 
-    # Terms 1 and 2 are fine
-
     end_center = la.solve(E2, F.T)
     middle = la.inv(Lambda) - F @ end_center
     end = middle @ X_demeaned.T

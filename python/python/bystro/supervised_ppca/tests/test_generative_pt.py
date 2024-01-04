@@ -76,3 +76,7 @@ def test_ppca():
     cov_emp = np.dot(X.T, X) / X.shape[0]
     s1 = la.norm(cov_emp - cov_est)
     assert s1 <= 10.0
+
+
+    model = PPCA(n_components=4, training_options={"n_iterations": 25})
+    model.fit(X,sherman_woodbury=True)

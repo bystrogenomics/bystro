@@ -51,6 +51,7 @@ from torch.distributions.gamma import Gamma
 
 from bystro.supervised_ppca._misc_np import softplus_inverse_np
 from bystro.supervised_ppca._base import BasePCASGDModel
+from bystro.supervised_ppca._misc_pt import mvn_log_prob_sw
 
 
 class PPCA(BasePCASGDModel):
@@ -144,7 +145,10 @@ class PPCA(BasePCASGDModel):
             momentum=training_options["momentum"],
         )
         eye = torch.tensor(np.eye(p).astype(np.float32))
-        zeros_p = torch.zeros(p)
+        eye_L = torch.tensor(np.eye(self.n_components).astype(np.float32))
+        zeros_p = torch.tensor(
+            np.zeros(p).astype(np.float32), dtype=torch.float32
+        )
         softplus = nn.Softplus()
 
         _prior = self._create_prior()
@@ -157,13 +161,13 @@ class PPCA(BasePCASGDModel):
                 size=training_options["batch_size"],
                 replace=False,
             )
-            X_batch = X_tensor[idx]
+            X_batch = X_tensor[idx].float()
 
             sigma = softplus(sigmal_)
 
             if sherman_woodbury:
-                Lambda = sigma*eye
-                like_tot = mvn_log_prob_sw(X_batch,zeros_p,Lambda,W_,eye)
+                Lambda = sigma * eye
+                like_tot = mvn_log_prob_sw(X_batch, zeros_p, Lambda, W_, eye_L)
             else:
                 WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
                 Sigma = WWT + sigma * eye
@@ -456,7 +460,6 @@ class SPCA(BasePCASGDModel):
             )
             X_batch = X_[idx]
 
-
             list_covs = torch.tensor(
                 [
                     softplus(sigmals_[k]) * list_constants[k]
@@ -727,7 +730,7 @@ class FactorAnalysis(BasePCASGDModel):
             Lambda = torch.diag(sigmas)
 
             if sherman_woodbury:
-                like_tot = mvn_log_prob_sw(X_batch,zeros_p,Lambda,W_,eye)
+                like_tot = mvn_log_prob_sw(X_batch, zeros_p, Lambda, W_, eye)
             else:
                 WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
                 Sigma = WWT + Lambda
