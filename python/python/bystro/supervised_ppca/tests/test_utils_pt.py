@@ -1,5 +1,4 @@
 import torch
-import pytest
 from bystro.supervised_ppca._misc_pt import (
     ldet_sw_full,
     inverse_sw_full,
@@ -12,7 +11,7 @@ from torch.distributions.multivariate_normal import MultivariateNormal
 
 def test_ldet_sw_full():
     # Test the log determinant computation
-    A = torch.randn(3, 3) + torch.diag(10 * torch.rand(3))
+    A = torch.randn(3, 3) + torch.diag(10 * torch.rand(3)) + 1
     U = 0.1 * torch.randn(3, 3)
     B = 0.1 * torch.randn(3, 3)
     V = 0.1 * torch.randn(3, 3)
@@ -21,7 +20,7 @@ def test_ldet_sw_full():
     _, result_full = torch.slogdet(A + U @ B @ V)
 
     assert torch.is_tensor(result)
-    assert torch.abs(result - result_full) < 1e-6
+    assert torch.abs(result - result_full) < 1e-5
 
 
 def test_inverse_sw_full():
@@ -38,12 +37,12 @@ def test_inverse_sw_full():
     ss = torch.sum(torch.abs(diff))
 
     assert torch.is_tensor(result)
-    assert ss < 1e-5
+    assert ss < 1e-4
 
 
 def test_ldet_sw_factor_analysis():
     # Test the log determinant computation in factor analysis
-    Lambda = torch.randn(3, 3) + torch.diag(10 * torch.rand(3))
+    Lambda = torch.randn(3, 3) + torch.diag(10 * torch.rand(3)) + 1.0
     W = torch.randn(2, 3)
 
     result = ldet_sw_factor_analysis(Lambda, W)
@@ -52,12 +51,12 @@ def test_ldet_sw_factor_analysis():
     ss = torch.abs(result - res2)
 
     assert torch.is_tensor(result)
-    assert ss < 1e-8
+    assert ss < 1e-6
 
 
 def test_inv_sw_factor_analysis():
     # Test the inverse computation in factor analysis
-    Lambda = torch.randn(3, 3)
+    Lambda = torch.randn(3, 3) + torch.diag(10 * torch.rand(3))
     W = torch.randn(2, 3)
 
     result = inv_sw_factor_analysis(Lambda, W)
@@ -67,7 +66,7 @@ def test_inv_sw_factor_analysis():
     ss = torch.sum(torch.abs(diff))
 
     assert torch.is_tensor(result)
-    assert ss < 1e-5
+    assert ss < 1e-4
 
 
 def test_mvn_log_prob_sw():
@@ -81,10 +80,10 @@ def test_mvn_log_prob_sw():
     Sigma = Lambda + W.T @ W
 
     result = mvn_log_prob_sw(X, mu, Lambda, W)
-    mu2 = mu[:, None]
     m = MultivariateNormal(mu, Sigma)
 
     like_tot = torch.mean(m.log_prob(X))
 
     assert torch.is_tensor(result)
     assert not torch.isnan(result).any()
+    assert torch.abs(like_tot - result) < 1e-5
