@@ -16,7 +16,6 @@ extends 'Seq::Tracks::Build';
 use Seq::Tracks::Reference::MapBases;
 
 use Parallel::ForkManager;
-use DDP;
 
 my $baseMapper = Seq::Tracks::Reference::MapBases->new();
 

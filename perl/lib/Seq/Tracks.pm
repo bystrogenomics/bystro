@@ -22,7 +22,7 @@ package Seq::Tracks;
 use 5.10.0;
 use strict;
 use warnings;
-use DDP;
+
 use Clone 'clone';
 
 use Mouse 2;
@@ -272,7 +272,12 @@ sub _buildTrackGetters {
     my $i      = 0;
     for my $name ( @{ $self->outputOrder } ) {
       if ( !defined $tracks{$name} ) {
-        $self->log( 'fatal', "Uknown track $name specified in 'outputOrder'" );
+        $self->log( 'fatal', "Uknown track $name specified in `outputOrder`" );
+      }
+      elsif ( $tracks{$name}{no_build} ) {
+        $self->log( 'fatal',
+          "Track $name specified in `outputOrder` has `no_build` set, which means this track cannot be built, and is likely used only as a 'join' track, joined onto another track."
+        );
       }
 
       $trackOrder{$name} = $i;
@@ -280,15 +285,17 @@ sub _buildTrackGetters {
     }
 
     if ( $i < @$trackConfigurationAref ) {
-      my @notSeen = map { exists $trackOrder{ $_->{name} } ? () : $_->{name} }
+      my @notSeen =
+        map { exists $trackOrder{ $_->{name} } || $_->{no_build} ? () : $_->{name} }
         @$trackConfigurationAref;
-      $self->log( 'fatal',
-        "When using 'outputOrder', specify all tracks, missing: " . join( ',', @notSeen ) );
+
+      if ( @notSeen > 0 ) {
+        $self->log( 'fatal',
+          "When using `outputOrder`, specify all tracks, unless they have `no_build: true`, missing: "
+            . join( ',', @notSeen ) );
+      }
     }
   }
-
-  # allow us to place tracks at specific indices
-  $#$orderedTrackGettersAref = $#$trackConfigurationAref;
 
   # Iterate over the original order
   # This is important, because otherwise we may accidentally set the
@@ -300,18 +307,26 @@ sub _buildTrackGetters {
       $trackHref->{ref} = $trackBuildersByName->{ $trackHref->{ref} };
     }
 
-    #class
-    my $className = $self->_toTrackGetterClass( $trackHref->{type} );
-
-    my $track = $className->new($trackHref);
-
     if ( !$seenRef ) {
       $seenRef = $trackHref->{type} eq $types->refType;
+
+      if ( $seenRef && $trackHref->{no_build} ) {
+        $self->log( 'fatal', "Reference track cannot have `no_build` set" );
+      }
     }
     elsif ( $trackHref->{type} eq $types->refType ) {
       $self->log( 'fatal', "Only one reference track allowed, found at least 2" );
-      return;
     }
+
+    # If we don't build the track, we also can't fetch data from the track
+    # In the rest of the body of this loop we define the track getters
+    if ( $trackHref->{no_build} ) {
+      next;
+    }
+
+    my $className = $self->_toTrackGetterClass( $trackHref->{type} );
+
+    my $track = $className->new($trackHref);
 
     if ( exists $seenTrackNames{ $track->{name} } ) {
       $self->log(
@@ -368,17 +383,20 @@ sub _buildTrackBuilders {
     if ( $trackHref->{ref} ) {
       $trackHref->{ref} = $trackBuildersByName->{ $trackHref->{ref} };
     }
-    #class
+
     my $className = $self->_toTrackBuilderClass( $trackHref->{type} );
 
     my $track = $className->new($trackHref);
 
     if ( !$seenRef ) {
       $seenRef = $track->{type} eq $types->refType;
+
+      if ( $track->{no_build} ) {
+        $self->log( 'fatal', "Reference track cannot have `no_build` set" );
+      }
     }
     elsif ( $track->{type} eq $types->refType ) {
       $self->log( 'fatal', "Only one reference track allowed, found at least 2" );
-      return;
     }
 
     #we use the track name rather than the trackHref name

@@ -134,7 +134,9 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
             The observational noise
         """
 
-    def get_precision(self, sherman_woodbury: bool = False) -> NDArray[np.float_]:
+    def get_precision(
+        self, sherman_woodbury: bool = False
+    ) -> NDArray[np.float_]:
         """
         Gets the precision matrix defined as the inverse of the covariance
 
@@ -320,7 +322,9 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
 
         if sherman_woodbury is False:
             covariance = self.get_covariance()
-            return _conditional_score_samples(covariance, X, observed_feature_idxs)
+            return _conditional_score_samples(
+                covariance, X, observed_feature_idxs
+            )
 
         return _conditional_score_samples_sherman_woodbury(
             self.get_noise(), self.W_, X, observed_feature_idxs
@@ -430,7 +434,9 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         if sherman_woodbury is False:
             return _score(self.get_covariance(), X, weights=weights)
 
-        return _score_sherman_woodbury(self.get_noise(), self.W_, X, weights=weights)
+        return _score_sherman_woodbury(
+            self.get_noise(), self.W_, X, weights=weights
+        )
 
     def score_samples(
         self, X: NDArray[np.float_], sherman_woodbury: bool = False

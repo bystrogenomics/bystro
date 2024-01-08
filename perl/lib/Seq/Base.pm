@@ -19,7 +19,6 @@ use namespace::autoclean;
 use Seq::DBManager;
 use Seq::Tracks;
 
-use DDP;
 #exports new_with_config
 with 'Seq::Role::ConfigFromFile',
   #setLogLevel, setLogPath, setPublisher
