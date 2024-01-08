@@ -1,4 +1,4 @@
-package main
+package decompress
 
 import (
 	"bufio"

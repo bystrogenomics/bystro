@@ -505,6 +505,8 @@ mappings:
           type: half_float
         MGP:
           type: half_float
+        alleleFreqs:
+          type: half_float
     gnomad:
       properties:
         genomes:
