@@ -124,7 +124,7 @@ func CreateMessageSender(beanstalkConfigPath string, jobSubmissionID string, noB
 		}, nil
 	}
 
-	beanstalkdConfig, err := createBeanstalkdConfig(b.Message.Data.PbeanstalkConfigPath)
+	beanstalkdConfig, err := createBeanstalkdConfig(beanstalkConfigPath)
 	if err != nil {
 		return nil, err
 	}
