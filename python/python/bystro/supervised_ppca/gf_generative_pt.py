@@ -140,9 +140,13 @@ class PPCA(BasePCASGDModel):
 
         _prior = self._create_prior()
 
-        for i in trange(training_options["n_iterations"], disable=not progress_bar):
+        for i in trange(
+            training_options["n_iterations"], disable=not progress_bar
+        ):
             idx = rng.choice(
-                X_tensor.shape[0], size=training_options["batch_size"], replace=False
+                X_tensor.shape[0],
+                size=training_options["batch_size"],
+                replace=False,
             )
             X_batch = X_tensor[idx]
 
@@ -219,16 +223,20 @@ class PPCA(BasePCASGDModel):
         def log_prior(trainable_variables: list[Tensor]):
             W_ = trainable_variables[0]
             sigma_ = trainable_variables[1]
-            part1 = -1 * prior_options["weight_W"] * torch.mean(torch.square(W_))
-            part2 = Gamma(prior_options["alpha"], prior_options["beta"]).log_prob(
-                sigma_
+            part1 = (
+                -1 * prior_options["weight_W"] * torch.mean(torch.square(W_))
             )
+            part2 = Gamma(
+                prior_options["alpha"], prior_options["beta"]
+            ).log_prob(sigma_)
             out = torch.mean(part1 + part2)
             return out
 
         return log_prior
 
-    def _initialize_variables(self, X: NDArray[np.float_]) -> tuple[Tensor, Tensor]:
+    def _initialize_variables(
+        self, X: NDArray[np.float_]
+    ) -> tuple[Tensor, Tensor]:
         """
         Initializes the variables of the model. Right now fits a PCA model
         in sklearn, uses the loadings and sets sigma^2 to be unexplained
@@ -288,7 +296,9 @@ class PPCA(BasePCASGDModel):
             self.losses_prior[i] = log_prior
         self.losses_posterior[i] = log_posterior.detach().numpy()
 
-    def _store_instance_variables(self, trainable_variables: list[Tensor]) -> None:
+    def _store_instance_variables(
+        self, trainable_variables: list[Tensor]
+    ) -> None:
         """
         Saves the learned variables
 
@@ -317,7 +327,9 @@ class PPCA(BasePCASGDModel):
         if self.training_options["batch_size"] > X.shape[0]:
             raise ValueError("Batch size exceeds number of samples")
 
-    def _fill_prior_options(self, prior_options: dict[str, Any]) -> dict[str, Any]:
+    def _fill_prior_options(
+        self, prior_options: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Fills in options for prior parameters
 
@@ -423,7 +435,9 @@ class SPCA(BasePCASGDModel):
 
         _prior = self._create_prior()
 
-        for i in trange(training_options["n_iterations"], disable=not progress_bar):
+        for i in trange(
+            training_options["n_iterations"], disable=not progress_bar
+        ):
             idx = rng.choice(
                 X_.shape[0], size=training_options["batch_size"], replace=False
             )
@@ -436,10 +450,7 @@ class SPCA(BasePCASGDModel):
                 ]
             )
 
-            sigma = torch.sum(
-                list_covs,
-                dim=0,
-            )
+            sigma = torch.sum(list_covs, dim=0,)
             WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
             Sigma = WWT + torch.diag(sigma)
 
@@ -515,9 +526,9 @@ class SPCA(BasePCASGDModel):
             list_gamma_log_probs = []
             for k in range(self.n_groups):
                 list_gamma_log_probs.append(
-                    Gamma(prior_options["alpha"], prior_options["beta"]).log_prob(
-                        trainable_variables[k + 1]
-                    )
+                    Gamma(
+                        prior_options["alpha"], prior_options["beta"]
+                    ).log_prob(trainable_variables[k + 1])
                 )
 
             return torch.mean(torch.stack(list_gamma_log_probs))
@@ -563,10 +574,14 @@ class SPCA(BasePCASGDModel):
         X_recon = np.dot(S_hat, W_init)
         diff = np.mean((X - X_recon) ** 2)
         sinv = softplus_inverse_np(diff * np.ones(1).astype(np.float32))
-        sigmal_ = [torch.tensor(sinv, requires_grad=True) for i in range(self.n_groups)]
+        sigmal_ = [
+            torch.tensor(sinv, requires_grad=True) for i in range(self.n_groups)
+        ]
         return W_, sigmal_
 
-    def _store_instance_variables(self, trainable_variables: list[Tensor]) -> None:
+    def _store_instance_variables(
+        self, trainable_variables: list[Tensor]
+    ) -> None:
         """
         Saves the learned variables
 
@@ -679,7 +694,9 @@ class FactorAnalysis(BasePCASGDModel):
 
         _prior = self._create_prior()
 
-        for i in trange(training_options["n_iterations"], disable=not progress_bar):
+        for i in trange(
+            training_options["n_iterations"], disable=not progress_bar
+        ):
             idx = rng.choice(
                 X_.shape[0], size=training_options["batch_size"], replace=False
             )
@@ -758,14 +775,16 @@ class FactorAnalysis(BasePCASGDModel):
         def log_prior(trainable_variables: list[Tensor]) -> Tensor:
             sigma_ = nn.Softmax()(trainable_variables[1])
             return torch.mean(
-                Gamma(self.prior_options["alpha"], self.prior_options["beta"]).log_prob(
-                    sigma_
-                )
+                Gamma(
+                    self.prior_options["alpha"], self.prior_options["beta"]
+                ).log_prob(sigma_)
             )
 
         return log_prior
 
-    def _fill_prior_options(self, prior_options: dict[str, Any]) -> dict[str, Any]:
+    def _fill_prior_options(
+        self, prior_options: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Fills in options for prior parameters
 
@@ -811,7 +830,9 @@ class FactorAnalysis(BasePCASGDModel):
 
         return W_, sigmal_
 
-    def _store_instance_variables(self, trainable_variables: list[Tensor]) -> None:
+    def _store_instance_variables(
+        self, trainable_variables: list[Tensor]
+    ) -> None:
         """
         Saves the learned variables
 

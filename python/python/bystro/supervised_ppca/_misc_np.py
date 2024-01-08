@@ -59,3 +59,25 @@ def subset_square_matrix_np(Sigma, idxs):
     """
     Sigma_sub = Sigma[np.ix_(idxs == 1, idxs == 1)]
     return Sigma_sub
+
+
+def classify_missingness(matrix):
+    pattern_dict = {}
+    matrices_list = []
+    vectors_list = []
+
+    for i, row in enumerate(matrix):
+        # Using a hashable representation of the NaN pattern
+        pattern = tuple(np.isnan(row))
+
+        if pattern not in pattern_dict:
+            pattern_dict[pattern] = [i]
+        else:
+            pattern_dict[pattern].append(i)
+
+    for indices in pattern_dict.values():
+        sub_matrix = matrix[indices]
+        matrices_list.append(sub_matrix)
+        vectors_list.append(~np.isnan(sub_matrix[0]))
+
+    return matrices_list, vectors_list

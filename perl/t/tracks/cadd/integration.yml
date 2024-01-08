@@ -1,0 +1,20 @@
+---
+assembly: hg19
+build_author: ec2-user
+build_date: 2017-11-27T05:44:00
+chromosomes:
+  - chr22
+database_dir: ~
+files_dir: ~
+tracks:
+  tracks:
+    - type: reference
+      name: ref
+      local_files:
+        - chr22_contrived.fastq
+    - local_files:
+        - whole_genome_SNVs.tsv.chr22.organized-by-chr.txt.sorted.29lines.txt
+      name: cadd
+      type: cadd
+      sorted: true
+      based: 1

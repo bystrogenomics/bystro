@@ -18,7 +18,7 @@ use Sys::CpuAffinity;
 
 use Path::Tiny;
 use Try::Tiny;
-use DDP;
+
 use Scalar::Util qw/looks_like_number/;
 with 'Seq::Role::Message';
 # tried various ways of assigning this to an attrib, with the intention that

@@ -22,8 +22,6 @@ use List::MoreUtils qw/firstidx/;
 use Parallel::ForkManager;
 use Scalar::Util qw/looks_like_number/;
 
-use DDP;
-
 extends 'Seq::Tracks::Build';
 
 # We assume sparse tracks have at least one feature; can remove this requirement

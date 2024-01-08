@@ -125,10 +125,12 @@ class PPCADropout(PPCA):
             training_options=training_options,
         )
         self._initialize_save_losses()
-        self.losses_supervision = np.empty(self.training_options["n_iterations"])
+        self.losses_supervision = np.empty(
+            self.training_options["n_iterations"]
+        )
 
     # override needed for mypy to ignore the non-optional `y` argument
-    def fit(  # type: ignore[override] 
+    def fit(  # type: ignore[override]
         self,
         X: NDArray[np.float_],
         y: NDArray[np.float_],
@@ -221,7 +223,9 @@ class PPCADropout(PPCA):
             z_samples = mean_z + torch.matmul(eps, C1_2)
 
             y_hat = (
-                self.delta * torch.matmul(z_samples[:, : self.n_supervised], one_s) + B_
+                self.delta
+                * torch.matmul(z_samples[:, : self.n_supervised], one_s)
+                + B_
             )
             if task == "regression":
                 loss_y = supervision_loss(y_hat, y_batch)

@@ -17,7 +17,6 @@ package Seq::Tracks::Gene::Site;
 
 use Mouse 2;
 use Scalar::Util qw/looks_like_number/;
-use DDP;
 
 use Seq::Tracks::Gene::Site::SiteTypeMap;
 use Seq::Tracks::Gene::Site::CodonMap;

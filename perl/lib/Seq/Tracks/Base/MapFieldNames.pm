@@ -15,7 +15,7 @@ package Seq::Tracks::Base::MapFieldNames;
 use Mouse 2;
 use List::Util qw/max/;
 use Seq::DBManager;
-use DDP;
+
 with 'Seq::Role::Message';
 
 ################### Required attributes at construction #######################

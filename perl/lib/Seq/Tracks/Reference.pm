@@ -10,7 +10,6 @@ our $VERSION = '0.001';
 # VERSION
 
 use Mouse 2;
-use DDP;
 
 use namespace::autoclean;
 

@@ -22,7 +22,6 @@ extends 'Seq::Tracks::Build';
 #exports regionTrackPath
 with 'Seq::Tracks::Region::RegionTrackPath';
 
-use DDP;
 use List::Util qw/first/;
 
 my $geneDef = Seq::Tracks::Gene::Definition->new();
