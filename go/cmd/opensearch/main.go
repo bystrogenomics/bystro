@@ -187,7 +187,15 @@ func main() {
 	progressSender.SetProgress(chunkStart)
 	progressSender.SendMessage()
 
-	connection.CompleteIndexRequest(client, osearchMapConfig, indexName)
+	err = progressSender.Close()
+	if err != nil {
+		log.Printf("Error closing progress sender due to: [%s]\n", err)
+	}
+
+	err = connection.CompleteIndexRequest(client, osearchMapConfig, indexName)
+	if err != nil {
+		log.Fatalf("Error completing index request due to: [%s]\n", err)
+	}
 
 	marshalledHeaderFields, err := sonic.Marshal(headerFields)
 	if err != nil {

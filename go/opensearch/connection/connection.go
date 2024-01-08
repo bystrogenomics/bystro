@@ -161,12 +161,10 @@ func CreateIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 	return osConfig, client, osearchMapConfig
 }
 
-func CompleteIndexRequest(client *opensearch.Client, osearchMapConfig OpensearchMappingConfig, indexName string) {
-
+func CompleteIndexRequest(client *opensearch.Client, osearchMapConfig OpensearchMappingConfig, indexName string) error {
 	postIndexSettings, err := sonic.Marshal(osearchMapConfig.PostIndexSettings)
-
 	if err != nil {
-		log.Fatalf("Marshaling failed of post index settings: [%s]\n", err)
+		return err
 	}
 
 	postIndexRequestBody := fmt.Sprintf(`{
@@ -180,21 +178,30 @@ func CompleteIndexRequest(client *opensearch.Client, osearchMapConfig Opensearch
 
 	res, err := req.Do(context.Background(), client)
 	if err != nil {
-		log.Fatalf("Error updating index settings: [%s]\n", err)
+		return err
 	}
+
 	defer res.Body.Close()
 
 	res, err = client.Indices.Flush(
 		client.Indices.Flush.WithIndex(indexName),
 	)
-	if err != nil || res.IsError() {
-		log.Fatal(err, res.StatusCode)
+	if err != nil {
+		return err
+	}
+	if res.IsError() {
+		return fmt.Errorf("error flushing index: %s", res)
 	}
 
 	refreshRes, err := client.Indices.Refresh(client.Indices.Refresh.WithIndex(indexName))
-	if err != nil || refreshRes.IsError() {
-		log.Fatalf("Error refreshing index: [%s]\n", err)
+	if err != nil {
+		return err
+	}
+	if refreshRes.IsError() {
+		return fmt.Errorf("error refreshing index: %s", refreshRes)
 	}
 
 	refreshRes.Body.Close()
+
+	return err
 }

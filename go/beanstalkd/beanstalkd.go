@@ -2,6 +2,7 @@ package beanstalkd
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/beanstalkd/go-beanstalk"
@@ -24,7 +25,7 @@ type ProgressMessage struct {
 
 type MessageSender interface {
 	SetProgress(progress int)
-	SendMessage() error
+	SendMessage()
 	Close() error
 }
 
@@ -77,20 +78,18 @@ func (d DebugMessageSender) Close() error {
 	return nil
 }
 
-func (b BeanstalkdMessageSender) SendMessage() error {
+func (b BeanstalkdMessageSender) SendMessage() {
 	messageJson, err := sonic.Marshal(b.Message)
 	if err != nil {
-		return err
+		log.Printf("failed to marshall progress message due to: [%s]\n", err)
+		return
 	}
 
 	b.eventTube.Put(messageJson, 0, 0, 0)
-
-	return nil
 }
 
-func (d DebugMessageSender) SendMessage() error {
+func (d DebugMessageSender) SendMessage() {
 	fmt.Printf("Indexed %d\n", d.Message.Data.Progress)
-	return nil
 }
 
 func createBeanstalkdConfig(beanstalkConfigPath string) (BeanstalkdConfig, error) {
