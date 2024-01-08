@@ -85,7 +85,7 @@ func Test_readLineGzip(t *testing.T) {
 	bufioReader := bufio.NewReader(reader)
 
 	// Test the function
-	line, err := readLine(bufioReader)
+	line, err := ReadLine(bufioReader)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -100,7 +100,7 @@ func Test_readLine(t *testing.T) {
 	reader := bufio.NewReader(strings.NewReader(testData))
 
 	// Test the function
-	line, err := readLine(reader)
+	line, err := ReadLine(reader)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
