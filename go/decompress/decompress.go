@@ -113,18 +113,18 @@ func ReadLines(r *bufio.Reader) ([]byte, error) {
 	return buf[:bytesRead-1], err
 }
 
-func (r BzfBystroReader) ReadLines() ([]byte, error) {
+func (r *BzfBystroReader) ReadLines() ([]byte, error) {
 	return ReadLinesBgzip(r.Reader)
 }
 
-func (r BzfBystroReader) ReadLine() ([]byte, error) {
+func (r *BzfBystroReader) ReadLine() ([]byte, error) {
 	return ReadLineBgzip(r.Reader)
 }
 
-func (r BufioBystroReader) ReadLines() ([]byte, error) {
+func (r *BufioBystroReader) ReadLines() ([]byte, error) {
 	return ReadLines(r.Reader)
 }
-func (r BufioBystroReader) ReadLine() ([]byte, error) {
+func (r *BufioBystroReader) ReadLine() ([]byte, error) {
 	return r.Reader.ReadBytes('\n')
 }
 
@@ -172,10 +172,10 @@ func GetAnnotationFhFromTarArchive(archive *os.File) (BystroReader, fs.FileInfo,
 
 		bufioReader := bufio.NewReader(b)
 
-		return BufioBystroReader{Reader: bufioReader}, fileStats, nil
+		return &BufioBystroReader{Reader: bufioReader}, fileStats, nil
 	}
 
-	return BzfBystroReader{Reader: b}, fileStats, err
+	return &BzfBystroReader{Reader: b}, fileStats, err
 }
 
 func _getAnnotationFhFromTarArchive(archive *os.File) (*tar.Reader, fs.FileInfo, error) {

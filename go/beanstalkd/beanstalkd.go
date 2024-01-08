@@ -62,23 +62,23 @@ type BeanstalkdYAML struct {
 	Beanstalkd BeanstalkdConfig `yaml:"beanstalkd"`
 }
 
-func (b BeanstalkdMessageSender) SetProgress(progress int) {
+func (b *BeanstalkdMessageSender) SetProgress(progress int) {
 	b.Message.Data.Progress = progress
 }
 
-func (d DebugMessageSender) SetProgress(progress int) {
+func (d *DebugMessageSender) SetProgress(progress int) {
 	d.Message.Data.Progress = progress
 }
 
-func (b BeanstalkdMessageSender) Close() error {
+func (b *BeanstalkdMessageSender) Close() error {
 	return b.connection.Close()
 }
 
-func (d DebugMessageSender) Close() error {
+func (d *DebugMessageSender) Close() error {
 	return nil
 }
 
-func (b BeanstalkdMessageSender) SendMessage() {
+func (b *BeanstalkdMessageSender) SendMessage() {
 	messageJson, err := sonic.Marshal(b.Message)
 	if err != nil {
 		log.Printf("failed to marshall progress message due to: [%s]\n", err)
@@ -88,7 +88,7 @@ func (b BeanstalkdMessageSender) SendMessage() {
 	b.eventTube.Put(messageJson, 0, 0, 0)
 }
 
-func (d DebugMessageSender) SendMessage() {
+func (d *DebugMessageSender) SendMessage() {
 	fmt.Printf("Indexed %d\n", d.Message.Data.Progress)
 }
 
@@ -119,12 +119,12 @@ func CreateMessageSender(beanstalkConfigPath string, jobSubmissionID string, noB
 	}
 
 	if noBean {
-		return DebugMessageSender{
+		return &DebugMessageSender{
 			Message: message,
 		}, nil
 	}
 
-	beanstalkdConfig, err := createBeanstalkdConfig(beanstalkConfigPath)
+	beanstalkdConfig, err := createBeanstalkdConfig(b.Message.Data.PbeanstalkConfigPath)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +136,7 @@ func CreateMessageSender(beanstalkConfigPath string, jobSubmissionID string, noB
 
 	eventTube := beanstalk.NewTube(beanstalkConnection, beanstalkdConfig.Tubes.Index.Events)
 
-	return BeanstalkdMessageSender{
+	return &BeanstalkdMessageSender{
 		Message:    message,
 		eventTube:  eventTube,
 		connection: beanstalkConnection,

@@ -166,6 +166,7 @@ func main() {
 
 			chunkStart += len(lines)
 			progressUpdate += len(lines)
+
 			lines = nil
 		}
 
