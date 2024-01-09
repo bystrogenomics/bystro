@@ -261,3 +261,80 @@ func readCompressedData(fileName string, expectedLines []string, bufferSize int)
 		}
 	}
 }
+
+// NOTE: test data comes from `../test/opensearch/testdata/input.txt`
+func Test_readLinesWithBuffer(t *testing.T) {
+	type args struct {
+		bufferSize int
+		input      []byte
+	}
+	type want struct {
+		file   string
+		golden []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []byte
+		wantErr error
+	}{
+		{
+			name: "empty input",
+			args: args{
+				bufferSize: 100,
+				input:      []byte(""),
+			},
+			want:    []byte(""),
+			wantErr: io.EOF,
+		},
+		{
+			name: "negative buffer",
+			args: args{
+				bufferSize: -1,
+				input:      []byte(""),
+			},
+			want:    []byte(""),
+			wantErr: io.EOF,
+		},
+		{
+			name: "ends with \\n",
+			args: args{
+				bufferSize: 100,
+				input:      []byte("a\tb.c\td.e.f\n1\tA\t1;2|3;4/5\n1|2\tA\t1;2|3;4/5\na/2\tA;B\t1/2|3;4/5\n"),
+			},
+			want:    []byte("a\tb.c\td.e.f\n1\tA\t1;2|3;4/5\n1|2\tA\t1;2|3;4/5\na/2\tA;B\t1/2|3;4/5"),
+			wantErr: nil,
+		},
+		{
+			name: "ends without \\n",
+			args: args{
+				bufferSize: 100,
+				input:      []byte("a\tb.c\td.e.f\n1\tA\t1;2|3;4/5\n1|2\tA\t1;2|3;4/5\na/2\tA;B\t1/2|3;4/5"),
+			},
+			want:    []byte("a\tb.c\td.e.f\n1\tA\t1;2|3;4/5\n1|2\tA\t1;2|3;4/5\na/2\tA;B\t1/2|3;4/5"),
+			wantErr: io.EOF,
+		},
+		{
+			name: "add blank lines after first line",
+			args: args{
+				bufferSize: 100,
+				input:      []byte("a\tb.c\td.e.f\n\n\n1\tA\t1;2|3;4/5\n1|2\tA\t1;2|3;4/5\na/2\tA;B\t1/2|3;4/5\n"),
+			},
+			want:    []byte("a\tb.c\td.e.f\n\n\n1\tA\t1;2|3;4/5\n1|2\tA\t1;2|3;4/5\na/2\tA;B\t1/2|3;4/5"),
+			wantErr: nil,
+		},
+	}
+	for _, tt := range tests {
+		b := bytes.NewReader(tt.args.input)
+		r := bufio.NewReader(b)
+		got, err := readLinesWithBuffer(r, tt.args.bufferSize)
+
+		if err != tt.wantErr {
+			log.Fatalf("Expected error: %v, got: %v", tt.wantErr, err)
+		}
+
+		if !bytes.Equal(got, tt.want) {
+			log.Fatalf("Expected: %v, got: %v", tt.want, got)
+		}
+	}
+}

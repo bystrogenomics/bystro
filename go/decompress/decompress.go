@@ -61,6 +61,10 @@ func readLineBgzip(r *bgzf.Reader) ([]byte, error) {
 }
 
 func readLinesBgzipWithBuffer(r *bgzf.Reader, bufferSize int) ([]byte, error) {
+	if bufferSize <= 0 {
+		bufferSize = DEFAULT_BUFFER_SIZE
+	}
+
 	buf := make([]byte, bufferSize)
 
 	tx := r.Begin()
@@ -100,6 +104,10 @@ func readLine(r *bufio.Reader) ([]byte, error) {
 }
 
 func readLinesWithBuffer(r *bufio.Reader, bufferSize int) ([]byte, error) {
+	if bufferSize <= 0 {
+		bufferSize = DEFAULT_BUFFER_SIZE
+	}
+
 	buf := make([]byte, bufferSize)
 
 	bytesRead, err := r.Read(buf)
