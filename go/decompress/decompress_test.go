@@ -323,6 +323,15 @@ func Test_readLinesWithBuffer(t *testing.T) {
 			want:    []byte("a\tb.c\td.e.f\n\n\n1\tA\t1;2|3;4/5\n1|2\tA\t1;2|3;4/5\na/2\tA;B\t1/2|3;4/5"),
 			wantErr: nil,
 		},
+		{
+			name: "add blank lines after first line, with large buffer",
+			args: args{
+				bufferSize: 1_000_000,
+				input:      []byte("a\tb.c\td.e.f\n\n\n1\tA\t1;2|3;4/5\n1|2\tA\t1;2|3;4/5\na/2\tA;B\t1/2|3;4/5\n"),
+			},
+			want:    []byte("a\tb.c\td.e.f\n\n\n1\tA\t1;2|3;4/5\n1|2\tA\t1;2|3;4/5\na/2\tA;B\t1/2|3;4/5"),
+			wantErr: nil,
+		},
 	}
 	for _, tt := range tests {
 		b := bytes.NewReader(tt.args.input)
