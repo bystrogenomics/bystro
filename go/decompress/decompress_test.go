@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/biogo/hts/bgzf"
@@ -137,10 +138,21 @@ func TestReadLinesSmallBuffers1(t *testing.T) {
 }
 
 func TestReadLinesSmallBuffers1Parallel(t *testing.T) {
-	log.Print("Testing ReadLines with buffer of 1 byte")
-	go testReadLinesWithBuffer(100_000, 1)
-	log.Print("Testing ReadLines with buffer of 10 bytes")
-	testReadLinesWithBuffer(100_000, 100)
+	// Test if the code is re-entrant
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		testReadLinesWithBuffer(100_000, 1)
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		testReadLinesWithBuffer(100_000, 100)
+	}()
+
+	wg.Wait()
 }
 
 func TestReadLinesSmallBuffers2(t *testing.T) {
@@ -151,10 +163,22 @@ func TestReadLinesSmallBuffers2(t *testing.T) {
 }
 
 func TestReadLinesSmallBuffers2Parallel(t *testing.T) {
-	log.Print("Testing ReadLines with buffer of 400 bytes")
-	go testReadLinesWithBuffer(100_000, 400)
-	log.Print("Testing ReadLines with buffer of 1000 bytes")
-	testReadLinesWithBuffer(100_000, 1000)
+	// Test if the code is re-entrant
+	log.Print("Testing ReadLines with buffer of 400 and 1000 bytes, run in parallel")
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		testReadLinesWithBuffer(100_000, 400)
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		testReadLinesWithBuffer(100_000, 1000)
+	}()
+
+	wg.Wait()
 }
 
 func testReadLinesWithBuffer(numLines int, bufferSize int) {
