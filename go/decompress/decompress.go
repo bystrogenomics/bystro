@@ -151,37 +151,56 @@ func GetHeaderPaths(b BystroReader) ([][]string, []string) {
 }
 
 func GetAnnotationFhFromTarArchive(archive *os.File) (BystroReader, fs.FileInfo, error) {
-	tarReader, fileStats, err := _getAnnotationFhFromTarArchive(archive)
+	tarReader, fileStats, err := getTarReader(archive)
 
 	if err != nil {
 		return nil, nil, err
 	}
 
-	b, err := bgzf.NewReader(tarReader, 0)
-	if err != nil {
-		archive.Seek(0, 0)
+	bzfReader, err := getBgzipReaderFromBgzipAnnotation(tarReader)
 
-		tarReader, fileStats, err := _getAnnotationFhFromTarArchive(archive)
-
-		if err != nil {
-			return nil, nil, err
-		}
-
-		b, err := gzip.NewReader(tarReader)
-
-		if err != nil {
-			return nil, nil, err
-		}
-
-		bufioReader := bufio.NewReader(b)
-
-		return &BufioBystroReader{Reader: bufioReader}, fileStats, nil
+	if err == nil {
+		return bzfReader, fileStats, nil
 	}
 
-	return &BzfBystroReader{Reader: b}, fileStats, err
+	archive.Seek(0, 0)
+
+	bufioReader, err := getBufioReaderFromGzipAnnotation(tarReader)
+
+	return bufioReader, fileStats, err
 }
 
-func _getAnnotationFhFromTarArchive(archive *os.File) (*tar.Reader, fs.FileInfo, error) {
+func getBgzipReaderFromBgzipAnnotation(tarReader *tar.Reader) (*BzfBystroReader, error) {
+	err := pointTarReaderAtAnnotation(tarReader)
+	if err != nil {
+		return nil, err
+	}
+
+	bgzfReader, err := bgzf.NewReader(tarReader, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	return &BzfBystroReader{Reader: bgzfReader}, nil
+}
+
+func getBufioReaderFromGzipAnnotation(tarReader *tar.Reader) (*BufioBystroReader, error) {
+	err := pointTarReaderAtAnnotation(tarReader)
+	if err != nil {
+		return nil, err
+	}
+
+	gzipReader, err := gzip.NewReader(tarReader)
+	if err != nil {
+		return nil, err
+	}
+
+	bufioReader := bufio.NewReader(gzipReader)
+
+	return &BufioBystroReader{Reader: bufioReader}, nil
+}
+
+func getTarReader(archive *os.File) (*tar.Reader, fs.FileInfo, error) {
 	fileStats, err := archive.Stat()
 	if err != nil {
 		return nil, nil, err
@@ -189,20 +208,24 @@ func _getAnnotationFhFromTarArchive(archive *os.File) (*tar.Reader, fs.FileInfo,
 
 	tarReader := tar.NewReader(archive)
 
+	return tarReader, fileStats, nil
+}
+
+func pointTarReaderAtAnnotation(tarReader *tar.Reader) error {
 	for {
 		header, err := tarReader.Next()
 		if err != nil {
 			if err == io.EOF {
 				break // End of archive
 			}
-			return nil, nil, err
+			return err
 		}
 
 		// TODO @akotlar 2023-11-24: Take the expected file name from the information submitted in the beanstalkd queue message
 		if strings.HasSuffix(header.Name, EXPECTED_ANNOTATION_FILE_SUFFIX) {
-			return tarReader, fileStats, nil
+			return nil
 		}
 	}
 
-	return nil, nil, fmt.Errorf("couldn't find annotation file in tarball")
+	return fmt.Errorf("couldn't find annotation file in tarball")
 }
