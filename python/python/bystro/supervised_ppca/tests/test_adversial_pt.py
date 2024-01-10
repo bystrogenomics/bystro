@@ -1,6 +1,4 @@
 import numpy as np
-from sklearn.linear_model import LogisticRegression  # type: ignore
-from sklearn.metrics import roc_auc_score  # type: ignore
 from scipy.stats import ortho_group  # type: ignore
 from scipy.stats import binom  # type: ignore
 
@@ -31,4 +29,3 @@ def test_ppca():
         2, mu=100.0, gamma=10.0, training_options=training_options
     )
     model.fit(X, y)
-    S_ = model.transform(X)
