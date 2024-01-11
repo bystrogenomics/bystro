@@ -3,6 +3,7 @@ package decompress
 import (
 	"archive/tar"
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -14,8 +15,10 @@ import (
 	gzip "github.com/klauspost/pgzip"
 )
 
-const EXPECTED_ANNOTATION_FILE_SUFFIX = "annotation.tsv.gz"
-const DEFAULT_BUFFER_SIZE = 64 * 1024 * 8 // 8 bgzip blocks at a time
+const ExpectedAnnotationFileSuffix = "annotation.tsv.gz"
+const DefaultBufferSize = 64 * 1024 * 8 // 8 bgzip blocks at a time
+
+var ErrBufferSize = errors.New("bufferSize must be greater than 0")
 
 type BystroReader interface {
 	ReadLines() ([]byte, error)
@@ -24,12 +27,12 @@ type BystroReader interface {
 
 type BzfBystroReader struct {
 	Reader     *bgzf.Reader
-	BufferSize int
+	BufferSize uint
 }
 
 type BufioBystroReader struct {
 	Reader     *bufio.Reader
-	BufferSize int
+	BufferSize uint
 }
 
 // Read a line up to the next newline character, and return the line excluding the newline character
@@ -60,9 +63,9 @@ func readLineBgzip(r *bgzf.Reader) ([]byte, error) {
 	return data, err
 }
 
-func readLinesBgzipWithBuffer(r *bgzf.Reader, bufferSize int) ([]byte, error) {
-	if bufferSize <= 0 {
-		bufferSize = DEFAULT_BUFFER_SIZE
+func readLinesBgzipWithBuffer(r *bgzf.Reader, bufferSize uint) ([]byte, error) {
+	if bufferSize == 0 {
+		return nil, ErrBufferSize
 	}
 
 	buf := make([]byte, bufferSize)
@@ -76,6 +79,15 @@ func readLinesBgzipWithBuffer(r *bgzf.Reader, bufferSize int) ([]byte, error) {
 		return nil, err
 	}
 
+	if err != nil {
+		if buf[bytesRead-1] != '\n' {
+			return buf[:bytesRead], err
+		}
+
+		return buf[:bytesRead-1], err
+	}
+
+	// Since not at EOF, we know that there is more to read
 	if buf[bytesRead-1] != '\n' {
 		remainder, err := readLineBgzipNoTx(r)
 		return append(buf[:bytesRead], remainder...), err
@@ -103,17 +115,25 @@ func readLine(r *bufio.Reader) ([]byte, error) {
 	return data, err
 }
 
-func readLinesWithBuffer(r *bufio.Reader, bufferSize int) ([]byte, error) {
-	if bufferSize <= 0 {
-		bufferSize = DEFAULT_BUFFER_SIZE
+func readLinesWithBuffer(r *bufio.Reader, bufferSize uint) ([]byte, error) {
+	if bufferSize == 0 {
+		return nil, ErrBufferSize
 	}
 
 	buf := make([]byte, bufferSize)
 
-	bytesRead, err := r.Read(buf)
+	bytesRead, err := io.ReadFull(r, buf)
 
 	if bytesRead == 0 {
 		return nil, err
+	}
+
+	if err == io.ErrUnexpectedEOF {
+		if buf[bytesRead-1] == '\n' {
+			return buf[:bytesRead-1], err
+		}
+
+		return buf[:bytesRead], err
 	}
 
 	if buf[bytesRead-1] != '\n' {
@@ -125,7 +145,7 @@ func readLinesWithBuffer(r *bufio.Reader, bufferSize int) ([]byte, error) {
 }
 
 func (r *BzfBystroReader) ReadLines() ([]byte, error) {
-	return readLinesBgzipWithBuffer(r.Reader, DEFAULT_BUFFER_SIZE)
+	return readLinesBgzipWithBuffer(r.Reader, DefaultBufferSize)
 }
 
 func (r *BzfBystroReader) ReadLine() ([]byte, error) {
@@ -133,7 +153,7 @@ func (r *BzfBystroReader) ReadLine() ([]byte, error) {
 }
 
 func (r *BufioBystroReader) ReadLines() ([]byte, error) {
-	return readLinesWithBuffer(r.Reader, DEFAULT_BUFFER_SIZE)
+	return readLinesWithBuffer(r.Reader, DefaultBufferSize)
 }
 func (r *BufioBystroReader) ReadLine() ([]byte, error) {
 	return r.Reader.ReadBytes('\n')
@@ -230,7 +250,7 @@ func pointTarReaderAtAnnotation(tarReader *tar.Reader) error {
 		}
 
 		// TODO @akotlar 2023-11-24: Take the expected file name from the information submitted in the beanstalkd queue message
-		if strings.HasSuffix(header.Name, EXPECTED_ANNOTATION_FILE_SUFFIX) {
+		if strings.HasSuffix(header.Name, ExpectedAnnotationFileSuffix) {
 			return nil
 		}
 	}
