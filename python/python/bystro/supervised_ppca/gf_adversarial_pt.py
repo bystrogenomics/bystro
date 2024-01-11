@@ -60,7 +60,7 @@ def _get_projection_matrix(W_: Tensor, sigma_: Tensor):
         Var(S|X)
     """
     n_components = int(W_.shape[0])
-    eye = torch.tensor(np.eye(n_components),dtype=torch.float32)
+    eye = torch.tensor(np.eye(n_components), dtype=torch.float32)
     M = torch.matmul(W_, torch.transpose(W_, 0, 1)) + sigma_ * eye
     Proj_X = torch.linalg.solve(M, W_)
     Cov = torch.linalg.inv(M) * sigma_
@@ -185,8 +185,8 @@ class PPCAAdversarial(PPCA):
             momentum=training_options["momentum"],
         )
 
-        eye = torch.tensor(np.eye(p),dtype=torch.float32)
-        zerosp = torch.zeros(p,dtype=torch.float32)
+        eye = torch.tensor(np.eye(p), dtype=torch.float32)
+        zerosp = torch.zeros(p, dtype=torch.float32)
         softplus = nn.Softplus()
 
         _prior = self._create_prior()
@@ -206,7 +206,7 @@ class PPCAAdversarial(PPCA):
 
             like_prior = _prior(trainable_variables)
 
-            m = MultivariateNormal(torch.zeros(p), Sigma)
+            m = MultivariateNormal(zerosp, Sigma)
             like_gen = torch.mean(m.log_prob(X_batch))
 
             P_x, Cov = _get_projection_matrix(W_, sigma)
@@ -298,11 +298,11 @@ class PPCAAdversarial(PPCA):
         model = PCA(self.n_components)
         S_hat = model.fit_transform(X)
         W_init = model.components_
-        W_ = torch.tensor(W_init, requires_grad=True,dtype=torch.float32)
+        W_ = torch.tensor(W_init, requires_grad=True, dtype=torch.float32)
         X_recon = np.dot(S_hat, W_init)
         diff = np.mean((X - X_recon) ** 2)
         sinv = softplus_inverse_np(diff * np.ones(1))
-        sigmal_ = torch.tensor(sinv, requires_grad=True,dtype=torch.float32)
+        sigmal_ = torch.tensor(sinv, requires_grad=True, dtype=torch.float32)
         return W_, sigmal_
 
     def _test_inputs(self, X, y):

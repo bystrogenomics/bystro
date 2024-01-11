@@ -450,7 +450,10 @@ class SPCA(BasePCASGDModel):
                 ]
             )
 
-            sigma = torch.sum(list_covs, dim=0,)
+            sigma = torch.sum(
+                list_covs,
+                dim=0,
+            )
             WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
             Sigma = WWT + torch.diag(sigma)
 
