@@ -130,6 +130,11 @@ func readLinesWithBuffer(r *bufio.Reader, bufferSize uint) ([]byte, error) {
 
 	// The typical errors will io.ErrUnexpectedEOF (buffer longer than input) and io.EOF (file ended)
 	if err != nil {
+		// Ensure that bgzip and gzip implementations are consistent
+		if err == io.ErrUnexpectedEOF {
+			err = io.EOF
+		}
+
 		if buf[bytesRead-1] == '\n' {
 			return buf[:bytesRead-1], err
 		}

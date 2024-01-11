@@ -312,7 +312,7 @@ func Test_readLinesWithBuffer(t *testing.T) {
 				input:      []byte("a\tb.c\td.e.f\n1\tA\t1;2|3;4/5\n1|2\tA\t1;2|3;4/5\na/2\tA;B\t1/2|3;4/5\n"),
 			},
 			want:    []byte("a\tb.c\td.e.f\n1\tA\t1;2|3;4/5\n1|2\tA\t1;2|3;4/5\na/2\tA;B\t1/2|3;4/5"),
-			wantErr: []error{io.ErrUnexpectedEOF, io.ErrUnexpectedEOF, io.EOF},
+			wantErr: []error{io.EOF, io.EOF, io.EOF},
 		},
 		{
 			name: "We do not truncate the input when newline is missing from end of file",
@@ -321,7 +321,7 @@ func Test_readLinesWithBuffer(t *testing.T) {
 				input:      []byte("a\tb.c\td.e.f\n1\tA\t1;2|3;4/5\n1|2\tA\t1;2|3;4/5\na/2\tA;B\t1/2|3;4/5"),
 			},
 			want:    []byte("a\tb.c\td.e.f\n1\tA\t1;2|3;4/5\n1|2\tA\t1;2|3;4/5\na/2\tA;B\t1/2|3;4/5"),
-			wantErr: []error{io.ErrUnexpectedEOF, io.ErrUnexpectedEOF, io.EOF},
+			wantErr: []error{io.EOF, io.EOF, io.EOF},
 		},
 		{
 			name: "Extra newlines within middle of file are retained",
@@ -330,7 +330,7 @@ func Test_readLinesWithBuffer(t *testing.T) {
 				input:      []byte("a\tb.c\td.e.f\n\n\n1\tA\t1;2|3;4/5\n1|2\tA\t1;2|3;4/5\na/2\tA;B\t1/2|3;4/5\n"),
 			},
 			want:    []byte("a\tb.c\td.e.f\n\n\n1\tA\t1;2|3;4/5\n1|2\tA\t1;2|3;4/5\na/2\tA;B\t1/2|3;4/5"),
-			wantErr: []error{io.ErrUnexpectedEOF, io.ErrUnexpectedEOF, io.EOF},
+			wantErr: []error{io.EOF, io.EOF, io.EOF},
 		},
 		{
 			name: "We support large buffers",
@@ -339,7 +339,7 @@ func Test_readLinesWithBuffer(t *testing.T) {
 				input:      []byte("a\tb.c\td.e.f\n\n\n1\tA\t1;2|3;4/5\n1|2\tA\t1;2|3;4/5\na/2\tA;B\t1/2|3;4/5\n"),
 			},
 			want:    []byte("a\tb.c\td.e.f\n\n\n1\tA\t1;2|3;4/5\n1|2\tA\t1;2|3;4/5\na/2\tA;B\t1/2|3;4/5"),
-			wantErr: []error{io.ErrUnexpectedEOF, io.ErrUnexpectedEOF, io.EOF},
+			wantErr: []error{io.EOF, io.EOF, io.EOF},
 		},
 	}
 
