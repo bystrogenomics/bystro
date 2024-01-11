@@ -5,8 +5,9 @@ This module provides functions for matrix operations utilizing the
 Sherman-Woodbury identity. It includes computations for log determinants, 
 inverses, and log probabilities, specifically tailored for factor 
 analysis and matrix products. The Sherman-Woodbury identity allows for 
-efficient calculations when dealing with precision matrices and factor 
-analysis models.
+efficient calculations when dealing with inverses of low rank +  diagonal, 
+which is necessary for evaluating normal likelihoods and coverting between
+preciion/covariance.
 
 Objects
 -------
@@ -164,7 +165,7 @@ def ldet_sw_factor_analysis(Lambda, W, I_l=None):
     Parameters
     ----------
     Lambda : torch.Tensor
-        Precision matrix in factor analysis.
+        Diagonal component of covariance matrix
 
     W : torch.Tensor
         Factor loading matrix.
@@ -195,7 +196,7 @@ def inv_sw_factor_analysis(Lambda, W, I_l=None, I_p=None):
     Parameters
     ----------
     Lambda : torch.Tensor
-        Precision matrix in factor analysis.
+        Diagonal component of covariance matrix
 
     W : torch.Tensor
         Factor loading matrix.
@@ -241,7 +242,7 @@ def mvn_log_prob_sw(X, mu, Lambda, W, I_l=None):
         Mean vector of the multivariate normal distribution.
 
     Lambda : torch.Tensor
-        Precision matrix of the multivariate normal distribution.
+        Diagonal component of covariance matrix
 
     W : torch.Tensor
         Weight matrix.
