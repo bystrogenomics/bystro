@@ -6,7 +6,6 @@
 # TODO 2023-05-08: get max_slices from opensearch index settings
 # TODO 2023-05-08: concatenate chunks in a different ray worker
 
-import gzip
 import logging
 import math
 import os
@@ -14,6 +13,7 @@ import pathlib
 import subprocess
 import traceback
 from typing import Any
+import gzip
 
 import numpy as np
 import ray
