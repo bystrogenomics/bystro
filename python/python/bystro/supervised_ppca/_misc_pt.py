@@ -6,8 +6,8 @@ Sherman-Woodbury identity. It includes computations for log determinants,
 inverses, and log probabilities, specifically tailored for factor 
 analysis and matrix products. The Sherman-Woodbury identity allows for 
 efficient calculations when dealing with inverses of low rank +  diagonal, 
-which is necessary for evaluating normal likelihoods and coverting between
-preciion/covariance.
+which is necessary for evaluating normal likelihoods and converting between
+precision/covariance.
 
 Objects
 -------
