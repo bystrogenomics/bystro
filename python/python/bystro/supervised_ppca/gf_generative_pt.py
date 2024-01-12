@@ -51,6 +51,7 @@ from torch.distributions.gamma import Gamma
 
 from bystro.supervised_ppca._misc_np import softplus_inverse_np
 from bystro.supervised_ppca._base import BasePCASGDModel
+from bystro.supervised_ppca._misc_pt import mvn_log_prob_sw
 
 
 class PPCA(BasePCASGDModel):
@@ -100,6 +101,7 @@ class PPCA(BasePCASGDModel):
         X: NDArray[np.float_],
         progress_bar: bool = True,
         seed: int = 2021,
+        sherman_woodbury: bool = False,
     ) -> "PPCA":
         """
         Fits a model given covariates X as well as option labels y in the
@@ -112,6 +114,13 @@ class PPCA(BasePCASGDModel):
 
         progress_bar : bool,default=True
             Whether to print the progress bar to monitor time
+
+        seed : int,default=2021
+            The seed of the random number generator
+
+        sherman_woodbury : bool,default=False
+            Whether to use the Sherman Woodbury identity to calculate 
+            the likelihood. Advantageous in high-p situations
 
         Returns
         -------
@@ -136,6 +145,10 @@ class PPCA(BasePCASGDModel):
             momentum=training_options["momentum"],
         )
         eye = torch.tensor(np.eye(p).astype(np.float32))
+        eye_L = torch.tensor(np.eye(self.n_components).astype(np.float32))
+        zeros_p = torch.tensor(
+            np.zeros(p).astype(np.float32), dtype=torch.float32
+        )
         softplus = nn.Softplus()
 
         _prior = self._create_prior()
@@ -148,15 +161,19 @@ class PPCA(BasePCASGDModel):
                 size=training_options["batch_size"],
                 replace=False,
             )
-            X_batch = X_tensor[idx]
+            X_batch = X_tensor[idx].float()
 
             sigma = softplus(sigmal_)
-            WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
-            Sigma = WWT + sigma * eye
 
-            m = MultivariateNormal(torch.zeros(p), Sigma)
+            if sherman_woodbury:
+                Lambda = sigma * eye
+                like_tot = mvn_log_prob_sw(X_batch, zeros_p, Lambda, W_, eye_L)
+            else:
+                WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
+                Sigma = WWT + sigma * eye
+                m = MultivariateNormal(zeros_p, Sigma)
+                like_tot = torch.mean(m.log_prob(X_batch))
 
-            like_tot = torch.mean(m.log_prob(X_batch))
             like_prior = _prior(trainable_variables)
             posterior = like_tot + like_prior / N
             loss = -1 * posterior
@@ -659,7 +676,11 @@ class FactorAnalysis(BasePCASGDModel):
         return f"FactorAnalysispt(n_components={self.n_components})"
 
     def fit(
-        self, X: NDArray[np.float_], progress_bar: bool = True, seed: int = 2021
+        self,
+        X: NDArray[np.float_],
+        progress_bar: bool = True,
+        seed: int = 2021,
+        sherman_woodbury: bool = False,
     ) -> "FactorAnalysis":
         """
         Fits a model given covariates X
@@ -697,6 +718,9 @@ class FactorAnalysis(BasePCASGDModel):
 
         _prior = self._create_prior()
 
+        eye = torch.tensor(np.eye(p).astype(np.float32))
+        zeros_p = torch.zeros(p)
+
         for i in trange(
             training_options["n_iterations"], disable=not progress_bar
         ):
@@ -706,13 +730,15 @@ class FactorAnalysis(BasePCASGDModel):
             X_batch = X_[idx]
 
             sigmas = softplus(sigmal_)
-            WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
-            D = torch.diag(sigmas)
-            Sigma = WWT + D
+            Lambda = torch.diag(sigmas)
 
-            m = MultivariateNormal(torch.zeros(p), Sigma)
-
-            like_tot = torch.mean(m.log_prob(X_batch))
+            if sherman_woodbury:
+                like_tot = mvn_log_prob_sw(X_batch, zeros_p, Lambda, W_, eye)
+            else:
+                WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
+                Sigma = WWT + Lambda
+                m = MultivariateNormal(zeros_p, Sigma)
+                like_tot = torch.mean(m.log_prob(X_batch))
             like_prior = _prior(trainable_variables)
             posterior = like_tot + like_prior / N
             loss = -1 * posterior
