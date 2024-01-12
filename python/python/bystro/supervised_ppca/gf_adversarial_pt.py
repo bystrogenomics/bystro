@@ -90,6 +90,10 @@ class PPCAAdversarial(PPCA):
 
     gamma : float,default=10.0
         Ensures that the components are orthogonal
+
+    training_options : dict
+        The options used for stochastic gradient descent for adversary
+        and generative model
     """
 
     def __init__(
