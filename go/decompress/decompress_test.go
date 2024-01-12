@@ -297,7 +297,7 @@ func Test_readLinesWithBuffer(t *testing.T) {
 			wantErr: []error{ErrBufferSize, ErrBufferSize, ErrBufferSize},
 		},
 		{
-			name: "When buffer is not as long as input we expect no errors",
+			name: "When buffer is not as long as input we expect no errors, and the file is read up until the first newline (exclusive)",
 			args: args{
 				bufferSize: 1,
 				input:      []byte("a\tb.c\td.e.f\n1\tA\t1;2|3;4/5\n1|2\tA\t1;2|3;4/5\na/2\tA;B\t1/2|3;4/5\n"),
