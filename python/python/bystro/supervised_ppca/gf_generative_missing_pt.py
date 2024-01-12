@@ -78,7 +78,11 @@ class PPCAM(BasePCASGDModel):
     def __repr__(self):
         return f"PPCAM(n_components={self.n_components})"
 
-    def fit(self, X: NDArray[np.float_], progress_bar: bool = True,) -> "PPCAM":
+    def fit(
+        self,
+        X: NDArray[np.float_],
+        progress_bar: bool = True,
+    ) -> "PPCAM":
         """
         Fits a model given covariates X as well as option labels y in the
         supervised methods
