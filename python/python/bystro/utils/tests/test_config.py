@@ -30,5 +30,5 @@ def test_get_opensearch_config():
 
 
 def test_get_mapping_config():
-    assert 5 == len(get_mapping_config(ReferenceGenome.hg38))
-    assert 5 == len(get_mapping_config(ReferenceGenome.hg19))
+    assert 4 == len(get_mapping_config(ReferenceGenome.hg38))
+    assert 4 == len(get_mapping_config(ReferenceGenome.hg19))

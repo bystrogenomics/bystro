@@ -27,15 +27,20 @@ use YAML::XS qw/LoadFile/;
 use Seq;
 use Path::Tiny qw/path/;
 
-my ( $verbose, $queueConfigPath, $connectionConfigPath, $maxThreads, $debug );
+my ( $verbose, $queueConfigPath, $maxThreads, $debug );
 
 GetOptions(
-  'v|verbose=i'          => \$verbose,
-  'd|debug'              => \$debug,
-  'q|queueConfig=s'      => \$queueConfigPath,
-  'c|connectionConfig=s' => \$connectionConfigPath,
-  'maxThreads=i'         => \$maxThreads,
+  'v|verbose=i'     => \$verbose,
+  'd|debug'         => \$debug,
+  'q|queueConfig=s' => \$queueConfigPath,
+  'maxThreads=i'    => \$maxThreads,
 );
+
+if ( !($queueConfigPath) ) {
+  # Generate a help strings that shows the arguments
+  say "\nUsage: perl $0 -q <queueConfigPath> --maxThreads <maxThreads>\n";
+  exit 1;
+}
 
 my $type = 'annotation';
 
@@ -85,8 +90,6 @@ my $beanstalkEvents = Beanstalk::Client->new(
     decoder         => sub { @{ decode_json(shift) } },
   }
 );
-
-my $events = $conf->{beanstalkd}{events};
 
 while ( my $job = $beanstalk->reserve ) {
   # Parallel ForkManager used only to throttle number of jobs run in parallel
