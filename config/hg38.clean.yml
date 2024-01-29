@@ -34,7 +34,7 @@ fileProcessors:
     args: --emptyField NA --minGq .95
     program: bystro-snp
   vcf:
-    args: --emptyField NA --sample %sampleList%
+    args: --emptyField NA --sample %sampleList% --keepPos --keepId --dosageOutput %dosageMatrixOutPath%
     program: bystro-vcf
 files_dir: "~"
 statistics:

@@ -35,7 +35,7 @@ has input_file => ( is => 'rw', isa => 'Str', required => 1 );
 has maxDel => ( is => 'ro', isa => 'Int', default => -32, writer => 'setMaxDel' );
 
 # TODO: formalize: check that they have name and args properties
-has fileProcessors => ( is => 'ro', isa => 'HashRef', default => 'bystro-vcf' );
+has fileProcessors => ( is => 'ro', isa => 'HashRef', required => 1 );
 
 # Defines most of the properties that can be configured at run time
 # Requires logPath to be provided (currently found in Seq::Base)
@@ -456,8 +456,9 @@ sub _getFileHandles {
   return ( undef, $inFh, $outFh, $statsFh, $headerFh );
 }
 
-sub _openAnnotationPipe {
+sub _preparePreprocessorProgram {
   my ( $self, $type ) = @_;
+
   if ( !$self->fileProcessors->{$type} ) {
     $self->_errorWithCleanup("No fileProcessors defined for $type file type");
   }
@@ -492,6 +493,14 @@ sub _openAnnotationPipe {
 
     $finalProgram .= " $args";
   }
+
+  return ( $finalProgram, $errPath );
+}
+
+sub _openAnnotationPipe {
+  my ( $self, $type ) = @_;
+
+  my ( $finalProgram, $errPath ) = $self->_preparePreprocessorProgram($type);
 
   my $fh;
   my $err = $self->safeOpen( $fh, '-|', "$finalProgram 2> $errPath" );

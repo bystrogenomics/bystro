@@ -179,7 +179,7 @@ sub annotate {
     archive            => $self->archive,
     run_statistics     => !!$self->run_statistics,
     delete_temp        => !!$self->delete_temp,
-    readAhead          => $self->read_ahead,
+    readAhead          => $self->read_ahead
   };
 
   if ( defined $self->verbose ) {
