@@ -24,6 +24,7 @@ with 'Seq::Role::ConfigFromFile',
   #setLogLevel, setLogPath, setPublisher
   'Seq::Role::Message',
 ############# Required Arguments ###########
+
   has database_dir => ( is => 'ro', required => 1 );
 
 has tracks => ( is => 'ro', required => 1 );
