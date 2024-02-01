@@ -56,14 +56,8 @@ def handler_fn(publisher: ProgressPublisher, beanstalkd_job_data: IndexJobData):
 
     inputs = beanstalkd_job_data.inputFileNames
 
-    if not inputs.archived:
-        raise ValueError("Indexing currently only works for indexing archived (tarballed) results")
-
-    tar_path = os.path.join(beanstalkd_job_data.inputDir, inputs.archived)
-
     return asyncio.get_event_loop().run_until_complete(go(
         index_name=beanstalkd_job_data.indexName,
-        tar_path=tar_path,
         mapping_conf=mapping_conf,
         search_conf=search_conf,
         publisher=publisher,

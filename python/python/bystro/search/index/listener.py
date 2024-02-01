@@ -67,7 +67,7 @@ def run_handler_with_config(
     index_name: str,
     mapping_config: str,
     opensearch_config: str,
-    tar_path: str,
+    annotation_path: str,
     no_queue: bool = False,
     submission_id: SubmissionID | None = None,
     queue_config: str | None = None,
@@ -80,8 +80,8 @@ def run_handler_with_config(
         mapping_config,
         "--opensearch-config",
         opensearch_config,
-        "--tarball-path",
-        tar_path,
+        "--input",
+        annotation_path,
     ]
 
     if no_queue:
@@ -136,10 +136,7 @@ def main():
     def handler_fn(_: ProgressPublisher, beanstalkd_job_data: IndexJobData) -> list[str]:
         inputs = beanstalkd_job_data.inputFileNames
 
-        if not inputs.archived:
-            raise ValueError("Indexing currently only works for indexing archived (tarballed) results")
-
-        tar_path = os.path.join(beanstalkd_job_data.inputDir, inputs.archived)
+        annotation_path = os.path.join(beanstalkd_job_data.inputDir, inputs.annotation)
         m_path = get_config_file_path(conf_dir, beanstalkd_job_data.assembly, ".mapping.y*ml")
 
         header_fields = run_handler_with_config(
@@ -148,7 +145,7 @@ def main():
             mapping_config=m_path,
             opensearch_config=search_conf,
             queue_config=queue_conf,
-            tar_path=tar_path,
+            annotation_path=annotation_path,
         )
 
         return header_fields
