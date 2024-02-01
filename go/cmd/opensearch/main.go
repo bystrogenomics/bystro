@@ -19,7 +19,7 @@ import (
 )
 
 type CLIArgs struct {
-	annotationTarballPath  string
+	annotationPath         string
 	osIndexConfigPath      string
 	beanstalkConfigPath    string
 	osConnectionConfigPath string
@@ -31,8 +31,8 @@ type CLIArgs struct {
 
 func setup(args []string) *CLIArgs {
 	cliargs := &CLIArgs{}
-	flag.StringVar(&cliargs.annotationTarballPath, "tarball-path", "", "The path to the input tarball")
-	flag.StringVar(&cliargs.annotationTarballPath, "t", "", "The path to the input tarball (short form)")
+	flag.StringVar(&cliargs.annotationPath, "input", "", "The path to the input annotation")
+	flag.StringVar(&cliargs.annotationPath, "in", "", "The path to the input annotation (short form)")
 	flag.StringVar(&cliargs.osIndexConfigPath, "mapping-config", "", "The path to the OpenSearch mapping and index definition (e.g. hg19.mapping.yml)")
 	flag.StringVar(&cliargs.osIndexConfigPath, "m", "", "The path to the OpenSearch mapping and index definition (short form)")
 	flag.StringVar(&cliargs.osConnectionConfigPath, "opensearch-config", "", "The path to the OpenSearch connection config (e.g. config/elasticsearch.yml)")
@@ -67,8 +67,8 @@ func setup(args []string) *CLIArgs {
 func validateArgs(args *CLIArgs) error {
 	var missing []string
 	v := *args
-	if v.annotationTarballPath == "" {
-		missing = append(missing, "annotation-tarball-path")
+	if v.annotationPath == "" {
+		missing = append(missing, "input")
 	}
 	if v.osIndexConfigPath == "" {
 		missing = append(missing, "os-index-config-path")
@@ -105,16 +105,21 @@ func main() {
 	workQueue := make(chan parser.Job)
 	complete := make(chan bool)
 
-	archive, err := os.Open(cliargs.annotationTarballPath)
+	input, err := os.Open(cliargs.annotationPath)
 	if err != nil {
-		log.Fatalf("Couldn't open tarball due to: [%s]\n", err)
+		log.Fatalf("Couldn't open annotation due to: [%s]\n", err)
 	}
-	defer archive.Close()
+	defer input.Close()
 
-	reader, fileStats, err := decompress.GetAnnotationFhFromTarArchive(archive)
-
+	reader, err := decompress.GetAnnotationFh(input)
 	if err != nil {
-		log.Fatalf("Couldn't get annotation file handle due to: [%s]\n", err)
+		log.Fatalf("Couldn't open annotation file due to: [%s]\n", err)
+	}
+
+	// Get the file size
+	fileStats, err := input.Stat()
+	if err != nil {
+		log.Fatalf("Couldn't get file stats due to: [%s]\n", err)
 	}
 
 	headerPaths, headerFields := decompress.GetHeaderPaths(reader)

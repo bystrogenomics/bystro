@@ -28,7 +28,6 @@ from bystro.search.utils.annotation import (
 from bystro.search.utils.messages import SaveJobData, PipelineType
 from bystro.search.utils.opensearch import gather_opensearch_args
 from bystro.utils.compress import GZIP_EXECUTABLE
-from bystro.utils.tar import GNU_TAR_EXECUTABLE_NAME
 from bystro.search.save.hwe import FilterFunctionType
 
 logger = logging.getLogger(__name__)
@@ -287,16 +286,6 @@ def go(  # pylint:disable=invalid-name
         )
         if ret != 0:
             raise IOError(f"Failed to write statistics for {annotation_path}")
-
-        tarball_name = os.path.basename(outputs.archived)
-        # Webserver requires the output to have top-level statistics data,
-        # but annotation data will be too large to want to store 2 copies of
-        ret = subprocess.call(
-            f'cd {output_dir}; {GNU_TAR_EXECUTABLE_NAME} --exclude ".*" --exclude={tarball_name} -cf {tarball_name} * && rm {annotation_path}',  # noqa: E501
-            shell=True,
-        )
-        if ret != 0:
-            raise IOError(f"Failed to write {outputs.archived}")
     except Exception as err:
         client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore
         raise IOError(err) from err
