@@ -76,8 +76,7 @@ def create_feather_file_with_multiple_batches(tmp_path, batches=5):
                 "1847": np.random.randint(0, 3, size=len(loci), dtype=np.uint16),  # noqa: NPY002
                 "4805": np.random.randint(0, 3, size=len(loci), dtype=np.uint16),  # noqa: NPY002
             }
-            print(data)
-            # write the batch of data to our feather file
+
             writer.write_table(pa.Table.from_pandas(pd.DataFrame(data)))
 
             weights.update({locus: random.random() for locus in loci})  # noqa: NPY002
@@ -105,7 +104,6 @@ def test_prs_calculation(create_feather_file):
             prs_scores[column] = pc.sum(weighted_column).as_py()
 
     assert len(prs_scores) == len(table.column_names) - 1  # excluding 'locus' column
-    print(prs_scores)
 
 
 def calculate_prs_in_pandas(file_path, weights):
@@ -129,12 +127,10 @@ def test_prs_calculations_with_pandas(create_feather_file):
     Test PRS calculations with Pandas
     This will be less memory efficient than operating on the Feather file directly
     """
-    print("running test_prs_calculations_with_pandas")
     file_path = create_feather_file
 
     prs_scores = calculate_prs_in_pandas(file_path, weights)
     assert len(prs_scores) == len(table.column_names) - 1  # excluding 'locus' column
-    print(prs_scores)
 
 
 def test_prs_calculations_arrow_with_missing_values(create_feather_file):
@@ -147,7 +143,6 @@ def test_prs_calculations_arrow_with_missing_values(create_feather_file):
     with pa.memory_map(file_path, "r") as source:
         table = pa.ipc.open_file(source).read_all()
 
-    # Compute the weighted sum for each sample column
     prs_scores = {}
     weights_subsetted_to_valid = None
     for column_name in table.column_names:
@@ -162,7 +157,6 @@ def test_prs_calculations_arrow_with_missing_values(create_feather_file):
             prs_scores[column_name] = pc.sum(weighted_values).as_py()
 
     assert len(prs_scores) == len(table.column_names) - 1  # excluding 'locus' column
-    print(prs_scores)
 
 
 def calculate_prs_in_batches(file_path, weights):
@@ -174,8 +168,6 @@ def calculate_prs_in_batches(file_path, weights):
     mask = pc.field("locus").isin(weights.index)
     my_dataset = my_dataset.filter(mask)
 
-    # Read the Feather file into a Pandas DataFrame in batches
-    # and calculate PRS in batches
     prs_scores: dict[str, float] = {}
     for batch in my_dataset.to_batches():
         loaded_arrays = batch.to_pandas()
@@ -201,14 +193,10 @@ def test_prs_one_batch(create_feather_file):
     prs_scores = calculate_prs_in_batches(file_path, weights)
     prs_scores_pandas = calculate_prs_in_pandas(file_path, weights)
 
-    # deep equality check that these two dictionaries contain the same keys and values
-    assert prs_scores == prs_scores_pandas
+    prs_scores = pd.DataFrame(calculate_prs_in_batches(file_path, weights), index=[0])
+    prs_scores_pandas = pd.DataFrame(calculate_prs_in_pandas(file_path, weights), index=[0])
 
-    assert len(prs_scores) == 3
-    for sample in prs_scores:
-        assert prs_scores[sample] > 0
-
-    print(prs_scores)
+    pd.testing.assert_frame_equal(prs_scores, prs_scores_pandas, rtol=1e-8, atol=1e-8)
 
 
 def test_prs_multiple_batches(create_feather_file_with_multiple_batches):
@@ -217,13 +205,10 @@ def test_prs_multiple_batches(create_feather_file_with_multiple_batches):
     This will be less memory efficient than operating on the Feather file directly
     """
     file_path, weights = create_feather_file_with_multiple_batches
-    prs_scores = calculate_prs_in_batches(file_path, weights)
+    prs_scores = pd.DataFrame(calculate_prs_in_batches(file_path, weights), index=[0])
+    prs_scores_pandas = pd.DataFrame(calculate_prs_in_pandas(file_path, weights), index=[0])
 
-    assert len(prs_scores) == 3
-    for sample in prs_scores:
-        assert prs_scores[sample] > 0
-
-    print(prs_scores)
+    pd.testing.assert_frame_equal(prs_scores, prs_scores_pandas, rtol=1e-8, atol=1e-8)
 
 
 def test_prs_columnar_one_batch(create_feather_file_with_multiple_batches):
@@ -248,7 +233,6 @@ def test_prs_columnar_one_batch(create_feather_file_with_multiple_batches):
         prs_scores[sample] = prs_scores_batch.item()
 
     assert prs_scores == expected
-    print(prs_scores)
 
 
 def test_prs_columnar_batches(create_feather_file_with_multiple_batches):
@@ -260,6 +244,8 @@ def test_prs_columnar_batches(create_feather_file_with_multiple_batches):
 
     filtered_data = my_dataset.filter(mask)
 
+    expected = calculate_prs_in_batches(file_path, weights)
+
     prs_scores: dict[str, float] = {}
     for batch in filtered_data.to_batches():
         for sample in samples:
@@ -270,8 +256,8 @@ def test_prs_columnar_batches(create_feather_file_with_multiple_batches):
             prs_scores_batch = sample_genotypes.multiply(weights_subset, axis="index").sum()
 
             if sample in prs_scores:
-                prs_scores[sample] += prs_scores_batch
+                prs_scores[sample] += prs_scores_batch.item()
             else:
-                prs_scores[sample] = prs_scores_batch
+                prs_scores[sample] = prs_scores_batch.item()
 
-    print(prs_scores)
+    assert prs_scores == expected
