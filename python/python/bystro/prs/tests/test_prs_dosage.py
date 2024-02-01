@@ -54,14 +54,15 @@ def create_feather_file(tmp_path):
     return file_path
 
 
-@pytest.fixture
-def create_feather_file_with_multiple_batches(tmp_path, batches=5):
+def _create_feather_file_with_multiple_batches(tmp_path, batches=5):
     # Use pytest's temporary directory feature
     file_path = str(tmp_path / "test_dosage.feather")
 
     # write an IPC/feather file
     weights = {}
-    with pa.OSFile(file_path, "wb") as sink, pa.RecordBatchFileWriter(sink, table.schema) as writer:
+    with pa.OSFile(file_path, "wb") as sink, pa.RecordBatchFileWriter(
+        sink, table.schema, options=pa.ipc.IpcWriteOptions(compression="zstd")
+    ) as writer:
         for i in range(batches):
             # generates a random set of 10 loci, taking chromosomes from chr1-22,
             # positions from 1-100000000, and alleles from ACGT
@@ -77,11 +78,18 @@ def create_feather_file_with_multiple_batches(tmp_path, batches=5):
                 "4805": np.random.randint(0, 3, size=len(loci), dtype=np.uint16),  # noqa: NPY002
             }
 
-            writer.write_table(pa.Table.from_pandas(pd.DataFrame(data)))
+            writer.write_table(
+                pa.Table.from_pandas(pd.DataFrame(data)),
+            )
 
             weights.update({locus: random.random() for locus in loci})  # noqa: NPY002
 
     return file_path, pd.Series(weights)
+
+
+@pytest.fixture
+def create_feather_file_with_multiple_batches(tmp_path, batches=5):
+    return _create_feather_file_with_multiple_batches(tmp_path, batches)
 
 
 def test_prs_calculation(create_feather_file):
@@ -122,6 +130,97 @@ def calculate_prs_in_pandas(file_path, weights):
     return prs_scores.to_dict()
 
 
+def calculate_prs_in_row_batches(file_path, weights):
+    """
+    Calculate PRS scores efficiently, in batches
+    """
+
+    my_dataset = ds.dataset([file_path], format="arrow")
+    mask = pc.field("locus").isin(weights.index)
+    my_dataset = my_dataset.filter(mask)
+
+    prs_scores: dict[str, float] = {}
+    for batch in my_dataset.to_batches():
+        loaded_arrays = batch.to_pandas()
+        loaded_arrays = loaded_arrays.set_index("locus")
+        weights_subset = weights.loc[loaded_arrays.index]
+        prs_scores_batch = loaded_arrays.multiply(weights_subset, axis="index").sum()
+        # add the batch scores to the total scores for each sample
+        for sample in prs_scores_batch.index:
+            if sample in prs_scores:
+                prs_scores[sample] += prs_scores_batch[sample]
+            else:
+                prs_scores[sample] = prs_scores_batch[sample]
+
+    return prs_scores
+
+
+def calculate_prs_columnar_one_batch(file_path, weights):
+    mask = pc.field("locus").isin(weights.index)
+
+    my_dataset = ds.dataset([file_path], format="arrow")
+    samples = [name for name in my_dataset.schema.names if name != "locus"]
+
+    filtered_data = my_dataset.filter(mask)
+
+    prs_scores = {}
+    for sample in samples:
+        sample_genotypes = filtered_data.to_table(["locus", sample]).to_pandas()
+        sample_genotypes = sample_genotypes.set_index("locus")
+
+        prs_scores_batch = sample_genotypes.multiply(weights, axis="index").sum()
+        prs_scores[sample] = prs_scores_batch.item()
+
+    return prs_scores
+
+
+def calculate_prs_columnar_one_batch_as_numpy_array(file_path, weights):
+    mask = pc.field("locus").isin(weights.index)
+
+    my_dataset = ds.dataset([file_path], format="arrow")
+    samples = [name for name in my_dataset.schema.names if name != "locus"]
+
+    filtered_data = my_dataset.filter(mask)
+
+    weights = np.array(weights)
+    prs_scores = {}
+    for sample in samples:
+        # Convert column to numpy array
+        sample_genotypes = pa.array(
+            filtered_data.to_table([sample]).column(sample), type=pa.uint16()
+        ).to_numpy()
+
+        prs_scores_batch = (sample_genotypes * weights).sum()
+        prs_scores[sample] = prs_scores_batch.item()
+
+    return prs_scores
+
+
+def calculate_prs_columnar_batches(file_path, weights):
+    mask = pc.field("locus").isin(weights.index)
+
+    my_dataset = ds.dataset([file_path], format="arrow")
+    samples = [name for name in my_dataset.schema.names if name != "locus"]
+
+    filtered_data = my_dataset.filter(mask)
+
+    prs_scores: dict[str, float] = {}
+    for batch in filtered_data.to_batches():
+        for sample in samples:
+            sample_genotypes = batch.select(["locus", sample]).to_pandas()
+            sample_genotypes = sample_genotypes.set_index("locus")
+
+            weights_subset = weights.loc[sample_genotypes.index]
+            prs_scores_batch = sample_genotypes.multiply(weights_subset, axis="index").sum()
+
+            if sample in prs_scores:
+                prs_scores[sample] += prs_scores_batch.item()
+            else:
+                prs_scores[sample] = prs_scores_batch.item()
+
+    return prs_scores
+
+
 def test_prs_calculations_with_pandas(create_feather_file):
     """
     Test PRS calculations with Pandas
@@ -159,41 +258,16 @@ def test_prs_calculations_arrow_with_missing_values(create_feather_file):
     assert len(prs_scores) == len(table.column_names) - 1  # excluding 'locus' column
 
 
-def calculate_prs_in_batches(file_path, weights):
-    """
-    Calculate PRS scores efficiently, in batches
-    """
-
-    my_dataset = ds.dataset([file_path], format="arrow")
-    mask = pc.field("locus").isin(weights.index)
-    my_dataset = my_dataset.filter(mask)
-
-    prs_scores: dict[str, float] = {}
-    for batch in my_dataset.to_batches():
-        loaded_arrays = batch.to_pandas()
-        loaded_arrays = loaded_arrays.set_index("locus")
-        weights_subset = weights.loc[loaded_arrays.index]
-        prs_scores_batch = loaded_arrays.multiply(weights_subset, axis="index").sum()
-        # add the batch scores to the total scores for each sample
-        for sample in prs_scores_batch.index:
-            if sample in prs_scores:
-                prs_scores[sample] += prs_scores_batch[sample]
-            else:
-                prs_scores[sample] = prs_scores_batch[sample]
-
-    return prs_scores
-
-
 def test_prs_one_batch(create_feather_file):
     """
     Test PRS calculations with Pandas
     This will be less memory efficient than operating on the Feather file directly
     """
     file_path = create_feather_file
-    prs_scores = calculate_prs_in_batches(file_path, weights)
+    prs_scores = calculate_prs_in_row_batches(file_path, weights)
     prs_scores_pandas = calculate_prs_in_pandas(file_path, weights)
 
-    prs_scores = pd.DataFrame(calculate_prs_in_batches(file_path, weights), index=[0])
+    prs_scores = pd.DataFrame(calculate_prs_in_row_batches(file_path, weights), index=[0])
     prs_scores_pandas = pd.DataFrame(calculate_prs_in_pandas(file_path, weights), index=[0])
 
     pd.testing.assert_frame_equal(prs_scores, prs_scores_pandas, rtol=1e-8, atol=1e-8)
@@ -205,7 +279,7 @@ def test_prs_multiple_batches(create_feather_file_with_multiple_batches):
     This will be less memory efficient than operating on the Feather file directly
     """
     file_path, weights = create_feather_file_with_multiple_batches
-    prs_scores = pd.DataFrame(calculate_prs_in_batches(file_path, weights), index=[0])
+    prs_scores = pd.DataFrame(calculate_prs_in_row_batches(file_path, weights), index=[0])
     prs_scores_pandas = pd.DataFrame(calculate_prs_in_pandas(file_path, weights), index=[0])
 
     pd.testing.assert_frame_equal(prs_scores, prs_scores_pandas, rtol=1e-8, atol=1e-8)
@@ -214,50 +288,27 @@ def test_prs_multiple_batches(create_feather_file_with_multiple_batches):
 def test_prs_columnar_one_batch(create_feather_file_with_multiple_batches):
     file_path, weights = create_feather_file_with_multiple_batches
 
-    expected = calculate_prs_in_pandas(file_path, weights)
+    expected = pd.DataFrame(calculate_prs_in_pandas(file_path, weights), index=[0])
+    prs_scores = pd.DataFrame(calculate_prs_columnar_one_batch(file_path, weights), index=[0])
 
-    mask = pc.field("locus").isin(weights.index)
+    pd.testing.assert_frame_equal(prs_scores, expected, rtol=1e-8, atol=1e-8)
 
-    my_dataset = ds.dataset([file_path], format="arrow")
-    samples = set(my_dataset.schema.names) - set(["locus"])
 
-    filtered_data = my_dataset.filter(mask)
+def test_prs_columnar_one_batch_as_numpy_array(create_feather_file_with_multiple_batches):
+    file_path, weights = create_feather_file_with_multiple_batches
 
-    prs_scores = {}
-    for sample in samples:
-        sample_genotypes = filtered_data.to_table(["locus", sample]).to_pandas()
-        sample_genotypes = sample_genotypes.set_index("locus")
+    expected = pd.DataFrame(calculate_prs_in_pandas(file_path, weights), index=[0])
+    prs_scores = pd.DataFrame(
+        calculate_prs_columnar_one_batch_as_numpy_array(file_path, weights), index=[0]
+    )
 
-        weights_subset = weights.loc[sample_genotypes.index]
-        prs_scores_batch = sample_genotypes.multiply(weights_subset, axis="index").sum()
-        prs_scores[sample] = prs_scores_batch.item()
-
-    assert prs_scores == expected
+    pd.testing.assert_frame_equal(prs_scores, expected, rtol=1e-8, atol=1e-8)
 
 
 def test_prs_columnar_batches(create_feather_file_with_multiple_batches):
     file_path, weights = create_feather_file_with_multiple_batches
-    mask = pc.field("locus").isin(weights.index)
 
-    my_dataset = ds.dataset([file_path], format="arrow")
-    samples = set(my_dataset.schema.names) - set(["locus"])
+    expected = pd.DataFrame(calculate_prs_in_row_batches(file_path, weights), index=[0])
+    prs_scores = pd.DataFrame(calculate_prs_columnar_batches(file_path, weights), index=[0])
 
-    filtered_data = my_dataset.filter(mask)
-
-    expected = calculate_prs_in_batches(file_path, weights)
-
-    prs_scores: dict[str, float] = {}
-    for batch in filtered_data.to_batches():
-        for sample in samples:
-            sample_genotypes = batch.select(["locus", sample]).to_pandas()
-            sample_genotypes = sample_genotypes.set_index("locus")
-
-            weights_subset = weights.loc[sample_genotypes.index]
-            prs_scores_batch = sample_genotypes.multiply(weights_subset, axis="index").sum()
-
-            if sample in prs_scores:
-                prs_scores[sample] += prs_scores_batch.item()
-            else:
-                prs_scores[sample] = prs_scores_batch.item()
-
-    assert prs_scores == expected
+    pd.testing.assert_frame_equal(prs_scores, expected, rtol=1e-8, atol=1e-8)
