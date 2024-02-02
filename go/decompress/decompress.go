@@ -1,12 +1,9 @@
 package decompress
 
 import (
-	"archive/tar"
 	"bufio"
 	"errors"
-	"fmt"
 	"io"
-	"io/fs"
 	"log"
 	"os"
 	"strings"
@@ -184,33 +181,22 @@ func GetHeaderPaths(b BystroReader) ([][]string, []string) {
 	return headerPaths, headers
 }
 
-func GetAnnotationFhFromTarArchive(archive *os.File) (BystroReader, fs.FileInfo, error) {
-	tarReader, fileStats, err := getTarReader(archive)
-
-	if err != nil {
-		return nil, nil, err
-	}
-
-	bzfReader, err := getBgzipReaderFromBgzipAnnotation(tarReader)
+func GetAnnotationFh(input *os.File) (BystroReader, error) {
+	bzfReader, err := getBgzipReaderFromBgzipAnnotation(input)
 
 	if err == nil {
-		return bzfReader, fileStats, nil
+		return bzfReader, nil
 	}
 
-	archive.Seek(0, 0)
+	input.Seek(0, 0)
 
-	bufioReader, err := getBufioReaderFromGzipAnnotation(tarReader)
+	bufioReader, err := getBufioReaderFromGzipAnnotation(input)
 
-	return bufioReader, fileStats, err
+	return bufioReader, err
 }
 
-func getBgzipReaderFromBgzipAnnotation(tarReader *tar.Reader) (*BzfBystroReader, error) {
-	err := pointTarReaderAtAnnotation(tarReader)
-	if err != nil {
-		return nil, err
-	}
-
-	bgzfReader, err := bgzf.NewReader(tarReader, 0)
+func getBgzipReaderFromBgzipAnnotation(inputFh *os.File) (*BzfBystroReader, error) {
+	bgzfReader, err := bgzf.NewReader(inputFh, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -218,13 +204,8 @@ func getBgzipReaderFromBgzipAnnotation(tarReader *tar.Reader) (*BzfBystroReader,
 	return &BzfBystroReader{Reader: bgzfReader}, nil
 }
 
-func getBufioReaderFromGzipAnnotation(tarReader *tar.Reader) (*BufioBystroReader, error) {
-	err := pointTarReaderAtAnnotation(tarReader)
-	if err != nil {
-		return nil, err
-	}
-
-	gzipReader, err := gzip.NewReader(tarReader)
+func getBufioReaderFromGzipAnnotation(inputFh *os.File) (*BufioBystroReader, error) {
+	gzipReader, err := gzip.NewReader(inputFh)
 	if err != nil {
 		return nil, err
 	}
@@ -232,34 +213,4 @@ func getBufioReaderFromGzipAnnotation(tarReader *tar.Reader) (*BufioBystroReader
 	bufioReader := bufio.NewReader(gzipReader)
 
 	return &BufioBystroReader{Reader: bufioReader}, nil
-}
-
-func getTarReader(archive *os.File) (*tar.Reader, fs.FileInfo, error) {
-	fileStats, err := archive.Stat()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	tarReader := tar.NewReader(archive)
-
-	return tarReader, fileStats, nil
-}
-
-func pointTarReaderAtAnnotation(tarReader *tar.Reader) error {
-	for {
-		header, err := tarReader.Next()
-		if err != nil {
-			if err == io.EOF {
-				break // End of archive
-			}
-			return err
-		}
-
-		// TODO @akotlar 2023-11-24: Take the expected file name from the information submitted in the beanstalkd queue message
-		if strings.HasSuffix(header.Name, ExpectedAnnotationFileSuffix) {
-			return nil
-		}
-	}
-
-	return fmt.Errorf("couldn't find annotation file in tarball")
 }

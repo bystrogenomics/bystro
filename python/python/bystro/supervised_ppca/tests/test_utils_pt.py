@@ -1,4 +1,7 @@
+import random
 import torch
+import numpy as np
+
 from bystro.supervised_ppca._misc_pt import (
     ldet_sw_full,
     inverse_sw_full,
@@ -8,8 +11,14 @@ from bystro.supervised_ppca._misc_pt import (
 )
 from torch.distributions.multivariate_normal import MultivariateNormal
 
+# Set global seeds
+random.seed(0)
+np.random.seed(0) # noqa: NPY002
 
 def test_ldet_sw_full():
+    # Torch seeds do not work globally
+    torch.manual_seed(0)
+
     # Test the log determinant computation
     A = torch.randn(3, 3) + torch.diag(10 * torch.rand(3)) + 1
     U = 0.1 * torch.randn(3, 3)
@@ -24,6 +33,8 @@ def test_ldet_sw_full():
 
 
 def test_inverse_sw_full():
+    torch.manual_seed(0)
+
     # Test the inverse computation
     A = torch.randn(3, 3)
     U = torch.randn(3, 3)
@@ -41,7 +52,10 @@ def test_inverse_sw_full():
 
 
 def test_ldet_sw_factor_analysis():
+    torch.manual_seed(0)
+
     # Test the log determinant computation in factor analysis
+
     Lambda = torch.randn(3, 3) + torch.diag(10 * torch.rand(3)) + 1.0
     W = torch.randn(2, 3)
 
@@ -55,6 +69,8 @@ def test_ldet_sw_factor_analysis():
 
 
 def test_inv_sw_factor_analysis():
+    torch.manual_seed(0)
+
     # Test the inverse computation in factor analysis
     Lambda = torch.randn(3, 3) + torch.diag(10 * torch.rand(3))
     W = torch.randn(2, 3)
@@ -70,6 +86,8 @@ def test_inv_sw_factor_analysis():
 
 
 def test_mvn_log_prob_sw():
+    torch.manual_seed(0)
+
     # Test the log probability computation for multivariate normal
     p = 3
     X = torch.randn(5, p)

@@ -8,7 +8,6 @@ use File::Basename;
 use Mouse;
 
 use Path::Tiny;
-# use Types::Path::Tiny qw/Path File AbsFile AbsPath/;
 use Mouse::Util::TypeConstraints;
 
 use namespace::autoclean;
@@ -27,7 +26,7 @@ has input_file => (
   required      => 1,
   metaclass     => 'Getopt',
   cmd_aliases   => [qw/input i in/],
-  documentation => qq{Input file path.},
+  documentation => 'Input file path.',
 );
 
 has output_file_base => (
@@ -35,7 +34,7 @@ has output_file_base => (
   isa           => 'Str',
   cmd_aliases   => [qw/o out/],
   metaclass     => 'Getopt',
-  documentation => qq{Where you want your output.},
+  documentation => 'Where you want your output.',
 );
 
 has output_json => (
@@ -44,7 +43,7 @@ has output_json => (
   cmd_aliases   => [qw/json/],
   metaclass     => 'Getopt',
   documentation =>
-    qq{Do you want to output JSON instead? Incompatible with run_statistics},
+    'Do you want to output JSON instead? Incompatible with run_statistics',
 );
 
 has config => (
@@ -54,7 +53,7 @@ has config => (
   required      => 1,
   metaclass     => 'Getopt',
   cmd_aliases   => [qw/c configuration/],
-  documentation => qq{Yaml config file path.},
+  documentation => 'Yaml config file path.',
 );
 
 has overwrite => (
@@ -63,7 +62,7 @@ has overwrite => (
   default       => 0,
   required      => 0,
   metaclass     => 'Getopt',
-  documentation => qq{Overwrite existing output file.},
+  documentation => 'Overwrite existing output file.',
 );
 
 has read_ahead => (
@@ -73,7 +72,7 @@ has read_ahead => (
   coerce        => 1,
   required      => 0,
   metaclass     => 'Getopt',
-  documentation => qq{For dense datasets, use system read-ahead},
+  documentation => 'For dense datasets, use system read-ahead',
 );
 
 has debug => (
@@ -95,7 +94,7 @@ has compress => (
   is            => 'ro',
   isa           => 'Str',
   metaclass     => 'Getopt',
-  documentation => qq{Compress the output?},
+  documentation => 'Compress the output?',
   default       => 0,
 );
 
@@ -103,7 +102,7 @@ has archive => (
   is            => 'ro',
   isa           => 'Bool',
   metaclass     => 'Getopt',
-  documentation => qq{Place all outputs into a tarball?},
+  documentation => 'Place all outputs into a tarball?',
   default       => 0,
 );
 
@@ -112,14 +111,14 @@ has run_statistics => (
   isa           => 'Int',
   metaclass     => 'Getopt',
   documentation =>
-    qq{Create per-sample feature statistics (like transition:transversions)?},
+    'Create per-sample feature statistics (like transition:transversions)?',
   default => 1,
 );
 
 has delete_temp => (
   is            => 'ro',
   isa           => 'Int',
-  documentation => qq{Delete the temporary directory made during annotation},
+  documentation => 'Delete the temporary directory made during annotation',
   default       => 1,
 );
 
@@ -128,14 +127,14 @@ has wantedChr => (
   isa           => 'Str',
   metaclass     => 'Getopt',
   cmd_aliases   => [qw/chr wanted_chr/],
-  documentation => qq{Annotate a single chromosome},
+  documentation => 'Annotate a single chromosome',
 );
 
 has maxThreads => (
   is            => 'ro',
   isa           => 'Int',
   metaclass     => 'Getopt',
-  documentation => qq{Number of CPU threads to use (optional)},
+  documentation => 'Number of CPU threads to use (optional)',
 );
 
 subtype HashRefJson => as
@@ -151,7 +150,7 @@ has publisher => (
   required      => 0,
   metaclass     => 'Getopt',
   documentation =>
-    qq{Tell Bystro how to send messages to a plugged-in interface (such as a web interface)}
+    'Tell Bystro how to send messages to a plugged-in interface (such as a web interface)'
 );
 
 has ignore_unknown_chr => (
@@ -160,7 +159,7 @@ has ignore_unknown_chr => (
   default       => 1,
   required      => 0,
   metaclass     => 'Getopt',
-  documentation => qq{Don't quit if we find a non-reference chromosome (like ChrUn)}
+  documentation => 'Don\'t quit if we find a non-reference chromosome (like ChrUn)'
 );
 
 sub annotate {
@@ -179,7 +178,7 @@ sub annotate {
     archive            => $self->archive,
     run_statistics     => !!$self->run_statistics,
     delete_temp        => !!$self->delete_temp,
-    readAhead          => $self->read_ahead,
+    readAhead          => $self->read_ahead
   };
 
   if ( defined $self->verbose ) {
