@@ -76,26 +76,29 @@ class AnnotationOutputs(Struct, frozen=True, forbid_unknown_fields=True):
     Attributes:
         output_dir: str
             Output directory
-        archived: str
-            Basename of the archive
         annotation: str
-            Basename of the annotation TSV file, found inside the archive only
+            Basename of the annotation TSV file, in the output directory
         sampleList: Optional[str]
-            Basename of the sample list file, in the archive and output directory
+            Basename of the sample list file, in the output directory
         log: str
-            Basename of the log file, in the archive and output directory
+            Basename of the log file, in the output directory
         statistics: StatisticsOutputs
-            Basenames of the statistics files, in the archive and output directory
+            Basenames of the statistics files, in the output directory
+        dosageMatrixOutPath: str
+            Basename of the dosage matrix, in the output directory
         header: Optional[str]
-            Basename of the header file, in the archive and output directory
+            Basename of the header file, in the output directory
+        archived: Optional[str]
+            Basename of the archived annotation file, in the output directory
     """
 
-    archived: str
     annotation: str
     sampleList: str
     log: str
     statistics: StatisticsOutputs
+    dosageMatrixOutPath: str
     header: str | None = None
+    archived: str | None = None
 
     @staticmethod
     def from_path(
@@ -120,21 +123,21 @@ class AnnotationOutputs(Struct, frozen=True, forbid_unknown_fields=True):
 
         sampleList = f"{basename}.sample_list"
 
-        archived = f"{basename}.tar"
-
         stats = Statistics(output_base_path=os.path.join(output_dir, basename))
-        statistics_tarball_members = StatisticsOutputs(
+        statistics_output_members = StatisticsOutputs(
             json=f"{os.path.basename(stats.json_output_path)}",
             tab=f"{os.path.basename(stats.tsv_output_path)}",
             qc=f"{os.path.basename(stats.qc_output_path)}",
         )
 
+        dosage = f"{basename}.dosage.feather"
+
         return (
             AnnotationOutputs(
                 annotation=annotation,
                 sampleList=sampleList,
-                statistics=statistics_tarball_members,
-                archived=archived,
+                statistics=statistics_output_members,
+                dosageMatrixOutPath=dosage,
                 log=log,
             ),
             stats,

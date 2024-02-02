@@ -97,7 +97,7 @@ jobs:
       - name: Install one-off Bystro dependencies
         shell: bash
         run: |
-          go install github.com/akotlar/bystro-vcf@1.0.0
+          go install github.com/bystrogenomics/bystro-vcf@2.1.0
           cpm install -g https://github.com/bystrogenomics/msgpack-perl.git
           cpm install -g --no-test MouseX::Getopt
           cpm install -g DBD::mysql@4.051

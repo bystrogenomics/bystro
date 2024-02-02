@@ -113,6 +113,8 @@ has outputFilesInfo => (
       };
     }
 
+    $out{dosageMatrixOutPath} = $outBaseName . '.dosage.feather';
+
     if ( $self->archive ) {
       # Seq::Role::IO method
       # Only compress the tarball if we're not compressing the inner file

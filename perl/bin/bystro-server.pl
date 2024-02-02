@@ -277,9 +277,9 @@ sub coerceInputs {
       }
     },
     compress       => 1,
-    archive        => 1,
     verbose        => $verbose,
     run_statistics => 1,
+    archive        => 0
   );
 
   if ($maxThreads) {
