@@ -1,24 +1,20 @@
 """Provide a worker for the ancestry model."""
 import argparse
 import logging
-from collections.abc import Callable, Collection
+from collections.abc import Callable
 from pathlib import Path
 
-import boto3
-import botocore
+import boto3  # type: ignore
 import pandas as pd
 from ruamel.yaml import YAML
-from skops.io import load as skops_load
+from skops.io import load as skops_load  # type: ignore
 
-from bystro.ancestry.ancestry_types import (
-    AncestryResponse,
-    AncestrySubmission,
-)
+from bystro.ancestry.ancestry_types import AncestryResults
 from bystro.ancestry.inference import AncestryModel, infer_ancestry
-from bystro.ancestry.train import parse_vcf
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
 from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, get_progress_reporter, listen
-from bystro.utils.timer import Timer
+
+import pyarrow.dataset as ds  # type: ignore
 
 logging.basicConfig(
     filename="ancestry_listener.log",
@@ -34,9 +30,9 @@ PCA_FILE = "pca.csv"
 RFC_FILE = "rfc.skop"
 
 
-def _get_model_from_s3(
-    s3_client: botocore.client.BaseClient,
-) -> AncestryModel:
+def _get_model_from_s3() -> AncestryModel:
+    s3_client = boto3.client("s3")
+
     s3_client.download_file(Bucket=ANCESTRY_BUCKET, Key=PCA_FILE, Filename=PCA_FILE)
     s3_client.download_file(Bucket=ANCESTRY_BUCKET, Key=RFC_FILE, Filename=RFC_FILE)
 
@@ -49,15 +45,15 @@ def _get_model_from_s3(
 
 
 class AncestryJobData(BaseMessage, frozen=True):
-    """Wrap an AncestrySubmission in a BaseMessage for beanstalk."""
+    """The input data expected from the job json message."""
 
-    ancestry_submission: AncestrySubmission
+    dosage_matrix_path: str
 
 
 class AncestryJobCompleteMessage(CompletedJobMessage, frozen=True, kw_only=True):
-    """Wrap an AncestryResponse in a CompletedJobMessage for beanstalk."""
+    """The returned JSON message expected by the API server"""
 
-    results: AncestryResponse
+    results: AncestryResults
 
 
 def _load_queue_conf(queue_conf_path: str) -> QueueConf:
@@ -67,20 +63,12 @@ def _load_queue_conf(queue_conf_path: str) -> QueueConf:
     return QueueConf(addresses=beanstalk_conf["addresses"], tubes=beanstalk_conf["tubes"])
 
 
-def _load_vcf(vcf_path: Path, variants: Collection[str]) -> pd.DataFrame:
-    """Load vcf, return dosages as df where index is sample_ids, columns are variants."""
-    # Currently the implementation is trivial, but we're stubbing this
-    # out now in order to encapsulate future volatility arising from EFS handling, &c.
-    logger.info("loading vcf from %s", vcf_path)
-    return parse_vcf(vcf_path, variants, return_exact_variants=True)
-
-
 def handler_fn_factory(
     ancestry_model: AncestryModel,
-) -> Callable[[ProgressPublisher, AncestryJobData], AncestryResponse]:
+) -> Callable[[ProgressPublisher, AncestryJobData], AncestryResults]:
     """Return partialed handler_fn with ancestry_model loaded."""
 
-    def handler_fn(publisher: ProgressPublisher, ancestry_job_data: AncestryJobData) -> AncestryResponse:
+    def handler_fn(publisher: ProgressPublisher, job_data: AncestryJobData) -> AncestryResults:
         """Do ancestry job, wrapping infer_ancestry for beanstalk."""
         # Separating _handler_fn from infer_ancestry in order to separate ML from infra concerns,
         # and especially to keep infer_ancestry eager.
@@ -88,13 +76,10 @@ def handler_fn_factory(
         # not doing anything with this reporter at the moment, we're
         # simply threading it through for later.
         _reporter = get_progress_reporter(publisher)
-        logger.debug("entering handler_fn with: %s", ancestry_job_data)
-        vcf_path = Path(ancestry_job_data.ancestry_submission.vcf_path)
-        logger.debug("loading VCF %s", vcf_path)
-        with Timer() as timer:
-            genotypes = _load_vcf(vcf_path, variants=ancestry_model.pca_loadings_df.index)
-        logger.debug("finished loading VCF %s in %f seconds", vcf_path, timer.elapsed_time)
-        return infer_ancestry(ancestry_model, genotypes, vcf_path)
+
+        dataset = ds.dataset([job_data.dosage_matrix_path], format="arrow")
+
+        return infer_ancestry(ancestry_model, dataset)
 
     return handler_fn
 
@@ -106,21 +91,12 @@ def submit_msg_fn(ancestry_job_data: AncestryJobData) -> SubmittedJobMessage:
 
 
 def completed_msg_fn(
-    ancestry_job_data: AncestryJobData, ancestry_response: AncestryResponse
+    ancestry_job_data: AncestryJobData, results: AncestryResults
 ) -> AncestryJobCompleteMessage:
     """Send job complete message."""
     logger.debug("entering completed_msg_fn: %s", ancestry_job_data)
-    ancestry_submission = ancestry_job_data.ancestry_submission
-    if ancestry_submission.vcf_path != ancestry_response.vcf_path:
-        err_msg = (
-            f"Ancestry submission filename {ancestry_submission.vcf_path} "
-            f"doesn't match response filename {ancestry_response.vcf_path}: this is a bug."
-        )
-        raise ValueError(err_msg)
-    logger.debug("completed ancestry inference for: %s", ancestry_response)
-    return AncestryJobCompleteMessage(
-        submissionID=ancestry_job_data.submissionID, results=ancestry_response
-    )
+
+    return AncestryJobCompleteMessage(submissionID=ancestry_job_data.submissionID, results=results)
 
 
 def main(ancestry_model: AncestryModel, queue_conf: QueueConf) -> None:
@@ -149,8 +125,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    s3_client = boto3.client("s3")
-    ancestry_model = _get_model_from_s3(s3_client)
+    ancestry_model = _get_model_from_s3()
     queue_conf = _load_queue_conf(args.queue_conf)
 
     main(ancestry_model, queue_conf)
