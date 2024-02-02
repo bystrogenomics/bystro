@@ -239,7 +239,9 @@ class PPCA(BasePCASGDModel):
 
         def log_prior(trainable_variables: list[Tensor]):
             W_ = trainable_variables[0]
-            sigma_ = trainable_variables[1]
+            sigmal_ = trainable_variables[1]
+            sigma_ = nn.Softplus()(sigmal_)
+
             part1 = (
                 -1 * prior_options["weight_W"] * torch.mean(torch.square(W_))
             )
@@ -467,10 +469,7 @@ class SPCA(BasePCASGDModel):
                 ]
             )
 
-            sigma = torch.sum(
-                list_covs,
-                dim=0,
-            )
+            sigma = torch.sum(list_covs, dim=0,)
             WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
             Sigma = WWT + torch.diag(sigma)
 
