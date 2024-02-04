@@ -30,8 +30,8 @@ has ucscGeneAref => (
   lazy     => 1,
   isa      => 'ArrayRef[Str]',
   default  => sub {
-    return
-      [ grep { $_ ne 'chrom' && $_ ne 'exonStarts' && $_ ne 'exonEnds' } @$ucscGeneAref ];
+    return [ grep { $_ ne 'chrom' && $_ ne 'exonStarts' && $_ ne 'exonEnds' }
+        @$ucscGeneAref ];
   }
 );
 
