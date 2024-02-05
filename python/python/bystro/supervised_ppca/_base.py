@@ -610,7 +610,7 @@ class BasePCASGDModel(BaseGaussianFactorModel):
         unexpected_but_present_keys = final_keys - default_keys
         if expected_but_missing_keys:
             raise ValueError(
-                "the following training options were expected but not found..."
+                "training options were expected but not found..."
             )
         if unexpected_but_present_keys:
             raise ValueError(
