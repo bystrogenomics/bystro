@@ -1,4 +1,5 @@
 """A module to handle the saving of search results into a new annotation"""
+
 # TODO 2023-05-08: Track number of skipped entries
 # TODO 2023-05-08: Write to Arrow IPC or Parquet, alongside tsv.
 # TODO 2023-05-08: Implement distributed pipeline/filters/transforms
@@ -10,6 +11,7 @@ import logging
 import math
 import os
 import pathlib
+import shutil
 import subprocess
 import traceback
 from typing import Any
@@ -110,9 +112,7 @@ def _make_output_string(rows: list, delims: DelimitersConfig):
                             inner_values.append(
                                 delims.overlap.join(
                                     map(
-                                        lambda x: str(x)
-                                        if x is not None
-                                        else empty_field_char,
+                                        lambda x: str(x) if x is not None else empty_field_char,
                                         sub,
                                     )
                                 )
@@ -172,9 +172,7 @@ def _process_query(
 
             row = np.empty(len(field_names), dtype=object)
             for y in range(len(field_names)):
-                row[y] = _populate_data(
-                    child_fields[y], doc["_source"].get(parent_fields[y])
-                )
+                row[y] = _populate_data(child_fields[y], doc["_source"].get(parent_fields[y]))
 
             if row[discordant_idx][0][0] is False:
                 row[discordant_idx][0][0] = 0
@@ -223,25 +221,26 @@ def go(  # pylint:disable=invalid-name
     keep_alive="1d",
 ) -> AnnotationOutputs:
     """Main function for running the query and writing the output"""
-    output_dir = os.path.dirname(job_data.outputBasePath)
-    basename = os.path.basename(job_data.outputBasePath)
+    output_dir = os.path.dirname(job_data.output_base_path)
+    basename = os.path.basename(job_data.output_base_path)
+
     pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
-    outputs, stats = AnnotationOutputs.from_path(output_dir, basename, compress=True)
+    outputs, stats = AnnotationOutputs.from_path(
+        output_dir, basename, job_data.input_file_names.config, compress=True
+    )
 
-    written_chunks = [os.path.join(output_dir, f"{job_data.indexName}_header")]
+    written_chunks = [os.path.join(output_dir, f"{job_data.index_name}_header")]
 
-    header = bytes("\t".join(job_data.fieldNames) + "\n", encoding="utf-8")
+    header = bytes("\t".join(job_data.field_names) + "\n", encoding="utf-8")
     with gzip.open(written_chunks[-1], "wb") as fw:
         fw.write(header)  # type: ignore
 
     search_client_args = gather_opensearch_args(search_conf)
     client = OpenSearch(**search_client_args)
 
-    query = _clean_query(job_data.queryBody)
-    num_slices = _get_num_slices(
-        client, job_data.indexName, max_query_size, max_slices, query
-    )
-    pit_id = client.create_point_in_time(index=job_data.indexName, params={"keep_alive": keep_alive})["pit_id"]  # type: ignore   # noqa: E501
+    query = _clean_query(job_data.query_body)
+    num_slices = _get_num_slices(client, job_data.index_name, max_query_size, max_slices, query)
+    pit_id = client.create_point_in_time(index=job_data.index_name, params={"keep_alive": keep_alive})["pit_id"]  # type: ignore   # noqa: E501
     try:
         reporter = get_progress_reporter(publisher)
         query["pit"] = {"id": pit_id}
@@ -249,9 +248,7 @@ def go(  # pylint:disable=invalid-name
 
         reqs = []
         for slice_id in range(num_slices):
-            written_chunks.append(
-                os.path.join(output_dir, f"{job_data.indexName}_{slice_id}")
-            )
+            written_chunks.append(os.path.join(output_dir, f"{job_data.index_name}_{slice_id}"))
             body = query.copy()
             if num_slices > 1:
                 # Slice queries require max > 1
@@ -259,7 +256,7 @@ def go(  # pylint:disable=invalid-name
             res = _process_query.remote(
                 {"body": body},
                 search_client_args,
-                job_data.fieldNames,
+                job_data.field_names,
                 job_data.pipeline,
                 written_chunks[-1],
                 reporter,
@@ -274,9 +271,7 @@ def go(  # pylint:disable=invalid-name
         all_chunks = " ".join(written_chunks)
 
         annotation_path = os.path.join(output_dir, outputs.annotation)
-        ret = subprocess.call(
-            f"cat {all_chunks} > {annotation_path}; rm {all_chunks}", shell=True
-        )
+        ret = subprocess.call(f"cat {all_chunks} > {annotation_path}; rm {all_chunks}", shell=True)
         if ret != 0:
             raise IOError(f"Failed to write {annotation_path}")
 
@@ -286,6 +281,10 @@ def go(  # pylint:disable=invalid-name
         )
         if ret != 0:
             raise IOError(f"Failed to write statistics for {annotation_path}")
+
+        # Copy the config file to the output directory
+        annotation_config_path = os.path.join(job_data.input_dir, job_data.input_file_names.config)
+        shutil.copy(annotation_config_path, os.path.join(output_dir, job_data.input_file_names.config))
     except Exception as err:
         client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore
         raise IOError(err) from err

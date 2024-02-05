@@ -82,6 +82,8 @@ class AnnotationOutputs(Struct, frozen=True, forbid_unknown_fields=True):
             Basename of the sample list file, in the output directory
         log: str
             Basename of the log file, in the output directory
+        config: str
+            Basename of the config file, in the output directory
         statistics: StatisticsOutputs
             Basenames of the statistics files, in the output directory
         dosageMatrixOutPath: str
@@ -95,6 +97,7 @@ class AnnotationOutputs(Struct, frozen=True, forbid_unknown_fields=True):
     annotation: str
     sampleList: str
     log: str
+    config: str
     statistics: StatisticsOutputs
     dosageMatrixOutPath: str
     header: str | None = None
@@ -104,6 +107,7 @@ class AnnotationOutputs(Struct, frozen=True, forbid_unknown_fields=True):
     def from_path(
         output_dir: str,
         basename: str,
+        annotation_config_path: str,
         compress: bool,
         make_dir: bool = True,
         make_dir_mode: int = 511,
@@ -121,7 +125,7 @@ class AnnotationOutputs(Struct, frozen=True, forbid_unknown_fields=True):
         if compress:
             annotation += ".gz"
 
-        sampleList = f"{basename}.sample_list"
+        sample_list = f"{basename}.sample_list"
 
         stats = Statistics(output_base_path=os.path.join(output_dir, basename))
         statistics_output_members = StatisticsOutputs(
@@ -135,8 +139,9 @@ class AnnotationOutputs(Struct, frozen=True, forbid_unknown_fields=True):
         return (
             AnnotationOutputs(
                 annotation=annotation,
-                sampleList=sampleList,
+                sampleList=sample_list,
                 statistics=statistics_output_members,
+                config=annotation_config_path,
                 dosageMatrixOutPath=dosage,
                 log=log,
             ),

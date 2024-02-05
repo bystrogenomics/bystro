@@ -53,11 +53,11 @@ my $conf = LoadFile($queueConfigPath);
 
 # The properties that we accept from the worker caller
 my %requiredForAll = (
-  output_file_base => 'outputBasePath',
+  output_file_base => 'output_base_path',
   assembly         => 'assembly',
 );
 
-my $requiredForType = { input_file => 'inputFilePath' };
+my $requiredForType = { input_file => 'input_file_path' };
 
 say "Running Annotation queue server";
 
@@ -119,40 +119,12 @@ while ( my $job = $beanstalk->reserve ) {
       die $err;
     }
 
-    my $configData = LoadFile( $inputHref->{config} );
-
-    # Hide the server paths in the config we send back;
-    # Those represent a security concern
-    $configData->{files_dir} = 'hidden';
-
-    if ( $configData->{temp_dir} ) {
-      $configData->{temp_dir} = 'hidden';
-    }
-
-    $configData->{database_dir} = 'hidden';
-
-    my $trackConfig;
-    if ( ref $configData->{tracks} eq 'ARRAY' ) {
-      $trackConfig = $configData->{tracks};
-    }
-    else {
-      # New version
-      $trackConfig = $configData->{tracks}{tracks};
-    }
-
-    for my $track (@$trackConfig) {
-      # Strip local_files of their directory names, for security reasons
-      $track->{local_files} =
-        [ map { !$_ ? "" : path($_)->basename } @{ $track->{local_files} } ];
-    }
-
     $beanstalkEvents->put(
       {
         priority => 0,
         data     => encode_json(
           {
             event        => $STARTED,
-            jobConfig    => $configData,
             submissionID => $jobDataHref->{submissionID},
             queueID      => $job->id,
           }
@@ -209,7 +181,7 @@ while ( my $job = $beanstalk->reserve ) {
     event        => $COMPLETED,
     queueID      => $job->id,
     submissionID => $jobDataHref->{submissionID},
-    results      => { outputFileNames => $outputFileNamesHashRef, }
+    results      => { output_file_names => $outputFileNamesHashRef, }
   };
 
   if ( defined $debug ) {

@@ -353,9 +353,12 @@ sub annotateFile {
   # Sync to ensure all files written
   # This simply tries each close/sync/move operation in order
   # And returns an error early, or proceeds to next operation
+  my $configOutPath = $self->_workingDir->child( $self->outputFilesInfo->{config} );
+
   $err =
        $self->safeClose($outFh)
     || ( $statsFh && $self->safeClose($statsFh) )
+    || $self->safeSystem( "cp " . $self->config . " $configOutPath" )
     || $self->safeSystem('sync')
     || $self->_moveFilesToOutputDir();
 
