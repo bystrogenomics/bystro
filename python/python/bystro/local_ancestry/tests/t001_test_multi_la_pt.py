@@ -2,8 +2,8 @@ import numpy as np
 from bystro.local_ancestry.multi_ancestry import MultiAncestry
 
 import torch
-from sklearn.model_selection import train_test_split
-from sklearn.datasets import fetch_openml
+from sklearn.model_selection import train_test_split # type: ignore
+from sklearn.datasets import fetch_openml # type: ignore
 
 
 def one_hot(arr):

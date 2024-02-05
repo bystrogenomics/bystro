@@ -148,11 +148,9 @@ class BaseMultiAncestry(BaseSGDModel, ABC):
 
     def _save_losses(self):
         """ For now just fitting format """ 
-        pass
         
     def _transform_training_data(self):
         """ For now just fitting format """ 
-        pass
 
 class MultiAncestry(BaseMultiAncestry):
     def __init__(self, n_hidden1, n_hidden2, training_options={}):
