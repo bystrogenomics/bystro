@@ -212,7 +212,7 @@ class MultiAncestry(BaseMultiAncestry):
             region_select = rng.choice(self.n_regions, bs_reg, replace=False)
 
             training_variables = list(shared_model.parameters())
-            training_variables_i = []
+            training_variables_i = [] # type: ignore
 
             for region in region_select:
                 training_variables = list(training_variables) + list(
