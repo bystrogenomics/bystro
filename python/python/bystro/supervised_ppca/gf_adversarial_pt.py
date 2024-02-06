@@ -28,6 +28,8 @@ from tqdm import trange
 import torch
 from torch import Tensor, nn
 from torch.distributions.multivariate_normal import MultivariateNormal
+from torch.distributions.gamma import Gamma
+
 from sklearn.decomposition import PCA
 
 from bystro.supervised_ppca._misc_np import softplus_inverse_np
@@ -157,11 +159,14 @@ class PPCAAdversarial(PPCA):
         self.p = p
 
         discriminator = nn.Sequential()
-        discriminator.add_module("dense1", nn.Linear(self.n_components, 30))
+        n_hidden = 5
+        discriminator.add_module(
+            "dense1", nn.Linear(self.n_components, n_hidden)
+        )
         discriminator.add_module("act1", nn.ReLU())
-        discriminator.add_module("dense2", nn.Linear(30, 1))
+        discriminator.add_module("dense2", nn.Linear(n_hidden, 1))
 
-        W_, sigmal_ = self._initialize_variables(X)
+        W_, sigmal_, sigma_max = self._initialize_variables(X)
         X_, y_ = self._transform_training_data(X, 1.0 * y)
         X_ = X_.type(torch.float32)
         y_ = y_.type(torch.float32)
@@ -195,16 +200,46 @@ class PPCAAdversarial(PPCA):
 
         _prior = self._create_prior()
 
+        fudge_factor = 0.7
         for i in trange(
             int(training_options["n_iterations"]), disable=not progress_bar
         ):
+            for j in range(80):
+                idx = rng.choice(
+                    X_.shape[0],
+                    size=training_options["batch_size"],
+                    replace=False,
+                )
+                X_batch = X_[idx]
+                y_batch = y_[idx]
+
+                sigma = softplus(sigmal_) + fudge_factor
+                WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
+                Sigma = WWT + sigma * eye
+
+                P_x, Cov = _get_projection_matrix(W_, sigma)
+                mean_z = torch.matmul(X_batch, torch.transpose(P_x, 0, 1))
+                eps = torch.rand_like(mean_z)
+                C1_2 = torch.linalg.cholesky(Cov)
+                z_samples = mean_z + torch.matmul(eps, C1_2)
+
+                y_hat = torch.squeeze(discriminator(z_samples))
+                if task == "regression":
+                    loss_y = supervision_loss(y_hat, y_batch)
+                else:
+                    loss_y = supervision_loss(sigm(y_hat), y_batch)
+
+                optimizer_d.zero_grad()
+                loss_y.backward()
+                optimizer_d.step()
+
             idx = rng.choice(
                 X_.shape[0], size=training_options["batch_size"], replace=False
             )
             X_batch = X_[idx]
             y_batch = y_[idx]
 
-            sigma = softplus(sigmal_)
+            sigma = softplus(sigmal_) + fudge_factor
             WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
             Sigma = WWT + sigma * eye
 
@@ -219,17 +254,6 @@ class PPCAAdversarial(PPCA):
             C1_2 = torch.linalg.cholesky(Cov)
             z_samples = mean_z + torch.matmul(eps, C1_2)
 
-            y_hat = torch.squeeze(discriminator(z_samples))
-
-            if task == "regression":
-                loss_y = supervision_loss(y_hat, y_batch)
-            else:
-                loss_y = supervision_loss(sigm(y_hat), y_batch)
-
-            optimizer_d.zero_grad()
-            loss_y.backward(retain_graph=True)
-            optimizer_d.step()
-
             y_hat2 = torch.squeeze(discriminator(z_samples))
             if task == "regression":
                 loss_y2 = supervision_loss(y_hat2, y_batch)
@@ -240,8 +264,34 @@ class PPCAAdversarial(PPCA):
             off_diag = WTW - torch.diag(torch.diag(WTW))
             loss_i = torch.linalg.matrix_norm(off_diag)
 
+            loss_sigma_large = nn.ReLU()(sigma - sigma_max) * 1000.0
+
+            if i % 10 == 0:
+                print(
+                    i,
+                    like_gen.detach().numpy(),
+                    "|",
+                    loss_y2.detach().numpy(),
+                    "|",
+                    sigma.detach().numpy(),
+                    sigma_max,
+                )
+                print(torch.norm(W_))
             posterior = like_gen + 1 / N * like_prior
-            loss_gen = -1 * posterior - self.mu * loss_y2 + self.gamma * loss_i
+
+            if i % 10 == 0:
+                loss_gen = (
+                    -1 * posterior
+                    - self.mu * loss_y2
+                    + self.gamma * loss_i
+                    + loss_sigma_large
+                )
+            else:
+                loss_gen = (
+                    -1 * self.mu * loss_y2
+                    + self.gamma * loss_i
+                    + loss_sigma_large
+                )
 
             optimizer_g.zero_grad()
             loss_gen.backward()
@@ -251,8 +301,37 @@ class PPCAAdversarial(PPCA):
             self.losses_supervision[i] = loss_y.detach().numpy()
 
         self._store_instance_variables(trainable_variables)
+        print(sigma_max)
 
         return self
+
+    def _create_prior(self):
+        """
+        This creates the function representing prior on pararmeters
+
+        Parameters
+        ----------
+        log_prior : function
+            The function representing the log density of the prior
+        """
+        prior_options = self.prior_options
+
+        def log_prior(trainable_variables: list[Tensor]):
+            W_ = trainable_variables[0]
+            sigmal_ = trainable_variables[1]
+            sigma_ = nn.Softplus()(sigmal_)
+
+            part1 = (
+                -1 * prior_options["weight_W"] * torch.mean(torch.square(W_))
+            )
+            part2 = Gamma(
+                prior_options["alpha"], prior_options["beta"]
+            ).log_prob(sigma_)
+            gamma_out = torch.mean(part1 + part2)
+            out = gamma_out
+            return out
+
+        return log_prior
 
     def _store_instance_variables(self, trainable_variables: list[Tensor]):
         """
@@ -296,8 +375,8 @@ class PPCAAdversarial(PPCA):
         sigmal_ : torch.tensor
             The unrectified variance of the model
 
-        B_ : torch.tensor
-            The predictive model intercept y = XW + B_
+        sigma_max : float
+            The maximum that the isotropic variance can feasibly be
         """
         model = PCA(self.n_components)
         S_hat = model.fit_transform(X)
@@ -307,7 +386,9 @@ class PPCAAdversarial(PPCA):
         diff = np.mean((X - X_recon) ** 2)
         sinv = softplus_inverse_np(diff * np.ones(1))
         sigmal_ = torch.tensor(sinv, requires_grad=True, dtype=torch.float32)
-        return W_, sigmal_
+
+        sigma_max = 3.0 * diff
+        return W_, sigmal_, sigma_max
 
     def _test_inputs(self, X, y):
         """
