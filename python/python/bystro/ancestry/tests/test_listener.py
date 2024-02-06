@@ -7,7 +7,7 @@ from bystro.ancestry.listener import (
     completed_msg_fn,
     SubmittedJobMessage,
     AncestryJobCompleteMessage,
-    AncestryResults
+    AncestryResults,
 )
 from bystro.ancestry.tests.test_inference import (
     ANCESTRY_MODEL,
@@ -24,7 +24,9 @@ handler_fn = handler_fn_factory(ANCESTRY_MODEL)
 
 def test_submit_fn():
     ancestry_job_data = AncestryJobData(
-        submissionID="my_submission_id2", dosage_matrix_path="some_dosage.feather"
+        submissionID="my_submission_id2",
+        dosage_matrix_path="some_dosage.feather",
+        out_dir="/path/to/some/dir",
     )
     submitted_job_message = submit_msg_fn(ancestry_job_data)
 
@@ -41,7 +43,9 @@ def test_handler_fn_happy_path(tmpdir):
     publisher = ProgressPublisher(
         host="127.0.0.1", port=1234, queue="my_queue", message=progress_message
     )
-    ancestry_job_data = AncestryJobData(submissionID="my_submission_id2", dosage_matrix_path=f1)
+    ancestry_job_data = AncestryJobData(
+        submissionID="my_submission_id2", dosage_matrix_path=f1, out_dir=str(tmpdir)
+    )
     ancestry_response = handler_fn(publisher, ancestry_job_data)
 
     assert isinstance(ancestry_response, AncestryResults)
@@ -55,9 +59,9 @@ def test_handler_fn_happy_path(tmpdir):
     assert samples_seen == expected_samples
 
 
-def test_completion_fn():
+def test_completion_fn(tmpdir):
     ancestry_job_data = AncestryJobData(
-        submissionID="my_submission_id2", dosage_matrix_path="some_dosage.feather"
+        submissionID="my_submission_id2", dosage_matrix_path="some_dosage.feather", out_dir=str(tmpdir)
     )
 
     ancestry_results, _ = _infer_ancestry()
