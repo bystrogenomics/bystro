@@ -8,6 +8,7 @@ my $test_db_dir = Path::Tiny->tempdir();
 my %baseArgs = (
   database_dir     => 't/tracks/gene/db/raw',
   input_file       => 'foo',
+  config           => 't/tracks/gene/db/raw/config.yaml',
   output_file_base => 'bar',
   tracks           => {
     tracks => [
@@ -16,7 +17,7 @@ my %baseArgs = (
         type        => 'reference',
         assembly    => 'hg19',
         chromosomes => ['chr1'],
-        files_dir   => 'fglla',
+        files_dir   => 'fglla'
       }
     ]
   },
@@ -34,24 +35,6 @@ sub test_dosageMatrixOut {
   );
   like( $outputFilesInfo->{dosageMatrixOutPath},
     qr/dosage\.feather$/, 'dosageMatrixOutPath should end with dosage.feather' );
-}
-
-# Mock a minimal configuration for testing
-sub mockConfig {
-  my ( $type, $args ) = shift;
-  return {
-    input_file     => "/path/to/input_file",
-    fileProcessors => {
-      $type => {
-        program  => "mockProgram",
-        args     => "--arg1 --arg2 \%output\%",
-        no_stdin => 0,                         # or 1, depending on the test case
-      }
-    },
-    outputFilesInfo => { output => "/path/to/output_file", },
-    _workingDir     => Path::Tiny->tempdir,
-    # Define other necessary attributes or methods here
-  };
 }
 
 sub test_preparePreprocessorProgram {
