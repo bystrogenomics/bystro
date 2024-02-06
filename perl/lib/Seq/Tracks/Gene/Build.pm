@@ -61,7 +61,7 @@ has join => ( is => 'ro', isa => 'HashRef' );
 # These are the features stored in the Gene track's region database
 # Does not include $geneDef->txErrorName here, because that is something
 # that is not actually present in UCSC refSeq or knownGene records, we add ourselves
-has '+features' => ( default => sub { $geneDef->allUCSCgeneFeatures; } );
+has '+features' => ( default => sub { $geneDef->ucscGeneAref; } );
 
 my $txNumberKey = 'txNumber';
 my $joinTrack;

@@ -28,12 +28,11 @@ has ucscGeneAref => (
   is       => 'ro',
   init_arg => undef,
   lazy     => 1,
+  isa      => 'ArrayRef[Str]',
   default  => sub {
-    return
-      grep { $_ ne 'chrom' && $_ ne 'exonStarts' && $_ ne 'exonEnds' } @$ucscGeneAref;
-  },
-  traits  => ['Array'],
-  handles => { allUCSCgeneFeatures => 'elements', }
+    return [ grep { $_ ne 'chrom' && $_ ne 'exonStarts' && $_ ne 'exonEnds' }
+        @$ucscGeneAref ];
+  }
 );
 
 __PACKAGE__->meta->make_immutable;
