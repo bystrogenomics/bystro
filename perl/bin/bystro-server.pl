@@ -53,11 +53,11 @@ my $conf = LoadFile($queueConfigPath);
 
 # The properties that we accept from the worker caller
 my %requiredForAll = (
-  output_file_base => 'output_base_path',
+  output_file_base => 'outputBasePath',
   assembly         => 'assembly',
 );
 
-my $requiredForType = { input_file => 'input_file_path' };
+my $requiredForType = { input_file => 'inputFilePath' };
 
 say "Running Annotation queue server";
 
@@ -125,8 +125,8 @@ while ( my $job = $beanstalk->reserve ) {
         data     => encode_json(
           {
             event        => $STARTED,
-            submissionID => $jobDataHref->{submissionID},
-            queueID      => $job->id,
+            submissionId => $jobDataHref->{submissionId},
+            queueId      => $job->id,
           }
         )
       }
@@ -161,8 +161,8 @@ while ( my $job = $beanstalk->reserve ) {
     my $data = {
       event        => $FAILED,
       reason       => $err,
-      queueID      => $job->id,
-      submissionID => $jobDataHref->{submissionID},
+      queueId      => $job->id,
+      submissionId => $jobDataHref->{submissionId},
     };
 
     $beanstalkEvents->put( { priority => 0, data => encode_json($data) } );
@@ -179,9 +179,9 @@ while ( my $job = $beanstalk->reserve ) {
 
   my $data = {
     event        => $COMPLETED,
-    queueID      => $job->id,
-    submissionID => $jobDataHref->{submissionID},
-    results      => { output_file_names => $outputFileNamesHashRef, }
+    queueId      => $job->id,
+    submissionId => $jobDataHref->{submissionId},
+    results      => { outputFileNames => $outputFileNamesHashRef, }
   };
 
   if ( defined $debug ) {
@@ -213,7 +213,7 @@ sub coerceInputs {
   my %jobSpecificArgs;
   for my $key ( keys %requiredForAll ) {
     if ( !defined $jobDetailsHref->{ $requiredForAll{$key} } ) {
-      $err = "Missing required key: $key in job message";
+      $err = "Missing required key: $requiredForAll{$key} in job message";
       return ( $err, undef );
     }
 
@@ -243,8 +243,8 @@ sub coerceInputs {
       queue       => $queueConfig->{events},
       messageBase => {
         event        => $PROGRESS,
-        queueID      => $queueId,
-        submissionID => $jobDetailsHref->{submissionID},
+        queueId      => $queueId,
+        submissionId => $jobDetailsHref->{submissionId},
         data         => undef,
       }
     },

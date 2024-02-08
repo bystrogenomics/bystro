@@ -34,7 +34,7 @@ class ProteomicsJobCompleteMessage(CompletedJobMessage, frozen=True, kw_only=Tru
 def submit_msg_fn(proteomics_job_data: ProteomicsJobData) -> SubmittedJobMessage:
     """Acknowledge receipt of ProteomicsJobData."""
     logger.debug("entering submit_msg_fn: %s", proteomics_job_data)
-    return SubmittedJobMessage(proteomics_job_data.submissionID)
+    return SubmittedJobMessage(proteomics_job_data.submission_id)
 
 
 def handler_fn(
@@ -60,7 +60,7 @@ def completed_msg_fn(
         )
         raise ValueError(err_msg)
     return ProteomicsJobCompleteMessage(
-        submissionID=proteomics_job_data.submissionID, results=proteomics_response
+        submission_id=proteomics_job_data.submission_id, results=proteomics_response
     )
 
 

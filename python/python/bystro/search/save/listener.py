@@ -56,11 +56,11 @@ def main():
         return go(job_data=job_data, search_conf=search_conf, publisher=publisher)
 
     def submit_msg_fn(job_data: SaveJobData):
-        return SubmittedJobMessage(submissionID=job_data.submissionID)
+        return SubmittedJobMessage(submission_id=job_data.submission_id)
 
     def completed_msg_fn(job_data: SaveJobData, results: AnnotationOutputs) -> SaveJobCompleteMessage:
         return SaveJobCompleteMessage(
-            submissionID=job_data.submissionID, results=SaveJobResults(results)
+            submission_id=job_data.submission_id, results=SaveJobResults(results)
         )
 
     listen(

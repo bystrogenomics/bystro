@@ -16,11 +16,11 @@ TUBE = "PRS"
 
 
 def submit_msg_fn(job_data: PRSJobData):
-    return SubmittedJobMessage(submissionID=job_data.submissionID)
+    return SubmittedJobMessage(submission_id=job_data.submission_id)
 
 
 def completed_msg_fn(job_data: PRSJobData, results: PRSJobResult) -> PRSJobResultMessage:
-    return PRSJobResultMessage(submissionID=job_data.submissionID, results=results)
+    return PRSJobResultMessage(submission_id=job_data.submission_id, results=results)
 
 
 def main():

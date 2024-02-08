@@ -78,7 +78,7 @@ EXAMPLE_JOB = {
         "_id": "64db4e68fb86b79cbda4f387",
         "type": "annotation",
         "submittedDate": "2023-08-15T10:07:36.027Z",
-        "queueID": "1538",
+        "queueId": "1538",
         "startedDate": "2023-08-15T10:07:37.045Z",
     },
     "config": json.encode(

@@ -1,3 +1,4 @@
+from msgspec import json
 import pytest
 
 from bystro.search.utils.annotation import (
@@ -23,11 +24,9 @@ def test_delimiters_default_values():
 
 
 def test_delimiters_from_dict_no_arg():
-    with pytest.raises(
-        TypeError, match=r"missing 1 required positional argument: 'annotation_config'"
-    ):
+    with pytest.raises(TypeError, match=r"missing 1 required positional argument: 'annotation_config'"):
         # Ignoring type checking because we're testing the error
-        DelimitersConfig.from_dict() # type: ignore
+        DelimitersConfig.from_dict()  # type: ignore
 
 
 def test_delimiters_from_dict_no_delimiters_key():
@@ -38,9 +37,7 @@ def test_delimiters_from_dict_no_delimiters_key():
 
 def test_delimiters_from_dict_unexpected_key():
     annotation_config = {"delimiters": {"random_delim_key": "random_value"}}
-    with pytest.raises(
-        TypeError, match=r"Unexpected keyword argument 'random_delim_key'"
-    ):
+    with pytest.raises(TypeError, match=r"Unexpected keyword argument 'random_delim_key'"):
         DelimitersConfig.from_dict(annotation_config)
 
 
@@ -73,11 +70,9 @@ def test_delimiters_from_dict_partial_delimiters_key():
 
 
 def test_delimiters_unexpected_key():
-    with pytest.raises(
-        TypeError, match=r"Unexpected keyword argument 'random_delim_key2'"
-    ):
-         # Ignoring type checking because we're testing the error
-        DelimitersConfig(random_delim_key2= "random_value") # type: ignore
+    with pytest.raises(TypeError, match=r"Unexpected keyword argument 'random_delim_key2'"):
+        # Ignoring type checking because we're testing the error
+        DelimitersConfig(random_delim_key2="random_value")  # type: ignore
 
 
 def test_get_config_file_path_no_path_found(mocker):
@@ -129,23 +124,21 @@ def test_statistics_output_extensions_defaults():
 
 def test_statistics_config_defaults():
     config = StatisticsConfig()
-    assert config.dbSNPnameField == "dbSNP.name"
-    assert config.siteTypeField == "refSeq.siteType"
-    assert config.exonicAlleleFunctionField == "refSeq.exonicAlleleFunction"
-    assert config.refField == "ref"
-    assert config.homozygotesField == "homozygotes"
-    assert config.heterozygotesField == "heterozygotes"
-    assert config.altField == "alt"
-    assert config.programPath == "bystro-stats"
-    assert isinstance(config.outputExtensions, StatisticsOutputExtensions)
+    assert config.dbsnp_name_field == "dbSNP.name"
+    assert config.site_type_field == "refSeq.siteType"
+    assert config.exonic_allele_function_field == "refSeq.exonicAlleleFunction"
+    assert config.ref_field == "ref"
+    assert config.homozygotes_field == "homozygotes"
+    assert config.heterozygotes_field == "heterozygotes"
+    assert config.alt_field == "alt"
+    assert config.program_path == "bystro-stats"
+    assert isinstance(config.output_extension, StatisticsOutputExtensions)
 
 
 def test_statistics_config_from_dict_none():
-    with pytest.raises(
-        TypeError, match=r"missing 1 required positional argument: 'annotation_config'"
-    ):
+    with pytest.raises(TypeError, match=r"missing 1 required positional argument: 'annotation_config'"):
         # Ignoring type checking because we're testing the error
-        StatisticsConfig.from_dict() # type: ignore
+        StatisticsConfig.from_dict()  # type: ignore
 
 
 def test_statistics_config_from_dict_no_statistics_key():
@@ -153,15 +146,13 @@ def test_statistics_config_from_dict_no_statistics_key():
     config = StatisticsConfig.from_dict(annotation_config)
 
     assert (
-        config.dbSNPnameField == "dbSNP.name"
+        config.dbsnp_name_field == "dbSNP.name"
     )  # Again, just checking one representative default value
 
 
 def test_statistics_config_no_statistics_key():
-    with pytest.raises(
-        TypeError, match=r"Unexpected keyword argument 'random_stats_key2'"
-    ):
-        StatisticsConfig(random_stats_key2="random_value") # type: ignore
+    with pytest.raises(TypeError, match=r"Unexpected keyword argument 'random_stats_key2'"):
+        StatisticsConfig(random_stats_key2="random_value")  # type: ignore
 
 
 def test_statistics_config_from_dict_unexpected_key():
@@ -173,9 +164,9 @@ def test_statistics_config_from_dict_unexpected_key():
 def test_statistics_config_from_dict_with_statistics_key():
     annotation_config = {
         "statistics": {
-            "dbSNPnameField": "new.dbSNP.name",
-            "siteTypeField": "new.refSeq.siteType",
-            "outputExtensions": {
+            "dbsnp_name_field": "new.dbSNP.name",
+            "site_type_field": "new.refSeq.siteType",
+            "output_extension": {
                 "json": ".new.json",
                 "tsv": ".new.tsv",
                 "qc": ".new.qc.tsv",
@@ -183,11 +174,11 @@ def test_statistics_config_from_dict_with_statistics_key():
         }
     }
     config = StatisticsConfig.from_dict(annotation_config)
-    assert config.dbSNPnameField == "new.dbSNP.name"
-    assert config.siteTypeField == "new.refSeq.siteType"
-    assert config.outputExtensions.json == ".new.json"
-    assert config.outputExtensions.tsv == ".new.tsv"
-    assert config.outputExtensions.qc == ".new.qc.tsv"
+    assert config.dbsnp_name_field == "new.dbSNP.name"
+    assert config.site_type_field == "new.refSeq.siteType"
+    assert config.output_extension.json == ".new.json"
+    assert config.output_extension.tsv == ".new.tsv"
+    assert config.output_extension.qc == ".new.qc.tsv"
 
 
 def test_statistics_init_program_not_found(mocker):
@@ -216,3 +207,37 @@ def test_statistics_get_stats_arguments(mocker):
     )
 
     assert statistics.stdin_cli_stats_command == expected_args
+
+
+def test_StatisticsConfig_camel_decamel():
+    annotation_config = {
+        "statistics": {
+            "dbsnp_name_field": "new.dbSNP.name",
+            "site_type_field": "new.refSeq.siteType",
+            "output_extension": {
+                "json": ".new.json",
+                "tsv": ".new.tsv",
+                "qc": ".new.qc.tsv",
+            },
+        }
+    }
+    config = StatisticsConfig.from_dict(annotation_config)
+    serialized_values = json.encode(config)
+    expected_value = {
+        "dbsnpNameField": "new.dbSNP.name",
+        "siteTypeField": "new.refSeq.siteType",
+        "exonicAlleleFunctionField": "refSeq.exonicAlleleFunction",
+        "refField": "ref",
+        "homozygotesField": "homozygotes",
+        "heterozygotesField": "heterozygotes",
+        "altField": "alt",
+        "programPath": "bystro-stats",
+        "outputExtension": {
+            "json": ".new.json", "tsv": ".new.tsv", "qc": ".new.qc.tsv"
+        }
+    }
+    serialized_expected_value = json.encode(expected_value)
+    assert serialized_values == serialized_expected_value
+
+    deserialized_values = json.decode(serialized_expected_value, type=StatisticsConfig)
+    assert deserialized_values == config
