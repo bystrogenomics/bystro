@@ -4,7 +4,7 @@ from msgspec import Struct
 LOWER_UNIT_BOUND = 0.0
 UPPER_UNIT_BOUND = 1.0
 
-class ProbabilityInterval(Struct):
+class ProbabilityInterval(Struct, rename="camel"):
     """Represent an interval of probabilities."""
 
     lower_bound: float
@@ -105,7 +105,7 @@ class AncestryTopHit(Struct):
             raise TypeError(f"probability must be between {LOWER_UNIT_BOUND} and {UPPER_UNIT_BOUND}")
 
 
-class AncestryScoresOneSample(Struct, frozen=True):
+class AncestryScoresOneSample(Struct, frozen=True, rename="camel"):
     """An ancestry result for a sample.
 
     Represents ancestry model output for an individual study

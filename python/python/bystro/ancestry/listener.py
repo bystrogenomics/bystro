@@ -45,13 +45,13 @@ def _get_model_from_s3() -> AncestryModel:
     return AncestryModel(pca_loadings_df, rfc)
 
 
-class AncestryJobData(BaseMessage, frozen=True):
+class AncestryJobData(BaseMessage, frozen=True, rename="camel"):
     """
     The expected JSON message for the Ancestry job.
 
     Parameters
     ----------
-    submissionID: str
+    submission_id: str
         The unique identifier for the job.
     dosage_matrix_path: str
         The path to the dosage matrix file.
@@ -63,7 +63,7 @@ class AncestryJobData(BaseMessage, frozen=True):
     out_dir: str
 
 
-class AncestryJobCompleteMessage(CompletedJobMessage, frozen=True, kw_only=True):
+class AncestryJobCompleteMessage(CompletedJobMessage, frozen=True, kw_only=True, rename="camel"):
     """The returned JSON message expected by the API server"""
 
     result_path: str
@@ -100,7 +100,7 @@ def handler_fn_factory(
 def submit_msg_fn(ancestry_job_data: AncestryJobData) -> SubmittedJobMessage:
     """Acknowledge receipt of AncestryJobData."""
     logger.debug("entering submit_msg_fn: %s", ancestry_job_data)
-    return SubmittedJobMessage(ancestry_job_data.submissionID)
+    return SubmittedJobMessage(ancestry_job_data.submission_id)
 
 
 def completed_msg_fn(
@@ -116,7 +116,9 @@ def completed_msg_fn(
     with open(out_path, "wb") as f:
         f.write(json_data)
 
-    return AncestryJobCompleteMessage(submissionID=ancestry_job_data.submissionID, result_path=out_path)
+    return AncestryJobCompleteMessage(
+        submission_id=ancestry_job_data.submission_id, result_path=out_path
+    )
 
 
 def main(ancestry_model: AncestryModel, queue_conf: QueueConf) -> None:

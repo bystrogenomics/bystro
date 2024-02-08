@@ -26,7 +26,7 @@ from bystro.utils.timer import Timer
 logger = logging.getLogger(__name__)
 
 
-class AncestryModel(Struct, frozen=True, forbid_unknown_fields=True):
+class AncestryModel(Struct, frozen=True, forbid_unknown_fields=True, rename="camel"):
     """Bundle together PCA and RFC models for bookkeeping purposes."""
 
     pca_loadings_df: pd.DataFrame

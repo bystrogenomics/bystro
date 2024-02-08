@@ -2,6 +2,7 @@
     CLI tool to start search indexing server that listens to beanstalkd queue
     and indexes submitted data in Opensearch
 """
+
 import argparse
 import os
 import subprocess
@@ -142,7 +143,7 @@ def main():
 
         header_fields = run_handler_with_config(
             index_name=beanstalkd_job_data.index_name,
-            submission_id=beanstalkd_job_data.submissionID,
+            submission_id=beanstalkd_job_data.submission_id,
             mapping_config=m_path,
             opensearch_config=search_conf,
             queue_config=queue_conf,
@@ -152,7 +153,8 @@ def main():
         return header_fields
 
     def submit_msg_fn(job_data: IndexJobData):
-        return SubmittedJobMessage(job_data.submissionID)
+        print("jbo_data", job_data)
+        return SubmittedJobMessage(job_data.submission_id)
 
     def completed_msg_fn(job_data: IndexJobData, field_names: list[str]):
         mapping_config_path = get_config_file_path(conf_dir, job_data.assembly, ".mapping.y*ml")
@@ -164,7 +166,8 @@ def main():
         shutil.copyfile(mapping_config_path, map_config_out_path)
 
         return IndexJobCompleteMessage(
-            submissionID=job_data.submissionID, results=IndexJobResults(map_config_basename, field_names)
+            submission_id=job_data.submission_id,
+            results=IndexJobResults(map_config_basename, field_names),
         )  # noqa: E501
 
     listen(
