@@ -18,6 +18,9 @@ from typing import Any
 import gzip
 
 import numpy as np
+import pyarrow.compute as pc # type: ignore
+import pyarrow.dataset as ds # type: ignore
+from pyarrow.feather import write_feather # type: ignore
 import ray
 
 from opensearchpy import OpenSearch
@@ -136,8 +139,10 @@ def _process_query(
     field_names: list,
     pipeline: PipelineType,
     chunk_output_name: str,
-    reporter,
-    delimiters,
+    reporter,  # ray-annotated classes are not supported in mypy yet:
+    delimiters: DelimitersConfig,
+    dosage_matrix_path: str,
+    filtered_dosage_chunk_path: str,
 ):
     client = OpenSearch(**search_client_args)
     resp = client.search(**query_args)
@@ -163,16 +168,18 @@ def _process_query(
     if discordant_idx == -1:
         raise ValueError("discordant field not found in field names")
 
+    loci = []
     try:
         for doc in resp["hits"]["hits"]:
+            src = doc["_source"]
             if filters is not None:
                 for filter_fn in filters:
-                    if filter_fn(doc["_source"]):
+                    if filter_fn(src):
                         continue
 
             row = np.empty(len(field_names), dtype=object)
             for y in range(len(field_names)):
-                row[y] = _populate_data(child_fields[y], doc["_source"].get(parent_fields[y]))
+                row[y] = _populate_data(child_fields[y], src.get(parent_fields[y]))
 
             if row[discordant_idx][0][0] is False:
                 row[discordant_idx][0][0] = 0
@@ -180,6 +187,9 @@ def _process_query(
                 row[discordant_idx][0][0] = 1
 
             rows.append(row)
+            loci.append(
+                f"{src['chrom'][0][0][0]}:{src['pos'][0][0][0]}:{src['inputRef'][0][0][0]}:{src['alt'][0][0][0]}"
+            )
     except Exception as err:
         logger.error(err)
         traceback.print_exc()
@@ -188,6 +198,14 @@ def _process_query(
     try:
         with gzip.open(chunk_output_name, "wb") as fw:
             fw.write(_make_output_string(rows, delimiters))  # type: ignore
+
+        mask = pc.field("locus").isin(loci)
+
+        dosage_matrix = ds.dataset(dosage_matrix_path, format="arrow")
+        dosage_matrix = dosage_matrix.filter(mask).to_table()
+
+        write_feather(dosage_matrix, filtered_dosage_chunk_path, compression="zstd")
+
         reporter.increment.remote(resp["hits"]["total"]["value"])
     except Exception:
         traceback.print_exc()
@@ -231,6 +249,13 @@ def go(  # pylint:disable=invalid-name
 
     written_chunks = [os.path.join(output_dir, f"{job_data.index_name}_header")]
 
+    parent_dosage_matrix_path = os.path.join(
+        job_data.input_dir, job_data.input_file_names.dosage_matrix_out_path
+    )
+
+    dosage_out_folder = os.path.join(output_dir, outputs.dosage_matrix_out_path)
+    pathlib.Path(dosage_out_folder).mkdir(parents=True, exist_ok=True)
+
     header = bytes("\t".join(job_data.field_names) + "\n", encoding="utf-8")
     with gzip.open(written_chunks[-1], "wb") as fw:
         fw.write(header)  # type: ignore
@@ -246,8 +271,11 @@ def go(  # pylint:disable=invalid-name
         query["pit"] = {"id": pit_id}
         query["size"] = max_query_size
 
+        dosage_out_chunks = []
         reqs = []
         for slice_id in range(num_slices):
+            dosage_chunk_out = os.path.join(dosage_out_folder, f"{slice_id}.feather")
+            dosage_out_chunks.append(dosage_chunk_out)
             written_chunks.append(os.path.join(output_dir, f"{job_data.index_name}_{slice_id}"))
             body = query.copy()
             if num_slices > 1:
@@ -261,6 +289,8 @@ def go(  # pylint:disable=invalid-name
                 written_chunks[-1],
                 reporter,
                 DelimitersConfig(),
+                parent_dosage_matrix_path,
+                dosage_chunk_out,
             )
             reqs.append(res)
         results_processed = ray.get(reqs)

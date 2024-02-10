@@ -227,7 +227,7 @@ class DebugProgressReporter(ProgressReporter):
         return self._value
 
 
-def get_progress_reporter(publisher: ProgressPublisher | None) -> ProgressReporter:
+def get_progress_reporter(publisher: ProgressPublisher | None = None) -> ProgressReporter:
     if publisher:
         return BeanstalkdProgressReporter.remote(publisher)  # type: ignore
 
