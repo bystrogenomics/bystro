@@ -8,6 +8,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -127,14 +128,14 @@ func Test_readLine(t *testing.T) {
 }
 
 func TestReadLinesDefaultBuffer(t *testing.T) {
-	testReadLinesWithBuffer(100_000, DefaultBufferSize)
+	testReadLinesWithBuffer(t, 100_000, DefaultBufferSize)
 }
 
 func TestReadLinesSmallBuffers1(t *testing.T) {
 	log.Print("Testing ReadLines with buffer of 1 byte")
-	testReadLinesWithBuffer(100_000, 1)
+	testReadLinesWithBuffer(t, 100_000, 1)
 	log.Print("Testing ReadLines with buffer of 10 bytes")
-	testReadLinesWithBuffer(100_000, 100)
+	testReadLinesWithBuffer(t, 100_000, 100)
 }
 
 func TestReadLinesSmallBuffers1Parallel(t *testing.T) {
@@ -143,13 +144,13 @@ func TestReadLinesSmallBuffers1Parallel(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		testReadLinesWithBuffer(100_000, 1)
+		testReadLinesWithBuffer(t, 100_000, 1)
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		testReadLinesWithBuffer(100_000, 100)
+		testReadLinesWithBuffer(t, 100_000, 100)
 	}()
 
 	wg.Wait()
@@ -157,9 +158,9 @@ func TestReadLinesSmallBuffers1Parallel(t *testing.T) {
 
 func TestReadLinesSmallBuffers2(t *testing.T) {
 	log.Print("Testing ReadLines with buffer of 400 bytes")
-	testReadLinesWithBuffer(100_000, 400)
+	testReadLinesWithBuffer(t, 100_000, 400)
 	log.Print("Testing ReadLines with buffer of 1000 bytes")
-	testReadLinesWithBuffer(100_000, 1000)
+	testReadLinesWithBuffer(t, 100_000, 1000)
 }
 
 func TestReadLinesSmallBuffers2Parallel(t *testing.T) {
@@ -169,25 +170,29 @@ func TestReadLinesSmallBuffers2Parallel(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		testReadLinesWithBuffer(100_000, 400)
+		testReadLinesWithBuffer(t, 100_000, 400)
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		testReadLinesWithBuffer(100_000, 1000)
+		testReadLinesWithBuffer(t, 100_000, 1000)
 	}()
 
 	wg.Wait()
 }
 
-func testReadLinesWithBuffer(numLines int, bufferSize uint) {
+func testReadLinesWithBuffer(t *testing.T, numLines int, bufferSize uint) {
+	// Generate tmp directory
+	tmpDir := t.TempDir()
 	// Step 1: Generate Test Data
 	testDataBytes := generateTestData(numLines)
 
 	// Step 2: Compress the Data
 	random_name := randStringBytes(10)
-	compressedFileName := fmt.Sprintf("test_data_%s.bgz", random_name)
+	compressedFileName := filepath.Join(tmpDir, fmt.Sprintf("test_data_%s.bgz", random_name))
+	defer os.Remove(compressedFileName)
+
 	compressData(testDataBytes, compressedFileName)
 
 	// Step 3: Read the Compressed Data
@@ -196,14 +201,8 @@ func testReadLinesWithBuffer(numLines int, bufferSize uint) {
 
 	err := readCompressedData(compressedFileName, expectedLines, bufferSize)
 
-	// delete the file
-	err2 := os.Remove(compressedFileName)
 	if err != nil {
 		log.Fatalf("Error reading compressed data: %v", err)
-	}
-
-	if err2 != nil {
-		log.Fatalf("Error deleting compressed file: %v", err2)
 	}
 }
 

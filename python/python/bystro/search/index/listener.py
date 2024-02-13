@@ -2,9 +2,11 @@
     CLI tool to start search indexing server that listens to beanstalkd queue
     and indexes submitted data in Opensearch
 """
+
 import argparse
 import os
 import subprocess
+import shutil
 
 from ruamel.yaml import YAML
 
@@ -67,7 +69,7 @@ def run_handler_with_config(
     index_name: str,
     mapping_config: str,
     opensearch_config: str,
-    tar_path: str,
+    annotation_path: str,
     no_queue: bool = False,
     submission_id: SubmissionID | None = None,
     queue_config: str | None = None,
@@ -80,8 +82,8 @@ def run_handler_with_config(
         mapping_config,
         "--opensearch-config",
         opensearch_config,
-        "--tarball-path",
-        tar_path,
+        "--input",
+        annotation_path,
     ]
 
     if no_queue:
@@ -134,36 +136,38 @@ def main():
         queue_conf_deserialized = YAML(typ="safe").load(queue_config_file)
 
     def handler_fn(_: ProgressPublisher, beanstalkd_job_data: IndexJobData) -> list[str]:
-        inputs = beanstalkd_job_data.inputFileNames
+        inputs = beanstalkd_job_data.input_file_names
 
-        if not inputs.archived:
-            raise ValueError("Indexing currently only works for indexing archived (tarballed) results")
-
-        tar_path = os.path.join(beanstalkd_job_data.inputDir, inputs.archived)
+        annotation_path = os.path.join(beanstalkd_job_data.input_dir, inputs.annotation)
         m_path = get_config_file_path(conf_dir, beanstalkd_job_data.assembly, ".mapping.y*ml")
 
         header_fields = run_handler_with_config(
-            index_name=beanstalkd_job_data.indexName,
-            submission_id=beanstalkd_job_data.submissionID,
+            index_name=beanstalkd_job_data.index_name,
+            submission_id=beanstalkd_job_data.submission_id,
             mapping_config=m_path,
             opensearch_config=search_conf,
             queue_config=queue_conf,
-            tar_path=tar_path,
+            annotation_path=annotation_path,
         )
 
         return header_fields
 
     def submit_msg_fn(job_data: IndexJobData):
-        return SubmittedJobMessage(job_data.submissionID)
+        print("jbo_data", job_data)
+        return SubmittedJobMessage(job_data.submission_id)
 
-    def completed_msg_fn(job_data: IndexJobData, fieldNames: list[str]):
-        m_path = get_config_file_path(conf_dir, job_data.assembly, ".mapping.y*ml")
+    def completed_msg_fn(job_data: IndexJobData, field_names: list[str]):
+        mapping_config_path = get_config_file_path(conf_dir, job_data.assembly, ".mapping.y*ml")
 
-        with open(m_path, "r", encoding="utf-8") as f:
-            mapping_conf = YAML(typ="safe").load(f)
+        # Write mapping config path to the job data out_dir directory
+        map_config_basename = os.path.basename(mapping_config_path)
+        out_dir = job_data.out_dir
+        map_config_out_path = os.path.join(out_dir, map_config_basename)
+        shutil.copyfile(mapping_config_path, map_config_out_path)
 
         return IndexJobCompleteMessage(
-            submissionID=job_data.submissionID, results=IndexJobResults(mapping_conf, fieldNames)
+            submission_id=job_data.submission_id,
+            results=IndexJobResults(map_config_basename, field_names),
         )  # noqa: E501
 
     listen(

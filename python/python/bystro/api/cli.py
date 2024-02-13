@@ -20,7 +20,7 @@ JOB_TYPE_ROUTE_MAP = {
 }
 
 
-class SignupResponse(Struct):
+class SignupResponse(Struct, rename="camel"):
     """
     The response body for signing up for Bystro.
 
@@ -33,7 +33,7 @@ class SignupResponse(Struct):
     access_token: str
 
 
-class LoginResponse(Struct):
+class LoginResponse(Struct, rename="camel"):
     """
     The response body for logging in to Bystro.
 
@@ -46,7 +46,7 @@ class LoginResponse(Struct):
     access_token: str
 
 
-class CachedAuth(Struct):
+class CachedAuth(Struct, rename="camel"):
     """
     The authentication state.
 
@@ -65,7 +65,7 @@ class CachedAuth(Struct):
     url: str
 
 
-class JobBasicResponse(Struct):
+class JobBasicResponse(Struct, rename="camel"):
     """
     The basic job information, returned in job list commands
 
@@ -84,7 +84,7 @@ class JobBasicResponse(Struct):
     createdAt: datetime.datetime
 
 
-class UserProfile(Struct):
+class UserProfile(Struct, rename="camel"):
     """
     The response body for fetching the user profile.
 

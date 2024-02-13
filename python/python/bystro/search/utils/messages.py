@@ -1,6 +1,5 @@
 from bystro.beanstalkd.messages import (
     BaseMessage,
-    SubmittedJobMessage,
     CompletedJobMessage,
     Struct,
 )
@@ -9,20 +8,21 @@ from bystro.search.save.hwe import HWEFilter
 from bystro.search.save.binomial_maf import BinomialMafFilter
 
 
-class IndexJobData(BaseMessage, frozen=True):
+class IndexJobData(BaseMessage, frozen=True, forbid_unknown_fields=True, kw_only=True, rename="camel"):
     """Data for Indexing jobs received from beanstalkd"""
 
-    inputDir: str
-    inputFileNames: AnnotationOutputs
-    indexName: str
+    input_dir: str
+    out_dir: str
+    input_file_names: AnnotationOutputs
+    index_name: str
     assembly: str
-    fieldNames: list[str] | None = None
-    indexConfig: dict | None = None
+    index_config_path: str | None = None
+    field_names: list[str] | None = None
 
 
-class IndexJobResults(Struct, frozen=True):
-    indexConfig: dict
-    fieldNames: list
+class IndexJobResults(Struct, frozen=True, forbid_unknown_fields=True, rename="camel"):
+    index_config_path: str
+    field_names: list[str]
 
 
 class IndexJobCompleteMessage(CompletedJobMessage, frozen=True, kw_only=True):
@@ -32,24 +32,22 @@ class IndexJobCompleteMessage(CompletedJobMessage, frozen=True, kw_only=True):
 PipelineType = list[BinomialMafFilter | HWEFilter] | None
 
 
-class SaveJobData(BaseMessage, frozen=True):
+class SaveJobData(BaseMessage, frozen=True, forbid_unknown_fields=True, kw_only=True, rename="camel"):
     """Data for SaveFromQuery jobs received from beanstalkd"""
 
     assembly: str
-    queryBody: dict
-    indexName: str
-    outputBasePath: str
-    fieldNames: list[str]
+    query_body: dict
+    input_dir: str
+    input_file_names: AnnotationOutputs
+    index_name: str
+    output_base_path: str
+    field_names: list[str]
     pipeline: PipelineType = None
 
 
-class SaveJobSubmitMessage(SubmittedJobMessage, frozen=True, kw_only=True):
-    jobConfig: dict
+class SaveJobResults(Struct, frozen=True, rename="camel"):
+    output_file_names: AnnotationOutputs
 
 
-class SaveJobResults(Struct, frozen=True):
-    outputFileNames: AnnotationOutputs
-
-
-class SaveJobCompleteMessage(CompletedJobMessage, frozen=True, kw_only=True):
+class SaveJobCompleteMessage(CompletedJobMessage, frozen=True, kw_only=True, rename="camel"):
     results: SaveJobResults

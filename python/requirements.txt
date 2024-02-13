@@ -1,14 +1,14 @@
 Cython==3.0.4
 attrs==23.1.0
 boto3==1.28.9
-liftover==1.1.16
+git+https://github.com/bystrogenomics/liftover.git@v1.1.18
 maturin[zig]==1.3.2
-msgspec==0.18.4
+msgspec==0.18.6
 opensearch-py[async]==2.3.2
 pandas==2.1.1
 pyarrow==14.0.1
 pystalk==0.7.0
-ray==2.8.0
+ray==2.9.2
 ruamel.yaml==0.17.31
 scikit-allel==1.3.6
 scikit-learn==1.2.2

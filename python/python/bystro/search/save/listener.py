@@ -11,13 +11,13 @@ from bystro.beanstalkd.worker import (
     QueueConf,
     listen,
 )
+from bystro.beanstalkd.messages import SubmittedJobMessage
 from bystro.search.save.handler import go
-from bystro.search.utils.annotation import AnnotationOutputs, get_config_file_path
+from bystro.search.utils.annotation import AnnotationOutputs
 from bystro.search.utils.messages import (
     SaveJobCompleteMessage,
     SaveJobData,
-    SaveJobResults,
-    SaveJobSubmitMessage,
+    SaveJobResults
 )
 
 TUBE = "saveFromQuery"
@@ -46,7 +46,6 @@ def main():
     )
     args = parser.parse_args()
 
-    config_path_base_dir = args.conf_dir
     with open(args.queue_conf, "r", encoding="utf-8") as queue_config_file:
         queue_conf = YAML(typ="safe").load(queue_config_file)
 
@@ -57,16 +56,11 @@ def main():
         return go(job_data=job_data, search_conf=search_conf, publisher=publisher)
 
     def submit_msg_fn(job_data: SaveJobData):
-        config_path = get_config_file_path(config_path_base_dir, job_data.assembly)
-
-        with open(config_path, "r", encoding="utf-8") as file:
-            job_config = YAML(typ="safe").load(file)
-
-        return SaveJobSubmitMessage(submissionID=job_data.submissionID, jobConfig=job_config)
+        return SubmittedJobMessage(submission_id=job_data.submission_id)
 
     def completed_msg_fn(job_data: SaveJobData, results: AnnotationOutputs) -> SaveJobCompleteMessage:
         return SaveJobCompleteMessage(
-            submissionID=job_data.submissionID, results=SaveJobResults(results)
+            submission_id=job_data.submission_id, results=SaveJobResults(results)
         )
 
     listen(

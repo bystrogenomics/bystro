@@ -60,8 +60,8 @@ def default_failed_msg_fn(
 ) -> FailedJobMessage | InvalidJobMessage:  # noqa: E501
     """Default failed message function"""
     if job_data is None:
-        return InvalidJobMessage(queueID=job_id, reason=str(err))
-    return FailedJobMessage(submissionID=job_data.submissionID, reason=str(err))
+        return InvalidJobMessage(queue_id=job_id, reason=str(err))
+    return FailedJobMessage(submission_id=job_data.submission_id, reason=str(err))
 
 
 def listen(
@@ -145,7 +145,7 @@ def listen(
                     host=client.host,
                     port=client.port,
                     queue=tube_conf["events"],
-                    message=ProgressMessage(submissionID=job_data.submissionID),
+                    message=ProgressMessage(submission_id=job_data.submission_id),
                 )
 
                 client.put_job(json.encode(submit_msg_fn(job_data)))

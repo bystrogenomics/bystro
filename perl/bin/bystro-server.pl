@@ -119,42 +119,14 @@ while ( my $job = $beanstalk->reserve ) {
       die $err;
     }
 
-    my $configData = LoadFile( $inputHref->{config} );
-
-    # Hide the server paths in the config we send back;
-    # Those represent a security concern
-    $configData->{files_dir} = 'hidden';
-
-    if ( $configData->{temp_dir} ) {
-      $configData->{temp_dir} = 'hidden';
-    }
-
-    $configData->{database_dir} = 'hidden';
-
-    my $trackConfig;
-    if ( ref $configData->{tracks} eq 'ARRAY' ) {
-      $trackConfig = $configData->{tracks};
-    }
-    else {
-      # New version
-      $trackConfig = $configData->{tracks}{tracks};
-    }
-
-    for my $track (@$trackConfig) {
-      # Strip local_files of their directory names, for security reasons
-      $track->{local_files} =
-        [ map { !$_ ? "" : path($_)->basename } @{ $track->{local_files} } ];
-    }
-
     $beanstalkEvents->put(
       {
         priority => 0,
         data     => encode_json(
           {
             event        => $STARTED,
-            jobConfig    => $configData,
-            submissionID => $jobDataHref->{submissionID},
-            queueID      => $job->id,
+            submissionId => $jobDataHref->{submissionId},
+            queueId      => $job->id,
           }
         )
       }
@@ -189,8 +161,8 @@ while ( my $job = $beanstalk->reserve ) {
     my $data = {
       event        => $FAILED,
       reason       => $err,
-      queueID      => $job->id,
-      submissionID => $jobDataHref->{submissionID},
+      queueId      => $job->id,
+      submissionId => $jobDataHref->{submissionId},
     };
 
     $beanstalkEvents->put( { priority => 0, data => encode_json($data) } );
@@ -207,8 +179,8 @@ while ( my $job = $beanstalk->reserve ) {
 
   my $data = {
     event        => $COMPLETED,
-    queueID      => $job->id,
-    submissionID => $jobDataHref->{submissionID},
+    queueId      => $job->id,
+    submissionId => $jobDataHref->{submissionId},
     results      => { outputFileNames => $outputFileNamesHashRef, }
   };
 
@@ -241,7 +213,7 @@ sub coerceInputs {
   my %jobSpecificArgs;
   for my $key ( keys %requiredForAll ) {
     if ( !defined $jobDetailsHref->{ $requiredForAll{$key} } ) {
-      $err = "Missing required key: $key in job message";
+      $err = "Missing required key: $requiredForAll{$key} in job message";
       return ( $err, undef );
     }
 
@@ -271,15 +243,15 @@ sub coerceInputs {
       queue       => $queueConfig->{events},
       messageBase => {
         event        => $PROGRESS,
-        queueID      => $queueId,
-        submissionID => $jobDetailsHref->{submissionID},
+        queueId      => $queueId,
+        submissionId => $jobDetailsHref->{submissionId},
         data         => undef,
       }
     },
     compress       => 1,
-    archive        => 1,
     verbose        => $verbose,
     run_statistics => 1,
+    archive        => 0
   );
 
   if ($maxThreads) {

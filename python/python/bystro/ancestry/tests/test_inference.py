@@ -3,17 +3,49 @@
 import numpy as np
 import pandas as pd
 import pytest
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier  # type: ignore
 
-from bystro.ancestry.inference import AncestryModel, _fill_missing_data, infer_ancestry
+import pyarrow as pa  # type: ignore
+import pyarrow.dataset as ds  # type: ignore
+
+from bystro.ancestry.inference import AncestryModel, infer_ancestry
 from bystro.ancestry.train import POPS
+from bystro.ancestry.listener import _get_model_from_s3
 
 SAMPLES = [f"sample{i}" for i in range(len(POPS))]
 VARIANTS = ["variant1", "variant2", "variant3"]
 PC_COLUMNS = ["pc1", "pc2", "pc3", "pc4"]
 FAKE_GENOTYPES = pd.DataFrame(
-    np.random.random((len(SAMPLES), len(VARIANTS))), index=SAMPLES, columns=VARIANTS
+    np.random.random((len(VARIANTS), len(SAMPLES))), index=VARIANTS, columns=SAMPLES
 )
+FAKE_GENOTYPES_DOSAGE_MATRIX = ds.dataset(
+    pa.Table.from_pandas(
+        FAKE_GENOTYPES.reset_index().rename(columns={"index": "locus"}), preserve_index=False
+    ).to_batches()
+)
+
+
+def _infer_ancestry():
+    samples = [f"sample{i}" for i in range(len(POPS))]
+    variants = ["variant1", "variant2", "variant3"]
+    pc_columns = ["pc1", "pc2", "pc3", "pc4"]
+    pca_loadings_df = pd.DataFrame(
+        np.random.random((len(variants), len(pc_columns))), index=variants, columns=pc_columns
+    )
+    genotypes = pd.DataFrame(
+        np.random.random((len(variants), len(samples))), index=variants, columns=samples
+    )
+
+    train_Xpc = genotypes.T @ pca_loadings_df
+    train_y = POPS
+    rfc = RandomForestClassifier(n_estimators=1, max_depth=1).fit(train_Xpc, train_y)
+    ancestry_model = AncestryModel(pca_loadings_df, rfc)
+
+    genotypes = genotypes.reset_index()
+    genotypes = genotypes.rename(columns={"index": "locus"})
+    genotypes = ds.dataset(pa.Table.from_pandas(genotypes, preserve_index=False).to_batches())
+
+    return infer_ancestry(ancestry_model, genotypes), samples
 
 
 def _make_ancestry_model() -> AncestryModel:
@@ -21,7 +53,7 @@ def _make_ancestry_model() -> AncestryModel:
     pca_loadings_df = pd.DataFrame(
         np.random.random((len(VARIANTS), len(PC_COLUMNS))), index=VARIANTS, columns=PC_COLUMNS
     )
-    train_Xpc = FAKE_GENOTYPES @ pca_loadings_df
+    train_Xpc = FAKE_GENOTYPES.T @ pca_loadings_df
     train_y = POPS
     rfc = RandomForestClassifier(n_estimators=1, max_depth=1).fit(train_Xpc, train_y)
     return AncestryModel(pca_loadings_df, rfc)
@@ -45,40 +77,50 @@ def test_Ancestry_Model_missing_pca_col():
 
 
 def test_infer_ancestry():
-    samples = [f"sample{i}" for i in range(len(POPS))]  # one pop per sample
-    variants = ["variant1", "variant2", "variant3"]
-    pc_columns = ["pc1", "pc2", "pc3", "pc4"]
-    pca_loadings_df = pd.DataFrame(
-        np.random.random((len(variants), len(pc_columns))), index=variants, columns=pc_columns
-    )
-    train_X = pd.DataFrame(
-        np.random.random((len(samples), len(variants))), index=samples, columns=variants
-    )
-    train_Xpc = train_X @ pca_loadings_df
-    train_y = POPS
-    rfc = RandomForestClassifier(n_estimators=1, max_depth=1).fit(train_Xpc, train_y)
-    ancestry_model = AncestryModel(pca_loadings_df, rfc)
-    vcf_path = "my_vcf.vcf"
-    ancestry_response = infer_ancestry(ancestry_model, train_X, vcf_path)
+    ancestry_response, samples = _infer_ancestry()
+
     assert len(samples) == len(ancestry_response.results)
-    assert vcf_path == ancestry_response.vcf_path
 
 
-def test__fill_missing_data():
-    genotypes = pd.DataFrame(np.random.random((3, 3)))
-    genotypes.iloc[0, 0] = np.nan
-    genotypes.iloc[1, 2] = np.nan
-    genotypes.iloc[2, 1] = np.nan
+@pytest.mark.integration()
+def test_infer_ancestry_from_model():
+    ancestry_model = _get_model_from_s3()
 
-    filled_genotypes, missingnesses = _fill_missing_data(genotypes)
-    assert filled_genotypes.notna().all().all()
-    assert np.allclose(genotypes.mean(), filled_genotypes.mean())
-    assert (missingnesses == 1 / 3).all()
+    # Generate an arrow table that contains genotype dosages for 1000 samples
+    variants = list(ancestry_model.pca_loadings_df.index)
+    samples = [f"sample{i}" for i in range(1000)]
+    genotypes = pd.DataFrame(
+        np.random.randint(0, 2, (len(variants), len(samples))),  # noqa: NPY002
+        index=variants,
+        columns=samples,  # noqa: NPY002
+    )
+    # randomly set 10% of the genotypes to missing to ensure we test missing data handling
+    genotypes = genotypes.mask(np.random.random(genotypes.shape) < 0.1)
 
+    # get missingness per sample
+    missingness = genotypes.isna().mean(axis=0)
 
-def test__fill_missing_data_col_completely_nan():
-    genotypes = pd.DataFrame(np.random.random((3, 3)))
-    genotypes.iloc[:, 0] = np.nan
+    genotypes = genotypes.reset_index()
+    genotypes = genotypes.rename(columns={"index": "locus"})
 
-    filled_genotypes, missingnesses = _fill_missing_data(genotypes)
-    assert not filled_genotypes.isna().any().any()
+    genotypes = ds.dataset(pa.Table.from_pandas(genotypes, preserve_index=False).to_batches())
+
+    ancestry_response = infer_ancestry(ancestry_model, genotypes)
+
+    assert len(samples) == len(ancestry_response.results)
+
+    top_hits = set()
+    top_probs = set()
+    samples_seen = set()
+    sample_set = set(samples)
+    for result in ancestry_response.results:
+        top_hits.add(result.top_hit.populations[0])
+        top_probs.add(result.top_hit.probability)
+
+        samples_seen.add(result.sample_id)
+
+        assert result.missingness == missingness[result.sample_id]
+
+    assert samples_seen == sample_set
+    assert len(top_hits) > 1
+    assert len(top_probs) > 1

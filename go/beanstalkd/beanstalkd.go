@@ -18,7 +18,7 @@ type ProgressData struct {
 }
 
 type ProgressMessage struct {
-	SubmissionID string       `json:"submissionID"`
+	SubmissionID string       `json:"submissionId"`
 	Data         ProgressData `json:"data"`
 	Event        string       `json:"event"`
 }

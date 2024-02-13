@@ -1,16 +1,20 @@
 """Classify genotypes at inference time."""
-import logging
-from dataclasses import dataclass
-from pathlib import Path
 
+import logging
+
+from msgspec import Struct
 import numpy as np
 import pandas as pd
+
+import pyarrow.compute as pc  # type: ignore
+from pyarrow.dataset import Dataset  # type: ignore
+
 from sklearn.ensemble import RandomForestClassifier
 
 from bystro.ancestry.ancestry_types import (
-    AncestryResponse,
+    AncestryResults,
+    AncestryScoresOneSample,
     AncestryTopHit,
-    AncestryResult,
     PopulationVector,
     ProbabilityInterval,
     SuperpopVector,
@@ -22,14 +26,13 @@ from bystro.utils.timer import Timer
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class AncestryModel:
+class AncestryModel(Struct, frozen=True, forbid_unknown_fields=True, rename="camel"):
     """Bundle together PCA and RFC models for bookkeeping purposes."""
 
     pca_loadings_df: pd.DataFrame
     rfc: RandomForestClassifier
 
-    def __post_init__(self) -> "AncestryModel":
+    def __post_init__(self) -> None:
         """Ensure that PCA and RFC features line up correctly."""
         pca_cols = self.pca_loadings_df.columns
         rfc_features = self.rfc.feature_names_in_
@@ -39,14 +42,19 @@ class AncestryModel:
                 f"rfc.feature_names_in: {self.rfc.feature_names_in_}"
             )
             raise ValueError(err_msg)
-        return self
 
     def predict_proba(self, genotypes: pd.DataFrame) -> tuple[dict[str, list[float]], pd.DataFrame]:
-        """Predict population probabilities from dosage matrix."""
+        """
+        Predict population probabilities from dosage matrix.
+
+        Args:
+            genotypes: pd.DataFrame, shape (n_variants, m_samples)
+                A dosage matrix with samples as rows and variants as columns.
+        """
         logger.debug("computing PCA transformation")
 
         with Timer() as timer:
-            Xpc = genotypes @ self.pca_loadings_df
+            Xpc = genotypes.T @ self.pca_loadings_df
 
         logger.debug("finished computing PCA transformation in %f seconds", timer.elapsed_time)
         logger.debug("computing RFC classification")
@@ -55,28 +63,18 @@ class AncestryModel:
             probs = self.rfc.predict_proba(Xpc)
 
         logger.debug("finished computing RFC classification in %f seconds", timer.elapsed_time)
+
         Xpc_dict = Xpc.T.to_dict(orient="list")
 
-        return Xpc_dict, pd.DataFrame(probs, index=genotypes.index, columns=POPS)
-
-
-def _fill_missing_data(genotypes: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
-    sample_missingnesses = genotypes.isna().mean(axis="columns")  # average over columns, leaving indices
-    # todo: much better imputation strategy to come, but we're stubbing out for now.
-    # if col completely missing in all samples, just fill as heterozygote for now
-    mean_column_values = genotypes.mean(axis="index").fillna(1)
-    imputed_genotypes = genotypes.fillna(mean_column_values)
-
-    return imputed_genotypes, sample_missingnesses
+        return Xpc_dict, pd.DataFrame(probs, index=genotypes.columns, columns=POPS)
 
 
 def _package_ancestry_response_from_pop_probs(
-    vcf_path: Path | str,
     pcs_for_plotting: dict[str, list[float]],
     pop_probs_df: pd.DataFrame,
     missingnesses: pd.Series,
-) -> AncestryResponse:
-    """Fill out AncestryResponse using filepath, numerical model output and sample-wise missingnesses."""
+) -> AncestryResults:
+    """Fill out AncestryResults using filepath, numerical model output and sample-wise missingnesses."""
     superpop_probs_df = _superpop_probs_from_pop_probs(pop_probs_df)
     ancestry_results = []
 
@@ -107,35 +105,84 @@ def _package_ancestry_response_from_pop_probs(
             }
         )
         ancestry_results.append(
-            AncestryResult(
+            AncestryScoresOneSample(
                 sample_id=sample_id,
-                top_hit=AncestryTopHit(
-                    probability=max_value,
-                    populations=top_pops
-                ),
+                top_hit=AncestryTopHit(probability=max_value, populations=top_pops),
                 populations=pop_vector,
                 superpops=superpop_vector,
-                missingness=missingnesses[sample_id],
+                missingness=float(missingnesses[sample_id]),
             )
         )
 
-    return AncestryResponse(vcf_path=str(vcf_path), results=ancestry_results, pcs=pcs_for_plotting)
+    return AncestryResults(results=ancestry_results, pcs=pcs_for_plotting)
 
 
-# TODO: implement with ray
-def infer_ancestry(
-    ancestry_model: AncestryModel, genotypes: pd.DataFrame, vcf_path: Path | str
-) -> AncestryResponse:
-    """Run an ancestry job."""
-    # TODO: main ancestry model logic goes here.  Just stubbing out for now.
+def infer_ancestry(ancestry_model: AncestryModel, genotypes: Dataset) -> AncestryResults:
+    """
+    Infer ancestry from genotypes using a trained model.
 
-    logger.debug("Filling missing data for VCF: %s", vcf_path)
+    Parameters
+    ----------
+    ancestry_model: AncestryModel
+        A trained model for predicting ancestry from genotypes.
+
+    genotypes: Arrow Dataset, shape (n_variants, m_samples)
+        A dataset containing genotypes to be classified.
+
+    Returns
+    -------
+    AncestryResults
+        A Struct of ancestry results for each sample in the dataset.
+        AncestryResults.results is a list of AncestryScoresOneSample objects and
+        AncestryResults.pcs is a dictionary of principal components for each sample.
+
+        AncestryScoresOneSample is a Struct with the following fields:
+        - sample_id: str
+            The ID of the sample. This is the same as the sample ID in the input dataset.
+        - top_hit: AncestryTopHit
+            The top hit for a sample, with the max value (a probability) and the list of population(s)
+            corresponding to that probability, typically a single population.
+        - populations: PopulationVector
+            A Struct of population probabilities for the sample. For instance, if the sample is
+            80% Finnish and 20% Nigerian, the PopulationVector
+            would be {"FIN": 0.8, "YRI": 0.2}.
+        - superpops: SuperpopVector
+            A Struct of super population probabilities for the sample. For instance, if the sample is
+            80% European and 20% African, the PopulationVector would be {"AFR": 0.2, "EUR": 0.8}.
+        - missingness: float
+            The fraction of expected variants (those in the AncestryModel)
+            found missing in the sample.
+
+            Note that this is not the overall sample missingness but rather
+            the sample missingness relative to the AncestryModel.
+    """
+
+    logger.debug("Beginning ancestry inference")
     with Timer() as timer:
-        imputed_genotypes, missingnesses = _fill_missing_data(genotypes)
-    logger.debug("Finished filling missing data for VCF in %f seconds", timer.elapsed_time)
-    pcs_for_plotting, pop_probs_df = ancestry_model.predict_proba(imputed_genotypes)
+        mask = pc.field("locus").isin(ancestry_model.pca_loadings_df.index)
+        genotypes = genotypes.filter(mask).to_table().to_pandas()
+        genotypes = genotypes.set_index("locus")
+        # TODO: @akotlar 2024-01-31: Replace reliance on imputation with Austin Talbot's model
+        # which is robust to missing data.
+        missing_rows = list(set(ancestry_model.pca_loadings_df.index) - set(genotypes.index))
+        if missing_rows:
+            missing_rows_df = pd.DataFrame(
+                np.ones((len(missing_rows), len(genotypes.columns))),
+                index=missing_rows,
+                columns=genotypes.columns,
+            )
+            genotypes = pd.concat([genotypes, missing_rows_df])
+
+        missingness = len(missing_rows) / len(ancestry_model.pca_loadings_df.index)
+        sample_missingnesses = genotypes.isna().mean(axis=0) + missingness
+
+        genotypes[genotypes.isna()] = 1
+
+        pcs_for_plotting, pop_probs_df = ancestry_model.predict_proba(genotypes)
+    logger.info("Completed ancestry inference in %f seconds", timer.elapsed_time)
+
     return _package_ancestry_response_from_pop_probs(
-        vcf_path, pcs_for_plotting, pop_probs_df, missingnesses
+        pcs_for_plotting, pop_probs_df, sample_missingnesses
     )
 
 
@@ -161,4 +208,5 @@ def _superpop_probs_from_pop_probs(pop_probs: pd.DataFrame) -> pd.DataFrame:
 
 def _make_trivial_probability_interval(x: float) -> ProbabilityInterval:
     """Promote a value to a trivial ProbabilityInterval with equal lower, upper bounds."""
-    return ProbabilityInterval(x, x)
+    # The ancestry calculations come out as np.float64, which is not JSON serializable in msgspec.
+    return ProbabilityInterval(float(x), float(x))

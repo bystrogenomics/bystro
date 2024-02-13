@@ -77,27 +77,6 @@ has alleleCountFieldIdx => ( is => 'ro', init_arg => undef );
 has lastSnpFileFieldIdx =>
   ( is => 'ro', init_arg => undef, writer => '_setLastSnpFileFieldIdx' );
 
-# The first sample genotype field
-# Set in checkInputFileHeader
-# has firstSampleIdx => (is => 'ro', init_arg => undef, writer => '_setFirstSampleIdx');
-
-# TODO: Remove. Currently depracated
-# sub getSampleNamesIdx {
-#   my ($self, $fAref) = @_;
-#   my $strt = $self->lastSnpFileFieldIdx + 1;
-
-#   # every other field column name is blank, holds genotype probability
-#   # for preceeding column's sample;
-#   # don't just check for ne '', to avoid simple header issues
-#   my %data;
-
-#   for(my $i = $strt; $i <= $#$fAref; $i += 2) {
-#     $data{$fAref->[$i] } = $i;
-#   }
-
-#   return %data;
-# }
-
 # Returns genotype indices
 # Assumes all other fields occur in a contiguous section before the start
 # of the sample/genotype block section

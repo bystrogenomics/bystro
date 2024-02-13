@@ -69,6 +69,9 @@ has maxThreads => (
 
 has outputJson => ( is => 'ro', isa => 'Bool', default => 0 );
 
+# The path to the annotation configuration file
+has config => ( is => 'ro', isa => 'Str', required => 1 );
+
 # has badSamplesField => (is => 'ro', default => 'badSamples', lazy => 1);
 
 ################ Public Exports ##################
@@ -113,6 +116,8 @@ has outputFilesInfo => (
       };
     }
 
+    $out{dosageMatrixOutPath} = $outBaseName . '.dosage.feather';
+
     if ( $self->archive ) {
       # Seq::Role::IO method
       # Only compress the tarball if we're not compressing the inner file
@@ -120,6 +125,8 @@ has outputFilesInfo => (
       # which dominates the archive 99%, cannot be compressed at all
       $out{archived} = $self->makeTarballName( $outBaseName, !$self->compress );
     }
+
+    $out{config} = path( $self->config )->basename;
 
     return \%out;
   }

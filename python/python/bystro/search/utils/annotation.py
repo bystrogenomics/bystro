@@ -21,16 +21,16 @@ class StatisticsOutputExtensions(Struct, frozen=True, forbid_unknown_fields=True
     qc: str = "statistics.qc.tsv"
 
 
-class StatisticsConfig(Struct, frozen=True, forbid_unknown_fields=True):
-    dbSNPnameField: str = "dbSNP.name"
-    siteTypeField: str = "refSeq.siteType"
-    exonicAlleleFunctionField: str = "refSeq.exonicAlleleFunction"
-    refField: str = "ref"
-    homozygotesField: str = "homozygotes"
-    heterozygotesField: str = "heterozygotes"
-    altField: str = "alt"
-    programPath: str = "bystro-stats"
-    outputExtensions: StatisticsOutputExtensions = StatisticsOutputExtensions()
+class StatisticsConfig(Struct, frozen=True, forbid_unknown_fields=True, rename="camel"):
+    dbsnp_name_field: str = "dbSNP.name"
+    site_type_field: str = "refSeq.siteType"
+    exonic_allele_function_field: str = "refSeq.exonicAlleleFunction"
+    ref_field: str = "ref"
+    homozygotes_field: str = "homozygotes"
+    heterozygotes_field: str = "heterozygotes"
+    alt_field: str = "alt"
+    program_path: str = "bystro-stats"
+    output_extension: StatisticsOutputExtensions = StatisticsOutputExtensions()
 
     @staticmethod
     def from_dict(annotation_config: dict[str, Any]):
@@ -43,9 +43,9 @@ class StatisticsConfig(Struct, frozen=True, forbid_unknown_fields=True):
             )
             return StatisticsConfig()
 
-        if "outputExtensions" in stats_config:
-            stats_config["outputExtensions"] = StatisticsOutputExtensions(
-                **stats_config["outputExtensions"]
+        if "output_extension" in stats_config:
+            stats_config["output_extension"] = StatisticsOutputExtensions(
+                **stats_config["output_extension"]
             )
 
         return StatisticsConfig(**stats_config)
@@ -69,38 +69,45 @@ class StatisticsOutputs(Struct, frozen=True, forbid_unknown_fields=True):
     qc: str
 
 
-class AnnotationOutputs(Struct, frozen=True, forbid_unknown_fields=True):
+class AnnotationOutputs(Struct, frozen=True, forbid_unknown_fields=True, rename="camel"):
     """
     Paths to all possible Bystro annotation outputs
 
     Attributes:
         output_dir: str
             Output directory
-        archived: str
-            Basename of the archive
         annotation: str
-            Basename of the annotation TSV file, found inside the archive only
-        sampleList: Optional[str]
-            Basename of the sample list file, in the archive and output directory
+            Basename of the annotation TSV file, in the output directory
+        sample_list: Optional[str]
+            Basename of the sample list file, in the output directory
         log: str
-            Basename of the log file, in the archive and output directory
+            Basename of the log file, in the output directory
+        config: str
+            Basename of the config file, in the output directory
         statistics: StatisticsOutputs
-            Basenames of the statistics files, in the archive and output directory
+            Basenames of the statistics files, in the output directory
+        dosage_matrix_out_path: str
+            Basename of the dosage matrix, in the output directory
         header: Optional[str]
-            Basename of the header file, in the archive and output directory
+            Basename of the header file, in the output directory
+        archived: Optional[str]
+            Basename of the archived annotation file, in the output directory
     """
 
-    archived: str
     annotation: str
-    sampleList: str
+    sample_list: str
     log: str
+    config: str
     statistics: StatisticsOutputs
+    dosage_matrix_out_path: str
     header: str | None = None
+    archived: str | None = None
 
     @staticmethod
     def from_path(
         output_dir: str,
         basename: str,
+        annotation_config_path: str,
         compress: bool,
         make_dir: bool = True,
         make_dir_mode: int = 511,
@@ -118,23 +125,24 @@ class AnnotationOutputs(Struct, frozen=True, forbid_unknown_fields=True):
         if compress:
             annotation += ".gz"
 
-        sampleList = f"{basename}.sample_list"
-
-        archived = f"{basename}.tar"
+        sample_list = f"{basename}.sample_list"
 
         stats = Statistics(output_base_path=os.path.join(output_dir, basename))
-        statistics_tarball_members = StatisticsOutputs(
+        statistics_output_members = StatisticsOutputs(
             json=f"{os.path.basename(stats.json_output_path)}",
             tab=f"{os.path.basename(stats.tsv_output_path)}",
             qc=f"{os.path.basename(stats.qc_output_path)}",
         )
 
+        dosage = f"{basename}.dosage.feather"
+
         return (
             AnnotationOutputs(
                 annotation=annotation,
-                sampleList=sampleList,
-                statistics=statistics_tarball_members,
-                archived=archived,
+                sample_list=sample_list,
+                statistics=statistics_output_members,
+                config=annotation_config_path,
+                dosage_matrix_out_path=dosage,
                 log=log,
             ),
             stats,
@@ -190,18 +198,18 @@ class Statistics:
             self._config = StatisticsConfig.from_dict(annotation_config)
             self._delimiters = DelimitersConfig.from_dict(annotation_config)
 
-        program_path = shutil.which(self._config.programPath)
+        program_path = shutil.which(self._config.program_path)
         if not program_path:
             raise ValueError(
-                f"Couldn't find statistics program {self._config.programPath}"
+                f"Couldn't find statistics program {self._config.program_path}"
             )
 
         self.program_path = program_path
         self.json_output_path = (
-            f"{output_base_path}.{self._config.outputExtensions.json}"
+            f"{output_base_path}.{self._config.output_extension.json}"
         )
-        self.tsv_output_path = f"{output_base_path}.{self._config.outputExtensions.tsv}"
-        self.qc_output_path = f"{output_base_path}.{self._config.outputExtensions.qc}"
+        self.tsv_output_path = f"{output_base_path}.{self._config.output_extension.tsv}"
+        self.qc_output_path = f"{output_base_path}.{self._config.output_extension.qc}"
 
     @property
     def stdin_cli_stats_command(self) -> str:
@@ -209,24 +217,24 @@ class Statistics:
         field_delim = self._delimiters.field
         empty_field = self._delimiters.empty_field
 
-        het_field = self._config.heterozygotesField
-        hom_field = self._config.homozygotesField
-        site_type_field = self._config.siteTypeField
-        ea_fun_field = self._config.exonicAlleleFunctionField
-        ref_field = self._config.refField
-        alt_field = self._config.altField
-        dbSNP_field = self._config.dbSNPnameField
+        het_field = self._config.heterozygotes_field
+        hom_field = self._config.homozygotes_field
+        site_type_field = self._config.site_type_field
+        ea_fun_field = self._config.exonic_allele_function_field
+        ref_field = self._config.ref_field
+        alt_field = self._config.alt_field
+        dbsnp_field = self._config.dbsnp_name_field
 
-        statsProg = self.program_path
+        prog = self.program_path
 
-        dbSNPpart = f"-dbSnpNameColumn {dbSNP_field}" if dbSNP_field else ""
+        dbsnp_part = f"-dbSnpNameColumn {dbsnp_field}" if dbsnp_field else ""
 
         return (
-            f"{statsProg} -outJsonPath {self.json_output_path} -outTabPath {self.tsv_output_path} "
+            f"{prog} -outJsonPath {self.json_output_path} -outTabPath {self.tsv_output_path} "
             f"-outQcTabPath {self.qc_output_path} -refColumn {ref_field} "
             f"-altColumn {alt_field} -homozygotesColumn {hom_field} "
             f"-heterozygotesColumn {het_field} -siteTypeColumn {site_type_field} "
-            f"{dbSNPpart} -emptyField {empty_field} "
+            f"{dbsnp_part} -emptyField {empty_field} "
             f"-exonicAlleleFunctionColumn {ea_fun_field} "
             f"-primaryDelimiter '{value_delim}' -fieldSeparator '{field_delim}'"
         )

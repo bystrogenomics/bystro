@@ -32,16 +32,17 @@ def ensure_annotation_file_present(index_name: str) -> None:
 
 
 def index_test_annotation_file(index_name: str) -> None:
-    mapping_config = str(BYSTRO_CONFIG_DIR / f"{ReferenceGenome.hg38}.mapping.yml")
-    tar_path = (
-        BYSTRO_PROJECT_ROOT / "python/python/bystro/proteomics/tests/integrations/trio_trim_vep_vcf.tar"
+    mapping_config = str(BYSTRO_CONFIG_DIR / f"{ReferenceGenome.hg19}.mapping.yml")
+    annotation_path = str(
+        BYSTRO_PROJECT_ROOT
+        / "python/python/bystro/proteomics/tests/integrations/trio_trim_vep_vcf.annotation.tsv.gz"
     )
-    assert tar_path.exists()
+
     run_handler_with_config(
         index_name=index_name,
         mapping_config=mapping_config,
         opensearch_config=str(OPENSEARCH_CONFIG_PATH),
-        tar_path=str(tar_path),
+        annotation_path=annotation_path,
         no_queue=True,
     )
     # after uploading, some additional time is required on the annotator's end before the results
