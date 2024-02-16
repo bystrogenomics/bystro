@@ -10,38 +10,47 @@
 import logging
 import math
 import os
+import psutil
 import pathlib
-import shutil
 import subprocess
-import traceback
-from typing import Any
-import gzip
+from numpy._typing import NDArray
 
 import numpy as np
-import pyarrow.compute as pc # type: ignore
-import pyarrow.dataset as ds # type: ignore
-from pyarrow.feather import write_feather # type: ignore
+from opensearchpy import OpenSearch, AsyncOpenSearch
+import pyarrow.compute as pc  # type: ignore
+import pyarrow.dataset as ds  # type: ignore
+import pyarrow.ipc as ipc  # type: ignore
 import ray
 
-from opensearchpy import OpenSearch
-
 from bystro.beanstalkd.worker import ProgressPublisher, get_progress_reporter
-from bystro.search.utils.annotation import (
-    AnnotationOutputs,
-    DelimitersConfig,
-)
-from bystro.search.utils.messages import SaveJobData, PipelineType
+from bystro.search.utils.annotation import AnnotationOutputs
+from bystro.search.utils.messages import SaveJobData
 from bystro.search.utils.opensearch import gather_opensearch_args
-from bystro.utils.compress import GZIP_EXECUTABLE
-from bystro.search.save.hwe import FilterFunctionType
+from bystro.utils.compress import get_compress_from_pipe_cmd, get_decompress_to_pipe_cmd
+from bystro.utils.timer import Timer
 
 logger = logging.getLogger(__name__)
+
+MAX_QUERY_SIZE = 10_000
+MAX_SLICES = 1e6
+KEEP_ALIVE = "1d"
+MAX_CONCURRENCY_PER_THREAD = 4
+
+# How many scroll requests for each worker to handle
+PARALLEL_SCROLL_CHUNK_INCREMENT = 2
+# Percentage of fetched records to report progress after
+REPORTING_INTERVAL = 0.2
+MINIMUM_RECORDS_TO_ENABLE_REPORTING = 10_000
+# These are the fields that are required to define a locus
+# They are used to filter the dosage matrix
+FIELDS_TO_QUERY = ["chrom", "pos", "inputRef", "alt"]
 
 ray.init(ignore_reinit_error=True, address="auto")
 
 
 def _clean_query(input_query_body: dict):
-    input_query_body["sort"] = ["_doc"]
+    if "sort" in input_query_body:
+        del input_query_body["sort"]
 
     if "aggs" in input_query_body:
         del input_query_body["aggs"]
@@ -52,166 +61,49 @@ def _clean_query(input_query_body: dict):
     if "size" in input_query_body:
         del input_query_body["size"]
 
+    if "track_total_hits" in input_query_body:
+        del input_query_body["track_total_hits"]
+
     return input_query_body
 
 
-def _get_header(field_names) -> tuple[list[str], list[str]]:
-    children = [""] * len(field_names)
-    parents = children.copy()
-
-    for i, field in enumerate(field_names):
-        if "." in field:
-            path = field.split(".")
-            parents[i] = path[0]
-            children[i] = path[1:]
-        else:
-            parents[i] = field
-            children[i] = field
-
-    return parents, children
-
-
-def _populate_data(field_path: list[str] | str, data_for_end_of_path: Any):
-    if not isinstance(data_for_end_of_path, dict):
-        return data_for_end_of_path
-
-    for child_field in field_path:
-        data_for_end_of_path = data_for_end_of_path.get(child_field)
-
-        if data_for_end_of_path is None:
-            return data_for_end_of_path
-
-    return data_for_end_of_path
-
-
-def _make_output_string(rows: list, delims: DelimitersConfig):
-    empty_field_char = delims.empty_field
-    for row_idx, row in enumerate(rows):  # pylint:disable=too-many-nested-blocks
-        # Some fields may just be missing; we won't store even the alt/pos [[]] structure for those
-        for i, column in enumerate(row):
-            if column is None:
-                row[i] = empty_field_char
-                continue
-
-            # For now, we don't store multiallelics; top level array is placeholder only
-            # With breadth 1
-            if not isinstance(column, list):
-                row[i] = str(column)
-                continue
-
-            for j, position_data in enumerate(column):
-                if position_data is None:
-                    column[j] = empty_field_char
-                    continue
-
-                if isinstance(position_data, list):
-                    inner_values = []
-                    for sub in position_data:
-                        if sub is None:
-                            inner_values.append(empty_field_char)
-                            continue
-
-                        if isinstance(sub, list):
-                            inner_values.append(
-                                delims.overlap.join(
-                                    map(
-                                        lambda x: str(x) if x is not None else empty_field_char,
-                                        sub,
-                                    )
-                                )
-                            )
-                        else:
-                            inner_values.append(str(sub))
-
-                    column[j] = delims.value.join(inner_values)
-
-            row[i] = delims.position.join(column)
-
-        rows[row_idx] = delims.field.join(row)
-
-    return bytes("\n".join(rows) + "\n", encoding="utf-8")
-
-
 @ray.remote
-def _process_query(
-    query_args: dict,
-    search_client_args: dict,
-    field_names: list,
-    pipeline: PipelineType,
-    chunk_output_name: str,
-    reporter,  # ray-annotated classes are not supported in mypy yet:
-    delimiters: DelimitersConfig,
-    dosage_matrix_path: str,
-    filtered_dosage_chunk_path: str,
-):
-    client = OpenSearch(**search_client_args)
-    resp = client.search(**query_args)
+class AsyncQueryProcessor:
+    REPORT_INCREMENT = 40_000
 
-    filters: list[FilterFunctionType] | None = None
-    if pipeline is not None:
-        filters = []
-        for filter_msg in pipeline:
-            filter_fn = filter_msg.make_filter()
+    def __init__(self, search_client_args: dict, reporter):
+        # Initialize the async OpenSearch client during actor construction
+        self.client = AsyncOpenSearch(**search_client_args)
+        self.last_reported_count = 0
+        self.reporter = reporter
 
-            if filter_fn is not None:
-                filters.append(filter_fn)
+    async def process_query(self, query: dict) -> tuple[NDArray[np.uint32] | None, list[str] | None]:
+        doc_ids = []
+        loci = []
 
-    if resp["hits"]["total"]["value"] == 0:
-        return 0
+        # Perform the search operation asynchronously using the pre-initialized client
+        resp = await self.client.search(**query)
 
-    rows = []
-
-    parent_fields, child_fields = _get_header(field_names)
-
-    discordant_idx = field_names.index("discordant")
-
-    if discordant_idx == -1:
-        raise ValueError("discordant field not found in field names")
-
-    loci = []
-    try:
         for doc in resp["hits"]["hits"]:
-            src = doc["_source"]
-            if filters is not None:
-                for filter_fn in filters:
-                    if filter_fn(src):
-                        continue
+            doc_ids.append(int(doc["_id"]))
 
-            row = np.empty(len(field_names), dtype=object)
-            for y in range(len(field_names)):
-                row[y] = _populate_data(child_fields[y], src.get(parent_fields[y]))
+            src = doc["fields"]
+            loci.append(f"{src['chrom'][0]}:{src['pos'][0]}:{src['inputRef'][0]}:{src['alt'][0]}")
 
-            if row[discordant_idx][0][0] is False:
-                row[discordant_idx][0][0] = 0
-            elif row[discordant_idx][0][0] is True:
-                row[discordant_idx][0][0] = 1
+        if len(loci) == 0:
+            return None, None
 
-            rows.append(row)
-            loci.append(
-                f"{src['chrom'][0][0][0]}:{src['pos'][0][0][0]}:{src['inputRef'][0][0][0]}:{src['alt'][0][0][0]}"
-            )
-    except Exception as err:
-        logger.error(err)
-        traceback.print_exc()
-        return -1
+        if self.last_reported_count > self.REPORT_INCREMENT:
+            self.reporter.increment.remote(self.last_reported_count)
+            self.last_reported_count = 0
 
-    try:
-        with gzip.open(chunk_output_name, "wb") as fw:
-            fw.write(_make_output_string(rows, delimiters))  # type: ignore
+        self.last_reported_count += len(loci)
 
-        mask = pc.field("locus").isin(loci)
+        return np.array(doc_ids), loci
 
-        dosage_matrix = ds.dataset(dosage_matrix_path, format="arrow")
-        dosage_matrix = dosage_matrix.filter(mask).to_table()
-
-        write_feather(dosage_matrix, filtered_dosage_chunk_path, compression="zstd")
-
-        reporter.increment.remote(resp["hits"]["total"]["value"])
-    except Exception:
-        traceback.print_exc()
-        return -1
-
-    return resp["hits"]["total"]["value"]
+    def close(self):
+        if self.last_reported_count > 0:
+            self.reporter.increment.remote(self.last_reported_count)
 
 
 def _get_num_slices(client, index_name, max_query_size, max_slices, query):
@@ -225,18 +117,33 @@ def _get_num_slices(client, index_name, max_query_size, max_slices, query):
     response = client.count(body=query_no_sort, index=index_name)
 
     n_docs = response["count"]
-    assert n_docs > 0
 
-    return max(min(math.ceil(n_docs / max_query_size), max_slices), 1)
+    if n_docs == 0:
+        raise RuntimeError("No documents found for the query")
+
+    # Opensearch does not always query the requested number of documents, and
+    # we have observed up to 3% loss; to be safe, assume 15% max and then round
+    # number of slices requested up
+    expected_query_size_with_loss = max_query_size * 0.85
+
+    num_slices_required = math.ceil(n_docs / expected_query_size_with_loss)
+    if num_slices_required > max_slices:
+        raise RuntimeError(
+            "Too many slices required to process the query. Please reduce the query size."
+        )
+
+    return max(num_slices_required, 1)
 
 
-def go(  # pylint:disable=invalid-name
-    job_data: SaveJobData,
-    search_conf: dict,
-    publisher: ProgressPublisher,
-    max_query_size: int = 10_000,
-    max_slices=128,
-    keep_alive="1d",
+def _prepare_query_body(query, slice_id, num_slices):
+    """Prepare the query body for the slice"""
+    body = query.copy()
+    body["slice"] = {"id": slice_id, "max": num_slices}
+    return body
+
+
+async def go(  # pylint:disable=invalid-name
+    job_data: SaveJobData, search_conf: dict, publisher: ProgressPublisher
 ) -> AnnotationOutputs:
     """Main function for running the query and writing the output"""
     output_dir = os.path.dirname(job_data.output_base_path)
@@ -247,77 +154,216 @@ def go(  # pylint:disable=invalid-name
         output_dir, basename, job_data.input_file_names.config, compress=True
     )
 
-    written_chunks = [os.path.join(output_dir, f"{job_data.index_name}_header")]
-
     parent_dosage_matrix_path = os.path.join(
         job_data.input_dir, job_data.input_file_names.dosage_matrix_out_path
     )
+    parent_annotation_path = os.path.join(job_data.input_dir, job_data.input_file_names.annotation)
 
-    dosage_out_folder = os.path.join(output_dir, outputs.dosage_matrix_out_path)
-    pathlib.Path(dosage_out_folder).mkdir(parents=True, exist_ok=True)
-
-    header = bytes("\t".join(job_data.field_names) + "\n", encoding="utf-8")
-    with gzip.open(written_chunks[-1], "wb") as fw:
-        fw.write(header)  # type: ignore
+    dosage_out_path = os.path.join(output_dir, outputs.dosage_matrix_out_path)
 
     search_client_args = gather_opensearch_args(search_conf)
     client = OpenSearch(**search_client_args)
 
     query = _clean_query(job_data.query_body)
-    num_slices = _get_num_slices(client, job_data.index_name, max_query_size, max_slices, query)
-    pit_id = client.create_point_in_time(index=job_data.index_name, params={"keep_alive": keep_alive})["pit_id"]  # type: ignore   # noqa: E501
+    num_slices = _get_num_slices(client, job_data.index_name, MAX_QUERY_SIZE, MAX_SLICES, query)
+    pit_id = client.create_point_in_time(index=job_data.index_name, params={"keep_alive": KEEP_ALIVE})["pit_id"]  # type: ignore   # noqa: E501
+
+    reporter = get_progress_reporter(publisher)
+    query["pit"] = {"id": pit_id}
+    query["size"] = MAX_QUERY_SIZE
+    query["fields"] = FIELDS_TO_QUERY
+    query["_source"] = False
+
     try:
-        reporter = get_progress_reporter(publisher)
-        query["pit"] = {"id": pit_id}
-        query["size"] = max_query_size
+        num_cpus = ray.available_resources().get("CPU", 1)
 
-        dosage_out_chunks = []
+        actor_index = 0
         reqs = []
-        for slice_id in range(num_slices):
-            dosage_chunk_out = os.path.join(dosage_out_folder, f"{slice_id}.feather")
-            dosage_out_chunks.append(dosage_chunk_out)
-            written_chunks.append(os.path.join(output_dir, f"{job_data.index_name}_{slice_id}"))
-            body = query.copy()
-            if num_slices > 1:
-                # Slice queries require max > 1
-                body["slice"] = {"id": slice_id, "max": num_slices}
-            res = _process_query.remote(
-                {"body": body},
-                search_client_args,
-                job_data.field_names,
-                job_data.pipeline,
-                written_chunks[-1],
-                reporter,
-                DelimitersConfig(),
-                parent_dosage_matrix_path,
-                dosage_chunk_out,
-            )
-            reqs.append(res)
-        results_processed = ray.get(reqs)
 
-        if -1 in results_processed:
-            raise IOError("Failed to process chunk")
+        # slice api requires more than 1 slice
+        actor_constructor = AsyncQueryProcessor.options(  # type: ignore
+            max_concurrency=MAX_CONCURRENCY_PER_THREAD
+        )
 
-        all_chunks = " ".join(written_chunks)
+        with Timer() as timer:
+
+            if num_slices == 1:
+                actor = actor_constructor.remote(search_client_args, reporter)  # type: ignore
+
+                results = ray.get([actor.process_query.remote({"body": query})])
+
+                # Report any remaining rows
+                ray.get(actor.close.remote())
+            else:
+                actors = []
+                for _ in range(int(num_cpus)):
+                    actors.append(actor_constructor.remote(search_client_args, reporter))  # type: ignore
+
+                for slice_id in range(num_slices):
+
+                    # Prepare the query body for this specific slice
+                    body = {"body": _prepare_query_body(query, slice_id, num_slices)}
+
+                    # Select an actor for this task in a round-robin fashion
+                    actor = actors[actor_index]
+
+                    # Call process_query for this slice
+                    res = actor.process_query.remote(body)
+                    reqs.append(res)
+
+                    # Move to the next actor for the next slice
+                    actor_index = (actor_index + 1) % len(actors)
+
+                results = ray.get(reqs)
+                ray.get([actor.close.remote() for actor in actors])
+
+        logger.info("Querying took %s seconds", timer.elapsed_time)
+
+        with Timer() as timer:
+            # Process and aggregate results from all actors...
+            doc_ids = []
+            loci = []
+            n_hits = 0
+            for doc_ids_chunk, loci_chunk in results:
+                if doc_ids_chunk is None:
+                    continue
+
+                n_hits += doc_ids_chunk.shape[0]
+                doc_ids.append(doc_ids_chunk)
+                loci.extend(loci_chunk)
+
+            doc_ids_nd = np.concatenate(doc_ids)
+            doc_ids_nd.sort()
+
+        logger.info("Concatenating document ids took %s seconds", timer.elapsed_time)
+
+        logger.info(
+            "Memory usage before genotype filtering: %s (MB)",
+            psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+        )
 
         annotation_path = os.path.join(output_dir, outputs.annotation)
-        ret = subprocess.call(f"cat {all_chunks} > {annotation_path}; rm {all_chunks}", shell=True)
-        if ret != 0:
-            raise IOError(f"Failed to write {annotation_path}")
 
-        ret = subprocess.call(
-            f"{GZIP_EXECUTABLE} -d -c {annotation_path} | {stats.stdin_cli_stats_command}",
-            shell=True,
-        )
-        if ret != 0:
-            raise IOError(f"Failed to write statistics for {annotation_path}")
+        reporter.message.remote("About to write dosage matrix")  # type: ignore
 
-        # Copy the config file to the output directory
-        annotation_config_path = os.path.join(job_data.input_dir, job_data.input_file_names.config)
-        shutil.copy(annotation_config_path, os.path.join(output_dir, job_data.input_file_names.config))
-    except Exception as err:
-        client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore
-        raise IOError(err) from err
+        with Timer() as timer:
+            dataset = ds.dataset(parent_dosage_matrix_path, format="arrow")
+            mask = pc.field("locus").isin(loci)
+
+            # Use the dataset's scanner to stream batches through a filter
+            scanner = dataset.scanner(filter=mask, use_threads=True)
+
+            # Initialize a RecordBatchFileWriter to write to the specified output path
+            with ipc.RecordBatchFileWriter(
+                dosage_out_path, schema=dataset.schema, options=ipc.IpcWriteOptions(compression="zstd")
+            ) as writer:
+                # Use the scanner to fetch and write record batches directly, applying the mask filter
+                for batch in scanner.to_batches():
+                    writer.write_batch(batch)
+
+            logger.debug(
+                "Memory usage after genotype filtering: %s (MB)",
+                psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+            )
+
+            reporter.message.remote(  # type: ignore
+                "Filtered dosage matrix written. Filtering annotation & generating stats."
+            )
+
+        logger.info("Filtering dosage matrix took %s seconds", timer.elapsed_time)
+
+        with Timer() as timer:
+            bgzip_cmd = get_compress_from_pipe_cmd(annotation_path)
+            bgzip_decompress_cmd = get_decompress_to_pipe_cmd(parent_annotation_path)
+            bystro_stats_cmd = stats.stdin_cli_stats_command
+
+            filters = None
+
+            with (
+                subprocess.Popen(bystro_stats_cmd, shell=True, stdin=subprocess.PIPE) as stats,
+                subprocess.Popen(bgzip_cmd, shell=True, stdin=subprocess.PIPE) as p,
+                subprocess.Popen(bgzip_decompress_cmd, shell=True, stdout=subprocess.PIPE) as in_fh,
+            ):
+                if in_fh.stdout is None:
+                    raise IOError("Failed to open annotation file for reading.")
+
+                if p.stdin is None:
+                    raise IOError("Failed to open filtered annotation file for writing.")
+
+                if stats.stdin is None:
+                    raise IOError("Failed to open stats file for writing.")
+
+                i = -1
+                current_target_index = 0
+                header_written = False
+                header_fields = None
+
+                report_progress = n_hits >= MINIMUM_RECORDS_TO_ENABLE_REPORTING
+                reporting_interval = math.ceil(n_hits * REPORTING_INTERVAL)
+
+                if report_progress:
+                    reporter.message.remote(  # type: ignore
+                        f"Reporting filtering progress every {reporting_interval} records."
+                    )
+
+                for line in iter(in_fh.stdout.readline, b""):
+                    if not header_written:
+                        p.stdin.write(line)
+                        stats.stdin.write(line)
+                        header_written = True
+
+                        if filters is not None:
+                            header_fields = line.rstrip().split(b"\t")
+
+                            if job_data.pipeline is not None and len(job_data.pipeline) > 0:
+                                filters = []
+                                for filter_msg in job_data.pipeline:
+                                    filter_fn = filter_msg.make_filter(header_fields)
+
+                                    if filter_fn is not None:
+                                        filters.append(filter_fn)
+                        continue
+
+                    i += 1
+                    if i == doc_ids_nd[current_target_index]:
+                        filtered = False
+                        if filters is not None:
+                            src = line.rstrip().split(b"\t")
+                            for filter_fn in filters:
+                                if filter_fn(src):
+                                    filtered = True
+                                    break
+
+                        if not filtered:
+                            if (
+                                current_target_index > 0
+                                and report_progress
+                                and current_target_index % reporting_interval == 0
+                            ):
+                                reporter.message.remote(  # type: ignore
+                                    f"{current_target_index} records written."
+                                )
+
+                            p.stdin.write(line)
+                            stats.stdin.write(line)
+
+                        # Move to the next target line number, if any
+                        current_target_index += 1
+
+                        if current_target_index >= n_hits:
+                            reporter.message.remote("Done, cleaning up.")  # type: ignore
+                            break
+
+                p.stdin.close()  # Close the stdin to signal that we're done sending input
+                stats.stdin.close()  # Close the stdin to signal that we're done sending input
+
+                p.wait()
+                stats.wait()
+        logger.info("Filtering annotation and stats took %s seconds", timer.elapsed_time)
+    except Exception as e:
+        # Handle exceptions and cleanup, including deleting the PIT ID
+        client.delete_point_in_time(body={"pit_id": pit_id})
+        raise e
 
     client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore
 

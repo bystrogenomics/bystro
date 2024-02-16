@@ -11,7 +11,7 @@ def gather_opensearch_args(search_conf: dict):
     return dict(
         hosts=list(search_conf["connection"]["nodes"]),
         http_compress=True,
-        timeout=search_conf["connection"].get("request_timeout", 300),
+        timeout=search_conf["connection"].get("request_timeout", 600),
         http_auth=search_conf["auth"].get("auth"),
         client_cert=search_conf["auth"].get("client_cert_path"),
         client_key=search_conf["auth"].get("client_key_path"),
@@ -19,4 +19,5 @@ def gather_opensearch_args(search_conf: dict):
         verify_certs=True,
         ssl_assert_hostname=True,
         ssl_show_warn=True,
+        pool_maxsize = 16
     )

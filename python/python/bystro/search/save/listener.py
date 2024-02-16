@@ -2,7 +2,10 @@
     CLI tool to start search saving server that listens to beanstalkd queue
     and write submitted queries to disk as valid Bystro annotations
 """
+
 import argparse
+import asyncio
+import logging
 
 from ruamel.yaml import YAML
 
@@ -14,10 +17,13 @@ from bystro.beanstalkd.worker import (
 from bystro.beanstalkd.messages import SubmittedJobMessage
 from bystro.search.save.handler import go
 from bystro.search.utils.annotation import AnnotationOutputs
-from bystro.search.utils.messages import (
-    SaveJobCompleteMessage,
-    SaveJobData,
-    SaveJobResults
+from bystro.search.utils.messages import SaveJobCompleteMessage, SaveJobData, SaveJobResults
+
+logging.basicConfig(
+    filename="save_listener.log",
+    level=logging.DEBUG,
+    format="%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
 
 TUBE = "saveFromQuery"
@@ -53,7 +59,7 @@ def main():
         search_conf = YAML(typ="safe").load(search_config_file)
 
     def handler_fn(publisher: ProgressPublisher, job_data: SaveJobData):
-        return go(job_data=job_data, search_conf=search_conf, publisher=publisher)
+        return asyncio.run(go(job_data=job_data, search_conf=search_conf, publisher=publisher))
 
     def submit_msg_fn(job_data: SaveJobData):
         return SubmittedJobMessage(submission_id=job_data.submission_id)
