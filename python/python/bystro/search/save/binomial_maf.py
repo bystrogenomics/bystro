@@ -2,7 +2,7 @@ from typing import Callable
 import math
 
 from msgspec import Struct
-from scipy.stats import norm # type: ignore
+from scipy.stats import norm  # type: ignore
 
 
 class BinomialMafFilter(
@@ -50,7 +50,7 @@ class BinomialMafFilter(
     estimates: list[str]
     crit_value: float | None = 0.025
 
-    def make_filter(self) -> Callable[[dict], bool] | None:
+    def make_filter(self, header_fields: list[bytes]) -> Callable[[list[bytes]], bool] | None:
         private_maf = self.private_maf
         snp_only = self.snp_only
         num_samples = self.num_samples
@@ -77,38 +77,46 @@ class BinomialMafFilter(
         if private_maf < min_possible_estimate:
             private_maf = min_possible_estimate
 
-        document_paths = [e.split(".") for e in estimates]
+        estimate_field_indices = []
+        for e in estimates:
+            idx = header_fields.index(bytes(e, "utf-8"))
+            if idx == -1:
+                raise ValueError(f"Estimate field {e} not found in header fields")
+            estimate_field_indices.append(idx)
 
-        def binom_filter(doc):
-            if snp_only and len(doc["alt"][0][0][0]) > 1:
+        missingness_idx = header_fields.index(b"missingness")
+        sample_maf_idx = header_fields.index(b"sampleMaf")
+        alt_idx = header_fields.index(b"alt")
+
+        if missingness_idx == -1:
+            raise ValueError("Missingness field not found in header fields")
+
+        if sample_maf_idx == -1:
+            raise ValueError("SampleMaf field not found in header fields")
+
+        if alt_idx == -1:
+            raise ValueError("Alt field not found in header fields")
+
+        def binom_filter(row: list[bytes]):
+            if snp_only and len(row[alt_idx]) > 1:
                 return False
 
-            n = total_alleles * (1.0 - float(doc["missingness"][0][0][0]))
+            n = total_alleles * (1.0 - float(row[missingness_idx]))
 
             if n == 0:
                 return True
 
-            k = n * float(doc["sampleMaf"][0][0][0])
-            is_rare = float(doc["sampleMaf"][0][0][0]) <= private_maf or (n == total_alleles and k < 1.5)
+            sample_maf = float(row[sample_maf_idx])
+            k = n * sample_maf
+            is_rare = sample_maf <= private_maf or (n == total_alleles and k < 1.5)
 
             tested = 0
 
-            for path in document_paths:
-                try:
-                    if len(path) == 3:
-                        p = doc[path[0]][path[1]][path[2]]
-                    elif len(path) == 2:
-                        p = doc[path[0]][path[1]]
-                    elif len(path) == 1:
-                        p = doc[path[0]]
-                    else:
-                        p = doc
-                        for key in path:
-                            p = p[key]
-                except KeyError:
+            for field_idx in estimate_field_indices:
+                if row[field_idx] == b"NA":
                     continue
 
-                p = float(p[0][0][0])
+                p = float(row[field_idx])
 
                 if (p == 1 and not is_rare) or (p <= private_maf and is_rare):
                     return False

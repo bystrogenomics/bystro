@@ -153,7 +153,6 @@ def main():
         return header_fields
 
     def submit_msg_fn(job_data: IndexJobData):
-        print("jbo_data", job_data)
         return SubmittedJobMessage(job_data.submission_id)
 
     def completed_msg_fn(job_data: IndexJobData, field_names: list[str]):

@@ -1,6 +1,8 @@
 """Classify genotypes at inference time."""
 
 import logging
+import os
+import psutil
 
 from msgspec import Struct
 import numpy as np
@@ -158,27 +160,53 @@ def infer_ancestry(ancestry_model: AncestryModel, genotypes: Dataset) -> Ancestr
     """
 
     logger.debug("Beginning ancestry inference")
+
     with Timer() as timer:
         mask = pc.field("locus").isin(ancestry_model.pca_loadings_df.index)
-        genotypes = genotypes.filter(mask).to_table().to_pandas()
-        genotypes = genotypes.set_index("locus")
+        scanner = genotypes.scanner(filter=mask)
+
+        # Initialize an empty DataFrame or a list to collect batches
+        filtered_genotypes = []
+
+        for batch in scanner.to_batches():
+            # Convert the current batch to a pandas DataFrame
+            batch_df = batch.to_pandas()
+
+            # Set the index to 'locus', assuming 'locus' is a column in your dataset
+            batch_df = batch_df.set_index("locus")
+
+            # Append the processed batch to the list
+            filtered_genotypes.append(batch_df)
+
+        # Concatenate all batches into a single DataFrame
+        genotypes_df = pd.concat(filtered_genotypes)
+
+    logger.info(
+        "Memory usage after dosage matrix filtering: %s (MB)",
+        psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+    )
+
+    logger.info("Completed dosage matrix filtering in %f seconds", timer.elapsed_time)
+
+    with Timer() as timer:
         # TODO: @akotlar 2024-01-31: Replace reliance on imputation with Austin Talbot's model
         # which is robust to missing data.
-        missing_rows = list(set(ancestry_model.pca_loadings_df.index) - set(genotypes.index))
+        missing_rows = list(set(ancestry_model.pca_loadings_df.index) - set(genotypes_df.index))
         if missing_rows:
             missing_rows_df = pd.DataFrame(
-                np.ones((len(missing_rows), len(genotypes.columns))),
+                np.ones((len(missing_rows), len(genotypes_df.columns))),
                 index=missing_rows,
-                columns=genotypes.columns,
+                columns=genotypes_df.columns,
             )
-            genotypes = pd.concat([genotypes, missing_rows_df])
+            genotypes_df = pd.concat([genotypes_df, missing_rows_df])
 
         missingness = len(missing_rows) / len(ancestry_model.pca_loadings_df.index)
-        sample_missingnesses = genotypes.isna().mean(axis=0) + missingness
+        sample_missingnesses = genotypes_df.isna().mean(axis=0) + missingness
 
-        genotypes[genotypes.isna()] = 1
+        genotypes_df[genotypes_df.isna()] = 1
 
-        pcs_for_plotting, pop_probs_df = ancestry_model.predict_proba(genotypes)
+        pcs_for_plotting, pop_probs_df = ancestry_model.predict_proba(genotypes_df)
+
     logger.info("Completed ancestry inference in %f seconds", timer.elapsed_time)
 
     return _package_ancestry_response_from_pop_probs(

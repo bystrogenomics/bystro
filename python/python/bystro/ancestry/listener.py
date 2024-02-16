@@ -90,7 +90,7 @@ def handler_fn_factory(
         # simply threading it through for later.
         _reporter = get_progress_reporter(publisher)
 
-        dataset = ds.dataset([job_data.dosage_matrix_path], format="arrow")
+        dataset = ds.dataset(job_data.dosage_matrix_path, format="arrow")
 
         return infer_ancestry(ancestry_model, dataset)
 

@@ -1,14 +1,9 @@
 import pytest
 from bystro.search.save.binomial_maf import BinomialMafFilter
 
-# Sample data to be used in tests
-sample_data = {
-    "alt": [[["A"]]],
-    "missingness": [[[0.1]]],
-    "sampleMaf": [[[0.05]]],
-    "gnomad": {"exomes": {"af": [[[0.03]]]}},
-}
-
+# make sample tsv with alt, missingness, sampleMaf, gnomad.exomes.af in that order
+sample_tsv_header = b"alt\tmissingness\tsampleMaf\tgnomad.exomes.af".split(b"\t")
+sample_tsv_row = b"A\t0.1\t0.05\t0.03".split(b"\t")
 
 # Test for basic functionality
 def test_basic_functionality():
@@ -19,10 +14,10 @@ def test_basic_functionality():
         estimates=["gnomad.exomes.af"],
         crit_value=0.025,
     )
-    binom_filter = filter_.make_filter()
+    binom_filter = filter_.make_filter(sample_tsv_header)
 
     assert binom_filter is not None
-    assert binom_filter(sample_data) is False  # within expectation
+    assert binom_filter(sample_tsv_row) is False  # within expectation
 
 
 # Test for different alpha values
@@ -35,14 +30,14 @@ def test_different_alpha_values(alpha):
         estimates=["gnomad.exomes.af"],
         crit_value=alpha,
     )
-    binom_filter = filter_.make_filter()
+    binom_filter = filter_.make_filter(sample_tsv_header)
 
     assert binom_filter is not None
 
     if alpha == 0.01 or alpha == 0.05:
-        assert binom_filter(sample_data) is False
+        assert binom_filter(sample_tsv_row) is False
     else:
-        assert binom_filter(sample_data) is True
+        assert binom_filter(sample_tsv_row) is True
 
 
 # Test for SNP only filtering
@@ -54,7 +49,7 @@ def test_snp_only_filtering():
         estimates=["gnomad.exomes.af"],
         crit_value=0.025,
     )
-    binom_filter = filter_.make_filter()
+    binom_filter = filter_.make_filter(sample_tsv_header)
 
     assert binom_filter is not None
-    assert binom_filter(sample_data) in [True, False]  # depending on the expected behavior
+    assert binom_filter(sample_tsv_row) in [True, False]  # depending on the expected behavior

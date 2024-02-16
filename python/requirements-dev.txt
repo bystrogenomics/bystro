@@ -9,4 +9,5 @@ pyright==1.1.349
 ruff==0.0.270
 types-tqdm==4.65.0.1
 types-requests==2.31.0.2
+types-psutil==5.9.5
 unipressed==1.2.0
