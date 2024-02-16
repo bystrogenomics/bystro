@@ -12,7 +12,7 @@ from bystro.beanstalkd.messages import SubmittedJobMessage
 from bystro.prs.messages import PRSJobData, PRSJobResult, PRSJobResultMessage
 from bystro.prs.handler import calculate_prs_scores
 
-TUBE = "PRS"
+TUBE = "prs"
 
 
 def submit_msg_fn(job_data: PRSJobData):
