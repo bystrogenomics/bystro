@@ -20,6 +20,3 @@ beanstalkd:
     proteomics:
       submission: proteomics
       events: proteomics_events
-    prs:
-      submission: prs
-      events: prs_events
