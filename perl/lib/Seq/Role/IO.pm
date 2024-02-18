@@ -442,37 +442,6 @@ sub compressDirIntoTarball {
   return $err;
 }
 
-sub getCompressedFileSize {
-  my ( $self, $filePath ) = @_;
-
-  my $extType = $self->isCompressedSingle($filePath);
-  if ( !$extType ) {
-    return ( 'Expect compressed file', undef );
-  }
-
-  my $gzProg = $extType eq 'gzip' ? $gzip : $lz4;
-
-  my $err =
-    $self->safeOpen( my $fh, "-|", "$gzProg -l " . path($filePath)->stringify );
-
-  if ($err) {
-    return ( $err, undef );
-  }
-
-  <$fh>;
-  my $sizeLine = <$fh>;
-
-  chomp $sizeLine;
-  my @sizes = split( " ", $sizeLine );
-
-  #pigz return 0? when file is larger than 4GB, gzip returns 0
-  if ( !$sizes[1] || !looks_like_number( $sizes[1] ) ) {
-    return ( undef, 0 );
-  }
-
-  return ( undef, $sizes[1] );
-}
-
 # returns chunk size in kbytes
 sub getChunkSize {
   my ( $self, $filePath, $parts, $min, $max ) = @_;
@@ -490,18 +459,9 @@ sub getChunkSize {
 
   my $size = path($filePath)->stat()->size;
 
-  # Files range from ~ 10 - 60x compression ratios; but large files don't report
-  # correct ratios (> 4GB)
-  # If file is < 4GB it will be reported correctly
-  if ( $self->isCompressedSingle($filePath) ) {
-    my ( $err, $compressedSize ) = $self->getCompressedFileSize($filePath);
-
-    if ($err) {
-      return ( $err, undef );
-    }
-
-    $size = $compressedSize == 0 ? $size * 30 : $compressedSize;
-  }
+  # Use 15x the size of the file as a heuristic
+  # VCF files compress roughly this well
+  $size *= 15;
 
   my $chunkSize = CORE::int( $size / ( $parts * 4096 ) );
 
