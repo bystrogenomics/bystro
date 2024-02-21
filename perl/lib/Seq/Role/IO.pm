@@ -168,7 +168,7 @@ sub getReadFh {
   }
 
   my $outerCommand = $self->getReadArgs($filePath);
-  my $compressed   = index( $outerCommand, $self->cat ) == -1;
+  my $compressed   = !!$self->getCompressionType($filePath);
 
   my ( $err, $fh );
 
