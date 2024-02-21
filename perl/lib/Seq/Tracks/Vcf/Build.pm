@@ -449,10 +449,7 @@ sub _openVcfPipe {
   my $outputter = Seq::Output::Delimiters->new();
 
   my $delim = $outputter->emptyFieldChar;
-  my $prog =
-      $self->isCompressedSingle($file)
-    ? $self->gzip . ' ' . $self->decompressArgs
-    : 'cat';
+  my $prog  = $self->getDecompressProgWithArgs($file);
 
   my $errPath = $file . ".build." . localtime() . ".log";
 
