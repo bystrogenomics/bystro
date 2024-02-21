@@ -28,7 +28,7 @@ my $config = {
         'name'        => 'dbSNP',
         'sorted'      => 1,
         'type'        => 'vcf',
-        'utils'       => [ { 'name' => 'DbSnp2FormatInfo' } ]
+        'utils'       => [ { 'name' => 'DbSnp2FormatInfo', args => {compress => 0}} ]
       }
     ]
   }
@@ -63,7 +63,8 @@ my $utility = Utils::DbSnp2FormatInfo->new(
   {
     config   => $config_file,
     name     => 'dbSNP',
-    utilName => 'DbSnp2FormatInfo'
+    utilName => 'DbSnp2FormatInfo',
+    compress => undef
   }
 );
 

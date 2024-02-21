@@ -168,6 +168,7 @@ sub getReadFh {
   }
 
   my $outerCommand = $self->getReadArgs($filePath);
+  my $compressed = index($outerCommand, $self->cat) == -1;
 
   my ( $err, $fh );
 
@@ -177,8 +178,6 @@ sub getReadFh {
   else {
     $err = $self->safeOpen( $fh, '<', $filePath, $errCode );
   }
-
-  my $compressed = !!$outerCommand;
 
   return ( $err, $compressed, $fh );
 }
