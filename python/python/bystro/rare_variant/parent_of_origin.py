@@ -1,8 +1,59 @@
+"""
+This module implements a parent of origin effect caller. The parent of 
+origin effect refers to the difference in phenotypes 
+depending on whether the allele is inherited paternally or maternally. The 
+caller employs a method that draws inspiration from the community 
+detection problem studied in computer science.
+
+The distribution of phenotypes in the heterozygotes is modeled as a 
+Gaussian mixture model. It assumes identical covariance matrices matching 
+the homozygous population but with distinct means for the maternal and 
+paternal populations. The model identifies this difference as the 
+principal eigenvector of the heterozygote population, after undergoing a 
+transformation that "whitens" the homozygous population. This process 
+corresponds to finding the dimension along which the covariance is 
+"stretched" compared to the heterozygote population.
+
+A justification for this method can be found in Vershynin's "High-
+Dimensional Probability" Chapter 4.7 or Wainwright's "High-Dimensional 
+Statistics" Chapter 8.1.
+
+Methods
+-------
+get_low_rank(A)
+    This extracts the rank-1 matrix approximation to A using the singular
+    value decomposition.
+
+Objects
+-------
+BasePOE
+    The base class of the parent of origin effect caller. Currently just 
+    implements methods to test inputs for proper dimensionality and a
+    method to classify heterozygotes based on their phenotypes
+
+POESingleSNP(BasePOE)
+    A caller for the POE of a single SNP. No sparsity assumptions are 
+    implemented in this model.
+"""
 import numpy as np
 import numpy.linalg as la
-from sklearn.covariance import ShrunkCovariance
+
 
 def get_low_rank(A):
+    """
+    This extracts the rank-1 matrix approximation to A using the singular
+    value decomposition.
+
+    Parameters
+    ----------
+    A : np.array-like,shape(N,p)
+        The matrix to approximate
+
+    Returns
+    -------
+    rank_1_approximation : np.array-like,shape(N,p)
+        The rank 1 approximation matrix
+    """
     U, s, Vt = la.svd(A)
     s[1:] = 0
     V = Vt.T
@@ -12,6 +63,12 @@ def get_low_rank(A):
 
 
 class BasePOE:
+    """
+    The base class of the parent of origin effect caller. Currently just
+    implements methods to test inputs for proper dimensionality and a
+    method to classify heterozygotes based on their phenotypes
+    """
+
     def _test_inputs(self, X, y):
         if not isinstance(X, np.ndarray):
             raise ValueError("X is numpy array")
@@ -20,36 +77,102 @@ class BasePOE:
         if X.shape[0] != len(y):
             raise ValueError("X and y have different samples")
 
+    def transform(self, X, return_inner=False):
+        """
+        This method predicts whether the heterozygote allele came from
+        a maternal/paternal origin. Note that due to a lack of
+        identifiability, we can't state whether class 1 is paternal or
+        maternal
+
+        Parameters
+        ----------
+        X : np.array-like,shape=(N,self.p)
+            The phenotype data
+
+        return_inner : bool,default=False
+            Whether to return the inner product classification, a measure
+            of confidence in the call
+
+        Returns
+        -------
+        calls : np.array-like,shape=(N,)
+            A vector of 1s and 0s predicting class
+
+        preds : np.array-like,shape=(N,)
+            The inner product, representing confidence in calls
+        """
+        X_dm = X - np.mean(X, axis=0)
+        preds = np.dot(X_dm, self.parent_effect_)
+        calls = 1.0 * (preds > 0)
+        if return_inner is False:
+            return calls
+        else:
+            return calls, preds
+
 
 class POESingleSNP(BasePOE):
-    def __init__(self, diagonalApproximation=False):
-        self.diagonalApproximation = diagonalApproximation
-        self.compute_pvalue = False
-        self.n_permutations = 10000
+    """
+    This is a parent of origin effect estimator inheriting methodology from
+    the commumity detection problem commonly studied in computer science
+    and statistics. It functions identically to a sklearn object, where
+    model parameters are defined in the __init__ method, a fit method which
+    takes in the data as input and fits the model, and a transform method
+    which predicts which group new individuals belong to.
+
+    Attributes
+    ----------
+    self.Sigma_AA : np.array-like,shape=(p,p)
+        The covariance matrix of the homozygous population
+
+    self.parent_effect_: np.array-like,shape=(p,)
+        The difference in effect between the parental or maternal allele
+    """
+
+    def __init__(self, compute_pvalue=False, n_permutations=10000):
+        self.compute_pvalue = compute_pvalue
+        self.n_permutations = n_permutations
 
     def fit(self, X, y):
+        """
+        This method predicts whether the heterozygote allele came from
+        a maternal/paternal origin. Note that due to a lack of
+        identifiability, we can't state whether class 1 is paternal or
+        maternal
+
+        Parameters
+        ----------
+        X : np.array-like,shape=(N,self.p)
+            The phenotype data
+
+        y: np.array-like,shape=(N,)
+            The genotype data indicating the number of copies of the
+            minority allele
+
+        Returns
+        -------
+        self : POESingleSNP
+            The instance of the method
+        """
         self._test_inputs(X, y)
         self.n_phenotypes = X.shape[1]
 
         X_homozygotes = X[y != 1]
         X_heterozygotes = X[y == 1]
 
-        model_shrink = ShrunkCovariance()
-        model_shrink.fit(X_homozygotes)
-        Sigma_AA = model_shrink.covariance_
-        model_shrink.fit(X_heterozygotes)
-        Sigma_AB = model_shrink.covariance_
+        Sigma_AA = np.cov(X_homozygotes.T)
+        L = la.cholesky(Sigma_AA)
+        L_inv = la.inv(L)
 
-        B_est = Sigma_AB - Sigma_AA
-        B_est_hat = get_low_rank(B_est)
+        self.Sigma_AA = Sigma_AA
 
-        self.B_estimate = B_est_hat
+        X_het_whitened = np.dot(X_heterozygotes, L_inv.T)
+        Sigma_AB_white = np.cov(X_het_whitened.T)
 
-        if self.diagonalApproximation:
-            B_diag = np.maximum(np.diag(B_est_hat), 0)
-            self.parent_effect_ = 4 * B_diag
-        else:
-            evals, evecs = la.eig((B_est_hat + B_est_hat.T) / 2)
-            rev = np.abs(np.real(evals))
-            idx_eval = np.where(rev == np.amax(rev))[0][0]
-            self.parent_effect_ = np.real(evecs[:, idx_eval])
+        B_est_hat = get_low_rank(Sigma_AB_white)
+        evals, evecs = la.eig((B_est_hat + B_est_hat.T) / 2)
+        rev = np.abs(np.real(evals))
+        idx_eval = np.where(rev == np.amax(rev))[0][0]
+        parent_effect_white = np.real(evecs[:, idx_eval])
+        self.parent_effect_ = np.dot(parent_effect_white, L.T)
+
+        return self

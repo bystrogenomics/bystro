@@ -6,8 +6,16 @@ the genotype and parental status. The function returns a dictionary containing
 various aspects of the generated data.
 """
 import numpy as np
+import numpy.linalg as la
 from bystro.rare_variant.parent_of_origin import POESingleSNP
 
+
+def cosine_similarity(vec1,vec2):
+    v1 = np.squeeze(vec1)
+    v2 = np.squeeze(vec2)
+    num = np.dot(v1,v2)
+    denom = la.norm(v1)*la.norm(v2)
+    return num/denom
 
 def generate_data(beta_m, beta_p, rng, n_individuals=10000, cov=None, maf=0.25):
     """
@@ -102,3 +110,5 @@ def test_decision_function():
     data = generate_data(beta_m, beta_p, rng, maf=0.1, n_individuals=20000)
     model = POESingleSNP()
     model.fit(data["phenotypes"], data["genotype"])
+    diff = beta_p-beta_m
+    assert np.abs(cosine_similarity(diff,model.parent_effect_))>.95
