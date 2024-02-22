@@ -68,6 +68,8 @@ class BasePOE:
     implements methods to test inputs for proper dimensionality and a
     method to classify heterozygotes based on their phenotypes
     """
+    def __init__(self):
+        self.parent_effect_ = None
 
     def _test_inputs(self, X, y):
         if not isinstance(X, np.ndarray):
