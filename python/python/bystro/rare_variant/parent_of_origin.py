@@ -106,8 +106,7 @@ class BasePOE:
         calls = 1.0 * (preds > 0)
         if return_inner is False:
             return calls
-        else:
-            return calls, preds
+        return calls, preds
 
 
 class POESingleSNP(BasePOE):
