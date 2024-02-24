@@ -69,7 +69,7 @@ class BasePOE:
     method to classify heterozygotes based on their phenotypes
     """
     def __init__(self):
-        self.parent_effect_ = None
+        self.parent_effect_ = np.empty(10) # Will be overwritten in fit
 
     def _test_inputs(self, X, y):
         if not isinstance(X, np.ndarray):
