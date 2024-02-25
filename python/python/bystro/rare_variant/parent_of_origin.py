@@ -157,8 +157,10 @@ class POESingleSNP(BasePOE):
         self._test_inputs(X, y)
         self.n_phenotypes = X.shape[1]
 
-        X_homozygotes = X[y != 1]
+        X_homozygotes = X[y == 0]
         X_heterozygotes = X[y == 1]
+        X_homozygotes = X_homozygotes - np.mean(X_homozygotes,axis=0)
+        X_heterozygotes = X_heterozygotes - np.mean(X_heterozygotes,axis=0)
 
         Sigma_AA = np.cov(X_homozygotes.T)
         L = la.cholesky(Sigma_AA)
@@ -169,11 +171,8 @@ class POESingleSNP(BasePOE):
         X_het_whitened = np.dot(X_heterozygotes, L_inv.T)
         Sigma_AB_white = np.cov(X_het_whitened.T)
 
-        B_est_hat = get_low_rank(Sigma_AB_white)
-        evals, evecs = la.eig((B_est_hat + B_est_hat.T) / 2)
-        rev = np.abs(np.real(evals))
-        idx_eval = np.where(rev == np.amax(rev))[0][0]
-        parent_effect_white = np.real(evecs[:, idx_eval])
-        self.parent_effect_ = np.dot(parent_effect_white, L.T)
-
+        U,s,Vt = la.svd(Sigma_AB_white)
+        norm_a = np.maximum(s[0]-1,0)
+        parent_effect_white = Vt[0]*2*np.sqrt(norm_a)
+        self.parent_effect_ = np.dot(parent_effect_white,L.T)
         return self
