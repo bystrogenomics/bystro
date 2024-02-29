@@ -83,7 +83,7 @@ class BaseSGLDModel(abc.ABC):
         -------
         training_opts : dict
         """
-        default_options = {"n_iterations": 5000}
+        default_options = {"n_samples": 25000,"batch_size":100}
         training_opts = {**default_options, **training_options}
         return training_opts
 
