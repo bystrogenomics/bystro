@@ -20,9 +20,7 @@ Statistics" Chapter 8.1.
 
 Methods
 -------
-get_low_rank(A)
-    This extracts the rank-1 matrix approximation to A using the singular
-    value decomposition.
+None
 
 Objects
 -------
@@ -37,29 +35,6 @@ POESingleSNP(BasePOE)
 """
 import numpy as np
 import numpy.linalg as la
-
-
-def get_low_rank(A):
-    """
-    This extracts the rank-1 matrix approximation to A using the singular
-    value decomposition.
-
-    Parameters
-    ----------
-    A : np.array-like,shape(N,p)
-        The matrix to approximate
-
-    Returns
-    -------
-    rank_1_approximation : np.array-like,shape(N,p)
-        The rank 1 approximation matrix
-    """
-    U, s, Vt = la.svd(A)
-    s[1:] = 0
-    V = Vt.T
-    V[:, 1:] = 0
-    rank_1_approximation = np.dot(U * s, V.T)
-    return rank_1_approximation
 
 
 class BasePOE:
