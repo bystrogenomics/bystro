@@ -28,9 +28,7 @@ def main():
     Start PRS listener that handles PRS jobs
     """
     parser = argparse.ArgumentParser(description=f"Start a listener for {TUBE} Bystro jobs")
-    parser.add_argument(
-        "--conf_dir", type=str, help="Path to the genome/assembly config directory", required=True
-    )
+
     parser.add_argument(
         "--queue_conf",
         type=str,
