@@ -29,7 +29,7 @@ class PRSCS(BaseSGLDModel):
             training_options=training_options, prior_options=prior_options
         )
 
-    def fit(self, X, y, progress_bar=False, seed=2021):
+    def fit(self, X, y, progress_bar=True, seed=2021):
         """ """
         self._test_inputs(X, y)
         X_, y_ = self._transform_training_data(X, y)
@@ -48,11 +48,9 @@ class PRSCS(BaseSGLDModel):
         self.samples_sigma2 = np.zeros((training_options["n_samples"], self.p))
 
         var_list = [beta_, psi_l, delta_l, sigma2_l]
-        print("--------------")
-        print(beta_)
 
         f_prior_delta = ptd.Gamma(
-            prior_options["b"], prior_options["phi"]
+            prior_options["b"], 1/prior_options["phi"]
         ).log_prob
 
         lr_fn = scheduler_sgld_geometric(
@@ -64,6 +62,7 @@ class PRSCS(BaseSGLDModel):
         zeros_p = torch.tensor(np.zeros(p))
 
         softplus = nn.Softplus()
+        relu = nn.ReLU()
 
         for i in trange(
             training_options["n_samples"], disable=not progress_bar
@@ -90,7 +89,7 @@ class PRSCS(BaseSGLDModel):
             f_prior_psi = ptd.Gamma(
                 prior_options["a"] * torch.ones(self.p), 1 / delta_ + 0.001
             ).log_prob
-            f_prior_sigma = ptd.Gamma(3, 3).log_prob
+            f_prior_sigma = ptd.Gamma(1, 1).log_prob
             f_prior_beta = ptd.Normal(
                 zeros_p, torch.sqrt(0.001 + sigma2_ / N * psi_)
             ).log_prob
@@ -105,12 +104,7 @@ class PRSCS(BaseSGLDModel):
             posterior = (
                 loglike + prior_beta + prior_psi + prior_delta + prior_sigma
             )
-            loss = -1 * posterior
-            if i % 1000 == 0:
-                print(sigma2_)
-                print(i, beta_)
-                print(psi_)
-                print(delta_)
+            loss = -1 * posterior + 100*relu(sigma2_-.3)
 
             optimizer.zero_grad()
             loss.backward()

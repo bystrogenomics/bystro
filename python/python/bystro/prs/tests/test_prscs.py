@@ -23,8 +23,8 @@ def test_prscs():
     mm = Ridge()
     mm.fit(X, y)
     beta = np.squeeze(mm.coef_)
-    model = PRSCS(training_options={"n_samples": 10000, "batch_size": 100})
-    model.fit(X, y)
+    model = PRSCS(training_options={"n_samples": 40000, "batch_size": 500})
+    model.fit(X, y,progress_bar=False)
 
-    posterior_mean = np.mean(model.samples_beta[2000:], axis=0)
+    posterior_mean = np.mean(model.samples_beta[20000:], axis=0)
     assert np.mean((posterior_mean - beta) ** 2) < 0.1
