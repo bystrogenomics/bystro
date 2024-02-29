@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 from bystro.prs.prscs import PRSCS
+from sklearn.linear_model import Ridge
 
 
 def generate_data_prscs(N=100000, p=25, sigma=np.sqrt(0.1)):
@@ -13,17 +14,17 @@ def generate_data_prscs(N=100000, p=25, sigma=np.sqrt(0.1)):
     Zb = np.dot(Z_s, beta)
     eps = rng.normal(0, sigma, size=N)
     y = Zb + eps
-    return Z_s, y, beta
+    y = (y - np.mean(y)) / np.std(y)
+    return Z_s, y
 
 
 def test_prscs():
-    X, y, beta = generate_data_prscs()
-    model = PRSCS(training_options={'n_samples':10000,'batch_size':1000})
+    X, y = generate_data_prscs()
+    mm = Ridge()
+    mm.fit(X, y)
+    beta = np.squeeze(mm.coef_)
+    model = PRSCS(training_options={"n_samples": 10000, "batch_size": 100})
     model.fit(X, y)
 
-    posterior_mean = np.mean(model.samples_beta[100:], axis=0)
-    print(beta)
-    print('>>>>>>>>>>>>')
-    print(posterior_mean)
-    print(model.samples_sigma2.shape)
+    posterior_mean = np.mean(model.samples_beta[2000:], axis=0)
     assert np.mean((posterior_mean - beta) ** 2) < 0.1

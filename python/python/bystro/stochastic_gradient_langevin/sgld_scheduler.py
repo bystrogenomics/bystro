@@ -13,7 +13,7 @@ scheduler_sgld_geometric(lr=1e-2,lr_final=1e-4,n_samples=1e4)
 """
 
 
-def scheduler_sgld_geometric(lr=1e-2, lr_final=1e-3, n_samples=1e4):
+def scheduler_sgld_geometric(lr=2.5, lr_final=1e-1, n_samples=1e4):
     gamma = -0.55
     b = n_samples / ((lr_final / lr) ** (1 / gamma) - 1.0)
     a = lr / (b**gamma)

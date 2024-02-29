@@ -13,7 +13,7 @@ class SGLDynamicsPT(Optimizer):
     def __init__(
         self,
         params,
-        lr=.001,
+        lr=0.001,
         momentum=0,
         dampening=0,
         weight_decay=0,

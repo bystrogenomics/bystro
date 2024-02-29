@@ -6,7 +6,7 @@ import torch
 from torch import nn
 
 from sklearn.preprocessing import StandardScaler  # type: ignore
-from sklearn.linear_model import ElasticNet
+from sklearn.linear_model import Ridge
 
 from bystro.stochastic_gradient_langevin.sgld_optimizer_pt import (
     PreconditionedSGLDynamicsPT,
@@ -29,7 +29,7 @@ class PRSCS(BaseSGLDModel):
             training_options=training_options, prior_options=prior_options
         )
 
-    def fit(self, X, y, progress_bar=True, seed=2021):
+    def fit(self, X, y, progress_bar=False, seed=2021):
         """ """
         self._test_inputs(X, y)
         X_, y_ = self._transform_training_data(X, y)
@@ -48,6 +48,8 @@ class PRSCS(BaseSGLDModel):
         self.samples_sigma2 = np.zeros((training_options["n_samples"], self.p))
 
         var_list = [beta_, psi_l, delta_l, sigma2_l]
+        print("--------------")
+        print(beta_)
 
         f_prior_delta = ptd.Gamma(
             prior_options["b"], prior_options["phi"]
@@ -59,11 +61,7 @@ class PRSCS(BaseSGLDModel):
         optimizer = PreconditionedSGLDynamicsPT(
             var_list, lr=0.001, weight_decay=0.5
         )
-        #optimizer = torch.optim.SGD(var_list,
-        #                        lr=.001,
-        #                        momentum=.9)
         zeros_p = torch.tensor(np.zeros(p))
-        eye_p = torch.tensor(np.eye(p))
 
         softplus = nn.Softplus()
 
@@ -85,30 +83,34 @@ class PRSCS(BaseSGLDModel):
 
             X_batch = X_[idx]
             y_batch = y_[idx]
+
             Xb = torch.matmul(X_batch, beta_)
             diff = torch.squeeze(y_batch - Xb)
-            
-            f_prior_psi = ptd.Gamma(prior_options["a"]*torch.ones(self.p), 1 / delta_).log_prob
-            f_prior_sigma = ptd.Gamma(3, 3).log_prob
-            f_prior_beta = ptd.Normal(zeros_p, sigma2_ / N * psi_).log_prob
-            f_likelihood = ptd.Normal(
-                0,torch.sqrt(sigma2_)
+
+            f_prior_psi = ptd.Gamma(
+                prior_options["a"] * torch.ones(self.p), 1 / delta_ + 0.001
             ).log_prob
+            f_prior_sigma = ptd.Gamma(3, 3).log_prob
+            f_prior_beta = ptd.Normal(
+                zeros_p, torch.sqrt(0.001 + sigma2_ / N * psi_)
+            ).log_prob
+            f_likelihood = ptd.Normal(0, torch.sqrt(sigma2_)).log_prob
 
             loglike = torch.mean(f_likelihood(diff))
-            prior_psi = torch.sum(f_prior_psi(psi_))/N
-            prior_beta = torch.sum(f_prior_beta(beta_))/N
-            prior_delta = torch.sum(f_prior_delta(delta_))/N
-            prior_sigma = f_prior_sigma(sigma2_)
+            prior_psi = torch.sum(f_prior_psi(psi_)) / N
+            prior_beta = torch.sum(f_prior_beta(beta_)) / N
+            prior_delta = torch.sum(f_prior_delta(delta_)) / N
+            prior_sigma = f_prior_sigma(sigma2_) / (2 * N)
 
             posterior = (
-                loglike
-                + prior_beta 
-                + prior_psi  
-                + prior_delta 
-                + prior_sigma
+                loglike + prior_beta + prior_psi + prior_delta + prior_sigma
             )
-            loss = -1 * posterior 
+            loss = -1 * posterior
+            if i % 1000 == 0:
+                print(sigma2_)
+                print(i, beta_)
+                print(psi_)
+                print(delta_)
 
             optimizer.zero_grad()
             loss.backward()
@@ -123,7 +125,7 @@ class PRSCS(BaseSGLDModel):
         return {**default_options, **prior_options}
 
     def _initialize_variables(self, X, y):
-        mod = ElasticNet()
+        mod = Ridge()
         mod.fit(X, y)
         y_hat = mod.predict(X)
         mse = np.mean((y - y_hat) ** 2)
