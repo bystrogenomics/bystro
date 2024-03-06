@@ -234,14 +234,14 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         if self.W_ is None:
             raise ValueError("Model has not been fit yet")
 
+        covariance = self.get_covariance()
+        cov_sub = covariance[np.ix_(observed_feature_idxs,observed_feature_idxs)]
+        Wo = self.W_[:,observed_feature_idxs]
+        
         if sherman_woodbury is False:
-            prec = self.get_precision()
-            coefs = np.dot(self.W_, prec)
+            coefs = np.dot(Wo, la.inv(cov_sub))
         else:
-            Lambda = self.get_noise()
-            coefs, _ = _get_conditional_parameters_sherman_woodbury(
-                Lambda, self.W_, observed_feature_idxs
-            )
+            coefs = np.dot(Wo, la.inv(cov_sub))
 
         return np.dot(X, coefs.T)
 
