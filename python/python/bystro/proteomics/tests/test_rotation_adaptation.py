@@ -1,6 +1,6 @@
 import numpy as np
 import numpy.linalg as la
-from scipy.stats import ortho_group
+from scipy.stats import ortho_group # type: ignore
 from sklearn import datasets
 from sklearn.preprocessing import StandardScaler
 
