@@ -29,6 +29,31 @@ index_settings:
           - uppercase
           - asciifolding
     filter:
+      exclude_pathogenic:
+        type: pattern_capture
+        patterns: ["conflicting_interpretations_of_pathogenicity"]
+      catenate_filter:
+        type: word_delimiter
+        catenate_words: true
+        catenate_numbers: true
+        catenate_all: true
+        preserve_original: false
+        generate_word_parts: false
+        stem_english_possessive: true
+        generate_number_parts: false
+        split_on_numerics: false
+        split_on_case_change: false
+      catenate_filter_split:
+        type: word_delimiter
+        catenate_words: true
+        catenate_numbers: true
+        catenate_all: true
+        preserve_original: false
+        generate_word_parts: true
+        stem_english_possessive: true
+        generate_number_parts: false
+        split_on_numerics: false
+        split_on_case_change: true
       english_stemmer:
         type: stemmer
         language: light_english
@@ -71,6 +96,8 @@ index_settings:
           - digit
           - punctuation
     tokenizer:
+      hgvs_tokenizer:
+        type: pattern
       edge_ngram_tokenizer:
         type: edge_ngram
         min_gram: 1
@@ -80,14 +107,37 @@ index_settings:
           - digit
           - punctuation
     analyzer:
+      hgvs_analyzer:
+        type: custom
+        tokenizer: hgvs_tokenizer
+        filter:
+          - lowercase
       autocomplete_english:
         type: custom
-        tokenizer: classic
+        tokenizer: whitespace
         filter:
           - lowercase
           - asciifolding
+          - catenate_filter
           - english_stemmer
           - autocomplete_filter
+      autocomplete_english_split:
+        type: custom
+        tokenizer: whitespace
+        filter:
+          - lowercase
+          - asciifolding
+          - catenate_filter_split
+          - english_stemmer
+          - autocomplete_filter
+      autocomplete_english_split_clinsig:
+        type: custom
+        tokenizer: whitespace
+        filter:
+          - lowercase
+          - exclude_pathogenic
+          - asciifolding
+          - catenate_filter_split
       autocomplete_english_graph:
         type: custom
         tokenizer: keyword
@@ -105,14 +155,6 @@ index_settings:
           - lowercase
           - asciifolding
           - english_stemmer
-      autocomplete_english_split:
-        type: custom
-        tokenizer: standard
-        filter:
-          - lowercase
-          - asciifolding
-          - english_stemmer
-          - autocomplete_filter
       autocomplete_english_letter:
         type: custom
         tokenizer: letter
@@ -319,6 +361,10 @@ mappings:
           type: text
           analyzer: autocomplete_english_split
           search_analyzer: search_english_description_synonyms
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
         rfamAcc:
           type: keyword
           normalizer: uppercase_normalizer
@@ -333,10 +379,18 @@ mappings:
               type: text
               analyzer: autocomplete_english_split
               search_analyzer: search_english_description_synonyms
+              fields:
+                exact:
+                  type: keyword
+                  normalizer: lowercase_normalizer
             clinicalSignificance:
               type: text
               analyzer: autocomplete_english_split
               search_analyzer: search_english_split
+              fields:
+                exact:
+                  type: keyword
+                  normalizer: lowercase_normalizer
             type:
               type: text
               analyzer: autocomplete_english
@@ -349,12 +403,20 @@ mappings:
               type: text
               analyzer: autocomplete_english_split
               search_analyzer: search_english_split
+              fields:
+                exact:
+                  type: keyword
+                  normalizer: lowercase_normalizer
             numberSubmitters:
               type: short
             reviewStatus:
               type: text
               analyzer: autocomplete_english_split
               search_analyzer: search_english_split
+              fields:
+                exact:
+                  type: keyword
+                  normalizer: lowercase_normalizer
             chromStart:
               type: integer
             chromEnd:
@@ -428,22 +490,50 @@ mappings:
           normalizer: lowercase_normalizer
         CLNSIG:
           type: text
-          analyzer: autocomplete_english_graph
+          analyzer: autocomplete_english_split_clinsig
+          search_analyzer: search_english_split
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
         CLNSIGCONF:
           type: text
-          analyzer: autocomplete_english_graph
+          analyzer: autocomplete_english_split
+          search_analyzer: search_english_split
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
         CLNREVSTAT:
           type: text
-          analyzer: english_graph
+          analyzer: autocomplete_english_split
+          search_analyzer: search_english_description_synonyms
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
         CLNDN:
           type: text
-          analyzer: autocomplete_english_graph
+          analyzer: autocomplete_english_split
+          search_analyzer: search_english_description_synonyms
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
         CLNDNINCL:
           type: text
-          analyzer: autocomplete_english_graph
+          analyzer: search_english_split
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
         CLNHGVS:
           type: text
           analyzer: english_graph
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
         DBVARID:
           type: keyword
           normalizer: lowercase_normalizer

@@ -1,8 +1,9 @@
 connection:
-  request_timeout: 300
+  request_timeout: 1200
   nodes:
-    - host: '10.98.135.70'
+    - host: 'host'
       port: '9200'
-      scheme: 'http'
+      scheme: 'https'
 auth:
-  dummy: True
+  username: 'admin'
+  password: 'admin'

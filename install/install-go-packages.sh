@@ -8,7 +8,7 @@ go mod init bystro
 
 go install github.com/akotlar/bystro-stats@1.0.0;
 
-go install github.com/bystrogenomics/bystro-vcf@2.1.0;
+go install github.com/bystrogenomics/bystro-vcf@2.1.1;
 
 go install github.com/akotlar/bystro-snp@1.0.0;
 
