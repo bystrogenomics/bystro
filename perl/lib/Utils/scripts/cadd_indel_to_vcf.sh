@@ -60,7 +60,7 @@ check_headers_and_extract_details() {
     local ref_genome=""
     local cadd_version=""
 
-    cadd_header_regex='^## CADD (GRCh[0-9]+)-v([0-9.]+)'
+    cadd_header_regex='^##\s*CADD\s+(GRCh[0-9]+)-v([0-9.]+)'
     cadd_header_line_two="^#Chrom\s+Pos\s+Ref\s+Alt\s+RawScore\s+PHRED"
 
     while IFS= read -r line; do
