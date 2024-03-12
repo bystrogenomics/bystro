@@ -235,17 +235,12 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
             raise ValueError("Model has not been fit yet")
 
         if sherman_woodbury is False:
-            covariance = self.get_covariance()
-            cov_sub = covariance[
-                np.ix_(observed_feature_idxs, observed_feature_idxs)
-            ]
-            Wo = self.W_[:, observed_feature_idxs]
-            coefs = np.dot(Wo, la.inv(cov_sub))
+            prec = self.get_precision()
+            coefs = np.dot(self.W_, prec)
         else:
-            noise = self.get_noise()
-            noise_sub = noise[observed_feature_idxs]
-            coef, _ = _get_conditional_parameters_sherman_woodbury(
-                noise_sub, self.W_, observed_feature_idxs
+            Lambda = self.get_noise()
+            coefs, _ = _get_conditional_parameters_sherman_woodbury(
+                Lambda, self.W_, observed_feature_idxs
             )
 
         return np.dot(X, coefs.T)
@@ -614,7 +609,9 @@ class BasePCASGDModel(BaseGaussianFactorModel):
         expected_but_missing_keys = default_keys - final_keys
         unexpected_but_present_keys = final_keys - default_keys
         if expected_but_missing_keys:
-            raise ValueError("training options were expected but not found...")
+            raise ValueError(
+                "training options were expected but not found..."
+            )
         if unexpected_but_present_keys:
             raise ValueError(
                 "the following training options were unrecognized but provided..."

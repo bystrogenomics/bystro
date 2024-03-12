@@ -1,7 +1,7 @@
 import argparse
 import io
 
-from bystro.api.proteomics import upload_proteomics_dataset
+from bystro.api.proteomics import upload_proteomics_dataset, DatasetTypes
 
 
 def upload_proteomics_cli(args: argparse.Namespace) -> dict:
@@ -15,10 +15,10 @@ def upload_proteomics_cli(args: argparse.Namespace) -> dict:
         Path to the protein abundance file.
     experiment_annotation_file : str | None
         Path to the experiment annotation file.
-    annotation_job_id : str | None
-        annotationId of the job associated with the annotation dataset.
-    experiment_name : str | None
-        Name of the experiment, required if the experiment annotation file contains multiple experiments
+    experiment_annotation_file : str | None
+        ID of the job associated with the annotation dataset.
+    proteomics_dataset_type : DatasetTypes
+        Type of the proteomics dataset (we only support fragpipe-TMT currently).
     print_result : bool, optional
         Whether to print the result of the upload operation, by default True.
 
@@ -27,12 +27,18 @@ def upload_proteomics_cli(args: argparse.Namespace) -> dict:
     dict
         A json response with annotationID and proteomicsID.
     """
+    dataset_type_str = args.proteomics_dataset_type.replace("-", "_")
+
+    try:
+        proteomics_dataset_type = DatasetTypes[dataset_type_str]
+    except KeyError:
+        raise ValueError(f"Invalid proteomics dataset type: {args.proteomics_dataset_type}")
 
     return upload_proteomics_dataset(
         protein_abundance_file=args.protein_abundance_file,
         experiment_annotation_file=args.experiment_annotation_file,
         annotation_job_id=args.annotation_job_id,
-        experiment_name=args.experiment_name,
+        proteomics_dataset_type=proteomics_dataset_type,
         print_result=True,
     )
 
@@ -71,8 +77,9 @@ def add_proteomics_subparser(subparsers) -> None:
         "--annotation_job_id", help="ID of the annotation job to link with the proteomics dataset"
     )
     upload_parser.add_argument(
-        "--experiment_name",
-        help=("Name of the experiment, required if the experiment "
-              "annotation file contains multiple experiments")
+        "--proteomics_dataset_type",
+        choices=[e.name for e in DatasetTypes],
+        default="fragpipe_TMT",
+        help="Type of the proteomics dataset",
     )
     upload_parser.set_defaults(func=upload_proteomics_cli)

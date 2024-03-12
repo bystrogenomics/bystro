@@ -59,9 +59,3 @@ class ProgressMessage(BaseMessage, frozen=True):
 
     event: Event = Event.PROGRESS
     data: ProgressData = field(default_factory=ProgressData)
-
-class ProgressStringMessage(BaseMessage, frozen=True):
-    """Beanstalkd Message with a string progress"""
-
-    data: str
-    event: Event = Event.PROGRESS

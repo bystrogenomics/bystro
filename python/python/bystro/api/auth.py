@@ -78,7 +78,7 @@ class UserProfile(Struct, rename="camel"):
         The accounts of the user.
     role : str
         The role of the user.
-    last_login : datetime.datetime
+    lastLogin : datetime.datetime
         The date the user last logged in.
     """
 

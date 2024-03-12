@@ -1,5 +1,4 @@
 *.mdb
-/local
 /.build
 /.tidyall.d
 Bytro-*
@@ -16,4 +15,4 @@ t/utils/filterCadd.yml.utils-bak.*
 t/utils/index
 t/utils/raw/cadd/cadd.*.log
 t/utils/raw/cadd/cadd.*.log
-t/utils/raw/cadd/test.*/
+t/utils/raw/cadd/test.*

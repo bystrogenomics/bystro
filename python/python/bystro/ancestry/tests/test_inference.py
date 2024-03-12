@@ -84,7 +84,7 @@ def test_infer_ancestry():
 
 @pytest.mark.integration()
 def test_infer_ancestry_from_model():
-    ancestry_model = _get_model_from_s3("hg38")
+    ancestry_model = _get_model_from_s3()
 
     # Generate an arrow table that contains genotype dosages for 1000 samples
     variants = list(ancestry_model.pca_loadings_df.index)

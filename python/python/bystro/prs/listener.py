@@ -12,7 +12,7 @@ from bystro.beanstalkd.messages import SubmittedJobMessage
 from bystro.prs.messages import PRSJobData, PRSJobResult, PRSJobResultMessage
 from bystro.prs.handler import calculate_prs_scores
 
-TUBE = "prs"
+TUBE = "PRS"
 
 
 def submit_msg_fn(job_data: PRSJobData):
@@ -28,7 +28,9 @@ def main():
     Start PRS listener that handles PRS jobs
     """
     parser = argparse.ArgumentParser(description=f"Start a listener for {TUBE} Bystro jobs")
-
+    parser.add_argument(
+        "--conf_dir", type=str, help="Path to the genome/assembly config directory", required=True
+    )
     parser.add_argument(
         "--queue_conf",
         type=str,

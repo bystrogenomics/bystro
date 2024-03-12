@@ -3,12 +3,12 @@ import pyarrow.feather as feather  # type: ignore
 
 from bystro.ancestry.listener import (
     AncestryJobData,
-    handler_fn,
+    handler_fn_factory,
     submit_msg_fn,
     completed_msg_fn,
     SubmittedJobMessage,
     AncestryJobCompleteMessage,
-    AncestryResults
+    AncestryResults,
 )
 from bystro.ancestry.tests.test_inference import (
     ANCESTRY_MODEL,
@@ -20,20 +20,21 @@ from bystro.beanstalkd.messages import ProgressMessage
 from bystro.beanstalkd.worker import ProgressPublisher
 
 
+handler_fn = handler_fn_factory(ANCESTRY_MODEL)
+
+
 def test_submit_fn():
     ancestry_job_data = AncestryJobData(
         submission_id="my_submission_id2",
         dosage_matrix_path="some_dosage.feather",
         out_dir="/path/to/some/dir",
-        assembly="hg38",
     )
     submitted_job_message = submit_msg_fn(ancestry_job_data)
 
     assert isinstance(submitted_job_message, SubmittedJobMessage)
 
 
-def test_handler_fn_happy_path(mocker, tmpdir):
-    mocker.patch("bystro.ancestry.listener._get_model_from_s3", return_value=ANCESTRY_MODEL)
+def test_handler_fn_happy_path(tmpdir):
     dosage_path = "some_dosage.feather"
     f1 = tmpdir.join(dosage_path)
 
@@ -44,7 +45,7 @@ def test_handler_fn_happy_path(mocker, tmpdir):
         host="127.0.0.1", port=1234, queue="my_queue", message=progress_message
     )
     ancestry_job_data = AncestryJobData(
-        submission_id="my_submission_id2", dosage_matrix_path=f1, out_dir=str(tmpdir), assembly="hg38"
+        submission_id="my_submission_id2", dosage_matrix_path=f1, out_dir=str(tmpdir)
     )
     ancestry_response = handler_fn(publisher, ancestry_job_data)
 
@@ -61,10 +62,7 @@ def test_handler_fn_happy_path(mocker, tmpdir):
 
 def test_completion_fn(tmpdir):
     ancestry_job_data = AncestryJobData(
-        submission_id="my_submission_id2",
-        dosage_matrix_path="some_dosage.feather",
-        out_dir=str(tmpdir),
-        assembly="hg38",
+        submission_id="my_submission_id2", dosage_matrix_path="some_dosage.feather", out_dir=str(tmpdir)
     )
 
     ancestry_results, _ = _infer_ancestry()
@@ -95,10 +93,7 @@ def test_completion_message():
 
 def test_job_data_from_beanstalkd():
     ancestry_job_data = AncestryJobData(
-        submission_id="my_submission_id2",
-        dosage_matrix_path="some_dosage.feather",
-        out_dir="/foo",
-        assembly="hg38",
+        submission_id="my_submission_id2", dosage_matrix_path="some_dosage.feather", out_dir="/foo"
     )
 
     serialized_values = json.encode(ancestry_job_data)
@@ -106,7 +101,6 @@ def test_job_data_from_beanstalkd():
         "submissionId": "my_submission_id2",
         "dosageMatrixPath": "some_dosage.feather",
         "outDir": "/foo",
-        "assembly": "hg38",
     }
     serialized_expected_value = json.encode(expected_value)
 

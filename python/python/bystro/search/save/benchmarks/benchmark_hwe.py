@@ -14,22 +14,17 @@ sample_maf_values = list(rng.random(SAMPLE_SIZE))
 heterozygosity_values = list(rng.random(SAMPLE_SIZE))
 homozygosity_values = list(rng.random(SAMPLE_SIZE))
 
-missingness_idx = 0
-sample_maf_idx = 1
-heterozygosity_idx = 2
-homozygosity_idx = 3
-header_row = b"missingness\tsampleMaf\theterozygosity\thomozygosity".split(b"\t")
 docs = []
 for missingness, sample_maf, heterozygosity, homozygosity in zip(
     missingness_values, sample_maf_values, heterozygosity_values, homozygosity_values
 ):
     docs.append(
-        [
-            bytes(f"{missingness}", "utf-8"),
-            bytes(f"{sample_maf}", "utf-8"),
-            bytes(f"{heterozygosity}", "utf-8"),
-            bytes(f"{homozygosity}", "utf-8"),
-        ]
+        {
+            "missingness": [[float(missingness)]],
+            "sampleMaf": [[float(sample_maf)]],
+            "heterozygosity": [[float(heterozygosity)]],
+            "homozygosity": [[float(homozygosity)]],
+        }
     )
 
 
@@ -69,7 +64,7 @@ def naive_drop_row_if_out_of_hwe(
 
 
 def test_drop_row_hwe(benchmark):
-    filter_fn = HWEFilter(num_samples=N, crit_value=0.025).make_filter(header_row)
+    filter_fn = HWEFilter(num_samples=N, crit_value=0.025).make_filter()
 
     def loop():
         assert filter_fn is not None
@@ -92,10 +87,10 @@ def test_naive_drop_row_hwe(benchmark):
             res = naive_drop_row_if_out_of_hwe(
                 crit_value,
                 num_samples,
-                float(doc[missingness_idx]),
-                float(doc[sample_maf_idx]),
-                float(doc[heterozygosity_idx]),
-                float(doc[homozygosity_idx])
+                doc["missingness"][0][0],
+                doc["sampleMaf"][0][0],
+                doc["heterozygosity"][0][0],
+                doc["homozygosity"][0][0],
             )
             assert res is True or res is False
 

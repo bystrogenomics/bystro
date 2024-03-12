@@ -18,7 +18,6 @@ from bystro.beanstalkd.messages import (
     FailedJobMessage,
     InvalidJobMessage,
     ProgressMessage,
-    ProgressStringMessage
 )
 
 BEANSTALK_ERR_TIMEOUT = "TIMED_OUT"
@@ -190,10 +189,6 @@ class ProgressReporter(abc.ABC):
         """Increment the counter by processed variant count and report to the beanstalk queue"""
 
     @abc.abstractmethod
-    def message(self, msg: str):
-        """Send a message to the beanstalk queue"""
-
-    @abc.abstractmethod
     def get_counter(self) -> int:
         """Get the current value of the counter"""
 
@@ -212,12 +207,7 @@ class BeanstalkdProgressReporter(ProgressReporter):
         self._message.data.progress += count
         self._client.put_job(json.encode(self._message))
 
-    def message(self, msg: str):
-        """Send a message to the beanstalk queue"""
-        progress_message = ProgressStringMessage(submission_id=self._message.submission_id, data=msg)
-        self._client.put_job(json.encode(progress_message))
-
-    def get_counter(self) -> int:
+    def get_counter(self):
         """Get the current value of the counter"""
         return self._message.data.progress
 
@@ -232,10 +222,6 @@ class DebugProgressReporter(ProgressReporter):
     def increment(self, count: int):
         self._value += count
         print(f"Processed {self._value} records")
-    
-    def message(self, msg: str):
-        """Send a message to the beanstalk queue"""
-        print(msg)
 
     def get_counter(self):
         return self._value

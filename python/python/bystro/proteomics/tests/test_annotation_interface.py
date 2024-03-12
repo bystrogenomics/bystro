@@ -49,7 +49,7 @@ def test_get_annotation_results_from_query():
 
     mock_client = MockOpenSearch()
     samples_and_genes_df = get_annotation_result_from_query(
-        user_query_string, index_name, mock_client # type: ignore
+        user_query_string, index_name, mock_client  # type: ignore
     )
     assert (1610, 7) == samples_and_genes_df.shape
 
