@@ -533,7 +533,6 @@ mappings:
           fields:
             exact:
               type: keyword
-              normalizer: lowercase_normalizer
         DBVARID:
           type: keyword
           normalizer: lowercase_normalizer
