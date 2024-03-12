@@ -471,8 +471,7 @@ sub _preparePreprocessorProgram {
 
   my $errPath = $self->_workingDir->child( $basename . '.file-log.log' );
 
-  #cat is wasteful, but we expect no one reads large uncompressed files
-  my $echoProg = $self->getReadArgs($inPath) || "cat $inPath";
+  my $echoProg = $self->getReadArgs($inPath);
 
   my $fp = $self->fileProcessors->{$type};
 

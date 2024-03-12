@@ -45,9 +45,9 @@ sub _get_fh_paths {
     $self->log( 'fatal', "input file path $input_vcf doesn't exist" );
     return;
   }
-
+  say STDERR "input_vcf is $input_vcf\n";
   my ( $err, $isCompressed, $in_fh ) = $self->getReadFh($input_vcf);
-
+  say STDERR "isCompressed is $isCompressed\n";
   $isCompressed ||= $self->compress;
 
   if ($err) {
@@ -93,7 +93,7 @@ sub go {
   for my $input_vcf ( @{ $self->{_localFiles} } ) {
     my ( $in_fh, $output_data_path, $output_header_path, $output_path ) =
       $self->_get_fh_paths($input_vcf);
-
+    say STDERR "output data path is $output_data_path\n";
     my $output_data_fh = $self->getWriteFh($output_data_path);
 
     $self->log( 'info', "Writing to $output_data_path" );
@@ -185,7 +185,7 @@ sub go {
     }
 
     splice( @header_lines, -1, 0, @pop_lines );
-
+    say STDERR "output header is $output_header_path\n";
     my $header_fh = $self->getWriteFh($output_header_path);
 
     # Write the updated header and VCF to output
