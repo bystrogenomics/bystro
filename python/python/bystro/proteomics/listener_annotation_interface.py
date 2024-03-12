@@ -25,6 +25,8 @@ class ProteomicsJobData(BaseMessage, frozen=True, rename="camel"):
 
     Parameters
     ----------
+    submission_id: str
+        The unique identifier for the job.
     data_path: str
         The path to the proteomics data file.
     out_dir: str
