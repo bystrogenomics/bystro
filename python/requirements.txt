@@ -1,6 +1,7 @@
 Cython==3.0.4
 attrs==23.1.0
 boto3==1.28.9
+cvxpy==1.4.2
 git+https://github.com/bystrogenomics/liftover.git@v1.1.18
 maturin[zig]==1.3.2
 msgspec==0.18.6
