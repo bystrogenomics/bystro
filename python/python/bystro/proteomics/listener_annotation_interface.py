@@ -3,8 +3,10 @@ import argparse
 import logging
 from ruamel.yaml import YAML
 from pathlib import Path
-import pyarrow.dataset as ds
+import pyarrow.dataset as ds    # type: ignore
 from opensearchpy import OpenSearch
+import pandas as pd
+from datetime import datetime, timezone
 
 from bystro.beanstalkd.worker import listen, QueueConf, ProgressPublisher
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
@@ -15,7 +17,6 @@ from bystro.proteomics.annotation_interface import (
 
 logger = logging.getLogger(__file__)
 
-EFS_BASE_PATH = "/seqant/user-data/"
 PROTEOMICS_TUBE = "proteomics"
 
 
@@ -25,8 +26,6 @@ class ProteomicsJobData(BaseMessage, frozen=True, rename="camel"):
 
     Parameters
     ----------
-    submission_id: str
-        The unique identifier for the job.
     data_path: str
         The path to the proteomics data file.
     out_dir: str
@@ -37,7 +36,6 @@ class ProteomicsJobData(BaseMessage, frozen=True, rename="camel"):
         The name of the OpenSearch index from which annotation data will be queried.
     """
 
-    submission_id: str
     data_path: str
     out_dir: str
     annotation_query: str
@@ -58,25 +56,32 @@ def _load_queue_conf(queue_conf_path: str) -> QueueConf:
 def handler_fn(_publisher: ProgressPublisher, job_data: ProteomicsJobData) -> str:
     logger.info("Processing Proteomics job: %s", job_data)
 
-    efs_out_dir = Path(EFS_BASE_PATH) / job_data.out_dir
-    efs_out_dir.mkdir(parents=True, exist_ok=True)
+    Path(job_data.out_dir).mkdir(parents=True, exist_ok=True)
 
-    dataset = ds.dataset([job_data.data_path], format="arrow")
+    try:
+        dataset = ds.dataset(job_data.data_path, format="arrow")
+        gene_abundance_df = dataset.to_table().to_pandas()
+    except Exception as arrow_exception:
+        logger.exception(arrow_exception)
+        try:
+            gene_abundance_df = pd.read_csv(job_data.data_path, sep="\t")
+        except Exception as pandas_exception:
+            logger.exception(pandas_exception)
+            raise ValueError(f"Failed to read {job_data.data_path}; not arrow feather or .tsv")
 
-    gene_abundance_df = dataset.to_table().to_pandas()
     client = OpenSearch()
     annotation_df = get_annotation_result_from_query(
         job_data.annotation_query, job_data.index_name, client
     )
 
     joined_df = join_annotation_result_to_proteomics_dataset(annotation_df, gene_abundance_df)
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
-    result_path = efs_out_dir / "joined_results.feather"
+    result_path = Path(job_data.out_dir) / f"joined.{timestamp}.feather"
     joined_df.to_feather(result_path)
 
     logger.info("Proteomics job completed. Results saved to %s", result_path)
     return str(result_path)
-
 
 def submit_msg_fn(proteomics_job_data: ProteomicsJobData) -> SubmittedJobMessage:
     logger.debug("Received ProteomicsJobData: %s", proteomics_job_data)

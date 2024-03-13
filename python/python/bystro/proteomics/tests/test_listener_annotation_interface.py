@@ -1,6 +1,7 @@
 from msgspec import json
-import pyarrow.feather as feather  # type: ignore
 import pandas as pd
+from datetime import datetime, timezone
+from pathlib import Path
 
 from bystro.proteomics.listener_annotation_interface import (
     ProteomicsJobData,
@@ -11,7 +12,6 @@ from bystro.proteomics.listener_annotation_interface import (
     ProteomicsJobCompleteMessage,
 )
 
-from bystro.beanstalkd.messages import ProgressMessage
 from bystro.beanstalkd.worker import ProgressPublisher
 
 
@@ -37,36 +37,43 @@ def test_submit_fn():
 
 
 def test_handler_fn_happy_path(tmpdir, mocker):
-    data_path = "some_data.feather"
-    f1 = tmpdir.join(data_path)
-
-    feather.write_feather(FAKE_PROTEOMICS_DATA, str(f1))
-
-    progress_message = ProgressMessage(submission_id="my_submission_id")
-    publisher = ProgressPublisher(
-        host="127.0.0.1", port=1234, queue="my_queue", message=progress_message
+    mocker.patch(
+        "bystro.proteomics.listener_annotation_interface.ds.dataset",
+        return_value=mocker.Mock(to_table=mocker.Mock(to_pandas=mocker.Mock(return_value=FAKE_PROTEOMICS_DATA)))
     )
-
+    mocker.patch(
+        "bystro.proteomics.listener_annotation_interface.pd.read_csv",
+        return_value=FAKE_PROTEOMICS_DATA
+    )
     mocker.patch(
         "bystro.proteomics.listener_annotation_interface.get_annotation_result_from_query",
-        return_value=pd.DataFrame(),
-    )
+        return_value=pd.DataFrame()
+        )
     mocker.patch(
         "bystro.proteomics.listener_annotation_interface.join_annotation_result_to_proteomics_dataset",
-        return_value=pd.DataFrame(),
+        return_value=pd.DataFrame()
+    )
+    mocker.patch(
+        "bystro.proteomics.listener_annotation_interface.OpenSearch",
+        return_value=mocker.Mock()
     )
 
-    proteomics_job_data = ProteomicsJobData(
-        submission_id="my_submission_id",
-        data_path=str(f1),
+    job_data = ProteomicsJobData(
+        data_path=str(tmpdir / "some_data.feather"),
         out_dir=str(tmpdir),
         annotation_query=FAKE_ANNOTATION_QUERY,
         index_name=FAKE_INDEX_NAME,
+        submission_id="test_submission"
     )
 
-    result_path = handler_fn(publisher, proteomics_job_data)
+    publisher = mocker.Mock(spec=ProgressPublisher)
 
-    assert result_path == str(tmpdir / "joined_results.feather")
+    result = handler_fn(publisher, job_data)
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    expected_path = str(Path(job_data.out_dir) / f"joined.{timestamp}.feather")
+
+    assert result == expected_path
 
 
 def test_completion_fn(tmpdir):
@@ -78,10 +85,13 @@ def test_completion_fn(tmpdir):
         index_name=FAKE_INDEX_NAME,
     )
 
-    completed_msg = completed_msg_fn(proteomics_job_data, str(tmpdir / "joined_results.feather"))
+    timestamp = "20230315_120000+0000"
+    result_path = tmpdir / f"joined.{timestamp}.feather"
+
+    completed_msg = completed_msg_fn(proteomics_job_data, str(result_path))
 
     assert isinstance(completed_msg, ProteomicsJobCompleteMessage)
-    assert completed_msg.result_path == str(tmpdir / "joined_results.feather")
+    assert completed_msg.result_path == str(result_path)
 
 
 def test_job_data_from_beanstalkd():
