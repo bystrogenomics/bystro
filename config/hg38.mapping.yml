@@ -1,1 +1,844 @@
-./hg19.mapping.yml
+sort:
+  cadd: avg
+  refSeq.codonNumber: avg
+  refSeq.codonPosition: avg
+post_index_settings:
+  index:
+    refresh_interval: 15s
+    number_of_replicas: 1
+index_settings:
+  index:
+    refresh_interval: -1
+    number_of_replicas: 0
+    codec: best_compression
+    mapping:
+      total_fields:
+        limit: 5000
+  analysis:
+    normalizer:
+      lowercase_normalizer:
+        type: custom
+        filter:
+          - lowercase
+          - asciifolding
+      uppercase_normalizer:
+        type: custom
+        filter:
+          - uppercase
+          - asciifolding
+    filter:
+      exclude_pathogenic:
+        type: pattern_capture
+        patterns: ["conflicting_interpretations_of_pathogenicity"]
+      catenate_filter:
+        type: word_delimiter
+        catenate_words: true
+        catenate_numbers: true
+        catenate_all: true
+        preserve_original: false
+        generate_word_parts: false
+        stem_english_possessive: true
+        generate_number_parts: false
+        split_on_numerics: false
+        split_on_case_change: false
+      catenate_filter_split:
+        type: word_delimiter
+        catenate_words: true
+        catenate_numbers: true
+        catenate_all: true
+        preserve_original: false
+        generate_word_parts: true
+        stem_english_possessive: true
+        generate_number_parts: false
+        split_on_numerics: false
+        split_on_case_change: true
+      english_stemmer:
+        type: stemmer
+        language: light_english
+      search_synonym_filter:
+        type: synonym
+        synonyms_path: "analysis/search-synonyms.txt"
+      amino_synonym_filter:
+        type: synonym
+        synonyms_path: "analysis/amino-synonyms.txt"
+      type_synonym_filter:
+        type: synonym
+        synonyms_path: "analysis/type-synonyms.txt"
+      dbSNP_func_synonyms:
+        type: synonym
+        synonyms_path: "analysis/dbsnp-func-synonyms.txt"
+      dbSNP_class_synonyms:
+        type: synonym
+        synonyms_path: "analysis/dbsnp-class-synonyms.txt"
+      exonic_allele_function_search_synonyms:
+        type: synonym
+        synonyms_path: "analysis/exonic-allele-function-search-synonyms.txt"
+      site_type_synonym_filter:
+        type: synonym
+        synonyms_path: "analysis/site-type-synonyms.txt"
+      codon_map_synonym_filter:
+        type: synonym
+        synonyms_path: "analysis/codon-map-synonyms.txt"
+      description_synonyms:
+        type: synonym
+        synonyms_path: "analysis/refseq-description-synonyms.txt"
+      disease_synonyms:
+        type: synonym
+        synonyms_path: "analysis/disease-synonyms.txt"
+      autocomplete_filter:
+        type: edge_ngram
+        min_gram: 1
+        max_gram: 30
+        token_chars:
+          - letter
+          - digit
+          - punctuation
+    tokenizer:
+      hgvs_tokenizer:
+        type: pattern
+      edge_ngram_tokenizer:
+        type: edge_ngram
+        min_gram: 1
+        max_gram: 30
+        token_chars:
+          - letter
+          - digit
+          - punctuation
+    analyzer:
+      hgvs_analyzer:
+        type: custom
+        tokenizer: hgvs_tokenizer
+        filter:
+          - lowercase
+      autocomplete_english:
+        type: custom
+        tokenizer: whitespace
+        filter:
+          - lowercase
+          - asciifolding
+          - catenate_filter
+          - english_stemmer
+          - autocomplete_filter
+      autocomplete_english_split:
+        type: custom
+        tokenizer: whitespace
+        filter:
+          - lowercase
+          - asciifolding
+          - catenate_filter_split
+          - english_stemmer
+          - autocomplete_filter
+      autocomplete_english_split_clinsig:
+        type: custom
+        tokenizer: whitespace
+        filter:
+          - lowercase
+          - exclude_pathogenic
+          - asciifolding
+          - catenate_filter_split
+      autocomplete_english_graph:
+        type: custom
+        tokenizer: keyword
+        filter:
+          - word_delimiter_graph
+          - lowercase
+          - asciifolding
+          - english_stemmer
+          - autocomplete_filter
+      english_graph:
+        type: custom
+        tokenizer: keyword
+        filter:
+          - word_delimiter_graph
+          - lowercase
+          - asciifolding
+          - english_stemmer
+      autocomplete_english_letter:
+        type: custom
+        tokenizer: letter
+        filter:
+          - lowercase
+          - asciifolding
+          - english_stemmer
+          - autocomplete_filter
+      search_english:
+        type: custom
+        tokenizer: classic
+        filter:
+          - lowercase
+          - asciifolding
+          - english_stemmer
+          - search_synonym_filter
+      search_english_split:
+        type: custom
+        tokenizer: standard
+        filter:
+          - lowercase
+          - asciifolding
+          - english_stemmer
+          - search_synonym_filter
+      search_english_split_letter:
+        type: custom
+        tokenizer: letter
+        filter:
+          - lowercase
+          - asciifolding
+          - english_stemmer
+          - search_synonym_filter
+      search_english_type:
+        type: custom
+        tokenizer: standard
+        filter:
+          - lowercase
+          - asciifolding
+          - english_stemmer
+          - type_synonym_filter
+          - dbSNP_class_synonyms
+      search_english_description_synonyms:
+        type: custom
+        tokenizer: standard
+        filter:
+          - lowercase
+          - asciifolding
+          - english_stemmer
+          - description_synonyms
+          - disease_synonyms
+      search_english_class:
+        type: custom
+        tokenizer: standard
+        filter:
+          - lowercase
+          - asciifolding
+          - english_stemmer
+          - dbSNP_class_synonyms
+      search_english_func:
+        type: custom
+        tokenizer: standard
+        filter:
+          - lowercase
+          - asciifolding
+          - english_stemmer
+          - dbSNP_func_synonyms
+      uppercase_keyword_text:
+        type: custom
+        tokenizer: keyword
+        filter:
+          - uppercase
+          - asciifolding
+      uppercase_keyword_text_codon:
+        type: custom
+        tokenizer: keyword
+        filter:
+          - uppercase
+          - asciifolding
+          - codon_map_synonym_filter
+          - amino_synonym_filter
+      uppercase_keyword_text_amino:
+        type: custom
+        tokenizer: keyword
+        filter:
+          - uppercase
+          - asciifolding
+          - amino_synonym_filter
+mappings:
+  properties:
+    chrom:
+      type: keyword
+      normalizer: lowercase_normalizer
+    pos:
+      type: integer
+    trTv:
+      type: byte
+    type:
+      type: text
+      analyzer: autocomplete_english
+      search_analyzer: search_english_type
+      fields:
+        exact:
+          type: keyword
+          normalizer: lowercase_normalizer
+    discordant:
+      type: byte
+    heterozygotes:
+      type: keyword
+    heterozygosity:
+      type: half_float
+    homozygotes:
+      type: keyword
+    homozygosity:
+      type: half_float
+    missingGenos:
+      type: keyword
+    missingness:
+      type: half_float
+    ac:
+      type: integer
+    an:
+      type: integer
+    sampleMaf:
+      type: half_float
+    alt:
+      type: text
+    ref:
+      type: keyword
+      normalizer: uppercase_normalizer
+    refSeq:
+      properties:
+        siteType:
+          type: text
+          analyzer: autocomplete_english
+          search_analyzer: search_english_func
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
+        exonicAlleleFunction:
+          type: text
+          analyzer: autocomplete_english
+          search_analyzer: search_english_func
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
+        refCodon:
+          type: keyword
+          normalizer: uppercase_normalizer
+        altCodon:
+          type: keyword
+          normalizer: uppercase_normalizer
+        refAminoAcid:
+          type: text
+          analyzer: uppercase_keyword_text
+          search_analyzer: uppercase_keyword_text_amino
+          fields:
+            exact:
+              type: keyword
+              normalizer: uppercase_normalizer
+        altAminoAcid:
+          type: text
+          analyzer: uppercase_keyword_text
+          search_analyzer: uppercase_keyword_text_amino
+          fields:
+            exact:
+              type: keyword
+              normalizer: uppercase_normalizer
+        codonPosition:
+          type: byte
+        codonNumber:
+          type: integer
+        strand:
+          type: keyword
+        kgID:
+          type: keyword
+          normalizer: lowercase_normalizer
+        mRNA:
+          type: keyword
+          normalizer: uppercase_normalizer
+        spID:
+          type: keyword
+          normalizer: uppercase_normalizer
+        spDisplayID:
+          type: keyword
+          normalizer: uppercase_normalizer
+        geneSymbol:
+          type: keyword
+          normalizer: uppercase_normalizer
+        tRnaName:
+          type: keyword
+          normalizer: uppercase_normalizer
+        ensemblID:
+          type: keyword
+          normalizer: uppercase_normalizer
+        name2:
+          type: keyword
+          normalizer: uppercase_normalizer
+        protAcc:
+          type: keyword
+          normalizer: uppercase_normalizer
+        description:
+          type: text
+          analyzer: autocomplete_english_split
+          search_analyzer: search_english_description_synonyms
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
+        rfamAcc:
+          type: keyword
+          normalizer: uppercase_normalizer
+        name:
+          type: keyword
+          normalizer: uppercase_normalizer
+        clinvar:
+          properties:
+            alleleID:
+              type: integer
+            phenotypeList:
+              type: text
+              analyzer: autocomplete_english_split
+              search_analyzer: search_english_description_synonyms
+              fields:
+                exact:
+                  type: keyword
+                  normalizer: lowercase_normalizer
+            clinicalSignificance:
+              type: text
+              analyzer: autocomplete_english_split
+              search_analyzer: search_english_split
+              fields:
+                exact:
+                  type: keyword
+                  normalizer: lowercase_normalizer
+            type:
+              type: text
+              analyzer: autocomplete_english
+              search_analyzer: search_english_class
+              fields:
+                exact:
+                  type: keyword
+                  normalizer: lowercase_normalizer
+            origin:
+              type: text
+              analyzer: autocomplete_english_split
+              search_analyzer: search_english_split
+              fields:
+                exact:
+                  type: keyword
+                  normalizer: lowercase_normalizer
+            numberSubmitters:
+              type: short
+            reviewStatus:
+              type: text
+              analyzer: autocomplete_english_split
+              search_analyzer: search_english_split
+              fields:
+                exact:
+                  type: keyword
+                  normalizer: lowercase_normalizer
+            chromStart:
+              type: integer
+            chromEnd:
+              type: integer
+    nearest:
+      properties:
+        refSeq:
+          properties:
+            name:
+              type: keyword
+              normalizer: uppercase_normalizer
+            name2:
+              type: keyword
+              normalizer: uppercase_normalizer
+            dist:
+              type: integer
+    nearestTss:
+      properties:
+        refSeq:
+          properties:
+            name:
+              type: keyword
+              normalizer: uppercase_normalizer
+            name2:
+              type: keyword
+              normalizer: uppercase_normalizer
+            dist:
+              type: integer
+    cadd:
+      type: scaled_float
+      scaling_factor: 10
+    caddIndel:
+      properties:
+        alt:
+          type: keyword
+          normalizer: uppercase_normalizer
+        id:
+          type: keyword
+          normalizer: lowercase_normalizer
+        PHRED:
+          type: scaled_float
+          scaling_factor: 10
+    phastCons:
+      type: scaled_float
+      scaling_factor: 100
+    phyloP:
+      type: scaled_float
+      scaling_factor: 100
+    clinvarVcf:
+      properties:
+        alt:
+          type: keyword
+          normalizer: uppercase_normalizer
+        id:
+          type: keyword
+          normalizer: lowercase_normalizer
+        ALLELEID:
+          type: keyword
+          normalizer: lowercase_normalizer
+        RS:
+          type: keyword
+          normalizer: lowercase_normalizer
+        AF_ESP:
+          type: half_float
+        AF_EXAC:
+          type: half_float
+        AF_TGP:
+          type: half_float
+        CLNVCSO:
+          type: keyword
+          normalizer: lowercase_normalizer
+        CLNSIG:
+          type: text
+          analyzer: autocomplete_english_split_clinsig
+          search_analyzer: search_english_split
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
+        CLNSIGCONF:
+          type: text
+          analyzer: autocomplete_english_split
+          search_analyzer: search_english_split
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
+        CLNREVSTAT:
+          type: text
+          analyzer: autocomplete_english_split
+          search_analyzer: search_english_description_synonyms
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
+        CLNDN:
+          type: text
+          analyzer: autocomplete_english_split
+          search_analyzer: search_english_description_synonyms
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
+        CLNDNINCL:
+          type: text
+          analyzer: search_english_split
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
+        CLNHGVS:
+          type: text
+          analyzer: english_graph
+          fields:
+            exact:
+              type: keyword
+        DBVARID:
+          type: keyword
+          normalizer: lowercase_normalizer
+        ORIGIN:
+          type: keyword
+          normalizer: lowercase_normalizer
+        SSR:
+          type: keyword
+          normalizer: lowercase_normalizer
+    dbSNP:
+      properties:
+        alt:
+          type: keyword
+          normalizer: uppercase_normalizer
+        id:
+          type: keyword
+          normalizer: lowercase_normalizer
+        TOMMO:
+          type: half_float
+        ExAC:
+          type: half_float
+        GnomAD:
+          type: half_float
+        Korea1K:
+          type: half_float
+        GoNL:
+          type: half_float
+        KOREAN:
+          type: half_float
+        TWINSUK:
+          type: half_float
+        Vietnamese:
+          type: half_float
+        GENOME_DK:
+          type: half_float
+        GoESP:
+          type: half_float
+        GnomAD_exomes:
+          type: half_float
+        Siberian:
+          type: half_float
+        PRJEB37584:
+          type: half_float
+        SGDP_PRJ:
+          type: half_float
+        1000Genomes:
+          type: half_float
+        dbGaP_PopFreq:
+          type: half_float
+        NorthernSweden:
+          type: half_float
+        HapMap:
+          type: half_float
+        TOPMED:
+          type: half_float
+        ALSPAC:
+          type: half_float
+        Qatari:
+          type: half_float
+        MGP:
+          type: half_float
+    gnomad:
+      properties:
+        genomes:
+          properties:
+            alt:
+              type: keyword
+              normalizer: uppercase_normalizer
+            id:
+              type: keyword
+              normalizer: lowercase_normalizer
+            spliceai_ds_max:
+              type: half_float
+            pangolin_largest_ds:
+              type: half_float
+            phylop:
+              type: half_float
+            sift_max:
+              type: half_float
+            polyphen_max:
+              type: half_float
+            AN:
+              type: integer
+            AF:
+              type: half_float
+            AN_XX:
+              type: integer
+            AF_XX:
+              type: half_float
+            AN_XY:
+              type: integer
+            AF_XY:
+              type: half_float
+            AF_afr:
+              type: half_float
+            AN_afr:
+              type: integer
+            AF_ami:
+              type: half_float
+            AN_ami:
+              type: integer
+            AF_amr:
+              type: half_float
+            AN_amr:
+              type: integer
+            AF_asj:
+              type: half_float
+            AN_asj:
+              type: integer
+            AF_eas:
+              type: half_float
+            AN_eas:
+              type: integer
+            AF_fin:
+              type: half_float
+            AN_fin:
+              type: integer
+            AF_mid:
+              type: half_float
+            AN_mid:
+              type: integer
+            AF_nfe:
+              type: half_float
+            AN_nfe:
+              type: integer
+            AF_remaining:
+              type: half_float
+            AN_remaining:
+              type: integer
+            AF_sas:
+              type: half_float
+            AN_sas:
+              type: integer
+            AF_joint_XX:
+              type: half_float
+            AN_joint_XX:
+              type: integer
+            AF_joint_XY:
+              type: half_float
+            AN_joint_XY:
+              type: integer
+            AF_joint:
+              type: half_float
+            AN_joint:
+              type: integer
+            AF_joint_afr:
+              type: half_float
+            AN_joint_afr:
+              type: integer
+            AF_joint_ami:
+              type: half_float
+            AN_joint_ami:
+              type: integer
+            AF_joint_amr:
+              type: half_float
+            AN_joint_amr:
+              type: integer
+            AF_joint_asj:
+              type: half_float
+            AN_joint_asj:
+              type: integer
+            AF_joint_eas:
+              type: half_float
+            AN_joint_eas:
+              type: integer
+            AF_joint_fin:
+              type: half_float
+            AN_joint_fin:
+              type: integer
+            AF_joint_mid:
+              type: half_float
+            AN_joint_mid:
+              type: integer
+            AF_joint_nfe:
+              type: half_float
+            AN_joint_nfe:
+              type: integer
+            AF_joint_remaining:
+              type: half_float
+            AN_joint_remaining:
+              type: integer
+            AF_joint_sas:
+              type: half_float
+            AN_joint_sas:
+              type: integer
+            AF_grpmax:
+              type: half_float
+            AN_grpmax:
+              type: integer
+            AF_grpmax_joint:
+              type: half_float
+            AN_grpmax_joint:
+              type: integer
+        exomes:
+          properties:
+            alt:
+              type: keyword
+              normalizer: uppercase_normalizer
+            id:
+              type: keyword
+              normalizer: lowercase_normalizer
+            spliceai_ds_max:
+              type: half_float
+            pangolin_largest_ds:
+              type: half_float
+            phylop:
+              type: half_float
+            sift_max:
+              type: half_float
+            polyphen_max:
+              type: half_float
+            AN:
+              type: integer
+            AF:
+              type: half_float
+            AF_XX:
+              type: half_float
+            AN_XX:
+              type: integer
+            AF_XY:
+              type: half_float
+            AN_XY:
+              type: integer
+            AF_afr:
+              type: half_float
+            AN_afr:
+              type: integer
+            AF_amr:
+              type: half_float
+            AN_amr:
+              type: integer
+            AF_asj:
+              type: half_float
+            AN_asj:
+              type: integer
+            AF_eas:
+              type: half_float
+            AN_eas:
+              type: integer
+            AF_fin:
+              type: half_float
+            AN_fin:
+              type: integer
+            AF_mid:
+              type: half_float
+            AN_mid:
+              type: integer
+            AF_nfe:
+              type: half_float
+            AN_nfe:
+              type: integer
+            AF_non_ukb:
+              type: half_float
+            AN_non_ukb:
+              type: integer
+            AF_non_ukb_afr:
+              type: half_float
+            AN_non_ukb_afr:
+              type: integer
+            AF_non_ukb_amr:
+              type: half_float
+            AN_non_ukb_amr:
+              type: integer
+            AF_non_ukb_asj:
+              type: half_float
+            AN_non_ukb_asj:
+              type: integer
+            AF_non_ukb_eas:
+              type: half_float
+            AN_non_ukb_eas:
+              type: integer
+            AF_non_ukb_fin:
+              type: half_float
+            AN_non_ukb_fin:
+              type: integer
+            AF_non_ukb_mid:
+              type: half_float
+            AN_non_ukb_mid:
+              type: integer
+            AF_non_ukb_nfe:
+              type: half_float
+            AN_non_ukb_nfe:
+              type: integer
+            AF_non_ukb_remaining:
+              type: half_float
+            AN_non_ukb_remaining:
+              type: integer
+            AF_non_ukb_sas:
+              type: half_float
+            AN_non_ukb_sas:
+              type: integer
+            AF_remaining:
+              type: half_float
+            AN_remaining:
+              type: integer
+            AF_sas:
+              type: half_float
+            AN_sas:
+              type: integer
+            AF_grpmax:
+              type: half_float
+            AN_grpmax:
+              type: integer
+            AF_grpmax_non_ukb:
+              type: half_float
+            AN_grpmax_non_ukb:
+              type: integer
+            AF_grpmax_joint:
+              type: half_float
+            AN_grpmax_joint:
+              type: integer
