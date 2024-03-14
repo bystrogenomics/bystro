@@ -1,7 +1,7 @@
 import argparse
 import io
 
-from bystro.api.proteomics import upload_proteomics_dataset
+from bystro.api.proteomics import upload_proteomics_dataset, fetch_proteomics_file
 
 
 def upload_proteomics_cli(args: argparse.Namespace) -> dict:
@@ -33,6 +33,29 @@ def upload_proteomics_cli(args: argparse.Namespace) -> dict:
         experiment_annotation_file=args.experiment_annotation_file,
         annotation_job_id=args.annotation_job_id,
         experiment_name=args.experiment_name,
+        print_result=True,
+    )
+
+
+def fetch_proteomics_cli(args: argparse.Namespace) -> None:
+    """
+    Fetch the proteomics feather file from the /api/jobs/getProteomics endpoint.
+
+    Parameters
+    ----------
+    job_id : str
+        The ID of the job of the proteomics annotated job.
+    output : bool, optional
+        Whether to fetch the output file (True) or the input file (False), by default False.
+    key_path : str, optional
+        The key path for the output file, required if `output` is True.
+    print_result : bool
+        Whether to print the result of the fetch operation, by default True.
+    """
+    fetch_proteomics_file(
+        job_id=args.job_id,
+        output=args.output,
+        key_path=args.key_path,
         print_result=True,
     )
 
@@ -76,3 +99,16 @@ def add_proteomics_subparser(subparsers) -> None:
               "annotation file contains multiple experiments")
     )
     upload_parser.set_defaults(func=upload_proteomics_cli)
+
+
+    fetch_parser = proteomics_subparser.add_parser("fetch", help="Fetch a proteomics file")
+    fetch_parser.add_argument(
+        "job_id", help="ID of the job to fetch the proteomics file from"
+    )
+    fetch_parser.add_argument(
+        "--output", action="store_true", help="Fetch the output file instead of the input file"
+    )
+    fetch_parser.add_argument(
+        "--key_path", help="Key path for the output file, required if --output is used"
+    )
+    fetch_parser.set_defaults(func=fetch_proteomics_cli)
