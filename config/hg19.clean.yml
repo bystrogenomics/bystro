@@ -147,18 +147,6 @@ tracks:
         - rfamAcc
         - tRnaName
         - ensemblID
-      join:
-        features:
-          - alleleID
-          - phenotypeList
-          - clinicalSignificance
-          - type
-          - origin
-          - numberSubmitters
-          - reviewStatus
-          - chromStart
-          - chromEnd
-        track: clinvar
       local_files:
         - hg19.kgXref.chr1.gz
         - hg19.kgXref.chr2.gz

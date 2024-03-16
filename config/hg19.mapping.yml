@@ -369,56 +369,6 @@ mappings:
         name:
           type: keyword
           normalizer: uppercase_normalizer
-        clinvar:
-          properties:
-            alleleID:
-              type: integer
-            phenotypeList:
-              type: text
-              analyzer: autocomplete_english_split
-              search_analyzer: search_english_description_synonyms
-              fields:
-                exact:
-                  type: keyword
-                  normalizer: lowercase_normalizer
-            clinicalSignificance:
-              type: text
-              analyzer: autocomplete_english_split
-              search_analyzer: search_english_split
-              fields:
-                exact:
-                  type: keyword
-                  normalizer: lowercase_normalizer
-            type:
-              type: text
-              analyzer: autocomplete_english
-              search_analyzer: search_english_class
-              fields:
-                exact:
-                  type: keyword
-                  normalizer: lowercase_normalizer
-            origin:
-              type: text
-              analyzer: autocomplete_english_split
-              search_analyzer: search_english_split
-              fields:
-                exact:
-                  type: keyword
-                  normalizer: lowercase_normalizer
-            numberSubmitters:
-              type: short
-            reviewStatus:
-              type: text
-              analyzer: autocomplete_english_split
-              search_analyzer: search_english_split
-              fields:
-                exact:
-                  type: keyword
-                  normalizer: lowercase_normalizer
-            chromStart:
-              type: integer
-            chromEnd:
-              type: integer
     nearest:
       properties:
         refSeq:
