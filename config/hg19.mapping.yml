@@ -258,7 +258,7 @@ mappings:
           type: keyword
           normalizer: lowercase_normalizer
     discordant:
-      type: byte
+      type: boolean
     heterozygotes:
       type: keyword
     heterozygosity:
