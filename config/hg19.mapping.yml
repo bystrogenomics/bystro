@@ -242,13 +242,25 @@ index_settings:
           - amino_synonym_filter
 mappings:
   properties:
+    id:
+      type: keyword
+      normalizer: lowercase_normalizer
     chrom:
       type: keyword
       normalizer: lowercase_normalizer
     pos:
       type: integer
-    trTv:
-      type: byte
+    vcfPos:
+      type: integer
+    ref:
+      type: keyword
+      normalizer: uppercase_normalizer
+    inputRef:
+      type: keyword
+      normalizer: uppercase_normalizer
+    alt:
+      type: keyword
+      normalizer: uppercase_normalizer
     type:
       type: text
       analyzer: autocomplete_english
@@ -257,8 +269,10 @@ mappings:
         exact:
           type: keyword
           normalizer: lowercase_normalizer
-    discordant:
+    trTv:
       type: byte
+    discordant:
+      type: boolean
     heterozygotes:
       type: keyword
     heterozygosity:
@@ -277,11 +291,6 @@ mappings:
       type: integer
     sampleMaf:
       type: half_float
-    alt:
-      type: text
-    ref:
-      type: keyword
-      normalizer: uppercase_normalizer
     refSeq:
       properties:
         siteType:
