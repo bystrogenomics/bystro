@@ -148,8 +148,10 @@ class POEGMM(BaseSGDModel):
             lr=training_options["learning_rate"],
             momentum=training_options["momentum"],
         )
+        print(L[:5,:5])
 
         weight = torch.tensor(0.5)
+        Lt = torch.tensor(L.T)
 
         for i in trange(
             training_options["n_iterations"], disable=not progress_bar
@@ -173,7 +175,9 @@ class POEGMM(BaseSGDModel):
             l2 = torch.logsumexp(LL, axis=0)
             loss_recon = torch.mean(-1 * l2)
 
-            loss_reg = loss_fn(beta_, torch.zeros_like(beta_))
+            beta_trans = torch.matmul(beta_,Lt)
+
+            loss_reg = loss_fn(beta_trans, torch.zeros_like(beta_))
 
             loss = loss_recon + self.mu * loss_reg
 
