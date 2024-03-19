@@ -35,7 +35,7 @@ index_settings:
         catenate_words: true
         catenate_numbers: true
         catenate_all: true
-        preserve_original: false
+        preserve_original: true
         generate_word_parts: false
         stem_english_possessive: true
         generate_number_parts: false
@@ -46,7 +46,7 @@ index_settings:
         catenate_words: true
         catenate_numbers: true
         catenate_all: true
-        preserve_original: false
+        preserve_original: true
         generate_word_parts: true
         stem_english_possessive: true
         generate_number_parts: false
@@ -203,6 +203,14 @@ index_settings:
           - english_stemmer
           - description_synonyms
           - disease_synonyms
+      search_english_simple:
+        type: custom
+        tokenizer: whitespace
+        filter:
+          - lowercase
+          - asciifolding
+          - catenate_filter_split
+          - english_stemmer
       search_english_class:
         type: custom
         tokenizer: standard
@@ -448,7 +456,7 @@ mappings:
         CLNSIG:
           type: text
           analyzer: autocomplete_english_split_clinsig
-          search_analyzer: search_english_split
+          search_analyzer: search_english_simple
           fields:
             exact:
               type: keyword
@@ -456,7 +464,7 @@ mappings:
         CLNSIGCONF:
           type: text
           analyzer: autocomplete_english_split
-          search_analyzer: search_english_split
+          search_analyzer: search_english_simple
           fields:
             exact:
               type: keyword
@@ -464,7 +472,7 @@ mappings:
         CLNREVSTAT:
           type: text
           analyzer: autocomplete_english_split
-          search_analyzer: search_english_description_synonyms
+          search_analyzer: search_english_simple
           fields:
             exact:
               type: keyword
@@ -472,7 +480,7 @@ mappings:
         CLNDN:
           type: text
           analyzer: autocomplete_english_split
-          search_analyzer: search_english_description_synonyms
+          search_analyzer: search_english_simple
           fields:
             exact:
               type: keyword
@@ -480,6 +488,7 @@ mappings:
         CLNDNINCL:
           type: text
           analyzer: search_english_split
+          search_analyzer: search_english_simple
           fields:
             exact:
               type: keyword
