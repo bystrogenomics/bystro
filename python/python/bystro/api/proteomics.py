@@ -186,4 +186,3 @@ def upload_proteomics_dataset(
         print("\nProteomics submission completed successfully without annotation linkage.\n")
     
     return proteomics_response_data
-
