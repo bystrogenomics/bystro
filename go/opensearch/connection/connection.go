@@ -30,7 +30,6 @@ type OpensearchConnectionConfig struct {
 		Nodes          []OpensearchNode `yaml:"nodes"`
 	} `yaml:"connection"`
 	Auth struct {
-		Dummy    bool   `yaml:"dummy"`
 		Username string `yaml:"username"`
 		Password string `yaml:"password"`
 	}
@@ -108,6 +107,8 @@ func CreateIndex(opensearchConnectionConfigPath string, opensearchIndexConfigPat
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
 		Addresses:     createAddresses(osearchConnConfig),
+		Username:      osearchConnConfig.Auth.Username,
+		Password:      osearchConnConfig.Auth.Password,
 		MaxRetries:    5,
 		RetryOnStatus: []int{502, 503, 504},
 	}

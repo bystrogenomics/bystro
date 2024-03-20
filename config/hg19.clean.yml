@@ -1,10 +1,34 @@
 ---
 assembly: hg19
 build_author: alexkotlar
-build_date: 2023-11-08T00:03:00
+build_date: 2024-03-07T13:01:00
 chromosomes:
   - chr1
-database_dir: "~"
+  - chr2
+  - chr3
+  - chr4
+  - chr5
+  - chr6
+  - chr7
+  - chr8
+  - chr9
+  - chr10
+  - chr11
+  - chr12
+  - chr13
+  - chr14
+  - chr15
+  - chr16
+  - chr17
+  - chr18
+  - chr19
+  - chr20
+  - chr21
+  - chr22
+  - chrM
+  - chrX
+  - chrY
+database_dir: /mnt/annotator/hg19_v8
 fileProcessors:
   snp:
     args: --emptyField NA --minGq .95
@@ -12,9 +36,9 @@ fileProcessors:
   vcf:
     args: --emptyField NA --sample %sampleList% --keepPos --keepId --dosageOutput %dosageMatrixOutPath%
     program: bystro-vcf
-files_dir: "~"
+files_dir: /mnt/files1/bystro_annotator/raw_files/hg19
 statistics:
-  dbSNPnameField: dbSNP.name
+  dbSNPnameField: dbSNP.id
   exonicAlleleFunctionField: refSeq.exonicAlleleFunction
   outputExtensions:
     json: .statistics.json
@@ -23,14 +47,22 @@ statistics:
   programPath: bystro-stats
   refTrackField: ref
   siteTypeField: refSeq.siteType
-temp_dir: "~"
+temp_dir: /mnt/annotator/tmp
 tracks:
   outputOrder:
     - ref
-    - clinvar2
+    - refSeq
+    - nearest.refSeq
+    - nearestTss.refSeq
+    - clinvarVcf
+    - gnomad.exomes
+    - gnomad.genomes
+    - dbSNP
+    - cadd
+    - caddIndel
   tracks:
     - build_author: alexkotlar
-      build_date: 2023-11-05T22:11:00
+      build_date: 2024-03-07T13:01:00
       local_files:
         - chr1.fa.gz
         - chr2.fa.gz
@@ -88,10 +120,310 @@ tracks:
               - chrM.fa.gz
               - chrX.fa.gz
               - chrY.fa.gz
+          completed: 2023-11-09T20:16:00
           name: fetch
-      version: 32
+      version: 35
     - build_author: alexkotlar
-      build_date: 2023-11-08T00:03:00
+      build_date: 2024-03-07T13:01:00
+      build_field_transformations:
+        description: split [;]
+        ensemblID: split [;]
+        kgID: split [;]
+        mRNA: split [;]
+        protAcc: split [;]
+        rfamAcc: split [;]
+        spDisplayID: split [;]
+        spID: split [;]
+        tRnaName: split [;]
+      features:
+        - name
+        - name2
+        - description
+        - kgID
+        - mRNA
+        - spID
+        - spDisplayID
+        - protAcc
+        - rfamAcc
+        - tRnaName
+        - ensemblID
+      local_files:
+        - hg19.kgXref.chr1.gz
+        - hg19.kgXref.chr2.gz
+        - hg19.kgXref.chr3.gz
+        - hg19.kgXref.chr4.gz
+        - hg19.kgXref.chr5.gz
+        - hg19.kgXref.chr6.gz
+        - hg19.kgXref.chr7.gz
+        - hg19.kgXref.chr8.gz
+        - hg19.kgXref.chr9.gz
+        - hg19.kgXref.chr10.gz
+        - hg19.kgXref.chr11.gz
+        - hg19.kgXref.chr12.gz
+        - hg19.kgXref.chr13.gz
+        - hg19.kgXref.chr14.gz
+        - hg19.kgXref.chr15.gz
+        - hg19.kgXref.chr16.gz
+        - hg19.kgXref.chr17.gz
+        - hg19.kgXref.chr18.gz
+        - hg19.kgXref.chr19.gz
+        - hg19.kgXref.chr20.gz
+        - hg19.kgXref.chr21.gz
+        - hg19.kgXref.chr22.gz
+        - hg19.kgXref.chrM.gz
+        - hg19.kgXref.chrX.gz
+        - hg19.kgXref.chrY.gz
+      name: refSeq
+      type: gene
+      utils:
+        - args:
+            connection:
+              database: hg19
+            sql:
+              SELECT r.*, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.kgID, '')) SEPARATOR
+              ';') FROM kgXref x WHERE x.refseq=r.name) AS kgID, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.description,
+              '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS description,
+              (SELECT GROUP_CONCAT(DISTINCT(NULLIF(e.value, '')) SEPARATOR ';') FROM knownToEnsembl
+              e JOIN kgXref x ON x.kgID = e.name WHERE x.refseq = r.name) AS ensemblID,
+              (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.tRnaName, '')) SEPARATOR ';') FROM
+              kgXref x WHERE x.refseq=r.name) AS tRnaName, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.spID,
+              '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS spID, (SELECT
+              GROUP_CONCAT(DISTINCT(NULLIF(x.spDisplayID, '')) SEPARATOR ';') FROM kgXref
+              x WHERE x.refseq=r.name) AS spDisplayID, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.protAcc,
+              '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS protAcc, (SELECT
+              GROUP_CONCAT(DISTINCT(NULLIF(x.mRNA, '')) SEPARATOR ';') FROM kgXref x WHERE
+              x.refseq=r.name) AS mRNA, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.rfamAcc,
+              '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS rfamAcc FROM
+              refGene r WHERE chrom=%chromosomes%;
+          completed: 2023-11-09T20:18:00
+          name: fetch
+      version: 4
+    - build_author: alexkotlar
+      build_date: 2024-03-07T13:01:00
+      build_row_filters:
+        AS_FilterStatus: == PASS
+      features:
+        - alt
+        - id
+        - AN: number
+        - AF: number
+        - AN_female: number
+        - AF_female: number
+        - non_cancer_AN: number
+        - non_cancer_AF: number
+        - non_neuro_AN: number
+        - non_neuro_AF: number
+        - non_topmed_AN: number
+        - non_topmed_AF: number
+        - controls_AN: number
+        - controls_AF: number
+        - AN_nfe_seu: number
+        - AF_nfe_seu: number
+        - AN_nfe_bgr: number
+        - AF_nfe_bgr: number
+        - AN_afr: number
+        - AF_afr: number
+        - AN_sas: number
+        - AF_sas: number
+        - AN_nfe_onf: number
+        - AF_nfe_onf: number
+        - AN_amr: number
+        - AF_amr: number
+        - AN_eas: number
+        - AF_eas: number
+        - AN_nfe_swe: number
+        - AF_nfe_swe: number
+        - AN_nfe_nwe: number
+        - AF_nfe_nwe: number
+        - AN_eas_jpn: number
+        - AF_eas_jpn: number
+        - AN_eas_kor: number
+        - AF_eas_kor: number
+      local_files:
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.1.vcf.bgz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.2.vcf.bgz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.3.vcf.bgz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.4.vcf.bgz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.5.vcf.bgz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.6.vcf.bgz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.7.vcf.bgz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.8.vcf.bgz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.9.vcf.bgz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.10.vcf.bgz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.11.vcf.bgz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.12.vcf.bgz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.13.vcf.bgz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.14.vcf.bgz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.15.vcf.bgz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.16.vcf.bgz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.17.vcf.bgz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.18.vcf.bgz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.19.vcf.bgz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.20.vcf.bgz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.21.vcf.bgz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.22.vcf.bgz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.X.vcf.bgz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/exomes/gnomad.exomes.r2.1.1.sites.Y.vcf.bgz
+      name: gnomad.exomes
+      type: vcf
+      version: 4
+    - build_author: alexkotlar
+      build_date: 2024-03-07T13:01:00
+      local_files:
+        - whole_genome_SNVs.tsv.chr1.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr10.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr11.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr12.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr13.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr14.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr15.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr16.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr17.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr18.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr19.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr2.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr20.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr21.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr22.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr3.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr4.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr5.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr6.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr7.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr8.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chr9.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chrX.organized-by-chr.txt.sorted.txt.gz
+        - whole_genome_SNVs.tsv.chrY.organized-by-chr.txt.sorted.txt.gz
+      name: cadd
+      sorted: 1
+      type: cadd
+      version: 6
+    - build_author: alexkotlar
+      build_date: 2024-03-07T13:01:00
+      dist: true
+      features:
+        - name2
+        - name
+      from: txStart
+      name: nearest.refSeq
+      ref: refSeq
+      to: txEnd
+      type: nearest
+      version: 4
+    - build_author: alexkotlar
+      build_date: 2024-03-07T13:01:00
+      dist: true
+      features:
+        - name2
+        - name
+      from: txStart
+      name: nearestTss.refSeq
+      ref: refSeq
+      type: nearest
+      version: 4
+    - build_author: alexkotlar
+      build_date: 2024-03-07T13:01:00
+      features:
+        - alt
+        - id
+        - AN: number
+        - AF: number
+        - AN_female: number
+        - AF_female: number
+        - non_neuro_AN: number
+        - non_neuro_AF: number
+        - non_topmed_AN: number
+        - non_topmed_AF: number
+        - controls_AN: number
+        - controls_AF: number
+        - AN_nfe_seu: number
+        - AF_nfe_seu: number
+        - AN_afr: number
+        - AF_afr: number
+        - AN_nfe_onf: number
+        - AF_nfe_onf: number
+        - AN_amr: number
+        - AF_amr: number
+        - AN_eas: number
+        - AF_eas: number
+        - AN_nfe_nwe: number
+        - AF_nfe_nwe: number
+        - AN_nfe_est: number
+        - AF_nfe_est: number
+        - AN_nfe: number
+        - AF_nfe: number
+        - AN_fin: number
+        - AF_fin: number
+        - AN_asj: number
+        - AF_asj: number
+        - AN_oth: number
+        - AF_oth: number
+      local_files:
+        - /mnt/files1/bystro_annotator/raw_files/hg19/gnomad2/vcf/genomes/gnomad.genomes.r2.1.1.sites.*.vcf.bgz
+      name: gnomad.genomes
+      type: vcf
+      version: 4
+    - build_author: alexkotlar
+      build_date: 2024-03-07T13:01:00
+      features:
+        - id
+        - alt
+        - TOMMO: number
+        - ExAC: number
+        - GnomAD: number
+        - Korea1K: number
+        - GoNL: number
+        - KOREAN: number
+        - TWINSUK: number
+        - Vietnamese: number
+        - GENOME_DK: number
+        - GoESP: number
+        - GnomAD_exomes: number
+        - Siberian: number
+        - PRJEB37584: number
+        - SGDP_PRJ: number
+        - 1000Genomes: number
+        - dbGaP_PopFreq: number
+        - NorthernSweden: number
+        - HapMap: number
+        - TOPMED: number
+        - ALSPAC: number
+        - Qatari: number
+        - MGP: number
+      local_files:
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.1.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.2.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.3.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.4.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.5.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.6.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.7.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.8.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.9.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.10.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.11.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.12.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.13.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.14.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.15.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.16.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.17.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.18.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.19.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.20.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.21.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.22.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.X.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.Y.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.MT.vcf.gz
+      name: dbSNP
+      type: vcf
+      utils:
+        - completed: 2023-11-09T20:19:00
+          name: DbSnp2FormatInfo
+      version: 4
+    - build_author: alexkotlar
+      build_date: 2024-03-07T13:01:00
       build_field_transformations:
         CLNDISDB: split [|]
         CLNDN: split [|]
@@ -116,8 +448,69 @@ tracks:
         - SSR
         - RS
       local_files:
-        - /mnt/files1/bystro_annotator/raw_files/hg19/clinvar/clinvar_20221001.vcf.gz
-      name: clinvar2
+        - clinvar.vcf.gz
+      name: clinvarVcf
       type: vcf
-      version: 5
-version: 16
+      utils:
+        - args:
+            remoteFiles:
+              - https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh37/clinvar.vcf.gz
+          completed: 2024-03-07T12:50:00
+          name: fetch
+      version: 4
+    - build_author: alexkotlar
+      build_date: 2024-03-07T13:01:00
+      features:
+        - alt
+        - PHRED: number
+      local_files:
+        - /mnt/files1/bystro_annotator/raw_files/hg19/caddIndel/Indels.vcf.gz
+      name: caddIndel
+      type: vcf
+      version: 4
+    - based: 1
+      build_field_transformations:
+        chrom: chr .
+        clinicalSignificance: split [;]
+        origin: split [;]
+        phenotypeList: split [;]
+        reviewStatus: split [;]
+        type: split [;]
+      build_row_filters:
+        Assembly: == GRCh37
+      features:
+        - alleleID: number
+        - phenotypeList
+        - clinicalSignificance
+        - type
+        - origin
+        - numberSubmitters: number
+        - reviewStatus
+        - referenceAllele
+        - alternateAllele
+      fieldMap:
+        "#AlleleID": alleleID
+        AlternateAllele: alternateAllele
+        Chromosome: chrom
+        ClinicalSignificance: clinicalSignificance
+        NumberSubmitters: numberSubmitters
+        Origin: origin
+        PhenotypeIDS: phenotypeIDs
+        PhenotypeList: phenotypeList
+        ReferenceAllele: referenceAllele
+        ReviewStatus: reviewStatus
+        Start: chromStart
+        Stop: chromEnd
+        Type: type
+      local_files:
+        - variant_summary.txt.gz
+      name: clinvar
+      no_build: true
+      type: sparse
+      utils:
+        - args:
+            remoteFiles:
+              - ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz
+          completed: 2024-03-07T12:51:00
+          name: fetch
+version: 4

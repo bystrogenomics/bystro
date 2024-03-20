@@ -26,77 +26,77 @@ line-length = 105
 # aspirationally left in so that we can gradually enforce them as well.
 
 select = [
-"A",  # flake8-builtins
-# "B",  # bugbear
-# "C",  # complexity
-# "D",  # pydocstyle
-"E",  # pyflakes errors
-"F",  # pyflakes
-"G",  # logging format
-# "I",  # imports, fixable
-"N",  # variable names
-"Q",  # flake quotes
-# "S",  # security
-# "T",  # print statements
-#"W",  # warnings, fixable
-# "ANN",  # annotations
-"ARG",  # unused arguments
-# "BLE",  # blind exceptions
-"DTZ",  # datetimes
-# "EM", # string formatting in execptions, fixable
-"ERA",  # commented code
-"EXE",  # flake8 executables
-# "FBT",  # boolean traps
-"ICN",  # import conventions
-"ISC",  # implicit string concatenation
-"NPY",  # numpy specific rules
-"PD",  # pandas rules
-# "PGH", # blanket type ignores
-"PIE",  # misc linting
-#"PL",  # refactoring
-# "PT",  # unittest-style asserts
-# "PTH",  # pathlib
-"RET",  # return statements
-"RSE",  # raise statements
-# "RUF",  # ruff-specific rules
-"SIM",  # simplifications
-"SLF",  # check for access of private class attributes
-#"TCH",  # type-checking
-#"TRY",  # try-statement linting
-#"UP",  # pyupgrade
-"YTT",  # sys.version lints
+    "A", # flake8-builtins
+    # "B",  # bugbear
+    # "C",  # complexity
+    # "D",  # pydocstyle
+    "E", # pyflakes errors
+    "F", # pyflakes
+    "G", # logging format
+    # "I",  # imports, fixable
+    "N", # variable names
+    "Q", # flake quotes
+    # "S",  # security
+    # "T",  # print statements
+    #"W",  # warnings, fixable
+    # "ANN",  # annotations
+    "ARG", # unused arguments
+    # "BLE",  # blind exceptions
+    "DTZ", # datetimes
+    # "EM", # string formatting in execptions, fixable
+    "ERA", # commented code
+    "EXE", # flake8 executables
+    # "FBT",  # boolean traps
+    "ICN", # import conventions
+    "ISC", # implicit string concatenation
+    "NPY", # numpy specific rules
+    "PD",  # pandas rules
+    # "PGH", # blanket type ignores
+    "PIE", # misc linting
+    #"PL",  # refactoring
+    # "PT",  # unittest-style asserts
+    # "PTH",  # pathlib
+    "RET", # return statements
+    "RSE", # raise statements
+    # "RUF",  # ruff-specific rules
+    "SIM", # simplifications
+    "SLF", # check for access of private class attributes
+    #"TCH",  # type-checking
+    #"TRY",  # try-statement linting
+    #"UP",  # pyupgrade
+    "YTT", # sys.version lints
 ]
 
 ignore = [
-"ANN101",  # don't require to annotate self, especially because ruff is sometimes confused about ANN101 vs ANN102
-"ANN102",  # don't require to annotate cls
-"D203", # one-blank-line-before class: conflicts with D211
-"D213",  # multiline-summary-second-string: conflicts with D212
-"N803",  # upercase variable names are often ok in scientific programming 
-"N806",  # upercase function names are often ok in scientific programming(ditto)
-"N815",  # ignore camelCase for now (remove this eventually)
-"RET504",  # allow variable assignments before return values
-"S311", # it's fine to use standard pseudo-random generators
-"SIM300",  # ignore yoda conditions, too many false positives
+    "ANN101", # don't require to annotate self, especially because ruff is sometimes confused about ANN101 vs ANN102
+    "ANN102", # don't require to annotate cls
+    "D203",   # one-blank-line-before class: conflicts with D211
+    "D213",   # multiline-summary-second-string: conflicts with D212
+    "N803",   # upercase variable names are often ok in scientific programming 
+    "N806",   # upercase function names are often ok in scientific programming(ditto)
+    "N815",   # ignore camelCase for now (remove this eventually)
+    "RET504", # allow variable assignments before return values
+    "S311",   # it's fine to use standard pseudo-random generators
+    "SIM300", # ignore yoda conditions, too many false positives
 ]
 unfixable = [
-"F841",  # don't let ruff remove unused variables by default-- results are often very confusing.
+    "F841", # don't let ruff remove unused variables by default-- results are often very confusing.
 ]
 
 # linting in test directories should be a little more relaxed
 [tool.ruff.per-file-ignores]
 "test*.py" = [
-'S101',  # bare asserts actually required for pytest
-'N802',  # snake-case violations are fine for test methods
-'PLR2004',  # magic constants are fine
-'D103',  # don't require docstrings in tests: method names should suffice
-'ANN201' # don't worry about return types in tests
+    'S101',    # bare asserts actually required for pytest
+    'N802',    # snake-case violations are fine for test methods
+    'PLR2004', # magic constants are fine
+    'D103',    # don't require docstrings in tests: method names should suffice
+    'ANN201',  # don't worry about return types in tests
 ]
 
 [project.scripts]
 bystro-save-worker = "bystro.search.save.listener:main"
 bystro-index-worker = "bystro.search.index.listener:main"
-bystro-api = "bystro.api.cli:main"
+bystro-api = "bystro.cli.cli:main"
 
 [tool.pytest.ini_options]
-addopts = "--cov --cov-report term-missing"  # add detailed coverage report by default
+addopts = "--cov --cov-report term-missing" # add detailed coverage report by default

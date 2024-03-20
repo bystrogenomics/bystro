@@ -1,7 +1,5 @@
 sort:
   cadd: avg
-  dbSNP.alleleNs: avg
-  dbSNP.alleleFreqs: min
   refSeq.codonNumber: avg
   refSeq.codonPosition: avg
 post_index_settings:
@@ -29,6 +27,31 @@ index_settings:
           - uppercase
           - asciifolding
     filter:
+      exclude_pathogenic:
+        type: pattern_capture
+        patterns: ["conflicting_interpretations_of_pathogenicity"]
+      catenate_filter:
+        type: word_delimiter
+        catenate_words: true
+        catenate_numbers: true
+        catenate_all: true
+        preserve_original: true
+        generate_word_parts: false
+        stem_english_possessive: true
+        generate_number_parts: false
+        split_on_numerics: false
+        split_on_case_change: false
+      catenate_filter_split:
+        type: word_delimiter
+        catenate_words: true
+        catenate_numbers: true
+        catenate_all: true
+        preserve_original: true
+        generate_word_parts: true
+        stem_english_possessive: true
+        generate_number_parts: false
+        split_on_numerics: false
+        split_on_case_change: true
       english_stemmer:
         type: stemmer
         language: light_english
@@ -71,6 +94,8 @@ index_settings:
           - digit
           - punctuation
     tokenizer:
+      hgvs_tokenizer:
+        type: pattern
       edge_ngram_tokenizer:
         type: edge_ngram
         min_gram: 1
@@ -80,14 +105,37 @@ index_settings:
           - digit
           - punctuation
     analyzer:
+      hgvs_analyzer:
+        type: custom
+        tokenizer: hgvs_tokenizer
+        filter:
+          - lowercase
       autocomplete_english:
         type: custom
-        tokenizer: classic
+        tokenizer: whitespace
         filter:
           - lowercase
           - asciifolding
+          - catenate_filter
           - english_stemmer
           - autocomplete_filter
+      autocomplete_english_split:
+        type: custom
+        tokenizer: whitespace
+        filter:
+          - lowercase
+          - asciifolding
+          - catenate_filter_split
+          - english_stemmer
+          - autocomplete_filter
+      autocomplete_english_split_clinsig:
+        type: custom
+        tokenizer: whitespace
+        filter:
+          - lowercase
+          - exclude_pathogenic
+          - asciifolding
+          - catenate_filter_split
       autocomplete_english_graph:
         type: custom
         tokenizer: keyword
@@ -105,14 +153,6 @@ index_settings:
           - lowercase
           - asciifolding
           - english_stemmer
-      autocomplete_english_split:
-        type: custom
-        tokenizer: standard
-        filter:
-          - lowercase
-          - asciifolding
-          - english_stemmer
-          - autocomplete_filter
       autocomplete_english_letter:
         type: custom
         tokenizer: letter
@@ -163,6 +203,14 @@ index_settings:
           - english_stemmer
           - description_synonyms
           - disease_synonyms
+      search_english_simple:
+        type: custom
+        tokenizer: whitespace
+        filter:
+          - lowercase
+          - asciifolding
+          - catenate_filter_split
+          - english_stemmer
       search_english_class:
         type: custom
         tokenizer: standard
@@ -202,13 +250,25 @@ index_settings:
           - amino_synonym_filter
 mappings:
   properties:
+    id:
+      type: keyword
+      normalizer: lowercase_normalizer
     chrom:
       type: keyword
       normalizer: lowercase_normalizer
     pos:
       type: integer
-    trTv:
-      type: byte
+    vcfPos:
+      type: integer
+    ref:
+      type: keyword
+      normalizer: uppercase_normalizer
+    inputRef:
+      type: keyword
+      normalizer: uppercase_normalizer
+    alt:
+      type: keyword
+      normalizer: uppercase_normalizer
     type:
       type: text
       analyzer: autocomplete_english
@@ -217,8 +277,10 @@ mappings:
         exact:
           type: keyword
           normalizer: lowercase_normalizer
-    discordant:
+    trTv:
       type: byte
+    discordant:
+      type: boolean
     heterozygotes:
       type: keyword
     heterozygosity:
@@ -237,11 +299,6 @@ mappings:
       type: integer
     sampleMaf:
       type: half_float
-    alt:
-      type: text
-    ref:
-      type: keyword
-      normalizer: uppercase_normalizer
     refSeq:
       properties:
         siteType:
@@ -319,46 +376,16 @@ mappings:
           type: text
           analyzer: autocomplete_english_split
           search_analyzer: search_english_description_synonyms
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
         rfamAcc:
           type: keyword
           normalizer: uppercase_normalizer
         name:
           type: keyword
           normalizer: uppercase_normalizer
-        clinvar:
-          properties:
-            alleleID:
-              type: integer
-            phenotypeList:
-              type: text
-              analyzer: autocomplete_english_split
-              search_analyzer: search_english_description_synonyms
-            clinicalSignificance:
-              type: text
-              analyzer: autocomplete_english_split
-              search_analyzer: search_english_split
-            type:
-              type: text
-              analyzer: autocomplete_english
-              search_analyzer: search_english_class
-              fields:
-                exact:
-                  type: keyword
-                  normalizer: lowercase_normalizer
-            origin:
-              type: text
-              analyzer: autocomplete_english_split
-              search_analyzer: search_english_split
-            numberSubmitters:
-              type: short
-            reviewStatus:
-              type: text
-              analyzer: autocomplete_english_split
-              search_analyzer: search_english_split
-            chromStart:
-              type: integer
-            chromEnd:
-              type: integer
     nearest:
       properties:
         refSeq:
@@ -428,22 +455,50 @@ mappings:
           normalizer: lowercase_normalizer
         CLNSIG:
           type: text
-          analyzer: autocomplete_english_graph
+          analyzer: autocomplete_english_split_clinsig
+          search_analyzer: search_english_simple
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
         CLNSIGCONF:
           type: text
-          analyzer: autocomplete_english_graph
+          analyzer: autocomplete_english_split
+          search_analyzer: search_english_simple
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
         CLNREVSTAT:
           type: text
-          analyzer: english_graph
+          analyzer: autocomplete_english_split
+          search_analyzer: search_english_simple
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
         CLNDN:
           type: text
-          analyzer: autocomplete_english_graph
+          analyzer: autocomplete_english_split
+          search_analyzer: search_english_simple
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
         CLNDNINCL:
           type: text
-          analyzer: autocomplete_english_graph
+          analyzer: search_english_split
+          search_analyzer: search_english_simple
+          fields:
+            exact:
+              type: keyword
+              normalizer: lowercase_normalizer
         CLNHGVS:
           type: text
           analyzer: english_graph
+          fields:
+            exact:
+              type: keyword
         DBVARID:
           type: keyword
           normalizer: lowercase_normalizer
@@ -505,8 +560,6 @@ mappings:
           type: half_float
         MGP:
           type: half_float
-        alleleFreqs:
-          type: half_float
     gnomad:
       properties:
         genomes:
@@ -521,599 +574,65 @@ mappings:
               type: integer
             AF:
               type: half_float
+            AN_female:
+              type: integer
+            AF_female:
+              type: half_float
+            non_neuro_AN:
+              type: integer
+            non_neuro_AF:
+              type: half_float
+            non_topmed_AN:
+              type: integer
+            non_topmed_AF:
+              type: half_float
+            controls_AN:
+              type: integer
+            controls_AF:
+              type: half_float
             AN_nfe_seu:
               type: integer
             AF_nfe_seu:
-              type: half_float
-            nhomalt_nfe_seu:
-              type: integer
-            controls_AN_afr_male:
-              type: integer
-            controls_AF_afr_male:
-              type: half_float
-            controls_nhomalt_afr_male:
-              type: half_float
-            non_topmed_AN_amr:
-              type: integer
-            non_topmed_AF_amr:
-              type: half_float
-            non_topmed_nhomalt_amr:
-              type: integer
-            AN_raw:
-              type: integer
-            AF_raw:
-              type: half_float
-            nhomalt_raw:
-              type: integer
-            AN_fin_female:
-              type: integer
-            AF_fin_female:
-              type: half_float
-            nhomalt_fin_female:
-              type: integer
-            non_neuro_AN_asj_female:
-              type: integer
-            non_neuro_AF_asj_female:
-              type: half_float
-            non_neuro_nhomalt_asj_female:
-              type: integer
-            non_neuro_AN_afr_male:
-              type: integer
-            non_neuro_AF_afr_male:
-              type: half_float
-            non_neuro_nhomalt_afr_male:
-              type: half_float
-            AN_afr_male:
-              type: integer
-            AF_afr_male:
-              type: half_float
-            nhomalt_afr_male:
               type: half_float
             AN_afr:
               type: integer
             AF_afr:
               type: half_float
-            nhomalt_afr:
-              type: half_float
-            non_neuro_AN_afr_female:
-              type: integer
-            non_neuro_AF_afr_female:
-              type: half_float
-            non_neuro_nhomalt_afr_female:
-              type: half_float
-            non_topmed_AN_amr_female:
-              type: integer
-            non_topmed_AF_amr_female:
-              type: half_float
-            non_topmed_nhomalt_amr_female:
-              type: integer
-            non_topmed_AN_oth_female:
-              type: integer
-            non_topmed_AF_oth_female:
-              type: half_float
-            non_topmed_nhomalt_oth_female:
-              type: integer
-            AN_eas_female:
-              type: integer
-            AF_eas_female:
-              type: half_float
-            nhomalt_eas_female:
-              type: integer
-            AN_afr_female:
-              type: integer
-            AF_afr_female:
-              type: half_float
-            nhomalt_afr_female:
-              type: half_float
-            non_neuro_AN_female:
-              type: integer
-            non_neuro_AF_female:
-              type: half_float
-            non_neuro_nhomalt_female:
-              type: integer
-            controls_AN_afr:
-              type: integer
-            controls_AF_afr:
-              type: half_float
-            controls_nhomalt_afr:
-              type: half_float
             AN_nfe_onf:
               type: integer
             AF_nfe_onf:
               type: half_float
-            nhomalt_nfe_onf:
-              type: integer
-            controls_AN_fin_male:
-              type: integer
-            controls_AF_fin_male:
-              type: half_float
-            controls_nhomalt_fin_male:
-              type: integer
-            non_neuro_AN_nfe_nwe:
-              type: integer
-            non_neuro_AF_nfe_nwe:
-              type: half_float
-            non_neuro_nhomalt_nfe_nwe:
-              type: integer
-            AN_fin_male:
-              type: integer
-            AF_fin_male:
-              type: half_float
-            nhomalt_fin_male:
-              type: integer
-            AN_nfe_female:
-              type: integer
-            AF_nfe_female:
-              type: half_float
-            nhomalt_nfe_female:
-              type: integer
             AN_amr:
               type: integer
             AF_amr:
               type: half_float
-            nhomalt_amr:
-              type: integer
-            non_topmed_AN_nfe_male:
-              type: integer
-            non_topmed_AF_nfe_male:
-              type: half_float
-            non_topmed_nhomalt_nfe_male:
-              type: integer
             AN_eas:
               type: integer
             AF_eas:
               type: half_float
-            nhomalt_eas:
-              type: integer
-            nhomalt:
-              type: integer
-            non_neuro_AN_nfe_female:
-              type: integer
-            non_neuro_AF_nfe_female:
-              type: half_float
-            non_neuro_nhomalt_nfe_female:
-              type: integer
-            non_neuro_AN_afr:
-              type: integer
-            non_neuro_AF_afr:
-              type: half_float
-            non_neuro_nhomalt_afr:
-              type: half_float
-            controls_AN_raw:
-              type: integer
-            controls_AF_raw:
-              type: half_float
-            controls_nhomalt_raw:
-              type: integer
-            controls_AN_male:
-              type: integer
-            controls_AF_male:
-              type: half_float
-            controls_nhomalt_male:
-              type: integer
-            non_topmed_AN_male:
-              type: integer
-            non_topmed_AF_male:
-              type: half_float
-            non_topmed_nhomalt_male:
-              type: integer
-            controls_AN_nfe_female:
-              type: integer
-            controls_AF_nfe_female:
-              type: half_float
-            controls_nhomalt_nfe_female:
-              type: integer
-            non_neuro_AN_amr:
-              type: integer
-            non_neuro_AF_amr:
-              type: half_float
-            non_neuro_nhomalt_amr:
-              type: integer
-            non_neuro_AN_eas_female:
-              type: integer
-            non_neuro_AF_eas_female:
-              type: half_float
-            non_neuro_nhomalt_eas_female:
-              type: integer
-            AN_asj_male:
-              type: integer
-            AF_asj_male:
-              type: half_float
-            nhomalt_asj_male:
-              type: integer
-            controls_AN_nfe_male:
-              type: integer
-            controls_AF_nfe_male:
-              type: half_float
-            controls_nhomalt_nfe_male:
-              type: integer
-            non_neuro_AN_fin:
-              type: integer
-            non_neuro_AF_fin:
-              type: half_float
-            non_neuro_nhomalt_fin:
-              type: integer
-            AN_oth_female:
-              type: integer
-            AF_oth_female:
-              type: half_float
-            nhomalt_oth_female:
-              type: integer
-            controls_AN_nfe:
-              type: integer
-            controls_AF_nfe:
-              type: half_float
-            controls_nhomalt_nfe:
-              type: integer
-            controls_AN_oth_female:
-              type: integer
-            controls_AF_oth_female:
-              type: half_float
-            controls_nhomalt_oth_female:
-              type: integer
-            controls_AN_asj:
-              type: integer
-            controls_AF_asj:
-              type: half_float
-            controls_nhomalt_asj:
-              type: integer
-            non_neuro_AN_amr_male:
-              type: integer
-            non_neuro_AF_amr_male:
-              type: half_float
-            non_neuro_nhomalt_amr_male:
-              type: integer
-            controls_AN_nfe_nwe:
-              type: integer
-            controls_AF_nfe_nwe:
-              type: half_float
-            controls_nhomalt_nfe_nwe:
-              type: integer
             AN_nfe_nwe:
               type: integer
             AF_nfe_nwe:
               type: half_float
-            nhomalt_nfe_nwe:
-              type: integer
-            controls_AN_nfe_seu:
-              type: integer
-            controls_AF_nfe_seu:
-              type: half_float
-            controls_nhomalt_nfe_seu:
-              type: integer
-            non_neuro_AN_amr_female:
-              type: integer
-            non_neuro_AF_amr_female:
-              type: half_float
-            non_neuro_nhomalt_amr_female:
-              type: integer
-            non_neuro_AN_nfe_onf:
-              type: integer
-            non_neuro_AF_nfe_onf:
-              type: half_float
-            non_neuro_nhomalt_nfe_onf:
-              type: integer
-            non_topmed_AN_eas_male:
-              type: integer
-            non_topmed_AF_eas_male:
-              type: half_float
-            non_topmed_nhomalt_eas_male:
-              type: integer
-            controls_AN_amr_female:
-              type: integer
-            controls_AF_amr_female:
-              type: half_float
-            controls_nhomalt_amr_female:
-              type: integer
-            non_neuro_AN_fin_male:
-              type: integer
-            non_neuro_AF_fin_male:
-              type: half_float
-            non_neuro_nhomalt_fin_male:
-              type: integer
-            AN_female:
-              type: integer
-            AF_female:
-              type: half_float
-            nhomalt_female:
-              type: integer
-            non_neuro_AN_oth_male:
-              type: integer
-            non_neuro_AF_oth_male:
-              type: half_float
-            non_neuro_nhomalt_oth_male:
-              type: integer
-            non_topmed_AN_nfe_est:
-              type: integer
-            non_topmed_AF_nfe_est:
-              type: half_float
-            non_topmed_nhomalt_nfe_est:
-              type: integer
-            non_topmed_AN_nfe_nwe:
-              type: integer
-            non_topmed_AF_nfe_nwe:
-              type: half_float
-            non_topmed_nhomalt_nfe_nwe:
-              type: integer
-            non_topmed_AN_amr_male:
-              type: integer
-            non_topmed_AF_amr_male:
-              type: half_float
-            non_topmed_nhomalt_amr_male:
-              type: integer
-            non_topmed_AN_nfe_onf:
-              type: integer
-            non_topmed_AF_nfe_onf:
-              type: half_float
-            non_topmed_nhomalt_nfe_onf:
-              type: integer
-            controls_AN_eas_male:
-              type: integer
-            controls_AF_eas_male:
-              type: half_float
-            controls_nhomalt_eas_male:
-              type: integer
-            controls_AN_oth_male:
-              type: integer
-            controls_AF_oth_male:
-              type: half_float
-            controls_nhomalt_oth_male:
-              type: integer
-            non_topmed_AN:
-              type: integer
-            non_topmed_AF:
-              type: half_float
-            non_topmed_nhomalt:
-              type: integer
-            controls_AN_fin:
-              type: integer
-            controls_AF_fin:
-              type: half_float
-            controls_nhomalt_fin:
-              type: integer
-            non_neuro_AN_nfe:
-              type: integer
-            non_neuro_AF_nfe:
-              type: half_float
-            non_neuro_nhomalt_nfe:
-              type: integer
-            non_neuro_AN_fin_female:
-              type: integer
-            non_neuro_AF_fin_female:
-              type: half_float
-            non_neuro_nhomalt_fin_female:
-              type: integer
-            non_topmed_AN_nfe_seu:
-              type: integer
-            non_topmed_AF_nfe_seu:
-              type: half_float
-            non_topmed_nhomalt_nfe_seu:
-              type: integer
-            controls_AN_eas_female:
-              type: integer
-            controls_AF_eas_female:
-              type: half_float
-            controls_nhomalt_eas_female:
-              type: integer
-            non_topmed_AN_asj:
-              type: integer
-            non_topmed_AF_asj:
-              type: half_float
-            non_topmed_nhomalt_asj:
-              type: integer
-            controls_AN_nfe_onf:
-              type: integer
-            controls_AF_nfe_onf:
-              type: half_float
-            controls_nhomalt_nfe_onf:
-              type: integer
-            non_neuro_AN:
-              type: integer
-            non_neuro_AF:
-              type: half_float
-            non_neuro_nhomalt:
-              type: integer
-            non_topmed_AN_nfe:
-              type: integer
-            non_topmed_AF_nfe:
-              type: half_float
-            non_topmed_nhomalt_nfe:
-              type: integer
-            non_topmed_AN_raw:
-              type: integer
-            non_topmed_AF_raw:
-              type: half_float
-            non_topmed_nhomalt_raw:
-              type: integer
-            non_neuro_AN_nfe_est:
-              type: integer
-            non_neuro_AF_nfe_est:
-              type: half_float
-            non_neuro_nhomalt_nfe_est:
-              type: integer
-            non_topmed_AN_oth_male:
-              type: integer
-            non_topmed_AF_oth_male:
-              type: half_float
-            non_topmed_nhomalt_oth_male:
-              type: integer
             AN_nfe_est:
               type: integer
             AF_nfe_est:
               type: half_float
-            nhomalt_nfe_est:
-              type: integer
-            non_topmed_AN_afr_male:
-              type: integer
-            non_topmed_AF_afr_male:
-              type: half_float
-            non_topmed_nhomalt_afr_male:
-              type: half_float
-            AN_eas_male:
-              type: integer
-            AF_eas_male:
-              type: half_float
-            nhomalt_eas_male:
-              type: integer
-            controls_AN_eas:
-              type: integer
-            controls_AF_eas:
-              type: half_float
-            controls_nhomalt_eas:
-              type: integer
-            non_neuro_AN_eas_male:
-              type: integer
-            non_neuro_AF_eas_male:
-              type: half_float
-            non_neuro_nhomalt_eas_male:
-              type: integer
-            non_neuro_AN_asj_male:
-              type: integer
-            non_neuro_AF_asj_male:
-              type: half_float
-            non_neuro_nhomalt_asj_male:
-              type: integer
-            controls_AN_oth:
-              type: integer
-            controls_AF_oth:
-              type: half_float
-            controls_nhomalt_oth:
-              type: integer
             AN_nfe:
               type: integer
             AF_nfe:
               type: half_float
-            nhomalt_nfe:
-              type: integer
-            non_topmed_AN_female:
-              type: integer
-            non_topmed_AF_female:
-              type: half_float
-            non_topmed_nhomalt_female:
-              type: integer
-            non_neuro_AN_asj:
-              type: integer
-            non_neuro_AF_asj:
-              type: half_float
-            non_neuro_nhomalt_asj:
-              type: integer
-            non_topmed_AN_eas_female:
-              type: integer
-            non_topmed_AF_eas_female:
-              type: half_float
-            non_topmed_nhomalt_eas_female:
-              type: integer
-            non_neuro_AN_raw:
-              type: integer
-            non_neuro_AF_raw:
-              type: half_float
-            non_neuro_nhomalt_raw:
-              type: integer
-            non_topmed_AN_eas:
-              type: integer
-            non_topmed_AF_eas:
-              type: half_float
-            non_topmed_nhomalt_eas:
-              type: integer
-            non_topmed_AN_fin_male:
-              type: integer
-            non_topmed_AF_fin_male:
-              type: half_float
-            non_topmed_nhomalt_fin_male:
-              type: integer
             AN_fin:
               type: integer
             AF_fin:
               type: half_float
-            nhomalt_fin:
-              type: integer
-            AN_nfe_male:
-              type: integer
-            AF_nfe_male:
-              type: half_float
-            nhomalt_nfe_male:
-              type: integer
-            controls_AN_amr_male:
-              type: integer
-            controls_AF_amr_male:
-              type: half_float
-            controls_nhomalt_amr_male:
-              type: integer
-            controls_AN_afr_female:
-              type: integer
-            controls_AF_afr_female:
-              type: half_float
-            controls_nhomalt_afr_female:
-              type: half_float
-            controls_AN_amr:
-              type: integer
-            controls_AF_amr:
-              type: half_float
-            controls_nhomalt_amr:
-              type: integer
-            AN_asj_female:
-              type: integer
-            AF_asj_female:
-              type: half_float
-            nhomalt_asj_female:
-              type: integer
-            non_neuro_AN_eas:
-              type: integer
-            non_neuro_AF_eas:
-              type: half_float
-            non_neuro_nhomalt_eas:
-              type: integer
-            non_neuro_AN_male:
-              type: integer
-            non_neuro_AF_male:
-              type: half_float
-            non_neuro_nhomalt_male:
-              type: integer
             AN_asj:
               type: integer
             AF_asj:
               type: half_float
-            nhomalt_asj:
-              type: integer
-            controls_AN_nfe_est:
-              type: integer
-            controls_AF_nfe_est:
-              type: half_float
-            controls_nhomalt_nfe_est:
-              type: integer
-            non_topmed_AN_asj_female:
-              type: integer
-            non_topmed_AF_asj_female:
-              type: half_float
-            non_topmed_nhomalt_asj_female:
-              type: integer
-            non_topmed_AN_oth:
-              type: integer
-            non_topmed_AF_oth:
-              type: half_float
-            non_topmed_nhomalt_oth:
-              type: integer
-            non_topmed_AN_fin_female:
-              type: integer
-            non_topmed_AF_fin_female:
-              type: half_float
-            non_topmed_nhomalt_fin_female:
-              type: integer
             AN_oth:
               type: integer
             AF_oth:
-              type: half_float
-            nhomalt_oth:
-              type: integer
-            non_neuro_AN_nfe_male:
-              type: integer
-            non_neuro_AF_nfe_male:
-              type: half_float
-            non_neuro_nhomalt_nfe_male:
-              type: integer
-            controls_AN_female:
-              type: integer
-            controls_AF_female:
               type: half_float
         exomes:
           properties:
@@ -1127,593 +646,63 @@ mappings:
               type: integer
             AF:
               type: half_float
+            AN_female:
+              type: integer
+            AF_female:
+              type: half_float
+            non_cancer_AN:
+              type: integer
+            non_cancer_AF:
+              type: half_float
+            non_neuro_AN:
+              type: integer
+            non_neuro_AF:
+              type: half_float
+            non_topmed_AN:
+              type: integer
+            non_topmed_AF:
+              type: half_float
             AN_nfe_seu:
               type: integer
             AF_nfe_seu:
               type: half_float
-            nhomalt_nfe_seu:
-              type: integer
-            controls_AN_afr_male:
-              type: integer
-            controls_AF_afr_male:
-              type: half_float
-            controls_nhomalt_afr_male:
-              type: half_float
-            non_neuro_AN_eas_kor:
-              type: integer
-            non_neuro_AF_eas_kor:
-              type: half_float
-            non_neuro_nhomalt_eas_kor:
-              type: integer
-            non_topmed_AN_amr:
-              type: integer
-            non_topmed_AF_amr:
-              type: half_float
-            non_topmed_nhomalt_amr:
-              type: integer
-            non_cancer_AN_asj_female:
-              type: integer
-            non_cancer_AF_asj_female:
-              type: integer
-            non_cancer_nhomalt_asj_female:
-              type: integer
-            AN_raw:
-              type: integer
-            AF_raw:
-              type: half_float
-            nhomalt_raw:
-              type: integer
-            AN_fin_female:
-              type: integer
-            AF_fin_female:
-              type: half_float
-            nhomalt_fin_female:
-              type: integer
-            non_cancer_AN_oth_female:
-              type: integer
-            non_cancer_AF_oth_female:
-              type: integer
-            non_cancer_nhomalt_oth_female:
-              type: integer
             AN_nfe_bgr:
               type: integer
             AF_nfe_bgr:
-              type: half_float
-            nhomalt_nfe_bgr:
-              type: integer
-            non_neuro_AN_asj_female:
-              type: integer
-            non_neuro_AF_asj_female:
-              type: half_float
-            non_neuro_nhomalt_asj_female:
-              type: integer
-            AN_sas_male:
-              type: integer
-            AF_sas_male:
-              type: half_float
-            nhomalt_sas_male:
-              type: integer
-            non_neuro_AN_afr_male:
-              type: integer
-            non_neuro_AF_afr_male:
-              type: half_float
-            non_neuro_nhomalt_afr_male:
-              type: half_float
-            AN_afr_male:
-              type: integer
-            AF_afr_male:
-              type: half_float
-            nhomalt_afr_male:
               type: half_float
             AN_afr:
               type: integer
             AF_afr:
               type: half_float
-            nhomalt_afr:
-              type: half_float
-            controls_AN_nfe_swe:
-              type: integer
-            controls_AF_nfe_swe:
-              type: half_float
-            controls_nhomalt_nfe_swe:
-              type: integer
-            non_neuro_AN_afr_female:
-              type: integer
-            non_neuro_AF_afr_female:
-              type: half_float
-            non_neuro_nhomalt_afr_female:
-              type: half_float
-            non_topmed_AN_amr_female:
-              type: integer
-            non_topmed_AF_amr_female:
-              type: half_float
-            non_topmed_nhomalt_amr_female:
-              type: integer
-            non_cancer_AN_female:
-              type: integer
-            non_cancer_AF_female:
-              type: integer
-            non_cancer_nhomalt_female:
-              type: integer
-            non_cancer_AN_nfe_onf:
-              type: integer
-            non_cancer_AF_nfe_onf:
-              type: integer
-            non_cancer_nhomalt_nfe_onf:
-              type: integer
-            non_cancer_AN_male:
-              type: integer
-            non_cancer_AF_male:
-              type: integer
-            non_cancer_nhomalt_male:
-              type: integer
-            non_topmed_AN_oth_female:
-              type: integer
-            non_topmed_AF_oth_female:
-              type: half_float
-            non_topmed_nhomalt_oth_female:
-              type: integer
-            AN_eas_female:
-              type: integer
-            AF_eas_female:
-              type: half_float
-            nhomalt_eas_female:
-              type: integer
-            non_cancer_AN_sas_female:
-              type: integer
-            non_cancer_AF_sas_female:
-              type: integer
-            non_cancer_nhomalt_sas_female:
-              type: integer
-            AN_afr_female:
-              type: integer
-            AF_afr_female:
-              type: half_float
-            nhomalt_afr_female:
-              type: half_float
             AN_sas:
               type: integer
             AF_sas:
               type: half_float
-            nhomalt_sas:
-              type: integer
-            non_neuro_AN_female:
-              type: integer
-            non_neuro_AF_female:
-              type: half_float
-            non_neuro_nhomalt_female:
-              type: integer
-            controls_AN_afr:
-              type: integer
-            controls_AF_afr:
-              type: half_float
-            controls_nhomalt_afr:
-              type: half_float
-            non_neuro_AN_eas_jpn:
-              type: integer
-            non_neuro_AF_eas_jpn:
-              type: half_float
-            non_neuro_nhomalt_eas_jpn:
-              type: integer
             AN_nfe_onf:
               type: integer
             AF_nfe_onf:
               type: half_float
-            nhomalt_nfe_onf:
-              type: integer
-            non_cancer_AN_amr_male:
-              type: integer
-            non_cancer_AF_amr_male:
-              type: integer
-            non_cancer_nhomalt_amr_male:
-              type: integer
-            controls_AN_fin_male:
-              type: integer
-            controls_AF_fin_male:
-              type: half_float
-            controls_nhomalt_fin_male:
-              type: integer
-            non_neuro_AN_nfe_nwe:
-              type: integer
-            non_neuro_AF_nfe_nwe:
-              type: half_float
-            non_neuro_nhomalt_nfe_nwe:
-              type: integer
-            AN_fin_male:
-              type: integer
-            AF_fin_male:
-              type: half_float
-            nhomalt_fin_male:
-              type: integer
-            AN_nfe_female:
-              type: integer
-            AF_nfe_female:
-              type: half_float
-            nhomalt_nfe_female:
-              type: integer
             AN_amr:
               type: integer
             AF_amr:
               type: half_float
-            nhomalt_amr:
-              type: integer
-            non_topmed_AN_nfe_male:
-              type: integer
-            non_topmed_AF_nfe_male:
-              type: half_float
-            non_topmed_nhomalt_nfe_male:
-              type: integer
-            non_neuro_AN_sas:
-              type: integer
-            non_neuro_AF_sas:
-              type: half_float
-            non_neuro_nhomalt_sas:
-              type: integer
-            non_cancer_AN_fin_male:
-              type: integer
-            non_cancer_AF_fin_male:
-              type: integer
-            non_cancer_nhomalt_fin_male:
-              type: integer
-            non_cancer_AN_nfe_seu:
-              type: integer
-            non_cancer_AF_nfe_seu:
-              type: integer
-            non_cancer_nhomalt_nfe_seu:
-              type: integer
             AN_eas:
               type: integer
             AF_eas:
               type: half_float
-            nhomalt_eas:
-              type: integer
-            nhomalt:
-              type: integer
-            non_neuro_AN_nfe_female:
-              type: integer
-            non_neuro_AF_nfe_female:
-              type: half_float
-            non_neuro_nhomalt_nfe_female:
-              type: integer
-            non_neuro_AN_afr:
-              type: integer
-            non_neuro_AF_afr:
-              type: half_float
-            non_neuro_nhomalt_afr:
-              type: half_float
-            controls_AN_raw:
-              type: integer
-            controls_AF_raw:
-              type: half_float
-            controls_nhomalt_raw:
-              type: integer
-            non_cancer_AN_eas:
-              type: integer
-            non_cancer_AF_eas:
-              type: integer
-            non_cancer_nhomalt_eas:
-              type: integer
-            non_cancer_AN_amr_female:
-              type: integer
-            non_cancer_AF_amr_female:
-              type: integer
-            non_cancer_nhomalt_amr_female:
-              type: integer
-            non_neuro_AN_nfe_swe:
-              type: integer
-            non_neuro_AF_nfe_swe:
-              type: half_float
-            non_neuro_nhomalt_nfe_swe:
-              type: integer
-            controls_AN_male:
-              type: integer
-            controls_AF_male:
-              type: half_float
-            controls_nhomalt_male:
-              type: integer
-            non_topmed_AN_male:
-              type: integer
-            non_topmed_AF_male:
-              type: half_float
-            non_topmed_nhomalt_male:
-              type: integer
-            controls_AN_eas_jpn:
-              type: integer
-            controls_AF_eas_jpn:
-              type: half_float
-            controls_nhomalt_eas_jpn:
-              type: integer
-            controls_AN_nfe_female:
-              type: integer
-            controls_AF_nfe_female:
-              type: half_float
-            controls_nhomalt_nfe_female:
-              type: integer
-            non_neuro_AN_amr:
-              type: integer
-            non_neuro_AF_amr:
-              type: half_float
-            non_neuro_nhomalt_amr:
-              type: integer
-            non_neuro_AN_eas_female:
-              type: integer
-            non_neuro_AF_eas_female:
-              type: half_float
-            non_neuro_nhomalt_eas_female:
-              type: integer
-            AN_asj_male:
-              type: integer
-            AF_asj_male:
-              type: half_float
-            nhomalt_asj_male:
-              type: integer
-            controls_AN_nfe_male:
-              type: integer
-            controls_AF_nfe_male:
-              type: half_float
-            controls_nhomalt_nfe_male:
-              type: integer
-            non_neuro_AN_fin:
-              type: integer
-            non_neuro_AF_fin:
-              type: half_float
-            non_neuro_nhomalt_fin:
-              type: integer
-            non_topmed_AN_sas:
-              type: integer
-            non_topmed_AF_sas:
-              type: half_float
-            non_topmed_nhomalt_sas:
-              type: integer
-            non_cancer_AN_nfe_female:
-              type: integer
-            non_cancer_AF_nfe_female:
-              type: integer
-            non_cancer_nhomalt_nfe_female:
-              type: integer
-            AN_oth_female:
-              type: integer
-            AF_oth_female:
-              type: half_float
-            nhomalt_oth_female:
-              type: integer
-            non_cancer_AN_asj:
-              type: integer
-            non_cancer_AF_asj:
-              type: integer
-            non_cancer_nhomalt_asj:
-              type: integer
             AN_nfe_swe:
               type: integer
             AF_nfe_swe:
               type: half_float
-            nhomalt_nfe_swe:
-              type: integer
-            controls_AN_nfe:
-              type: integer
-            controls_AF_nfe:
-              type: half_float
-            controls_nhomalt_nfe:
-              type: integer
-            controls_AN_oth_female:
-              type: integer
-            controls_AF_oth_female:
-              type: half_float
-            controls_nhomalt_oth_female:
-              type: integer
-            controls_AN_asj:
-              type: integer
-            controls_AF_asj:
-              type: half_float
-            controls_nhomalt_asj:
-              type: integer
-            non_neuro_AN_amr_male:
-              type: integer
-            non_neuro_AF_amr_male:
-              type: half_float
-            non_neuro_nhomalt_amr_male:
-              type: integer
-            controls_AN_nfe_nwe:
-              type: integer
-            controls_AF_nfe_nwe:
-              type: half_float
-            controls_nhomalt_nfe_nwe:
-              type: integer
             AN_nfe_nwe:
               type: integer
             AF_nfe_nwe:
               type: half_float
-            nhomalt_nfe_nwe:
-              type: integer
-            controls_AN_nfe_seu:
-              type: integer
-            controls_AF_nfe_seu:
-              type: half_float
-            controls_nhomalt_nfe_seu:
-              type: integer
-            controls_AN_sas_female:
-              type: integer
-            controls_AF_sas_female:
-              type: half_float
-            controls_nhomalt_sas_female:
-              type: integer
-            non_neuro_AN_amr_female:
-              type: integer
-            non_neuro_AF_amr_female:
-              type: half_float
-            non_neuro_nhomalt_amr_female:
-              type: integer
-            non_cancer_AN_eas_jpn:
-              type: integer
-            non_cancer_AF_eas_jpn:
-              type: integer
-            non_cancer_nhomalt_eas_jpn:
-              type: integer
-            non_neuro_AN_nfe_onf:
-              type: integer
-            non_neuro_AF_nfe_onf:
-              type: half_float
-            non_neuro_nhomalt_nfe_onf:
-              type: integer
-            non_topmed_AN_eas_male:
-              type: integer
-            non_topmed_AF_eas_male:
-              type: half_float
-            non_topmed_nhomalt_eas_male:
-              type: integer
             AN_eas_jpn:
               type: integer
             AF_eas_jpn:
               type: half_float
-            nhomalt_eas_jpn:
-              type: integer
-            non_cancer_AN_afr_male:
-              type: integer
-            non_cancer_AF_afr_male:
-              type: integer
-            non_cancer_nhomalt_afr_male:
-              type: integer
-            non_cancer_AN_afr:
-              type: integer
-            non_cancer_AF_afr:
-              type: integer
-            non_cancer_nhomalt_afr:
-              type: integer
-            controls_AN_amr_female:
-              type: integer
-            controls_AF_amr_female:
-              type: half_float
-            controls_nhomalt_amr_female:
-              type: integer
-            non_neuro_AN_fin_male:
-              type: integer
-            non_neuro_AF_fin_male:
-              type: half_float
-            non_neuro_nhomalt_fin_male:
-              type: integer
-            AN_female:
-              type: integer
-            AF_female:
-              type: half_float
-            nhomalt_female:
-              type: integer
-            non_neuro_AN_nfe_bgr:
-              type: integer
-            non_neuro_AF_nfe_bgr:
-              type: half_float
-            non_neuro_nhomalt_nfe_bgr:
-              type: integer
-            non_neuro_AN_oth_male:
-              type: integer
-            non_neuro_AF_oth_male:
-              type: half_float
-            non_neuro_nhomalt_oth_male:
-              type: integer
-            non_topmed_AN_nfe_est:
-              type: integer
-            non_topmed_AF_nfe_est:
-              type: half_float
-            non_topmed_nhomalt_nfe_est:
-              type: integer
-            non_topmed_AN_nfe_nwe:
-              type: integer
-            non_topmed_AF_nfe_nwe:
-              type: half_float
-            non_topmed_nhomalt_nfe_nwe:
-              type: integer
-            non_topmed_AN_amr_male:
-              type: integer
-            non_topmed_AF_amr_male:
-              type: half_float
-            non_topmed_nhomalt_amr_male:
-              type: integer
-            non_cancer_AN_amr:
-              type: integer
-            non_cancer_AF_amr:
-              type: integer
-            non_cancer_nhomalt_amr:
-              type: integer
-            non_topmed_AN_nfe_swe:
-              type: integer
-            non_topmed_AF_nfe_swe:
-              type: half_float
-            non_topmed_nhomalt_nfe_swe:
-              type: integer
-            non_topmed_AN_nfe_onf:
-              type: integer
-            non_topmed_AF_nfe_onf:
-              type: half_float
-            non_topmed_nhomalt_nfe_onf:
-              type: integer
-            controls_AN_eas_kor:
-              type: integer
-            controls_AF_eas_kor:
-              type: half_float
-            controls_nhomalt_eas_kor:
-              type: integer
-            non_topmed_AN_eas_oea:
-              type: integer
-            non_topmed_AF_eas_oea:
-              type: half_float
-            non_topmed_nhomalt_eas_oea:
-              type: integer
-            controls_AN_eas_male:
-              type: integer
-            controls_AF_eas_male:
-              type: half_float
-            controls_nhomalt_eas_male:
-              type: integer
-            controls_AN_oth_male:
-              type: integer
-            controls_AF_oth_male:
-              type: half_float
-            controls_nhomalt_oth_male:
-              type: integer
-            non_topmed_AN:
-              type: integer
-            non_topmed_AF:
-              type: half_float
-            non_topmed_nhomalt:
-              type: integer
-            controls_AN_fin:
-              type: integer
-            controls_AF_fin:
-              type: half_float
-            controls_nhomalt_fin:
-              type: integer
             AN_eas_kor:
               type: integer
             AF_eas_kor:
               type: half_float
-            nhomalt_eas_kor:
-              type: integer
-            non_neuro_AN_nfe:
-              type: integer
-            non_neuro_AF_nfe:
-              type: half_float
-            non_neuro_nhomalt_nfe:
-              type: integer
-            non_neuro_AN_fin_female:
-              type: integer
-            non_neuro_AF_fin_female:
-              type: half_float
-            non_neuro_nhomalt_fin_female:
-              type: integer
-            non_cancer_AN_nfe_male:
-              type: integer
-            non_cancer_AF_nfe_male:
-              type: integer
-            non_cancer_nhomalt_nfe_male:
-              type: integer
-            controls_AN_eas_oea:
-              type: integer
-            controls_AF_eas_oea:
-              type: half_float
-            controls_nhomalt_eas_oea:
-              type: integer
-            non_topmed_AN_nfe_seu:
-              type: integer
-            non_topmed_AF_nfe_seu:
-              type: half_float
-            non_topmed_nhomalt_nfe_seu:
-              type: integer

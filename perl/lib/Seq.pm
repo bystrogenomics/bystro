@@ -29,7 +29,7 @@ extends 'Seq::Base';
 # We  add a few of our own annotation attributes
 # These will be re-used in the body of the annotation processor below
 # Users may configure these
-has input_file => ( is => 'rw', isa => 'Str', required => 1 );
+has input_files => ( is => 'rw', isa => 'ArrayRef', required => 1 );
 
 # Maximum (signed) size of del allele
 has maxDel => ( is => 'ro', isa => 'Int', default => -32, writer => 'setMaxDel' );
@@ -77,15 +77,26 @@ sub annotate {
 
   $self->log( 'info', 'Checking input file format' );
 
-  my ( $err, $fileType ) = $self->validateInputFile( $self->input_file );
+  my $firstFileType;
+  for my $file ( @{ $self->input_files } ) {
+    my ( $err, $fileType ) = $self->validateInputFile($file);
 
-  if ($err) {
-    $self->_errorWithCleanup($err);
-    return ( $err, undef );
+    if ($err) {
+      $self->_errorWithCleanup($err);
+      return ( $err, undef );
+    }
+
+    if ( !$firstFileType ) {
+      $firstFileType = $fileType;
+    }
+    elsif ( $fileType ne $firstFileType ) {
+      $self->_errorWithCleanup("All input files must be of the same type");
+      return ( "All input files must be of the same type", undef );
+    }
   }
 
   $self->log( 'info', 'Beginning annotation' );
-  return $self->annotateFile($fileType);
+  return $self->annotateFile($firstFileType);
 }
 
 sub annotateFile {
@@ -93,7 +104,7 @@ sub annotateFile {
   my $self = shift;
   my $type = shift;
 
-  my ( $err, $fh, $outFh, $statsFh, $headerFh ) = $self->_getFileHandles($type);
+  my ( $err, $inFhs, $outFh, $statsFh, $headerFh ) = $self->_getFileHandles($type);
 
   if ($err) {
     $self->_errorWithCleanup($err);
@@ -101,7 +112,16 @@ sub annotateFile {
   }
 
   ########################## Write the header ##################################
-  my $header = <$fh>;
+  my $header;
+  for my $inFh (@$inFhs) {
+    $header = <$inFh>;
+
+    if ( !$header ) {
+      $self->_errorWithCleanup("Empty input file");
+      return ( "Empty input file", undef );
+    }
+  }
+
   $self->setLineEndings($header);
 
   my ( $finalHeader, $numberSplitFields ) = $self->_getFinalHeader($header);
@@ -176,160 +196,162 @@ sub annotateFile {
 
   my $outJson = $self->outputJson;
 
-  mce_loop_f {
-    #my ($mce, $slurp_ref, $chunk_id) = @_;
-    #    $_[0], $_[1],     $_[2]
-    open my $MEM_FH, '<', $_[1];
-    binmode $MEM_FH, ':raw';
+  for my $inFh (@$inFhs) {
+    mce_loop_f {
+      #my ($mce, $slurp_ref, $chunk_id) = @_;
+      #    $_[0], $_[1],     $_[2]
+      open my $MEM_FH, '<', $_[1];
+      binmode $MEM_FH, ':raw';
 
-    my $total = 0;
+      my $total = 0;
 
-    my @indelDbData;
-    my @indelRef;
-    my @lines;
-    my $dataFromDbAref;
-    my $zeroPos;
+      my @indelDbData;
+      my @indelRef;
+      my @lines;
+      my $dataFromDbAref;
+      my $zeroPos;
 
-    # This is going to be copied on write... avoid a bunch of function calls
-    # Each thread will get its own %cursors object
-    # But start in child because relying on COW seems like it could lead to
-    # future bugs (in, say Rust if sharing between user threads)
-    my %cursors = ();
+      # This is going to be copied on write... avoid a bunch of function calls
+      # Each thread will get its own %cursors object
+      # But start in child because relying on COW seems like it could lead to
+      # future bugs (in, say Rust if sharing between user threads)
+      my %cursors = ();
 
-    # Each line is expected to be
-    # chrom \t pos \t type \t inputRef \t alt \t hets \t homozygotes \n
-    # the chrom is always in ucsc form, chr (the golang program guarantees it)
-    my $outputJson = $self->outputJson;
-    while ( my $line = $MEM_FH->getline() ) {
-      chomp $line;
+      # Each line is expected to be
+      # chrom \t pos \t type \t inputRef \t alt \t hets \t homozygotes \n
+      # the chrom is always in ucsc form, chr (the golang program guarantees it)
+      my $outputJson = $self->outputJson;
+      while ( my $line = $MEM_FH->getline() ) {
+        chomp $line;
 
-      my @fields = split( '\t', $line, $numberSplitFields );
+        my @fields = split( '\t', $line, $numberSplitFields );
 
-      $total++;
+        $total++;
 
-      if ( !$wantedChromosomes{ $fields[0] } ) {
-        next;
-      }
+        if ( !$wantedChromosomes{ $fields[0] } ) {
+          next;
+        }
 
-      $zeroPos = $fields[1] - 1;
+        $zeroPos = $fields[1] - 1;
 
-      # Caveat: It seems that, per database ($chr), we can have only one
-      # read-only transaction; so ... yeah can't combine with dbRead, dbReadOne
-      if ( !$cursors{ $fields[0] } ) {
-        $cursors{ $fields[0] } = $db->dbStartCursorTxn( $fields[0] );
-      }
+        # Caveat: It seems that, per database ($chr), we can have only one
+        # read-only transaction; so ... yeah can't combine with dbRead, dbReadOne
+        if ( !$cursors{ $fields[0] } ) {
+          $cursors{ $fields[0] } = $db->dbStartCursorTxn( $fields[0] );
+        }
 
-      $dataFromDbAref = $db->dbReadOneCursorUnsafe( $cursors{ $fields[0] }, $zeroPos );
+        $dataFromDbAref = $db->dbReadOneCursorUnsafe( $cursors{ $fields[0] }, $zeroPos );
 
-      if ( !defined $dataFromDbAref ) {
-        $self->_errorWithCleanup("Wrong assembly? $fields[0]\: $fields[1] not found.");
-        # Store a reference to the error, allowing us to exit with a useful fail message
-        MCE->gather( 0, 0, "Wrong assembly? $fields[0]\: $fields[1] not found." );
-        $_[0]->abort();
-        return;
-      }
+        if ( !defined $dataFromDbAref ) {
+          $self->_errorWithCleanup("Wrong assembly? $fields[0]\: $fields[1] not found.");
+          # Store a reference to the error, allowing us to exit with a useful fail message
+          MCE->gather( 0, 0, "Wrong assembly? $fields[0]\: $fields[1] not found." );
+          $_[0]->abort();
+          return;
+        }
 
-      if ( length( $fields[4] ) > 1 ) {
-        # INS or DEL
-        if ( looks_like_number( $fields[4] ) ) {
-          # We ignore -1 alleles, treat them just like SNPs
-          if ( $fields[4] < -1 ) {
-            # Grab everything from + 1 the already fetched position to the $pos + number of deleted bases - 1
-            # Note that position_1_based - (negativeDelLength + 2) == position_0_based + (delLength - 1)
-            if ( $fields[4] < $maxDel ) {
-              @indelDbData = ( $fields[1] .. $fields[1] - ( $maxDel + 2 ) );
+        if ( length( $fields[4] ) > 1 ) {
+          # INS or DEL
+          if ( looks_like_number( $fields[4] ) ) {
+            # We ignore -1 alleles, treat them just like SNPs
+            if ( $fields[4] < -1 ) {
+              # Grab everything from + 1 the already fetched position to the $pos + number of deleted bases - 1
+              # Note that position_1_based - (negativeDelLength + 2) == position_0_based + (delLength - 1)
+              if ( $fields[4] < $maxDel ) {
+                @indelDbData = ( $fields[1] .. $fields[1] - ( $maxDel + 2 ) );
+              }
+              else {
+                @indelDbData = ( $fields[1] .. $fields[1] - ( $fields[4] + 2 ) );
+              }
+
+              #last argument: skip commit
+              $db->dbReadCursorUnsafe( $cursors{ $fields[0] }, \@indelDbData );
+
+              #Note that the first position keeps the same $inputRef
+              #This means in the (rare) discordant multiallelic situation, the reference
+              #Will be identical between the SNP and DEL alleles
+              #faster than perl-style loop (much faster than c-style)
+              @indelRef = ( $fields[3], map { $refTrackGetter->get($_) } @indelDbData );
+
+              #Add the db data that we already have for this position
+              unshift @indelDbData, $dataFromDbAref;
             }
-            else {
-              @indelDbData = ( $fields[1] .. $fields[1] - ( $fields[4] + 2 ) );
-            }
-
-            #last argument: skip commit
-            $db->dbReadCursorUnsafe( $cursors{ $fields[0] }, \@indelDbData );
+          }
+          else {
+            #It's an insertion, we always read + 1 to the position being annotated
+            # which itself is + 1 from the db position, so we read  $out[1][0][0] to get the + 1 base
+            # Read without committing by using 1 as last argument
+            @indelDbData = (
+              $dataFromDbAref, $db->dbReadOneCursorUnsafe( $cursors{ $fields[0] }, $fields[1] )
+            );
 
             #Note that the first position keeps the same $inputRef
             #This means in the (rare) discordant multiallelic situation, the reference
             #Will be identical between the SNP and DEL alleles
-            #faster than perl-style loop (much faster than c-style)
-            @indelRef = ( $fields[3], map { $refTrackGetter->get($_) } @indelDbData );
-
-            #Add the db data that we already have for this position
-            unshift @indelDbData, $dataFromDbAref;
+            @indelRef = ( $fields[3], $refTrackGetter->get( $indelDbData[1] ) );
           }
         }
-        else {
-          #It's an insertion, we always read + 1 to the position being annotated
-          # which itself is + 1 from the db position, so we read  $out[1][0][0] to get the + 1 base
-          # Read without committing by using 1 as last argument
-          @indelDbData = (
-            $dataFromDbAref, $db->dbReadOneCursorUnsafe( $cursors{ $fields[0] }, $fields[1] )
-          );
 
-          #Note that the first position keeps the same $inputRef
-          #This means in the (rare) discordant multiallelic situation, the reference
-          #Will be identical between the SNP and DEL alleles
-          @indelRef = ( $fields[3], $refTrackGetter->get( $indelDbData[1] ) );
+        if (@indelDbData) {
+          ############### Gather all track data (besides reference) #################
+          for my $posIdx ( 0 .. $#indelDbData ) {
+            for my $trackIndex (@trackIndicesExceptReference) {
+              $fields[ $outIndicesExceptReference[$trackIndex] ] //= [];
+
+              $trackGettersExceptReference[$trackIndex]->get(
+                $indelDbData[$posIdx], $fields[0], $indelRef[$posIdx], $fields[4], $posIdx,
+                $fields[ $outIndicesExceptReference[$trackIndex] ],
+                $zeroPos + $posIdx
+              );
+            }
+
+            $fields[$refTrackOutIdx][$posIdx] = $indelRef[$posIdx];
+          }
+
+          # If we have multiple indel alleles at one position, need to clear stored values
+          @indelDbData = ();
+          @indelRef    = ();
         }
-      }
-
-      if (@indelDbData) {
-        ############### Gather all track data (besides reference) #################
-        for my $posIdx ( 0 .. $#indelDbData ) {
+        else {
           for my $trackIndex (@trackIndicesExceptReference) {
             $fields[ $outIndicesExceptReference[$trackIndex] ] //= [];
 
-            $trackGettersExceptReference[$trackIndex]->get(
-              $indelDbData[$posIdx], $fields[0], $indelRef[$posIdx], $fields[4], $posIdx,
-              $fields[ $outIndicesExceptReference[$trackIndex] ],
-              $zeroPos + $posIdx
-            );
+            $trackGettersExceptReference[$trackIndex]
+              ->get( $dataFromDbAref, $fields[0], $fields[3], $fields[4], 0,
+              $fields[ $outIndicesExceptReference[$trackIndex] ], $zeroPos );
           }
 
-          $fields[$refTrackOutIdx][$posIdx] = $indelRef[$posIdx];
+          $fields[$refTrackOutIdx][0] = $refTrackGetter->get($dataFromDbAref);
         }
 
-        # If we have multiple indel alleles at one position, need to clear stored values
-        @indelDbData = ();
-        @indelRef    = ();
-      }
-      else {
-        for my $trackIndex (@trackIndicesExceptReference) {
-          $fields[ $outIndicesExceptReference[$trackIndex] ] //= [];
+        # 3 holds the input reference, we'll replace this with the discordant status
+        $fields[$discordantIdx] =
+          $refTrackGetter->get($dataFromDbAref) ne $fields[3] ? "true" : "false";
 
-          $trackGettersExceptReference[$trackIndex]
-            ->get( $dataFromDbAref, $fields[0], $fields[3], $fields[4], 0,
-            $fields[ $outIndicesExceptReference[$trackIndex] ], $zeroPos );
+        push @lines, \@fields;
+      }
+
+      close $MEM_FH;
+
+      if (@lines) {
+        if ($outJson) {
+          MCE->gather( scalar @lines, $total - @lines, undef, encode_json( \@lines ) );
         }
-
-        $fields[$refTrackOutIdx][0] = $refTrackGetter->get($dataFromDbAref);
-      }
-
-      # 3 holds the input reference, we'll replace this with the discordant status
-      $fields[$discordantIdx] =
-        $refTrackGetter->get($dataFromDbAref) ne $fields[3] ? 1 : 0;
-
-      push @lines, \@fields;
-    }
-
-    close $MEM_FH;
-
-    if (@lines) {
-      if ($outJson) {
-        MCE->gather( scalar @lines, $total - @lines, undef, encode_json( \@lines ) );
+        else {
+          MCE->gather(
+            scalar @lines,
+            $total - @lines,
+            undef, $outputter->makeOutputString( \@lines )
+          );
+        }
       }
       else {
-        MCE->gather(
-          scalar @lines,
-          $total - @lines,
-          undef, $outputter->makeOutputString( \@lines )
-        );
+        MCE->gather( 0, $total );
       }
-    }
-    else {
-      MCE->gather( 0, $total );
-    }
 
+    }
+    $inFh;
   }
-  $fh;
 
   # Force flush
   $progressFunc->( 0, 0, undef, undef, 1 );
@@ -422,24 +444,26 @@ sub makeLogProgressAndPrint {
 sub _getFileHandles {
   my ( $self, $type ) = @_;
 
-  my ( $outFh, $statsFh, $inFh, $headerFh );
-  my $err;
+  my ( $outFh, $statsFh, @inFhs, $headerFh, $err );
 
-  ( $err, $inFh ) = $self->_openAnnotationPipe($type);
+  for my $file ( @{ $self->input_files } ) {
+    my ( $err, $inFh ) = $self->_openAnnotationPipe( $type, $file );
 
-  if ($err) {
-    return ( $err, undef, undef, undef );
+    if ($err) {
+      return ( $err, undef, undef, undef, undef );
+    }
+
+    push @inFhs, $inFh;
   }
 
   if ( $self->run_statistics ) {
     ########################## Tell stats program about our annotation ##############
-    # TODO: error handling if fh fails to open
     my $statArgs = $self->_statisticsRunner->getStatsArguments();
 
     $err = $self->safeOpen( $statsFh, "|-", $statArgs );
 
     if ($err) {
-      return ( $err, undef, undef, undef );
+      return ( $err, undef, undef, undef, undef );
     }
   }
 
@@ -447,26 +471,25 @@ sub _getFileHandles {
   ( $err, $outFh ) = $self->getWriteFh( $self->{_outPath} );
 
   if ($err) {
-    return ( $err, undef, undef, undef );
+    return ( $err, undef, undef, undef, undef );
   }
 
   ( $err, $headerFh ) = $self->getWriteFh( $self->{_headerPath} );
 
   if ($err) {
-    return ( $err, undef, undef, undef );
+    return ( $err, undef, undef, undef, undef );
   }
 
-  return ( undef, $inFh, $outFh, $statsFh, $headerFh );
+  return ( undef, \@inFhs, $outFh, $statsFh, $headerFh );
 }
 
 sub _preparePreprocessorProgram {
-  my ( $self, $type ) = @_;
+  my ( $self, $type, $inPath ) = @_;
 
   if ( !$self->fileProcessors->{$type} ) {
     $self->_errorWithCleanup("No fileProcessors defined for $type file type");
   }
 
-  my $inPath   = $self->input_file;
   my $basename = path($inPath)->basename;
 
   my $errPath = $self->_workingDir->child( $basename . '.file-log.log' );
@@ -501,9 +524,10 @@ sub _preparePreprocessorProgram {
 }
 
 sub _openAnnotationPipe {
-  my ( $self, $type ) = @_;
+  my ( $self, $type, $inPath ) = @_;
 
-  my ( $finalProgram, $errPath ) = $self->_preparePreprocessorProgram($type);
+  my ( $finalProgram, $errPath ) =
+    $self->_preparePreprocessorProgram( $type, $inPath );
 
   my $fh;
   my $err = $self->safeOpen( $fh, '-|', "$finalProgram 2> $errPath" );

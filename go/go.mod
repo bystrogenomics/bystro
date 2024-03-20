@@ -1,6 +1,6 @@
 module bystro
 
-go 1.21.4
+go 1.21
 
 require (
 	github.com/beanstalkd/go-beanstalk v0.2.0
