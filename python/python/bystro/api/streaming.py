@@ -47,10 +47,10 @@ def streaming_file(
 
     if response.status_code == 200:
 
-        content_disposition = response.headers.get('Content-Disposition')
-        filename = content_disposition.split('filename=')[-1].strip("\"'")
+        content_disposition = response.headers.get("Content-Disposition")
+        filename = content_disposition.split("filename=")[-1].strip("\"'")
 
-        with open(filename, 'wb') as file:
+        with open(filename, "wb") as file:
             file.write(response.content)
 
         if print_result:
