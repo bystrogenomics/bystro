@@ -19,3 +19,4 @@ cloudpickle==3.0.0
 torch==2.2
 psutil==5.9.6
 git+https://github.com/bystrogenomics/canopy.git@f6d3031494a692db040492fa1dead5faf19fef5a
+matplotlib==3.7.1
