@@ -6,7 +6,7 @@ from bystro.api.annotation import get_jobs, create_jobs, query, JobBasicResponse
 
 from bystro.cli.proteomics_cli import add_proteomics_subparser
 
-from bystro.api.streaming import streaming_file
+from bystro.api.streaming import stream_file
 
 
 def signup_cli(args: argparse.Namespace, print_result=True) -> CachedAuth:
@@ -153,7 +153,7 @@ def query_cli(args: argparse.Namespace) -> None:
 
 def fetch_proteomics_cli(args: argparse.Namespace) -> None:
     """
-    Fetch the file from the /api/jobs/streamingFile endpoint.
+    Fetch the file from the /api/jobs/streamFile endpoint.
 
     Parameters
     ----------
@@ -166,7 +166,7 @@ def fetch_proteomics_cli(args: argparse.Namespace) -> None:
     print_result : bool
         Whether to print the result of the fetch operation, by default True.
     """
-    streaming_file(
+    stream_file(
         job_id=args.job_id,
         output=args.output,
         key_path=args.key_path,

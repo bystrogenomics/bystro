@@ -1,16 +1,16 @@
 import requests
 from bystro.api.auth import authenticate
 
-GET_STREAM_ENDPOINT = "/api/jobs/streamingFile/"
+GET_STREAM_ENDPOINT = "/api/jobs/streamFile/"
 
-def streaming_file(
+def stream_file(
     job_id: str,
     output: bool = False,
     key_path: str | None = None,
     print_result: bool = True,
 ) -> None:
     """
-    Fetch the file from the /api/jobs/streamingFile endpoint.
+    Fetch the file from the /api/jobs/streamFile endpoint.
 
     Parameters
     ----------
