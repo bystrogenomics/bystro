@@ -54,7 +54,6 @@ on 'test' => sub {
   requires "Exporter" => "0";
   requires "ExtUtils::MakeMaker" => "0";
   requires "File::Spec" => "0";
-  requires "Test::Exception" => "0";
   requires "Test::More" => "0";
   requires "Types::Common::String" => "0";
 };
@@ -72,6 +71,7 @@ on 'develop' => sub {
   requires "Test::EOF" => "0";
   requires "Test::EOL" => "0";
   requires "Test::MinimumVersion" => "0";
-  requires "Test::More" => "0.88";
+  requires "Test::More" => "0.96";
   requires "Test::NoTabs" => "0";
+  requires "Test::Vars" => "0";
 };

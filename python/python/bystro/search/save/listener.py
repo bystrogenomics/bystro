@@ -6,9 +6,6 @@
 import argparse
 import asyncio
 import logging
-from pprint import pformat
-
-import msgspec
 
 from ruamel.yaml import YAML
 
@@ -28,8 +25,6 @@ logging.basicConfig(
     format="%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-
-logger = logging.getLogger(__name__)
 
 TUBE = "saveFromQuery"
 
@@ -64,7 +59,6 @@ def main():
         search_conf = YAML(typ="safe").load(search_config_file)
 
     def handler_fn(publisher: ProgressPublisher, job_data: SaveJobData):
-        logger.debug("Processing job: %s", pformat(msgspec.structs.asdict(job_data)))
         return asyncio.run(go(job_data=job_data, search_conf=search_conf, publisher=publisher))
 
     def submit_msg_fn(job_data: SaveJobData):

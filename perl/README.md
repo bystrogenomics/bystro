@@ -65,10 +65,10 @@ Install [cpm](https://metacpan.org/pod/App::cpm) with `curl -fsSL https://raw.gi
 
 ```bash
 # install msgpack fork
-cpm install -g https://github.com/bystrogenomics/msgpack-perl.git
+cpm install https://github.com/bystrogenomics/msgpack-perl.git
 
 # install MouseX::Getopt despite some tests failing
-cpm install -g --no-test MouseX::Getopt
+cpm install --no-test MouseX::Getopt
 
 # install LMDB_File that comes with latest LMDB
 # NOTE: you will need mysql_config to install this
@@ -81,10 +81,7 @@ git clone --depth 1 --recurse-submodules https://github.com/salortiz/LMDB_File.g
   && rm -rf LMDB_File
 
 # install mysql driver
-# NOTE: you will need mysql_config to install this
-#       ubuntu 22.04 LTS => sudo apt install -y libmariadb-dev libmariadb-dev-compat
-#       amazon 2023 => sudo yum install -y <mariadb105>
-cpm install -g DBD::mysql@4.051
+cpm install DBD::mysql@4.051
 
 # clone bystro and change into perl package
 git clone git@github.com:bystrogenomics/bystro.git && cd bystro/perl
@@ -93,7 +90,7 @@ git clone git@github.com:bystrogenomics/bystro.git && cd bystro/perl
 cpm install -g --with-develop
 
 # Install dzil build dependencies
-cpm install -g --show-build-log-on-failure $(dzil authordeps --missing)
+RUN cpm install -g --show-build-log-on-failure $(dzil authordeps --missing)
 ```
 
 ## Coding style and tidying

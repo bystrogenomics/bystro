@@ -1,7 +1,7 @@
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage, Struct
 
 
-class PRSJobData(BaseMessage, frozen=True, forbid_unknown_fields=True, rename="camel"):
+class PRSJobData(BaseMessage, frozen=True, forbid_unknown_fields=True):
     """Data for PRS jobs received from beanstalkd"""
 
     dosage_matrix_path: str
@@ -9,24 +9,22 @@ class PRSJobData(BaseMessage, frozen=True, forbid_unknown_fields=True, rename="c
     assembly: str
 
 
-class PRSJobSubmitMessage(SubmittedJobMessage, frozen=True, kw_only=True, rename="camel"):
+class PRSJobSubmitMessage(SubmittedJobMessage, frozen=True, kw_only=True):
     """
     The acknowledgement message to be sent back through beanstalkd
     after PRS job is picked up for processing
     """
 
-    job_config: dict
+    jobConfig: dict
 
 
-class PRSJobResult(Struct, frozen=True, forbid_unknown_fields=True, rename="camel"):
+class PRSJobResult(Struct, frozen=True, forbid_unknown_fields=True):
     """The contents of the PRS result object to be sent back through beanstalkd"""
 
     prs_scores_path: str
 
 
-class PRSJobResultMessage(
-    CompletedJobMessage, frozen=True, forbid_unknown_fields=True, kw_only=True, rename="camel"
-):
+class PRSJobResultMessage(CompletedJobMessage, frozen=True, forbid_unknown_fields=True, kw_only=True):
     """
     Results to be sent back through beanstalkd after PRS job is completed
     prs_scores_path: str

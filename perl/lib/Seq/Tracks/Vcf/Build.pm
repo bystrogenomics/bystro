@@ -63,7 +63,7 @@ sub BUILD {
   my $self = shift;
 
   if ( !@{ $self->features } ) {
-    $self->log( 'fatal', 'VCF tracks require features to be specified' );
+    $self->log( 'fatal', 'VCF build requires INFO features' );
   }
 
   my ( $err, $feats ) = $self->_findExpectedFeatures($requiredHeader);

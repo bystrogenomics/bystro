@@ -21,9 +21,3 @@ def test_methods():
     s1 = la.norm(cov_emp - cov)
     s2 = la.norm(cov_est - cov)
     assert np.abs(s2 - s1) <= 0.01
-
-    idx_subset = np.zeros(p)
-    n_sub = 8
-    idx_subset[:n_sub] = 1
-
-    model.transform_subset(X[:, :n_sub], idx_subset == 1)

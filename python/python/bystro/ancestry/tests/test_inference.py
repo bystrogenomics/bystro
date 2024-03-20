@@ -8,9 +8,9 @@ from sklearn.ensemble import RandomForestClassifier  # type: ignore
 import pyarrow as pa  # type: ignore
 import pyarrow.dataset as ds  # type: ignore
 
-from bystro.ancestry.inference import AncestryModel, AncestryModels, infer_ancestry
+from bystro.ancestry.inference import AncestryModel, infer_ancestry
 from bystro.ancestry.train import POPS
-from bystro.ancestry.listener import _get_models_from_s3
+from bystro.ancestry.listener import _get_model_from_s3
 
 SAMPLES = [f"sample{i}" for i in range(len(POPS))]
 VARIANTS = ["variant1", "variant2", "variant3"]
@@ -45,7 +45,7 @@ def _infer_ancestry():
     genotypes = genotypes.rename(columns={"index": "locus"})
     genotypes = ds.dataset(pa.Table.from_pandas(genotypes, preserve_index=False).to_batches())
 
-    return infer_ancestry(AncestryModels(ancestry_model, ancestry_model), genotypes), samples
+    return infer_ancestry(ancestry_model, genotypes), samples
 
 
 def _make_ancestry_model() -> AncestryModel:
@@ -84,10 +84,10 @@ def test_infer_ancestry():
 
 @pytest.mark.integration()
 def test_infer_ancestry_from_model():
-    ancestry_models = _get_models_from_s3("hg38")
+    ancestry_model = _get_model_from_s3()
 
     # Generate an arrow table that contains genotype dosages for 1000 samples
-    variants = list(ancestry_models.gnomad_model.pca_loadings_df.index)
+    variants = list(ancestry_model.pca_loadings_df.index)
     samples = [f"sample{i}" for i in range(1000)]
     genotypes = pd.DataFrame(
         np.random.randint(0, 2, (len(variants), len(samples))),  # noqa: NPY002
@@ -105,7 +105,7 @@ def test_infer_ancestry_from_model():
 
     genotypes = ds.dataset(pa.Table.from_pandas(genotypes, preserve_index=False).to_batches())
 
-    ancestry_response = infer_ancestry(ancestry_models, genotypes)
+    ancestry_response = infer_ancestry(ancestry_model, genotypes)
 
     assert len(samples) == len(ancestry_response.results)
 
