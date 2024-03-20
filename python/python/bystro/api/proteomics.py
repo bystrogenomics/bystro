@@ -11,7 +11,6 @@ import uuid
 # ruff: noqa: T201
 
 UPLOAD_PROTEIN_ENDPOINT = "/api/jobs/proteomics/"
-GET_PROTEOMICS_ENDPOINT = "/api/jobs/getProteomics/"
 GET_ANNOTATION = "/api/jobs/:id"
 HTTP_STATUS_OK = 200
 ONE_HOUR_IN_SECONDS = 60 * 60
@@ -187,56 +186,3 @@ def upload_proteomics_dataset(
         print("\nProteomics submission completed successfully without annotation linkage.\n")
     
     return proteomics_response_data
-
-def fetch_proteomics_file(
-    job_id: str,
-    output: bool = False,
-    key_path: str | None = None,
-    print_result: bool = True,
-) -> None:
-    """
-    Fetch the proteomics feather file from the /api/jobs/getProteomics endpoint.
-
-    Parameters
-    ----------
-    job_id : str
-        The ID of the job of the proteomics annotated job.
-    output : bool, optional
-        Whether to fetch the output file (True) or the input file (False), by default False.
-    key_path : str, optional
-        The key path for the output file, required if `output` is True.
-    print_result : bool
-        Whether to print the result of the fetch operation, by default True.
-    """
-
-    state, auth_header = authenticate()
-    url = state.url + GET_PROTEOMICS_ENDPOINT
-
-    payload = {
-        "output": output,
-    }
-
-    if output:
-        if key_path is None:
-            raise ValueError(
-                "key_path is required when output is True"
-            )
-
-        payload["keyPath"] = key_path
-
-    response = requests.post(url, headers=auth_header, json=payload)
-
-    if response.status_code == 200:
-
-        content_disposition = response.headers.get('Content-Disposition')
-        filename = content_disposition.split('filename=')[-1].strip("\"'")
-
-        with open(filename, 'wb') as file:
-            file.write(response.content)
-
-        if print_result:
-            print(f"Proteomics feather file fetched and saved as {filename} successfully.")
-    else:
-        raise RuntimeError(
-            f"Failed to fetch proteomics feather file. Error code: {response.status_code}"
-        )
