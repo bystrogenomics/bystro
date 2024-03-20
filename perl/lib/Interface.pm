@@ -13,6 +13,7 @@ use Mouse::Util::TypeConstraints;
 use namespace::autoclean;
 
 use YAML::XS qw/LoadFile/;
+use JSON::XS;
 
 use Getopt::Long::Descriptive;
 
@@ -20,24 +21,24 @@ use Seq;
 with 'MouseX::Getopt';
 
 ##########Parameters accepted from command line#################
-has input_file => (
+has input => (
   is            => 'ro',
-  isa           => 'Str',
-  required      => 1,
+  isa           => 'ArrayRef[Str]',
   metaclass     => 'Getopt',
-  cmd_aliases   => [qw/input i in/],
-  documentation => 'Input file path.',
+  cmd_aliases   => [qw/i in/],
+  documentation =>
+    'Input files. Supports mulitiple files: --in file1 --in file2 --in file3',
 );
 
-has output_file_base => (
+has output => (
   is            => 'ro',
   isa           => 'Str',
   cmd_aliases   => [qw/o out/],
   metaclass     => 'Getopt',
-  documentation => 'Where you want your output.',
+  documentation => 'Base path for output files: /path/to/output',
 );
 
-has output_json => (
+has json => (
   is            => 'ro',
   isa           => 'Bool',
   cmd_aliases   => [qw/json/],
@@ -134,11 +135,11 @@ has maxThreads => (
   is            => 'ro',
   isa           => 'Int',
   metaclass     => 'Getopt',
+  cmd_aliases   => [qw/threads/],
   documentation => 'Number of CPU threads to use (optional)',
 );
 
-subtype HashRefJson => as
-  'HashRef'; #subtype 'HashRefJson', as 'HashRef', where { ref $_ eq 'HASH' };
+subtype HashRefJson => as 'HashRef';
 coerce HashRefJson => from 'Str' => via { from_json $_ };
 subtype ArrayRefJson => as 'ArrayRef';
 coerce ArrayRefJson => from 'Str' => via { from_json $_ };
@@ -167,8 +168,8 @@ sub annotate {
 
   my $args = {
     config             => $self->config,
-    input_file         => $self->input_file,
-    output_file_base   => $self->output_file_base,
+    input_files        => $self->input,
+    output_file_base   => $self->output,
     debug              => $self->debug,
     wantedChr          => $self->wantedChr,
     ignore_unknown_chr => $self->ignore_unknown_chr,
@@ -189,17 +190,26 @@ sub annotate {
     $args->{maxThreads} = $self->maxThreads;
   }
 
-  if ( defined $self->output_json ) {
-    $args->{outputJson} = $self->output_json;
+  if ( defined $self->json ) {
+    $args->{outputJson} = $self->json;
 
     if ( $self->run_statistics ) {
-      say STDERR "--output_json incompatible with --run_statistics 1";
+      say STDERR "--json incompatible with --run_statistics 1";
       exit(1);
     }
   }
 
   my $annotator = Seq->new_with_config($args);
-  $annotator->annotate();
+  my ( $err, $results ) = $annotator->annotate();
+
+  if ($err) {
+    say STDERR "\nError: $err\n";
+    exit(1);
+  }
+
+  say "\nCompleted successfull! Results:\n";
+  say JSON::XS->new->pretty(1)->encode($results);
+  say "";
 }
 
 __PACKAGE__->meta->make_immutable;
