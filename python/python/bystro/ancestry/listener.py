@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 
 import boto3  # type: ignore
-from botocore.exceptions import ClientError # type: ignore
+from botocore.exceptions import ClientError  # type: ignore
 import msgspec
 import pandas as pd
 import pyarrow.dataset as ds  # type: ignore
@@ -13,7 +13,7 @@ from ruamel.yaml import YAML
 from skops.io import load as skops_load  # type: ignore
 
 from bystro.ancestry.ancestry_types import AncestryResults
-from bystro.ancestry.inference import AncestryModel, infer_ancestry
+from bystro.ancestry.inference import AncestryModel, AncestryModels, infer_ancestry
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
 from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, get_progress_reporter, listen
 
@@ -29,24 +29,16 @@ logger = logging.getLogger()
 
 ANCESTRY_TUBE = "ancestry"
 ANCESTRY_BUCKET = "bystro-ancestry"
-PCA_FILE = "pca.csv"
-RFC_FILE = "rfc.skop"
+GNOMAD_PCA_FILE = "gnomadset_pca.csv"
+GNOMAD_RFC_FILE = "gnomadset_rfc.skop"
+ARRAY_PCA_FILE = "arrayset_pca.csv"
+ARRAY_RFC_FILE = "arrayset_rfc.skop"
 
-models_cache: dict[str, AncestryModel] = {}
+models_cache: dict[str, AncestryModels] = {}
 
 
-def _get_model_from_s3(assembly: str) -> AncestryModel:
-    if assembly in models_cache:
-        logger.info("Model for assembly %s found in cache.", assembly)
-        return models_cache[assembly]
-
+def _get_one_model_from_s3(pca_local_key, rfc_local_key, pca_file_key, rfc_file_key) -> AncestryModel:
     s3_client = boto3.client("s3")
-
-    pca_local_key = f"{assembly}_pca.csv"
-    rfc_local_key = f"{assembly}_rfc.skop"
-
-    pca_file_key = f"{assembly}/{pca_local_key}"
-    rfc_file_key = f"{assembly}/{rfc_local_key}"
 
     logger.info("Downloading PCA file %s", pca_file_key)
 
@@ -55,9 +47,7 @@ def _get_model_from_s3(assembly: str) -> AncestryModel:
             s3_client.download_file(Bucket=ANCESTRY_BUCKET, Key=pca_file_key, Filename=pca_local_key)
         except ClientError as e:
             if e.response["Error"]["Code"] == "NoSuchKey":
-                raise ValueError(
-                    f"{assembly} ancestry PCA file not found. This assembly is not supported."
-                )
+                raise ValueError(f"{pca_file_key} not found. This assembly is not supported.")
             raise  # Re-raise the exception if it's not a "NoSuchKey" error
 
         try:
@@ -65,7 +55,7 @@ def _get_model_from_s3(assembly: str) -> AncestryModel:
         except ClientError as e:
             if e.response["Error"]["Code"] == "NoSuchKey":
                 raise ValueError(
-                    f"{assembly} ancestry model not found. This assembly is not supported."
+                    f"{rfc_file_key} ancestry model not found. This assembly is not supported."
                 )
             raise
 
@@ -82,16 +72,43 @@ def _get_model_from_s3(assembly: str) -> AncestryModel:
 
     logger.info("Loaded ancestry models from S3")
 
-    model = AncestryModel(pca_loadings_df, rfc)
+    return AncestryModel(pca_loadings_df, rfc)
+
+
+def _get_models_from_s3(assembly: str) -> AncestryModels:
+    if assembly in models_cache:
+        logger.info("Model for assembly %s found in cache.", assembly)
+        return models_cache[assembly]
+
+    pca_local_key_gnomad = f"{assembly}_{GNOMAD_PCA_FILE}"
+    rfc_local_key_gnomad = f"{assembly}_{GNOMAD_RFC_FILE}"
+
+    pca_file_key_gnomad = f"{assembly}/{pca_local_key_gnomad}"
+    rfc_file_key_gnomad = f"{assembly}/{rfc_local_key_gnomad}"
+
+    pca_local_key_array = f"{assembly}_{ARRAY_PCA_FILE}"
+    rfc_local_key_array = f"{assembly}_{ARRAY_RFC_FILE}"
+
+    pca_file_key_array = f"{assembly}/{pca_local_key_array}"
+    rfc_file_key_array = f"{assembly}/{rfc_local_key_array}"
+
+    gnomad_model = _get_one_model_from_s3(
+        pca_local_key_gnomad, rfc_local_key_gnomad, pca_file_key_gnomad, rfc_file_key_gnomad
+    )
+    array_model = _get_one_model_from_s3(
+        pca_local_key_array, rfc_local_key_array, pca_file_key_array, rfc_file_key_array
+    )
+
+    models = AncestryModels(gnomad_model, array_model)
 
     # Update the cache with the new model
-    if len(models_cache) >= 2:
+    if len(models_cache) >= 1:
         # Remove the oldest loaded model to maintain cache size
         oldest_assembly = next(iter(models_cache))
         del models_cache[oldest_assembly]
-    models_cache[assembly] = model
+    models_cache[assembly] = models
 
-    return model
+    return models
 
 
 class AncestryJobData(BaseMessage, frozen=True, rename="camel"):
@@ -139,9 +156,9 @@ def handler_fn(publisher: ProgressPublisher, job_data: AncestryJobData) -> Ances
 
     dataset = ds.dataset(job_data.dosage_matrix_path, format="arrow")
 
-    ancestry_model = _get_model_from_s3(job_data.assembly)
+    ancestry_models = _get_models_from_s3(job_data.assembly)
 
-    return infer_ancestry(ancestry_model, dataset)
+    return infer_ancestry(ancestry_models, dataset)
 
 
 def submit_msg_fn(ancestry_job_data: AncestryJobData) -> SubmittedJobMessage:

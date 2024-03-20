@@ -305,7 +305,7 @@ sub annotateFile {
 
       # 3 holds the input reference, we'll replace this with the discordant status
       $fields[$discordantIdx] =
-        $refTrackGetter->get($dataFromDbAref) ne $fields[3] ? 1 : 0;
+        $refTrackGetter->get($dataFromDbAref) ne $fields[3] ? "true" : "false";
 
       push @lines, \@fields;
     }

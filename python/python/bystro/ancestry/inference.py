@@ -2,6 +2,7 @@
 
 import logging
 import os
+from typing import Generator
 import psutil
 
 from msgspec import Struct
@@ -9,9 +10,9 @@ import numpy as np
 import pandas as pd
 
 import pyarrow.compute as pc  # type: ignore
-from pyarrow.dataset import Dataset  # type: ignore
+from pyarrow.dataset import Dataset, Scanner  # type: ignore
 
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier # type: ignore
 
 from bystro.ancestry.ancestry_types import (
     AncestryResults,
@@ -71,6 +72,12 @@ class AncestryModel(Struct, frozen=True, forbid_unknown_fields=True, rename="cam
         return Xpc_dict, pd.DataFrame(probs, index=genotypes.columns, columns=POPS)
 
 
+def _generate_batches(scanner: Scanner) -> Generator[pd.DataFrame, None, None]:
+    for batch in scanner.to_batches():
+        batch_df = batch.to_pandas()
+        yield batch_df.set_index("locus")
+
+
 def _package_ancestry_response_from_pop_probs(
     pcs_for_plotting: dict[str, list[float]],
     pop_probs_df: pd.DataFrame,
@@ -119,14 +126,24 @@ def _package_ancestry_response_from_pop_probs(
     return AncestryResults(results=ancestry_results, pcs=pcs_for_plotting)
 
 
-def infer_ancestry(ancestry_model: AncestryModel, genotypes: Dataset) -> AncestryResults:
+class AncestryModels(Struct, frozen=True, forbid_unknown_fields=True, rename="camel"):
+    """
+    A Struct of trained models for predicting ancestry,
+    using either gnomAD PC's or genotyping array PC's, depending on which has lower missingness.
+    """
+
+    gnomad_model: AncestryModel
+    array_model: AncestryModel
+
+
+def infer_ancestry(ancestry_models: AncestryModels, genotypes: Dataset) -> AncestryResults:
     """
     Infer ancestry from genotypes using a trained model.
 
     Parameters
     ----------
-    ancestry_model: AncestryModel
-        A trained model for predicting ancestry from genotypes.
+    ancestry_models: AncestryModels
+        A Struct of trained models for predicting ancestry,
 
     genotypes: Arrow Dataset, shape (n_variants, m_samples)
         A dataset containing genotypes to be classified.
@@ -161,25 +178,60 @@ def infer_ancestry(ancestry_model: AncestryModel, genotypes: Dataset) -> Ancestr
 
     logger.debug("Beginning ancestry inference")
 
+    logger.info(
+        "Memory usage before dosage matrix filtered row counting: %s (MB)",
+        psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+    )
+
     with Timer() as timer:
-        mask = pc.field("locus").isin(ancestry_model.pca_loadings_df.index)
-        scanner = genotypes.scanner(filter=mask)
+        gnomad_model = ancestry_models.gnomad_model
+        array_model = ancestry_models.array_model
 
-        # Initialize an empty DataFrame or a list to collect batches
-        filtered_genotypes = []
+        mask_gnomad = pc.field("locus").isin(gnomad_model.pca_loadings_df.index)
+        mask_array = pc.field("locus").isin(array_model.pca_loadings_df.index)
 
-        for batch in scanner.to_batches():
-            # Convert the current batch to a pandas DataFrame
-            batch_df = batch.to_pandas()
+        scanner_gnomad = genotypes.scanner(filter=mask_gnomad)
+        scanner_array = genotypes.scanner(filter=mask_array)
 
-            # Set the index to 'locus', assuming 'locus' is a column in your dataset
-            batch_df = batch_df.set_index("locus")
+        gnomad_matching_row_count = scanner_gnomad.count_rows()
+        array_matching_row_count = scanner_array.count_rows()
 
-            # Append the processed batch to the list
-            filtered_genotypes.append(batch_df)
+        logger.debug(
+            "Found %d rows in genotypes matching gnomAD PCA loadings",
+            gnomad_matching_row_count,
+        )
+        logger.debug(
+            "Found %d rows in genotypes matching array PCA loadings",
+            array_matching_row_count,
+        )
 
-        # Concatenate all batches into a single DataFrame
-        genotypes_df = pd.concat(filtered_genotypes)
+        logger.info(
+            "Memory usage after dosage matrix filtered row counting: %s (MB)",
+            psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+        )
+
+        if gnomad_matching_row_count >= array_matching_row_count:
+            scanner = scanner_gnomad
+            ancestry_model = gnomad_model
+
+            logger.debug("Using gnomAD PCA loadings for ancestry inference due to lower missingness")
+
+            del scanner_array
+            del array_model
+        else:
+            scanner = scanner_array
+            ancestry_model = array_model
+
+            logger.debug("Using array PCA loadings for ancestry inference due to lower missingness")
+
+            del scanner_gnomad
+            del gnomad_model
+
+    logger.info("Completed ancestry model selection in %f seconds", timer.elapsed_time)
+
+    with Timer() as timer:
+        # Directly concatenate the batches using a generator expression
+        genotypes_df = pd.concat(_generate_batches(scanner))
 
     logger.info(
         "Memory usage after dosage matrix filtering: %s (MB)",
