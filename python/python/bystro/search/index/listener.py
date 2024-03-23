@@ -20,7 +20,7 @@ from msgspec import json
 
 TUBE = "index"
 
-_GO_HANDLER_BINARY_PATH = None
+_GO_HANDLER_BINARY_PATH: str | None = None
 
 
 def get_go_handler_binary_path() -> str:
@@ -45,11 +45,19 @@ def get_go_handler_binary_path() -> str:
 
 def run_binary_with_args(binary_path: str, args: list[str]) -> list[str]:
     """
-    Run the binary with specified arguments and handle errors.
-    :param binary_path: Path to the binary file.
-    :param args: List of arguments for the binary.
-    :return: None
+    Run a binary with the specified arguments and return the output as a list of strings.
+
+    Args:
+        binary_path (str): The path to the binary executable.
+        args (list[str]): The list of arguments to pass to the binary.
+
+    Returns:
+        list[str]: The output of the binary as a list of strings.
+
+    Raises:
+        RuntimeError: If the binary execution fails or if there is an error in the stderr output.
     """
+
     # Construct the command
     command = [binary_path] + args
 
@@ -58,11 +66,11 @@ def run_binary_with_args(binary_path: str, args: list[str]) -> list[str]:
     stdout, stderr = process.communicate()
 
     if process.returncode != 0 or stderr:
-        raise Exception(f"Binary execution failed: {stderr.decode('utf-8')}")
+        raise RuntimeError(f"Binary execution failed: {stderr.decode('utf-8')}")
 
-    headerFieldsStr = stdout.decode("utf-8")
+    header_fields = stdout.decode("utf-8")
 
-    return json.decode(headerFieldsStr, type=list[str])
+    return json.decode(header_fields, type=list[str])
 
 
 def run_handler_with_config(
@@ -74,6 +82,24 @@ def run_handler_with_config(
     submission_id: SubmissionID | None = None,
     queue_config: str | None = None,
 ) -> list[str]:
+    """
+    Run the handler with the specified configuration.
+
+    Args:
+        index_name (str): The name of the index.
+        mapping_config (str): The path to the mapping configuration file.
+        opensearch_config (str): The path to the OpenSearch configuration file.
+        annotation_path (str): The path to the annotation file.
+        no_queue (bool, optional): Whether to disable the queue. Defaults to False.
+        submission_id (SubmissionID | None, optional): The submission ID. Required when no_queue is not False. Defaults to None.
+        queue_config (str | None, optional): The path to the queue configuration file. Required when no_queue is not False. Defaults to None.
+
+    Returns:
+        list[str]: The header fields.
+
+    Raises:
+        ValueError: If submission_id and queue_config are not specified when no_queue is not False.
+    """
     binary_path = get_go_handler_binary_path()
     args = [
         "--index-name",
