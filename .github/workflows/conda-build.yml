@@ -22,6 +22,7 @@ jobs:
       run: |
         . .initialize_conda_env.sh
         make install
+        echo "PATH=$CONDA/bin:$PATH" >> $GITHUB_ENV
       shell: bash
     - name: Verify Bystro wheel exists
       run: |
