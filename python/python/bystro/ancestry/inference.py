@@ -4,6 +4,7 @@ import logging
 import os
 from typing import Generator
 import psutil
+import warnings
 
 from msgspec import Struct
 import numpy as np
@@ -12,7 +13,7 @@ import pandas as pd
 import pyarrow.compute as pc  # type: ignore
 from pyarrow.dataset import Dataset, Scanner  # type: ignore
 
-from sklearn.ensemble import RandomForestClassifier # type: ignore
+from sklearn.ensemble import RandomForestClassifier  # type: ignore
 
 from bystro.ancestry.ancestry_types import (
     AncestryResults,
@@ -27,6 +28,7 @@ from bystro.ancestry.train import POPS, SUPERPOP_FROM_POP, SUPERPOPS
 from bystro.utils.timer import Timer
 
 logger = logging.getLogger(__name__)
+warnings.simplefilter(action="ignore", category=FutureWarning)
 
 
 class AncestryModel(Struct, frozen=True, forbid_unknown_fields=True, rename="camel"):

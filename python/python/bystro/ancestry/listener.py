@@ -4,20 +4,16 @@ import argparse
 import logging
 from pathlib import Path
 
-import boto3  # type: ignore
-from botocore.exceptions import ClientError  # type: ignore
 import msgspec
-import pandas as pd
 import pyarrow.dataset as ds  # type: ignore
 from ruamel.yaml import YAML
-from skops.io import load as skops_load  # type: ignore
 
 from bystro.ancestry.ancestry_types import AncestryResults
-from bystro.ancestry.inference import AncestryModel, AncestryModels, infer_ancestry
+from bystro.ancestry.inference import infer_ancestry
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
 from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, get_progress_reporter, listen
 
-from bystro.utils.timer import Timer
+from bystro.ancestry.model import get_models_from_s3
 
 logging.basicConfig(
     filename="ancestry_listener.log",
@@ -28,88 +24,6 @@ logging.basicConfig(
 logger = logging.getLogger()
 
 ANCESTRY_TUBE = "ancestry"
-ANCESTRY_BUCKET = "bystro-ancestry"
-GNOMAD_PCA_FILE = "gnomadset_pca.csv"
-GNOMAD_RFC_FILE = "gnomadset_rfc.skop"
-ARRAY_PCA_FILE = "arrayset_pca.csv"
-ARRAY_RFC_FILE = "arrayset_rfc.skop"
-
-models_cache: dict[str, AncestryModels] = {}
-
-
-def _get_one_model_from_s3(pca_local_key, rfc_local_key, pca_file_key, rfc_file_key) -> AncestryModel:
-    s3_client = boto3.client("s3")
-
-    logger.info("Downloading PCA file %s", pca_file_key)
-
-    with Timer() as timer:
-        try:
-            s3_client.download_file(Bucket=ANCESTRY_BUCKET, Key=pca_file_key, Filename=pca_local_key)
-        except ClientError as e:
-            if e.response["Error"]["Code"] == "NoSuchKey":
-                raise ValueError(f"{pca_file_key} not found. This assembly is not supported.")
-            raise  # Re-raise the exception if it's not a "NoSuchKey" error
-
-        try:
-            s3_client.download_file(Bucket=ANCESTRY_BUCKET, Key=rfc_file_key, Filename=rfc_local_key)
-        except ClientError as e:
-            if e.response["Error"]["Code"] == "NoSuchKey":
-                raise ValueError(
-                    f"{rfc_file_key} ancestry model not found. This assembly is not supported."
-                )
-            raise
-
-    logger.debug("Downloaded PCA file and RFC file in %f seconds", timer.elapsed_time)
-
-    with Timer() as timer:
-        logger.info("Loading PCA file %s", pca_local_key)
-        pca_loadings_df = pd.read_csv(pca_local_key, index_col=0)
-
-        logger.info("Loading RFC file %s", rfc_local_key)
-        rfc = skops_load(rfc_local_key)
-
-    logger.debug("Loaded PCA and RFC files in %f seconds", timer.elapsed_time)
-
-    logger.info("Loaded ancestry models from S3")
-
-    return AncestryModel(pca_loadings_df, rfc)
-
-
-def _get_models_from_s3(assembly: str) -> AncestryModels:
-    if assembly in models_cache:
-        logger.info("Model for assembly %s found in cache.", assembly)
-        return models_cache[assembly]
-
-    pca_local_key_gnomad = f"{assembly}_{GNOMAD_PCA_FILE}"
-    rfc_local_key_gnomad = f"{assembly}_{GNOMAD_RFC_FILE}"
-
-    pca_file_key_gnomad = f"{assembly}/{pca_local_key_gnomad}"
-    rfc_file_key_gnomad = f"{assembly}/{rfc_local_key_gnomad}"
-
-    pca_local_key_array = f"{assembly}_{ARRAY_PCA_FILE}"
-    rfc_local_key_array = f"{assembly}_{ARRAY_RFC_FILE}"
-
-    pca_file_key_array = f"{assembly}/{pca_local_key_array}"
-    rfc_file_key_array = f"{assembly}/{rfc_local_key_array}"
-
-    gnomad_model = _get_one_model_from_s3(
-        pca_local_key_gnomad, rfc_local_key_gnomad, pca_file_key_gnomad, rfc_file_key_gnomad
-    )
-    array_model = _get_one_model_from_s3(
-        pca_local_key_array, rfc_local_key_array, pca_file_key_array, rfc_file_key_array
-    )
-
-    models = AncestryModels(gnomad_model, array_model)
-
-    # Update the cache with the new model
-    if len(models_cache) >= 1:
-        # Remove the oldest loaded model to maintain cache size
-        oldest_assembly = next(iter(models_cache))
-        del models_cache[oldest_assembly]
-    models_cache[assembly] = models
-
-    return models
-
 
 class AncestryJobData(BaseMessage, frozen=True, rename="camel"):
     """
@@ -156,7 +70,7 @@ def handler_fn(publisher: ProgressPublisher, job_data: AncestryJobData) -> Ances
 
     dataset = ds.dataset(job_data.dosage_matrix_path, format="arrow")
 
-    ancestry_models = _get_models_from_s3(job_data.assembly)
+    ancestry_models = get_models_from_s3(job_data.assembly)
 
     return infer_ancestry(ancestry_models, dataset)
 
