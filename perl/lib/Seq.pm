@@ -104,7 +104,7 @@ sub annotateFile {
   my $self = shift;
   my $type = shift;
 
-  my ( $err, $inFhs, $outFh, $statsFh, $headerFh ) = $self->_getFileHandles($type);
+  my ( $err, $inFhs, $outFh, $statsFh, $headerFh, $preOutArgs ) = $self->_getFileHandles($type);
 
   if ($err) {
     $self->_errorWithCleanup($err);
@@ -381,8 +381,7 @@ sub annotateFile {
        $self->safeClose($outFh)
     || ( $statsFh && $self->safeClose($statsFh) )
     || $self->safeSystem( "cp " . $self->config . " $configOutPath" )
-    || $self->safeSystem('sync')
-    || $self->_moveFilesToOutputDir();
+    || $self->safeSystem('sync');
 
   if ($err) {
     $self->_errorWithCleanup($err);
@@ -390,6 +389,103 @@ sub annotateFile {
   }
 
   $db->cleanUp();
+
+  # If there are multiple input files, we will have multiple pre-processor outputs
+  # should the pre-processor be configured to output sampleList or dosageMatrixOutPath
+  # We need to combine these into a single file each
+
+  # 1) For the sampleList, we need to:
+  ## 1a) check that the sampleList files are identical
+  ## 1b) if they are, we can simply move one to the final outBaseName.sample_list destination
+  ## 1c) if they are not, we need to combine them and note that they are not identical
+  # 2) for the dosageMatrixOutPath, we need to call the dosage-combiner
+  ## 2a) the dosage-combiner will check that the dosageMatrixOutPath schemas are identical
+  ## 2b) if they are, it will combine them into a single file
+  ## 2c) if they are not, it will combine them into a single file, such that the schema is the union of all schemas
+  ## 2c) meaning that the number of samples is the total across all dosage files
+  ## 2c) and the number of variants is the total across all dosage files
+  ## 2c) with missing values filled in with 0 (reference allele)
+
+  # Step 1:
+  if(@$preOutArgs > 1) {
+    $self->log("has multiple pre-processor outputs; combining them");
+    my @sampleLists;
+    my @dosageMatrixOutPaths;
+    for my $preOutArgHref (@$preOutArgs) {
+      if ( $preOutArgHref->{sampleList} ) {
+        push @sampleLists, $preOutArgHref->{sampleList};
+      }
+
+      if ( $preOutArgHref->{dosageMatrixOutPath} ) {
+        push @dosageMatrixOutPaths, $preOutArgHref->{dosageMatrixOutPath};
+      }
+    }
+
+    # Read the sample lists, and check that they are identical
+    if (@sampleLists) {
+      my $sampleList = $self->_workingDir->child( $self->outputFilesInfo->{sampleList} );
+
+      my $sampleListContents;
+      my $sampleListErr;
+      my %uniqueSamples;
+      my @uniqueSamples;
+
+      my $idx = 0;
+      my $hasNonUniqueSamples = 0;
+      for my $sampleListPath (@sampleLists) {
+        my $sampleListContentsNew = path($sampleListPath)->slurp;
+
+        # We could have heterogenous files, some with samples and some without
+        if(!$sampleListContentsNew) {
+          next;
+        }
+
+        my @samples = split( '\n', $sampleListContentsNew );
+        for(@samples) {
+          if($uniqueSamples{$_}) {
+            next;
+          }
+
+          $uniqueSamples{$_} = 1;
+          push @uniqueSamples, $_;
+
+          if($idx > 0) {
+            $hasNonUniqueSamples = 1;
+          }
+        }
+
+        $idx += 1;
+      }
+
+      $sampleListContents = join("\n", @uniqueSamples);
+
+      my $finalSampleListDestination = $self->_workingDir->child( $self->outputFilesInfo->{sampleList} );
+      $err = $self->safeSystem("echo \"$sampleListContents\" > $finalSampleListDestination");
+
+      if ($err) {
+        $self->_errorWithCleanup($err);
+        return ( $err, undef );
+      }
+
+      # Remove the intermediate sample lists
+      for my $sampleListPath (@sampleLists) {
+        $err = $self->safeSystem("rm $sampleListPath");
+
+        if ($err) {
+          $self->_errorWithCleanup($err);
+          return ( $err, undef );
+        }
+      }
+    }
+
+    $self->log("done combining pre-processor outputs");
+  }
+
+  $err = $self->_moveFilesToOutputDir();
+  if ($err) {
+    $self->_errorWithCleanup($err);
+    return ( $err, undef );
+  }
 
   return ( $err, $self->outputFilesInfo );
 }
@@ -444,16 +540,21 @@ sub makeLogProgressAndPrint {
 sub _getFileHandles {
   my ( $self, $type ) = @_;
 
-  my ( $outFh, $statsFh, @inFhs, $headerFh, $err );
+  my ( $outFh, $statsFh, @inFhs, @preOutArgs, $headerFh, $err );
 
+  my $index = 0;
+  my $total = @{ $self->input_files };
   for my $file ( @{ $self->input_files } ) {
-    my ( $err, $inFh ) = $self->_openAnnotationPipe( $type, $file );
+    my ( $err, $inFh, $preOutArgHref ) = $self->_openAnnotationPipe( $type, $file, $index, $total );
 
     if ($err) {
       return ( $err, undef, undef, undef, undef );
     }
 
     push @inFhs, $inFh;
+    push @preOutArgs, $preOutArgHref;
+
+    $index += 1;
   }
 
   if ( $self->run_statistics ) {
@@ -463,7 +564,7 @@ sub _getFileHandles {
     $err = $self->safeOpen( $statsFh, "|-", $statArgs );
 
     if ($err) {
-      return ( $err, undef, undef, undef, undef );
+      return ( $err, undef, undef, undef, undef, undef );
     }
   }
 
@@ -471,20 +572,20 @@ sub _getFileHandles {
   ( $err, $outFh ) = $self->getWriteFh( $self->{_outPath} );
 
   if ($err) {
-    return ( $err, undef, undef, undef, undef );
+    return ( $err, undef, undef, undef, undef, undef );
   }
 
   ( $err, $headerFh ) = $self->getWriteFh( $self->{_headerPath} );
 
   if ($err) {
-    return ( $err, undef, undef, undef, undef );
+    return ( $err, undef, undef, undef, undef, undef );
   }
 
-  return ( undef, \@inFhs, $outFh, $statsFh, $headerFh );
+  return ( undef, \@inFhs, $outFh, $statsFh, $headerFh, \@preOutArgs );
 }
 
 sub _preparePreprocessorProgram {
-  my ( $self, $type, $inPath ) = @_;
+  my ( $self, $type, $inPath, $index, $total ) = @_;
 
   if ( !$self->fileProcessors->{$type} ) {
     $self->_errorWithCleanup("No fileProcessors defined for $type file type");
@@ -507,32 +608,37 @@ sub _preparePreprocessorProgram {
     $finalProgram = $echoProg . " | " . $fp->{program};
   }
 
+  my %finalPreprocessArgs;
   if ( $fp->{args} ) {
     my $args = $fp->{args};
 
-    for my $type ( keys %{ $self->outputFilesInfo } ) {
+    my $potentialPreArgs = $self->prepareBystroPreprocessorOutputsForMultiFile( $index, $total );
+
+    for my $type ( keys %{ $potentialPreArgs } ) {
       if ( index( $args, "\%$type\%" ) > -1 ) {
-        substr( $args, index( $args, "\%$type\%" ), length("\%$type\%") ) =
-          $self->_workingDir->child( $self->outputFilesInfo->{$type} );
+        my $arg = $self->_workingDir->child( $potentialPreArgs->{$type} );
+        substr( $args, index( $args, "\%$type\%" ), length("\%$type\%") ) = $arg;
+
+        $finalPreprocessArgs{$type} = $arg;
       }
     }
 
     $finalProgram .= " $args";
   }
 
-  return ( $finalProgram, $errPath );
+  return ( $finalProgram, $errPath, \%finalPreprocessArgs );
 }
 
 sub _openAnnotationPipe {
-  my ( $self, $type, $inPath ) = @_;
+  my ( $self, $type, $inPath, $index, $total ) = @_;
 
-  my ( $finalProgram, $errPath ) =
-    $self->_preparePreprocessorProgram( $type, $inPath );
+  my ( $finalProgram, $errPath, $preOutArgs ) =
+    $self->_preparePreprocessorProgram( $type, $inPath, $index, $total );
 
   my $fh;
   my $err = $self->safeOpen( $fh, '-|', "$finalProgram 2> $errPath" );
 
-  return ( $err, $fh );
+  return ( $err, $fh, $preOutArgs );
 }
 
 sub _getFinalHeader {

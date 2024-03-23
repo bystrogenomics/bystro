@@ -1,3 +1,4 @@
+# TODO //2024-03-24 @akotlar: Split out pre-processor outputs into separate attribute
 use 5.10.0;
 use strict;
 use warnings;
@@ -105,7 +106,10 @@ has outputFilesInfo => (
       . ".annotation.$extension"
       . ( $self->compress ? "." . $self->compressType : "" );
     $out{header}     = $outBaseName . ".annotation.header.json";
+
+    # sampleList and dosageMatrixOutPath are available to be used by the preprocessor
     $out{sampleList} = $outBaseName . '.sample_list';
+    $out{dosageMatrixOutPath} = $outBaseName . '.dosage.feather';
 
     # Must be lazy in order to allow "revealing module pattern", with __statisticsRunner below
     if ( $self->run_statistics ) {
@@ -115,8 +119,6 @@ has outputFilesInfo => (
         qc   => path( $self->_statisticsRunner->qcFilePath )->basename,
       };
     }
-
-    $out{dosageMatrixOutPath} = $outBaseName . '.dosage.feather';
 
     if ( $self->archive ) {
       # Seq::Role::IO method
@@ -195,6 +197,28 @@ has _statisticsRunner => (
     return undef;
   }
 );
+
+sub prepareBystroPreprocessorOutputsForMultiFile {
+  # If we have multiple files, we need to update the outputs that the pre-processor
+  # generates, so that they are unique to each preprocessor instance
+  my $self = shift;
+
+  # the index of the current input file
+  my $index = shift;
+
+  # the total number of expected input files
+  my $totalCount = shift;
+
+  # Update sampleList and dosageMatrixOutPath based on the index
+  # But if the index is 0 and totalCount is 1, we don't need to update the file names
+  my %preprocessorOutputs;
+  if (!($index == 0 && $totalCount == 1)) {
+    $preprocessorOutputs{sampleList} = $self->outputFilesInfo->{sampleList} . ".$index";
+    $preprocessorOutputs{dosageMatrixOutPath} = $self->outputFilesInfo->{dosageMatrixOutPath} . ".$index";
+  }
+
+  return \%preprocessorOutputs;
+}
 
 # TODO: This assumes that if workingDir != outDir, the working dir is only for annotation files
 # TODO: Properly set write permissions
