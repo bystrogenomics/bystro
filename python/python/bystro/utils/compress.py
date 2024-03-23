@@ -31,7 +31,20 @@ IS_GZIP = GZIP_EXECUTABLE.endswith("gzip")
 IS_BGZIP = GZIP_EXECUTABLE.endswith("bgzip")
 
 
-def get_compress_from_pipe_cmd(out: str, pipe_from_cmd: str = None, pipe_to_cmd: str = None) -> str:
+def get_compress_from_pipe_cmd(
+    out: str, pipe_from_cmd: str | None = None, pipe_to_cmd: str | None = None
+) -> str:
+    """
+    Generate a command string for compressing data from a pipe.
+
+    Args:
+        out (str): The output path for the compressed data.
+        pipe_from_cmd (str | None, optional): The command to pipe data from. Defaults to None.
+        pipe_to_cmd (str | None, optional): The command to pipe data to. Defaults to None.
+
+    Returns:
+        str: The command string for compressing data from a pipe.
+    """
     cmd = None
     if (IS_PIGZ or IS_BGZIP or IS_GZIP) and not out.endswith(".gz"):
         raise ValueError("Output path must end with .gz")
@@ -52,14 +65,24 @@ def get_compress_from_pipe_cmd(out: str, pipe_from_cmd: str = None, pipe_to_cmd:
     return f"{cmd} > {out}"
 
 
-def get_decompress_to_pipe_cmd(input_path: str, pipe_to_cmd: str = None) -> str:
+def get_decompress_to_pipe_cmd(input_path: str, pipe_to_cmd: str | None = None) -> str:
+    """
+    Generate a command for decompressing a file to a pipe.
+
+    Args:
+        input_path (str): The path to the input file.
+        pipe_to_cmd (str, optional): The command to pipe the decompressed output to. Defaults to None.
+
+    Returns:
+        str: The command for decompressing the file to a pipe.
+    """
+
     cmd = None
-    if IS_PIGZ:
-        # pigz doesn't benefit much from more than 2 threads during decompression
-        cmd = f"{GZIP_EXECUTABLE} -d -c {input_path} -p 2"
-    elif IS_BGZIP:
+   
+    if IS_BGZIP:
         cmd = f"{GZIP_EXECUTABLE} -d -c {input_path} --threads {NUM_CPUS}"
     else:
+        # pigz decompression is multithreaded by default
         cmd = f"{GZIP_EXECUTABLE} -d -c {input_path}"
 
     if pipe_to_cmd:
