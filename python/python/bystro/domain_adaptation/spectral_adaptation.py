@@ -25,7 +25,6 @@ import numpy as np
 import numpy.linalg as la
 import cvxpy as cp
 import time
-from sklearn.preprocessing import StandardScaler
 from typing import List, Optional
 
 
