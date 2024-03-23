@@ -91,8 +91,10 @@ def run_handler_with_config(
         opensearch_config (str): The path to the OpenSearch configuration file.
         annotation_path (str): The path to the annotation file.
         no_queue (bool, optional): Whether to disable the queue. Defaults to False.
-        submission_id (SubmissionID | None, optional): The submission ID. Required when no_queue is not False. Defaults to None.
-        queue_config (str | None, optional): The path to the queue configuration file. Required when no_queue is not False. Defaults to None.
+        submission_id (SubmissionID | None, optional):
+            The submission ID. Required when no_queue is not False (optional).
+        queue_config (str | None, optional):
+            The path to the queue configuration file. Required when no_queue is not False (optional).
 
     Returns:
         list[str]: The header fields.
