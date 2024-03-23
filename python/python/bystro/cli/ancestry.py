@@ -62,6 +62,7 @@ def add_ancestry_subparser(subparsers):
     )
     ancestry_score_parser.add_argument(
         "--dosage",
+        default=False,
         action="store_true",
         help="Whether or not to write the dosage matrix output to the output directory (optional)",
     )
@@ -95,4 +96,7 @@ def _calculate_and_write_ancestry_scores(args: argparse.Namespace):
     if args.out_dir is None:
         json_data = msgspec.json.encode(res)
 
-        print(json_data)
+        print(str(json_data, "utf-8"))
+
+    else:
+        print(f"Ancestry results written to {args.out_dir}")

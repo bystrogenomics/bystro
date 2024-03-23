@@ -1,14 +1,34 @@
-# Assumes you have run ". .initialize-conda-env.sh"; since each make command runs in a separate subshell we need this to happen first
+ray-start-local:
+	ray stop && ray start --head --disable-usage-stats
 
-build:
-	cd python && maturin build --release && cd ../
+ray-stop-local:
+	ray stop
 
-develop:
-	cd go/cmd/opensearch && go build && cd ../../../
-	cd python && maturin develop && cd ../
+build-python:
+	(cd python && maturin build --release)
 
-# Ray must be started with make serve-dev
-# without ray start, make serve-dev will succeed, but the handlers that rely on Ray will fail to start
-serve-dev: develop
-	ray stop && ray start --head
+build-python-dev:
+	(cd python && maturin develop)
+
+install-python: build-python
+	pip install python/target/wheels/*.whl
+
+install-go:
+	(cd ./go && go install bystro/cmd/opensearch)
+
+install: install-python install-go
+
+uninstall:
+	pip uninstall -y bystro
+	(cd ./go && go clean -i bystro/cmd/opensearch)
+
+develop: install-go build-python-dev ray-start-local
+
+run-local: install ray-start-local
+
+# Currently assumes that Perl package has been separately installed
+serve-local: ray-stop-local run-local
 	pm2 delete all 2> /dev/null || true && pm2 start startup.yml
+
+# Currently assumes that Perl package has been separately installed
+serve-dev: ray-stop-local start-local develop pm2

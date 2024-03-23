@@ -41,7 +41,7 @@ def calculate_ancestry_scores(
         path_out_dir = Path(out_dir)
         path_out_dir.mkdir(parents=True, exist_ok=True)
 
-    if dosage is None:
+    if not dosage:
         dosage_matrix_path = tempfile.mktemp(suffix=".feather")
     else:
         if path_out_dir is None:
@@ -66,7 +66,7 @@ def calculate_ancestry_scores(
     json_data = msgspec.json.encode(results)
 
     if path_out_dir is not None:
-        with open(str(path_out_dir / "ancestry_results.json"), "wb") as f:
-            f.write(json_data)
+        with open(str(path_out_dir / "ancestry_results.json"), "w") as f:
+            f.write(str(json_data, "utf-8"))
 
     return results
