@@ -1,5 +1,5 @@
 import numpy as np
-from bystro.impute.soft_impute import SoftImpute
+from bystro.imputation.soft_impute import SoftImpute
 
 
 def reconstruction_error(XY, XY_completed, missing_mask):
@@ -16,10 +16,10 @@ def reconstruction_error(XY, XY_completed, missing_mask):
 
 
 def create_rank_k_dataset(
-    n_rows=5,
-    n_cols=5,
+    n_rows=50,
+    n_cols=50,
     k=3,
-    fraction_missing=0.1,
+    fraction_missing=0.01,
     symmetric=False,
     random_seed=2021,
 ):
@@ -46,7 +46,6 @@ def test_soft_impute_with_low_rank_random_matrix():
     XY, XY_incomplete, missing_mask = create_rank_k_dataset()
     solver = SoftImpute()
     XY_completed = solver.fit_transform(XY_incomplete)
-    _, missing_mae = reconstruction_error(
-        XY, XY_completed, missing_mask, name="SoftImpute"
-    )
+    _, missing_mae = reconstruction_error(XY, XY_completed, missing_mask)
+    print(missing_mae)
     assert missing_mae < 0.1, "Error too high!"
