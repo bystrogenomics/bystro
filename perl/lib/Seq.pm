@@ -478,6 +478,32 @@ sub annotateFile {
       }
     }
 
+    # Step 2:
+    if (@dosageMatrixOutPaths) {
+      $self->log("info", "has multiple dosageMatrixOutPaths; combining them");
+
+      my $finalOutPath = $self->_workingDir->child( $self->outputFilesInfo->{dosageMatrixOutPath} );
+
+      my $err = $self->safeSystem( 'dosage --output ' . $finalOutPath . " " . join(" ", @dosageMatrixOutPaths));
+
+      if ($err) {
+        $self->_errorWithCleanup($err);
+        return ( $err, undef );
+      }
+
+      # Remove the intermediate dosageMatrixOutPaths
+      for my $dosageMatrixOutPath (@dosageMatrixOutPaths) {
+        $err = $self->safeSystem("rm $dosageMatrixOutPath");
+
+        if ($err) {
+          $self->_errorWithCleanup($err);
+          return ( $err, undef );
+        }
+      }
+
+      $self->log("info", "finished combining dosage matrix outputs");
+    }
+
     $self->log("info", "done combining pre-processor outputs");
   }
 
