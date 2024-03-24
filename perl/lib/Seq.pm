@@ -408,7 +408,7 @@ sub annotateFile {
 
   # Step 1:
   if(@$preOutArgs > 1) {
-    $self->log("has multiple pre-processor outputs; combining them");
+    $self->log("info", "has multiple pre-processor outputs; combining them");
     my @sampleLists;
     my @dosageMatrixOutPaths;
     for my $preOutArgHref (@$preOutArgs) {
@@ -478,7 +478,7 @@ sub annotateFile {
       }
     }
 
-    $self->log("done combining pre-processor outputs");
+    $self->log("info", "done combining pre-processor outputs");
   }
 
   $err = $self->_moveFilesToOutputDir();
