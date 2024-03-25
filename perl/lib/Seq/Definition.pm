@@ -146,6 +146,8 @@ has _workingDir => (
   default  => sub {
     my $self = shift;
 
+    $self->outDir->mkpath;
+
     if ( $self->temp_dir ) {
       my $dir = path( $self->temp_dir );
       $dir->mkpath;
