@@ -217,6 +217,9 @@ sub prepareBystroPreprocessorOutputsForMultiFile {
   if (!($index == 0 && $totalCount == 1)) {
     $preprocessorOutputs{sampleList} = $self->outputFilesInfo->{sampleList} . ".$index";
     $preprocessorOutputs{dosageMatrixOutPath} = $self->outputFilesInfo->{dosageMatrixOutPath} . ".$index";
+  } else {
+    $preprocessorOutputs{sampleList} = $self->outputFilesInfo->{sampleList};
+    $preprocessorOutputs{dosageMatrixOutPath} = $self->outputFilesInfo->{dosageMatrixOutPath};
   }
 
   return \%preprocessorOutputs;
