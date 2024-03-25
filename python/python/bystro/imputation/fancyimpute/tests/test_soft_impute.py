@@ -1,5 +1,5 @@
 import numpy as np
-from bystro.imputation.soft_impute import SoftImpute
+from bystro.imputation.fancyimpute.soft_impute import SoftImpute
 
 
 def reconstruction_error(XY, XY_completed, missing_mask):

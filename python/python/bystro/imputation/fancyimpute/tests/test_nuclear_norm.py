@@ -1,5 +1,5 @@
 import numpy as np
-from bystro.imputation.nuclear_norm import NuclearNormMinimization
+from bystro.imputation.fancyimpute.nuclear_norm import NuclearNormMinimization
 
 
 def reconstruction_error(XY, XY_completed, missing_mask):
