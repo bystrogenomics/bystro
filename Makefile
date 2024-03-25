@@ -14,7 +14,6 @@ install-python: build-python
 	pip install python/target/wheels/*.whl
 
 install-go:
-	(cd ./go && go install bystro/cmd/dosage)
 	(cd ./go && go install bystro/cmd/opensearch)
 
 install: install-python install-go
