@@ -14,6 +14,7 @@ install-python: build-python
 	pip install python/target/wheels/*.whl
 
 install-go:
+	(cd ./go && go install bystro/cmd/dosage)
 	(cd ./go && go install bystro/cmd/opensearch)
 
 install: install-python install-go
@@ -26,9 +27,11 @@ develop: install-go build-python-dev ray-start-local
 
 run-local: install ray-start-local
 
-# Currently assumes that Perl package has been separately installed
-serve-local: ray-stop-local run-local
+pm2:
 	pm2 delete all 2> /dev/null || true && pm2 start startup.yml
 
 # Currently assumes that Perl package has been separately installed
-serve-dev: ray-stop-local start-local develop pm2
+serve-local: ray-stop-local run-local pm2
+
+# Currently assumes that Perl package has been separately installed
+serve-dev: ray-stop-local develop pm2
