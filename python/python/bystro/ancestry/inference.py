@@ -250,8 +250,12 @@ def infer_ancestry(ancestry_models: AncestryModels, genotypes: Dataset) -> Ances
                 psutil.Process(os.getpid()).memory_info().rss / 1024**2,
             )
 
-            genotypes_df = genotypes_chunk_table.to_pandas()
-            genotypes_df = genotypes_df.set_index("locus")
+            genotypes_df = genotypes_chunk_table.to_pandas().set_index("locus")
+
+            # If there are duplicates, log them and remove them
+            if genotypes_df.index.duplicated().any():
+                logger.warning("Found duplicate loci in genotypes, removing duplicates")
+                genotypes_df = genotypes_df[~genotypes_df.index.duplicated(keep="first")]
 
             logger.info(
                 "Memory usage after converting table to Pandas dataframe, for samples %d to %d: %s (MB)",
