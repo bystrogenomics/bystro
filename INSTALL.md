@@ -68,13 +68,24 @@ source "$HOME/.cargo/env"
 source .initialize_conda_env.sh;
 ```
 
-to install the Python package dependencies. Then, run:
+
+The easiest way to get started:
+```sh
+# Installs the Bystro Python library and cli, and starts the Ray cluster
+# alternatively you could have run `make install && make ray-start-local`
+# or just `make install` if you only wished to install Bystro
+make run-local
 ```
-# Build the Python package for local use
-make build
+- This will create a local Ray server, which is needed for some Bystro operations
+- To stop Ray: `ray stop`
+
+
+If you are developing/contributing to the Bystro library, for a faster build use:
+```sh
+make develop
 ```
 
-to intall the Bystro Python library.
+To start a local beanstalkd listener, use either `make serve-local` or `make serve-dev`, depending on whether you are in a product environment, or development.
 
 Follow the instructions below to install the Bystro annotator:
 
