@@ -10,7 +10,7 @@ from msgspec import Struct
 import numpy as np
 import pandas as pd
 
-import pyarrow as pa # type: ignore
+import pyarrow as pa  # type: ignore
 import pyarrow.compute as pc  # type: ignore
 from pyarrow.dataset import Dataset  # type: ignore
 

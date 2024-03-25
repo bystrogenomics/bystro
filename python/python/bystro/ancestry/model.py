@@ -51,7 +51,13 @@ def get_one_model_from_s3(
     """
     s3_client = boto3.client("s3")
 
-    logger.info("Downloading PCA file %s", pca_file_key)
+    logger.info(
+        "Downloading PCA file %s and RFC file %s to %s and %s",
+        pca_file_key,
+        rfc_file_key,
+        pca_local_path,
+        rfc_local_path,
+    )
 
     with Timer() as timer:
         try:
@@ -107,23 +113,17 @@ def get_models_from_s3(assembly: str) -> AncestryModels:
         )
         models = AncestryModels(gnomad_model, array_model)
     else:
-        pca_file_key_gnomad = paths["gnomad"]["pca_basename"]
-        rfc_file_key_gnomad = paths["gnomad"]["rfc_basename"]
-
-        pca_file_key_array = paths["array"]["pca_basename"]
-        rfc_file_key_array = paths["array"]["rfc_basename"]
-
         gnomad_model = get_one_model_from_s3(
             paths["gnomad"]["pca_local_path"],
             paths["gnomad"]["rfc_local_path"],
-            pca_file_key_gnomad,
-            rfc_file_key_gnomad,
+            paths["gnomad"]["pca_remote_path"],
+            paths["gnomad"]["rfc_remote_path"],
         )
         array_model = get_one_model_from_s3(
             paths["array"]["pca_local_path"],
             paths["array"]["rfc_local_path"],
-            pca_file_key_array,
-            rfc_file_key_array,
+            paths["array"]["pca_remote_path"],
+            paths["array"]["rfc_remote_path"],
         )
 
         models = AncestryModels(gnomad_model, array_model)
@@ -221,16 +221,25 @@ def _get_local_paths(assembly: str) -> dict[str, dict[str, str]]:
     pca_local_path_array = local_dir / array_pca_basename
     rfc_local_path_array = local_dir / array_rfc_basename
 
+    pca_remote_path_gnomad = f"{assembly}/{gnomad_pca_basename}"
+    rfc_remote_path_gnomad = f"{assembly}/{gnomad_rfc_basename}"
+    pca_remote_path_array = f"{assembly}/{array_pca_basename}"
+    rfc_remote_path_array = f"{assembly}/{array_rfc_basename}"
+
     return {
         "gnomad": {
             "pca_local_path": str(pca_local_path_gnomad),
             "rfc_local_path": str(rfc_local_path_gnomad),
+            "pca_remote_path": pca_remote_path_gnomad,
+            "rfc_remote_path": rfc_remote_path_gnomad,
             "pca_basename": gnomad_pca_basename,
             "rfc_basename": gnomad_rfc_basename,
         },
         "array": {
             "pca_local_path": str(pca_local_path_array),
             "rfc_local_path": str(rfc_local_path_array),
+            "pca_remote_path": pca_remote_path_array,
+            "rfc_remote_path": rfc_remote_path_array,
             "pca_basename": array_pca_basename,
             "rfc_basename": array_rfc_basename,
         },

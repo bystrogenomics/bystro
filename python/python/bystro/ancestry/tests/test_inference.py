@@ -95,10 +95,10 @@ def test_infer_ancestry_from_model():
         columns=samples,  # noqa: NPY002
     )
     # randomly set 10% of the genotypes to missing to ensure we test missing data handling
-    genotypes = genotypes.mask(np.random.random(genotypes.shape) < 0.1)
-
-    # get missingness per sample
-    missingness = genotypes.isna().mean(axis=0)
+    drop_snps_n = int(0.1 * len(genotypes))
+    retained_snps_n = len(genotypes) - drop_snps_n
+    drop_indices = np.random.choice(genotypes.index, size=drop_snps_n, replace=False) # noqa: NPY002
+    genotypes = genotypes.drop(list(drop_indices))
 
     genotypes = genotypes.reset_index()
     genotypes = genotypes.rename(columns={"index": "locus"})
@@ -119,7 +119,7 @@ def test_infer_ancestry_from_model():
 
         samples_seen.add(result.sample_id)
 
-        assert result.missingness == missingness[result.sample_id]
+        assert result.n_snps == retained_snps_n
 
     assert samples_seen == sample_set
     assert len(top_hits) > 1
