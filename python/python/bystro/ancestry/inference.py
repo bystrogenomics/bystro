@@ -1,8 +1,8 @@
 """Classify genotypes at inference time."""
 
 import logging
+import gc
 import os
-from typing import Generator
 import psutil
 import warnings
 
@@ -10,8 +10,9 @@ from msgspec import Struct
 import numpy as np
 import pandas as pd
 
+import pyarrow as pa # type: ignore
 import pyarrow.compute as pc  # type: ignore
-from pyarrow.dataset import Dataset, Scanner  # type: ignore
+from pyarrow.dataset import Dataset  # type: ignore
 
 from sklearn.ensemble import RandomForestClassifier  # type: ignore
 
@@ -29,6 +30,8 @@ from bystro.utils.timer import Timer
 
 logger = logging.getLogger(__name__)
 warnings.simplefilter(action="ignore", category=FutureWarning)
+
+ANCESTRY_SCORE_SAMPLE_CHUNK_SIZE = int(os.getenv("ANCESTRY_SCORE_SAMPLE_CHUNK_SIZE", 200))
 
 
 class AncestryModel(Struct, frozen=True, forbid_unknown_fields=True, rename="camel"):
@@ -74,16 +77,10 @@ class AncestryModel(Struct, frozen=True, forbid_unknown_fields=True, rename="cam
         return Xpc_dict, pd.DataFrame(probs, index=genotypes.columns, columns=POPS)
 
 
-def _generate_batches(scanner: Scanner) -> Generator[pd.DataFrame, None, None]:
-    for batch in scanner.to_batches():
-        batch_df = batch.to_pandas()
-        yield batch_df.set_index("locus")
-
-
 def _package_ancestry_response_from_pop_probs(
     pcs_for_plotting: dict[str, list[float]],
     pop_probs_df: pd.DataFrame,
-    missingnesses: pd.Series,
+    n_snps: int,
 ) -> AncestryResults:
     """Fill out AncestryResults using filepath, numerical model output and sample-wise missingnesses."""
     superpop_probs_df = _superpop_probs_from_pop_probs(pop_probs_df)
@@ -121,7 +118,7 @@ def _package_ancestry_response_from_pop_probs(
                 top_hit=AncestryTopHit(probability=max_value, populations=top_pops),
                 populations=pop_vector,
                 superpops=superpop_vector,
-                missingness=float(missingnesses[sample_id]),
+                n_snps=n_snps,
             )
         )
 
@@ -170,12 +167,8 @@ def infer_ancestry(ancestry_models: AncestryModels, genotypes: Dataset) -> Ances
         - superpops: SuperpopVector
             A Struct of super population probabilities for the sample. For instance, if the sample is
             80% European and 20% African, the PopulationVector would be {"AFR": 0.2, "EUR": 0.8}.
-        - missingness: float
-            The fraction of expected variants (those in the AncestryModel)
-            found missing in the sample.
-
-            Note that this is not the overall sample missingness but rather
-            the sample missingness relative to the AncestryModel.
+        - num_snps_selected: int
+            The number of SNPs used to infer ancestry for the sample.
     """
 
     logger.debug("Beginning ancestry inference")
@@ -185,6 +178,8 @@ def infer_ancestry(ancestry_models: AncestryModels, genotypes: Dataset) -> Ances
         psutil.Process(os.getpid()).memory_info().rss / 1024**2,
     )
 
+    pool = pa.default_memory_pool()
+
     with Timer() as timer:
         gnomad_model = ancestry_models.gnomad_model
         array_model = ancestry_models.array_model
@@ -192,11 +187,11 @@ def infer_ancestry(ancestry_models: AncestryModels, genotypes: Dataset) -> Ances
         mask_gnomad = pc.field("locus").isin(gnomad_model.pca_loadings_df.index)
         mask_array = pc.field("locus").isin(array_model.pca_loadings_df.index)
 
-        scanner_gnomad = genotypes.scanner(filter=mask_gnomad)
-        scanner_array = genotypes.scanner(filter=mask_array)
+        scanner_gnomad = genotypes.filter(mask_gnomad)
+        scanner_array = genotypes.filter(mask_array)
 
-        gnomad_matching_row_count = scanner_gnomad.count_rows()
-        array_matching_row_count = scanner_array.count_rows()
+        gnomad_matching_row_count = scanner_gnomad.count_rows(memory_pool=pool)
+        array_matching_row_count = scanner_array.count_rows(memory_pool=pool)
 
         logger.debug(
             "Found %d rows in genotypes matching gnomAD PCA loadings",
@@ -212,6 +207,7 @@ def infer_ancestry(ancestry_models: AncestryModels, genotypes: Dataset) -> Ances
             psutil.Process(os.getpid()).memory_info().rss / 1024**2,
         )
 
+        num_snps_selected = max(gnomad_matching_row_count, array_matching_row_count)
         if gnomad_matching_row_count >= array_matching_row_count:
             scanner = scanner_gnomad
             ancestry_model = gnomad_model
@@ -231,40 +227,75 @@ def infer_ancestry(ancestry_models: AncestryModels, genotypes: Dataset) -> Ances
 
     logger.info("Completed ancestry model selection in %f seconds", timer.elapsed_time)
 
-    with Timer() as timer:
-        # Directly concatenate the batches using a generator expression
-        genotypes_df = pd.concat(_generate_batches(scanner))
+    samples = [name for name in genotypes.schema.names if name != "locus"]
 
-    logger.info(
-        "Memory usage after dosage matrix filtering: %s (MB)",
-        psutil.Process(os.getpid()).memory_info().rss / 1024**2,
-    )
+    # Take chunks of up to 500 samples
+    chunk_size = ANCESTRY_SCORE_SAMPLE_CHUNK_SIZE
+    num_samples = len(samples)
+    start = 0
 
-    logger.info("Completed dosage matrix filtering in %f seconds", timer.elapsed_time)
+    all_pcs_for_plotting = {}
+    all_pop_probs_df = []
+    while start < num_samples:
+        with Timer() as timer:
+            end = min(start + chunk_size, num_samples)
+            chunk_samples = samples[start:end]
 
-    with Timer() as timer:
-        # TODO: @akotlar 2024-01-31: Replace reliance on imputation with Austin Talbot's model
-        # which is robust to missing data.
-        missing_rows = list(set(ancestry_model.pca_loadings_df.index) - set(genotypes_df.index))
-        if missing_rows:
-            missing_rows_df = pd.DataFrame(
-                np.ones((len(missing_rows), len(genotypes_df.columns))),
-                index=missing_rows,
-                columns=genotypes_df.columns,
+            genotypes_chunk_table = scanner.to_table(["locus", *chunk_samples], memory_pool=pool)
+
+            logger.info(
+                "Memory usage after dosage matrix filtering for samples %d to %d: %s (MB)",
+                start,
+                end,
+                psutil.Process(os.getpid()).memory_info().rss / 1024**2,
             )
-            genotypes_df = pd.concat([genotypes_df, missing_rows_df])
 
-        missingness = len(missing_rows) / len(ancestry_model.pca_loadings_df.index)
-        sample_missingnesses = genotypes_df.isna().mean(axis=0) + missingness
+            genotypes_df = genotypes_chunk_table.to_pandas()
+            genotypes_df = genotypes_df.set_index("locus")
 
-        genotypes_df[genotypes_df.isna()] = 1
+            logger.info(
+                "Memory usage after converting table to Pandas dataframe, for samples %d to %d: %s (MB)",
+                start,
+                end,
+                psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+            )
 
-        pcs_for_plotting, pop_probs_df = ancestry_model.predict_proba(genotypes_df)
+            missing_rows = list(set(ancestry_model.pca_loadings_df.index) - set(genotypes_df.index))
+            if missing_rows:
+                missing_rows_df = pd.DataFrame(
+                    np.ones((len(missing_rows), len(genotypes_df.columns))),
+                    index=missing_rows,
+                    columns=genotypes_df.columns,
+                )
+                genotypes_df = pd.concat([genotypes_df, missing_rows_df])
 
-    logger.info("Completed ancestry inference in %f seconds", timer.elapsed_time)
+            genotypes_df[genotypes_df.isna()] = 1
+
+            pcs_for_plotting, pop_probs_df = ancestry_model.predict_proba(genotypes_df)
+
+            all_pcs_for_plotting.update(pcs_for_plotting)
+            all_pop_probs_df.append(pop_probs_df)
+
+        # We must manually free memory, because
+        # otherwise it appears Python has a tough time coping
+        # with the size of allocations, which can reach into gigabytes per loop iteration
+        del genotypes_df
+        del genotypes_chunk_table
+        pool.release_unused()
+        gc.collect()
+
+        logger.info(
+            "Completed ancestry inference for samples %d to %d in %f seconds. RSS: %s (MB)",
+            start,
+            end,
+            timer.elapsed_time,
+            psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+        )
+
+        start = end
 
     return _package_ancestry_response_from_pop_probs(
-        pcs_for_plotting, pop_probs_df, sample_missingnesses
+        all_pcs_for_plotting, pd.concat(all_pop_probs_df), num_snps_selected
     )
 
 

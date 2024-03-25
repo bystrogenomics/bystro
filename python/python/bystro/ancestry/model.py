@@ -11,6 +11,7 @@ from skops.io import load as skops_load  # type: ignore
 from bystro.ancestry.inference import AncestryModel, AncestryModels
 
 from bystro.utils.timer import Timer
+import os
 
 logging.basicConfig(
     filename="ancestry_model.log",
@@ -20,7 +21,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger()
 
-ANCESTRY_BUCKET = "bystro-ancestry"
+ANCESTRY_BUCKET = os.getenv("ANCESTRY_BUCKET", "bystro-ancestry")
+ANCESTRY_MODEL_DIR = os.getenv("ANCESTRY_MODEL_DIR", str(Path(__file__).parent / "data"))
 GNOMAD_PCA_FILE = "gnomadset_pca.csv"
 GNOMAD_RFC_FILE = "gnomadset_rfc.skop"
 ARRAY_PCA_FILE = "arrayset_pca.csv"
@@ -29,14 +31,17 @@ ARRAY_RFC_FILE = "arrayset_rfc.skop"
 models_cache: dict[str, AncestryModels] = {}
 
 
-def get_one_model_from_s3(pca_local_path, rfc_local_path, pca_file_key, rfc_file_key) -> AncestryModel:
-    """_summary_
+def get_one_model_from_s3(
+    pca_local_path: str, rfc_local_path: str, pca_file_key: str, rfc_file_key: str
+) -> AncestryModel:
+    """
+    Load an ancestry model from S3.
 
     Args:
-        pca_local_path (_type_): The local path to save the PCA file.
-        rfc_local_path (_type_): The local path to save the RFC file.
-        pca_file_key (_type_): The remove path to the PCA file.
-        rfc_file_key (_type_): The remove path to the RFC file.
+        pca_local_path (str): The local path to save the PCA file.
+        rfc_local_path (str): The local path to save the RFC file.
+        pca_file_key (str): The remove path to the PCA file.
+        rfc_file_key (str): The remove path to the RFC file.
 
     Raises:
         ValueError: If the PCA or RFC file is not found.
@@ -85,26 +90,43 @@ def get_models_from_s3(assembly: str) -> AncestryModels:
         logger.info("Model for assembly %s found in cache.", assembly)
         return models_cache[assembly]
 
-    pca_local_key_gnomad = f"{assembly}_{GNOMAD_PCA_FILE}"
-    rfc_local_key_gnomad = f"{assembly}_{GNOMAD_RFC_FILE}"
+    paths = _get_local_paths(assembly)
 
-    pca_file_key_gnomad = f"{assembly}/{pca_local_key_gnomad}"
-    rfc_file_key_gnomad = f"{assembly}/{rfc_local_key_gnomad}"
+    if (
+        Path(paths["gnomad"]["pca_local_path"]).exists()
+        and Path(paths["gnomad"]["rfc_local_path"]).exists()
+        and Path(paths["array"]["pca_local_path"]).exists()
+        and Path(paths["array"]["rfc_local_path"]).exists()
+    ):
+        logger.info("Loading models from disk.")
+        gnomad_model = get_one_model_from_file_system(
+            paths["gnomad"]["pca_local_path"], paths["gnomad"]["rfc_local_path"]
+        )
+        array_model = get_one_model_from_file_system(
+            paths["array"]["pca_local_path"], paths["array"]["rfc_local_path"]
+        )
+        models = AncestryModels(gnomad_model, array_model)
+    else:
+        pca_file_key_gnomad = paths["gnomad"]["pca_basename"]
+        rfc_file_key_gnomad = paths["gnomad"]["rfc_basename"]
 
-    pca_local_key_array = f"{assembly}_{ARRAY_PCA_FILE}"
-    rfc_local_key_array = f"{assembly}_{ARRAY_RFC_FILE}"
+        pca_file_key_array = paths["array"]["pca_basename"]
+        rfc_file_key_array = paths["array"]["rfc_basename"]
 
-    pca_file_key_array = f"{assembly}/{pca_local_key_array}"
-    rfc_file_key_array = f"{assembly}/{rfc_local_key_array}"
+        gnomad_model = get_one_model_from_s3(
+            paths["gnomad"]["pca_local_path"],
+            paths["gnomad"]["rfc_local_path"],
+            pca_file_key_gnomad,
+            rfc_file_key_gnomad,
+        )
+        array_model = get_one_model_from_s3(
+            paths["array"]["pca_local_path"],
+            paths["array"]["rfc_local_path"],
+            pca_file_key_array,
+            rfc_file_key_array,
+        )
 
-    gnomad_model = get_one_model_from_s3(
-        pca_local_key_gnomad, rfc_local_key_gnomad, pca_file_key_gnomad, rfc_file_key_gnomad
-    )
-    array_model = get_one_model_from_s3(
-        pca_local_key_array, rfc_local_key_array, pca_file_key_array, rfc_file_key_array
-    )
-
-    models = AncestryModels(gnomad_model, array_model)
+        models = AncestryModels(gnomad_model, array_model)
 
     # Update the cache with the new model
     if len(models_cache) >= 1:
@@ -139,7 +161,7 @@ def get_one_model_from_file_system(pca_path: str, rfc_path: str) -> AncestryMode
     return AncestryModel(pca_loadings_df, rfc)
 
 
-def get_models_from_file_system(model_dir: str, assembly: str) -> AncestryModels:
+def get_models_from_file_system(assembly: str) -> AncestryModels:
     """
     Load the ancestry models for the given assembly from the local file system.
 
@@ -164,14 +186,14 @@ def get_models_from_file_system(model_dir: str, assembly: str) -> AncestryModels
         logger.info("Model for assembly %s found in cache.", assembly)
         return models_cache[assembly]
 
-    pca_local_key_gnomad = str(Path(model_dir) / assembly / f"{assembly}_{GNOMAD_PCA_FILE}")
-    rfc_local_key_gnomad = str(Path(model_dir) / assembly / f"{assembly}_{GNOMAD_RFC_FILE}")
+    paths = _get_local_paths(assembly)
 
-    pca_local_key_array = str(Path(model_dir) / assembly / f"{assembly}_{ARRAY_PCA_FILE}")
-    rfc_local_key_array = str(Path(model_dir) / assembly / f"{assembly}_{ARRAY_RFC_FILE}")
-
-    gnomad_model = get_one_model_from_file_system(pca_local_key_gnomad, rfc_local_key_gnomad)
-    array_model = get_one_model_from_file_system(pca_local_key_array, rfc_local_key_array)
+    gnomad_model = get_one_model_from_file_system(
+        paths["gnomad"]["pca_local_path"], paths["gnomad"]["rfc_local_path"]
+    )
+    array_model = get_one_model_from_file_system(
+        paths["array"]["pca_local_path"], paths["array"]["rfc_local_path"]
+    )
 
     models = AncestryModels(gnomad_model, array_model)
 
@@ -183,3 +205,33 @@ def get_models_from_file_system(model_dir: str, assembly: str) -> AncestryModels
     models_cache[assembly] = models
 
     return models
+
+
+def _get_local_paths(assembly: str) -> dict[str, dict[str, str]]:
+    local_dir = Path(ANCESTRY_MODEL_DIR) / assembly
+    local_dir.mkdir(exist_ok=True, parents=True)
+
+    gnomad_pca_basename = f"{assembly}_{GNOMAD_PCA_FILE}"
+    gnomad_rfc_basename = f"{assembly}_{GNOMAD_RFC_FILE}"
+    array_pca_basename = f"{assembly}_{ARRAY_PCA_FILE}"
+    array_rfc_basename = f"{assembly}_{ARRAY_RFC_FILE}"
+
+    pca_local_path_gnomad = local_dir / gnomad_pca_basename
+    rfc_local_path_gnomad = local_dir / gnomad_rfc_basename
+    pca_local_path_array = local_dir / array_pca_basename
+    rfc_local_path_array = local_dir / array_rfc_basename
+
+    return {
+        "gnomad": {
+            "pca_local_path": str(pca_local_path_gnomad),
+            "rfc_local_path": str(rfc_local_path_gnomad),
+            "pca_basename": gnomad_pca_basename,
+            "rfc_basename": gnomad_rfc_basename,
+        },
+        "array": {
+            "pca_local_path": str(pca_local_path_array),
+            "rfc_local_path": str(rfc_local_path_array),
+            "pca_basename": array_pca_basename,
+            "rfc_basename": array_rfc_basename,
+        },
+    }
