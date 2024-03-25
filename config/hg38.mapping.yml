@@ -411,8 +411,7 @@ mappings:
             dist:
               type: integer
     cadd:
-      type: scaled_float
-      scaling_factor: 10
+      type: half_float
     caddIndel:
       properties:
         alt:
@@ -422,14 +421,7 @@ mappings:
           type: keyword
           normalizer: lowercase_normalizer
         PHRED:
-          type: scaled_float
-          scaling_factor: 10
-    phastCons:
-      type: scaled_float
-      scaling_factor: 100
-    phyloP:
-      type: scaled_float
-      scaling_factor: 100
+          type: half_float
     clinvarVcf:
       properties:
         alt:
