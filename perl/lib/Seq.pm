@@ -512,7 +512,7 @@ sub annotateFile {
     $self->log( "info", "done combining pre-processor outputs" );
   }
 
-  $err = $self->_moveFilesToOutputDir();
+  $err = $self->safeSystem('sync') || $self->_moveFilesToOutputDir();
   if ($err) {
     $self->_errorWithCleanup($err);
     return ( $err, undef );
