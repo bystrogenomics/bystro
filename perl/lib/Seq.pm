@@ -385,8 +385,9 @@ sub annotateFile {
     || $self->safeSystem('sync');
 
   if ($err) {
-    $self->_errorWithCleanup($err);
-    return ( $err, undef );
+    my $humanErr = "Failed to close files";
+    $self->_errorWithCleanup($humanErr);
+    return ( $humanErr, undef );
   }
 
   $db->cleanUp();
@@ -466,8 +467,9 @@ sub annotateFile {
         $self->safeSystem("echo \"$sampleListContents\" > $finalSampleListDestination");
 
       if ($err) {
-        $self->_errorWithCleanup($err);
-        return ( $err, undef );
+        my $humanErr = "Failed to write combined sample list file";
+        $self->_errorWithCleanup($humanErr);
+        return ( $humanErr, undef );
       }
 
       # Remove the intermediate sample lists
@@ -475,8 +477,9 @@ sub annotateFile {
         $err = $self->safeSystem("rm $sampleListPath");
 
         if ($err) {
-          $self->_errorWithCleanup($err);
-          return ( $err, undef );
+          my $humanErr = "Failed to remove intermediate sample list files";
+          $self->_errorWithCleanup($humanErr);
+          return ( $humanErr, undef );
         }
       }
     }
@@ -492,8 +495,9 @@ sub annotateFile {
         'dosage --output ' . $finalOutPath . " " . join( " ", @dosageMatrixOutPaths ) );
 
       if ($err) {
-        $self->_errorWithCleanup($err);
-        return ( $err, undef );
+        my $humanErr = "Failed to combine dosage matrix outputs";
+        $self->_errorWithCleanup("Failed to combine dosage matrix outputs");
+        return ( $humanErr, undef );
       }
 
       # Remove the intermediate dosageMatrixOutPaths
@@ -501,8 +505,9 @@ sub annotateFile {
         $err = $self->safeSystem("rm $dosageMatrixOutPath");
 
         if ($err) {
-          $self->_errorWithCleanup($err);
-          return ( $err, undef );
+          my $humanErr = "Failed to remove intermediate dosage matrix files";
+          $self->_errorWithCleanup($humanErr);
+          return ( $humanErr, undef );
         }
       }
 
@@ -514,8 +519,9 @@ sub annotateFile {
 
   $err = $self->safeSystem('sync') || $self->_moveFilesToOutputDir();
   if ($err) {
-    $self->_errorWithCleanup($err);
-    return ( $err, undef );
+    my $humanErr = "Failed to move files to output directory";
+    $self->_errorWithCleanup($humanErr);
+    return ( $humanErr, undef );
   }
 
   return ( $err, $self->outputFilesInfo );
