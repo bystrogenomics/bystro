@@ -63,10 +63,10 @@ F32PREC = np.finfo(np.float32).eps
 
 class SoftImpute(BaseImpute):
     """
-    Implementation of the SoftImpute algorithm for matrix completion 
+    Implementation of the SoftImpute algorithm for matrix completion
     and imputation.
 
-    This algorithm iteratively fills missing values in a matrix using 
+    This algorithm iteratively fills missing values in a matrix using
     soft-thresholded singular value decomposition (SVD).
 
     Parameters
@@ -75,13 +75,14 @@ class SoftImpute(BaseImpute):
         The shrinkage value or bias applied during the soft-
         thresholding step.
     training_options : Optional[Dict[str, Any]], default=None
-        A dictionary containing options for the training process. 
-        Keys include 'n_iterations', 'convergence_threshold', 
+        A dictionary containing options for the training process.
+        Keys include 'n_iterations', 'convergence_threshold',
         'n_power_iterations', and 'max_rank'.
     init_fill_method : str, default="zero"
-        The initial method to fill missing values before the 
+        The initial method to fill missing values before the
         iterative process begins. Options are 'zero', 'mean', and 'median'.
     """
+
     def __init__(
         self,
         shrinkage_value: float = 0.1,
@@ -109,7 +110,7 @@ class SoftImpute(BaseImpute):
         X_new : np.ndarray
             The imputed matrix from the current iteration.
         missing_mask : np.ndarray
-            A boolean array where True indicates a missing value in 
+            A boolean array where True indicates a missing value in
             the original matrix.
 
         Returns
@@ -135,7 +136,7 @@ class SoftImpute(BaseImpute):
         max_rank: Optional[int] = None,
     ) -> Tuple[np.ndarray, int]:
         """
-        Perform the singular value decomposition (SVD) step with soft 
+        Perform the singular value decomposition (SVD) step with soft
         thresholding.
 
         Parameters
@@ -150,7 +151,7 @@ class SoftImpute(BaseImpute):
         Returns
         -------
         Tuple[np.ndarray, int]
-            The reconstructed matrix after applying the soft threshold, 
+            The reconstructed matrix after applying the soft threshold,
             and the rank of the thresholded matrix.
         """
         training_options = self.training_options
@@ -227,7 +228,7 @@ class SoftImpute(BaseImpute):
         training_options : Dict[str, Any]
             The user-provided training options:
             n_iterations : number of iterations of algorithm
-            convergence_threshold : criteria for ending training if 
+            convergence_threshold : criteria for ending training if
                                     only small change observed
             n_power_iterations : number of iterations for randomized SVD
             max_rank : maximum rank of decomposition
@@ -240,7 +241,7 @@ class SoftImpute(BaseImpute):
         Raises
         ------
         ValueError
-            If there are missing expected options or unrecognized 
+            If there are missing expected options or unrecognized
             options provided.
         """
         default_options = {
