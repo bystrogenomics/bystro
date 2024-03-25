@@ -104,7 +104,8 @@ sub annotateFile {
   my $self = shift;
   my $type = shift;
 
-  my ( $err, $inFhs, $outFh, $statsFh, $headerFh, $preOutArgs ) = $self->_getFileHandles($type);
+  my ( $err, $inFhs, $outFh, $statsFh, $headerFh, $preOutArgs ) =
+    $self->_getFileHandles($type);
 
   if ($err) {
     $self->_errorWithCleanup($err);
@@ -407,8 +408,8 @@ sub annotateFile {
   ## 2c) with missing values filled in with 0 (reference allele)
 
   # Step 1:
-  if(@$preOutArgs > 1) {
-    $self->log("info", "has multiple pre-processor outputs; combining them");
+  if ( @$preOutArgs > 1 ) {
+    $self->log( "info", "has multiple pre-processor outputs; combining them" );
     my @sampleLists;
     my @dosageMatrixOutPaths;
     for my $preOutArgHref (@$preOutArgs) {
@@ -430,26 +431,26 @@ sub annotateFile {
       my %uniqueSamples;
       my @uniqueSamples;
 
-      my $idx = 0;
+      my $idx                 = 0;
       my $hasNonUniqueSamples = 0;
       for my $sampleListPath (@sampleLists) {
         my $sampleListContentsNew = path($sampleListPath)->slurp;
 
         # We could have heterogenous files, some with samples and some without
-        if(!$sampleListContentsNew) {
+        if ( !$sampleListContentsNew ) {
           next;
         }
 
         my @samples = split( '\n', $sampleListContentsNew );
-        for(@samples) {
-          if($uniqueSamples{$_}) {
+        for (@samples) {
+          if ( $uniqueSamples{$_} ) {
             next;
           }
 
           $uniqueSamples{$_} = 1;
           push @uniqueSamples, $_;
 
-          if($idx > 0) {
+          if ( $idx > 0 ) {
             $hasNonUniqueSamples = 1;
           }
         }
@@ -457,10 +458,12 @@ sub annotateFile {
         $idx += 1;
       }
 
-      $sampleListContents = join("\n", @uniqueSamples);
+      $sampleListContents = join( "\n", @uniqueSamples );
 
-      my $finalSampleListDestination = $self->_workingDir->child( $self->outputFilesInfo->{sampleList} );
-      $err = $self->safeSystem("echo \"$sampleListContents\" > $finalSampleListDestination");
+      my $finalSampleListDestination =
+        $self->_workingDir->child( $self->outputFilesInfo->{sampleList} );
+      $err =
+        $self->safeSystem("echo \"$sampleListContents\" > $finalSampleListDestination");
 
       if ($err) {
         $self->_errorWithCleanup($err);
@@ -480,11 +483,13 @@ sub annotateFile {
 
     # Step 2:
     if (@dosageMatrixOutPaths) {
-      $self->log("info", "has multiple dosageMatrixOutPaths; combining them");
+      $self->log( "info", "has multiple dosageMatrixOutPaths; combining them" );
 
-      my $finalOutPath = $self->_workingDir->child( $self->outputFilesInfo->{dosageMatrixOutPath} );
+      my $finalOutPath =
+        $self->_workingDir->child( $self->outputFilesInfo->{dosageMatrixOutPath} );
 
-      my $err = $self->safeSystem( 'dosage --output ' . $finalOutPath . " " . join(" ", @dosageMatrixOutPaths));
+      my $err = $self->safeSystem(
+        'dosage --output ' . $finalOutPath . " " . join( " ", @dosageMatrixOutPaths ) );
 
       if ($err) {
         $self->_errorWithCleanup($err);
@@ -501,10 +506,10 @@ sub annotateFile {
         }
       }
 
-      $self->log("info", "finished combining dosage matrix outputs");
+      $self->log( "info", "finished combining dosage matrix outputs" );
     }
 
-    $self->log("info", "done combining pre-processor outputs");
+    $self->log( "info", "done combining pre-processor outputs" );
   }
 
   $err = $self->_moveFilesToOutputDir();
@@ -571,13 +576,14 @@ sub _getFileHandles {
   my $index = 0;
   my $total = @{ $self->input_files };
   for my $file ( @{ $self->input_files } ) {
-    my ( $err, $inFh, $preOutArgHref ) = $self->_openAnnotationPipe( $type, $file, $index, $total );
+    my ( $err, $inFh, $preOutArgHref ) =
+      $self->_openAnnotationPipe( $type, $file, $index, $total );
 
     if ($err) {
       return ( $err, undef, undef, undef, undef );
     }
 
-    push @inFhs, $inFh;
+    push @inFhs,      $inFh;
     push @preOutArgs, $preOutArgHref;
 
     $index += 1;
@@ -638,9 +644,10 @@ sub _preparePreprocessorProgram {
   if ( $fp->{args} ) {
     my $args = $fp->{args};
 
-    my $potentialPreArgs = $self->prepareBystroPreprocessorOutputsForMultiFile( $index, $total );
+    my $potentialPreArgs =
+      $self->prepareBystroPreprocessorOutputsForMultiFile( $index, $total );
 
-    for my $type ( keys %{ $potentialPreArgs } ) {
+    for my $type ( keys %{$potentialPreArgs} ) {
       if ( index( $args, "\%$type\%" ) > -1 ) {
         my $arg = $self->_workingDir->child( $potentialPreArgs->{$type} );
         substr( $args, index( $args, "\%$type\%" ), length("\%$type\%") ) = $arg;

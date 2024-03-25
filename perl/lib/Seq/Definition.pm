@@ -105,10 +105,10 @@ has outputFilesInfo => (
         $outBaseName
       . ".annotation.$extension"
       . ( $self->compress ? "." . $self->compressType : "" );
-    $out{header}     = $outBaseName . ".annotation.header.json";
+    $out{header} = $outBaseName . ".annotation.header.json";
 
     # sampleList and dosageMatrixOutPath are available to be used by the preprocessor
-    $out{sampleList} = $outBaseName . '.sample_list';
+    $out{sampleList}          = $outBaseName . '.sample_list';
     $out{dosageMatrixOutPath} = $outBaseName . '.dosage.feather';
 
     # Must be lazy in order to allow "revealing module pattern", with __statisticsRunner below
@@ -214,12 +214,15 @@ sub prepareBystroPreprocessorOutputsForMultiFile {
   # Update sampleList and dosageMatrixOutPath based on the index
   # But if the index is 0 and totalCount is 1, we don't need to update the file names
   my %preprocessorOutputs;
-  if (!($index == 0 && $totalCount == 1)) {
+  if ( !( $index == 0 && $totalCount == 1 ) ) {
     $preprocessorOutputs{sampleList} = $self->outputFilesInfo->{sampleList} . ".$index";
-    $preprocessorOutputs{dosageMatrixOutPath} = $self->outputFilesInfo->{dosageMatrixOutPath} . ".$index";
-  } else {
+    $preprocessorOutputs{dosageMatrixOutPath} =
+      $self->outputFilesInfo->{dosageMatrixOutPath} . ".$index";
+  }
+  else {
     $preprocessorOutputs{sampleList} = $self->outputFilesInfo->{sampleList};
-    $preprocessorOutputs{dosageMatrixOutPath} = $self->outputFilesInfo->{dosageMatrixOutPath};
+    $preprocessorOutputs{dosageMatrixOutPath} =
+      $self->outputFilesInfo->{dosageMatrixOutPath};
   }
 
   return \%preprocessorOutputs;
