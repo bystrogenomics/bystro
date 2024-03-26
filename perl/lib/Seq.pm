@@ -44,6 +44,18 @@ with 'Seq::Definition', 'Seq::Role::Validator';
 # To initialize Seq::Base with only getters
 has '+readOnly' => ( init_arg => undef, default => 1 );
 
+# https://stackoverflow.com/questions/1609467/in-perl-is-there-a-built-in-way-to-compare-two-arrays-for-equality
+sub _arraysEqual {
+  my ( $xref, $yref ) = @_;
+  return unless @$xref == @$yref;
+
+  my $i;
+  for my $e (@$xref) {
+    return unless $e eq $yref->[ $i++ ];
+  }
+  return 1;
+}
+
 # TODO: further reduce complexity
 sub BUILD {
   my $self = shift;
@@ -410,7 +422,7 @@ sub annotateFile {
 
   # Step 1:
   if ( @$preOutArgs > 1 ) {
-    $self->log( "info", "has multiple pre-processor outputs; combining them" );
+    $self->log( "info", "Has multiple pre-processor outputs; combining them" );
     my @sampleLists;
     my @dosageMatrixOutPaths;
     for my $preOutArgHref (@$preOutArgs) {
@@ -424,7 +436,10 @@ sub annotateFile {
     }
 
     # Read the sample lists, and check that they are identical
+    my $allSampleListsIdentical = 1;
     if (@sampleLists) {
+      $self->log( "info", "Combining sample lists" );
+
       my $sampleList = $self->_workingDir->child( $self->outputFilesInfo->{sampleList} );
 
       my $sampleListContents;
@@ -434,6 +449,8 @@ sub annotateFile {
 
       my $idx                 = 0;
       my $hasNonUniqueSamples = 0;
+
+      my @canonicalSampleList;
       for my $sampleListPath (@sampleLists) {
         my $sampleListContentsNew = path($sampleListPath)->slurp;
 
@@ -443,6 +460,14 @@ sub annotateFile {
         }
 
         my @samples = split( '\n', $sampleListContentsNew );
+
+        if ( $idx == 0 ) {
+          @canonicalSampleList = @samples;
+        }
+        elsif ( !_arraysEqual( \@canonicalSampleList, \@samples ) ) {
+          $allSampleListsIdentical = 0;
+        }
+
         for (@samples) {
           if ( $uniqueSamples{$_} ) {
             next;
@@ -486,35 +511,40 @@ sub annotateFile {
 
     # Step 2:
     if (@dosageMatrixOutPaths) {
-      $self->log( "info", "has multiple dosageMatrixOutPaths; combining them" );
+      $self->log( "info", "Combining dosage matrix outputs" );
 
-      my $finalOutPath =
-        $self->_workingDir->child( $self->outputFilesInfo->{dosageMatrixOutPath} );
-
-      my $err = $self->safeSystem(
-        'dosage --output ' . $finalOutPath . " " . join( " ", @dosageMatrixOutPaths ) );
-
-      if ($err) {
-        my $humanErr = "Failed to combine dosage matrix outputs";
-        $self->_errorWithCleanup("Failed to combine dosage matrix outputs");
-        return ( $humanErr, undef );
+      if ( !$allSampleListsIdentical ) {
+        $self->log( "warn",
+          "Skipping dosage matrix combination: for dosage matrices to be combined, samples in input files must be identical"
+        );
       }
+      else {
+        my $finalOutPath =
+          $self->_workingDir->child( $self->outputFilesInfo->{dosageMatrixOutPath} );
 
-      # Remove the intermediate dosageMatrixOutPaths
-      for my $dosageMatrixOutPath (@dosageMatrixOutPaths) {
-        $err = $self->safeSystem("rm $dosageMatrixOutPath");
+        my $err = $self->safeSystem(
+          'dosage --output ' . $finalOutPath . " " . join( " ", @dosageMatrixOutPaths ) );
 
         if ($err) {
-          my $humanErr = "Failed to remove intermediate dosage matrix files";
+          my $humanErr = "Failed to combine dosage matrix outputs";
           $self->_errorWithCleanup($humanErr);
           return ( $humanErr, undef );
         }
+
+        # Remove the intermediate dosageMatrixOutPaths
+        for my $dosageMatrixOutPath (@dosageMatrixOutPaths) {
+          $err = $self->safeSystem("rm $dosageMatrixOutPath");
+
+          if ($err) {
+            my $humanErr = "Failed to remove intermediate dosage matrix files";
+            $self->_errorWithCleanup($humanErr);
+            return ( $humanErr, undef );
+          }
+        }
+
+        $self->log( "info", "Finished combining dosage matrix outputs" );
       }
-
-      $self->log( "info", "finished combining dosage matrix outputs" );
     }
-
-    $self->log( "info", "done combining pre-processor outputs" );
   }
 
   $err = $self->safeSystem('sync') || $self->_moveFilesToOutputDir();

@@ -265,7 +265,7 @@ sub _moveFilesToOutputDir {
     return;
   }
 
-  $self->log( 'info', "Moving output file to EFS or S3" );
+  $self->log( 'info', "Moving output files to output directory" );
 
   my $workDir = $self->_workingDir->stringify();
 
