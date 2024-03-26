@@ -6,6 +6,7 @@ from bystro.api.annotation import get_jobs, create_jobs, query, JobBasicResponse
 
 from bystro.cli.proteomics_cli import add_proteomics_subparser
 
+from bystro.cli.ancestry import add_ancestry_subparser
 
 def signup_cli(args: argparse.Namespace, print_result=True) -> CachedAuth:
     """
@@ -273,6 +274,7 @@ def main():
     query_parser.add_argument("--job_id", required=True, type=str, help="The job id to query")
     query_parser.set_defaults(func=query_cli)
     add_proteomics_subparser(subparsers)
+    add_ancestry_subparser(subparsers)
 
     args = parser.parse_args()
     if hasattr(args, "func"):
