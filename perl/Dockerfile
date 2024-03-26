@@ -1,14 +1,18 @@
 # ---- Build Golang Binaries ----
-FROM golang:1.17 AS go-builder
+FROM golang:1.21.3 AS go-builder
 
 # Set the environment variable for Go binaries. This makes sure the binaries are saved to a defined path.
 ENV GOBIN=/app/bin
 
 # Install the specific versions of the Go programs
 RUN go install github.com/akotlar/bystro-stats@1.0.0
-RUN go install github.com/bystrogenomics/bystro-vcf@2.1.0
+RUN go install github.com/bystrogenomics/bystro-vcf@2.1.1
 RUN go install github.com/akotlar/bystro-snp@1.0.0
 RUN go install github.com/mikefarah/yq@2.4.1
+
+COPY ./go /app/bystro-go-tools
+
+RUN cd /app/bystro-go-tools && go install bystro/cmd/dosage
 
 # ---- Perl Stage ----
 # see https://hub.docker.com/_/perl/

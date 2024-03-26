@@ -14,3 +14,6 @@ go install github.com/akotlar/bystro-snp@1.0.0;
 
 # allows us to modify our config files in place
 go install github.com/mikefarah/yq@2.4.1;
+
+# install local go packages
+(cd ./go && go install bystro/cmd/dosage);
