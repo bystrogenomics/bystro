@@ -3,7 +3,8 @@ import datetime
 import os
 import requests
 import sys
-
+import uuid
+import concurrent.futures
 
 from bystro.api.auth import authenticate
 
@@ -34,6 +35,10 @@ class JobBasicResponse(Struct, rename="camel"):
     _id: str
     name: str
     createdAt: datetime.datetime
+
+
+def _generate_uuid():
+    return str(uuid.uuid4())
 
 
 def get_jobs(job_type=None, job_id=None, print_result=True) -> list[JobBasicResponse] | dict:
@@ -94,8 +99,31 @@ def get_jobs(job_type=None, job_id=None, print_result=True) -> list[JobBasicResp
     return mjson.decode(response.text, type=list[JobBasicResponse])
 
 
+def _upload_file(file_path, url: str, headers: dict, payload: dict):
+    with open(file_path, "rb") as f:
+        file_request = [
+            (
+                "file",
+                (
+                    os.path.basename(file_path),
+                    f,
+                    "application/octet-stream",
+                ),
+            )
+        ]
+
+        response = requests.post(url, headers=headers, data=payload, files=file_request, timeout=600)
+
+    return response
+
+
 def create_jobs(
-    files, assembly: str, names: list[str] | None = None, index=True, print_result=True
+    files,
+    assembly: str,
+    combine=False,
+    names: list[str] | None = None,
+    no_index=False,
+    print_result=True,
 ) -> list[dict]:
     """
     Creates 1+ annotation jobs
@@ -106,10 +134,12 @@ def create_jobs(
         List of file paths for job creation.
     assembly : str
         Genome assembly (e.g., hg19, hg38).
+    combine : bool, optional
+        Whether to combine the input files into a single annotation dataset/job, by default False.
     names : list[str], optional
         List of names for the annotation jobs, one per file. If not provided, the file name will be used.
-    index : bool, optional
-        Whether to create a search index for the annotation, by default True.
+    no_index : bool, optional
+        Whether to skip creation of a search index for the annotation, by default False.
     print_result : bool, optional
         Whether to print the result of the job creation operation, by default True.
 
@@ -118,34 +148,74 @@ def create_jobs(
     list[dict]
         The annotation submissions
     """
-    if names is not None and len(names) != len(files):
-        raise ValueError("The number of names must match the number of files")
-
     state, auth_header = authenticate()
-    url = state.url + "/api/jobs/upload/"
+    file_upload_url = state.url + "/api/jobs/upload/"
+    job_create_url = state.url + "/api/jobs/create"
 
-    jobs_created = []
-    for i, file in enumerate(files):
-        name = names[i] if names is not None else os.path.basename(file)
-        payload = {
-            "job": mjson.encode({"assembly": assembly, "options": {"index": index}, "name": name})
+    combine = len(files) > 1 if combine is None else combine
+
+    no_duplicate_files = len(files) == len(set(files))
+
+    if not no_duplicate_files:
+        raise ValueError("Duplicate file names detected. Please provide unique file names")
+
+    if combine:
+        # To create a singel job,
+        # 1. Upload all files to a common folder (the uuid folder)
+        # 2. Create a job with the uuid as an input
+        # 3. Create a merged job
+        job_uuid = _generate_uuid()
+
+        if names:
+            if len(names) > 1:
+                raise ValueError("Cannot specify more than  for combined job")
+        else:
+            names = [os.path.basename(files[0])]
+
+        job_metadata = {
+            "job": {"assembly": assembly, "options": {"index": not no_index}, "name": names[0]},
+            "uuid": job_uuid,
+            "inputFileNames": [os.path.basename(file) for file in files],
         }
 
-        with open(file, "rb") as f:
-            file_request = [
-                (
-                    "file",
-                    (
-                        os.path.basename(file),
-                        f,
-                        "application/octet-stream",
-                    ),
-                )
-            ]
+        file_upload_metadata = {"uuid": job_uuid}
 
-            response = requests.post(
-                url, headers=auth_header, data=payload, files=file_request, timeout=30
-            )
+        files_uploaded = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            future_to_file = {
+                executor.submit(
+                    _upload_file,
+                    file_path=file,
+                    url=file_upload_url,
+                    payload=file_upload_metadata,
+                    headers=auth_header,
+                ): file
+                for file in files
+            }
+
+            for future in concurrent.futures.as_completed(future_to_file):
+                response = future.result()
+                if response.status_code != 200:
+                    raise RuntimeError(
+                        (
+                            f"File upload failed for {future_to_file[future]} with status: "
+                            f"{response.status_code}. Error: \n{response.text}\n"
+                        )
+                    )
+                if print_result:
+                    print(f"\nFile upload successful {future_to_file[future]}:\n")
+                    print(mjson.format(response.text, indent=4))
+                    print("\n")
+                files_uploaded.append(response.json())
+
+        if len(files_uploaded) != len(files):
+            raise RuntimeError("Failed to upload all files")
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": auth_header["Authorization"],
+        }
+        response = requests.put(job_create_url, headers=headers, json=job_metadata, timeout=30)
 
         if response.status_code != 200:
             raise RuntimeError(
@@ -158,7 +228,49 @@ def create_jobs(
             print(mjson.format(response.text, indent=4))
             print("\n")
 
-        jobs_created.append(response.json())
+        return [response.json()]
+
+    if names is None:
+        names = [os.path.basename(file) for file in files]
+    elif len(names) != len(files):
+        raise ValueError("Number of names must match the number of files")
+
+    job_metadata = {}
+    for i, file in enumerate(files):
+        payload = {
+            "job": mjson.encode(
+                {"assembly": assembly, "options": {"index": not no_index}, "name": names[i]}
+            )
+        }
+
+        job_metadata[file] = payload
+
+    jobs_created = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        future_to_file = {
+            executor.submit(
+                _upload_file,
+                file_path=file,
+                url=file_upload_url,
+                payload=job_metadata[file],
+                headers=auth_header,
+            ): file
+            for file in files
+        }
+        for future in concurrent.futures.as_completed(future_to_file):
+            response = future.result()
+            if response.status_code != 200:
+                raise RuntimeError(
+                    (
+                        f"File upload and job creation failed for {future_to_file[future]} with status: "
+                        f"{response.status_code}. Error: \n{response.text}\n"
+                    )
+                )
+            if print_result:
+                print(f"\nJob creation successful for {future_to_file[future]}")
+                print(mjson.format(response.text, indent=4))
+                print("\n")
+            jobs_created.append(response.json())
 
     return jobs_created
 

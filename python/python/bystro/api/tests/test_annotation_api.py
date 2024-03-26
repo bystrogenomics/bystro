@@ -82,12 +82,46 @@ def test_create_job(mocker):
         return_value=mocker.Mock(status_code=200, json=lambda: {"success": True}),
     )
 
-    files = [os.path.join(os.path.dirname(__file__), "trio.trim.vep.short.vcf.gz")]
+    files = [
+        os.path.join(os.path.dirname(__file__), "trio.trim.vep.short.vcf.gz"),
+        os.path.join(os.path.dirname(__file__), "trio.trim.vep.short.vcf.gz"),
+    ]
     assembly = "hg38"
-    index = True
-    names = None
+    names = ["job1", "job2"]
 
-    response = create_jobs(files, assembly, names, index, print_result=False)
+    response = create_jobs(
+        files, assembly=assembly, combine=False, names=names, no_index=False, print_result=False
+    )
+    assert response == [{"success": True}, {"success": True}]
+
+class MockState:
+    def __init__(self):
+        self.url = "localhost:8080"
+
+def test_create_combined_vcf_job(mocker):
+    mocker.patch(
+        "bystro.api.annotation.authenticate",
+        return_value=(MockState(), EXAMPLE_CACHED_AUTH),
+    )
+    mocker.patch(
+        "requests.post",
+        return_value=mocker.Mock(status_code=200, json=lambda: {"success": True}),
+    )
+    mocker.patch(
+        "requests.put",
+        return_value=mocker.Mock(status_code=200, json=lambda: {"success": True}),
+    )
+
+    files = [
+        os.path.join(os.path.dirname(__file__), "trio.trim.vep.short.vcf.gz"),
+        os.path.join(os.path.dirname(__file__), "trio.trim.vep.short2.vcf.gz"),
+    ]
+    assembly = "hg38"
+    names = ["Foo"]
+
+    response = create_jobs(
+        files, assembly=assembly, combine=True, names=names, no_index=False, print_result=False
+    )
     assert response == [{"success": True}]
 
 
