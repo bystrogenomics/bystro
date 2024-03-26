@@ -1,13 +1,13 @@
 """
 This module aligns the data using spectral features, with the goal of 
-harmonize data from multiple proteomics experiments that exhibit 
+harmonizing data from multiple proteomics experiments that exhibit 
 significant batch effects. There are several approaches implemented here,
 all of which depend on aligning matrix quantities (such as spectral features
 like eigenvalues) or means.
 
 RotationAdaptation, known as CORAL, seeks to align the first and second 
 moments of the different distributions to a centroid distribution. This 
-may not be appropriate for very small sample sizes, instead we allow for 
+may not be appropriate for very small sample sizes, so instead we allow for 
 either just aligning the first moments (means), the variances, or a 
 spectral alignment method. This avoids the concepts of estimating rotations,
 and instead focuses on making sure that the eigenvalues of the covariance
