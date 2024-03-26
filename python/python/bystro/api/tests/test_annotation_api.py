@@ -72,11 +72,9 @@ EXAMPLE_JOB = {
 def test_create_job(mocker):
     mocker.patch(
         "bystro.api.annotation.authenticate",
-        return_value=(
-            EXAMPLE_CACHED_AUTH,
-            "localhost:8080",
-        ),
+        return_value=(MockState(), {"Authorization": "Bearer TOKEN"}),
     )
+
     mocker.patch(
         "requests.post",
         return_value=mocker.Mock(status_code=200, json=lambda: {"success": True}),
@@ -84,7 +82,7 @@ def test_create_job(mocker):
 
     files = [
         os.path.join(os.path.dirname(__file__), "trio.trim.vep.short.vcf.gz"),
-        os.path.join(os.path.dirname(__file__), "trio.trim.vep.short.vcf.gz"),
+        os.path.join(os.path.dirname(__file__), "trio.trim.vep.short2.vcf.gz"),
     ]
     assembly = "hg38"
     names = ["job1", "job2"]
@@ -94,14 +92,16 @@ def test_create_job(mocker):
     )
     assert response == [{"success": True}, {"success": True}]
 
+
 class MockState:
     def __init__(self):
         self.url = "localhost:8080"
 
+
 def test_create_combined_vcf_job(mocker):
     mocker.patch(
         "bystro.api.annotation.authenticate",
-        return_value=(MockState(), EXAMPLE_CACHED_AUTH),
+        return_value=(MockState(), {"Authorization": "Bearer TOKEN"}),
     )
     mocker.patch(
         "requests.post",

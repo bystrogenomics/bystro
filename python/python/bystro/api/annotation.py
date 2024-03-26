@@ -152,9 +152,12 @@ def create_jobs(
     file_upload_url = state.url + "/api/jobs/upload/"
     job_create_url = state.url + "/api/jobs/create"
 
-    combine = len(files) > 1 if combine is None else combine
+    combine = len(files) > 1 and combine
 
-    no_duplicate_files = len(files) == len(set(files))
+    # We cannot have duplicate file names (not just unique paths, but unique names)
+    # because the server will not be able to distinguish between them
+    file_basenames = [os.path.basename(file) for file in files]
+    no_duplicate_files = len(file_basenames) == len(set(file_basenames))
 
     if not no_duplicate_files:
         raise ValueError("Duplicate file names detected. Please provide unique file names")
