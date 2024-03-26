@@ -509,41 +509,45 @@ sub annotateFile {
       }
     }
 
+    # This is technically a warning; the rest of the annotation will work
+    # However we have not threaded through Bystro optional dosage matrices
+    # Nor can we yet combine them if they have different sample lists
+    if ( !$allSampleListsIdentical ) {
+      my $humanErr =
+        "Bystro currently requires identical samples per input file. Different sample lists found";
+      $self->_errorWithCleanup($humanErr);
+      return ( $humanErr, undef );
+    }
+
     # Step 2:
     if (@dosageMatrixOutPaths) {
       $self->log( "info", "Combining dosage matrix outputs" );
 
-      if ( !$allSampleListsIdentical ) {
-        $self->log( "warn",
-          "Skipping dosage matrix combination: for dosage matrices to be combined, samples in input files must be identical"
-        );
-      }
-      else {
-        my $finalOutPath =
-          $self->_workingDir->child( $self->outputFilesInfo->{dosageMatrixOutPath} );
+      my $finalOutPath =
+        $self->_workingDir->child( $self->outputFilesInfo->{dosageMatrixOutPath} );
 
-        my $err = $self->safeSystem(
-          'dosage --output ' . $finalOutPath . " " . join( " ", @dosageMatrixOutPaths ) );
+      my $err = $self->safeSystem(
+        'dosage --output ' . $finalOutPath . " " . join( " ", @dosageMatrixOutPaths ) );
+
+      if ($err) {
+        my $humanErr = "Failed to combine dosage matrix outputs";
+        $self->_errorWithCleanup($humanErr);
+        return ( $humanErr, undef );
+      }
+
+      # Remove the intermediate dosageMatrixOutPaths
+      for my $dosageMatrixOutPath (@dosageMatrixOutPaths) {
+        $err = $self->safeSystem("rm $dosageMatrixOutPath");
 
         if ($err) {
-          my $humanErr = "Failed to combine dosage matrix outputs";
+          my $humanErr = "Failed to remove intermediate dosage matrix files";
           $self->_errorWithCleanup($humanErr);
           return ( $humanErr, undef );
         }
-
-        # Remove the intermediate dosageMatrixOutPaths
-        for my $dosageMatrixOutPath (@dosageMatrixOutPaths) {
-          $err = $self->safeSystem("rm $dosageMatrixOutPath");
-
-          if ($err) {
-            my $humanErr = "Failed to remove intermediate dosage matrix files";
-            $self->_errorWithCleanup($humanErr);
-            return ( $humanErr, undef );
-          }
-        }
-
-        $self->log( "info", "Finished combining dosage matrix outputs" );
       }
+
+      $self->log( "info", "Finished combining dosage matrix outputs" );
+
     }
   }
 
