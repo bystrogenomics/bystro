@@ -8,6 +8,8 @@ import concurrent.futures
 
 from bystro.api.auth import authenticate
 
+FILE_UPLOAD_TIMEOUT = int(os.getenv("FILE_UPLOAD_TIMEOUT", f"{60 * 60 * 24 * 7}"))  # 1 week
+
 JOB_TYPE_ROUTE_MAP = {
     "all": "/list/all",
     "public": "/list/all/public",
@@ -112,7 +114,9 @@ def _upload_file(file_path, url: str, headers: dict, payload: dict):
             )
         ]
 
-        response = requests.post(url, headers=headers, data=payload, files=file_request, timeout=600)
+        response = requests.post(
+            url, headers=headers, data=payload, files=file_request, timeout=FILE_UPLOAD_TIMEOUT
+        )
 
     return response
 

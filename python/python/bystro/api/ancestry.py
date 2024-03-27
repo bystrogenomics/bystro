@@ -52,6 +52,7 @@ def calculate_ancestry_scores(
 
     return calculate_ancestry_scores_from_dosage(dosage_matrix_path, assembly, out_dir)
 
+
 def calculate_ancestry_scores_from_dosage(
     dosage_matrix_path: str, assembly: str, out_dir: str | None = None
 ) -> AncestryResults:
