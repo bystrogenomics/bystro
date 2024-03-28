@@ -11,6 +11,7 @@ index_settings:
     refresh_interval: -1
     number_of_replicas: 0
     codec: best_compression
+    max_slices_per_pit: 50000
     mapping:
       total_fields:
         limit: 5000
