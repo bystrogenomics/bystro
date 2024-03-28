@@ -36,7 +36,7 @@ fileProcessors:
   vcf:
     args: --emptyField NA --sample %sampleList% --keepPos --keepId --dosageOutput %dosageMatrixOutPath%
     program: bystro-vcf
-files_dir: /mnt/files1/bystro_annotator/raw_files/hg38
+files_dir: null
 statistics:
   dbSNPnameField: dbSNP.name
   exonicAlleleFunctionField: refSeq.exonicAlleleFunction
@@ -47,7 +47,7 @@ statistics:
   programPath: bystro-stats
   refTrackField: ref
   siteTypeField: refSeq.siteType
-temp_dir: /mnt/annotator/tmp
+temp_dir: null
 tracks:
   outputOrder:
     - ref
@@ -615,7 +615,6 @@ tracks:
     - build_author: alexkotlar
       build_date: 2024-03-11T12:24:00
       build_field_transformations:
-        CLNDISDB: split [|]
         CLNDN: split [|]
         CLNSIGCONF: split [|]
         CLNSIGINC: split [|]
