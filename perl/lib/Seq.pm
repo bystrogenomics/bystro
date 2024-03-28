@@ -534,6 +534,10 @@ sub annotateFile {
       my $finalOutPath =
         $self->_workingDir->child( $self->outputFilesInfo->{dosageMatrixOutPath} );
 
+      if ( @nonEmptyDosageMatrixOutPaths != @dosageMatrixOutPaths ) {
+        $self->log( "warn", "Some empty dosage matrix outputs found. Combining non-empty files" );
+      }
+
       if ( !@nonEmptyDosageMatrixOutPaths ) {
         $self->log( "warn", "No non-empty dosage matrix outputs found" );
 
