@@ -523,31 +523,59 @@ sub annotateFile {
     if (@dosageMatrixOutPaths) {
       $self->log( "info", "Combining dosage matrix outputs" );
 
+      # Find all non-empty dosageMatrixOutPaths, by stat-ing them
+      my @nonEmptyDosageMatrixOutPaths;
+      for my $dosageMatrixOutPath (@dosageMatrixOutPaths) {
+        if ( -s $dosageMatrixOutPath ) {
+          push @nonEmptyDosageMatrixOutPaths, $dosageMatrixOutPath;
+        }
+      }
+
       my $finalOutPath =
         $self->_workingDir->child( $self->outputFilesInfo->{dosageMatrixOutPath} );
 
-      my $err = $self->safeSystem(
-        'dosage --output ' . $finalOutPath . " " . join( " ", @dosageMatrixOutPaths ) );
-
-      if ($err) {
-        my $humanErr = "Failed to combine dosage matrix outputs";
-        $self->_errorWithCleanup($humanErr);
-        return ( $humanErr, undef );
+      if ( @nonEmptyDosageMatrixOutPaths != @dosageMatrixOutPaths ) {
+        $self->log( "warn",
+          "Some empty dosage matrix outputs found. Combining non-empty files" );
       }
 
-      # Remove the intermediate dosageMatrixOutPaths
-      for my $dosageMatrixOutPath (@dosageMatrixOutPaths) {
-        $err = $self->safeSystem("rm $dosageMatrixOutPath");
+      if ( !@nonEmptyDosageMatrixOutPaths ) {
+        $self->log( "warn", "No non-empty dosage matrix outputs found" );
+
+        # Create an empty file in the final dosageMatrixOutPath destination
+        $err = $self->safeSystem("touch $finalOutPath");
 
         if ($err) {
-          my $humanErr = "Failed to remove intermediate dosage matrix files";
+          my $humanErr = "Failed to create empty dosage matrix output file";
           $self->_errorWithCleanup($humanErr);
           return ( $humanErr, undef );
         }
       }
+      else {
+        my $err =
+          $self->safeSystem( 'dosage --output '
+            . $finalOutPath . " "
+            . join( " ", @nonEmptyDosageMatrixOutPaths ) );
 
-      $self->log( "info", "Finished combining dosage matrix outputs" );
+        if ($err) {
+          my $humanErr = "Failed to combine dosage matrix outputs";
+          $self->_errorWithCleanup($humanErr);
+          return ( $humanErr, undef );
+        }
 
+        # Remove the intermediate dosageMatrixOutPaths
+        for my $dosageMatrixOutPath (@dosageMatrixOutPaths) {
+          $err = $self->safeSystem("rm $dosageMatrixOutPath");
+
+          if ($err) {
+            my $humanErr = "Failed to remove intermediate dosage matrix files";
+            $self->_errorWithCleanup($humanErr);
+            return ( $humanErr, undef );
+          }
+        }
+
+        $self->log( "info", "Finished combining dosage matrix outputs" );
+      }
     }
   }
 
