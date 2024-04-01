@@ -498,9 +498,6 @@ mappings:
         ORIGIN:
           type: keyword
           normalizer: lowercase_normalizer
-        SSR:
-          type: keyword
-          normalizer: lowercase_normalizer
     dbSNP:
       properties:
         alt:
