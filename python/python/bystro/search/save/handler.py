@@ -13,10 +13,14 @@ import os
 import psutil
 import pathlib
 import subprocess
+import time
+
 from numpy._typing import NDArray
 
 import numpy as np
 from opensearchpy import OpenSearch, AsyncOpenSearch
+
+import pyarrow as pa  # type: ignore
 import pyarrow.compute as pc  # type: ignore
 import pyarrow.dataset as ds  # type: ignore
 import pyarrow.ipc as ipc  # type: ignore
@@ -35,11 +39,14 @@ MAX_QUERY_SIZE = 10_000
 MAX_SLICES = 1e6
 KEEP_ALIVE = "1d"
 MAX_CONCURRENCY_PER_THREAD = 4
+SAVE_FILTER_BATCH_READAHEAD = int(os.getenv("SAVE_FILTER_BATCH_READAHEAD", 0))
+SAVE_FILTER_BATCH_READ_SIZE = int(os.getenv("SAVE_FILTER_BATCH_READ_SIZE", 200_000))
+SAVE_FILTER_BATCH_WRITE_SIZE = int(os.getenv("SAVE_FILTER_BATCH_WRITE_SIZE", 2_000))
 
 # How many scroll requests for each worker to handle
 PARALLEL_SCROLL_CHUNK_INCREMENT = 2
 # Percentage of fetched records to report progress after
-REPORTING_INTERVAL = 0.2
+REPORTING_INTERVAL = 0.1
 MINIMUM_RECORDS_TO_ENABLE_REPORTING = 10_000
 # These are the fields that are required to define a locus
 # They are used to filter the dosage matrix
@@ -244,22 +251,86 @@ async def go(  # pylint:disable=invalid-name
 
         annotation_path = os.path.join(output_dir, outputs.annotation)
 
-        reporter.message.remote("About to write dosage matrix")  # type: ignore
+        reporter.message.remote("About to filter dosage matrix and annotation tsv.gz")  # type: ignore
 
+        report_progress = n_hits >= MINIMUM_RECORDS_TO_ENABLE_REPORTING
+        reporting_interval = math.ceil(n_hits * REPORTING_INTERVAL)
+
+        if report_progress:
+            reporter.message.remote(  # type: ignore
+                f"Reporting filtering progress every {reporting_interval} records."
+            )
+
+        pool = pa.default_memory_pool()
         with Timer() as timer:
             dataset = ds.dataset(parent_dosage_matrix_path, format="arrow")
             mask = pc.field("locus").isin(loci)
 
             # Use the dataset's scanner to stream batches through a filter
-            scanner = dataset.scanner(filter=mask, use_threads=True)
+            scanner = dataset.scanner(
+                filter=mask,
+                use_threads=True,
+                batch_size=SAVE_FILTER_BATCH_READ_SIZE,
+                batch_readahead=SAVE_FILTER_BATCH_READAHEAD,
+                fragment_readahead=0,
+                memory_pool=pool,
+            )
 
             # Initialize a RecordBatchFileWriter to write to the specified output path
             with ipc.RecordBatchFileWriter(
                 dosage_out_path, schema=dataset.schema, options=ipc.IpcWriteOptions(compression="zstd")
             ) as writer:
                 # Use the scanner to fetch and write record batches directly, applying the mask filter
+                total_since_last_mentioned = 0
+                total_rows_filtered = 0
+                total_filtered_unwritten = 0
+                table_chunks = []
+                report_chunk_start_time = time.time()
                 for batch in scanner.to_batches():
-                    writer.write_batch(batch)
+                    if batch.num_rows == 0:
+                        continue
+
+                    # Append the batch to the list of chunks
+                    table_chunks.append(batch)
+                    total_filtered_unwritten += batch.num_rows
+
+                    # The batch.num_rows can be very small, because pyarrow fetches all records
+                    # and then filters them in-memory.
+                    # Unfortunately, pyarrow is not always be able to push down predicates
+                    if total_filtered_unwritten >= SAVE_FILTER_BATCH_WRITE_SIZE:
+                        table = pa.Table.from_batches(table_chunks)
+                        writer.write_table(table)
+
+                        total_filtered_unwritten = 0
+                        table_chunks = []
+
+                    total_rows_filtered += batch.num_rows
+                    total_since_last_mentioned += batch.num_rows
+
+                    if total_since_last_mentioned >= reporting_interval:
+                        reporter.message.remote(  # type: ignore
+                            (f"Filtered {total_rows_filtered} dosage rows (out of {n_hits}).")
+                        )
+
+                        logger.debug(
+                            "Time to filter %d dosage matrix rows: %s",
+                            total_since_last_mentioned,
+                            time.time() - report_chunk_start_time,
+                        )
+
+                        total_since_last_mentioned = 0
+                        report_chunk_start_time = time.time()
+
+                    if total_rows_filtered >= n_hits:
+                        if total_filtered_unwritten > 0:
+                            table = pa.Table.from_batches(table_chunks)
+                            writer.write_table(table)
+
+                            reporter.message.remote(  # type: ignore
+                                (f"Filtered {total_rows_filtered} dosage rows (out of {n_hits}).")
+                            )
+
+                        break
 
             logger.debug(
                 "Memory usage after genotype filtering: %s (MB)",
@@ -297,14 +368,6 @@ async def go(  # pylint:disable=invalid-name
                 current_target_index = 0
                 header_written = False
                 header_fields = None
-
-                report_progress = n_hits >= MINIMUM_RECORDS_TO_ENABLE_REPORTING
-                reporting_interval = math.ceil(n_hits * REPORTING_INTERVAL)
-
-                if report_progress:
-                    reporter.message.remote(  # type: ignore
-                        f"Reporting filtering progress every {reporting_interval} records."
-                    )
 
                 for line in iter(in_fh.stdout.readline, b""):
                     if not header_written:
