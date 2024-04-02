@@ -5,6 +5,8 @@ import requests
 import sys
 import uuid
 import concurrent.futures
+from requests_toolbelt.multipart.encoder import MultipartEncoder
+from requests_toolbelt.streaming_iterator import StreamingIterator
 
 from bystro.api.auth import authenticate
 
@@ -101,25 +103,86 @@ def get_jobs(job_type=None, job_id=None, print_result=True) -> list[JobBasicResp
     return mjson.decode(response.text, type=list[JobBasicResponse])
 
 
-def _upload_file(file_path, url: str, headers: dict, payload: dict):
-    with open(file_path, "rb") as f:
-        file_request = [
-            (
-                "file",
-                (
-                    os.path.basename(file_path),
-                    f,
-                    "application/octet-stream",
-                ),
-            )
-        ]
 
-        response = requests.post(
-            url, headers=headers, data=payload, files=file_request, timeout=FILE_UPLOAD_TIMEOUT
-        )
+
+
+class ProgressFileWrapper:
+    def __init__(self, file_path, callback, chunk_size=8192):
+        self.file_path = file_path
+        self.chunk_size = chunk_size
+        self.callback = callback
+        self.file = open(file_path, 'rb')
+        print('getting size')
+        self.size = os.path.getsize(file_path)
+        print('size', self.size)
+        self.read_so_far = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        print('calling next')
+        data = self.file.read(self.chunk_size)
+        if not data:
+            self.file.close()
+            raise StopIteration
+        print("atttempting addition")
+        self.read_so_far += len(data)
+        self.callback(self.read_so_far, self.size)
+        return data
+
+    def read(self, size=-1):
+        print("about to read")
+        if size == -1:
+            return self.file.read()
+        return self.file.read(size)
+
+    def close(self):
+        self.file.close()
+
+def progress_monitor(monitor):
+    # This function will be called with each chunk of data read
+    print(f"Uploaded {monitor.bytes_read} of {monitor.len} bytes ({(monitor.bytes_read / monitor.len) * 100:.2f}%)")
+
+
+
+def read_file_in_chunks(file_path, chunk_size=128_000_000):
+    def generator(file_path, progress_callback):
+        with open(file_path, 'rb') as file:
+            size = os.path.getsize(file_path)
+            total_read = 0
+            while True:
+                data = file.read(chunk_size)
+                if not data:
+                    break
+                total_read += len(data)
+                progress_callback(total_read, size)
+                yield data
+    
+    # Define your progress callback here
+    def progress_callback(uploaded, total):
+        print(f"Uploaded {uploaded} of {total} bytes ({(uploaded / total) * 100:.2f}%)")
+
+    return generator(file_path, progress_callback)
+
+def _upload_file(file_path, url: str, headers: dict, payload: dict):
+    file_size = os.path.getsize(file_path)
+    file_generator = read_file_in_chunks(file_path)
+
+    file_request = MultipartEncoder(
+        fields={
+            'file': (os.path.basename(file_path), StreamingIterator(file_size, file_generator), 'application/octet-stream'),
+            **payload
+        }
+    )
+
+    headers.update({'Content-Type': file_request.content_type})
+
+    response = requests.post(
+        url, headers=headers, data=file_request, timeout=FILE_UPLOAD_TIMEOUT
+    )
 
     return response
-
 
 def create_jobs(
     files,
@@ -280,6 +343,60 @@ def create_jobs(
             jobs_created.append(response.json())
 
     return jobs_created
+
+
+def create_demo_jobs(
+    file_name,
+    assembly: str
+) -> list[dict]:
+    """
+    Creates 1+ annotation jobs
+
+    Parameters
+    ----------
+    files : list[str]
+        List of file paths for job creation.
+    assembly : str
+        Genome assembly (e.g., hg19, hg38).
+    combine : bool, optional
+        Whether to combine the input files into a single annotation dataset/job, by default False.
+    names : list[str], optional
+        List of names for the annotation jobs, one per file. If not provided, the file name will be used.
+    no_index : bool, optional
+        Whether to skip creation of a search index for the annotation, by default False.
+    print_result : bool, optional
+        Whether to print the result of the job creation operation, by default True.
+
+    Returns
+    -------
+    list[dict]
+        The annotation submissions
+    """
+    state, auth_header = authenticate()
+    job_create_url = state.url + "/api/jobs/create"
+
+    job_metadata = {
+        "job": {"assembly": assembly},
+        "inputFileNames": [file_name],
+    }
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": auth_header["Authorization"],
+    }
+    response = requests.put(job_create_url, headers=headers, json=job_metadata, timeout=30)
+
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"Job creation failed with response status: {response.status_code}.\
+                Error: \n{response.text}\n"
+        )
+
+    print("\nJob creation successful:\n")
+    print(mjson.format(response.text, indent=4))
+    print("\n")
+
+    return [response.json()]
 
 
 def query(job_id, query, size=10, from_=0):

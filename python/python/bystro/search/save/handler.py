@@ -41,7 +41,6 @@ KEEP_ALIVE = "1d"
 MAX_CONCURRENCY_PER_THREAD = 4
 SAVE_FILTER_BATCH_READAHEAD = int(os.getenv("SAVE_FILTER_BATCH_READAHEAD", 0))
 SAVE_FILTER_BATCH_READ_SIZE = int(os.getenv("SAVE_FILTER_BATCH_READ_SIZE", 200_000))
-SAVE_FILTER_BATCH_WRITE_SIZE = int(os.getenv("SAVE_FILTER_BATCH_WRITE_SIZE", 2_000))
 
 # How many scroll requests for each worker to handle
 PARALLEL_SCROLL_CHUNK_INCREMENT = 2
@@ -283,26 +282,13 @@ async def go(  # pylint:disable=invalid-name
                 # Use the scanner to fetch and write record batches directly, applying the mask filter
                 total_since_last_mentioned = 0
                 total_rows_filtered = 0
-                total_filtered_unwritten = 0
-                table_chunks = []
+
                 report_chunk_start_time = time.time()
                 for batch in scanner.to_batches():
                     if batch.num_rows == 0:
                         continue
 
-                    # Append the batch to the list of chunks
-                    table_chunks.append(batch)
-                    total_filtered_unwritten += batch.num_rows
-
-                    # The batch.num_rows can be very small, because pyarrow fetches all records
-                    # and then filters them in-memory.
-                    # Unfortunately, pyarrow is not always be able to push down predicates
-                    if total_filtered_unwritten >= SAVE_FILTER_BATCH_WRITE_SIZE:
-                        table = pa.Table.from_batches(table_chunks)
-                        writer.write_table(table)
-
-                        total_filtered_unwritten = 0
-                        table_chunks = []
+                    writer.write_batch(batch)
 
                     total_rows_filtered += batch.num_rows
                     total_since_last_mentioned += batch.num_rows
@@ -322,13 +308,9 @@ async def go(  # pylint:disable=invalid-name
                         report_chunk_start_time = time.time()
 
                     if total_rows_filtered >= n_hits:
-                        if total_filtered_unwritten > 0:
-                            table = pa.Table.from_batches(table_chunks)
-                            writer.write_table(table)
-
-                            reporter.message.remote(  # type: ignore
-                                (f"Filtered {total_rows_filtered} dosage rows (out of {n_hits}).")
-                            )
+                        reporter.message.remote(  # type: ignore
+                            (f"Filtered {total_rows_filtered} dosage rows (out of {n_hits}).")
+                        )
 
                         break
 
