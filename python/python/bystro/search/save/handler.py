@@ -260,6 +260,8 @@ async def go(  # pylint:disable=invalid-name
                 f"Reporting filtering progress every {reporting_interval} records."
             )
 
+        # Filter the dosage matrix, if it has rows
+
         pool = pa.default_memory_pool()
         with Timer() as timer:
             dataset = ds.dataset(parent_dosage_matrix_path, format="arrow")
@@ -293,9 +295,9 @@ async def go(  # pylint:disable=invalid-name
                     total_rows_filtered += batch.num_rows
                     total_since_last_mentioned += batch.num_rows
 
-                    if total_since_last_mentioned >= reporting_interval:
+                    if report_progress and total_since_last_mentioned >= reporting_interval:
                         reporter.message.remote(  # type: ignore
-                            (f"Filtered {total_rows_filtered} dosage rows (out of {n_hits}).")
+                            (f"Dosage: filtered and wrote {total_rows_filtered} of {n_hits}) rows.")
                         )
 
                         logger.debug(
@@ -308,11 +310,14 @@ async def go(  # pylint:disable=invalid-name
                         report_chunk_start_time = time.time()
 
                     if total_rows_filtered >= n_hits:
-                        reporter.message.remote(  # type: ignore
-                            (f"Filtered {total_rows_filtered} dosage rows (out of {n_hits}).")
-                        )
-
                         break
+
+            if report_progress and total_since_last_mentioned > 0:
+                reporter.message.remote(  # type: ignore
+                    (f"Dosage: filtered and wrote {total_rows_filtered} of {n_hits}) rows.")
+                )
+
+                total_since_last_mentioned = 0
 
             logger.debug(
                 "Memory usage after genotype filtering: %s (MB)",
@@ -386,7 +391,10 @@ async def go(  # pylint:disable=invalid-name
                                 and current_target_index % reporting_interval == 0
                             ):
                                 reporter.message.remote(  # type: ignore
-                                    f"{current_target_index} records written."
+                                    (
+                                        "Annotation/stats: Filtered & wrote "
+                                        f"{current_target_index} of {n_hits} rows."
+                                    )
                                 )
 
                             p.stdin.write(line)
@@ -396,6 +404,13 @@ async def go(  # pylint:disable=invalid-name
                         current_target_index += 1
 
                         if current_target_index >= n_hits:
+                            if report_progress:
+                                reporter.message.remote(  # type: ignore
+                                    (
+                                        "Annotation/stats: Filtered & wrote "
+                                        f"{current_target_index} of {n_hits} rows."
+                                    )
+                                )
                             reporter.message.remote("Done, cleaning up.")  # type: ignore
                             break
 
