@@ -283,13 +283,14 @@ async def go(  # pylint:disable=invalid-name
                     schema=dataset.schema,
                     options=ipc.IpcWriteOptions(compression="zstd"),
                 ) as writer:
-                    # Use the scanner to fetch and write record batches
-                    # directly, applying the mask filter
                     total_since_last_mentioned = 0
                     total_rows_filtered = 0
 
                     report_chunk_start_time = time.time()
                     for batch in scanner.to_batches():
+                        # The scanner filters in-memory after it reads a batch of rows
+                        # of size SAVE_FILTER_BATCH_READ_SIZE, so we may have far fewer
+                        # than SAVE_FILTER_BATCH_READ_SIZE rows here, including 0
                         if batch.num_rows == 0:
                             continue
 
