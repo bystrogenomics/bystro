@@ -34,39 +34,7 @@ from sklearn.decomposition import PCA
 
 from bystro.supervised_ppca._misc_np import softplus_inverse_np
 from bystro.supervised_ppca.gf_generative_pt import PPCA
-
-
-def _get_projection_matrix(W_: Tensor, sigma_: Tensor):
-    """
-    This is currently just implemented for PPCA due to nicer formula. Will
-    modify for broader application later.
-
-    Computes the parameters for p(S|X)
-
-    Description in future to be released paper
-
-    Parameters
-    ----------
-    W_ : Tensor(n_components,p)
-        The loadings
-
-    sigma_ : Tensor
-        Isotropic noise
-
-    Returns
-    -------
-    Proj_X : Tensor(n_components,p)
-        Beta such that np.dot(Proj_X, X) = E[S|X]
-
-    Cov : Tensor(n_components,n_components)
-        Var(S|X)
-    """
-    n_components = int(W_.shape[0])
-    eye = torch.tensor(np.eye(n_components), dtype=torch.float32)
-    M = torch.matmul(W_, torch.transpose(W_, 0, 1)) + sigma_ * eye
-    Proj_X = torch.linalg.solve(M, W_)
-    Cov = torch.linalg.inv(M) * sigma_
-    return Proj_X, Cov
+from bystro.supervised_ppca._base import _get_projection_matrix
 
 
 class PPCAAdversarial(PPCA):
@@ -332,29 +300,6 @@ class PPCAAdversarial(PPCA):
             return out
 
         return log_prior
-
-    def _store_instance_variables(self, trainable_variables: list[Tensor]):
-        """
-        Saves the learned variables
-
-        Parameters
-        ----------
-        trainable_variables : list
-            List of saved variables of type Tensor
-
-        Sets
-        ----
-        W_ : NDArray,(n_components,p)
-            The loadings
-
-        sigma2_ : float
-            The isotropic variance
-
-        B_ : float
-            The intercept for the predictive model
-        """
-        self.W_ = trainable_variables[0].detach().numpy()
-        self.sigma2_ = nn.Softplus()(trainable_variables[1]).detach().numpy()
 
     def _initialize_variables(self, X: NDArray):
         """

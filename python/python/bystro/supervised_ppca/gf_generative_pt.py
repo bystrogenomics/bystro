@@ -119,7 +119,7 @@ class PPCA(BasePCASGDModel):
             The seed of the random number generator
 
         sherman_woodbury : bool,default=False
-            Whether to use the Sherman Woodbury identity to calculate 
+            Whether to use the Sherman Woodbury identity to calculate
             the likelihood. Advantageous in high-p situations
 
         Returns
@@ -469,7 +469,10 @@ class SPCA(BasePCASGDModel):
                 ]
             )
 
-            sigma = torch.sum(list_covs, dim=0,)
+            sigma = torch.sum(
+                list_covs,
+                dim=0,
+            )
             WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
             Sigma = WWT + torch.diag(sigma)
 
