@@ -148,7 +148,7 @@ def _prepare_query_body(query, slice_id, num_slices):
     return body
 
 
-def correct_loci_case(loci):
+def _correct_loci_case(loci):
     corrected_loci = []
     for locus in loci:
         # Check and replace the prefix as needed
@@ -279,7 +279,7 @@ async def go(  # pylint:disable=invalid-name
 
         # Filter the dosage matrix, if it has rows
         if os.path.exists(parent_dosage_matrix_path) and os.stat(parent_dosage_matrix_path).st_size > 0:
-            loci = correct_loci_case(loci)
+            loci = _correct_loci_case(loci)
             # Write requested loci to disk for logging purposes
             with open(os.path.join(output_dir, f"{basename}_loci.txt"), "w") as loci_fh:
                 for locus in loci:
