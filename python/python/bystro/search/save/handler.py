@@ -261,74 +261,77 @@ async def go(  # pylint:disable=invalid-name
             )
 
         # Filter the dosage matrix, if it has rows
+        if os.path.exists(parent_dosage_matrix_path) and os.stat(parent_dosage_matrix_path).st_size > 0:
+            pool = pa.default_memory_pool()
+            with Timer() as timer:
+                dataset = ds.dataset(parent_dosage_matrix_path, format="arrow")
+                mask = pc.field("locus").isin(loci)
 
-        pool = pa.default_memory_pool()
-        with Timer() as timer:
-            dataset = ds.dataset(parent_dosage_matrix_path, format="arrow")
-            mask = pc.field("locus").isin(loci)
-
-            # Use the dataset's scanner to stream batches through a filter
-            scanner = dataset.scanner(
-                filter=mask,
-                use_threads=True,
-                batch_size=SAVE_FILTER_BATCH_READ_SIZE,
-                batch_readahead=SAVE_FILTER_BATCH_READAHEAD,
-                fragment_readahead=0,
-                memory_pool=pool,
-            )
-
-            # Initialize a RecordBatchFileWriter to write to the specified output path
-            with ipc.RecordBatchFileWriter(
-                dosage_out_path, schema=dataset.schema, options=ipc.IpcWriteOptions(compression="zstd")
-            ) as writer:
-                # Use the scanner to fetch and write record batches directly, applying the mask filter
-                total_since_last_mentioned = 0
-                total_rows_filtered = 0
-
-                report_chunk_start_time = time.time()
-                for batch in scanner.to_batches():
-                    if batch.num_rows == 0:
-                        continue
-
-                    writer.write_batch(batch)
-
-                    total_rows_filtered += batch.num_rows
-                    total_since_last_mentioned += batch.num_rows
-
-                    if report_progress and total_since_last_mentioned >= reporting_interval:
-                        reporter.message.remote(  # type: ignore
-                            (f"Dosage: filtered and wrote {total_rows_filtered} of {n_hits}) rows.")
-                        )
-
-                        logger.debug(
-                            "Time to filter %d dosage matrix rows: %s",
-                            total_since_last_mentioned,
-                            time.time() - report_chunk_start_time,
-                        )
-
-                        total_since_last_mentioned = 0
-                        report_chunk_start_time = time.time()
-
-                    if total_rows_filtered >= n_hits:
-                        break
-
-            if report_progress and total_since_last_mentioned > 0:
-                reporter.message.remote(  # type: ignore
-                    (f"Dosage: filtered and wrote {total_rows_filtered} of {n_hits}) rows.")
+                # Use the dataset's scanner to stream batches through a filter
+                scanner = dataset.scanner(
+                    filter=mask,
+                    use_threads=True,
+                    batch_size=SAVE_FILTER_BATCH_READ_SIZE,
+                    batch_readahead=SAVE_FILTER_BATCH_READAHEAD,
+                    fragment_readahead=0,
+                    memory_pool=pool,
                 )
 
-                total_since_last_mentioned = 0
+                # Initialize a RecordBatchFileWriter to write to the specified output path
+                with ipc.RecordBatchFileWriter(
+                    dosage_out_path,
+                    schema=dataset.schema,
+                    options=ipc.IpcWriteOptions(compression="zstd"),
+                ) as writer:
+                    # Use the scanner to fetch and write record batches
+                    # directly, applying the mask filter
+                    total_since_last_mentioned = 0
+                    total_rows_filtered = 0
 
-            logger.debug(
-                "Memory usage after genotype filtering: %s (MB)",
-                psutil.Process(os.getpid()).memory_info().rss / 1024**2,
-            )
+                    report_chunk_start_time = time.time()
+                    for batch in scanner.to_batches():
+                        if batch.num_rows == 0:
+                            continue
 
-            reporter.message.remote(  # type: ignore
-                "Filtered dosage matrix written. Filtering annotation & generating stats."
-            )
+                        writer.write_batch(batch)
 
-        logger.info("Filtering dosage matrix took %s seconds", timer.elapsed_time)
+                        total_rows_filtered += batch.num_rows
+                        total_since_last_mentioned += batch.num_rows
+
+                        if report_progress and total_since_last_mentioned >= reporting_interval:
+                            reporter.message.remote(  # type: ignore
+                                (f"Dosage: filtered and wrote {total_rows_filtered} of {n_hits}) rows.")
+                            )
+
+                            logger.debug(
+                                "Time to filter %d dosage matrix rows: %s",
+                                total_since_last_mentioned,
+                                time.time() - report_chunk_start_time,
+                            )
+
+                            total_since_last_mentioned = 0
+                            report_chunk_start_time = time.time()
+
+                        if total_rows_filtered >= n_hits:
+                            break
+
+                if report_progress and total_since_last_mentioned > 0:
+                    reporter.message.remote(  # type: ignore
+                        (f"Dosage: filtered and wrote {total_rows_filtered} of {n_hits}) rows.")
+                    )
+
+                    total_since_last_mentioned = 0
+
+                logger.debug(
+                    "Memory usage after genotype filtering: %s (MB)",
+                    psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+                )
+
+                reporter.message.remote(  # type: ignore
+                    "Filtered dosage matrix written. Filtering annotation & generating stats."
+                )
+
+            logger.info("Filtering dosage matrix took %s seconds", timer.elapsed_time)
 
         with Timer() as timer:
             bgzip_cmd = get_compress_from_pipe_cmd(annotation_path)

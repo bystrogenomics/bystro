@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
 ANCESTRY_SCORE_SAMPLE_CHUNK_SIZE = int(os.getenv("ANCESTRY_SCORE_SAMPLE_CHUNK_SIZE", 200))
-ANCESTRY_SCORE_BATCH_READAHEAD = int(os.getenv("ANCESTRY_SCORE_SAMPLE_CHUNK_SIZE", 1))
+
 
 class AncestryModel(Struct, frozen=True, forbid_unknown_fields=True, rename="camel"):
     """Bundle together PCA and RFC models for bookkeeping purposes."""
@@ -190,12 +190,8 @@ def infer_ancestry(ancestry_models: AncestryModels, genotypes: Dataset) -> Ances
         scanner_gnomad = genotypes.filter(mask_gnomad)
         scanner_array = genotypes.filter(mask_array)
 
-        gnomad_matching_row_count = scanner_gnomad.count_rows(
-            memory_pool=pool
-        )
-        array_matching_row_count = scanner_array.count_rows(
-            memory_pool=pool
-        )
+        gnomad_matching_row_count = scanner_gnomad.count_rows(memory_pool=pool)
+        array_matching_row_count = scanner_array.count_rows(memory_pool=pool)
 
         logger.debug(
             "Found %d rows in genotypes matching gnomAD PCA loadings",
@@ -245,9 +241,7 @@ def infer_ancestry(ancestry_models: AncestryModels, genotypes: Dataset) -> Ances
             end = min(start + chunk_size, num_samples)
             chunk_samples = samples[start:end]
 
-            genotypes_chunk_table = scanner.to_table(
-                ["locus", *chunk_samples], memory_pool=pool, batch_readahead=ANCESTRY_SCORE_BATCH_READAHEAD, fragment_readahead=0
-            )
+            genotypes_chunk_table = scanner.to_table(["locus", *chunk_samples], memory_pool=pool)
 
             logger.info(
                 "Memory usage after dosage matrix filtering for samples %d to %d: %s (MB)",
