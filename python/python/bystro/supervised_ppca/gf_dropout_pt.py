@@ -173,10 +173,9 @@ class PPCADropout(PPCA):
                 reduction="mean"
             )
 
-            mod = LogisticRegression()
+            mod = LogisticRegression(max_iter=1000)
             mod.fit(X, 1.0 * y)
             b_ = torch.tensor(mod.intercept_.astype(np.float32))
-            print(b_)
         elif task == "regression":
             supervision_loss = nn.MSELoss()
         else:
