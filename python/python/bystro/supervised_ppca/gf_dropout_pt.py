@@ -18,14 +18,6 @@ Objects
 PPCADropout(PPCA)
     This is PPCA with SGD but supervises a single factor to predict y.
 
-TODO
-SPPCADropout(SPCA)
-    This is SPCA with SGD but supervises a single factor. 
-
-TODO
-FactorAnalysisDropout(FactorAnalysis)
-    This is factor analysis but supervises a single factor.
-
 Methods
 -------
 None
@@ -37,9 +29,8 @@ from tqdm import trange
 import torch
 from torch import Tensor, nn
 from torch.distributions.multivariate_normal import MultivariateNormal
-from sklearn.decomposition import PCA
+from sklearn.linear_model import LogisticRegression
 
-from bystro.supervised_ppca._misc_np import softplus_inverse_np
 from bystro.supervised_ppca.gf_generative_pt import PPCA
 
 
@@ -69,8 +60,10 @@ def _get_projection_matrix(W_: Tensor, sigma_: Tensor):
         Var(S|X)
     """
     n_components = int(W_.shape[0])
-    eye = torch.tensor(np.eye(n_components))
-    M = torch.matmul(W_, torch.transpose(W_, 0, 1)) + sigma_ * eye
+    eye = torch.tensor(np.eye(n_components).astype(np.float32))
+    M_init = torch.matmul(W_, torch.transpose(W_, 0, 1))
+    M_end = sigma_ * eye
+    M = M_init + M_end
     Proj_X = torch.linalg.solve(M, W_)
     Cov = torch.linalg.inv(M) * sigma_
     return Proj_X, Cov
@@ -171,27 +164,34 @@ class PPCADropout(PPCA):
         N, p = X.shape
         self.p = p
 
-        W_, sigmal_, B_ = self._initialize_variables(X)
+        W_, sigmal_ = self._initialize_variables(X)
         X_, y_ = self._transform_training_data(X, 1.0 * y)
 
         if task == "classification":
             sigm = nn.Sigmoid()
-            supervision_loss: nn.BCELoss | nn.MSELoss = nn.BCELoss()
+            supervision_loss: nn.BCELoss | nn.MSELoss = nn.BCELoss(
+                reduction="mean"
+            )
+
+            mod = LogisticRegression(max_iter=1000)
+            mod.fit(X, 1.0 * y)
+            b_ = torch.tensor(mod.intercept_.astype(np.float32))
         elif task == "regression":
             supervision_loss = nn.MSELoss()
         else:
             err_msg = f"unrecognized_task {task}, must be regression or classification"
             raise ValueError(err_msg)
 
-        trainable_variables = [W_, sigmal_, B_]
+        trainable_variables = [W_, sigmal_]
 
         optimizer = torch.optim.SGD(
             trainable_variables,
             lr=training_options["learning_rate"],
             momentum=training_options["momentum"],
         )
-        eye = torch.tensor(np.eye(p))
-        one_s = torch.tensor(np.ones(self.n_supervised))
+
+        eye = torch.tensor(np.eye(p).astype(np.float32))
+        one_s = torch.tensor(np.ones(self.n_supervised).astype(np.float32))
         softplus = nn.Softplus()
 
         _prior = self._create_prior()
@@ -222,14 +222,15 @@ class PPCADropout(PPCA):
             C1_2 = torch.linalg.cholesky(Cov)
             z_samples = mean_z + torch.matmul(eps, C1_2)
 
-            y_hat = (
-                self.delta
-                * torch.matmul(z_samples[:, : self.n_supervised], one_s)
-                + B_
-            )
             if task == "regression":
+                y_hat = torch.matmul(z_samples[:, : self.n_supervised], one_s)
                 loss_y = supervision_loss(y_hat, y_batch)
             else:
+                y_hat = (
+                    self.delta
+                    * torch.matmul(z_samples[:, : self.n_supervised], one_s)
+                    + b_
+                )
                 loss_y = supervision_loss(sigm(y_hat), y_batch)
 
             WTW = torch.matmul(W_, torch.transpose(W_, 0, 1))
@@ -247,6 +248,8 @@ class PPCADropout(PPCA):
             self.losses_supervision[i] = loss_y.detach().numpy()
 
         self._store_instance_variables(trainable_variables)
+
+        self.B_ = b_.detach().numpy()
 
         return self
 
@@ -267,45 +270,9 @@ class PPCADropout(PPCA):
         sigma2_ : float
             The isotropic variance
 
-        B_ : float
-            The intercept for the predictive model
         """
         self.W_ = trainable_variables[0].detach().numpy()
         self.sigma2_ = nn.Softplus()(trainable_variables[1]).detach().numpy()
-        self.B_ = trainable_variables[2].detach().numpy()
-
-    def _initialize_variables(self, X: NDArray):
-        """
-        Initializes the variables of the model. Right now fits a PCA model
-        in sklearn, uses the loadings and sets sigma^2 to be unexplained
-        variance.
-
-        Parameters
-        ----------
-        X : NDArray,(n_samples,p)
-            The data
-
-        Returns
-        -------
-        W_ : torch.tensor,shape=(n_components,p)
-            The loadings of our latent factor model
-
-        sigmal_ : torch.tensor
-            The unrectified variance of the model
-
-        B_ : torch.tensor
-            The predictive model intercept y = XW + B_
-        """
-        model = PCA(self.n_components)
-        S_hat = model.fit_transform(X)
-        W_init = model.components_
-        W_ = torch.tensor(W_init, requires_grad=True)
-        X_recon = np.dot(S_hat, W_init)
-        diff = np.mean((X - X_recon) ** 2)
-        sinv = softplus_inverse_np(diff * np.ones(1))
-        sigmal_ = torch.tensor(sinv, requires_grad=True)
-        B_ = torch.tensor(0.0, requires_grad=True)
-        return W_, sigmal_, B_
 
     def _test_inputs(self, X, y):
         """

@@ -66,6 +66,41 @@ from bystro.covariance._base_covariance import (
 from bystro._template_sgd_np import BaseSGDModel
 
 
+def _get_projection_matrix(W_: Tensor, sigma_: Tensor):
+    """
+    This is currently just implemented for PPCA due to nicer formula. Will
+    modify for broader application later.
+
+    Computes the parameters for p(S|X)
+
+    Description in future to be released paper
+
+    Parameters
+    ----------
+    W_ : Tensor(n_components,p)
+        The loadings
+
+    sigma_ : Tensor
+        Isotropic noise
+
+    Returns
+    -------
+    Proj_X : Tensor(n_components,p)
+        Beta such that np.dot(Proj_X, X) = E[S|X]
+
+    Cov : Tensor(n_components,n_components)
+        Var(S|X)
+    """
+    n_components = int(W_.shape[0])
+    eye = torch.tensor(np.eye(n_components).astype(np.float32))
+    M_init = torch.matmul(W_, torch.transpose(W_, 0, 1))
+    M_end = sigma_ * eye
+    M = M_init + M_end
+    Proj_X = torch.linalg.solve(M, W_)
+    Cov = torch.linalg.inv(M) * sigma_
+    return Proj_X, Cov
+
+
 class BaseGaussianFactorModel(BaseSGDModel, ABC):
     def __init__(self, n_components=2):
         """
@@ -680,7 +715,7 @@ class BasePCASGDModel(BaseGaussianFactorModel):
         """
         out = []
         for arg in args:
-            out.append(torch.tensor(arg))
+            out.append(torch.tensor(arg.astype(np.float32)))
         return out
 
     @abstractmethod
