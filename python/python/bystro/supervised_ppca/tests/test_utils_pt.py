@@ -13,7 +13,8 @@ from torch.distributions.multivariate_normal import MultivariateNormal
 
 # Set global seeds
 random.seed(0)
-np.random.seed(0) # noqa: NPY002
+np.random.seed(0)  # noqa: NPY002
+
 
 def test_ldet_sw_full():
     # Torch seeds do not work globally

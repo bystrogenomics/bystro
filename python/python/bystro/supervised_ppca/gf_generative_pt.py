@@ -28,9 +28,6 @@ Objects
 PPCApt(BaseSGDModel)
     Principal component analysis but with Pytorch implementation.
 
-SPCApt(BaseSGDModel)
-    Supervised probabilistic component analysis
-
 FactorAnalysispt(BaseSGDModel)
     Factor analysis implemented in pytorch. See Bishop 2006
 

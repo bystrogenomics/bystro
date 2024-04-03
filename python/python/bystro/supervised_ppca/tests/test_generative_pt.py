@@ -54,9 +54,10 @@ def test_ppca():
     s1 = la.norm(cov_emp - cov_est)
     assert s1 <= 10.0
 
-
     model = PPCA(n_components=4, training_options={"n_iterations": 25})
-    model.fit(X,sherman_woodbury=True)
+    model.fit(X, sherman_woodbury=True)
 
-    model = PPCA(n_components=4, training_options={"n_iterations": 25,"use_gpu":False})
+    model = PPCA(
+        n_components=4, training_options={"n_iterations": 25, "use_gpu": False}
+    )
     model.fit(X)
