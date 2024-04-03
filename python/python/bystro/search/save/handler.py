@@ -325,7 +325,7 @@ async def go(  # pylint:disable=invalid-name
 
                         if report_progress and total_since_last_mentioned >= reporting_interval:
                             reporter.message.remote(  # type: ignore
-                                (f"Dosage: filtered and wrote {total_rows_filtered} of {n_hits}) rows.")
+                                (f"Dosage: filtered and wrote {total_rows_filtered} of {n_hits} rows.")
                             )
 
                             logger.debug(
