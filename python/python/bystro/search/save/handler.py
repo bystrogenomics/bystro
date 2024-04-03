@@ -250,7 +250,7 @@ async def go(  # pylint:disable=invalid-name
 
         annotation_path = os.path.join(output_dir, outputs.annotation)
 
-        reporter.message.remote("About to filter dosage matrix and annotation tsv.gz")  # type: ignore
+        reporter.message.remote("About to filter dosage matrix and annotation tsv.gz.")  # type: ignore
 
         report_progress = n_hits >= MINIMUM_RECORDS_TO_ENABLE_REPORTING
         reporting_interval = math.ceil(n_hits * REPORTING_INTERVAL)
