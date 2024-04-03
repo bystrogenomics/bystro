@@ -148,6 +148,23 @@ def _prepare_query_body(query, slice_id, num_slices):
     return body
 
 
+def correct_loci_case(loci):
+    corrected_loci = []
+    for locus in loci:
+        # Check and replace the prefix as needed
+        if locus.startswith("chrx"):
+            corrected_loci.append("chrX" + locus[4:])
+        elif locus.startswith("chry"):
+            corrected_loci.append("chrY" + locus[4:])
+        elif locus.startswith("chrm"):
+            corrected_loci.append("chrM" + locus[4:])
+        elif locus.startswith("chrmt"):
+            corrected_loci.append("chrMT" + locus[5:])
+        else:
+            corrected_loci.append(locus)
+    return corrected_loci
+
+
 async def go(  # pylint:disable=invalid-name
     job_data: SaveJobData, search_conf: dict, publisher: ProgressPublisher
 ) -> AnnotationOutputs:
@@ -262,6 +279,12 @@ async def go(  # pylint:disable=invalid-name
 
         # Filter the dosage matrix, if it has rows
         if os.path.exists(parent_dosage_matrix_path) and os.stat(parent_dosage_matrix_path).st_size > 0:
+            loci = correct_loci_case(loci)
+            # Write requested loci to disk for logging purposes
+            with open(os.path.join(output_dir, f"{basename}_loci.txt"), "w") as loci_fh:
+                for locus in loci:
+                    loci_fh.write(locus + "\n")
+
             pool = pa.default_memory_pool()
             with Timer() as timer:
                 dataset = ds.dataset(parent_dosage_matrix_path, format="arrow")
@@ -291,6 +314,7 @@ async def go(  # pylint:disable=invalid-name
                         # The scanner filters in-memory after it reads a batch of rows
                         # of size SAVE_FILTER_BATCH_READ_SIZE, so we may have far fewer
                         # than SAVE_FILTER_BATCH_READ_SIZE rows here, including 0
+                        # TODO: 2024-04-03 @akotlar: Remove this once confirmed not needed
                         if batch.num_rows == 0:
                             continue
 
@@ -305,14 +329,16 @@ async def go(  # pylint:disable=invalid-name
                             )
 
                             logger.debug(
-                                "Time to filter %d dosage matrix rows: %s",
+                                "Time to filter %d dosage matrix rows (total: %d): %s",
                                 total_since_last_mentioned,
+                                total_rows_filtered,
                                 time.time() - report_chunk_start_time,
                             )
 
                             total_since_last_mentioned = 0
                             report_chunk_start_time = time.time()
 
+                        # TODO: 2024-04-03 @akotlar: Remove this once confirmed not needed
                         if total_rows_filtered >= n_hits:
                             break
 
