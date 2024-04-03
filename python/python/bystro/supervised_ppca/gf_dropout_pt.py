@@ -169,7 +169,9 @@ class PPCADropout(PPCA):
 
         if task == "classification":
             sigm = nn.Sigmoid()
-            supervision_loss: nn.BCELoss | nn.MSELoss = nn.BCELoss(reduction='mean')
+            supervision_loss: nn.BCELoss | nn.MSELoss = nn.BCELoss(
+                reduction="mean"
+            )
 
             mod = LogisticRegression()
             mod.fit(X, 1.0 * y)
