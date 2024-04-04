@@ -151,7 +151,7 @@ def query_cli(args: argparse.Namespace) -> None:
     )
 
 
-def fetch_proteomics_cli(args: argparse.Namespace) -> None:
+def stream_file_cli(args: argparse.Namespace) -> None:
     """
     Fetch the file from the /api/jobs/streamFile endpoint.
 
@@ -301,12 +301,12 @@ def main():
     fetch_parser = subparsers.add_parser("fetch", help="Fetch a file")
     fetch_parser.add_argument("--job_id", help="ID of the job to fetch the file from")
     fetch_parser.add_argument(
-        "--output", action="store_true", help="Fetch the output file instead of the input file"
+        "--output", action="store_true", help="Fetch from output dir instead of the input dir"
     )
     fetch_parser.add_argument(
-        "--key_path", help="Key path for the output file, required if --output is used"
+        "--key_path", help="Key path for the output and input dir, required if --output is used"
     )
-    fetch_parser.set_defaults(func=fetch_proteomics_cli)
+    fetch_parser.set_defaults(func=stream_file_cli)
 
     add_proteomics_subparser(subparsers)
 
