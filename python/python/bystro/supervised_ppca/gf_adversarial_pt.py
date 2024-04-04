@@ -23,12 +23,12 @@ None
 """
 import numpy as np
 from numpy.typing import NDArray
+from typing import Any
 
 from tqdm import trange
 import torch
-from torch import Tensor, nn
+from torch import nn
 from torch.distributions.multivariate_normal import MultivariateNormal
-from torch.distributions.gamma import Gamma
 
 from sklearn.decomposition import PCA
 
@@ -125,6 +125,11 @@ class PPCAAdversarial(PPCA):
         training_options = self.training_options
         N, p = X.shape
         self.p = p
+        device = torch.device(
+            "cuda"
+            if torch.cuda.is_available() and training_options["use_gpu"]
+            else "cpu"
+        )
 
         discriminator = nn.Sequential()
         n_hidden = 5
@@ -133,9 +138,10 @@ class PPCAAdversarial(PPCA):
         )
         discriminator.add_module("act1", nn.ReLU())
         discriminator.add_module("dense2", nn.Linear(n_hidden, 1))
+        discriminator = discriminator.to(device)
 
-        W_, sigmal_, sigma_max = self._initialize_variables(X)
-        X_, y_ = self._transform_training_data(X, 1.0 * y)
+        W_, sigmal_, sigma_max = self._initialize_variables(device, X)
+        X_, y_ = self._transform_training_data(device, X, 1.0 * y)
         X_ = X_.type(torch.float32)
         y_ = y_.type(torch.float32)
 
@@ -162,11 +168,11 @@ class PPCAAdversarial(PPCA):
             momentum=training_options["momentum"],
         )
 
-        eye = torch.tensor(np.eye(p), dtype=torch.float32)
-        zerosp = torch.zeros(p, dtype=torch.float32)
+        eye = torch.tensor(np.eye(p), dtype=torch.float32, device=device)
+        zerosp = torch.zeros(p, dtype=torch.float32, device=device)
         softplus = nn.Softplus()
 
-        _prior = self._create_prior()
+        _prior = self._create_prior(device)
 
         fudge_factor = 0.7
         for i in trange(
@@ -185,7 +191,7 @@ class PPCAAdversarial(PPCA):
                 WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
                 Sigma = WWT + sigma * eye
 
-                P_x, Cov = _get_projection_matrix(W_, sigma)
+                P_x, Cov = _get_projection_matrix(W_, sigma, device)
                 mean_z = torch.matmul(X_batch, torch.transpose(P_x, 0, 1))
                 eps = torch.rand_like(mean_z)
                 C1_2 = torch.linalg.cholesky(Cov)
@@ -216,7 +222,7 @@ class PPCAAdversarial(PPCA):
             m = MultivariateNormal(zerosp, Sigma)
             like_gen = torch.mean(m.log_prob(X_batch))
 
-            P_x, Cov = _get_projection_matrix(W_, sigma)
+            P_x, Cov = _get_projection_matrix(W_, sigma, device)
             mean_z = torch.matmul(X_batch, torch.transpose(P_x, 0, 1))
             eps = torch.rand_like(mean_z)
             C1_2 = torch.linalg.cholesky(Cov)
@@ -234,17 +240,6 @@ class PPCAAdversarial(PPCA):
 
             loss_sigma_large = nn.ReLU()(sigma - sigma_max) * 1000.0
 
-            if i % 10 == 0:
-                print(
-                    i,
-                    like_gen.detach().numpy(),
-                    "|",
-                    loss_y2.detach().numpy(),
-                    "|",
-                    sigma.detach().numpy(),
-                    sigma_max,
-                )
-                print(torch.norm(W_))
             posterior = like_gen + 1 / N * like_prior
 
             if i % 10 == 0:
@@ -265,43 +260,17 @@ class PPCAAdversarial(PPCA):
             loss_gen.backward()
             optimizer_g.step()
 
-            self._save_losses(i, like_gen, like_prior, posterior)
-            self.losses_supervision[i] = loss_y.detach().numpy()
+            self._save_losses(i, device, like_gen, like_prior, posterior)
+            if device.type == "cuda":
+                self.losses_supervision[i] = loss_y.detach().cpu().numpy()
+            else:
+                self.losses_supervision[i] = loss_y.detach().numpy()
 
-        self._store_instance_variables(trainable_variables)
-        print(sigma_max)
+        self._store_instance_variables(device, trainable_variables)
 
         return self
 
-    def _create_prior(self):
-        """
-        This creates the function representing prior on pararmeters
-
-        Parameters
-        ----------
-        log_prior : function
-            The function representing the log density of the prior
-        """
-        prior_options = self.prior_options
-
-        def log_prior(trainable_variables: list[Tensor]):
-            W_ = trainable_variables[0]
-            sigmal_ = trainable_variables[1]
-            sigma_ = nn.Softplus()(sigmal_)
-
-            part1 = (
-                -1 * prior_options["weight_W"] * torch.mean(torch.square(W_))
-            )
-            part2 = Gamma(
-                prior_options["alpha"], prior_options["beta"]
-            ).log_prob(sigma_)
-            gamma_out = torch.mean(part1 + part2)
-            out = gamma_out
-            return out
-
-        return log_prior
-
-    def _initialize_variables(self, X: NDArray):
+    def _initialize_variables(self, device: Any, X: NDArray):
         """
         Initializes the variables of the model. Right now fits a PCA model
         in sklearn, uses the loadings and sets sigma^2 to be unexplained
@@ -326,11 +295,15 @@ class PPCAAdversarial(PPCA):
         model = PCA(self.n_components)
         S_hat = model.fit_transform(X)
         W_init = model.components_
-        W_ = torch.tensor(W_init, requires_grad=True, dtype=torch.float32)
+        W_ = torch.tensor(
+            W_init, requires_grad=True, dtype=torch.float32, device=device
+        )
         X_recon = np.dot(S_hat, W_init)
         diff = np.mean((X - X_recon) ** 2)
         sinv = softplus_inverse_np(diff * np.ones(1))
-        sigmal_ = torch.tensor(sinv, requires_grad=True, dtype=torch.float32)
+        sigmal_ = torch.tensor(
+            sinv, requires_grad=True, dtype=torch.float32, device=device
+        )
 
         sigma_max = 3.0 * diff
         return W_, sigmal_, sigma_max
