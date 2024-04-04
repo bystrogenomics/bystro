@@ -270,6 +270,9 @@ class PPCA(BasePCASGDModel):
 
         Parameters
         ----------
+        device ; pytorch.device
+            The device used for trainging (gpu or cpu)
+
         X : NDArray,(n_samples,p)
             The data
 

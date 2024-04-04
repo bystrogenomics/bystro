@@ -243,6 +243,9 @@ class PPCADropout(PPCA):
 
         Parameters
         ----------
+        device ; pytorch.device
+            The device used for trainging (gpu or cpu)
+
         trainable_variables : list
             List of saved variables of type Tensor
 

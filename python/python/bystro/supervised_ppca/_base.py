@@ -691,6 +691,9 @@ class BasePCASGDModel(BaseGaussianFactorModel):
 
         Parameters
         -----------
+        device ; pytorch.device
+            The device used for trainging (gpu or cpu)
+
         i : int
             Current training iteration
 

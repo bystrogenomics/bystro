@@ -308,6 +308,9 @@ class PPCAM(BasePCASGDModel):
 
         Parameters
         ----------
+        device ; pytorch.device
+            The device used for trainging (gpu or cpu)
+
         trainable_variables : list[Tensor]
             List of tensorflow variables saved
 
