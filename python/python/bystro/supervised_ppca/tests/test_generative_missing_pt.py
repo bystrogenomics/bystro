@@ -18,6 +18,11 @@ def test_ppcam_fit():
     assert ppcam.sigma2_ is not None
     assert ppcam.p is not None
 
+    ppcam = PPCAM(
+        n_components=n_components, training_options={"use_gpu": False}
+    )
+    ppcam.fit(X)
+
 
 def test_ppcam_get_covariance():
     # Generate synthetic data for testing

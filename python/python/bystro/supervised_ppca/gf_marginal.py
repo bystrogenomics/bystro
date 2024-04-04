@@ -91,6 +91,12 @@ class PPCAMarginal(PPCA):
         rng = np.random.default_rng(int(seed))
         training_options = self.training_options
         N, p = X.shape
+        device = torch.device(
+            "cuda"
+            if torch.cuda.is_available() and training_options["use_gpu"]
+            else "cpu"
+        )
+
         n_groups = len(idx_list)
         self.idx_list = idx_list
         self.n_groups, self.p = n_groups, p
@@ -99,11 +105,17 @@ class PPCAMarginal(PPCA):
         for i in range(n_groups):
             n_g_indiv[i] = np.sum(1 * idx_list[i])
         n_g_indiv = n_g_indiv.astype(int)
-        idxs = [torch.tensor(vals[idx_list[i]]) for i in range(n_groups)]
-        idxs_c = [torch.tensor(vals[~idx_list[i]]) for i in range(n_groups)]
+        idxs = [
+            torch.tensor(vals[idx_list[i]], device=device)
+            for i in range(n_groups)
+        ]
+        idxs_c = [
+            torch.tensor(vals[~idx_list[i]], device=device)
+            for i in range(n_groups)
+        ]
 
-        W_, sigmal_ = self._initialize_variables(X)
-        X_ = self._transform_training_data(X)[0]
+        W_, sigmal_ = self._initialize_variables(device, X)
+        X_ = self._transform_training_data(device, X)[0]
 
         trainable_variables = [W_, sigmal_]
 
@@ -112,11 +124,15 @@ class PPCAMarginal(PPCA):
             lr=training_options["learning_rate"],
             momentum=training_options["momentum"],
         )
-        eye = torch.tensor(np.eye(p))
+        eye = torch.tensor(np.eye(p).astype(np.float32), device=device)
         softplus = nn.Softplus()
 
-        _prior = self._create_prior()
-        z_vecs = [torch.zeros(n_g_indiv[i]) for i in range(n_groups)]
+        _prior = self._create_prior(device)
+        z_vecs = [
+            torch.zeros(n_g_indiv[i], device=device) for i in range(n_groups)
+        ]
+
+        Lamb = torch.tensor(lamb, device=device)
 
         for i in trange(
             int(training_options["n_iterations"]), disable=not progress_bar
@@ -142,14 +158,16 @@ class PPCAMarginal(PPCA):
                 m = MultivariateNormal(z_vecs[k], Sigma_marg)
                 like_gens.append(torch.mean(m.log_prob(X_o)))
 
-                P_x, Sigma_pred = _get_projection_matrix(W_[:, idxs[k]], sigma)
+                P_x, Sigma_pred = _get_projection_matrix(
+                    W_[:, idxs[k]], sigma, device
+                )
                 mean_z = torch.matmul(X_o, torch.transpose(P_x, 0, 1))
 
                 X_bar = X_m - mean_z
                 m2 = MultivariateNormal(
-                    torch.zeros(p - n_g_indiv[k]), Sigma_pred
+                    torch.zeros(p - n_g_indiv[k], device=device), Sigma_pred
                 )
-                like_preds.append(lamb[k] * torch.mean(m2.log_prob(X_bar)))
+                like_preds.append(Lamb[k] * torch.mean(m2.log_prob(X_bar)))
 
             WTW = torch.matmul(W_, torch.transpose(W_, 0, 1))
             off_diag = WTW - torch.diag(torch.diag(WTW))
@@ -165,9 +183,9 @@ class PPCAMarginal(PPCA):
             loss.backward()
             optimizer.step()
 
-            self._save_losses(i, like_gen, like_prior, posterior)
+            self._save_losses(i, device, like_gen, like_prior, posterior)
 
-        self._store_instance_variables(trainable_variables)
+        self._store_instance_variables(device, trainable_variables)
 
         return self
 

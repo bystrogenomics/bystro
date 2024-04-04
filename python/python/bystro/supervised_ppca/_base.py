@@ -66,7 +66,7 @@ from bystro.covariance._base_covariance import (
 from bystro._template_sgd_np import BaseSGDModel
 
 
-def _get_projection_matrix(W_: Tensor, sigma_: Tensor):
+def _get_projection_matrix(W_: Tensor, sigma_: Tensor, device: Any):
     """
     This is currently just implemented for PPCA due to nicer formula. Will
     modify for broader application later.
@@ -92,7 +92,7 @@ def _get_projection_matrix(W_: Tensor, sigma_: Tensor):
         Var(S|X)
     """
     n_components = int(W_.shape[0])
-    eye = torch.tensor(np.eye(n_components).astype(np.float32))
+    eye = torch.tensor(np.eye(n_components).astype(np.float32), device=device)
     M_init = torch.matmul(W_, torch.transpose(W_, 0, 1))
     M_end = sigma_ * eye
     M = M_init + M_end
@@ -636,7 +636,7 @@ class BasePCASGDModel(BaseGaussianFactorModel):
         default_options = {
             "n_iterations": 3000,
             "learning_rate": 1e-2,
-            "gpu_memory": 1024,
+            "use_gpu": True,
             "method": "Nadam",
             "batch_size": 100,
             "momentum": 0.9,
@@ -681,6 +681,7 @@ class BasePCASGDModel(BaseGaussianFactorModel):
     def _save_losses(
         self,
         i: int,
+        device: Any,
         log_likelihood: Tensor,
         log_prior: Tensor | NDArray[np.float_],
         log_posterior: Tensor,
@@ -690,6 +691,9 @@ class BasePCASGDModel(BaseGaussianFactorModel):
 
         Parameters
         -----------
+        device ; pytorch.device
+            The device used for trainging (gpu or cpu)
+
         i : int
             Current training iteration
 
@@ -702,24 +706,34 @@ class BasePCASGDModel(BaseGaussianFactorModel):
         losses_posterior : Tensor
             The log posterior
         """
-        self.losses_likelihood[i] = log_likelihood.detach().numpy()
-        if isinstance(log_prior, np.ndarray):
-            self.losses_prior[i] = log_prior
+        if device.type == "cuda":
+            self.losses_likelihood[i] = log_likelihood.detach().cpu().numpy()
+            if isinstance(log_prior, np.ndarray):
+                self.losses_prior[i] = log_prior
+            else:
+                self.losses_prior[i] = log_prior.detach().cpu().numpy()
+            self.losses_posterior[i] = log_posterior.detach().cpu().numpy()
         else:
-            self.losses_prior[i] = log_prior.detach().numpy()
-        self.losses_posterior[i] = log_posterior.detach().numpy()
+            self.losses_likelihood[i] = log_likelihood.detach().numpy()
+            if isinstance(log_prior, np.ndarray):
+                self.losses_prior[i] = log_prior
+            else:
+                self.losses_prior[i] = log_prior.detach().numpy()
+            self.losses_posterior[i] = log_posterior.detach().numpy()
 
-    def _transform_training_data(self, *args: NDArray) -> list[Tensor]:
+    def _transform_training_data(
+        self, device: Any, *args: NDArray
+    ) -> list[Tensor]:
         """
         Convert a list of numpy arrays to tensors
         """
         out = []
         for arg in args:
-            out.append(torch.tensor(arg.astype(np.float32)))
+            out.append(torch.tensor(arg.astype(np.float32)).to(device))
         return out
 
     @abstractmethod
-    def _create_prior(self):
+    def _create_prior(self, device: Any):
         """
         Creates a prior on the parameters taking your trainable variable
         dictionary as input

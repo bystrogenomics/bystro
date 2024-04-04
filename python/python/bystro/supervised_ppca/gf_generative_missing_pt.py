@@ -104,11 +104,16 @@ class PPCAM(BasePCASGDModel):
         training_options = self.training_options
         N, p = X.shape
         self.p = p
+        device = torch.device(
+            "cuda"
+            if torch.cuda.is_available() and training_options["use_gpu"]
+            else "cpu"
+        )
 
-        W_, sigmal_ = self._initialize_variables(X)
+        W_, sigmal_ = self._initialize_variables(device, X)
 
         X_list, miss_pat = classify_missingness(X)
-        Xt_list = [torch.tensor(X) for X in X_list]
+        Xt_list = [torch.tensor(X, device=device) for X in X_list]
 
         n_groups = len(Xt_list)
         p_list = np.array([np.sum(mp) for mp in miss_pat])
@@ -120,10 +125,10 @@ class PPCAM(BasePCASGDModel):
             lr=training_options["learning_rate"],
             momentum=training_options["momentum"],
         )
-        eye = torch.tensor(np.eye(p).astype(np.float32))
+        eye = torch.tensor(np.eye(p).astype(np.float32), device=device)
         softplus = nn.Softplus()
 
-        _prior = self._create_prior()
+        _prior = self._create_prior(device)
 
         for i in trange(
             training_options["n_iterations"], disable=not progress_bar
@@ -135,7 +140,9 @@ class PPCAM(BasePCASGDModel):
             like_marginal = []
             for y in range(n_groups):
                 sigma = Sigma[miss_pat[y]][:, miss_pat[y]]
-                mvn = MultivariateNormal(torch.zeros(p_list[y]), sigma)
+                mvn = MultivariateNormal(
+                    torch.zeros(p_list[y], device=device), sigma
+                )
                 like_marginal.append(torch.sum(mvn.log_prob(Xt_list[y])))
 
             like_tot = torch.sum(torch.stack(like_marginal)) / N
@@ -151,9 +158,9 @@ class PPCAM(BasePCASGDModel):
             loss.backward()
             optimizer.step()
 
-            self._save_losses(i, like_tot, like_prior, posterior)
+            self._save_losses(i, device, like_tot, like_prior, posterior)
 
-        self._store_instance_variables(trainable_variables)
+        self._store_instance_variables(device, trainable_variables)
 
         return self
 
@@ -195,7 +202,7 @@ class PPCAM(BasePCASGDModel):
 
         return self.sigma2_ * np.eye(self.p)
 
-    def _create_prior(self):
+    def _create_prior(self, device):
         """
         This creates the function representing prior on pararmeters
 
@@ -212,16 +219,18 @@ class PPCAM(BasePCASGDModel):
             part1 = (
                 -1 * prior_options["weight_W"] * torch.mean(torch.square(W_))
             )
-            part2 = Gamma(
-                prior_options["alpha"], prior_options["beta"]
-            ).log_prob(nn.Softplus()(sigmal_))
+            part2 = (
+                Gamma(prior_options["alpha"], prior_options["beta"])
+                .log_prob(nn.Softplus()(sigmal_))
+                .to(device)
+            )
             out = torch.mean(part1 + part2)
             return out
 
         return log_prior
 
     def _initialize_variables(
-        self, X: NDArray[np.float_]
+        self, device: Any, X: NDArray[np.float_]
     ) -> tuple[Tensor, Tensor]:
         """
         Initializes the variables of the model. Right now fits a PCA model
@@ -244,16 +253,17 @@ class PPCAM(BasePCASGDModel):
         model = PCA(self.n_components)
         S_hat = model.fit_transform(X)
         W_init = model.components_.astype(np.float32)
-        W_ = torch.tensor(W_init, requires_grad=True)
+        W_ = torch.tensor(W_init, requires_grad=True, device=device)
         X_recon = np.dot(S_hat, W_init)
         diff = np.mean((X - X_recon) ** 2)
         sinv = softplus_inverse_np(diff * np.ones(1).astype(np.float32))
-        sigmal_ = torch.tensor(sinv, requires_grad=True)
+        sigmal_ = torch.tensor(sinv, requires_grad=True, device=device)
         return W_, sigmal_
 
     def _save_losses(
         self,
-        i,
+        i: int,
+        device: Any,
         log_likelihood: Tensor,
         log_prior: NDArray[np.float_] | Tensor,
         log_posterior,
@@ -275,21 +285,32 @@ class PPCAM(BasePCASGDModel):
         losses_posterior : Tensor
             The log posterior
         """
-        self.losses_likelihood[i] = log_likelihood.detach().numpy()
-        if isinstance(log_prior, Tensor):
-            self.losses_prior[i] = log_prior.detach().numpy()
+        if device.type == "cuda":
+            self.losses_likelihood[i] = log_likelihood.detach().cpu().numpy()
+            if isinstance(log_prior, Tensor):
+                self.losses_prior[i] = log_prior.detach().cpu().numpy()
+            else:
+                self.losses_prior[i] = log_prior
+            self.losses_posterior[i] = log_posterior.detach().cpu().numpy()
         else:
-            self.losses_prior[i] = log_prior
-        self.losses_posterior[i] = log_posterior.detach().numpy()
+            self.losses_likelihood[i] = log_likelihood.detach().numpy()
+            if isinstance(log_prior, Tensor):
+                self.losses_prior[i] = log_prior.detach().numpy()
+            else:
+                self.losses_prior[i] = log_prior
+            self.losses_posterior[i] = log_posterior.detach().numpy()
 
-    def _store_instance_variables(
-        self, trainable_variables: list[Tensor]
+    def _store_instance_variables(  # type: ignore[override]
+        self, device: Any, trainable_variables: list[Tensor]
     ) -> None:
         """
         Saves the learned variables
 
         Parameters
         ----------
+        device ; pytorch.device
+            The device used for trainging (gpu or cpu)
+
         trainable_variables : list[Tensor]
             List of tensorflow variables saved
 
@@ -301,8 +322,16 @@ class PPCAM(BasePCASGDModel):
         sigma2_ : np.float_
             The isotropic variance
         """
-        self.W_ = trainable_variables[0].detach().numpy()
-        self.sigma2_ = nn.Softplus()(trainable_variables[1]).detach().numpy()
+        if device.type == "cuda":
+            self.W_ = trainable_variables[0].detach().cpu().numpy()
+            self.sigma2_ = (
+                nn.Softplus()(trainable_variables[1]).detach().cpu().numpy()
+            )
+        else:
+            self.W_ = trainable_variables[0].detach().numpy()
+            self.sigma2_ = (
+                nn.Softplus()(trainable_variables[1]).detach().numpy()
+            )
 
     def _test_inputs(self, X: NDArray[np.float_]) -> None:
         """
