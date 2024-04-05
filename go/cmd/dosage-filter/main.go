@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/apache/arrow/go/v14/arrow/array"
@@ -249,8 +250,7 @@ func main() {
 	defer arrowWriter.Close()
 
 	totalRecords := fr.NumRecords()
-	numWorkers := 32
-	recordsPerWorker := totalRecords / numWorkers
+	numWorkers := runtime.NumCPU() * 8
 
 	// var wg sync.WaitGroup
 	workQueue := make(chan int, 16)
@@ -261,16 +261,8 @@ func main() {
 		go processRecordAt(fr, loci, arrowWriter, workQueue, complete)
 	}
 
-	for i := 0; i < numWorkers; i++ {
-		start := i * recordsPerWorker
-		end := start + recordsPerWorker
-		if i == numWorkers-1 {
-			// Ensure the last worker picks up any remaining records
-			end = totalRecords
-		}
-		for j := start; j < end; j++ {
-			workQueue <- j
-		}
+	for i := 0; i < totalRecords; i++ {
+		workQueue <- i
 	}
 
 	close(workQueue)
