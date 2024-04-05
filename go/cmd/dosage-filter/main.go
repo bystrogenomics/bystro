@@ -118,22 +118,13 @@ func processRecordAt(fr *ipc.FileReader, loci map[string]bool, arrowWriter *byst
 	builder := array.NewRecordBuilder(pool, arrowWriter.Schema)
 	defer builder.Release()
 
-	// Fetch the specific record by its index
 	rowsAccumulated := 0
 	for index := range queue {
-		// start, end := startEnd[0], startEnd[1]
-
-		// for index := start; index < end; index++ {
-
 		record, err := fr.RecordAt(index)
 		if err != nil {
 			log.Fatalf("Failed to read record at %d: %v", index, err)
 		}
 
-		// Here you would process the record as needed
-		// log.Printf("Processing record at %d with %d rows", index, record.NumRows())
-
-		// Correcting the type for the "locus" column to use *array.String
 		locusCol := record.Column(0).(*array.String)
 
 		for j := 0; j < int(record.NumRows()); j++ {
@@ -194,14 +185,11 @@ func processRecordAt(fr *ipc.FileReader, loci map[string]bool, arrowWriter *byst
 
 			rowsAccumulated = 0
 		}
-		// }
 	}
 
 	if rowsAccumulated >= 0 {
-		// Create a new record from the row
 		filteredRecord := builder.NewRecord()
 
-		// Write the new record to the output file
 		if err := arrowWriter.WriteChunk(filteredRecord); err != nil {
 			log.Fatal(err)
 		}
