@@ -42,8 +42,8 @@ def run_binary_with_args(binary_path: str, args: list[str]) -> list[str]:
 
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     stdout, stderr = process.communicate()
-
-    if process.returncode != 0 or stderr:
+    print("stdout, stderr", stdout, stderr)
+    if process.returncode != 0:
         raise RuntimeError(f"Binary execution failed: {stderr.decode('utf-8')}")
 
     header_fields = stdout.decode("utf-8")
