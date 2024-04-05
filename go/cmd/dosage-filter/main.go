@@ -265,6 +265,8 @@ func main() {
 	totalRecords := fr.NumRecords()
 	numWorkers := runtime.NumCPU() * 2
 
+	fmt.Println("totalRecords", totalRecords)
+
 	// var wg sync.WaitGroup
 	workQueue := make(chan int, 16)
 	complete := make(chan bool)
@@ -282,7 +284,12 @@ func main() {
 	var progressUpdate int64 = 0
 	var totalRowsProcessed int64 = 0
 
-	checkInteval := totalRecords / 100
+	checkInterval := totalRecords / 100
+
+	if checkInterval == 0 {
+		checkInterval = 1
+	}
+
 	totalRows := int64(len(loci))
 	totalRowsProcessed = 0
 
@@ -290,7 +297,7 @@ func main() {
 	for i := 0; i < totalRecords; i++ {
 		workQueue <- i
 
-		if i%checkInteval == 0 {
+		if i%checkInterval == 0 {
 			totalRowsProcessed = totalCount.Load()
 
 			if totalRowsProcessed >= totalRows {

@@ -20,10 +20,6 @@ from numpy._typing import NDArray
 import numpy as np
 from opensearchpy import OpenSearch, AsyncOpenSearch
 
-import pyarrow as pa  # type: ignore
-import pyarrow.compute as pc  # type: ignore
-import pyarrow.dataset as ds  # type: ignore
-import pyarrow.ipc as ipc  # type: ignore
 import ray
 
 from bystro.beanstalkd.worker import ProgressPublisher, get_progress_reporter
@@ -32,6 +28,8 @@ from bystro.search.utils.messages import SaveJobData
 from bystro.search.utils.opensearch import gather_opensearch_args
 from bystro.utils.compress import get_compress_from_pipe_cmd, get_decompress_to_pipe_cmd
 from bystro.utils.timer import Timer
+from bystro.utils.config import _get_bystro_project_root
+
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +51,9 @@ FIELDS_TO_QUERY = ["chrom", "pos", "inputRef", "alt"]
 
 ray.init(ignore_reinit_error=True, address="auto")
 
+_GO_HANDLER_BINARY_PATH = os.path.join(
+            _get_bystro_project_root(), "go/cmd/dosage-filter/dosage-filter"
+        )
 
 def _clean_query(input_query_body: dict):
     if "sort" in input_query_body:
@@ -171,8 +172,7 @@ def run_dosage_filter(
     loci_path: str,
     queue_config_path: str,
     progress_frequency: int,
-    submission_id: str,
-    binary_path: str = "dosage-filter",
+    submission_id: str
 ):
     """
     Run the dosage_filter binary
@@ -191,7 +191,7 @@ def run_dosage_filter(
     # call the dosage-filter program, which takes an --input --output --loci --progress-frequency --queue-config --job-submission-id args
     # and filters the dosage matrix to only include the loci in the loci file
     dosage_filter_cmd = (
-        f"{binary_path} --input {parent_dosage_matrix_path} --output {dosage_out_path} "
+        f"{_GO_HANDLER_BINARY_PATH} --input {parent_dosage_matrix_path} --output {dosage_out_path} "
         f"--loci {loci_path} --progress-frequency {progress_frequency} --queue-config {queue_config_path} "
         f"--job-submission-id {submission_id}"
     )
@@ -199,7 +199,7 @@ def run_dosage_filter(
     logger.info("Beginning to filter genotypes")
 
     # Run the command and capture stderr
-    process = subprocess.Popen(dosage_filter_cmd, stderr=subprocess.PIPE)
+    process = subprocess.Popen(dosage_filter_cmd, stderr=subprocess.PIPE, shell=True)
     _, stderr = process.communicate()
 
     if process.returncode != 0 or stderr:
@@ -312,9 +312,9 @@ async def go(  # pylint:disable=invalid-name
 
         reporter.message.remote("About to filter dosage matrix and annotation tsv.gz.")  # type: ignore
 
-        reporting_interval = np.max(
-            math.ceil(n_hits * REPORTING_INTERVAL), MINIMUM_RECORDS_TO_ENABLE_REPORTING
-        )
+        reporting_interval =  math.ceil(n_hits * REPORTING_INTERVAL)
+        if reporting_interval < MINIMUM_RECORDS_TO_ENABLE_REPORTING:
+            reporting_interval = MINIMUM_RECORDS_TO_ENABLE_REPORTING
 
         reporter.message.remote(  # type: ignore
             f"Reporting filtering progress every {reporting_interval} records."
