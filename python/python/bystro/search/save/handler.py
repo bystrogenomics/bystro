@@ -198,11 +198,11 @@ def run_dosage_filter(
     logger.info("Beginning to filter genotypes")
 
     # Run the command and capture stderr
-    process = subprocess.Popen(dosage_filter_cmd, stderr=subprocess.PIPE, shell=True)
+    process = subprocess.Popen(dosage_filter_cmd, stderr=subprocess.PIPE, shell=True, text=True)
     _, stderr = process.communicate()
 
-    if process.returncode != 0 or stderr:
-        raise RuntimeError(f"Binary execution failed: {stderr.decode('utf-8')}")
+    if process.returncode != 0:
+        raise RuntimeError(f"Binary execution failed: {stderr}")
 
     return
 
