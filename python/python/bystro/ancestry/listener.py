@@ -4,20 +4,16 @@ import argparse
 import logging
 from pathlib import Path
 
-import boto3  # type: ignore
-from botocore.exceptions import ClientError # type: ignore
 import msgspec
-import pandas as pd
 import pyarrow.dataset as ds  # type: ignore
 from ruamel.yaml import YAML
-from skops.io import load as skops_load  # type: ignore
 
 from bystro.ancestry.ancestry_types import AncestryResults
-from bystro.ancestry.inference import AncestryModel, infer_ancestry
+from bystro.ancestry.inference import infer_ancestry
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
 from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, get_progress_reporter, listen
 
-from bystro.utils.timer import Timer
+from bystro.ancestry.model import get_models_from_s3
 
 logging.basicConfig(
     filename="ancestry_listener.log",
@@ -28,71 +24,6 @@ logging.basicConfig(
 logger = logging.getLogger()
 
 ANCESTRY_TUBE = "ancestry"
-ANCESTRY_BUCKET = "bystro-ancestry"
-PCA_FILE = "pca.csv"
-RFC_FILE = "rfc.skop"
-
-models_cache: dict[str, AncestryModel] = {}
-
-
-def _get_model_from_s3(assembly: str) -> AncestryModel:
-    if assembly in models_cache:
-        logger.info("Model for assembly %s found in cache.", assembly)
-        return models_cache[assembly]
-
-    s3_client = boto3.client("s3")
-
-    pca_local_key = f"{assembly}_pca.csv"
-    rfc_local_key = f"{assembly}_rfc.skop"
-
-    pca_file_key = f"{assembly}/{pca_local_key}"
-    rfc_file_key = f"{assembly}/{rfc_local_key}"
-
-    logger.info("Downloading PCA file %s", pca_file_key)
-
-    with Timer() as timer:
-        try:
-            s3_client.download_file(Bucket=ANCESTRY_BUCKET, Key=pca_file_key, Filename=pca_local_key)
-        except ClientError as e:
-            if e.response["Error"]["Code"] == "NoSuchKey":
-                raise ValueError(
-                    f"{assembly} ancestry PCA file not found. This assembly is not supported."
-                )
-            raise  # Re-raise the exception if it's not a "NoSuchKey" error
-
-        try:
-            s3_client.download_file(Bucket=ANCESTRY_BUCKET, Key=rfc_file_key, Filename=rfc_local_key)
-        except ClientError as e:
-            if e.response["Error"]["Code"] == "NoSuchKey":
-                raise ValueError(
-                    f"{assembly} ancestry model not found. This assembly is not supported."
-                )
-            raise
-
-    logger.debug("Downloaded PCA file and RFC file in %f seconds", timer.elapsed_time)
-
-    with Timer() as timer:
-        logger.info("Loading PCA file %s", pca_local_key)
-        pca_loadings_df = pd.read_csv(pca_local_key, index_col=0)
-
-        logger.info("Loading RFC file %s", rfc_local_key)
-        rfc = skops_load(rfc_local_key)
-
-    logger.debug("Loaded PCA and RFC files in %f seconds", timer.elapsed_time)
-
-    logger.info("Loaded ancestry models from S3")
-
-    model = AncestryModel(pca_loadings_df, rfc)
-
-    # Update the cache with the new model
-    if len(models_cache) >= 2:
-        # Remove the oldest loaded model to maintain cache size
-        oldest_assembly = next(iter(models_cache))
-        del models_cache[oldest_assembly]
-    models_cache[assembly] = model
-
-    return model
-
 
 class AncestryJobData(BaseMessage, frozen=True, rename="camel"):
     """
@@ -139,9 +70,9 @@ def handler_fn(publisher: ProgressPublisher, job_data: AncestryJobData) -> Ances
 
     dataset = ds.dataset(job_data.dosage_matrix_path, format="arrow")
 
-    ancestry_model = _get_model_from_s3(job_data.assembly)
+    ancestry_models = get_models_from_s3(job_data.assembly)
 
-    return infer_ancestry(ancestry_model, dataset)
+    return infer_ancestry(ancestry_models, dataset)
 
 
 def submit_msg_fn(ancestry_job_data: AncestryJobData) -> SubmittedJobMessage:

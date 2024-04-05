@@ -1,0 +1,60 @@
+# ---- Build Golang Binaries ----
+FROM golang:1.21.3 AS go-builder
+
+# Set the environment variable for Go binaries. This makes sure the binaries are saved to a defined path.
+ENV GOBIN=/app/bin
+
+# Install the specific versions of the Go programs
+RUN go install github.com/akotlar/bystro-stats@1.0.0
+RUN go install github.com/bystrogenomics/bystro-vcf@2.2.0;
+RUN go install github.com/akotlar/bystro-snp@1.0.0
+RUN go install github.com/mikefarah/yq@2.4.1
+
+COPY ./go /app/bystro-go-tools
+
+RUN cd /app/bystro-go-tools && go install bystro/cmd/opensearch
+
+# Use Ubuntu as the base image to match the GitHub Actions environment
+FROM python:3.11.8-bookworm
+
+# Copy the compiled Go binaries from the builder stage
+COPY --from=go-builder /app/bin/ /app/bin/
+
+# Add app/bin to PATH
+ENV PATH="/app/bin:${PATH}"
+
+# # Install common dependencies and utilities
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    wget curl\
+    openssl libcurl4-openssl-dev libssl-dev \
+    tar lz4 pigz tabix unzip \
+    patch \
+    awscli \
+    unzip \
+    libssl-dev \
+    pkg-config \ 
+    && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+    && . $HOME/.cargo/env
+
+# Make sure Cargo is in the PATH
+ENV PATH="/root/.cargo/bin:${PATH}"
+ENV PATH="/usr/local/go/bin:${PATH}"
+
+# Set up the workspace
+WORKDIR /workspace
+
+# Copy the entire monorepo
+COPY ./python ./python
+
+# Install Python and dependencies
+RUN pip install --upgrade pip && pip install -r python/requirements.txt -r python/requirements-dev.txt
+
+COPY ./Makefile ./
+
+RUN make install-python
+
+ENTRYPOINT ["bystro-api"]
+
+CMD ["--help"]

@@ -8,6 +8,7 @@ from bystro.cli.proteomics_cli import add_proteomics_subparser
 
 from bystro.api.streaming import stream_file
 
+from bystro.cli.ancestry import add_ancestry_subparser
 
 def signup_cli(args: argparse.Namespace, print_result=True) -> CachedAuth:
     """
@@ -102,7 +103,8 @@ def create_jobs_cli(args: argparse.Namespace) -> list[dict]:
         files=args.files,
         names=args.names,
         assembly=args.assembly,
-        index=args.create_index,
+        combine=args.combine,
+        no_index=args.no_index,
         print_result=True,
     )
 
@@ -264,9 +266,15 @@ def main():
         help="Genome assembly (e.g., hg19 or hg38 for human genomes)",
     )
     create_jobs_parser.add_argument(
-        "--create-index",
-        type=bool,
-        default=True,
+        "--combine",
+        default=False,
+        action="store_true",
+        help="Where to combine/stitch the input .vcf/.snp files into a single annotation",
+    )
+    create_jobs_parser.add_argument(
+        "--no-index",
+        default=False,
+        action="store_true",
         help="Whether or not to create a natural language search index the annotation",
     )
     create_jobs_parser.set_defaults(func=create_jobs_cli)
@@ -309,6 +317,7 @@ def main():
     fetch_parser.set_defaults(func=stream_file_cli)
 
     add_proteomics_subparser(subparsers)
+    add_ancestry_subparser(subparsers)
 
     args = parser.parse_args()
     if hasattr(args, "func"):

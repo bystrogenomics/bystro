@@ -18,10 +18,11 @@ jobs:
           auto-activate-base: true
           activate-environment: true
           python-version: ${{ matrix.python-version }}   
-    - name: Build Bystro using Maturin
+    - name: Install Bystro using Maturin
       run: |
         . .initialize_conda_env.sh
-        make build
+        make install
+        echo "PATH=$CONDA/bin:$PATH" >> $GITHUB_ENV
       shell: bash
     - name: Verify Bystro wheel exists
       run: |
@@ -30,3 +31,8 @@ jobs:
           exit 1
         fi
         echo "Bystro wheel found! Build succeeded."
+    - name: Verify bystro-api is installed
+      run: |
+        set -e
+        bystro-api --help
+        echo "bystro-api installed successfully"

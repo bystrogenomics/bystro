@@ -70,7 +70,7 @@ def test_get_compress_from_pipe_cmd(
     "executable, is_pigz, is_bgzip, is_gzip, expected_cmd",
     [
         ("/usr/bin/bgzip", False, True, False, f"/usr/bin/bgzip -d -c input.gz --threads {NUM_CPUS}"),
-        ("/usr/bin/pigz", True, False, False, "/usr/bin/pigz -d -c input.gz -p 2"),
+        ("/usr/bin/pigz", True, False, False, "/usr/bin/pigz -d -c input.gz"),
         ("/usr/bin/gzip", False, False, True, "/usr/bin/gzip -d -c input.gz"),
     ],
 )

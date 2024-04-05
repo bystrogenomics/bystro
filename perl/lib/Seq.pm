@@ -29,7 +29,7 @@ extends 'Seq::Base';
 # We  add a few of our own annotation attributes
 # These will be re-used in the body of the annotation processor below
 # Users may configure these
-has input_file => ( is => 'rw', isa => 'Str', required => 1 );
+has input_files => ( is => 'rw', isa => 'ArrayRef', required => 1 );
 
 # Maximum (signed) size of del allele
 has maxDel => ( is => 'ro', isa => 'Int', default => -32, writer => 'setMaxDel' );
@@ -43,6 +43,18 @@ with 'Seq::Definition', 'Seq::Role::Validator';
 
 # To initialize Seq::Base with only getters
 has '+readOnly' => ( init_arg => undef, default => 1 );
+
+# https://stackoverflow.com/questions/1609467/in-perl-is-there-a-built-in-way-to-compare-two-arrays-for-equality
+sub _arraysEqual {
+  my ( $xref, $yref ) = @_;
+  return unless @$xref == @$yref;
+
+  my $i;
+  for my $e (@$xref) {
+    return unless $e eq $yref->[ $i++ ];
+  }
+  return 1;
+}
 
 # TODO: further reduce complexity
 sub BUILD {
@@ -77,15 +89,26 @@ sub annotate {
 
   $self->log( 'info', 'Checking input file format' );
 
-  my ( $err, $fileType ) = $self->validateInputFile( $self->input_file );
+  my $firstFileType;
+  for my $file ( @{ $self->input_files } ) {
+    my ( $err, $fileType ) = $self->validateInputFile($file);
 
-  if ($err) {
-    $self->_errorWithCleanup($err);
-    return ( $err, undef );
+    if ($err) {
+      $self->_errorWithCleanup($err);
+      return ( $err, undef );
+    }
+
+    if ( !$firstFileType ) {
+      $firstFileType = $fileType;
+    }
+    elsif ( $fileType ne $firstFileType ) {
+      $self->_errorWithCleanup("All input files must be of the same type");
+      return ( "All input files must be of the same type", undef );
+    }
   }
 
   $self->log( 'info', 'Beginning annotation' );
-  return $self->annotateFile($fileType);
+  return $self->annotateFile($firstFileType);
 }
 
 sub annotateFile {
@@ -93,7 +116,8 @@ sub annotateFile {
   my $self = shift;
   my $type = shift;
 
-  my ( $err, $fh, $outFh, $statsFh, $headerFh ) = $self->_getFileHandles($type);
+  my ( $err, $inFhs, $outFh, $statsFh, $headerFh, $preOutArgs ) =
+    $self->_getFileHandles($type);
 
   if ($err) {
     $self->_errorWithCleanup($err);
@@ -101,7 +125,16 @@ sub annotateFile {
   }
 
   ########################## Write the header ##################################
-  my $header = <$fh>;
+  my $header;
+  for my $inFh (@$inFhs) {
+    $header = <$inFh>;
+
+    if ( !$header ) {
+      $self->_errorWithCleanup("Empty input file");
+      return ( "Empty input file", undef );
+    }
+  }
+
   $self->setLineEndings($header);
 
   my ( $finalHeader, $numberSplitFields ) = $self->_getFinalHeader($header);
@@ -176,160 +209,162 @@ sub annotateFile {
 
   my $outJson = $self->outputJson;
 
-  mce_loop_f {
-    #my ($mce, $slurp_ref, $chunk_id) = @_;
-    #    $_[0], $_[1],     $_[2]
-    open my $MEM_FH, '<', $_[1];
-    binmode $MEM_FH, ':raw';
+  for my $inFh (@$inFhs) {
+    mce_loop_f {
+      #my ($mce, $slurp_ref, $chunk_id) = @_;
+      #    $_[0], $_[1],     $_[2]
+      open my $MEM_FH, '<', $_[1];
+      binmode $MEM_FH, ':raw';
 
-    my $total = 0;
+      my $total = 0;
 
-    my @indelDbData;
-    my @indelRef;
-    my @lines;
-    my $dataFromDbAref;
-    my $zeroPos;
+      my @indelDbData;
+      my @indelRef;
+      my @lines;
+      my $dataFromDbAref;
+      my $zeroPos;
 
-    # This is going to be copied on write... avoid a bunch of function calls
-    # Each thread will get its own %cursors object
-    # But start in child because relying on COW seems like it could lead to
-    # future bugs (in, say Rust if sharing between user threads)
-    my %cursors = ();
+      # This is going to be copied on write... avoid a bunch of function calls
+      # Each thread will get its own %cursors object
+      # But start in child because relying on COW seems like it could lead to
+      # future bugs (in, say Rust if sharing between user threads)
+      my %cursors = ();
 
-    # Each line is expected to be
-    # chrom \t pos \t type \t inputRef \t alt \t hets \t homozygotes \n
-    # the chrom is always in ucsc form, chr (the golang program guarantees it)
-    my $outputJson = $self->outputJson;
-    while ( my $line = $MEM_FH->getline() ) {
-      chomp $line;
+      # Each line is expected to be
+      # chrom \t pos \t type \t inputRef \t alt \t hets \t homozygotes \n
+      # the chrom is always in ucsc form, chr (the golang program guarantees it)
+      my $outputJson = $self->outputJson;
+      while ( my $line = $MEM_FH->getline() ) {
+        chomp $line;
 
-      my @fields = split( '\t', $line, $numberSplitFields );
+        my @fields = split( '\t', $line, $numberSplitFields );
 
-      $total++;
+        $total++;
 
-      if ( !$wantedChromosomes{ $fields[0] } ) {
-        next;
-      }
+        if ( !$wantedChromosomes{ $fields[0] } ) {
+          next;
+        }
 
-      $zeroPos = $fields[1] - 1;
+        $zeroPos = $fields[1] - 1;
 
-      # Caveat: It seems that, per database ($chr), we can have only one
-      # read-only transaction; so ... yeah can't combine with dbRead, dbReadOne
-      if ( !$cursors{ $fields[0] } ) {
-        $cursors{ $fields[0] } = $db->dbStartCursorTxn( $fields[0] );
-      }
+        # Caveat: It seems that, per database ($chr), we can have only one
+        # read-only transaction; so ... yeah can't combine with dbRead, dbReadOne
+        if ( !$cursors{ $fields[0] } ) {
+          $cursors{ $fields[0] } = $db->dbStartCursorTxn( $fields[0] );
+        }
 
-      $dataFromDbAref = $db->dbReadOneCursorUnsafe( $cursors{ $fields[0] }, $zeroPos );
+        $dataFromDbAref = $db->dbReadOneCursorUnsafe( $cursors{ $fields[0] }, $zeroPos );
 
-      if ( !defined $dataFromDbAref ) {
-        $self->_errorWithCleanup("Wrong assembly? $fields[0]\: $fields[1] not found.");
-        # Store a reference to the error, allowing us to exit with a useful fail message
-        MCE->gather( 0, 0, "Wrong assembly? $fields[0]\: $fields[1] not found." );
-        $_[0]->abort();
-        return;
-      }
+        if ( !defined $dataFromDbAref ) {
+          $self->_errorWithCleanup("Wrong assembly? $fields[0]\: $fields[1] not found.");
+          # Store a reference to the error, allowing us to exit with a useful fail message
+          MCE->gather( 0, 0, "Wrong assembly? $fields[0]\: $fields[1] not found." );
+          $_[0]->abort();
+          return;
+        }
 
-      if ( length( $fields[4] ) > 1 ) {
-        # INS or DEL
-        if ( looks_like_number( $fields[4] ) ) {
-          # We ignore -1 alleles, treat them just like SNPs
-          if ( $fields[4] < -1 ) {
-            # Grab everything from + 1 the already fetched position to the $pos + number of deleted bases - 1
-            # Note that position_1_based - (negativeDelLength + 2) == position_0_based + (delLength - 1)
-            if ( $fields[4] < $maxDel ) {
-              @indelDbData = ( $fields[1] .. $fields[1] - ( $maxDel + 2 ) );
+        if ( length( $fields[4] ) > 1 ) {
+          # INS or DEL
+          if ( looks_like_number( $fields[4] ) ) {
+            # We ignore -1 alleles, treat them just like SNPs
+            if ( $fields[4] < -1 ) {
+              # Grab everything from + 1 the already fetched position to the $pos + number of deleted bases - 1
+              # Note that position_1_based - (negativeDelLength + 2) == position_0_based + (delLength - 1)
+              if ( $fields[4] < $maxDel ) {
+                @indelDbData = ( $fields[1] .. $fields[1] - ( $maxDel + 2 ) );
+              }
+              else {
+                @indelDbData = ( $fields[1] .. $fields[1] - ( $fields[4] + 2 ) );
+              }
+
+              #last argument: skip commit
+              $db->dbReadCursorUnsafe( $cursors{ $fields[0] }, \@indelDbData );
+
+              #Note that the first position keeps the same $inputRef
+              #This means in the (rare) discordant multiallelic situation, the reference
+              #Will be identical between the SNP and DEL alleles
+              #faster than perl-style loop (much faster than c-style)
+              @indelRef = ( $fields[3], map { $refTrackGetter->get($_) } @indelDbData );
+
+              #Add the db data that we already have for this position
+              unshift @indelDbData, $dataFromDbAref;
             }
-            else {
-              @indelDbData = ( $fields[1] .. $fields[1] - ( $fields[4] + 2 ) );
-            }
-
-            #last argument: skip commit
-            $db->dbReadCursorUnsafe( $cursors{ $fields[0] }, \@indelDbData );
+          }
+          else {
+            #It's an insertion, we always read + 1 to the position being annotated
+            # which itself is + 1 from the db position, so we read  $out[1][0][0] to get the + 1 base
+            # Read without committing by using 1 as last argument
+            @indelDbData = (
+              $dataFromDbAref, $db->dbReadOneCursorUnsafe( $cursors{ $fields[0] }, $fields[1] )
+            );
 
             #Note that the first position keeps the same $inputRef
             #This means in the (rare) discordant multiallelic situation, the reference
             #Will be identical between the SNP and DEL alleles
-            #faster than perl-style loop (much faster than c-style)
-            @indelRef = ( $fields[3], map { $refTrackGetter->get($_) } @indelDbData );
-
-            #Add the db data that we already have for this position
-            unshift @indelDbData, $dataFromDbAref;
+            @indelRef = ( $fields[3], $refTrackGetter->get( $indelDbData[1] ) );
           }
         }
-        else {
-          #It's an insertion, we always read + 1 to the position being annotated
-          # which itself is + 1 from the db position, so we read  $out[1][0][0] to get the + 1 base
-          # Read without committing by using 1 as last argument
-          @indelDbData = (
-            $dataFromDbAref, $db->dbReadOneCursorUnsafe( $cursors{ $fields[0] }, $fields[1] )
-          );
 
-          #Note that the first position keeps the same $inputRef
-          #This means in the (rare) discordant multiallelic situation, the reference
-          #Will be identical between the SNP and DEL alleles
-          @indelRef = ( $fields[3], $refTrackGetter->get( $indelDbData[1] ) );
+        if (@indelDbData) {
+          ############### Gather all track data (besides reference) #################
+          for my $posIdx ( 0 .. $#indelDbData ) {
+            for my $trackIndex (@trackIndicesExceptReference) {
+              $fields[ $outIndicesExceptReference[$trackIndex] ] //= [];
+
+              $trackGettersExceptReference[$trackIndex]->get(
+                $indelDbData[$posIdx], $fields[0], $indelRef[$posIdx], $fields[4], $posIdx,
+                $fields[ $outIndicesExceptReference[$trackIndex] ],
+                $zeroPos + $posIdx
+              );
+            }
+
+            $fields[$refTrackOutIdx][$posIdx] = $indelRef[$posIdx];
+          }
+
+          # If we have multiple indel alleles at one position, need to clear stored values
+          @indelDbData = ();
+          @indelRef    = ();
         }
-      }
-
-      if (@indelDbData) {
-        ############### Gather all track data (besides reference) #################
-        for my $posIdx ( 0 .. $#indelDbData ) {
+        else {
           for my $trackIndex (@trackIndicesExceptReference) {
             $fields[ $outIndicesExceptReference[$trackIndex] ] //= [];
 
-            $trackGettersExceptReference[$trackIndex]->get(
-              $indelDbData[$posIdx], $fields[0], $indelRef[$posIdx], $fields[4], $posIdx,
-              $fields[ $outIndicesExceptReference[$trackIndex] ],
-              $zeroPos + $posIdx
-            );
+            $trackGettersExceptReference[$trackIndex]
+              ->get( $dataFromDbAref, $fields[0], $fields[3], $fields[4], 0,
+              $fields[ $outIndicesExceptReference[$trackIndex] ], $zeroPos );
           }
 
-          $fields[$refTrackOutIdx][$posIdx] = $indelRef[$posIdx];
+          $fields[$refTrackOutIdx][0] = $refTrackGetter->get($dataFromDbAref);
         }
 
-        # If we have multiple indel alleles at one position, need to clear stored values
-        @indelDbData = ();
-        @indelRef    = ();
-      }
-      else {
-        for my $trackIndex (@trackIndicesExceptReference) {
-          $fields[ $outIndicesExceptReference[$trackIndex] ] //= [];
+        # 3 holds the input reference, we'll replace this with the discordant status
+        $fields[$discordantIdx] =
+          $refTrackGetter->get($dataFromDbAref) ne $fields[3] ? "true" : "false";
 
-          $trackGettersExceptReference[$trackIndex]
-            ->get( $dataFromDbAref, $fields[0], $fields[3], $fields[4], 0,
-            $fields[ $outIndicesExceptReference[$trackIndex] ], $zeroPos );
+        push @lines, \@fields;
+      }
+
+      close $MEM_FH;
+
+      if (@lines) {
+        if ($outJson) {
+          MCE->gather( scalar @lines, $total - @lines, undef, encode_json( \@lines ) );
         }
-
-        $fields[$refTrackOutIdx][0] = $refTrackGetter->get($dataFromDbAref);
-      }
-
-      # 3 holds the input reference, we'll replace this with the discordant status
-      $fields[$discordantIdx] =
-        $refTrackGetter->get($dataFromDbAref) ne $fields[3] ? 1 : 0;
-
-      push @lines, \@fields;
-    }
-
-    close $MEM_FH;
-
-    if (@lines) {
-      if ($outJson) {
-        MCE->gather( scalar @lines, $total - @lines, undef, encode_json( \@lines ) );
+        else {
+          MCE->gather(
+            scalar @lines,
+            $total - @lines,
+            undef, $outputter->makeOutputString( \@lines )
+          );
+        }
       }
       else {
-        MCE->gather(
-          scalar @lines,
-          $total - @lines,
-          undef, $outputter->makeOutputString( \@lines )
-        );
+        MCE->gather( 0, $total );
       }
-    }
-    else {
-      MCE->gather( 0, $total );
-    }
 
+    }
+    $inFh;
   }
-  $fh;
 
   # Force flush
   $progressFunc->( 0, 0, undef, undef, 1 );
@@ -359,15 +394,197 @@ sub annotateFile {
        $self->safeClose($outFh)
     || ( $statsFh && $self->safeClose($statsFh) )
     || $self->safeSystem( "cp " . $self->config . " $configOutPath" )
-    || $self->safeSystem('sync')
-    || $self->_moveFilesToOutputDir();
+    || $self->safeSystem('sync');
 
   if ($err) {
-    $self->_errorWithCleanup($err);
-    return ( $err, undef );
+    my $humanErr = "Failed to close files";
+    $self->_errorWithCleanup($humanErr);
+    return ( $humanErr, undef );
   }
 
   $db->cleanUp();
+
+  # If there are multiple input files, we will have multiple pre-processor outputs
+  # should the pre-processor be configured to output sampleList or dosageMatrixOutPath
+  # We need to combine these into a single file each
+
+  # 1) For the sampleList, we need to:
+  ## 1a) check that the sampleList files are identical
+  ## 1b) if they are, we can simply move one to the final outBaseName.sample_list destination
+  ## 1c) if they are not, we need to combine them and note that they are not identical
+  # 2) for the dosageMatrixOutPath, we need to call the dosage-combiner
+  ## 2a) the dosage-combiner will check that the dosageMatrixOutPath schemas are identical
+  ## 2b) if they are, it will combine them into a single file
+  ## 2c) if they are not, it will combine them into a single file, such that the schema is the union of all schemas
+  ## 2c) meaning that the number of samples is the total across all dosage files
+  ## 2c) and the number of variants is the total across all dosage files
+  ## 2c) with missing values filled in with 0 (reference allele)
+
+  # Step 1:
+  if ( @$preOutArgs > 1 ) {
+    $self->log( "info", "Has multiple pre-processor outputs; combining them" );
+    my @sampleLists;
+    my @dosageMatrixOutPaths;
+    for my $preOutArgHref (@$preOutArgs) {
+      if ( $preOutArgHref->{sampleList} ) {
+        push @sampleLists, $preOutArgHref->{sampleList};
+      }
+
+      if ( $preOutArgHref->{dosageMatrixOutPath} ) {
+        push @dosageMatrixOutPaths, $preOutArgHref->{dosageMatrixOutPath};
+      }
+    }
+
+    # Read the sample lists, and check that they are identical
+    my $allSampleListsIdentical = 1;
+    if (@sampleLists) {
+      $self->log( "info", "Combining sample lists" );
+
+      my $sampleList = $self->_workingDir->child( $self->outputFilesInfo->{sampleList} );
+
+      my $sampleListContents;
+      my $sampleListErr;
+      my %uniqueSamples;
+      my @uniqueSamples;
+
+      my $idx                 = 0;
+      my $hasNonUniqueSamples = 0;
+
+      my @canonicalSampleList;
+      for my $sampleListPath (@sampleLists) {
+        my $sampleListContentsNew = path($sampleListPath)->slurp;
+
+        # We could have heterogenous files, some with samples and some without
+        if ( !$sampleListContentsNew ) {
+          next;
+        }
+
+        my @samples = split( '\n', $sampleListContentsNew );
+
+        if ( $idx == 0 ) {
+          @canonicalSampleList = @samples;
+        }
+        elsif ( !_arraysEqual( \@canonicalSampleList, \@samples ) ) {
+          $allSampleListsIdentical = 0;
+        }
+
+        for (@samples) {
+          if ( $uniqueSamples{$_} ) {
+            next;
+          }
+
+          $uniqueSamples{$_} = 1;
+          push @uniqueSamples, $_;
+
+          if ( $idx > 0 ) {
+            $hasNonUniqueSamples = 1;
+          }
+        }
+
+        $idx += 1;
+      }
+
+      $sampleListContents = join( "\n", @uniqueSamples );
+
+      my $finalSampleListDestination =
+        $self->_workingDir->child( $self->outputFilesInfo->{sampleList} );
+      $err =
+        $self->safeSystem("echo \"$sampleListContents\" > $finalSampleListDestination");
+
+      if ($err) {
+        my $humanErr = "Failed to write combined sample list file";
+        $self->_errorWithCleanup($humanErr);
+        return ( $humanErr, undef );
+      }
+
+      # Remove the intermediate sample lists
+      for my $sampleListPath (@sampleLists) {
+        $err = $self->safeSystem("rm $sampleListPath");
+
+        if ($err) {
+          my $humanErr = "Failed to remove intermediate sample list files";
+          $self->_errorWithCleanup($humanErr);
+          return ( $humanErr, undef );
+        }
+      }
+    }
+
+    # This is technically a warning; the rest of the annotation will work
+    # However we have not threaded through Bystro optional dosage matrices
+    # Nor can we yet combine them if they have different sample lists
+    if ( !$allSampleListsIdentical ) {
+      my $humanErr =
+        "Bystro currently requires identical samples per input file. Different sample lists found";
+      $self->_errorWithCleanup($humanErr);
+      return ( $humanErr, undef );
+    }
+
+    # Step 2:
+    if (@dosageMatrixOutPaths) {
+      $self->log( "info", "Combining dosage matrix outputs" );
+
+      # Find all non-empty dosageMatrixOutPaths, by stat-ing them
+      my @nonEmptyDosageMatrixOutPaths;
+      for my $dosageMatrixOutPath (@dosageMatrixOutPaths) {
+        if ( -s $dosageMatrixOutPath ) {
+          push @nonEmptyDosageMatrixOutPaths, $dosageMatrixOutPath;
+        }
+      }
+
+      my $finalOutPath =
+        $self->_workingDir->child( $self->outputFilesInfo->{dosageMatrixOutPath} );
+
+      if ( @nonEmptyDosageMatrixOutPaths != @dosageMatrixOutPaths ) {
+        $self->log( "warn",
+          "Some empty dosage matrix outputs found. Combining non-empty files" );
+      }
+
+      if ( !@nonEmptyDosageMatrixOutPaths ) {
+        $self->log( "warn", "No non-empty dosage matrix outputs found" );
+
+        # Create an empty file in the final dosageMatrixOutPath destination
+        $err = $self->safeSystem("touch $finalOutPath");
+
+        if ($err) {
+          my $humanErr = "Failed to create empty dosage matrix output file";
+          $self->_errorWithCleanup($humanErr);
+          return ( $humanErr, undef );
+        }
+      }
+      else {
+        my $err =
+          $self->safeSystem( 'dosage --output '
+            . $finalOutPath . " "
+            . join( " ", @nonEmptyDosageMatrixOutPaths ) );
+
+        if ($err) {
+          my $humanErr = "Failed to combine dosage matrix outputs";
+          $self->_errorWithCleanup($humanErr);
+          return ( $humanErr, undef );
+        }
+
+        # Remove the intermediate dosageMatrixOutPaths
+        for my $dosageMatrixOutPath (@dosageMatrixOutPaths) {
+          $err = $self->safeSystem("rm $dosageMatrixOutPath");
+
+          if ($err) {
+            my $humanErr = "Failed to remove intermediate dosage matrix files";
+            $self->_errorWithCleanup($humanErr);
+            return ( $humanErr, undef );
+          }
+        }
+
+        $self->log( "info", "Finished combining dosage matrix outputs" );
+      }
+    }
+  }
+
+  $err = $self->safeSystem('sync') || $self->_moveFilesToOutputDir();
+  if ($err) {
+    my $humanErr = "Failed to move files to output directory";
+    $self->_errorWithCleanup($humanErr);
+    return ( $humanErr, undef );
+  }
 
   return ( $err, $self->outputFilesInfo );
 }
@@ -422,24 +639,32 @@ sub makeLogProgressAndPrint {
 sub _getFileHandles {
   my ( $self, $type ) = @_;
 
-  my ( $outFh, $statsFh, $inFh, $headerFh );
-  my $err;
+  my ( $outFh, $statsFh, @inFhs, @preOutArgs, $headerFh, $err );
 
-  ( $err, $inFh ) = $self->_openAnnotationPipe($type);
+  my $index = 0;
+  my $total = @{ $self->input_files };
+  for my $file ( @{ $self->input_files } ) {
+    my ( $err, $inFh, $preOutArgHref ) =
+      $self->_openAnnotationPipe( $type, $file, $index, $total );
 
-  if ($err) {
-    return ( $err, undef, undef, undef );
+    if ($err) {
+      return ( $err, undef, undef, undef, undef );
+    }
+
+    push @inFhs,      $inFh;
+    push @preOutArgs, $preOutArgHref;
+
+    $index += 1;
   }
 
   if ( $self->run_statistics ) {
     ########################## Tell stats program about our annotation ##############
-    # TODO: error handling if fh fails to open
     my $statArgs = $self->_statisticsRunner->getStatsArguments();
 
     $err = $self->safeOpen( $statsFh, "|-", $statArgs );
 
     if ($err) {
-      return ( $err, undef, undef, undef );
+      return ( $err, undef, undef, undef, undef, undef );
     }
   }
 
@@ -447,26 +672,25 @@ sub _getFileHandles {
   ( $err, $outFh ) = $self->getWriteFh( $self->{_outPath} );
 
   if ($err) {
-    return ( $err, undef, undef, undef );
+    return ( $err, undef, undef, undef, undef, undef );
   }
 
   ( $err, $headerFh ) = $self->getWriteFh( $self->{_headerPath} );
 
   if ($err) {
-    return ( $err, undef, undef, undef );
+    return ( $err, undef, undef, undef, undef, undef );
   }
 
-  return ( undef, $inFh, $outFh, $statsFh, $headerFh );
+  return ( undef, \@inFhs, $outFh, $statsFh, $headerFh, \@preOutArgs );
 }
 
 sub _preparePreprocessorProgram {
-  my ( $self, $type ) = @_;
+  my ( $self, $type, $inPath, $index, $total ) = @_;
 
   if ( !$self->fileProcessors->{$type} ) {
     $self->_errorWithCleanup("No fileProcessors defined for $type file type");
   }
 
-  my $inPath   = $self->input_file;
   my $basename = path($inPath)->basename;
 
   my $errPath = $self->_workingDir->child( $basename . '.file-log.log' );
@@ -484,31 +708,38 @@ sub _preparePreprocessorProgram {
     $finalProgram = $echoProg . " | " . $fp->{program};
   }
 
+  my %finalPreprocessArgs;
   if ( $fp->{args} ) {
     my $args = $fp->{args};
 
-    for my $type ( keys %{ $self->outputFilesInfo } ) {
+    my $potentialPreArgs =
+      $self->prepareBystroPreprocessorOutputsForMultiFile( $index, $total );
+
+    for my $type ( keys %{$potentialPreArgs} ) {
       if ( index( $args, "\%$type\%" ) > -1 ) {
-        substr( $args, index( $args, "\%$type\%" ), length("\%$type\%") ) =
-          $self->_workingDir->child( $self->outputFilesInfo->{$type} );
+        my $arg = $self->_workingDir->child( $potentialPreArgs->{$type} );
+        substr( $args, index( $args, "\%$type\%" ), length("\%$type\%") ) = $arg;
+
+        $finalPreprocessArgs{$type} = $arg;
       }
     }
 
     $finalProgram .= " $args";
   }
 
-  return ( $finalProgram, $errPath );
+  return ( $finalProgram, $errPath, \%finalPreprocessArgs );
 }
 
 sub _openAnnotationPipe {
-  my ( $self, $type ) = @_;
+  my ( $self, $type, $inPath, $index, $total ) = @_;
 
-  my ( $finalProgram, $errPath ) = $self->_preparePreprocessorProgram($type);
+  my ( $finalProgram, $errPath, $preOutArgs ) =
+    $self->_preparePreprocessorProgram( $type, $inPath, $index, $total );
 
   my $fh;
   my $err = $self->safeOpen( $fh, '-|', "$finalProgram 2> $errPath" );
 
-  return ( $err, $fh );
+  return ( $err, $fh, $preOutArgs );
 }
 
 sub _getFinalHeader {

@@ -8,9 +8,9 @@ from sklearn.ensemble import RandomForestClassifier  # type: ignore
 import pyarrow as pa  # type: ignore
 import pyarrow.dataset as ds  # type: ignore
 
-from bystro.ancestry.inference import AncestryModel, infer_ancestry
+from bystro.ancestry.inference import AncestryModel, AncestryModels, infer_ancestry
 from bystro.ancestry.train import POPS
-from bystro.ancestry.listener import _get_model_from_s3
+from bystro.ancestry.model import get_models_from_s3
 
 SAMPLES = [f"sample{i}" for i in range(len(POPS))]
 VARIANTS = ["variant1", "variant2", "variant3"]
@@ -45,7 +45,7 @@ def _infer_ancestry():
     genotypes = genotypes.rename(columns={"index": "locus"})
     genotypes = ds.dataset(pa.Table.from_pandas(genotypes, preserve_index=False).to_batches())
 
-    return infer_ancestry(ancestry_model, genotypes), samples
+    return infer_ancestry(AncestryModels(ancestry_model, ancestry_model), genotypes), samples
 
 
 def _make_ancestry_model() -> AncestryModel:
@@ -84,10 +84,10 @@ def test_infer_ancestry():
 
 @pytest.mark.integration()
 def test_infer_ancestry_from_model():
-    ancestry_model = _get_model_from_s3("hg38")
+    ancestry_models = get_models_from_s3("hg38")
 
     # Generate an arrow table that contains genotype dosages for 1000 samples
-    variants = list(ancestry_model.pca_loadings_df.index)
+    variants = list(ancestry_models.gnomad_model.pca_loadings_df.index)
     samples = [f"sample{i}" for i in range(1000)]
     genotypes = pd.DataFrame(
         np.random.randint(0, 2, (len(variants), len(samples))),  # noqa: NPY002
@@ -95,17 +95,17 @@ def test_infer_ancestry_from_model():
         columns=samples,  # noqa: NPY002
     )
     # randomly set 10% of the genotypes to missing to ensure we test missing data handling
-    genotypes = genotypes.mask(np.random.random(genotypes.shape) < 0.1)
-
-    # get missingness per sample
-    missingness = genotypes.isna().mean(axis=0)
+    drop_snps_n = int(0.1 * len(genotypes))
+    retained_snps_n = len(genotypes) - drop_snps_n
+    drop_indices = np.random.choice(genotypes.index, size=drop_snps_n, replace=False) # noqa: NPY002
+    genotypes = genotypes.drop(list(drop_indices))
 
     genotypes = genotypes.reset_index()
     genotypes = genotypes.rename(columns={"index": "locus"})
 
     genotypes = ds.dataset(pa.Table.from_pandas(genotypes, preserve_index=False).to_batches())
 
-    ancestry_response = infer_ancestry(ancestry_model, genotypes)
+    ancestry_response = infer_ancestry(ancestry_models, genotypes)
 
     assert len(samples) == len(ancestry_response.results)
 
@@ -119,7 +119,7 @@ def test_infer_ancestry_from_model():
 
         samples_seen.add(result.sample_id)
 
-        assert result.missingness == missingness[result.sample_id]
+        assert result.n_snps == retained_snps_n
 
     assert samples_seen == sample_set
     assert len(top_hits) > 1

@@ -8,8 +8,9 @@ from bystro.ancestry.listener import (
     completed_msg_fn,
     SubmittedJobMessage,
     AncestryJobCompleteMessage,
-    AncestryResults
+    AncestryResults,
 )
+from bystro.ancestry.inference import AncestryModels
 from bystro.ancestry.tests.test_inference import (
     ANCESTRY_MODEL,
     FAKE_GENOTYPES,
@@ -33,7 +34,10 @@ def test_submit_fn():
 
 
 def test_handler_fn_happy_path(mocker, tmpdir):
-    mocker.patch("bystro.ancestry.listener._get_model_from_s3", return_value=ANCESTRY_MODEL)
+    mocker.patch(
+        "bystro.ancestry.listener.get_models_from_s3",
+        return_value=AncestryModels(ANCESTRY_MODEL, ANCESTRY_MODEL),
+    )
     dosage_path = "some_dosage.feather"
     f1 = tmpdir.join(dosage_path)
 
