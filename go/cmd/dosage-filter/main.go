@@ -73,7 +73,7 @@ func validateArgs(args *CLIArgs) error {
 		missing = append(missing, "output")
 	}
 	if v.lociPath == "" {
-		missing = append(missing, "os-connection-config-path")
+		missing = append(missing, "loci")
 	}
 	if v.beanstalkConfigPath == "" {
 		if !v.noBeanstalkd {
