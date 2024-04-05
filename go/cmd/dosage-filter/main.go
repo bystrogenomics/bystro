@@ -9,7 +9,6 @@ import (
 	"os"
 	"runtime"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -29,8 +28,6 @@ type CLIArgs struct {
 	lociPath            string
 	progressFrequency   int64
 }
-
-var once sync.Once
 
 // setup parses the command-line arguments and returns a CLIArgs struct.
 func setup(args []string) *CLIArgs {
@@ -172,6 +169,10 @@ func processRecordAt(fr *ipc.FileReader, loci map[string]bool, arrowWriter *byst
 			}
 		}
 
+		if rowsAccepted == 0 {
+			continue
+		}
+
 		record.Release()
 
 		// We have to count the rows we will eventually write
@@ -199,7 +200,7 @@ func processRecordAt(fr *ipc.FileReader, loci map[string]bool, arrowWriter *byst
 		}
 	}
 
-	if rowsAccumulated >= 0 {
+	if rowsAccumulated > 0 {
 		filteredRecord := builder.NewRecord()
 
 		if err := arrowWriter.WriteChunk(filteredRecord); err != nil {
@@ -252,6 +253,7 @@ func main() {
 	defer arrowWriter.Close()
 
 	totalRecords := fr.NumRecords()
+
 	numWorkers := runtime.NumCPU() * 2
 
 	// var wg sync.WaitGroup
