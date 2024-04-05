@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync/atomic"
 
 	"github.com/apache/arrow/go/v14/arrow/array"
 	"github.com/apache/arrow/go/v14/arrow/ipc"
@@ -113,13 +114,21 @@ func readLociFile(filePath string) (map[string]bool, error) {
 	return loci, nil
 }
 
-func processRecordAt(fr *ipc.FileReader, loci map[string]bool, arrowWriter *bystroArrow.ArrowWriter, queue chan int, complete chan bool) {
+func processRecordAt(fr *ipc.FileReader, loci map[string]bool, arrowWriter *bystroArrow.ArrowWriter, queue chan int, complete chan bool, count *atomic.Uint64) {
 	pool := memory.NewGoAllocator()
 	builder := array.NewRecordBuilder(pool, arrowWriter.Schema)
 	defer builder.Release()
 
 	rowsAccumulated := 0
+
+	totalRows := uint64(len(loci))
 	for index := range queue {
+		// We don't have an easy way to close the channel
+		// so we'll just quickly skip to the end
+		if count.Load() >= totalRows {
+			continue
+		}
+
 		record, err := fr.RecordAt(index)
 		if err != nil {
 			log.Fatalf("Failed to read record at %d: %v", index, err)
@@ -177,6 +186,7 @@ func processRecordAt(fr *ipc.FileReader, loci map[string]bool, arrowWriter *byst
 			if err := arrowWriter.WriteChunk(filteredRecord); err != nil {
 				log.Fatal(err)
 			}
+			count.Add(uint64(rowsAccumulated))
 
 			filteredRecord.Release()
 			builder.Release()
@@ -194,6 +204,8 @@ func processRecordAt(fr *ipc.FileReader, loci map[string]bool, arrowWriter *byst
 			log.Fatal(err)
 		}
 
+		count.Add(uint64(rowsAccumulated))
+
 		filteredRecord.Release()
 		builder.Release()
 		rowsAccumulated = 0
@@ -202,7 +214,19 @@ func processRecordAt(fr *ipc.FileReader, loci map[string]bool, arrowWriter *byst
 	complete <- true
 }
 
+func IsClosed(ch <-chan int) bool {
+	select {
+	case <-ch:
+		return true
+	default:
+	}
+
+	return false
+}
+
 func main() {
+	var totalCount atomic.Uint64
+
 	cliargs := setup(nil)
 
 	loci, err := readLociFile(cliargs.lociPath)
@@ -238,7 +262,7 @@ func main() {
 	defer arrowWriter.Close()
 
 	totalRecords := fr.NumRecords()
-	numWorkers := runtime.NumCPU() * 8
+	numWorkers := runtime.NumCPU() * 2
 
 	// var wg sync.WaitGroup
 	workQueue := make(chan int, 16)
@@ -246,17 +270,34 @@ func main() {
 
 	// Spawn threads
 	for i := 0; i < numWorkers; i++ {
-		go processRecordAt(fr, loci, arrowWriter, workQueue, complete)
+		go processRecordAt(fr, loci, arrowWriter, workQueue, complete, &totalCount)
 	}
+
+	checkInteval := totalRecords / 1000
+
+	totalRows := uint64(len(loci))
 
 	for i := 0; i < totalRecords; i++ {
 		workQueue <- i
+
+		if i%checkInteval == 0 {
+			if totalCount.Load() >= totalRows {
+				fmt.Printf("Finished processing all loci by record %d\n", i)
+
+				if !IsClosed(workQueue) {
+					close(workQueue)
+				}
+
+				break
+			}
+		}
 	}
 
-	close(workQueue)
+	if !IsClosed(workQueue) {
+		close(workQueue)
+	}
 
 	for i := 0; i < numWorkers; i++ {
 		<-complete
 	}
-
 }
