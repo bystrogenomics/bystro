@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"bystro/beanstalkd"
-	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -124,14 +123,7 @@ func processRecordAt(fr *ipc.FileReader, loci map[string]bool, arrowWriter *byst
 
 	rowsAccumulated := 0
 
-	totalRows := int64(len(loci))
 	for index := range queue {
-		// We don't have an easy way to close the channel
-		// so we'll just quickly skip to the end
-		if count.Load() >= totalRows {
-			continue
-		}
-
 		record, err := fr.RecordAt(index)
 		if err != nil {
 			log.Fatalf("Failed to read record at %d: %v", index, err)
@@ -276,9 +268,7 @@ func main() {
 		log.Fatalf("Couldn't create message sender due to: [%s]\n", err)
 	}
 
-	var totalRows int64 = int64(len(loci))
-
-	ctx, cancel := context.WithCancel(context.Background())
+	quit := make(chan bool)
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
@@ -287,9 +277,10 @@ func main() {
 		var currentCount int64
 		for {
 			select {
-			case <-ctx.Done():
-				log.Println("Goroutine exiting...")
+			case <-quit:
+				log.Println("Progress goroutine exiting...")
 				return
+
 			case <-ticker.C:
 				// Send your message here. For demonstration, we'll just print.
 				currentCount = totalCount.Load()
@@ -299,26 +290,26 @@ func main() {
 					progressSender.SetProgress(int(lastUpdate))
 					progressSender.SendMessage()
 				}
-
-				if currentCount >= totalRows {
-					once.Do(func() {
-						close(workQueue)
-					})
-				}
-
 			}
 		}
 	}()
 
+	totalRows := int64(len(loci))
 	for i := 0; i < totalRecords; i++ {
 		workQueue <- i
+
+		if totalCount.Load() >= totalRows {
+			break
+		}
 	}
+
+	close(workQueue)
 
 	for i := 0; i < numWorkers; i++ {
 		<-complete
 	}
 
-	cancel()
+	quit <- true
 
 	progressSender.SetProgress(int(totalCount.Load()))
 	progressSender.SendMessage()
