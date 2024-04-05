@@ -136,11 +136,12 @@ func processRecordAt(fr *ipc.FileReader, loci map[string]bool, arrowWriter *byst
 
 		locusCol := record.Column(0).(*array.String)
 
+		rowsAccepted := 0
 		for j := 0; j < int(record.NumRows()); j++ {
 			locusValue := locusCol.Value(j)
 			if _, exists := loci[locusValue]; exists {
 				rowsAccumulated += 1
-
+				rowsAccepted += 1
 				// Fill the builder with values from the original columns, filtering by selectedIndices
 				for colIdx := 0; colIdx < int(record.NumCols()); colIdx++ {
 					column := record.Column(colIdx)
@@ -178,6 +179,13 @@ func processRecordAt(fr *ipc.FileReader, loci map[string]bool, arrowWriter *byst
 
 		record.Release()
 
+		// WE have to count the rows we will eventually write
+		// not the amount we've written
+		// since the chunk size may not align neatly with the number of requested loci
+		// If the channel is closed due to the count
+		// we will clean up and write the reamining chunk before exiting
+		count.Add(uint64(rowsAccepted))
+
 		if rowsAccumulated >= WRITE_CHUNK_SIZE {
 			// Create a new record from the row
 			filteredRecord := builder.NewRecord()
@@ -186,7 +194,6 @@ func processRecordAt(fr *ipc.FileReader, loci map[string]bool, arrowWriter *byst
 			if err := arrowWriter.WriteChunk(filteredRecord); err != nil {
 				log.Fatal(err)
 			}
-			count.Add(uint64(rowsAccumulated))
 
 			filteredRecord.Release()
 			builder.Release()
@@ -204,24 +211,12 @@ func processRecordAt(fr *ipc.FileReader, loci map[string]bool, arrowWriter *byst
 			log.Fatal(err)
 		}
 
-		count.Add(uint64(rowsAccumulated))
-
 		filteredRecord.Release()
 		builder.Release()
 		rowsAccumulated = 0
 	}
 
 	complete <- true
-}
-
-func IsClosed(ch <-chan int) bool {
-	select {
-	case <-ch:
-		return true
-	default:
-	}
-
-	return false
 }
 
 func main() {
@@ -273,10 +268,11 @@ func main() {
 		go processRecordAt(fr, loci, arrowWriter, workQueue, complete, &totalCount)
 	}
 
-	checkInteval := totalRecords / 1000
+	checkInteval := totalRecords / 100
 
 	totalRows := uint64(len(loci))
 
+	var hasClosed bool
 	for i := 0; i < totalRecords; i++ {
 		workQueue <- i
 
@@ -284,16 +280,15 @@ func main() {
 			if totalCount.Load() >= totalRows {
 				fmt.Printf("Finished processing all loci by record %d\n", i)
 
-				if !IsClosed(workQueue) {
-					close(workQueue)
-				}
+				close(workQueue)
+				hasClosed = true
 
 				break
 			}
 		}
 	}
 
-	if !IsClosed(workQueue) {
+	if !hasClosed {
 		close(workQueue)
 	}
 
