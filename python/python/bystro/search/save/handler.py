@@ -165,8 +165,51 @@ def _correct_loci_case(loci):
     return corrected_loci
 
 
+def run_dosage_filter(
+    parent_dosage_matrix_path: str,
+    dosage_out_path: str,
+    loci_path: str,
+    queue_config_path: str,
+    progress_frequency: int,
+    submission_id: str,
+    binary_path: str = "dosage-filter",
+):
+    """
+    Run the dosage_filter binary
+
+    Args:
+        binary_path (str): The path to the binary executable.
+        args (list[str]): The list of arguments to pass to the binary.
+
+    Returns:
+        None
+
+    Raises:
+        RuntimeError: If the binary execution fails or if there is an error in the stderr output.
+    """
+
+    # call the dosage-filter program, which takes an --input --output --loci --progress-frequency --queue-config --job-submission-id args
+    # and filters the dosage matrix to only include the loci in the loci file
+    dosage_filter_cmd = (
+        f"{binary_path} --input {parent_dosage_matrix_path} --output {dosage_out_path} "
+        f"--loci {loci_path} --progress-frequency {progress_frequency} --queue-config {queue_config_path} "
+        f"--job-submission-id {submission_id}"
+    )
+
+    logger.info("Beginning to filter genotypes")
+
+    # Run the command and capture stderr
+    process = subprocess.Popen(dosage_filter_cmd, stderr=subprocess.PIPE)
+    _, stderr = process.communicate()
+
+    if process.returncode != 0 or stderr:
+        raise RuntimeError(f"Binary execution failed: {stderr.decode('utf-8')}")
+
+    return
+
+
 async def go(  # pylint:disable=invalid-name
-    job_data: SaveJobData, search_conf: dict, publisher: ProgressPublisher
+    job_data: SaveJobData, search_conf: dict, publisher: ProgressPublisher, queue_config_path: str
 ) -> AnnotationOutputs:
     """Main function for running the query and writing the output"""
     output_dir = os.path.dirname(job_data.output_base_path)
@@ -269,13 +312,13 @@ async def go(  # pylint:disable=invalid-name
 
         reporter.message.remote("About to filter dosage matrix and annotation tsv.gz.")  # type: ignore
 
-        report_progress = n_hits >= MINIMUM_RECORDS_TO_ENABLE_REPORTING
-        reporting_interval = math.ceil(n_hits * REPORTING_INTERVAL)
+        reporting_interval = np.max(
+            math.ceil(n_hits * REPORTING_INTERVAL), MINIMUM_RECORDS_TO_ENABLE_REPORTING
+        )
 
-        if report_progress:
-            reporter.message.remote(  # type: ignore
-                f"Reporting filtering progress every {reporting_interval} records."
-            )
+        reporter.message.remote(  # type: ignore
+            f"Reporting filtering progress every {reporting_interval} records."
+        )
 
         # Filter the dosage matrix, if it has rows
         if os.path.exists(parent_dosage_matrix_path) and os.stat(parent_dosage_matrix_path).st_size > 0:
@@ -285,80 +328,14 @@ async def go(  # pylint:disable=invalid-name
                 for locus in loci:
                     loci_fh.write(locus + "\n")
 
-            pool = pa.default_memory_pool()
-            with Timer() as timer:
-                dataset = ds.dataset(parent_dosage_matrix_path, format="arrow")
-                mask = pc.field("locus").isin(loci)
-
-                # Use the dataset's scanner to stream batches through a filter
-                scanner = dataset.scanner(
-                    filter=mask,
-                    use_threads=True,
-                    batch_size=SAVE_FILTER_BATCH_READ_SIZE,
-                    batch_readahead=SAVE_FILTER_BATCH_READAHEAD,
-                    fragment_readahead=0,
-                    memory_pool=pool,
-                )
-
-                # Initialize a RecordBatchFileWriter to write to the specified output path
-                with ipc.RecordBatchFileWriter(
-                    dosage_out_path,
-                    schema=dataset.schema,
-                    options=ipc.IpcWriteOptions(compression="zstd"),
-                ) as writer:
-                    total_since_last_mentioned = 0
-                    total_rows_filtered = 0
-
-                    report_chunk_start_time = time.time()
-                    for batch in scanner.to_batches():
-                        # The scanner filters in-memory after it reads a batch of rows
-                        # of size SAVE_FILTER_BATCH_READ_SIZE, so we may have far fewer
-                        # than SAVE_FILTER_BATCH_READ_SIZE rows here, including 0
-                        # TODO: 2024-04-03 @akotlar: Remove this once confirmed not needed
-                        if batch.num_rows == 0:
-                            continue
-
-                        writer.write_batch(batch)
-
-                        total_rows_filtered += batch.num_rows
-                        total_since_last_mentioned += batch.num_rows
-
-                        if report_progress and total_since_last_mentioned >= reporting_interval:
-                            reporter.message.remote(  # type: ignore
-                                (f"Dosage: filtered and wrote {total_rows_filtered} of {n_hits} rows.")
-                            )
-
-                            logger.debug(
-                                "Time to filter %d dosage matrix rows (total: %d): %s",
-                                total_since_last_mentioned,
-                                total_rows_filtered,
-                                time.time() - report_chunk_start_time,
-                            )
-
-                            total_since_last_mentioned = 0
-                            report_chunk_start_time = time.time()
-
-                        # TODO: 2024-04-03 @akotlar: Remove this once confirmed not needed
-                        if total_rows_filtered >= n_hits:
-                            break
-
-                if report_progress and total_since_last_mentioned > 0:
-                    reporter.message.remote(  # type: ignore
-                        (f"Dosage: filtered and wrote {total_rows_filtered} of {n_hits}) rows.")
-                    )
-
-                    total_since_last_mentioned = 0
-
-                logger.debug(
-                    "Memory usage after genotype filtering: %s (MB)",
-                    psutil.Process(os.getpid()).memory_info().rss / 1024**2,
-                )
-
-                reporter.message.remote(  # type: ignore
-                    "Filtered dosage matrix written. Filtering annotation & generating stats."
-                )
-
-            logger.info("Filtering dosage matrix took %s seconds", timer.elapsed_time)
+            run_dosage_filter(
+                parent_dosage_matrix_path=parent_dosage_matrix_path,
+                dosage_out_path=dosage_out_path,
+                loci_path=loci_fh.name,
+                queue_config_path=queue_config_path,
+                progress_frequency=reporting_interval,
+                submission_id=str(job_data.submission_id),
+            )
 
         with Timer() as timer:
             bgzip_cmd = get_compress_from_pipe_cmd(annotation_path)
@@ -417,7 +394,6 @@ async def go(  # pylint:disable=invalid-name
                         if not filtered:
                             if (
                                 current_target_index > 0
-                                and report_progress
                                 and current_target_index % reporting_interval == 0
                             ):
                                 reporter.message.remote(  # type: ignore
@@ -434,13 +410,12 @@ async def go(  # pylint:disable=invalid-name
                         current_target_index += 1
 
                         if current_target_index >= n_hits:
-                            if report_progress:
-                                reporter.message.remote(  # type: ignore
-                                    (
-                                        "Annotation/stats: Filtered & wrote "
-                                        f"{current_target_index} of {n_hits} rows."
-                                    )
+                            reporter.message.remote(  # type: ignore
+                                (
+                                    "Annotation/stats: Filtered & wrote "
+                                    f"{current_target_index} of {n_hits} rows."
                                 )
+                            )
                             reporter.message.remote("Done, cleaning up.")  # type: ignore
                             break
 
