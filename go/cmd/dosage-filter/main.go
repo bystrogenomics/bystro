@@ -3,13 +3,16 @@ package main
 import (
 	"bufio"
 	"bystro/beanstalkd"
+	"context"
 	"flag"
 	"fmt"
 	"log"
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/apache/arrow/go/v14/arrow/array"
 	"github.com/apache/arrow/go/v14/arrow/ipc"
@@ -27,6 +30,8 @@ type CLIArgs struct {
 	lociPath            string
 	progressFrequency   int64
 }
+
+var once sync.Once
 
 // setup parses the command-line arguments and returns a CLIArgs struct.
 func setup(args []string) *CLIArgs {
@@ -271,51 +276,49 @@ func main() {
 		log.Fatalf("Couldn't create message sender due to: [%s]\n", err)
 	}
 
-	var progressUpdate int64 = 0
-	var totalRowsProcessed int64 = 0
+	var totalRows int64 = int64(len(loci))
 
-	checkInterval := totalRecords / 100
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
 
-	if checkInterval == 0 {
-		checkInterval = 1
-	}
+		var lastUpdate int64
+		var currentCount int64
+		for {
+			select {
+			case <-ctx.Done():
+				log.Println("Goroutine exiting...")
+				return
+			case <-ticker.C:
+				// Send your message here. For demonstration, we'll just print.
+				currentCount = totalCount.Load()
 
-	totalRows := int64(len(loci))
-	totalRowsProcessed = 0
+				if currentCount-lastUpdate >= cliargs.progressFrequency {
+					lastUpdate = currentCount
+					progressSender.SetProgress(int(lastUpdate))
+					progressSender.SendMessage()
+				}
 
-	var hasClosed bool
-	for i := 0; i < totalRecords; i++ {
-		workQueue <- i
+				if currentCount >= totalRows {
+					once.Do(func() {
+						close(workQueue)
+					})
+				}
 
-		if i%checkInterval == 0 {
-			totalRowsProcessed = totalCount.Load()
-
-			if totalRowsProcessed >= totalRows {
-				log.Printf("Finished processing all loci by record %d\n", i)
-
-				close(workQueue)
-				hasClosed = true
-
-				break
-			}
-
-			progressUpdate += totalRowsProcessed
-
-			if totalRowsProcessed-progressUpdate >= cliargs.progressFrequency {
-				progressSender.SetProgress(int(totalRowsProcessed))
-				go progressSender.SendMessage()
-				progressUpdate = totalRowsProcessed
 			}
 		}
-	}
+	}()
 
-	if !hasClosed {
-		close(workQueue)
+	for i := 0; i < totalRecords; i++ {
+		workQueue <- i
 	}
 
 	for i := 0; i < numWorkers; i++ {
 		<-complete
 	}
+
+	cancel()
 
 	progressSender.SetProgress(int(totalCount.Load()))
 	progressSender.SendMessage()
