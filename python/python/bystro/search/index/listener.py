@@ -14,33 +14,12 @@ from bystro.beanstalkd.messages import SubmissionID, SubmittedJobMessage
 from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, listen
 from bystro.search.utils.annotation import get_config_file_path
 from bystro.search.utils.messages import IndexJobCompleteMessage, IndexJobData, IndexJobResults
-from bystro.utils.config import _get_bystro_project_root
 
 from msgspec import json
 
 TUBE = "index"
 
-_GO_HANDLER_BINARY_PATH: str | None = None
-
-
-def get_go_handler_binary_path() -> str:
-    """Return path to go handler binary."""
-    global _GO_HANDLER_BINARY_PATH
-    if _GO_HANDLER_BINARY_PATH is None:
-        _GO_HANDLER_BINARY_PATH = os.path.join(
-            _get_bystro_project_root(), "go/cmd/opensearch/opensearch"
-        )
-
-    if not os.path.exists(_GO_HANDLER_BINARY_PATH):
-        raise ValueError(
-            (
-                f"Binary not found at {_GO_HANDLER_BINARY_PATH}. "
-                "Please ensure to build the binary first, by running "
-                "`go build` in the `go/cmd/opensearch` directory."
-            )
-        )
-
-    return _GO_HANDLER_BINARY_PATH
+_INDEXER_BINARY = "opensearch"
 
 
 def run_binary_with_args(binary_path: str, args: list[str]) -> list[str]:
@@ -59,10 +38,9 @@ def run_binary_with_args(binary_path: str, args: list[str]) -> list[str]:
     """
 
     # Construct the command
-    command = [binary_path] + args
+    command = " ".join([binary_path] + args)
 
-    # Run the command and capture stderr
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     stdout, stderr = process.communicate()
 
     if process.returncode != 0 or stderr:
@@ -102,7 +80,7 @@ def run_handler_with_config(
     Raises:
         ValueError: If submission_id and queue_config are not specified when no_queue is not False.
     """
-    binary_path = get_go_handler_binary_path()
+
     args = [
         "--index-name",
         index_name,
@@ -128,7 +106,7 @@ def run_handler_with_config(
         args.append("--job-submission-id")
         args.append(str(submission_id))
 
-    header_fields = run_binary_with_args(binary_path, args)
+    header_fields = run_binary_with_args(_INDEXER_BINARY, args)
 
     return header_fields
 

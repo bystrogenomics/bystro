@@ -25,7 +25,6 @@ type CLIArgs struct {
 	beanstalkConfigPath string
 	jobSubmissionID     string
 	lociPath            string
-	noBeanstalkd        bool
 	progressFrequency   int64
 }
 
@@ -42,8 +41,6 @@ func setup(args []string) *CLIArgs {
 
 	flag.StringVar(&cliargs.beanstalkConfigPath, "queue-config", "", "The path to the Beanstalkd queue connection config (e.g. config/beanstalk.yml)")
 	flag.StringVar(&cliargs.beanstalkConfigPath, "q", "", "The path to the Beanstalkd queue connection config (short form)")
-	flag.BoolVar(&cliargs.noBeanstalkd, "no-queue", true, "Disable beanstalkd progress events")
-	flag.BoolVar(&cliargs.noBeanstalkd, "n", true, "Disable beanstalkd progress events (short form)")
 	flag.Int64Var(&cliargs.progressFrequency, "progress-frequency", int64(5e3), "Print progress every N variants processed")
 	flag.Int64Var(&cliargs.progressFrequency, "p", int64(5e3), "Print progress every N variants processed (short form)")
 
@@ -79,14 +76,9 @@ func validateArgs(args *CLIArgs) error {
 	if v.lociPath == "" {
 		missing = append(missing, "loci")
 	}
-	if v.beanstalkConfigPath == "" {
-		if !v.noBeanstalkd {
-			missing = append(missing, "beanstalk-config-path")
-		}
-	}
 
 	if v.jobSubmissionID == "" {
-		if !v.noBeanstalkd {
+		if v.beanstalkConfigPath != "" {
 			missing = append(missing, "job-submission-id")
 		}
 	}
@@ -276,7 +268,7 @@ func main() {
 		go processRecordAt(fr, loci, arrowWriter, workQueue, complete, &totalCount)
 	}
 
-	progressSender, err := beanstalkd.CreateMessageSender(cliargs.beanstalkConfigPath, cliargs.jobSubmissionID, cliargs.noBeanstalkd)
+	progressSender, err := beanstalkd.CreateMessageSender(cliargs.beanstalkConfigPath, cliargs.jobSubmissionID, "saveFromQuery")
 	if err != nil {
 		log.Fatalf("Couldn't create message sender due to: [%s]\n", err)
 	}
@@ -311,10 +303,10 @@ func main() {
 
 			progressUpdate += totalRowsProcessed
 
-			if progressUpdate >= cliargs.progressFrequency {
+			if totalRowsProcessed-progressUpdate >= cliargs.progressFrequency {
 				progressSender.SetProgress(int(totalRowsProcessed))
 				go progressSender.SendMessage()
-				progressUpdate = 0
+				progressUpdate = totalRowsProcessed
 			}
 		}
 	}
@@ -326,4 +318,7 @@ func main() {
 	for i := 0; i < numWorkers; i++ {
 		<-complete
 	}
+
+	progressSender.SetProgress(int(totalRowsProcessed))
+	progressSender.SendMessage()
 }

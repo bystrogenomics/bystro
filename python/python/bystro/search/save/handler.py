@@ -51,9 +51,7 @@ FIELDS_TO_QUERY = ["chrom", "pos", "inputRef", "alt"]
 
 ray.init(ignore_reinit_error=True, address="auto")
 
-_GO_HANDLER_BINARY_PATH = os.path.join(
-            _get_bystro_project_root(), "go/cmd/dosage-filter/dosage-filter"
-        )
+_GO_HANDLER_BINARY_PATH = 'dosage-filter'
 
 def _clean_query(input_query_body: dict):
     if "sort" in input_query_body:
@@ -196,6 +194,7 @@ def run_dosage_filter(
         f"--job-submission-id {submission_id}"
     )
 
+    print(dosage_filter_cmd)
     logger.info("Beginning to filter genotypes")
 
     # Run the command and capture stderr

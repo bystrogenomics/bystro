@@ -15,6 +15,7 @@ install-python: build-python
 
 install-go:
 	(cd ./go && go install bystro/cmd/dosage)
+	(cd ./go && go install bystro/cmd/dosage-filter)
 	(cd ./go && go install bystro/cmd/opensearch)
 
 install: install-python install-go
