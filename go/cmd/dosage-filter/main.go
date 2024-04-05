@@ -268,7 +268,7 @@ func main() {
 		go processRecordAt(fr, loci, arrowWriter, workQueue, complete, &totalCount)
 	}
 
-	checkInteval := totalRecords / 100
+	checkInteval := 100
 
 	totalRows := uint64(len(loci))
 
@@ -278,7 +278,7 @@ func main() {
 
 		if i%checkInteval == 0 {
 			if totalCount.Load() >= totalRows {
-				fmt.Printf("Finished processing all loci by record %d\n", i)
+				log.Printf("Finished processing all loci by record %d\n", i)
 
 				close(workQueue)
 				hasClosed = true
