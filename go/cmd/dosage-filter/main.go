@@ -257,8 +257,6 @@ func main() {
 	totalRecords := fr.NumRecords()
 	numWorkers := runtime.NumCPU() * 2
 
-	fmt.Println("totalRecords", totalRecords)
-
 	// var wg sync.WaitGroup
 	workQueue := make(chan int, 16)
 	complete := make(chan bool)
@@ -293,7 +291,7 @@ func main() {
 			totalRowsProcessed = totalCount.Load()
 
 			if totalRowsProcessed >= totalRows {
-				fmt.Printf("Finished processing all loci by record %d\n", i)
+				log.Printf("Finished processing all loci by record %d\n", i)
 
 				close(workQueue)
 				hasClosed = true
@@ -319,6 +317,6 @@ func main() {
 		<-complete
 	}
 
-	progressSender.SetProgress(int(totalRowsProcessed))
+	progressSender.SetProgress(int(totalCount.Load()))
 	progressSender.SendMessage()
 }

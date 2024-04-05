@@ -100,6 +100,7 @@ func (d *DebugMessageSender) Close() error {
 
 func (b *BeanstalkdMessageSender) SendMessage() {
 	messageJson, err := sonic.Marshal(b.Message)
+
 	if err != nil {
 		log.Printf("failed to marshall progress message due to: [%s]\n", err)
 		return
@@ -166,7 +167,6 @@ func CreateMessageSender(beanstalkConfigPath string, jobSubmissionID string, tub
 		eventTube = beanstalk.NewTube(beanstalkConnection, beanstalkdConfig.Tubes.PRS.Events)
 	case "saveFromQuery":
 		eventTube = beanstalk.NewTube(beanstalkConnection, beanstalkdConfig.Tubes.SaveFromQuery.Events)
-		fmt.Println("Constructing from SaveFromQuery Events")
 	case "index":
 		eventTube = beanstalk.NewTube(beanstalkConnection, beanstalkdConfig.Tubes.Index.Events)
 	default:
