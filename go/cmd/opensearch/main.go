@@ -25,7 +25,6 @@ type CLIArgs struct {
 	osConnectionConfigPath string
 	indexName              string
 	jobSubmissionID        string
-	noBeanstalkd           bool
 	progressFrequency      int
 }
 
@@ -43,8 +42,6 @@ func setup(args []string) *CLIArgs {
 	flag.StringVar(&cliargs.indexName, "i", "", "The index name (short form)")
 	flag.StringVar(&cliargs.jobSubmissionID, "job-submission-id", "", "The job submission ID")
 	flag.StringVar(&cliargs.jobSubmissionID, "j", "", "The job submission ID (short form)")
-	flag.BoolVar(&cliargs.noBeanstalkd, "no-queue", false, "Disable beanstalkd progress events")
-	flag.BoolVar(&cliargs.noBeanstalkd, "n", false, "Disable beanstalkd progress events (short form)")
 	flag.IntVar(&cliargs.progressFrequency, "progress-frequency", 5e3, "Print progress every N variants processed")
 	flag.IntVar(&cliargs.progressFrequency, "p", 5e3, "Print progress every N variants processed (short form)")
 
@@ -76,16 +73,13 @@ func validateArgs(args *CLIArgs) error {
 	if v.osConnectionConfigPath == "" {
 		missing = append(missing, "os-connection-config-path")
 	}
-	if v.beanstalkConfigPath == "" {
-		if !v.noBeanstalkd {
-			missing = append(missing, "beanstalk-config-path")
-		}
-	}
 	if v.indexName == "" {
 		missing = append(missing, "index-name")
 	}
 	if v.jobSubmissionID == "" {
-		missing = append(missing, "job-submission-id")
+		if v.beanstalkConfigPath != "" {
+			missing = append(missing, "job-submission-id")
+		}
 	}
 
 	if len(missing) > 0 {
@@ -135,7 +129,7 @@ func main() {
 		go parser.Parse(headerPaths, indexName, osConfig, workQueue, complete, i)
 	}
 
-	progressSender, err := beanstalkd.CreateMessageSender(cliargs.beanstalkConfigPath, cliargs.jobSubmissionID, cliargs.noBeanstalkd)
+	progressSender, err := beanstalkd.CreateMessageSender(cliargs.beanstalkConfigPath, cliargs.jobSubmissionID, "index")
 	if err != nil {
 		log.Fatalf("Couldn't create message sender due to: [%s]\n", err)
 	}

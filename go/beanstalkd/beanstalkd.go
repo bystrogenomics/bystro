@@ -51,6 +51,26 @@ type DebugMessageSender struct {
 type BeanstalkdConfig struct {
 	Addresses []string `yaml:"addresses"`
 	Tubes     struct {
+		Annotation struct {
+			Submission string `yaml:"submission"`
+			Events     string `yaml:"events"`
+		} `yaml:"annotation"`
+		Ancestry struct {
+			Submission string `yaml:"submission"`
+			Events     string `yaml:"events"`
+		} `yaml:"ancestry"`
+		Proteomics struct {
+			Submission string `yaml:"submission"`
+			Events     string `yaml:"events"`
+		} `yaml:"proteomics"`
+		PRS struct {
+			Submission string `yaml:"submission"`
+			Events     string `yaml:"events"`
+		} `yaml:"prs"`
+		SaveFromQuery struct {
+			Submission string `yaml:"submission"`
+			Events     string `yaml:"events"`
+		} `yaml:"save_from_query"`
 		Index struct {
 			Submission string `yaml:"submission"`
 			Events     string `yaml:"events"`
@@ -80,6 +100,7 @@ func (d *DebugMessageSender) Close() error {
 
 func (b *BeanstalkdMessageSender) SendMessage() {
 	messageJson, err := sonic.Marshal(b.Message)
+
 	if err != nil {
 		log.Printf("failed to marshall progress message due to: [%s]\n", err)
 		return
@@ -108,7 +129,7 @@ func createBeanstalkdConfig(beanstalkConfigPath string) (BeanstalkdConfig, error
 	return bConfig.Beanstalkd, nil
 }
 
-func CreateMessageSender(beanstalkConfigPath string, jobSubmissionID string, noBean bool) (MessageSender, error) {
+func CreateMessageSender(beanstalkConfigPath string, jobSubmissionID string, tube string) (MessageSender, error) {
 	message := ProgressMessage{
 		SubmissionID: jobSubmissionID,
 		Event:        PROGRESS_EVENT,
@@ -118,7 +139,7 @@ func CreateMessageSender(beanstalkConfigPath string, jobSubmissionID string, noB
 		},
 	}
 
-	if noBean {
+	if beanstalkConfigPath == "" {
 		return &DebugMessageSender{
 			Message: message,
 		}, nil
@@ -134,7 +155,23 @@ func CreateMessageSender(beanstalkConfigPath string, jobSubmissionID string, noB
 		return nil, err
 	}
 
-	eventTube := beanstalk.NewTube(beanstalkConnection, beanstalkdConfig.Tubes.Index.Events)
+	var eventTube *beanstalk.Tube
+	switch tube {
+	case "annotation":
+		eventTube = beanstalk.NewTube(beanstalkConnection, beanstalkdConfig.Tubes.Annotation.Events)
+	case "ancestry":
+		eventTube = beanstalk.NewTube(beanstalkConnection, beanstalkdConfig.Tubes.Ancestry.Events)
+	case "proteomics":
+		eventTube = beanstalk.NewTube(beanstalkConnection, beanstalkdConfig.Tubes.Proteomics.Events)
+	case "prs":
+		eventTube = beanstalk.NewTube(beanstalkConnection, beanstalkdConfig.Tubes.PRS.Events)
+	case "saveFromQuery":
+		eventTube = beanstalk.NewTube(beanstalkConnection, beanstalkdConfig.Tubes.SaveFromQuery.Events)
+	case "index":
+		eventTube = beanstalk.NewTube(beanstalkConnection, beanstalkdConfig.Tubes.Index.Events)
+	default:
+		return nil, fmt.Errorf("unknown event tube: %s", eventTube)
+	}
 
 	return &BeanstalkdMessageSender{
 		Message:    message,

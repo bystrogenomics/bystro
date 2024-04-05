@@ -2,13 +2,17 @@ package main
 
 import (
 	"bufio"
+	"bystro/beanstalkd"
+	"context"
 	"flag"
 	"fmt"
 	"log"
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/apache/arrow/go/v14/arrow/array"
 	"github.com/apache/arrow/go/v14/arrow/ipc"
@@ -24,10 +28,12 @@ type CLIArgs struct {
 	beanstalkConfigPath string
 	jobSubmissionID     string
 	lociPath            string
-	noBeanstalkd        bool
-	progressFrequency   int
+	progressFrequency   int64
 }
 
+var once sync.Once
+
+// setup parses the command-line arguments and returns a CLIArgs struct.
 func setup(args []string) *CLIArgs {
 	cliargs := &CLIArgs{}
 	flag.StringVar(&cliargs.inputPath, "input", "", "The path to the input Arrow IPC/Feather file")
@@ -40,11 +46,8 @@ func setup(args []string) *CLIArgs {
 
 	flag.StringVar(&cliargs.beanstalkConfigPath, "queue-config", "", "The path to the Beanstalkd queue connection config (e.g. config/beanstalk.yml)")
 	flag.StringVar(&cliargs.beanstalkConfigPath, "q", "", "The path to the Beanstalkd queue connection config (short form)")
-	flag.BoolVar(&cliargs.noBeanstalkd, "no-queue", true, "Disable beanstalkd progress events")
-	flag.BoolVar(&cliargs.noBeanstalkd, "n", true, "Disable beanstalkd progress events (short form)")
-
-	flag.IntVar(&cliargs.progressFrequency, "progress-frequency", 5e3, "Print progress every N variants processed")
-	flag.IntVar(&cliargs.progressFrequency, "p", 5e3, "Print progress every N variants processed (short form)")
+	flag.Int64Var(&cliargs.progressFrequency, "progress-frequency", int64(5e3), "Print progress every N variants processed")
+	flag.Int64Var(&cliargs.progressFrequency, "p", int64(5e3), "Print progress every N variants processed (short form)")
 
 	flag.StringVar(&cliargs.jobSubmissionID, "job-submission-id", "", "The job submission ID")
 	flag.StringVar(&cliargs.jobSubmissionID, "j", "", "The job submission ID (short form)")
@@ -65,6 +68,7 @@ func setup(args []string) *CLIArgs {
 	return cliargs
 }
 
+// validateArgs checks if the required arguments are provided.
 func validateArgs(args *CLIArgs) error {
 	var missing []string
 	v := *args
@@ -77,14 +81,9 @@ func validateArgs(args *CLIArgs) error {
 	if v.lociPath == "" {
 		missing = append(missing, "loci")
 	}
-	if v.beanstalkConfigPath == "" {
-		if !v.noBeanstalkd {
-			missing = append(missing, "beanstalk-config-path")
-		}
-	}
 
 	if v.jobSubmissionID == "" {
-		if !v.noBeanstalkd {
+		if v.beanstalkConfigPath != "" {
 			missing = append(missing, "job-submission-id")
 		}
 	}
@@ -96,6 +95,8 @@ func validateArgs(args *CLIArgs) error {
 	return nil
 }
 
+// readLociFile reads a file containing loci to filter and returns a map of loci.
+// Each line in the file represents a locus.
 func readLociFile(filePath string) (map[string]bool, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -114,14 +115,16 @@ func readLociFile(filePath string) (map[string]bool, error) {
 	return loci, nil
 }
 
-func processRecordAt(fr *ipc.FileReader, loci map[string]bool, arrowWriter *bystroArrow.ArrowWriter, queue chan int, complete chan bool, count *atomic.Uint64) {
+// processRecordAt processes a record at the given index, filters the rows based on the loci,
+// and writes the filtered rows to the arrowWriter.
+func processRecordAt(fr *ipc.FileReader, loci map[string]bool, arrowWriter *bystroArrow.ArrowWriter, queue chan int, complete chan bool, count *atomic.Int64) {
 	pool := memory.NewGoAllocator()
 	builder := array.NewRecordBuilder(pool, arrowWriter.Schema)
 	defer builder.Release()
 
 	rowsAccumulated := 0
 
-	totalRows := uint64(len(loci))
+	totalRows := int64(len(loci))
 	for index := range queue {
 		// We don't have an easy way to close the channel
 		// so we'll just quickly skip to the end
@@ -179,12 +182,12 @@ func processRecordAt(fr *ipc.FileReader, loci map[string]bool, arrowWriter *byst
 
 		record.Release()
 
-		// WE have to count the rows we will eventually write
+		// We have to count the rows we will eventually write
 		// not the amount we've written
 		// since the chunk size may not align neatly with the number of requested loci
 		// If the channel is closed due to the count
-		// we will clean up and write the reamining chunk before exiting
-		count.Add(uint64(rowsAccepted))
+		// we will clean up and write the remaining chunk before exiting
+		count.Add(int64(rowsAccepted))
 
 		if rowsAccumulated >= WRITE_CHUNK_SIZE {
 			// Create a new record from the row
@@ -220,7 +223,7 @@ func processRecordAt(fr *ipc.FileReader, loci map[string]bool, arrowWriter *byst
 }
 
 func main() {
-	var totalCount atomic.Uint64
+	var totalCount atomic.Int64
 
 	cliargs := setup(nil)
 
@@ -268,31 +271,55 @@ func main() {
 		go processRecordAt(fr, loci, arrowWriter, workQueue, complete, &totalCount)
 	}
 
-	checkInteval := 100
-
-	totalRows := uint64(len(loci))
-
-	var hasClosed bool
-	for i := 0; i < totalRecords; i++ {
-		workQueue <- i
-
-		if i%checkInteval == 0 {
-			if totalCount.Load() >= totalRows {
-				log.Printf("Finished processing all loci by record %d\n", i)
-
-				close(workQueue)
-				hasClosed = true
-
-				break
-			}
-		}
+	progressSender, err := beanstalkd.CreateMessageSender(cliargs.beanstalkConfigPath, cliargs.jobSubmissionID, "saveFromQuery")
+	if err != nil {
+		log.Fatalf("Couldn't create message sender due to: [%s]\n", err)
 	}
 
-	if !hasClosed {
-		close(workQueue)
+	var totalRows int64 = int64(len(loci))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
+		var lastUpdate int64
+		var currentCount int64
+		for {
+			select {
+			case <-ctx.Done():
+				log.Println("Goroutine exiting...")
+				return
+			case <-ticker.C:
+				// Send your message here. For demonstration, we'll just print.
+				currentCount = totalCount.Load()
+
+				if currentCount-lastUpdate >= cliargs.progressFrequency {
+					lastUpdate = currentCount
+					progressSender.SetProgress(int(lastUpdate))
+					progressSender.SendMessage()
+				}
+
+				if currentCount >= totalRows {
+					once.Do(func() {
+						close(workQueue)
+					})
+				}
+
+			}
+		}
+	}()
+
+	for i := 0; i < totalRecords; i++ {
+		workQueue <- i
 	}
 
 	for i := 0; i < numWorkers; i++ {
 		<-complete
 	}
+
+	cancel()
+
+	progressSender.SetProgress(int(totalCount.Load()))
+	progressSender.SendMessage()
 }
