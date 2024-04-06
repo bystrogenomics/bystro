@@ -39,7 +39,6 @@ func TestValidateArgsMissingRequired(t *testing.T) {
 			},
 			wantErr: true,
 		},
-		// Add more cases as necessary
 	}
 
 	for _, tt := range tests {
