@@ -193,8 +193,7 @@ def run_dosage_filter(
         f"--job-submission-id {submission_id}"
     )
 
-    print(dosage_filter_cmd)
-    logger.info("Beginning to filter genotypes")
+    logger.info("Beginning to filter genotypes using command `%s`", dosage_filter_cmd)
 
     # Run the command and capture stderr
     process = subprocess.Popen(dosage_filter_cmd, stderr=subprocess.PIPE, shell=True, text=True)
@@ -396,8 +395,8 @@ async def go(  # pylint:disable=invalid-name
                             ):
                                 reporter.message.remote(  # type: ignore
                                     (
-                                        "Annotation/stats: Filtered & wrote "
-                                        f"{current_target_index} of {n_hits} rows."
+                                        "Annotation: Filtered "
+                                        f"{current_target_index} of {n_hits} variants."
                                     )
                                 )
 
@@ -410,8 +409,8 @@ async def go(  # pylint:disable=invalid-name
                         if current_target_index >= n_hits:
                             reporter.message.remote(  # type: ignore
                                 (
-                                    "Annotation/stats: Filtered & wrote "
-                                    f"{current_target_index} of {n_hits} rows."
+                                    "Annotation: Filtered "
+                                    f"{current_target_index} of {n_hits} variants."
                                 )
                             )
                             reporter.message.remote("Done, cleaning up.")  # type: ignore

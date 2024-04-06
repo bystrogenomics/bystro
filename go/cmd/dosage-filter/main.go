@@ -270,6 +270,7 @@ func main() {
 		log.Fatalf("Couldn't create message sender due to: [%s]\n", err)
 	}
 
+	totalRows := int64(len(loci))
 	quit := make(chan bool)
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
@@ -289,14 +290,12 @@ func main() {
 
 				if currentCount-lastUpdate >= cliargs.progressFrequency {
 					lastUpdate = currentCount
-					progressSender.SetProgress(int(lastUpdate))
-					progressSender.SendMessage()
+					progressSender.SendStringMessage(fmt.Sprintf("Dosage: Filtered %d of %d variants", int(lastUpdate), totalRows))
 				}
 			}
 		}
 	}()
 
-	totalRows := int64(len(loci))
 	for i := 0; i < totalRecords; i++ {
 		workQueue <- i
 
@@ -313,6 +312,5 @@ func main() {
 
 	quit <- true
 
-	progressSender.SetProgress(int(totalCount.Load()))
-	progressSender.SendMessage()
+	progressSender.SendStringMessage(fmt.Sprintf("Dosage: filtered %d of %d variants", int(totalCount.Load()), totalRows))
 }

@@ -23,9 +23,16 @@ type ProgressMessage struct {
 	Event        string       `json:"event"`
 }
 
+type StringMessage struct {
+	SubmissionID string `json:"submissionId"`
+	Data         string `json:"data"`
+	Event        string `json:"event"`
+}
+
 type MessageSender interface {
 	SetProgress(progress int)
 	SendMessage()
+	SendStringMessage(message string)
 	Close() error
 }
 
@@ -70,7 +77,7 @@ type BeanstalkdConfig struct {
 		SaveFromQuery struct {
 			Submission string `yaml:"submission"`
 			Events     string `yaml:"events"`
-		} `yaml:"save_from_query"`
+		} `yaml:"saveFromQuery"`
 		Index struct {
 			Submission string `yaml:"submission"`
 			Events     string `yaml:"events"`
@@ -110,7 +117,26 @@ func (b *BeanstalkdMessageSender) SendMessage() {
 }
 
 func (d *DebugMessageSender) SendMessage() {
-	fmt.Printf("Indexed %d\n", d.Message.Data.Progress)
+	fmt.Printf("Progress: %d\n", d.Message.Data.Progress)
+}
+
+func (b *BeanstalkdMessageSender) SendStringMessage(message string) {
+	messageJson, err := sonic.Marshal(StringMessage{
+		SubmissionID: b.Message.SubmissionID,
+		Data:         message,
+		Event:        PROGRESS_EVENT,
+	})
+
+	if err != nil {
+		log.Printf("failed to marshall progress message due to: [%s]\n", err)
+		return
+	}
+
+	b.eventTube.Put(messageJson, 0, 0, 0)
+}
+
+func (d *DebugMessageSender) SendStringMessage(message string) {
+	fmt.Printf("%s\n", message)
 }
 
 func createBeanstalkdConfig(beanstalkConfigPath string) (BeanstalkdConfig, error) {
@@ -170,7 +196,7 @@ func CreateMessageSender(beanstalkConfigPath string, jobSubmissionID string, tub
 	case "index":
 		eventTube = beanstalk.NewTube(beanstalkConnection, beanstalkdConfig.Tubes.Index.Events)
 	default:
-		return nil, fmt.Errorf("unknown event tube: %s", eventTube)
+		return nil, fmt.Errorf("unknown event tube: %s", tube)
 	}
 
 	return &BeanstalkdMessageSender{
