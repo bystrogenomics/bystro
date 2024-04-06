@@ -1,3 +1,4 @@
+github.com/akotlar/bystro-utils v0.0.0-20180921004542-b5183a523f20/go.mod h1:BHUTiQAFM7OSW8+09I/OwWMhgbsonqQ6J8jTlnpOPnk=
 github.com/apache/arrow/go/v14 v14.0.2 h1:N8OkaJEOfI3mEZt07BIkvo4sC6XDbL+48MBPWO5IONw=
 github.com/apache/arrow/go/v14 v14.0.2/go.mod h1:u3fgh3EdgN/YQ8cVQRguVW3R+seMybFg8QBQ5LU+eBY=
 github.com/aws/aws-sdk-go v1.44.263/go.mod h1:aVsgQcEevwlmQ7qHE9I3h+dtQgpqhFB+i8Phjh7fkwI=
@@ -18,8 +19,8 @@ github.com/beanstalkd/go-beanstalk v0.2.0/go.mod h1:/G8YTyChOtpOArwLTQPY1CHB+i21
 github.com/biogo/boom v0.0.0-20150317015657-28119bc1ffc1/go.mod h1:fwtxkutinkQcME9Zlywh66T0jZLLjgrwSLY2WxH2N3U=
 github.com/biogo/hts v1.4.4 h1:Z+TminqAKRE/t6nyy5PwI/DL90kdew4GpghB+QdjjFk=
 github.com/biogo/hts v1.4.4/go.mod h1:AfPn4uJQ2zxi04Q/4vccdmCX16W+IsHXVguPsdh4HE4=
-github.com/bystrogenomics/bystro-vcf v0.0.0-20240402234936-cb7a8a568d10 h1:YhmP1gujzA9tRpv2UAFg63usOwbpNB366/UeVNKJyrM=
-github.com/bystrogenomics/bystro-vcf v0.0.0-20240402234936-cb7a8a568d10/go.mod h1:ssLIZJL1hUm8xIFZO33X2Mp0b3Ju7oJ2liBW0Qov0KQ=
+github.com/bystrogenomics/bystro-vcf v0.0.0-20240406002905-a9a245f1ffb0 h1:iAbMGYoCpvqcPLuolyHMH6HKdiYIg8EVzb/lbUjCZwI=
+github.com/bystrogenomics/bystro-vcf v0.0.0-20240406002905-a9a245f1ffb0/go.mod h1:ssLIZJL1hUm8xIFZO33X2Mp0b3Ju7oJ2liBW0Qov0KQ=
 github.com/bytedance/sonic v1.5.0/go.mod h1:ED5hyg4y6t3/9Ku1R6dU/4KyJ48DZ4jPhfY1O2AihPM=
 github.com/bytedance/sonic v1.10.0-rc/go.mod h1:ElCzW+ufi8qKqNW0FY314xriJhyJhuoJ3gFZdAHF7NM=
 github.com/bytedance/sonic v1.10.2 h1:GQebETVBxYB7JGWJtLBi07OVzWwt+8dWA00gEVW2ZFE=

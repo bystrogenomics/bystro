@@ -14,7 +14,8 @@ require (
 )
 
 require (
-	github.com/bystrogenomics/bystro-vcf v0.0.0-20240402234936-cb7a8a568d10 // indirect
+	github.com/akotlar/bystro-utils v0.0.0-20180921004542-b5183a523f20 // indirect
+	github.com/bystrogenomics/bystro-vcf v0.0.0-20240406002905-a9a245f1ffb0 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20230717121745-296ad89f973d // indirect
 	github.com/chenzhuoyu/iasm v0.9.1 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
