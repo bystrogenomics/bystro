@@ -313,10 +313,6 @@ async def go(  # pylint:disable=invalid-name
         if reporting_interval < MINIMUM_RECORDS_TO_ENABLE_REPORTING:
             reporting_interval = MINIMUM_RECORDS_TO_ENABLE_REPORTING
 
-        reporter.message.remote(  # type: ignore
-            f"Reporting filtering progress every {reporting_interval} records."
-        )
-
         # Filter the dosage matrix, if it has rows
         if os.path.exists(parent_dosage_matrix_path) and os.stat(parent_dosage_matrix_path).st_size > 0:
             loci = _correct_loci_case(loci)
