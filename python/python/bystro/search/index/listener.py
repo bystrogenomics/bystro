@@ -40,7 +40,9 @@ def run_binary_with_args(binary_path: str, args: list[str]) -> list[str]:
     # Construct the command
     command = " ".join([binary_path] + args)
 
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, text=True)
+    process = subprocess.Popen(
+        command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, text=True
+    )
     stdout, stderr = process.communicate()
 
     if process.returncode != 0 or stderr:

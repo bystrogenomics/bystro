@@ -1,11 +1,9 @@
 """A module to handle the saving of search results into a new annotation"""
 
 # TODO 2023-05-08: Track number of skipped entries
-# TODO 2023-05-08: Write to Arrow IPC or Parquet, alongside tsv.
 # TODO 2023-05-08: Implement distributed pipeline/filters/transforms
 # TODO 2023-05-08: Support sort queries
 # TODO 2023-05-08: get max_slices from opensearch index settings
-# TODO 2023-05-08: concatenate chunks in a different ray worker
 
 import logging
 import math
@@ -13,7 +11,6 @@ import os
 import psutil
 import pathlib
 import subprocess
-import time
 
 from numpy._typing import NDArray
 
@@ -28,7 +25,6 @@ from bystro.search.utils.messages import SaveJobData
 from bystro.search.utils.opensearch import gather_opensearch_args
 from bystro.utils.compress import get_compress_from_pipe_cmd, get_decompress_to_pipe_cmd
 from bystro.utils.timer import Timer
-from bystro.utils.config import _get_bystro_project_root
 
 
 logger = logging.getLogger(__name__)
@@ -51,7 +47,8 @@ FIELDS_TO_QUERY = ["chrom", "pos", "inputRef", "alt"]
 
 ray.init(ignore_reinit_error=True, address="auto")
 
-_GO_HANDLER_BINARY_PATH = 'dosage-filter'
+_GO_HANDLER_BINARY_PATH = "dosage-filter"
+
 
 def _clean_query(input_query_body: dict):
     if "sort" in input_query_body:
@@ -170,7 +167,7 @@ def run_dosage_filter(
     loci_path: str,
     queue_config_path: str,
     progress_frequency: int,
-    submission_id: str
+    submission_id: str,
 ):
     """
     Run the dosage_filter binary
@@ -186,11 +183,13 @@ def run_dosage_filter(
         RuntimeError: If the binary execution fails or if there is an error in the stderr output.
     """
 
-    # call the dosage-filter program, which takes an --input --output --loci --progress-frequency --queue-config --job-submission-id args
+    # call the dosage-filter program, which takes an --input --output --loci
+    # --progress-frequency --queue-config --job-submission-id args
     # and filters the dosage matrix to only include the loci in the loci file
     dosage_filter_cmd = (
         f"{_GO_HANDLER_BINARY_PATH} --input {parent_dosage_matrix_path} --output {dosage_out_path} "
-        f"--loci {loci_path} --progress-frequency {progress_frequency} --queue-config {queue_config_path} "
+        f"--loci {loci_path} --progress-frequency {progress_frequency} "
+        f"--queue-config {queue_config_path} "
         f"--job-submission-id {submission_id}"
     )
 
@@ -311,7 +310,7 @@ async def go(  # pylint:disable=invalid-name
 
         reporter.message.remote("About to filter dosage matrix and annotation tsv.gz.")  # type: ignore
 
-        reporting_interval =  math.ceil(n_hits * REPORTING_INTERVAL)
+        reporting_interval = math.ceil(n_hits * REPORTING_INTERVAL)
         if reporting_interval < MINIMUM_RECORDS_TO_ENABLE_REPORTING:
             reporting_interval = MINIMUM_RECORDS_TO_ENABLE_REPORTING
 
