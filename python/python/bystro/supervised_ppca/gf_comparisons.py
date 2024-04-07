@@ -1,0 +1,309 @@
+"""
+"""
+import numpy as np
+from numpy.typing import NDArray
+from typing import Any
+
+from tqdm import trange
+import torch
+from torch import Tensor, nn
+from torch.distributions.multivariate_normal import MultivariateNormal
+from sklearn.linear_model import LogisticRegression
+
+from bystro.supervised_ppca.gf_generative_pt import PPCA
+from bystro.supervised_ppca._base import _get_projection_matrix
+
+import torch
+
+
+def kl_divergence_gaussian(
+    mu0: torch.Tensor,
+    sigma0: torch.Tensor,
+    mu1: torch.Tensor,
+    sigma1: torch.Tensor,
+) -> torch.Tensor:
+    """
+    Compute the KL divergence between two multivariate Gaussian distributions.
+
+    Parameters
+    ----------
+    mu0 : torch.Tensor
+        Mean of the first Gaussian distribution, shape (d,).
+    sigma0 : torch.Tensor
+        Covariance matrix of the first Gaussian distribution, shape (d, d).
+    mu1 : torch.Tensor
+        Mean of the second Gaussian distribution, shape (d,).
+    sigma1 : torch.Tensor
+        Covariance matrix of the second Gaussian distribution, shape (d, d).
+
+    Returns
+    -------
+    torch.Tensor
+        The KL divergence between the two Gaussian distributions.
+    """
+    d = mu0.size(0)
+    sigma1_inv = torch.linalg.inv(sigma1)
+    trace_term = torch.trace(sigma1_inv @ sigma0)
+    mu_diff = mu1 - mu0
+    quadratic_term = mu_diff.T @ sigma1_inv @ mu_diff
+    log_det_term = torch.logdet(sigma1) - torch.logdet(sigma0)
+
+    kl_div = 0.5 * (log_det_term - d + trace_term + quadratic_term)
+    return kl_div
+
+def kl_divergence_vae(
+    mu1: torch.Tensor,
+    sigma1: torch.Tensor,
+) -> torch.Tensor:
+    d = sigma1.shape[1]
+    term1 = -1*torch.logdet(sigma1)
+    term2 = -d
+    term3 = torch.trace(sigma1)
+    term4 = torch.sum(torch.square(mu1),dim=1)
+    kl_div = 0.5*(term1 + term2 + term3 + term4)
+    return kl_div
+
+
+class PPCADropoutVAE(PPCA):
+    """
+
+    Parameters
+    ----------
+    n_components : int
+        The latent dimensionality
+
+    n_supervised : int
+        The number of predictive latent variables
+
+    prior_options : dict
+        The hyperparameters for the prior on the parameters
+
+    mu : float>0,default=1.0
+
+    gamma : float,default=10.0
+
+    delta : 5.0
+
+
+    """
+
+    def __init__(
+        self,
+        n_components: int = 2,
+        n_supervised: int = 1,
+        prior_options: dict | None = None,
+        mu: float = 1.0,
+        gamma: float = 10.0,
+        delta: float = 5.0,
+        training_options: dict | None = None,
+    ):
+        self.mu = float(mu)
+        self.gamma = float(gamma)
+        self.delta = float(delta)
+        self.n_supervised = int(n_supervised)
+        super().__init__(
+            n_components=n_components,
+            prior_options=prior_options,
+            training_options=training_options,
+        )
+        self._initialize_save_losses()
+        self.losses_supervision = np.empty(
+            self.training_options["n_iterations"]
+        )
+
+    # override needed for mypy to ignore the non-optional `y` argument
+    def fit(  # type: ignore[override]
+        self,
+        X: NDArray[np.float_],
+        y: NDArray[np.float_],
+        task: str = "classification",
+        progress_bar: bool = True,
+        seed: int = 2021,
+    ) -> "PPCADropoutVAE":
+        """
+        Fits a model given covariates X as well as option labels y in the
+        supervised methods
+
+        Parameters
+        ----------
+        X : NDArray,(n_samples,n_covariates)
+            The data
+
+        y : NDArray,(n_samples,n_prediction)
+            Covariates we wish to predict. For now lazy and assuming
+            logistic regression.
+
+        task : string,default='classification'
+            Is this prediction, multinomial regression, or classification
+
+        progress_bar : bool,default=True
+            Whether to print the progress bar to monitor time
+
+        seed : int,default=2021
+            The random number generator seed used to ensure reproducibility
+
+        Returns
+        -------
+        self : PPCADropoutVAE
+            The model
+        """
+        self._test_inputs(X, y)
+        rng = np.random.default_rng(int(seed))
+        training_options = self.training_options
+        N, p = X.shape
+        self.p = p
+        device = torch.device(
+            "cuda"
+            if torch.cuda.is_available() and training_options["use_gpu"]
+            else "cpu"
+        )
+
+        W_, sigmal_ = self._initialize_variables(device, X)
+        X_, y_ = self._transform_training_data(device, X, 1.0 * y)
+
+        if task == "classification":
+            sigm = nn.Sigmoid()
+            supervision_loss: nn.BCELoss | nn.MSELoss = nn.BCELoss(
+                reduction="mean"
+            )
+
+            mod = LogisticRegression(max_iter=1000)
+            mod.fit(X, 1.0 * y)
+            b_ = torch.tensor(mod.intercept_.astype(np.float32), device=device)
+        elif task == "regression":
+            supervision_loss = nn.MSELoss()
+        else:
+            err_msg = f"unrecognized_task {task}, must be regression or classification"
+            raise ValueError(err_msg)
+
+        trainable_variables = [W_, sigmal_]
+
+        optimizer = torch.optim.SGD(
+            trainable_variables,
+            lr=training_options["learning_rate"],
+            momentum=training_options["momentum"],
+        )
+
+        eye = torch.tensor(np.eye(p).astype(np.float32), device=device)
+        one_s = torch.tensor(
+            np.ones(self.n_supervised).astype(np.float32), device=device
+        )
+        softplus = nn.Softplus()
+
+        _prior = self._create_prior(device)
+
+        for i in trange(
+            int(training_options["n_iterations"]), disable=not progress_bar
+        ):
+            idx = rng.choice(
+                X_.shape[0], size=training_options["batch_size"], replace=False
+            )
+            X_batch = X_[idx]
+            y_batch = y_[idx]
+
+            sigma = softplus(sigmal_)
+            WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
+            Sigma = WWT + sigma * eye
+
+            like_prior = _prior(trainable_variables)
+
+            # Predictive lower bound
+            P_x, Cov = _get_projection_matrix(W_, sigma, device)
+            mean_z = torch.matmul(X_batch, torch.transpose(P_x, 0, 1))
+            eps = torch.rand_like(mean_z)
+            C1_2 = torch.linalg.cholesky(Cov)
+            z_samples = mean_z + torch.matmul(eps, C1_2)
+
+            if task == "regression":
+                y_hat = torch.matmul(z_samples[:, : self.n_supervised], one_s)
+                loss_y = supervision_loss(y_hat, y_batch)
+            else:
+                y_hat = (
+                    self.delta
+                    * torch.matmul(z_samples[:, : self.n_supervised], one_s)
+                    + b_
+                )
+                loss_y = supervision_loss(sigm(y_hat), y_batch)
+
+            # Generative likelihood
+            X_recon = torch.matmul(z_samples,W_)
+            X_diff = X_batch - X_recon
+            m = MultivariateNormal(torch.zeros(p, device=device), sigma*eye)
+            like_gen_recon = torch.mean(m.log_prob(X_diff))
+
+            like_gen_kl = torch.mean(kl_divergence_vae(mean_z,Cov))
+            like_gen = like_gen_recon + like_gen_kl
+
+            WTW = torch.matmul(W_, torch.transpose(W_, 0, 1))
+            off_diag = WTW - torch.diag(torch.diag(WTW))
+            loss_i = torch.linalg.matrix_norm(off_diag)
+
+            posterior = like_gen + 1 / N * like_prior
+            loss = -1 * posterior + self.mu * loss_y + self.gamma * loss_i
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            self._save_losses(i, device, like_gen, like_prior, posterior)
+            if device.type == "cuda":
+                self.losses_supervision[i] = loss_y.detach().cpu().numpy()
+            else:
+                self.losses_supervision[i] = loss_y.detach().numpy()
+
+        self._store_instance_variables(device, trainable_variables)
+
+        if device.type == "cuda":
+            self.B_ = b_.detach().cpu().numpy()
+        else:
+            self.B_ = b_.detach().numpy()
+
+        return self
+
+    def _store_instance_variables(  # type: ignore[override]
+        self,
+        device: Any,
+        trainable_variables: list[Tensor],
+    ) -> None:
+        """
+        Saves the learned variables
+
+        Parameters
+        ----------
+        device ; pytorch.device
+            The device used for trainging (gpu or cpu)
+
+        trainable_variables : list
+            List of saved variables of type Tensor
+
+        Sets
+        ----
+        W_ : NDArray,(n_components,p)
+            The loadings
+
+        sigma2_ : float
+            The isotropic variance
+
+        """
+        if device.type == "cuda":
+            self.W_ = trainable_variables[0].detach().cpu().numpy()
+            self.sigma2_ = (
+                nn.Softplus()(trainable_variables[1]).detach().cpu().numpy()
+            )
+        else:
+            self.W_ = trainable_variables[0].detach().numpy()
+            self.sigma2_ = (
+                nn.Softplus()(trainable_variables[1]).detach().numpy()
+            )
+
+    def _test_inputs(self, X, y):
+        """
+        Just tests to make sure data is numpy array and dimensions match
+        """
+        if not isinstance(X, np.ndarray):
+            raise ValueError("Data must be numpy array")
+        if self.training_options["batch_size"] > X.shape[0]:
+            raise ValueError("Batch size exceeds number of samples")
+        if X.shape[0] != len(y):
+            err_msg = "Length of data matrix X must equal length of labels y"
+            raise ValueError(err_msg)
