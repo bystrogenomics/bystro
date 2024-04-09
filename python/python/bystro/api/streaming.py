@@ -35,9 +35,9 @@ def stream_file(
     if output:
         if key_path is None:
             raise ValueError("key_path is required when output is True")
-        payload["keyPath"] = key_path
+        payload["keyPath"] = key_path # type: ignore
     else:
-        payload["keyPath"] = key_path if key_path else "0"
+        payload["keyPath"] = key_path if key_path else "0" # type: ignore
 
     response = requests.get(url, headers=auth_header, json=payload)
 
