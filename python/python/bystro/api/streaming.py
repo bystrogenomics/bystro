@@ -29,7 +29,7 @@ def stream_file(
     url = state.url + GET_STREAM_ENDPOINT.format(job_id=job_id)
 
     payload = {
-        "output": str(output),
+        "output": output, # type: ignore
     }
 
     if output:
