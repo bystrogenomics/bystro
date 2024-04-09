@@ -40,11 +40,8 @@ def test_ppca():
     roc_linear = roc_auc_score(y, Y_hat)
     assert roc_model > roc_linear - 0.05
 
-    training_options = {"n_iterations": 1000,"use_gpu":False}
+    training_options = {"n_iterations": 1000, "use_gpu": False}
     model = PPCADropout(
         2, mu=100.0, gamma=10.0, delta=5.0, training_options=training_options
     )
     model.fit(X, y)
-
-
-

@@ -99,7 +99,7 @@ def PPCA_generate_data(N=10000, L=5, p=30, phi=1.0, sigma=1.0):
     return X, y, X_hat, S, W, logits
 
 
-def test_ppca():
+def test_vae_dropout():
     X, y, X_hat, S, W, logits = PPCA_generate_data(L=3, p=200)
     training_options = {"n_iterations": 1000}
     model = PPCADropoutVAE(
@@ -121,7 +121,8 @@ def test_ppca():
     )
     model.fit(X, y)
 
-def test_ppca():
+
+def test_svae():
     X, y, X_hat, S, W, logits = PPCA_generate_data(L=3, p=200)
     training_options = {"n_iterations": 1000}
     model = PPCASVAE(
@@ -144,8 +145,3 @@ def test_ppca():
     model.fit(X, y)
     model.transform(X)
     model.transform_encoder(X)
-
-
-
-
-
