@@ -12,6 +12,7 @@ import pytest
 from bystro.supervised_ppca.gf_comparisons import (
     kl_divergence_gaussian,
     PPCADropoutVAE,
+    PPCASVAE,
 )
 
 
@@ -119,3 +120,32 @@ def test_ppca():
         2, mu=100.0, gamma=10.0, delta=5.0, training_options=training_options
     )
     model.fit(X, y)
+
+def test_ppca():
+    X, y, X_hat, S, W, logits = PPCA_generate_data(L=3, p=200)
+    training_options = {"n_iterations": 1000}
+    model = PPCASVAE(
+        2, mu=100.0, gamma=10.0, delta=5.0, training_options=training_options
+    )
+    model.fit(X, y)
+    S_ = model.transform(X)
+    Y_hat = S_[:, 0] + model.B_
+    model2 = LogisticRegression(C=0.1)
+    model2.fit(X, y)
+    y_hat = model2.decision_function(X)
+    roc_model = roc_auc_score(y, y_hat)
+    roc_linear = roc_auc_score(y, Y_hat)
+    assert roc_model > roc_linear - 0.05
+
+    training_options = {"n_iterations": 1000, "use_gpu": False}
+    model = PPCASVAE(
+        2, mu=100.0, gamma=10.0, delta=5.0, training_options=training_options
+    )
+    model.fit(X, y)
+    model.transform(X)
+    model.transform_encoder(X)
+
+
+
+
+

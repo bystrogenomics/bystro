@@ -1,4 +1,36 @@
 """
+Description:
+This file contains implementations related to the PPCASVAE model, a variant 
+of Probabilistic Principal Component Analysis (PPCA) tailored for semi-
+supervised variational autoencoder structures. It includes the PPCASVAE 
+class, which offers functionality for fitting the model to data, 
+transforming input features, and reconstructing inputs from latent 
+representations. The file also contains utility functions and classes for 
+model comparison and evaluation, showcasing the PPCASVAE model's performance 
+against traditional PCA and other baseline models in generative feature 
+comparison tasks.
+
+Classes:
+- PPCASVAE: Implementation of the PPCASVAE model, including methods for 
+  fitting to data, encoding, decoding, and utility functions
+  for parameter initialization and optimization.
+
+Functions:
+- Other utility functions for model comparison and evaluation, including metric 
+  computation and visualization tools.
+
+Usage:
+This module is intended to be used in machine learning pipelines requiring 
+dimensionality reduction, feature extraction, or generative modeling, especially 
+in contexts where semi-supervised learning is beneficial. The PPCASVAE model 
+can be applied to a wide range of datasets, including but not limited to image 
+data, signal data, and general high-dimensional numerical datasets.
+
+Requirements:
+- PyTorch: For model implementation and operations.
+- NumPy, SciPy: For numerical operations.
+- Scikit-learn: For baseline models and preprocessing.
+- Matplotlib, Seaborn (optional): For visualization.
 """
 import numpy as np
 from numpy.typing import NDArray
@@ -14,6 +46,8 @@ import sklearn.decomposition as dp
 from bystro.supervised_ppca.gf_generative_pt import PPCA
 from bystro.supervised_ppca._base import _get_projection_matrix
 from bystro.supervised_ppca._misc_np import softplus_inverse_np
+
+from torch.nn.utils import clip_grad_value_
 
 
 def kl_divergence_gaussian(
@@ -111,6 +145,7 @@ class PPCADropoutVAE(PPCA):
         self.losses_supervision = np.empty(
             self.training_options["n_iterations"]
         )
+        self.losses_total = np.empty(self.training_options["n_iterations"])
         self.Phi_: NDArray[np.float_] | None = None
 
     # override needed for mypy to ignore the non-optional `y` argument
@@ -231,7 +266,7 @@ class PPCADropoutVAE(PPCA):
             like_gen_recon = torch.mean(m.log_prob(X_diff))
 
             like_gen_kl = torch.mean(kl_divergence_vae(mean_z, Cov))
-            like_gen = like_gen_recon + like_gen_kl
+            like_gen = like_gen_recon - like_gen_kl
 
             WTW = torch.matmul(W_, torch.transpose(W_, 0, 1))
             off_diag = WTW - torch.diag(torch.diag(WTW))
@@ -247,8 +282,10 @@ class PPCADropoutVAE(PPCA):
             self._save_losses(i, device, like_gen, like_prior, posterior)
             if device.type == "cuda":
                 self.losses_supervision[i] = loss_y.detach().cpu().numpy()
+                self.losses_total[i] = loss.detach().cpu().numpy()
             else:
                 self.losses_supervision[i] = loss_y.detach().numpy()
+                self.losses_total[i] = loss.detach().numpy()
 
         self._store_instance_variables(device, trainable_variables)
 
@@ -309,28 +346,6 @@ class PPCADropoutVAE(PPCA):
 
 
 class PPCASVAE(PPCA):
-    """
-
-    Parameters
-    ----------
-    n_components : int
-        The latent dimensionality
-
-    n_supervised : int
-        The number of predictive latent variables
-
-    prior_options : dict
-        The hyperparameters for the prior on the parameters
-
-    mu : float>0,default=1.0
-
-    gamma : float,default=10.0
-
-    delta : 5.0
-
-
-    """
-
     def __init__(
         self,
         n_components: int = 2,
@@ -354,6 +369,7 @@ class PPCASVAE(PPCA):
         self.losses_supervision = np.empty(
             self.training_options["n_iterations"]
         )
+        self.losses_total = np.empty(self.training_options["n_iterations"])
 
     # override needed for mypy to ignore the non-optional `y` argument
     def fit(  # type: ignore[override]
@@ -363,7 +379,7 @@ class PPCASVAE(PPCA):
         task: str = "classification",
         progress_bar: bool = True,
         seed: int = 2021,
-    ) -> "PPCADropoutVAE":
+    ) -> "PPCASVAE":
         """
         Fits a model given covariates X as well as option labels y in the
         supervised methods
@@ -449,9 +465,9 @@ class PPCASVAE(PPCA):
             y_batch = y_[idx]
 
             sigma = softplus(sigmal_)
-            sigma_p = softplus(sigma_pl_)
+            sigma_p = softplus(sigma_pl_) + 0.001
 
-            like_prior = _prior(trainable_variables)
+            like_prior = _prior(trainable_variables[:2])
 
             # Predictive lower bound
             Cov = sigma_p * eye_L
@@ -478,7 +494,7 @@ class PPCASVAE(PPCA):
             like_gen_recon = torch.mean(m.log_prob(X_diff))
 
             like_gen_kl = torch.mean(kl_divergence_vae(mean_z, Cov))
-            like_gen = like_gen_recon + like_gen_kl
+            like_gen = like_gen_recon - like_gen_kl
 
             WTW = torch.matmul(W_, torch.transpose(W_, 0, 1))
             off_diag = WTW - torch.diag(torch.diag(WTW))
@@ -489,13 +505,19 @@ class PPCASVAE(PPCA):
 
             optimizer.zero_grad()
             loss.backward()
+            clip_grad_value_(Phi_, clip_value=10.0)
+            clip_grad_value_(W_, clip_value=10.0)
+            clip_grad_value_(sigmal_, clip_value=10.0)
+            clip_grad_value_(sigma_pl_, clip_value=10.0)
             optimizer.step()
 
             self._save_losses(i, device, like_gen, like_prior, posterior)
             if device.type == "cuda":
                 self.losses_supervision[i] = loss_y.detach().cpu().numpy()
+                self.losses_total[i] = loss.detach().cpu().numpy()
             else:
                 self.losses_supervision[i] = loss_y.detach().numpy()
+                self.losses_total[i] = loss.detach().numpy()
 
         self._store_instance_variables(device, trainable_variables)
 
@@ -537,9 +559,9 @@ class PPCASVAE(PPCA):
                 nn.Softplus()(trainable_variables[1]).detach().cpu().numpy()
             )
             self.Phi_ = trainable_variables[2].detach().cpu().numpy()
-            self.sigma_pl_ = (
+            self.sigma_enc = (
                 nn.Softplus()(trainable_variables[3]).detach().cpu().numpy()
-            )
+            ) + 0.001
         else:
             self.W_ = trainable_variables[0].detach().numpy()
             self.sigma2_ = (
@@ -548,7 +570,7 @@ class PPCASVAE(PPCA):
             self.Phi_ = trainable_variables[2].detach().numpy()
             self.sigma2_enc = (
                 nn.Softplus()(trainable_variables[3]).detach().numpy()
-            )
+            ) + 0.001
 
     def transform_encoder(self, X: NDArray[np.float_]):
         """
@@ -571,9 +593,9 @@ class PPCASVAE(PPCA):
         mean_z = np.dot(X, self.Phi_)
         return mean_z
 
-    def _initialize_variables(
+    def _initialize_variables(  # type: ignore[override]
         self, device: Any, X: NDArray[np.float_]
-    ) -> tuple[Tensor, Tensor]:
+    ) -> tuple[Tensor, Tensor, Tensor, Tensor]:
         """
         Initializes the variables of the model. Right now fits a PCA model
         in sklearn, uses the loadings and sets sigma^2 to be unexplained
@@ -607,11 +629,13 @@ class PPCASVAE(PPCA):
 
         model_lm = Ridge(fit_intercept=False)
         model_lm.fit(X, S_hat)
-        phi_ = torch.tensor(
-            model_lm.coef_.astype(np.float32), requires_grad=True, device=device
+        Phi_ = torch.tensor(
+            model_lm.coef_.T.astype(np.float32),
+            requires_grad=True,
+            device=device,
         )
 
-        return W_, sigmal_, phi_, sigma_pl_
+        return W_, sigmal_, Phi_, sigma_pl_
 
     def _test_inputs(self, X, y):
         """
