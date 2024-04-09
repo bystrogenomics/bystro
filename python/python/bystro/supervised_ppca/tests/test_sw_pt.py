@@ -2,7 +2,7 @@ import random
 import torch
 import numpy as np
 
-from bystro.supervised_ppca._misc_pt import (
+from bystro.supervised_ppca._sherman_woodbury_pt import (
     ldet_sw_full,
     inverse_sw_full,
     ldet_sw_factor_analysis,
