@@ -28,16 +28,16 @@ def stream_file(
     state, auth_header = authenticate()
     url = state.url + GET_STREAM_ENDPOINT.format(job_id=job_id)
 
-    payload = {
-        "output": output, # type: ignore
+    payload : dict[str, bool | str | int]  = {
+        "output": output,
     }
 
     if output:
         if key_path is None:
             raise ValueError("key_path is required when output is True")
-        payload["keyPath"] = key_path # type: ignore
+        payload["keyPath"] = key_path
     else:
-        payload["keyPath"] = key_path if key_path else "0" # type: ignore
+        payload["keyPath"] = key_path if key_path else 0
 
     response = requests.get(url, headers=auth_header, json=payload)
 
