@@ -8,7 +8,10 @@ from torch import nn
 from torch.distributions.multivariate_normal import MultivariateNormal
 
 from bystro.supervised_ppca.gf_generative_pt import PPCA
-from bystro.supervised_ppca._base import _get_projection_matrix
+from bystro.supervised_ppca._base import (
+    _get_projection_matrix,
+    kl_divergence_vae,
+)
 
 
 class BaseMarginal(PPCA):
@@ -351,12 +354,19 @@ class PPCAMarginalKL(BaseMarginal):
             lr=training_options["learning_rate"],
             momentum=training_options["momentum"],
         )
-        eye = torch.tensor(np.eye(p).astype(np.float32), device=device)
         softplus = nn.Softplus()
 
         _prior = self._create_prior(device)
         z_vecs = [
             torch.zeros(n_g_indiv[i], device=device) for i in range(n_groups)
+        ]
+        z_vecs_c = [
+            torch.zeros(p - n_g_indiv[i], device=device)
+            for i in range(n_groups)
+        ]
+        eyes = [torch.eye(n_g_indiv[i], device=device) for i in range(n_groups)]
+        eyes_c = [
+            torch.eye(p - n_g_indiv[i], device=device) for i in range(n_groups)
         ]
 
         Lamb = torch.tensor(lamb, device=device)
@@ -368,37 +378,30 @@ class PPCAMarginalKL(BaseMarginal):
                 X_.shape[0], size=training_options["batch_size"], replace=False
             )
             X_batch = X_[idx]
-
             sigma = softplus(sigmal_)
-            WWT = torch.matmul(torch.transpose(W_, 0, 1), W_)
-            Sigma = WWT + sigma * eye
+
+            # Perform reconstruction
+            P_x, Cov = _get_projection_matrix(W_, sigma, device)
+            mean_z = torch.matmul(X_batch, torch.transpose(P_x, 0, 1))
+            eps = torch.rand_like(mean_z)
+            C1_2 = torch.linalg.cholesky(Cov)
+            z_samples = mean_z + torch.matmul(eps, C1_2)
+            X_recon = torch.matmul(z_samples, W_)
+            X_diff = X_batch - X_recon
 
             like_prior = _prior(trainable_variables)
+            like_gen_kl = torch.mean(kl_divergence_vae(mean_z, Cov))
 
             like_gens = []
             like_preds = []
 
             for k in range(n_groups):
-                Sigma_marg = Sigma[torch.meshgrid(idxs[k], idxs[k])]
-                X_o = X_batch[:, idxs[k]]
-                X_m = X_batch[:, idxs_c[k]]
-                m = MultivariateNormal(z_vecs[k], Sigma_marg)
-                like_gens.append(torch.mean(m.log_prob(X_o)))
-
-                Sigma_21 = Sigma[torch.meshgrid(idxs_c[k], idxs[k])]
-                Sigma_11 = Sigma[torch.meshgrid(idxs_c[k], idxs_c[k])]
-
-                X_o_s = torch.linalg.solve(
-                    Sigma_marg, torch.transpose(X_o, 0, 1)
-                )
-
-                projection = torch.matmul(Sigma_21, X_o_s)
-
-                X_bar = X_m - torch.transpose(projection, 0, 1)
-                m2 = MultivariateNormal(
-                    torch.zeros(p - n_g_indiv[k], device=device), Sigma_11
-                )
-                like_preds.append(Lamb[k] * torch.mean(m2.log_prob(X_bar)))
+                X_o = X_diff[:, idxs[k]]
+                X_m = X_diff[:, idxs_c[k]]
+                m1 = MultivariateNormal(z_vecs[k], sigma * eyes[k])
+                m2 = MultivariateNormal(z_vecs_c[k], sigma * eyes_c[k])
+                like_gens.append(torch.mean(m1.log_prob(X_o)))
+                like_preds.append(Lamb[k] * torch.mean(m2.log_prob(X_m)))
 
             WTW = torch.matmul(W_, torch.transpose(W_, 0, 1))
             off_diag = WTW - torch.diag(torch.diag(WTW))
@@ -408,7 +411,7 @@ class PPCAMarginalKL(BaseMarginal):
             like_pred = torch.sum(torch.stack(like_preds))
             self.losses_pred[i] = like_pred.detach().cpu().numpy()
 
-            posterior = like_gen + like_pred + 1 / N * like_prior
+            posterior = like_gen + like_pred + 1 / N * like_prior - like_gen_kl
             loss = -1 * posterior + self.gamma * loss_i
 
             optimizer.zero_grad()
