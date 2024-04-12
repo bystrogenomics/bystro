@@ -12,7 +12,6 @@ from bystro.supervised_ppca._base import _get_projection_matrix
 
 
 class BaseMarginal(PPCA):
-
     def _test_inputs(  # type: ignore[override]
         self,
         X: NDArray[np.float_],
@@ -51,6 +50,7 @@ class BaseMarginal(PPCA):
             raise ValueError(
                 "Mismatch in lamb length and number of groups in idx_list"
             )
+
 
 class PPCAMarginal(BaseMarginal):
     """
@@ -200,14 +200,16 @@ class PPCAMarginal(BaseMarginal):
                 m = MultivariateNormal(z_vecs[k], Sigma_marg)
                 like_gens.append(torch.mean(m.log_prob(X_o)))
 
-                Sigma_21 = Sigma[torch.meshgrid(idxs_c[k], idxs[k])] 
-                Sigma_11 = Sigma[torch.meshgrid(idxs_c[k], idxs_c[k])] 
+                Sigma_21 = Sigma[torch.meshgrid(idxs_c[k], idxs[k])]
+                Sigma_11 = Sigma[torch.meshgrid(idxs_c[k], idxs_c[k])]
 
-                X_o_s = torch.linalg.solve(Sigma_marg,torch.transpose(X_o,0,1))
+                X_o_s = torch.linalg.solve(
+                    Sigma_marg, torch.transpose(X_o, 0, 1)
+                )
 
-                projection = torch.matmul(Sigma_21,X_o_s)
+                projection = torch.matmul(Sigma_21, X_o_s)
 
-                X_bar = X_m - torch.transpose(projection,0,1)
+                X_bar = X_m - torch.transpose(projection, 0, 1)
                 m2 = MultivariateNormal(
                     torch.zeros(p - n_g_indiv[k], device=device), Sigma_11
                 )
@@ -233,6 +235,7 @@ class PPCAMarginal(BaseMarginal):
         self._store_instance_variables(device, trainable_variables)
 
         return self
+
 
 class PPCAMarginalKL(BaseMarginal):
     """
@@ -287,7 +290,7 @@ class PPCAMarginalKL(BaseMarginal):
         lamb: NDArray[np.float_],
         progress_bar: bool = True,
         seed: int = 2021,
-    ) -> "PPCAMarginal":
+    ) -> "PPCAMarginalKL":
         """
         Fit the PPCA model with marginalization to the given data.
 
@@ -382,14 +385,16 @@ class PPCAMarginalKL(BaseMarginal):
                 m = MultivariateNormal(z_vecs[k], Sigma_marg)
                 like_gens.append(torch.mean(m.log_prob(X_o)))
 
-                Sigma_21 = Sigma[torch.meshgrid(idxs_c[k], idxs[k])] 
-                Sigma_11 = Sigma[torch.meshgrid(idxs_c[k], idxs_c[k])] 
+                Sigma_21 = Sigma[torch.meshgrid(idxs_c[k], idxs[k])]
+                Sigma_11 = Sigma[torch.meshgrid(idxs_c[k], idxs_c[k])]
 
-                X_o_s = torch.linalg.solve(Sigma_marg,torch.transpose(X_o,0,1))
+                X_o_s = torch.linalg.solve(
+                    Sigma_marg, torch.transpose(X_o, 0, 1)
+                )
 
-                projection = torch.matmul(Sigma_21,X_o_s)
+                projection = torch.matmul(Sigma_21, X_o_s)
 
-                X_bar = X_m - torch.transpose(projection,0,1)
+                X_bar = X_m - torch.transpose(projection, 0, 1)
                 m2 = MultivariateNormal(
                     torch.zeros(p - n_g_indiv[k], device=device), Sigma_11
                 )
@@ -415,4 +420,3 @@ class PPCAMarginalKL(BaseMarginal):
         self._store_instance_variables(device, trainable_variables)
 
         return self
-

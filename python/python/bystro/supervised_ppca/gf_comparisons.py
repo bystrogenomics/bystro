@@ -44,10 +44,11 @@ from sklearn.linear_model import LogisticRegression, Ridge
 import sklearn.decomposition as dp
 
 from bystro.supervised_ppca.gf_generative_pt import PPCA
-from bystro.supervised_ppca._base import _get_projection_matrix,kl_divergence_vae
+from bystro.supervised_ppca._base import (
+    _get_projection_matrix,
+    kl_divergence_vae,
+)
 from bystro.supervised_ppca._misc_np import softplus_inverse_np
-
-from torch.nn.utils import clip_grad_value_
 
 
 def kl_divergence_gaussian(
