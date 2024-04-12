@@ -44,7 +44,7 @@ from sklearn.linear_model import LogisticRegression, Ridge
 import sklearn.decomposition as dp
 
 from bystro.supervised_ppca.gf_generative_pt import PPCA
-from bystro.supervised_ppca._base import _get_projection_matrix
+from bystro.supervised_ppca._base import _get_projection_matrix,kl_divergence_vae
 from bystro.supervised_ppca._misc_np import softplus_inverse_np
 
 from torch.nn.utils import clip_grad_value_
@@ -86,42 +86,7 @@ def kl_divergence_gaussian(
     return kl_div
 
 
-def kl_divergence_vae(
-    mu1: torch.Tensor,
-    sigma1: torch.Tensor,
-) -> torch.Tensor:
-    d = sigma1.shape[1]
-    term1 = -1 * torch.logdet(sigma1)
-    term2 = -d
-    term3 = torch.trace(sigma1)
-    term4 = torch.sum(torch.square(mu1), dim=1)
-    kl_div = 0.5 * (term1 + term2 + term3 + term4)
-    return kl_div
-
-
 class PPCADropoutVAE(PPCA):
-    """
-
-    Parameters
-    ----------
-    n_components : int
-        The latent dimensionality
-
-    n_supervised : int
-        The number of predictive latent variables
-
-    prior_options : dict
-        The hyperparameters for the prior on the parameters
-
-    mu : float>0,default=1.0
-
-    gamma : float,default=10.0
-
-    delta : 5.0
-
-
-    """
-
     def __init__(
         self,
         n_components: int = 2,
@@ -142,10 +107,9 @@ class PPCADropoutVAE(PPCA):
             training_options=training_options,
         )
         self._initialize_save_losses()
-        self.losses_supervision = np.empty(
-            self.training_options["n_iterations"]
-        )
-        self.losses_total = np.empty(self.training_options["n_iterations"])
+        n_iterations = self.training_options["n_iterations"]
+        self.losses_supervision = np.empty(n_iterations)
+        self.losses_total = np.empty(n_iterations)
         self.Phi_: NDArray[np.float_] | None = None
 
     # override needed for mypy to ignore the non-optional `y` argument
@@ -354,22 +318,24 @@ class PPCASVAE(PPCA):
         mu: float = 1.0,
         gamma: float = 10.0,
         delta: float = 5.0,
+        lamb: float = 1.0,
         training_options: dict | None = None,
     ):
         self.mu = float(mu)
         self.gamma = float(gamma)
         self.delta = float(delta)
         self.n_supervised = int(n_supervised)
+        self.lamb = float(lamb)
         super().__init__(
             n_components=n_components,
             prior_options=prior_options,
             training_options=training_options,
         )
+        n_iterations = self.training_options["n_iterations"]
         self._initialize_save_losses()
-        self.losses_supervision = np.empty(
-            self.training_options["n_iterations"]
-        )
-        self.losses_total = np.empty(self.training_options["n_iterations"])
+        self.losses_supervision = np.empty(n_iterations)
+        self.losses_encoder = np.empty(n_iterations)
+        self.losses_total = np.empty(n_iterations)
 
     # override needed for mypy to ignore the non-optional `y` argument
     def fit(  # type: ignore[override]
@@ -500,23 +466,35 @@ class PPCASVAE(PPCA):
             off_diag = WTW - torch.diag(torch.diag(WTW))
             loss_i = torch.linalg.matrix_norm(off_diag)
 
+            loss_encoder = torch.mean(torch.square(Phi_)) + torch.mean(
+                torch.abs(Phi_)
+            )
+            loss_decoder = torch.mean(torch.square(Phi_)) + torch.mean(
+                torch.abs(Phi_)
+            )
+
             posterior = like_gen + 1 / N * like_prior
-            loss = -1 * posterior + self.mu * loss_y + self.gamma * loss_i
+            loss = (
+                -1 * posterior
+                + self.mu * loss_y
+                + self.gamma * loss_i
+                + self.lamb * loss_encoder
+                + self.lamb * loss_decoder
+            )
 
             optimizer.zero_grad()
             loss.backward()
-            clip_grad_value_(Phi_, clip_value=10.0)
-            clip_grad_value_(W_, clip_value=10.0)
-            clip_grad_value_(sigmal_, clip_value=10.0)
-            clip_grad_value_(sigma_pl_, clip_value=10.0)
             optimizer.step()
 
             self._save_losses(i, device, like_gen, like_prior, posterior)
             if device.type == "cuda":
                 self.losses_supervision[i] = loss_y.detach().cpu().numpy()
+                self.losses_encoder[i] = loss_encoder.detach().cpu().numpy()
                 self.losses_total[i] = loss.detach().cpu().numpy()
+
             else:
                 self.losses_supervision[i] = loss_y.detach().numpy()
+                self.losses_encoder[i] = loss_encoder.detach().numpy()
                 self.losses_total[i] = loss.detach().numpy()
 
         self._store_instance_variables(device, trainable_variables)
