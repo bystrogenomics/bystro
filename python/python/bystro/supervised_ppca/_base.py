@@ -101,6 +101,45 @@ def _get_projection_matrix(W_: Tensor, sigma_: Tensor, device: Any):
     return Proj_X, Cov
 
 
+def kl_divergence_vae(
+    mu1: torch.Tensor,
+    sigma1: torch.Tensor,
+) -> torch.Tensor:
+    """
+    Computes the Kullback-Leibler divergence between two multivariate
+    normal distributions.
+
+    This function assumes the first distribution, N(mu1, sigma1),
+    represents the conditional distribution of latent variables given
+    observations (approximate posterior), and the second distribution
+    is the standard multivariate normal distribution N(0, I) representing
+    the marginal latent distribution (prior).
+
+    The KL divergence is computed using the formula:
+    KL(N(mu1, sigma1) || N(0, I)) = 0.5 * (tr(sigma1) +
+                            mu1^T * mu1 - log(det(sigma1)) - d)
+    where `d` is the dimensionality of the latent space.
+
+    Parameters:
+    - mu1 (torch.Tensor): Mean vector of the first Gaussian
+      distribution (approximate posterior), shape (batch_size, d).
+    - sigma1 (torch.Tensor): Covariance matrix of the first Gaussian
+      distribution (approximate posterior), expected to be a diagonal
+      matrix represented as a tensor of shape (batch_size, d).
+
+    Returns:
+    - torch.Tensor: A tensor containing the KL divergence for each
+      instance in the batch, shape (batch_size,).
+    """
+    d = sigma1.shape[1]  # Dimensionality of the latent space
+    term1 = -1 * torch.logdet(sigma1)  # Log determinant
+    term2 = -d  # Negative of the latent space dimensionality
+    term3 = torch.trace(sigma1)  # Trace of the covariance matrix
+    term4 = torch.sum(torch.square(mu1), dim=1)  # Sum of squares
+    kl_div = 0.5 * (term1 + term2 + term3 + term4)
+    return kl_div
+
+
 class BaseGaussianFactorModel(BaseSGDModel, ABC):
     def __init__(self, n_components=2):
         """
