@@ -25,6 +25,12 @@ class EmpiricalCovariance(BaseCovariance):
         -------
         self : EmpiricalCovariance
             The model
+
+        Raises
+        ------
+        ValueError:
+            A value error will be raised if missing data is found in X ( 
+            np.isnan(X) evaluates to true ), or if X is not an NDArray
         """
         self._test_inputs(X)
         self.N, self.p = X.shape
@@ -59,6 +65,12 @@ class BayesianCovariance(BaseCovariance):
         -------
         self : BayesianCovariance
             The model
+
+        Raises
+        ------
+        ValueError:
+            A value error will be raised if missing data is found in X ( 
+            np.isnan(X) evaluates to true ), or if X is not an NDArray
         """
         self._test_inputs(X)
         self.N, self.p = X.shape
@@ -113,6 +125,12 @@ class LinearShrinkageCovariance(BaseCovariance):
         -------
         self : LinearShrinkageCovariance
             The model, with updated covariance attribute
+
+        Raises
+        ------
+        ValueError:
+            A value error will be raised if missing data is found in X ( 
+            np.isnan(X) evaluates to true ), or if X is not an NDArray
         """
 
         self._test_inputs(X)
@@ -180,6 +198,12 @@ class NonLinearShrinkageCovariance(BaseCovariance):
         -------
         self : NonLinearShrinkageCovariance
             The model, with updated covariance attribute
+
+        Raises
+        ------
+        ValueError:
+            A value error will be raised if missing data is found in X ( 
+            np.isnan(X) evaluates to true ), or if X is not an NDArray
         """
         self._test_inputs(X)
         self.N, self.p = X.shape
