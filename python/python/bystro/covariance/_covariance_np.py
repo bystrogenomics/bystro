@@ -1,18 +1,3 @@
-"""
-This implements two objects, the empirical covariance estimator used as a 
-baseline comparison method. It also implements BayesianCovariance, which
-implements MAP estimation using several common priors.
-
-Objects
--------
-EmpiricalCovariance(BaseCovariance)
-    This object just fits the covariance matrix as the standard sample
-    covariance matrix
-
-BayesianCovariance(BaseCovariance):
-    This object fits the covariance matrix as the MAP estimator using
-    user-defined priors.
-"""
 from typing import Any
 import numpy as np
 from numpy.typing import NDArray
@@ -41,6 +26,7 @@ class EmpiricalCovariance(BaseCovariance):
         self : EmpiricalCovariance
             The model
         """
+        self._test_inputs(X)
         self.N, self.p = X.shape
         XTX = np.dot(X.T, X)
         self.covariance = XTX / self.N
@@ -74,6 +60,7 @@ class BayesianCovariance(BaseCovariance):
         self : BayesianCovariance
             The model
         """
+        self._test_inputs(X)
         self.N, self.p = X.shape
 
         p_opts = self.prior_options
@@ -87,7 +74,9 @@ class BayesianCovariance(BaseCovariance):
 
         return self
 
-    def _fill_prior_options(self, prior_options: dict[str, Any]) -> dict[str, Any]:
+    def _fill_prior_options(
+        self, prior_options: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         This sets the prior options for our inference scheme
 
@@ -106,3 +95,91 @@ class BayesianCovariance(BaseCovariance):
             "iw_params": {"pnu": 2, "sigma": 1.0},
         }
         return {**default_options, **prior_options}
+
+
+class LinearShrinkageCovariance(BaseCovariance):
+    def fit(self, X: NDArray[np.float_]) -> "LinearShrinkageCovariance":
+        self._test_inputs(X)
+        self.N, self.p = X.shape
+
+        S = np.cov(X.T)
+
+        # Compute shrinkage intensity
+        evalues = np.linalg.eigvalsh(S)
+        lambd = np.mean(evalues)
+
+        temp = [
+            np.linalg.norm(np.outer(X[:, i], X[:, i]) - S, "fro") ** 2
+            for i in range(self.N)
+        ]
+
+        b_bar_sq = np.sum(temp) / self.N**2
+        d_sq = np.linalg.norm(S - lambd * np.eye(self.p), "fro") ** 2
+        b_sq = np.minimum(b_bar_sq, d_sq)
+        rho_hat = b_sq / d_sq
+
+        # Shrink covariance matrix
+        lambda_bar = np.trace(S) / self.p
+        self.covariance = (
+            rho_hat * lambda_bar * np.eye(self.p) + (1 - rho_hat) * S
+        )
+
+        return self
+
+
+class NonLinearShrinkageCovariance(BaseCovariance):
+    def fit(self, X: NDArray[np.float_]) -> "NonLinearShrinkageCovariance":
+        self._test_inputs(X)
+        self.N, self.p = X.shape
+        N, p = X.shape
+        S = np.cov(X.T)
+        lambd, u = np.linalg.eigh(S)
+
+        # compute analytical nonlinear shrinkage kernel formula.
+        lambd = lambd[np.maximum(0, p - N) :]
+        L = np.tile(lambd, (np.minimum(p, N), 1)).T
+        h = N ** (-1 / 3)
+
+        H = h * L.T
+        x = (L - L.T) / H
+        ftilde = 3 / 4 / np.sqrt(5)
+        ftilde *= np.mean(np.maximum(1 - x**2 / 5, 0) / H, axis=1)
+
+        Hftemp = (-3 / 10 / np.pi) * x + (3 / 4 / np.sqrt(5) / np.pi) * (
+            1 - x**2 / 5
+        ) * np.log(np.abs((np.sqrt(5) - x) / (np.sqrt(5) + x)))
+
+        Hftemp[np.abs(x) == np.sqrt(5)] = (-3 / 10 / np.pi) * x[
+            np.abs(x) == np.sqrt(5)
+        ]
+
+        Hftilde = np.mean(Hftemp / H, axis=1)
+
+        if p <= N:
+            dtilde = lambd / (
+                (np.pi * (p / N) * lambd * ftilde) ** 2
+                + (1 - (p / N) - np.pi * (p / N) * lambd * Hftilde) ** 2
+            )
+        else:
+            Hftilde0 = (
+                (1 / np.pi)
+                * (
+                    3 / 10 / h**2
+                    + 3
+                    / 4
+                    / np.sqrt(5)
+                    / h
+                    * (1 - 1 / 5 / h**2)
+                    * np.log((1 + np.sqrt(5) * h) / (1 - np.sqrt(5) * h))
+                )
+                * np.mean(1 / lambd)
+            )
+            dtilde0 = 1 / (np.pi * (p - N) / N * Hftilde0)
+            dtilde1 = lambd / (
+                np.pi**2 * lambd**2 * (ftilde**2 + Hftilde**2)
+            )
+            dtilde = np.concatenate([dtilde0 * np.ones((p - N)), dtilde1])
+
+        self.covariance = np.dot(np.dot(u, np.diag(dtilde)), u.T)
+
+        return self

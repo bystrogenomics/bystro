@@ -177,6 +177,15 @@ class BaseCovariance:
 
         return _mutual_information(self.covariance, idxs1, idxs2)
 
+    def _test_inputs(self, X: NDArray[np.float_]):
+        """ 
+        Just tests to make sure data is numpy array
+        """
+        if not isinstance(X, np.ndarray):
+            raise ValueError("Data is numpy array")
+        if np.sum(np.isnan(X))>0:
+            raise ValueError("Data has nans")
+
 
 def _get_precision(covariance: NDArray[np.float_]) -> NDArray[np.float_]:
     """
