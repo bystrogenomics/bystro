@@ -103,7 +103,9 @@ class BasePrecision(BaseCovariance):
     ):
         self._set_covariance_if_none()
 
-        return super(BasePrecision, self).conditional_score(X, idxs, weights=weights)
+        return super(BasePrecision, self).conditional_score(
+            X, idxs, weights=weights
+        )
 
     def conditional_score_samples(
         self, X: NDArray[np.float_], idxs: NDArray[np.float_]
@@ -120,14 +122,20 @@ class BasePrecision(BaseCovariance):
     ):
         self._set_covariance_if_none()
 
-        return super(BasePrecision, self).marginal_score(X, idxs, weights=weights)
+        return super(BasePrecision, self).marginal_score(
+            X, idxs, weights=weights
+        )
 
-    def marginal_score_samples(self, X: NDArray[np.float_], idxs: NDArray[np.float_]):
+    def marginal_score_samples(
+        self, X: NDArray[np.float_], idxs: NDArray[np.float_]
+    ):
         self._set_covariance_if_none()
 
         return super(BasePrecision, self).marginal_score_samples(X, idxs)
 
-    def score(self, X: NDArray[np.float_], weights: NDArray[np.float_] | None = None):
+    def score(
+        self, X: NDArray[np.float_], weights: NDArray[np.float_] | None = None
+    ):
         self._set_covariance_if_none()
 
         return super(BasePrecision, self).score(X, weights=weights)
@@ -147,7 +155,9 @@ class BasePrecision(BaseCovariance):
 
         return super(BasePrecision, self).entropy_subset(idxs)
 
-    def mutual_information(self, idxs1: NDArray[np.float_], idxs2: NDArray[np.float_]):
+    def mutual_information(
+        self, idxs1: NDArray[np.float_], idxs2: NDArray[np.float_]
+    ):
         self._set_covariance_if_none()
 
         return super(BasePrecision, self).mutual_information(idxs1, idxs2)

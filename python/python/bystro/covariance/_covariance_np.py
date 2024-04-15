@@ -98,11 +98,10 @@ class BayesianCovariance(BaseCovariance):
 
 
 class LinearShrinkageCovariance(BaseCovariance):
-
     def fit(self, X: NDArray[np.float_]) -> "LinearShrinkageCovariance":
         """
-        This fits a covariance matrix using the linear shrinkage approach 
-        to combine the empirical covariance matrix with a structured 
+        This fits a covariance matrix using the linear shrinkage approach
+        to combine the empirical covariance matrix with a structured
         estimator.
 
         Parameters
@@ -143,30 +142,31 @@ class LinearShrinkageCovariance(BaseCovariance):
 
         return self
 
+
 class NonLinearShrinkageCovariance(BaseCovariance):
     """
-    This method adjusts each eigenvalue of the sample covariance matrix 
-    individually according to a nonlinear shrinkage formula, based on the 
-    Hilbert transform. This approach contrasts with linear shrinkage methods 
-    that apply a uniform adjustment across all eigenvalues. The nonlinear 
-    technique allows for a more nuanced adjustment that is particularly 
-    beneficial in scenarios with clusters of eigenvalues, optimizing the 
-    shrinkage based on local eigenvalue densities. The method assumes a 
-    sample matrix composed of i.i.d. random variables with mean zero and 
-    finite 16th moment, and is suitable for large-dimensional data sets where 
+    This method adjusts each eigenvalue of the sample covariance matrix
+    individually according to a nonlinear shrinkage formula, based on the
+    Hilbert transform. This approach contrasts with linear shrinkage methods
+    that apply a uniform adjustment across all eigenvalues. The nonlinear
+    technique allows for a more nuanced adjustment that is particularly
+    beneficial in scenarios with clusters of eigenvalues, optimizing the
+    shrinkage based on local eigenvalue densities. The method assumes a
+    sample matrix composed of i.i.d. random variables with mean zero and
+    finite 16th moment, and is suitable for large-dimensional data sets where
     the ratio of variables p to n is significant.
 
-    The theoretical basis of this approach is built around the optimal 
+    The theoretical basis of this approach is built around the optimal
     estimation of p parameters, which balances between overfitting p^2
-    parameters and underfitting with only 1 parameter. The nonlinear shrinkage 
-    is calculated using an oracle estimator that depends on a sample spectral density 
-    function approximated via kernel estimation using the Epanechnikov kernel. 
-    This estimation facilitates the derivation of shrinkage intensities for each 
-    eigenvalue, tailoring the adjustment to improve estimations under various 
-    data conditions. Practical implementation details are provided, adapted from a 
-    Matlab script by the authors, ensuring that users can apply this method effectively 
-    to empirical data sets. The docstring also underscores the utility of this estimator 
-    in practical settings, providing a more parameter-efficient approach compared 
+    parameters and underfitting with only 1 parameter. The nonlinear shrinkage
+    is calculated using an oracle estimator that depends on a sample spectral density
+    function approximated via kernel estimation using the Epanechnikov kernel.
+    This estimation facilitates the derivation of shrinkage intensities for each
+    eigenvalue, tailoring the adjustment to improve estimations under various
+    data conditions. Practical implementation details are provided, adapted from a
+    Matlab script by the authors, ensuring that users can apply this method effectively
+    to empirical data sets. The docstring also underscores the utility of this estimator
+    in practical settings, providing a more parameter-efficient approach compared
     to traditional methods, which often rely on unfeasibly large parameter sets.
     """
 

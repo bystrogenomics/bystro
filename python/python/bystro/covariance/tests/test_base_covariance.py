@@ -1,6 +1,6 @@
 import numpy as np
 import numpy.linalg as la
-import scipy.stats as st # type: ignore
+import scipy.stats as st  # type: ignore
 from bystro.covariance._base_covariance import (
     BaseCovariance,
     _score_samples,
@@ -60,7 +60,7 @@ def test_predict():
 
 def test_conditional_score_samples():
     """
-    Test conditional likelihood calculations from samples using the 
+    Test conditional likelihood calculations from samples using the
     direct method in `BaseCovariance`. Verifies against expected outcomes.
     """
     rng = np.random.default_rng(2021)

@@ -100,7 +100,6 @@ import pytz
 
 
 class BaseCovariance:
-
     def __init__(self):
         self.creationDate = dt.now(pytz.timezone("US/Pacific"))
         self.covariance: NDArray | None = None
@@ -171,19 +170,21 @@ class BaseCovariance:
 
         return _entropy_subset(self.covariance, idxs)
 
-    def mutual_information(self, idxs1: NDArray[np.float_], idxs2: NDArray[np.float_]):
+    def mutual_information(
+        self, idxs1: NDArray[np.float_], idxs2: NDArray[np.float_]
+    ):
         if self.covariance is None:
             raise ValueError("Covariance matrix has not been fit")
 
         return _mutual_information(self.covariance, idxs1, idxs2)
 
     def _test_inputs(self, X: NDArray[np.float_]):
-        """ 
+        """
         Just tests to make sure data is numpy array
         """
         if not isinstance(X, np.ndarray):
             raise ValueError("Data is numpy array")
-        if np.sum(np.isnan(X))>0:
+        if np.sum(np.isnan(X)) > 0:
             raise ValueError("Data has nans")
 
 
@@ -225,7 +226,9 @@ def _get_stable_rank(covariance: NDArray[np.float_]) -> np.float_:
 
 
 def _predict(
-    covariance: NDArray[np.float_], Xobs: NDArray[np.float_], idxs: NDArray[np.float_]
+    covariance: NDArray[np.float_],
+    Xobs: NDArray[np.float_],
+    idxs: NDArray[np.float_],
 ) -> NDArray[np.float_]:
     """
     Predicts missing data using observed data. This uses the conditional
@@ -286,7 +289,9 @@ def _conditional_score(
     avg_score : np.float_
         Average log likelihood
     """
-    weights = np.ones(X.shape[0]) if weights is None else weights / np.mean(weights)
+    weights = (
+        np.ones(X.shape[0]) if weights is None else weights / np.mean(weights)
+    )
 
     return np.mean(weights * _conditional_score_samples(covariance, X, idxs))
 
@@ -326,15 +331,20 @@ def _conditional_score_sherman_woodbury(
     avg_score : np.float_
         Average log likelihood
     """
-    weights = np.ones(X.shape[0]) if weights is None else weights / np.mean(weights)
+    weights = (
+        np.ones(X.shape[0]) if weights is None else weights / np.mean(weights)
+    )
 
     return np.mean(
-        weights * _conditional_score_samples_sherman_woodbury(Lambda, W, X, idxs)
+        weights
+        * _conditional_score_samples_sherman_woodbury(Lambda, W, X, idxs)
     )
 
 
 def _conditional_score_samples(
-    covariance: NDArray[np.float_], X: NDArray[np.float_], idxs: NDArray[np.float_]
+    covariance: NDArray[np.float_],
+    X: NDArray[np.float_],
+    idxs: NDArray[np.float_],
 ) -> np.float_:
     """
     Return the conditional log likelihood of each sample, that is
@@ -589,7 +599,9 @@ def _marginal_score_sherman_woodbury(
 
 
 def _marginal_score_samples(
-    covariance: NDArray[np.float_], X: NDArray[np.float_], idxs: NDArray[np.float_]
+    covariance: NDArray[np.float_],
+    X: NDArray[np.float_],
+    idxs: NDArray[np.float_],
 ) -> np.float_:
     """
     Returns the marginal log-likelihood of a subset of data
@@ -730,7 +742,9 @@ def _score_sherman_woodbury(
     return np.mean(weights * _score_samples_sherman_woodbury(Lambda, W, X))
 
 
-def _score_samples(covariance: NDArray[np.float_], X: NDArray[np.float_]) -> np.float_:
+def _score_samples(
+    covariance: NDArray[np.float_], X: NDArray[np.float_]
+) -> np.float_:
     """
     Return the log likelihood of each sample
 
@@ -822,7 +836,9 @@ def _entropy(covariance: NDArray[np.float_]) -> np.float_:
     return 0.5 * logdet
 
 
-def _entropy_subset(covariance: NDArray[np.float_], idxs: NDArray[np.float_]) -> np.float_:
+def _entropy_subset(
+    covariance: NDArray[np.float_], idxs: NDArray[np.float_]
+) -> np.float_:
     """
     Computes the entropy of a subset of the Gaussian distribution
     parameterized by covariance.
@@ -848,7 +864,9 @@ def _entropy_subset(covariance: NDArray[np.float_], idxs: NDArray[np.float_]) ->
 
 
 def _mutual_information(
-    covariance: NDArray[np.float_], idxs1: NDArray[np.float_], idxs2: NDArray[np.float_]
+    covariance: NDArray[np.float_],
+    idxs1: NDArray[np.float_],
+    idxs2: NDArray[np.float_],
 ) -> np.float_:
     """
     This computes the mutual information bewteen the two sets of
@@ -872,7 +890,9 @@ def _mutual_information(
     idxs1_sub = idxs1[idxs == 1]
     Hy = _entropy(cov_sub[np.ix_(idxs1_sub == 1, idxs1_sub == 1)])
 
-    _, covariance_conditional = _get_conditional_parameters(cov_sub, 1 - idxs1_sub)
+    _, covariance_conditional = _get_conditional_parameters(
+        cov_sub, 1 - idxs1_sub
+    )
     H_y_given_x = _entropy(covariance_conditional)
     mutual_information = Hy - H_y_given_x
 
