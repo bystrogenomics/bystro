@@ -8,7 +8,7 @@ class EmpiricalCovariance(BaseCovariance):
     def __init__(self):
         """
         This object just fits the covariance matrix as the standard sample
-        covariance matrix
+        covariance matrix. Does not handle missing values
         """
         super().__init__()
 
@@ -38,7 +38,7 @@ class BayesianCovariance(BaseCovariance):
     def __init__(self, prior_options=None):
         """
         This object fits the covariance matrix as the MAP estimator using
-        user-defined priors.
+        user-defined priors. Does not handle missing values
         """
         super().__init__()
         if prior_options is None:
@@ -163,11 +163,7 @@ class NonLinearShrinkageCovariance(BaseCovariance):
     function approximated via kernel estimation using the Epanechnikov kernel.
     This estimation facilitates the derivation of shrinkage intensities for each
     eigenvalue, tailoring the adjustment to improve estimations under various
-    data conditions. Practical implementation details are provided, adapted from a
-    Matlab script by the authors, ensuring that users can apply this method effectively
-    to empirical data sets. The docstring also underscores the utility of this estimator
-    in practical settings, providing a more parameter-efficient approach compared
-    to traditional methods, which often rely on unfeasibly large parameter sets.
+    data conditions. 
     """
 
     def fit(self, X: NDArray[np.float_]) -> "NonLinearShrinkageCovariance":
