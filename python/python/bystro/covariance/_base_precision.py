@@ -76,9 +76,6 @@ class BasePrecision(BaseCovariance):
         if self.covariance is None:
             self.covariance = self.get_covariance()
 
-    #################
-    # Miscellaneous #
-    #################
     def get_covariance(self):
         if self.precision is None:
             raise ValueError(
@@ -98,9 +95,6 @@ class BasePrecision(BaseCovariance):
 
         return super(BasePrecision, self).predict(Xobs, idxs)
 
-    #####################################
-    # Gaussian Likelihood-based methods #
-    #####################################
     def conditional_score(
         self,
         X: NDArray[np.float_],
@@ -143,9 +137,6 @@ class BasePrecision(BaseCovariance):
 
         return super(BasePrecision, self).score_samples(X)
 
-    #################################
-    # Information-theoretic methods #
-    #################################
     def entropy(self):
         self._set_covariance_if_none()
 

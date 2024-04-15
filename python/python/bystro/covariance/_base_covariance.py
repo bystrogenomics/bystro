@@ -100,18 +100,11 @@ import pytz
 
 
 class BaseCovariance:
-    """
-    This object basically contains all the methods asides for fitting
-    a covariance matrix.
-    """
 
     def __init__(self):
         self.creationDate = dt.now(pytz.timezone("US/Pacific"))
         self.covariance: NDArray | None = None
 
-    #################
-    # Miscellaneous #
-    #################
     def get_precision(self) -> NDArray[np.float_]:
         if self.covariance is None:
             raise ValueError("Covariance matrix has not been fit")
@@ -130,9 +123,6 @@ class BaseCovariance:
 
         return _predict(self.covariance, Xobs, idxs)
 
-    #####################################
-    # Gaussian Likelihood-based methods #
-    #####################################
     def conditional_score(self, X: NDArray, idxs: NDArray, weights=None):
         if self.covariance is None:
             raise ValueError("Covariance matrix has not been fit")
@@ -169,9 +159,6 @@ class BaseCovariance:
 
         return _score_samples(self.covariance, X)
 
-    #################################
-    # Information-theoretic methods #
-    #################################
     def entropy(self):
         if self.covariance is None:
             raise ValueError("Covariance matrix has not been fit")
@@ -189,19 +176,6 @@ class BaseCovariance:
             raise ValueError("Covariance matrix has not been fit")
 
         return _mutual_information(self.covariance, idxs1, idxs2)
-
-
-###########################################
-###########################################
-###########################################
-###                                     ###
-###                                     ###
-###   Methods for covariance matrices   ###
-###                                     ###
-###                                     ###
-###########################################
-###########################################
-###########################################
 
 
 def _get_precision(covariance: NDArray[np.float_]) -> NDArray[np.float_]:
