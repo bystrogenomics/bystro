@@ -27,27 +27,33 @@ import cvxpy as cp
 import time
 from typing import List, Optional
 
+from bystro.covariance._covariance_np import (
+    EmpiricalCovariance,
+    LinearShrinkageCovariance,
+    NonLinearShrinkageCovariance,
+)
+
 
 class MeanAdaptation:
     """
     A class to adapt datasets by aligning their means.
 
-    This adaptation method works by calculating the mean of each dataset 
-    in a list of datasets (X_list) and adjusting each dataset to have 
+    This adaptation method works by calculating the mean of each dataset
+    in a list of datasets (X_list) and adjusting each dataset to have
     the same mean. This can be useful in scenarios where datasets from
-    different sources or conditions should be brought to a common scale 
+    different sources or conditions should be brought to a common scale
     or reference point before analysis.
 
     Parameters
     ----------
     prior_mu : bool, default=True
-        If True, the adaptation process will include a regularization 
+        If True, the adaptation process will include a regularization
         term towards zero in the calculation of the new means.
     lamb : float, default=0.1
-        The regularization parameter used when `prior_mu` is True. It 
+        The regularization parameter used when `prior_mu` is True. It
         determines the weight of the regularization towards zero.
     weighted : bool, default=False
-        If True, weights the contribution of each dataset by its number 
+        If True, weights the contribution of each dataset by its number
         of samples in calculating the overall mean.
 
     Attributes
@@ -66,19 +72,19 @@ class MeanAdaptation:
         self, prior_mu: bool = True, lamb: float = 0.1, weighted: bool = False
     ) -> None:
         """
-        Initializes the MeanAdaptation instance with the specified 
-        parameters 
+        Initializes the MeanAdaptation instance with the specified
+        parameters
 
         Parameters
         ----------
         prior_mu : bool, default=True
-            If True, the adaptation process will include a regularization 
+            If True, the adaptation process will include a regularization
             term towards zero in the calculation of the new means.
         lamb : float, default=0.1
-            The regularization parameter used when `prior_mu` is True. It 
+            The regularization parameter used when `prior_mu` is True. It
             determines the weight of the regularization towards zero.
         weighted : bool, default=False
-            If True, weights the contribution of each dataset by its number 
+            If True, weights the contribution of each dataset by its number
             of samples in calculating the overall mean.
         """
         self.prior_mu: bool = prior_mu
@@ -93,15 +99,15 @@ class MeanAdaptation:
         """
         Fit the mean adaptation model on a list of datasets.
 
-        Calculates the overall mean (optionally weighted by the size 
+        Calculates the overall mean (optionally weighted by the size
         of each dataset) to which all datasets will be adapted.
         This mean can be adjusted towards zero if `prior_mu` is True.
 
         Parameters
         ----------
         X_list : List[np.ndarray]
-            A list of numpy arrays where each array is a dataset to 
-            be adapted. Arrays must have the same number of columns 
+            A list of numpy arrays where each array is a dataset to
+            be adapted. Arrays must have the same number of columns
             (features).
 
         Returns
@@ -137,17 +143,17 @@ class MeanAdaptation:
         """
         Transform a dataset to align its mean with the target mean.
 
-        If `j` is specified, it aligns the dataset to the mean of the 
-        `j`th dataset from `X_list` used in fitting. Otherwise, it 
+        If `j` is specified, it aligns the dataset to the mean of the
+        `j`th dataset from `X_list` used in fitting. Otherwise, it
         aligns to the overall target mean.
 
         Parameters
         ----------
         X : np.ndarray
-            The dataset to transform, must have the same number of 
+            The dataset to transform, must have the same number of
             columns (features) as the datasets in `X_list`.
         j : int, optional
-            The index of the dataset in `X_list` to align `X` to. If 
+            The index of the dataset in `X_list` to align `X` to. If
             None, aligns to the overall target mean.
 
         Returns
@@ -166,7 +172,7 @@ class MeanAdaptation:
         """
         Internal method to validate the input datasets.
 
-        Checks that all datasets in `X_list` have the same number 
+        Checks that all datasets in `X_list` have the same number
         of features. Raises a ValueError if not.
 
         Parameters
@@ -177,7 +183,7 @@ class MeanAdaptation:
         Raises
         ------
         ValueError
-            If not all datasets in `X_list` have the same number of 
+            If not all datasets in `X_list` have the same number of
             features.
         """
         self.n_covariates = X_list[0].shape[1]
@@ -234,7 +240,9 @@ class RotationAdaptation:
         Applies the affine transformation to the given dataset X.
     """
 
-    def __init__(self, norm: str = "fro") -> None:
+    def __init__(
+        self, norm: str = "fro", regularization: str = "Linear"
+    ) -> None:
         """
         Initializes the RotationAdaptation instance with the specified norm.
 
@@ -246,13 +254,14 @@ class RotationAdaptation:
         """
         self.norm: str = norm
         self.J: int = 0
-        self.mu_0: np.ndarray = np.array([])  # Placeholder until set
-        self.Sigma_0: np.ndarray = np.array([])  # Placeholder until set
-        self.L_0_inv: np.ndarray = np.array([])  # Placeholder until set
+        self.mu_0: np.ndarray = np.array([])
+        self.Sigma_0: np.ndarray = np.array([])
+        self.L_0_inv: np.ndarray = np.array([])
         self.Sigma_list: List[np.ndarray] = []
         self.L_i_cholesky: List[np.ndarray] = []
         self.mu_list: List[np.ndarray] = []
         self.elapsed_time: float = 0.0
+        self.regularization = regularization
 
     def fit(self, X_list: List[np.ndarray]) -> "RotationAdaptation":
         """
@@ -266,14 +275,30 @@ class RotationAdaptation:
             A list containing the datasets to be harmonized. Each element
             of the list is a numpy array representing a dataset.
         """
+        self._test_inputs(X_list)
         self.J = len(X_list)
 
         mu_list = [np.mean(X_list[j], axis=0) for j in range(self.J)]
         Sigma_list = []
         L_i_cholesky_list = []
+
+        if self.regularization == "Empirical":
+            model_cov = EmpiricalCovariance()
+        elif self.regularization == "Linear":
+            model_cov = LinearShrinkageCovariance()
+        elif self.regularization == "NonLinear":
+            model_cov = NonLinearShrinkageCovariance()
+        elif self.regularization == "Bayesian":
+            raise ValueError("Bayesian currently not supported")
+        else:
+            raise ValueError(
+                "Unrecognized regularization %s" % self.regularization
+            )
+
         for j in range(self.J):
             X_dm = X_list[j] - mu_list[j]
-            cov = np.cov(X_dm.T) + 0.001 * np.eye(X_dm.shape[1])
+            model_cov.fit(X_dm)
+            cov = model_cov.covariance
             L = la.cholesky(cov)
             Sigma_list.append(cov)
             L_i_cholesky_list.append(la.inv(L))
@@ -329,3 +354,26 @@ class RotationAdaptation:
             X_w = np.dot(X_dm, self.L_i_cholesky[j].T)
         X_o = np.dot(X_w, self.L_0.T) + self.mu_0
         return X_o
+
+    def _test_inputs(self, X_list: List[np.ndarray]) -> None:
+        """
+        Internal method to validate the input datasets.
+
+        Checks that all datasets in `X_list` have the same number
+        of features. Raises a ValueError if not.
+
+        Parameters
+        ----------
+        X_list : List[np.ndarray]
+            The list of datasets to validate.
+
+        Raises
+        ------
+        ValueError
+            If not all datasets in `X_list` have the same number of
+            features.
+        """
+        self.n_covariates = X_list[0].shape[1]
+        for X in X_list:
+            if X.shape[1] != self.n_covariates:
+                raise ValueError("Mismatch in number of covariates")

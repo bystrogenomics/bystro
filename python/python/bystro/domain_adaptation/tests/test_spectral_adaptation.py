@@ -77,7 +77,7 @@ def test_rotation_adaptation():
     n_clust = 3
     X_list = generate_data(n_clusters=n_clust)
 
-    model = RotationAdaptation()
+    model = RotationAdaptation(regularization='Empirical')
     model.fit(X_list)
 
     X_transformed_list = [model.transform(X_list[i], i) for i in range(n_clust)]
