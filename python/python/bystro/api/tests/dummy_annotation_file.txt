@@ -1,0 +1,10 @@
+Experiment Name	Subject ID	Sample ID	covariate1	covariate2	covariate3
+experiment 1	Subject_ID_1	Sample_ID_1	a	0.1	5
+experiment 1	Subject_ID_2	Sample_ID_2	b	0.2	5
+experiment 1	Subject_ID_3	Sample_ID_3	c	0.3	5
+experiment 1	Subject_ID_4	Sample_ID_4	a	0.4	5
+experiment 1	Subject_ID_5	Sample_ID_5	b	0.5	5
+experiment 1	Subject_ID_6	Sample_ID_6	c	0.6	5
+experiment 1	Subject_ID_1	Sample_ID_7	a	0.7	5
+experiment 1	Subject_ID_2	Sample_ID_8	b	0.8	5
+experiment 1	Subject_ID_3	Sample_ID_9	c	0.9	5
