@@ -298,7 +298,8 @@ class RotationAdaptation:
         for j in range(self.J):
             X_dm = X_list[j] - mu_list[j]
             model_cov.fit(X_dm)
-            cov = model_cov.covariance
+            cov = model_cov.covariance + 0.001 * np.eye(X_dm.shape[1])
+            cov2 = np.cov(X_dm.T)
             L = la.cholesky(cov)
             Sigma_list.append(cov)
             L_i_cholesky_list.append(la.inv(L))

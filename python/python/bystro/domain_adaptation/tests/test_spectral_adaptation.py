@@ -84,4 +84,4 @@ def test_rotation_adaptation():
     cov_list = [np.cov(X_transformed_list[i].T) for i in range(n_clust)]
 
     for i in range(n_clust):
-        assert la.norm(model.Sigma_0 - cov_list[i]) < 0.1
+        assert la.norm(model.Sigma_0 - cov_list[i])/la.norm(cov_list[i]) < 0.01
