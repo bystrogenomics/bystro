@@ -77,11 +77,13 @@ def test_rotation_adaptation():
     n_clust = 3
     X_list = generate_data(n_clusters=n_clust)
 
-    model = RotationAdaptation(regularization='Empirical')
+    model = RotationAdaptation(regularization="Empirical")
     model.fit(X_list)
 
     X_transformed_list = [model.transform(X_list[i], i) for i in range(n_clust)]
     cov_list = [np.cov(X_transformed_list[i].T) for i in range(n_clust)]
 
     for i in range(n_clust):
-        assert la.norm(model.Sigma_0 - cov_list[i])/la.norm(cov_list[i]) < 0.01
+        assert (
+            la.norm(model.Sigma_0 - cov_list[i]) / la.norm(cov_list[i]) < 0.01
+        )
