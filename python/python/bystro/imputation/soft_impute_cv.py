@@ -83,8 +83,11 @@ def nan_with_probability(X, p, rng):
 
 class SoftImputeCV:
     """
-    Cross-validation for SoftImpute algorithm which automatically 
-    selects the regularization strength that leads to the best data reconstruction. This is achieved by creating a small hold-out set from the observed data and testing how well each candidate regularization strength can impute these "missing" values.
+    Cross-validation for SoftImpute algorithm which automatically selects 
+    the regularization strength that leads to the best data reconstruction. 
+    This is achieved by creating a small hold-out set from the observed 
+    data and testing how well each candidate regularization strength can 
+    impute these "missing" values.
 
     Parameters
     ----------
