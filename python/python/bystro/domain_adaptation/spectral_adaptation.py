@@ -25,7 +25,7 @@ import numpy as np
 import numpy.linalg as la
 import cvxpy as cp
 import time
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from bystro.covariance._covariance_np import (
     EmpiricalCovariance,
@@ -282,6 +282,11 @@ class RotationAdaptation:
         Sigma_list = []
         L_i_cholesky_list = []
 
+        model_cov: Union[
+            EmpiricalCovariance,
+            LinearShrinkageCovariance,
+            NonLinearShrinkageCovariance,
+        ]
         if self.regularization == "Empirical":
             model_cov = EmpiricalCovariance()
         elif self.regularization == "Linear":
@@ -298,6 +303,8 @@ class RotationAdaptation:
         for j in range(self.J):
             X_dm = X_list[j] - mu_list[j]
             model_cov.fit(X_dm)
+            if model_cov.covariance is None:
+                raise ValueError("Covariance matrix is None.")
             cov = model_cov.covariance + 0.001 * np.eye(X_dm.shape[1])
             L = la.cholesky(cov)
             Sigma_list.append(cov)
