@@ -34,6 +34,9 @@ def test_covariance_output():
         n_components=2, regularization_options={"method": "LinearShrinkage"}
     )
     pca_model.fit(X)
+    assert pca_model.W_ is not None, "Model weights are uninitialized."
+    assert pca_model.sigma2_ is not None, "Model variance is uninitialized."
+    assert pca_model.p is not None, "Model dimensionality is uninitialized."
 
     cov_matrix = pca_model.get_covariance()
     assert cov_matrix.shape == (
