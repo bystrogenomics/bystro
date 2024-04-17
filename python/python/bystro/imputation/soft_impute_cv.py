@@ -31,6 +31,7 @@ def nan_with_probability(X, p, rng):
         a boolean array where True indicates a value was set to
         NaN by this function.
     """
+    X = X.copy()
     # Create a mask of the same shape as X, initially all False
     mask = np.zeros(X.shape, dtype=bool)
     # Find indices of non-NaN values in X
