@@ -40,6 +40,7 @@ class PPCAadversarial(BaseGaussianFactorModel):
         Y_dm = Y - self.mean_y
         N, self.p = X.shape
         p = self.p
+        q = Y.shape[1]
 
         B_11 = X_dm.T @ X_dm
         B_12 = X_dm.T @ Y_dm
@@ -47,13 +48,11 @@ class PPCAadversarial(BaseGaussianFactorModel):
 
         XtX = X_dm.T @ X_dm + diag_reg
         B_22 = B_12.T @ la.solve(XtX, B_12)
-        B = np.concatenate(
-            (
-                np.concatenate((B_11, -self.mu * B_12), axis=1),
-                np.concatenate((B_12, -self.mu * B_22), axis=1),
-            ),
-            axis=0,
-        )
+        B = np.zeros((p + q, p + q))
+        B[:p, :p] = B_11
+        B[:p, p:] = B_12
+        B[p:, :p] = -self.mu * B_12.T
+        B[p:, p:] = -self.mu * B_22
         eigvals, eigvecs = la.eig(B)
         eigvals = np.real(eigvals)
         eigvecs = np.real(eigvecs)
