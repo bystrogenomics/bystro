@@ -98,6 +98,8 @@ def test_decision_function():
     )
     model.fit(data["phenotypes"], data["genotype"])
     diff = beta_p - beta_m
+    if model.parent_effect_ is None:
+        raise ValueError("parent_effect_ is not initialized.")
     v1 = np.mean(np.abs(model.parent_effect_ - diff))
     v2 = np.mean(np.abs(model.parent_effect_ + diff))
     mse = np.minimum(v1, v2)

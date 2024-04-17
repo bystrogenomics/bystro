@@ -13,6 +13,7 @@ from typing import Any
 
 import torch
 from torch import nn
+from torch.nn.modules.loss import _Loss
 from tqdm import trange
 from torch.distributions.multivariate_normal import MultivariateNormal
 
@@ -130,6 +131,7 @@ class POEGMM(BaseSGDModel):
 
         cov_t = torch.tensor(np.eye(self.n_phenotypes).astype(np.float32))
 
+        loss_fn: _Loss
         if self.loss_function == "l1":
             loss_fn = nn.L1Loss()
         elif self.loss_function == "l2":
@@ -148,7 +150,7 @@ class POEGMM(BaseSGDModel):
             lr=training_options["learning_rate"],
             momentum=training_options["momentum"],
         )
-        print(L[:5,:5])
+        print(L[:5, :5])
 
         weight = torch.tensor(0.5)
         Lt = torch.tensor(L.T)
@@ -172,10 +174,10 @@ class POEGMM(BaseSGDModel):
             loss1 = m1.log_prob(X_batch) + torch.log(weight)
             loss2 = m2.log_prob(X_batch) + torch.log(weight)
             LL = torch.stack((loss1, loss2))
-            l2 = torch.logsumexp(LL, axis=0)
+            l2 = torch.logsumexp(LL, dim=0)
             loss_recon = torch.mean(-1 * l2)
 
-            beta_trans = torch.matmul(beta_,Lt)
+            beta_trans = torch.matmul(beta_, Lt)
 
             loss_reg = loss_fn(beta_trans, torch.zeros_like(beta_))
 
@@ -214,6 +216,8 @@ class POEGMM(BaseSGDModel):
             The inner product of the transformation, returned
             if `return_inner` is True.
         """
+        if self.parent_effect_ is None:
+            raise ValueError("parent_effect_ has not been initialized.")
         X_dm = X - np.mean(X, axis=0)
         preds = np.dot(X_dm, self.parent_effect_)
         calls = 1.0 * (preds > 0)
@@ -311,6 +315,8 @@ class POEGMM(BaseSGDModel):
             The list of trainable variables, including the
             estimated parent effect.
         """
+        if self.Sigma_AA_ is None:
+            raise ValueError("Sigma_AA_ has not been initialized.")
         parent_effect_w = np.squeeze(trainable_variables[0].detach().numpy())
         L = la.cholesky(self.Sigma_AA_)
         self.parent_effect_ = np.dot(parent_effect_w, L.T) * 2
