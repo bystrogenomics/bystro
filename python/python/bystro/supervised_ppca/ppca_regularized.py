@@ -22,6 +22,8 @@ class PPCARegularized(BaseGaussianFactorModel):
 
     def __init__(self, n_components: int = 2, regularization_options=None):
         super().__init__(n_components=n_components)
+        if regularization_options is None:
+            regularization_options = {}
         self.regularization_options = self._fill_regularization_options(
             regularization_options
         )
@@ -152,3 +154,11 @@ class PPCARegularized(BaseGaussianFactorModel):
 
     def _save_variables(self):
         pass
+
+    def _fill_regularization_options(self, regularization_options):
+        default_options = {
+            "method": "LinearShrinkage",
+            "prior_options": {"iw_params": {"pnu": 2, "sigma": 3}},
+        }
+        rops = {**default_options, **regularization_options}
+        return rops

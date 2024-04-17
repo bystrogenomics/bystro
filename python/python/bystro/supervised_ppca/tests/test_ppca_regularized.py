@@ -13,7 +13,7 @@ def test_initialization():
 def test_fit():
     """Test the fitting process of the PPCARegularized model."""
     # Create a synthetic dataset
-    rng = np.random.defult_rng(2021)
+    rng = np.random.default_rng(2021)
     X = rng.normal(size=(100, 5))  # 100 samples and 5 features
 
     pca_model = PPCARegularized(
@@ -28,8 +28,8 @@ def test_fit():
 
 def test_covariance_output():
     """Test the output of the covariance matrix computation."""
-    rng = np.random.defult_rng(2021)
-    X = rng.normal(size=(100, 5)
+    rng = np.random.default_rng(2021)
+    X = rng.normal(size=(100, 5))
 
     pca_model = PPCARegularized(
         n_components=2,
@@ -51,12 +51,12 @@ def test_covariance_output():
 
 def test_noise_output():
     """Test the output of the noise matrix."""
-    rng = np.random.defult_rng(2021)
-    X = rng.normal(size=(100, 5)
+    rng = np.random.default_rng(2021)
+    X = rng.normal(size=(100, 5))
 
     pca_model = PPCARegularized(
         n_components=2,
-        regularization_options={"method": "Bayesian", "prior_options": {}},
+        regularization_options={"method": "Bayesian"},
     )
     pca_model.fit(X)
 
