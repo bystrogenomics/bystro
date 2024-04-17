@@ -17,8 +17,7 @@ def test_fit():
     X = rng.normal(size=(100, 5))  # 100 samples and 5 features
 
     pca_model = PPCARegularized(
-        n_components=2,
-        regularization_options={"method": "Bayesian", "prior_options": {}},
+        n_components=2, regularization_options={"method": "NonLinearShrinkage"}
     )
     pca_model.fit(X)
 
@@ -32,39 +31,17 @@ def test_covariance_output():
     X = rng.normal(size=(100, 5))
 
     pca_model = PPCARegularized(
-        n_components=2,
-        regularization_options={"method": "Bayesian", "prior_options": {}},
+        n_components=2, regularization_options={"method": "LinearShrinkage"}
     )
     pca_model.fit(X)
 
     cov_matrix = pca_model.get_covariance()
     assert cov_matrix.shape == (
-        2,
-        2,
-    ), "Covariance matrix should have dimensions (n_components, n_components)."
+        5,
+        5,
+    ), "Covariance matrix should have dimensions (p, p)."
     assert np.allclose(
         cov_matrix,
         np.dot(pca_model.W_.T, pca_model.W_)
         + pca_model.sigma2_ * np.eye(pca_model.p),
     ), "Covariance calculation error."
-
-
-def test_noise_output():
-    """Test the output of the noise matrix."""
-    rng = np.random.default_rng(2021)
-    X = rng.normal(size=(100, 5))
-
-    pca_model = PPCARegularized(
-        n_components=2,
-        regularization_options={"method": "Bayesian"},
-    )
-    pca_model.fit(X)
-
-    noise_matrix = pca_model.get_noise()
-    assert noise_matrix.shape == (
-        2,
-        2,
-    ), "Noise matrix should be (n_components, n_components)."
-    assert np.all(
-        noise_matrix == pca_model.sigma2_ * np.eye(pca_model.p)
-    ), "Noise matrix calculation error."

@@ -1,10 +1,10 @@
+from typing import Union
 import numpy as np
 from numpy.typing import NDArray
 import numpy.linalg as la
 
 from bystro.supervised_ppca._base import BaseGaussianFactorModel
 from bystro.covariance._covariance_np import (
-    BayesianCovariance,
     LinearShrinkageCovariance,
     NonLinearShrinkageCovariance,
 )
@@ -47,16 +47,15 @@ class PPCARegularized(BaseGaussianFactorModel):
         """
         N, self.p = X.shape
         L = self.n_components
-        regularization_options = self.regularization_options["method"]
+        regularization_options = self.regularization_options
 
+        model_cov : Union[LinearShrinkageCovariance, NonLinearShrinkageCovariance]
         if regularization_options["method"] == "LinearShrinkage":
             model_cov = LinearShrinkageCovariance()
         elif regularization_options["method"] == "NonLinearShrinkage":
             model_cov = NonLinearShrinkageCovariance()
         elif regularization_options["method"] == "Bayesian":
-            model_cov = BayesianCovariance(
-                regularization_options["prior_options"]
-            )
+            raise ValueError("Currently not supported")
         else:
             raise ValueError(
                 "Unrecognized regularization option %s"
@@ -65,16 +64,17 @@ class PPCARegularized(BaseGaussianFactorModel):
         model_cov.fit(X)
         cov = model_cov.covariance
 
-        eigenvalues, eigenvectors = la.eigh(cov)
+        if cov is not None:
+            eigenvalues, eigenvectors = la.eigh(cov)
+        else:
+            raise ValueError("Covariance matrix is none")
         sorted_idx = np.argsort(eigenvalues)[::-1]
         eigenvectors = eigenvectors[:, sorted_idx]
 
         sigma2 = np.mean(eigenvalues[L:])
-        W = (
-            eigenvectors[:, :L]
-            * np.sqrt(eigenvalues[:L] - sigma2)[:, np.newaxis]
-        )
-        W = W.T
+        W = eigenvectors[:, :L] * np.sqrt(
+            eigenvalues[:L] - sigma2
+        )  # [:, np.newaxis]
 
         self._store_instance_variables((W, sigma2))
 
