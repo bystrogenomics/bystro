@@ -1,3 +1,38 @@
+"""
+This module provides an implementation of the SoftImpute algorithm
+with automatic cross-validation to select the optimal regularization
+strength. The `SoftImputeCV` class handles the model fitting and
+transformation process, using internal cross-validation to determine
+the best regularization parameter from a set of possible values.
+
+The SoftImpute algorithm imputes missing entries in a matrix based
+on low-rank SVD by iteratively replacing missing values with estimates
+and updating the singular value decomposition of the matrix.
+
+Classes
+-------
+- SoftImputeCV : Automatically tunes the regularization strength of
+  SoftImpute using cross-validation.
+
+Methods
+-------
+- fit_transform : Fits the model to the data and transforms the input
+  matrix by imputing missing values.
+
+Mathematical Description:
+- Given a matrix X with missing entries, SoftImpute minimizes the
+  objective function ||X - XY||_F^2 + lambda * ||Y||_*, where ||.||_F
+  is the Frobenius norm, ||.||_* is the nuclear norm, and lambda is the
+  regularization parameter.
+
+References:
+- Mazumder, R., Hastie, T. & Tibshirani, R. (2010). Spectral
+  Regularization Algorithms for Learning Large Incomplete Matrices,
+  JMLR.
+- Hastie, T., Mazumder, R., Lee, J. D., & Zadeh, R. (2015). Matrix
+  Completion and Low-Rank SVD via Fast Alternating Least Squares,
+  JMLR.
+"""
 from typing import Any, Dict
 import numpy as np
 
@@ -47,6 +82,29 @@ def nan_with_probability(X, p, rng):
 
 
 class SoftImputeCV:
+    """
+    Cross-validation for SoftImpute algorithm which automatically 
+    selects the regularization strength that leads to the best data reconstruction. This is achieved by creating a small hold-out set from the observed data and testing how well each candidate regularization strength can impute these "missing" values.
+
+    Parameters
+    ----------
+    Cs : int, default=10
+        The number of regularization strengths to consider. Regularization 
+        strengths are logarithmically spaced between 10^-2 and 10^2.
+    seed : int, default=2021
+        Random seed for reproducibility.
+    k_fold : int, default=3
+        The number of folds in the cross-validation.
+    prob_holdout : float, default=0.05
+        The proportion of the observed data to hold out for validation.
+    training_options : dict, optional
+        Additional options to pass to the imputation model during training.
+
+    Attributes
+    ----------
+    training_options : dict
+        Stores training options after processing.
+    """
     def __init__(
         self,
         Cs=10,
@@ -64,6 +122,22 @@ class SoftImputeCV:
         self.training_options = self._fill_training_options(training_options)
 
     def fit_transform(self, X):
+        """
+        Fits the imputation model on the input data matrix X using 
+        cross-validated selection of the regularization strength and 
+        then transforms the data by imputing missing values.
+
+        Parameters
+        ----------
+        X : ndarray
+            The data matrix to be imputed, where NaNs represent 
+            missing values.
+
+        Returns
+        -------
+        X_imputed : ndarray
+            The imputed data matrix with no missing values.
+        """
         rng = np.random.default_rng(self.seed)
         regs = np.logspace(-2, 2, self.Cs)  # Regularization strengths
 
