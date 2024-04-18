@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 
@@ -50,12 +51,41 @@ func TestValidateArgsMissingRequired(t *testing.T) {
 	}
 }
 
-func TestArrowWriteRead(t *testing.T) {
-	filePath := "test.arrow"
+func createArrowFile(filePath string, fieldTypes []arrow.DataType, fieldNames []string, rows [][]any) error {
 	file, err := os.Create(filePath)
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
+
+	writer, err := bystroArrow.NewArrowIPCFileWriter(file, fieldNames, fieldTypes)
+	if err != nil {
+		return err
+	}
+
+	builder, err := bystroArrow.NewArrowRowBuilder(writer, len(rows))
+	if err != nil {
+		return err
+	}
+
+	for _, row := range rows {
+		if err := builder.WriteRow(row); err != nil {
+			return err
+		}
+	}
+
+	if err := builder.Release(); err != nil {
+		return err
+	}
+
+	if err := writer.Close(); err != nil {
+		return err
+	}
+
+	return err
+}
+
+func TestArrowWriteRead(t *testing.T) {
+	filePath := path.Join(t.TempDir(), "test.feather")
 
 	// Define the data types for the fields
 	fieldTypes := []arrow.DataType{arrow.BinaryTypes.String, arrow.PrimitiveTypes.Uint8, arrow.PrimitiveTypes.Uint8}
@@ -65,32 +95,13 @@ func TestArrowWriteRead(t *testing.T) {
 	rows[1] = []any{"chr2:1000:A:T", uint8(0), uint8(1)}
 	rows[2] = []any{"chr3:1000:A:T", uint8(10), uint8(12)}
 
-	writer, err := bystroArrow.NewArrowIPCFileWriter(file, fieldNames, fieldTypes)
+	err := createArrowFile(filePath, fieldTypes, fieldNames, rows)
 	if err != nil {
-		t.Fatal(err)
-	}
-
-	builder, err := bystroArrow.NewArrowRowBuilder(writer, 3)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for _, row := range rows {
-		if err := builder.WriteRow(row); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	if err := builder.Release(); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := writer.Close(); err != nil {
 		t.Fatal(err)
 	}
 
 	// Read the file
-	file, err = os.Open(filePath)
+	file, err := os.Open(filePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +118,7 @@ func TestArrowWriteRead(t *testing.T) {
 
 	lociFile.Close()
 
-	outFilePath := "output.feather" //filepath.Join(t.TempDir(), "output.feather")
+	outFilePath := path.Join(t.TempDir(), "output.feather")
 
 	// Call main
 	os.Args = []string{"cmd", "-in", filePath, "-out", outFilePath, "-loci", lociFilePath}
@@ -185,4 +196,57 @@ func TestArrowWriteRead(t *testing.T) {
 		t.Errorf("Expected 12, got %d", sample2)
 	}
 
+}
+
+// test 0 loci retained
+func TestArrowWriteRead0Loci(t *testing.T) {
+	filePath := path.Join(t.TempDir(), "test.feather")
+
+	// Define the data types for the fields
+	fieldTypes := []arrow.DataType{arrow.BinaryTypes.String, arrow.PrimitiveTypes.Uint8, arrow.PrimitiveTypes.Uint8}
+	fieldNames := []string{"Locus", "Sample1", "Sample2"}
+	rows := make([][]any, 3)
+	rows[0] = []any{"chr1:1000:A:T", uint8(0), uint8(1)}
+	rows[1] = []any{"chr2:1000:A:T", uint8(0), uint8(1)}
+	rows[2] = []any{"chr3:1000:A:T", uint8(10), uint8(12)}
+
+	err := createArrowFile(filePath, fieldTypes, fieldNames, rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// write loci file to temp dir
+	lociFilePath := filepath.Join(t.TempDir(), "loci.txt")
+	lociFile, err := os.Create(lociFilePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lociFile.Close()
+
+	outFilePath := filepath.Join(t.TempDir(), "output.feather")
+
+	os.Args = []string{"cmd", "-in", filePath, "-out", outFilePath, "-loci", lociFilePath}
+	main()
+
+	// assert that the outputFile exists
+	if _, err := os.Stat(outFilePath); os.IsNotExist(err) {
+		t.Errorf("Expected output file to exist, got %v", err)
+	}
+
+	// Read outFilePath and ensure it is missing chr2 locus entry
+	file, err := os.Open(outFilePath)
+	if err != nil {
+		t.Error(err)
+	}
+
+	reader, err := ipc.NewFileReader(file)
+	if err != nil {
+		t.Error(err)
+	}
+	defer reader.Close()
+
+	if reader.NumRecords() != 0 {
+		t.Error("Expected 0 records, got ", reader.NumRecords())
+	}
 }
