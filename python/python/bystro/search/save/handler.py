@@ -94,7 +94,9 @@ class AsyncQueryProcessor:
             return None
 
         if self.last_reported_count > self.REPORT_INCREMENT:
-            self.reporter.message.remote(f"Fetched {self.last_reported_count} variants.")  # type: ignore
+            self.reporter.increment_and_write_progress_message.remote(  # type: ignore
+                self.last_reported_count, "Fetched", "variants"
+            )
             self.last_reported_count = 0
 
         self.last_reported_count += len(results)
@@ -103,7 +105,10 @@ class AsyncQueryProcessor:
 
     def close(self):
         if self.last_reported_count > 0:
-            self.reporter.message.remote(f"Fetched {self.last_reported_count} variants.")  # type: ignore
+            self.reporter.increment_and_write_progress_message.remote(  # type: ignore
+                self.last_reported_count, "Fetched", "variants"
+            )
+            self.last_reported_count = 0
 
 
 def _get_num_slices(client, index_name, max_query_size, max_slices, query):
@@ -314,8 +319,8 @@ def filter_annotation(
                         reporter.message.remote(  # type: ignore
                             f"Annotation: Filtered {current_target_index} of {n_hits} variants."
                         )
-                        reporter.message.remote( # type: ignore
-                            f"{filtered_loci} variants survived filtering."
+                        reporter.message.remote(  # type: ignore
+                            f"Annotation: {len(filtered_loci)} variants survived filtering."
                         )
                         break
 
@@ -335,6 +340,7 @@ def filter_dosage_matrix(
     parent_dosage_matrix_path: str,
     filtered_loci: list[str],
     job_data: SaveJobData,
+    reporter: ProgressReporter,
     queue_config_path: str,
     reporting_interval: int,
     output_dir: str,
@@ -344,9 +350,12 @@ def filter_dosage_matrix(
         os.path.exists(parent_dosage_matrix_path) and os.stat(parent_dosage_matrix_path).st_size > 0
     ):
         logger.info("No dosage matrix to filter")
+        reporter.message.remote("No dosage matrix to filter.")  # type: ignore
         # Touch the output file to avoid errors downstream
         pathlib.Path(dosage_out_path).touch()
         return
+
+    reporter.message.remote("Filtering dosage matrix file.")  # type: ignore
 
     filtered_loci = _correct_loci_case(filtered_loci)
 
@@ -391,7 +400,7 @@ def filter_annotation_and_dosage_matrix(
 
     annotation_path = os.path.join(output_dir, outputs.annotation)
 
-    reporter.message.remote("Beginning filtering of dosage and annotation files")  # type: ignore
+    reporter.message.remote("Filtering annotation file.")  # type: ignore
 
     reporting_interval = math.ceil(n_hits * REPORTING_INTERVAL)
     if reporting_interval < MINIMUM_RECORDS_TO_ENABLE_REPORTING:
@@ -415,13 +424,14 @@ def filter_annotation_and_dosage_matrix(
         parent_dosage_matrix_path=parent_dosage_matrix_path,
         filtered_loci=filtered_loci,
         job_data=job_data,
+        reporter=reporter,
         queue_config_path=queue_config_path,
         reporting_interval=reporting_interval,
         output_dir=output_dir,
         basename=basename,
     )
 
-    reporter.increment.remote(len(filtered_loci))  # type: ignore
+    reporter.increment.remote(len(filtered_loci), True)  # type: ignore
 
     return outputs
 
@@ -492,6 +502,11 @@ async def go(  # pylint:disable=invalid-name
     logger.info("Querying took %s seconds", timer.elapsed_time)
 
     doc_ids_sorted, n_hits = sort_loci_and_doc_ids(results)
+
+    reporter.increment_and_write_progress_message.remote(  # type: ignore
+        0, "Fetched", "variants", force=True
+    )
+    reporter.clear_progress.remote()  # type: ignore
 
     outputs = filter_annotation_and_dosage_matrix(
         job_data=job_data,

@@ -157,7 +157,7 @@ def test_filter_annotation_excludes_correct_loci(mock_dependencies, mocker):
     filter_fn.assert_called()  # Ensure the filter function was called
 
 
-def test_filter_annotation_excludes_correct_loci2(mock_dependencies, _mocker):
+def test_filter_annotation_excludes_correct_loci2(mock_dependencies):
     stats, job_data, reporter = mock_dependencies
     doc_ids_sorted = [(0, "locus1"), (1, "locus3")]  # Indices of rows to include if not filtered
     n_hits = 2
@@ -174,14 +174,14 @@ def test_filter_annotation_excludes_correct_loci2(mock_dependencies, _mocker):
     assert filtered_loci == ["locus1"]  # we filtered out the 2nd locus
 
 
-def test_filter_annotation_excludes_correct_loci3(mock_dependencies, _mocker):
+def test_filter_annotation_excludes_correct_loci3(mock_dependencies):
     stats, job_data, reporter = mock_dependencies
     doc_ids_sorted = [(0, "locus1"), (1, "locus3")]  # Indices of rows to include if not filtered
     n_hits = 2
 
     def filter_fn(_row: list[bytes]) -> bool:
         """Filter out all rows."""
-        return False
+        return True
 
     job_data.pipeline[0].make_filter.return_value = filter_fn
     filtered_loci = filter_annotation(
@@ -213,19 +213,22 @@ def common_args(mock_job_data):
 
 
 @patch("bystro.search.save.handler.logger")
-def test_no_dosage_matrix(mock_logger, common_args):
+def test_no_dosage_matrix(mock_logger, common_args, mock_dependencies):
+    _, _, reporter = mock_dependencies
+
     with patch("pathlib.Path.touch") as mock_touch:
-        filter_dosage_matrix(**common_args)
+        filter_dosage_matrix(**common_args, reporter=reporter)
         mock_touch.assert_called_once_with()  # Ensure touch is called to create the file
         mock_logger.info.assert_called_with("No dosage matrix to filter")
 
 
 @patch("bystro.search.save.handler.logger")
 @patch("os.stat")
-def test_empty_dosage_matrix(mock_stat, mock_logger, common_args):
+def test_empty_dosage_matrix(mock_stat, mock_logger, common_args, mock_dependencies):
+    _, _, reporter = mock_dependencies
     mock_stat.return_value.st_size = 0
     with patch("pathlib.Path.touch") as mock_touch:
-        filter_dosage_matrix(**common_args)
+        filter_dosage_matrix(**common_args, reporter=reporter)
         mock_touch.assert_called_once_with()
         mock_logger.info.assert_called_with("No dosage matrix to filter")
 
@@ -233,7 +236,8 @@ def test_empty_dosage_matrix(mock_stat, mock_logger, common_args):
 @patch("bystro.search.save.handler.logger")
 @patch("os.stat")
 @patch("builtins.open", new_callable=MagicMock)
-def test_normal_operation(mock_open, mock_stat, mock_logger, common_args):
+def test_normal_operation(mock_open, mock_stat, mock_logger, common_args, mock_dependencies):
+    _, _, reporter = mock_dependencies
     mock_stat.return_value.st_size = 1024  # Non-zero size
     with (
         patch("pathlib.Path.touch") as mock_touch,
@@ -241,7 +245,7 @@ def test_normal_operation(mock_open, mock_stat, mock_logger, common_args):
         patch("bystro.search.save.handler.Timer") as mock_timer,
     ):
         mock_timer.return_value.__enter__.return_value.elapsed_time = 5
-        filter_dosage_matrix(**common_args)
+        filter_dosage_matrix(**common_args, reporter=reporter)
         mock_run.assert_called_once()  # Check if the filtering function was indeed called
         mock_touch.assert_not_called()  # Should not touch since matrix exists
         assert mock_open.called
@@ -250,7 +254,9 @@ def test_normal_operation(mock_open, mock_stat, mock_logger, common_args):
 
 @patch("os.stat")
 @patch("builtins.open", new_callable=MagicMock)
-def test_no_loci_provided(mock_open, mock_stat, common_args):
+def test_no_loci_provided(mock_open, mock_stat, common_args, mock_dependencies, mocker):
+    _, _, reporter = mock_dependencies
+
     # Setting the mock to return a non-zero file size
     mock_stat.return_value.st_size = 1024
 
@@ -260,7 +266,7 @@ def test_no_loci_provided(mock_open, mock_stat, common_args):
     ):
         handle = mocked_file.return_value.__enter__.return_value
 
-        filter_dosage_matrix(**common_args)
+        filter_dosage_matrix(**common_args, reporter=reporter)
         mocked_file.assert_called_once_with(
             os.path.join(common_args["output_dir"], "mock_basename_loci.txt"), "w"
         )
