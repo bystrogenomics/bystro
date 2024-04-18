@@ -230,7 +230,9 @@ class BeanstalkdProgressReporter(ProgressReporter):
     def increment_and_write_progress_message(
         self, count: int, msg_prefix: str, msg_suffix: str = "", force: bool = False
     ):
-        """Increment the counter by processed variant count and report to the beanstalk queue as a string message"""
+        """Increment the counter by processed variant count
+           and report to the beanstalk queue as a string message
+        """
         self._message.data.progress += count
 
         if force or self._message.data.progress % self._update_interval == 0:
@@ -266,7 +268,7 @@ class DebugProgressReporter(ProgressReporter):
         print(f"Processed {self._value} records")
 
     def increment_and_write_progress_message(
-        self, count: int, msg_prefix: str, msg_suffix: str = "", force: bool = False
+        self, count: int, msg_prefix: str, msg_suffix: str = "", _force: bool = False
     ):
         self._value += count
         print(f"{msg_prefix} {self._value} {msg_suffix}")

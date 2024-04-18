@@ -254,7 +254,7 @@ def test_normal_operation(mock_open, mock_stat, mock_logger, common_args, mock_d
 
 @patch("os.stat")
 @patch("builtins.open", new_callable=MagicMock)
-def test_no_loci_provided(mock_open, mock_stat, common_args, mock_dependencies, mocker):
+def test_no_loci_provided(mock_open, mock_stat, common_args, mock_dependencies):
     _, _, reporter = mock_dependencies
 
     # Setting the mock to return a non-zero file size

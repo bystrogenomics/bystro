@@ -9,7 +9,6 @@ import logging
 import math
 import os
 from typing import Callable
-from numpy.random import f
 import pathlib
 import subprocess
 
@@ -304,7 +303,7 @@ def filter_annotation(
                     if not filtered:
                         if current_target_index > 0 and current_target_index % reporting_interval == 0:
                             reporter.message.remote(  # type: ignore
-                                ("Annotation: Filtered " f"{current_target_index} of {n_hits} variants.")
+                                f"Annotation: Filtered {current_target_index} of {n_hits} variants."
                             )
 
                         p.stdin.write(line)
