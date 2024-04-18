@@ -1,18 +1,3 @@
-"""
-This implements two objects, the empirical covariance estimator used as a 
-baseline comparison method. It also implements BayesianCovariance, which
-implements MAP estimation using several common priors.
-
-Objects
--------
-EmpiricalCovariance(BaseCovariance)
-    This object just fits the covariance matrix as the standard sample
-    covariance matrix
-
-BayesianCovariance(BaseCovariance):
-    This object fits the covariance matrix as the MAP estimator using
-    user-defined priors.
-"""
 from typing import Any
 import numpy as np
 from numpy.typing import NDArray
@@ -23,7 +8,7 @@ class EmpiricalCovariance(BaseCovariance):
     def __init__(self):
         """
         This object just fits the covariance matrix as the standard sample
-        covariance matrix
+        covariance matrix. Does not handle missing values
         """
         super().__init__()
 
@@ -40,7 +25,14 @@ class EmpiricalCovariance(BaseCovariance):
         -------
         self : EmpiricalCovariance
             The model
+
+        Raises
+        ------
+        ValueError:
+            A value error will be raised if missing data is found in X ( 
+            np.isnan(X) evaluates to true ), or if X is not an NDArray
         """
+        self._test_inputs(X)
         self.N, self.p = X.shape
         XTX = np.dot(X.T, X)
         self.covariance = XTX / self.N
@@ -52,7 +44,7 @@ class BayesianCovariance(BaseCovariance):
     def __init__(self, prior_options=None):
         """
         This object fits the covariance matrix as the MAP estimator using
-        user-defined priors.
+        user-defined priors. Does not handle missing values
         """
         super().__init__()
         if prior_options is None:
@@ -73,7 +65,14 @@ class BayesianCovariance(BaseCovariance):
         -------
         self : BayesianCovariance
             The model
+
+        Raises
+        ------
+        ValueError:
+            A value error will be raised if missing data is found in X ( 
+            np.isnan(X) evaluates to true ), or if X is not an NDArray
         """
+        self._test_inputs(X)
         self.N, self.p = X.shape
 
         p_opts = self.prior_options
@@ -87,7 +86,9 @@ class BayesianCovariance(BaseCovariance):
 
         return self
 
-    def _fill_prior_options(self, prior_options: dict[str, Any]) -> dict[str, Any]:
+    def _fill_prior_options(
+        self, prior_options: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         This sets the prior options for our inference scheme
 
@@ -106,3 +107,154 @@ class BayesianCovariance(BaseCovariance):
             "iw_params": {"pnu": 2, "sigma": 1.0},
         }
         return {**default_options, **prior_options}
+
+
+class LinearShrinkageCovariance(BaseCovariance):
+    def fit(self, X: NDArray[np.float_]) -> "LinearShrinkageCovariance":
+        """
+        This fits a covariance matrix using the linear shrinkage approach
+        to combine the empirical covariance matrix with a structured
+        estimator.
+
+        Parameters
+        ----------
+        X : np.array-like, (n_samples, n_covariates)
+            The centered data
+
+        Returns
+        -------
+        self : LinearShrinkageCovariance
+            The model, with updated covariance attribute
+
+        Raises
+        ------
+        ValueError:
+            A value error will be raised if missing data is found in X ( 
+            np.isnan(X) evaluates to true ), or if X is not an NDArray
+        """
+
+        self._test_inputs(X)
+        self.N, self.p = X.shape
+
+        S = np.cov(X.T)
+
+        # Compute shrinkage intensity
+        evalues = np.linalg.eigvalsh(S)
+        lambd = np.mean(evalues)
+
+        temp = [
+            np.linalg.norm(np.outer(X[i], X[i]) - S, "fro") ** 2
+            for i in range(self.N)
+        ]
+
+        b_bar_sq = np.sum(temp) / self.N**2
+        d_sq = np.linalg.norm(S - lambd * np.eye(self.p), "fro") ** 2
+        b_sq = np.minimum(b_bar_sq, d_sq)
+        rho_hat = b_sq / d_sq
+
+        # Shrink covariance matrix
+        lambda_bar = np.trace(S) / self.p
+        self.covariance = (
+            rho_hat * lambda_bar * np.eye(self.p) + (1 - rho_hat) * S
+        )
+
+        return self
+
+
+class NonLinearShrinkageCovariance(BaseCovariance):
+    """
+    This method adjusts each eigenvalue of the sample covariance matrix
+    individually according to a nonlinear shrinkage formula, based on the
+    Hilbert transform. This approach contrasts with linear shrinkage methods
+    that apply a uniform adjustment across all eigenvalues. The nonlinear
+    technique allows for a more nuanced adjustment that is particularly
+    beneficial in scenarios with clusters of eigenvalues, optimizing the
+    shrinkage based on local eigenvalue densities. The method assumes a
+    sample matrix composed of i.i.d. random variables with mean zero and
+    finite 16th moment, and is suitable for large-dimensional data sets where
+    the ratio of variables p to n is significant.
+
+    The theoretical basis of this approach is built around the optimal
+    estimation of p parameters, which balances between overfitting p^2
+    parameters and underfitting with only 1 parameter. The nonlinear shrinkage
+    is calculated using an oracle estimator that depends on a sample spectral density
+    function approximated via kernel estimation using the Epanechnikov kernel.
+    This estimation facilitates the derivation of shrinkage intensities for each
+    eigenvalue, tailoring the adjustment to improve estimations under various
+    data conditions. 
+    """
+
+    def fit(self, X: NDArray[np.float_]) -> "NonLinearShrinkageCovariance":
+        """
+        This fits a covariance matrix using the nonlinear shrinkage approach, which
+        adjusts the empirical eigenvalues based on asymptotic results.
+
+        Parameters
+        ----------
+        X : np.array-like, (n_samples, n_covariates)
+            The centered data
+
+        Returns
+        -------
+        self : NonLinearShrinkageCovariance
+            The model, with updated covariance attribute
+
+        Raises
+        ------
+        ValueError:
+            A value error will be raised if missing data is found in X ( 
+            np.isnan(X) evaluates to true ), or if X is not an NDArray
+        """
+        self._test_inputs(X)
+        self.N, self.p = X.shape
+        N, p = X.shape
+        S = np.cov(X.T)
+        lambd, u = np.linalg.eigh(S)
+
+        lambd = lambd[np.maximum(0, p - N) :]
+        L = np.tile(lambd, (np.minimum(p, N), 1)).T
+        h = N ** (-1 / 3)
+
+        H = h * L.T
+        x = (L - L.T) / H
+        ftilde = 3 / 4 / np.sqrt(5)
+        ftilde *= np.mean(np.maximum(1 - x**2 / 5, 0) / H, axis=1)
+
+        Hftemp = (-3 / 10 / np.pi) * x + (3 / 4 / np.sqrt(5) / np.pi) * (
+            1 - x**2 / 5
+        ) * np.log(np.abs((np.sqrt(5) - x) / (np.sqrt(5) + x)))
+
+        Hftemp[np.abs(x) == np.sqrt(5)] = (-3 / 10 / np.pi) * x[
+            np.abs(x) == np.sqrt(5)
+        ]
+
+        Hftilde = np.mean(Hftemp / H, axis=1)
+
+        if p <= N:
+            dtilde = lambd / (
+                (np.pi * (p / N) * lambd * ftilde) ** 2
+                + (1 - (p / N) - np.pi * (p / N) * lambd * Hftilde) ** 2
+            )
+        else:
+            Hftilde0 = (
+                (1 / np.pi)
+                * (
+                    3 / 10 / h**2
+                    + 3
+                    / 4
+                    / np.sqrt(5)
+                    / h
+                    * (1 - 1 / 5 / h**2)
+                    * np.log((1 + np.sqrt(5) * h) / (1 - np.sqrt(5) * h))
+                )
+                * np.mean(1 / lambd)
+            )
+            dtilde0 = 1 / (np.pi * (p - N) / N * Hftilde0)
+            dtilde1 = lambd / (
+                np.pi**2 * lambd**2 * (ftilde**2 + Hftilde**2)
+            )
+            dtilde = np.concatenate([dtilde0 * np.ones((p - N)), dtilde1])
+
+        self.covariance = np.dot(np.dot(u, np.diag(dtilde)), u.T)
+
+        return self

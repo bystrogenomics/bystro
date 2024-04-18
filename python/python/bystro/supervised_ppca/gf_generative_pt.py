@@ -48,7 +48,7 @@ from torch.distributions.gamma import Gamma
 
 from bystro.supervised_ppca._misc_np import softplus_inverse_np
 from bystro.supervised_ppca._base import BasePCASGDModel
-from bystro.supervised_ppca._misc_pt import mvn_log_prob_sw
+from bystro.supervised_ppca._sherman_woodbury_pt import mvn_log_prob_sw
 
 
 class PPCA(BasePCASGDModel):
