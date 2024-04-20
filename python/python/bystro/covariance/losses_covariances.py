@@ -28,7 +28,7 @@ References:
 
 import numpy as np
 import numpy.linalg as la
-from scipy.linalg import logm, trace
+from scipy.linalg import logm
 
 
 def schatten_norm(X: np.ndarray, p: float) -> float:
@@ -84,7 +84,7 @@ def bregman_schatten_p_divergence(
     norm_A_p = schatten_norm(A, p)
     U, Sigma, Vt = la.svd(B, full_matrices=False)
     B_norm_p_minus_1 = np.dot(U, np.diag(np.power(Sigma, p - 1))) @ Vt
-    trace_term = trace(B_norm_p_minus_1.T @ (A - B))
+    trace_term = np.trace(B_norm_p_minus_1.T @ (A - B))
     return norm_A_p**p - norm_B_p**p - p * trace_term
 
 
@@ -140,7 +140,7 @@ def kl_divergence_gaussian(
         The KL divergence from Gaussian N(mu0, Sigma0) to N(mu1, Sigma1).
     """
     k = mu0.shape[0]
-    Sigma1_inv = np.linalg.inv(Sigma1)
+    Sigma1_inv = la.inv(Sigma1)
     trace_term = np.trace(Sigma1_inv @ Sigma0)
     mean_diff = mu1 - mu0
     quadratic_term = mean_diff.T @ Sigma1_inv @ mean_diff
@@ -201,7 +201,7 @@ def mahalanobis_divergence(A: np.ndarray, B: np.ndarray) -> float:
     float
         The Mahalanobis divergence between A and B.
     """
-    return trace(np.dot(A, A) - 2 * np.dot(A, B) + np.dot(B, B))
+    return np.trace(np.dot(A, A) - 2 * np.dot(A, B) + np.dot(B, B))
 
 
 def stein_loss(S: np.ndarray, Sigma: np.ndarray) -> float:
@@ -230,8 +230,8 @@ def stein_loss(S: np.ndarray, Sigma: np.ndarray) -> float:
         raise ValueError("Sigma must be invertible.")
     Sigma_inv = la.inv(Sigma)
     SSigma_inv = np.dot(S, Sigma_inv)
-    trace_part = trace(SSigma_inv)
-    log_det_part = logm(SSigma_inv)
+    trace_part = np.trace(SSigma_inv)
+    _, log_det_part = la.slogdet(SSigma_inv)
     n = S.shape[0]
     return trace_part - log_det_part - n
 
@@ -264,9 +264,9 @@ def von_neumann_relative_entropy(Sigma: np.ndarray, S: np.ndarray) -> float:
     log_S = logm(S)
     Sigma_log_Sigma = np.dot(Sigma, log_Sigma)
     Sigma_log_S = np.dot(Sigma, log_S)
-    trace_Sigma_log_Sigma = trace(Sigma_log_Sigma)
-    trace_Sigma_log_S = trace(Sigma_log_S)
-    return trace_Sigma_log_Sigma - trace_Sigma_log_S - trace(Sigma - S)
+    trace_Sigma_log_Sigma = np.trace(Sigma_log_Sigma)
+    trace_Sigma_log_S = np.trace(Sigma_log_S)
+    return trace_Sigma_log_Sigma - trace_Sigma_log_S - np.trace(Sigma - S)
 
 
 def logdet_divergence(A: np.ndarray, B: np.ndarray) -> float:
