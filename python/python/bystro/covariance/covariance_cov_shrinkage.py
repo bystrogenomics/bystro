@@ -88,13 +88,11 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
+from typing import Optional
 import numpy as np
 from numpy.typing import NDArray
 from bystro.covariance._base_covariance import BaseCovariance
 import math
-
-from numpy.typing import NDArray
-from bystro.covariance._base_covariance import BaseCovariance
 
 
 class GeometricInverseShrinkage(BaseCovariance):
@@ -172,7 +170,7 @@ class QuadraticInverseShrinkage(BaseCovariance):
         return self
 
 
-def gis(Y: NDArray[np.float64], k: int = None) -> NDArray[np.float64]:
+def gis(Y: NDArray[np.float64], k: Optional[int] = None) -> NDArray[np.float64]:
     """
     Compute the Geometric Inverse Shrinkage covariance matrix.
 
@@ -189,6 +187,10 @@ def gis(Y: NDArray[np.float64], k: int = None) -> NDArray[np.float64]:
         The shrunk covariance matrix.
     """
     N, p = Y.shape
+    if N <= p:
+        raise ValueError(
+            "p must be <= n for the Symmetrized Kullback-Leibler divergence"
+        )
 
     if k is None or math.isnan(k):
         Y = Y - Y.mean(axis=0)
@@ -219,16 +221,12 @@ def gis(Y: NDArray[np.float64], k: int = None) -> NDArray[np.float64]:
     Htheta = np.mean(Lj * Lj * h / den, axis=0)
     Atheta2 = theta**2 + Htheta**2
 
-    if p <= n:
-        deltahat_1 = (1 - c) * invlambda + 2 * c * invlambda * theta
-        delta = 1 / (
-            (1 - c) ** 2 * invlambda
-            + 2 * c * (1 - c) * invlambda * theta
-            + c**2 * invlambda * Atheta2
-        )
-    else:
-        print("p must be <= n for the Symmetrized Kullback-Leibler divergence")
-        return -1
+    deltahat_1 = (1 - c) * invlambda + 2 * c * invlambda * theta
+    delta = 1 / (
+        (1 - c) ** 2 * invlambda
+        + 2 * c * (1 - c) * invlambda * theta
+        + c**2 * invlambda * Atheta2
+    )
 
     deltaLIS_1 = np.maximum(deltahat_1, np.min(invlambda))
 
@@ -238,7 +236,7 @@ def gis(Y: NDArray[np.float64], k: int = None) -> NDArray[np.float64]:
     return sigmahat
 
 
-def lis(Y: NDArray[np.float64], k: int = None) -> NDArray[np.float64]:
+def lis(Y: NDArray[np.float64], k: Optional[int] = None) -> NDArray[np.float64]:
     """
     Compute the Linear Inverse Shrinkage covariance matrix.
 
@@ -255,6 +253,8 @@ def lis(Y: NDArray[np.float64], k: int = None) -> NDArray[np.float64]:
         The shrunk covariance matrix.
     """
     N, p = Y.shape
+    if N <= p:
+        raise ValueError("p must be <= n for Stein's loss")
 
     if k is None or math.isnan(k):
         Y = Y - np.mean(Y, axis=0)  # demean
@@ -282,11 +282,7 @@ def lis(Y: NDArray[np.float64], k: int = None) -> NDArray[np.float64]:
     denominator = Lj_i**2 + (Lj**2) * h**2
     theta = np.mean(numerator / denominator, axis=0)
 
-    if p <= n:
-        deltahat_1 = (1 - c) * invlambda + 2 * c * invlambda * theta
-    else:
-        print("p must be <= n for Stein's loss")
-        return -1
+    deltahat_1 = (1 - c) * invlambda + 2 * c * invlambda * theta
 
     # Ensure no eigenvalue shrinkage below minimum
     deltaLIS_1 = np.maximum(deltahat_1, np.min(invlambda))
@@ -298,7 +294,7 @@ def lis(Y: NDArray[np.float64], k: int = None) -> NDArray[np.float64]:
     return sigmahat
 
 
-def qis(Y: NDArray[np.float64], k: int = None) -> NDArray[np.float64]:
+def qis(Y: NDArray[np.float64], k: Optional[int] = None) -> NDArray[np.float64]:
     """
     Compute the Quadratic Inverse Shrinkage covariance matrix.
 
