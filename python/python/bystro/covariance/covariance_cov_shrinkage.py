@@ -96,6 +96,7 @@ import math
 from numpy.typing import NDArray
 from bystro.covariance._base_covariance import BaseCovariance
 
+
 class GeometricInverseShrinkage(BaseCovariance):
     def __init__(self) -> None:
         """
@@ -103,7 +104,7 @@ class GeometricInverseShrinkage(BaseCovariance):
         """
         super().__init__()
 
-    def fit(self, X: NDArray[np.float64]) -> 'GeometricInverseShrinkage':
+    def fit(self, X: NDArray[np.float64]) -> "GeometricInverseShrinkage":
         """
         Fit the Geometric Inverse Shrinkage model to the given data.
 
@@ -128,7 +129,7 @@ class LinearInverseShrinkage(BaseCovariance):
         """
         super().__init__()
 
-    def fit(self, X: NDArray[np.float64]) -> 'LinearInverseShrinkage':
+    def fit(self, X: NDArray[np.float64]) -> "LinearInverseShrinkage":
         """
         Fit the Linear Inverse Shrinkage model to the given data.
 
@@ -145,6 +146,7 @@ class LinearInverseShrinkage(BaseCovariance):
         self.covariance = lis(X)
         return self
 
+
 class QuadraticInverseShrinkage(BaseCovariance):
     def __init__(self) -> None:
         """
@@ -152,7 +154,7 @@ class QuadraticInverseShrinkage(BaseCovariance):
         """
         super().__init__()
 
-    def fit(self, X: NDArray[np.float64]) -> 'QuadraticInverseShrinkage':
+    def fit(self, X: NDArray[np.float64]) -> "QuadraticInverseShrinkage":
         """
         Fit the Quadratic Inverse Shrinkage model to the given data.
 
@@ -168,6 +170,7 @@ class QuadraticInverseShrinkage(BaseCovariance):
         """
         self.covariance = qis(X)
         return self
+
 
 def gis(Y: NDArray[np.float64], k: int = None) -> NDArray[np.float64]:
     """
@@ -294,6 +297,7 @@ def lis(Y: NDArray[np.float64], k: int = None) -> NDArray[np.float64]:
 
     return sigmahat
 
+
 def qis(Y: NDArray[np.float64], k: int = None) -> NDArray[np.float64]:
     """
     Compute the Quadratic Inverse Shrinkage covariance matrix.
@@ -356,4 +360,3 @@ def qis(Y: NDArray[np.float64], k: int = None) -> NDArray[np.float64]:
     sigmahat = np.dot(np.dot(u, temp2), u.T.conjugate())
 
     return sigmahat
-
