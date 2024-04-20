@@ -13,7 +13,7 @@ from bystro.covariance.covariance_cov_shrinkage import (
 )
 
 
-def gis_original(Y, k=None):
+def gis_original(Y, k=None): # type: ignore
     N, p = Y.shape
     if k is None or math.isnan(k):
         Y = Y.sub(Y.mean(axis=0), axis=1)
@@ -29,7 +29,7 @@ def gis_original(Y, k=None):
 
     dfu = pd.DataFrame(u, columns=lambda1)
     dfu = dfu.sort_index(axis=1)
-    lambda1 = dfu.columns
+    lambda1 = dfu.columns # type: ignore
     h = (min(c**2, 1 / c**2) ** 0.35) / p**0.35
     invlambda = 1 / lambda1[max(1, p - n + 1) - 1 : p]
 
@@ -72,7 +72,7 @@ def gis_original(Y, k=None):
     return sigmahat
 
 
-def lis_original(Y, k=None):
+def lis_original(Y, k=None): # type: ignore
     N, p = Y.shape
     if k is None or math.isnan(k):
         Y = Y.sub(Y.mean(axis=0), axis=1)
@@ -87,7 +87,7 @@ def lis_original(Y, k=None):
     lambda1 = lambda1.real.clip(min=0)
     dfu = pd.DataFrame(u, columns=lambda1)
     dfu = dfu.sort_index(axis=1)
-    lambda1 = dfu.columns
+    lambda1 = dfu.columns # type: ignore
     h = (min(c**2, 1 / c**2) ** 0.35) / p**0.35
     invlambda = 1 / lambda1[max(1, p - n + 1) - 1 : p]
 
@@ -118,7 +118,7 @@ def lis_original(Y, k=None):
     return sigmahat
 
 
-def qis_original(Y, k=None):
+def qis_original(Y, k=None): # type: ignore
     # Pre-Conditions: Y is a valid pd.dataframe and optional arg- k which can be
     #    None, np.nan or int
     # Post-Condition: Sigmahat dataframe is returned
@@ -149,7 +149,7 @@ def qis_original(Y, k=None):
     dfu = pd.DataFrame(u, columns=lambda1)  # create df with column names lambda
     #                                        and values u
     dfu.sort_index(axis=1)
-    lambda1 = dfu.columns  # recapture sorted lambda
+    lambda1 = dfu.columns  # type: ignore 
 
     # COMPUTE Quadratic-Inverse Shrinkage estimator of the covariance matrix
     h = (min(c**2, 1 / c**2) ** 0.35) / p**0.35  # smoothing parameter
@@ -183,7 +183,7 @@ def qis_original(Y, k=None):
         delta = delta.to_numpy()
     else:
         delta0 = 1 / (
-            (c - 1) * np.mean(invlambda.to_numpy())
+            (c - 1) * np.mean(invlambda.to_numpy()) # type: ignore
         )  # shrinkage of null
         #                                                 eigenvalues
         delta = np.repeat(delta0, p - n)
@@ -199,39 +199,39 @@ def qis_original(Y, k=None):
     return sigmahat
 
 
-def test_linear_inverse_shrinkage():
+def test_linear_inverse_shrinkage(): # type: ignore
     rng = np.random.default_rng(2021)
     L = 80
     X = rng.normal(size=(20000, L))
     lis_instance = LinearInverseShrinkage()
     lis_instance.fit(X)
-    val = la.norm(lis_instance.covariance - np.eye(L)) / la.norm(np.eye(L))
+    val = la.norm(lis_instance.covariance - np.eye(L)) / la.norm(np.eye(L)) # type: ignore
     assert val < 0.01
 
 
-def test_quadratic_inverse_shrinkage():
+def test_quadratic_inverse_shrinkage(): # type: ignore
     rng = np.random.default_rng(2021)
     L = 200
     X = rng.normal(size=(200000, L))
     qis_instance = QuadraticInverseShrinkage()
     qis_instance.fit(X)
-    assert (
-        la.norm(qis_instance.covariance - np.eye(L)) / la.norm(np.eye(L)) < 0.01
-    )
+    assert ( # type: ignore
+        la.norm(qis_instance.covariance - np.eye(L)) / la.norm(np.eye(L)) < 0.01 # type: ignore
+    ) # type: ignore
 
 
-def test_geometric_inverse_shrinkage():
+def test_geometric_inverse_shrinkage(): # type: ignore
     rng = np.random.default_rng(2021)
     L = 200
     X = rng.normal(size=(200000, L))
     gis_instance = GeometricInverseShrinkage()
     gis_instance.fit(X)
-    assert (
-        la.norm(gis_instance.covariance - np.eye(L)) / la.norm(np.eye(L)) < 0.01
-    )
+    assert ( # type: ignore
+        la.norm(gis_instance.covariance - np.eye(L)) / la.norm(np.eye(L)) < 0.01 # type: ignore
+    ) # type: ignore
 
 
-def test_lis_function():
+def test_lis_function(): # type: ignore
     rng = np.random.default_rng(2021)
     L = 200
     Y = rng.normal(size=(10000, L))
@@ -241,7 +241,7 @@ def test_lis_function():
     assert la.norm(result - result2.to_numpy()) < 0.01, "Same result"
 
 
-def test_qis_function():
+def test_qis_function(): # type: ignore
     rng = np.random.default_rng(2021)
     L = 40
     Y = rng.normal(size=(15000, L))
@@ -252,7 +252,7 @@ def test_qis_function():
     assert la.norm(result - result2.to_numpy()) < 0.01, "Same result"
 
 
-def test_gis_function():
+def test_gis_function(): # type: ignore
     rng = np.random.default_rng(2021)
     L = 50
     Y = rng.normal(size=(15000, L))
