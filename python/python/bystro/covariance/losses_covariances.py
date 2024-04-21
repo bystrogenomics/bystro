@@ -28,7 +28,7 @@ References:
 
 import numpy as np
 import numpy.linalg as la
-from scipy.linalg import logm
+from scipy.linalg import logm # type: ignore 
 
 
 def schatten_norm(X: np.ndarray, p: float) -> float:
