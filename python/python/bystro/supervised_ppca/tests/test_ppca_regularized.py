@@ -28,7 +28,7 @@ def test_fit():
 def test_covariance_output():
     """Test the output of the covariance matrix computation."""
     rng = np.random.default_rng(2021)
-    X = rng.normal(size=(100, 5))
+    X = rng.normal(size=(1000, 5))
 
     pca_model = PPCARegularized(
         n_components=2, regularization_options={"method": "LinearShrinkage"}
@@ -48,3 +48,17 @@ def test_covariance_output():
         np.dot(pca_model.W_.T, pca_model.W_)
         + pca_model.sigma2_ * np.eye(pca_model.p),
     ), "Covariance calculation error."
+
+
+def test_example():
+    rng = np.random.default_rng(2021)
+    X = rng.normal(size=(1000, 5))
+    pca_model = PPCARegularized(
+        n_components=2, regularization_options={"method": "NonLinearShrinkage"}
+    )
+    pca_model.fit(X)
+    if pca_model.W_ is not None:
+        assert pca_model.W_.shape == (2, 5), "Wrong shape"
+        assert np.sum(np.isnan(pca_model.W_)) == 0, "Eigenvalue error"
+    else:
+        raise ValueError("Model training did not properly save W")

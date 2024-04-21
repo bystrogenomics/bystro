@@ -12,12 +12,34 @@ from bystro.covariance._covariance_np import (
 
 class PPCARegularized(BaseGaussianFactorModel):
     """
-    Analytic PPCA solution as described by Bishop
+    This implements PPCA but with a regularized covariance matrix. PPCA
+    can be viewed as fitting a low rank model to the marginal covariance 
+    matrix on the data, with a noise term that is calculated based on the 
+    unexplained variance. This is traditionally done using the empirical
+    covariance matrix. However, this estimate of the covariance matrix
+    is known to perform poorly in practice. So as an alternative, we 
+    compute this low rank approximation on regularized covariance matrices
+    using a variety of strategies. 
 
     Parameters
     ----------
     n_components : int,default=2
         The latent dimensionality
+
+    regularization options : dict
+        The regularization options
+
+    Regularization options: The most important choice is regularization_
+    options['method']  which determines which strategy is used for 
+    shrinkage. Current are linear and NonLinear
+
+    Linear: Honey I shrunk the covariance matrix by Ledoit and wolfe
+
+    NonLinear: Analytical NonLinear Shrinkage of Large Dimensional 
+        Covariance Matrices by Ledoit and wolf
+        https://www.jstor.org/stable/27028732
+
+
     """
 
     def __init__(self, n_components: int = 2, regularization_options=None):
@@ -70,11 +92,13 @@ class PPCARegularized(BaseGaussianFactorModel):
             raise ValueError("Covariance matrix is none")
         sorted_idx = np.argsort(eigenvalues)[::-1]
         eigenvectors = eigenvectors[:, sorted_idx]
+        eigenvalues = eigenvalues[sorted_idx]
+
 
         sigma2 = np.mean(eigenvalues[L:])
         W = eigenvectors[:, :L] * np.sqrt(
             eigenvalues[:L] - sigma2
-        )  # [:, np.newaxis]
+        )
 
         self._store_instance_variables((W, sigma2))
 
