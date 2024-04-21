@@ -114,7 +114,7 @@ class LinearShrinkageCovariance(BaseCovariance):
         """
         This fits a covariance matrix using the linear shrinkage approach
         to combine the empirical covariance matrix with a structured
-        estimator.
+        estimator. This uses the 2004 paper from Ledoit and Wolf
 
         Parameters
         ----------
@@ -177,17 +177,20 @@ class NonLinearShrinkageCovariance(BaseCovariance):
     The theoretical basis of this approach is built around the optimal
     estimation of p parameters, which balances between overfitting p^2
     parameters and underfitting with only 1 parameter. The nonlinear shrinkage
-    is calculated using an oracle estimator that depends on a sample spectral density
+    is calculated using an oracle estimator that depends on a sample 
+    spectral density
     function approximated via kernel estimation using the Epanechnikov kernel.
     This estimation facilitates the derivation of shrinkage intensities for each
     eigenvalue, tailoring the adjustment to improve estimations under various
     data conditions. 
+
+    https://www.jstor.org/stable/27028732
     """
 
     def fit(self, X: NDArray[np.float_]) -> "NonLinearShrinkageCovariance":
         """
-        This fits a covariance matrix using the nonlinear shrinkage approach, which
-        adjusts the empirical eigenvalues based on asymptotic results.
+        This fits a covariance matrix using the nonlinear shrinkage approach, 
+        which adjusts the empirical eigenvalues based on asymptotic results.
 
         Parameters
         ----------
