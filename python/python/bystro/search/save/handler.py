@@ -237,7 +237,7 @@ def filter_annotation(
     reporting_interval: int,
 ):
 
-    reporter.message.remote( # type: ignore
+    reporter.message.remote(  # type: ignore
         (
             "Filtering annotation and re-generating stats. "
             f"Reporting progress every ~{reporting_interval} variants"
@@ -362,7 +362,7 @@ def filter_dosage_matrix(
         pathlib.Path(dosage_out_path).touch()
         return
 
-    reporter.message.remote( # type: ignore
+    reporter.message.remote(  # type: ignore
         f"Filtering dosage matrix file. Reporting progress every ~{reporting_interval} variants"
     )
 
@@ -451,13 +451,15 @@ async def go(  # pylint:disable=invalid-name
     client = OpenSearch(**search_client_args)
 
     query = _clean_query(job_data.query_body)
-    num_slices, num_docs = _get_num_slices(client, job_data.index_name, MAX_QUERY_SIZE, MAX_SLICES, query)
+    num_slices, num_docs = _get_num_slices(
+        client, job_data.index_name, MAX_QUERY_SIZE, MAX_SLICES, query
+    )
     pit_id = client.create_point_in_time(index=job_data.index_name, params={"keep_alive": KEEP_ALIVE})["pit_id"]  # type: ignore   # noqa: E501
 
     update_interval = max(MINIMUM_RECORDS_TO_ENABLE_REPORTING, math.ceil(num_docs * REPORTING_INTERVAL))
     reporter = get_progress_reporter(publisher, update_interval)
 
-    reporter.message.remote( # type: ignore
+    reporter.message.remote(  # type: ignore
         f"Fetching variants from search engine, Reporting progress every ~{update_interval} variants."
     )
 

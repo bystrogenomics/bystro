@@ -294,6 +294,8 @@ def get_progress_reporter(
     publisher: ProgressPublisher | None = None, update_interval: int = 100_000
 ) -> ProgressReporter:
     if publisher:
-        return BeanstalkdProgressReporter.remote(publisher, update_interval=update_interval)  # type: ignore
+        return BeanstalkdProgressReporter.remote(  # type: ignore
+            publisher, update_interval=update_interval
+        )
 
     return DebugProgressReporter.remote()  # type: ignore
