@@ -1,3 +1,17 @@
+"""
+This module reworks the augmented-pca package to implement Probabilistic 
+PCA (PPCA) instead of standard PCA. PPCA combines the benefits of a 
+generative model with the analytic solution typical of PCA. The 
+PPCAadversarial object developed herein allows for mitigating the 
+influence of confounding variables in the latent representation.
+
+The implementation facilitates more effective dimensionality reduction in 
+the presence of confounders by penalizing their representation in the 
+latent variables. Two key parameters, 'mu' and 'eps', control the strength 
+of the adversarial component and the conditioning of inverses, 
+respectively, enhancing the robustness and stability of the model.
+"""
+
 import numpy as np
 import numpy.linalg as la
 
@@ -6,6 +20,39 @@ from numpy.typing import NDArray
 
 
 class PPCAadversarial(BaseGaussianFactorModel):
+    """
+    Probabilistic PCA that mitigates the influence of confounding
+    variables in the latent representation.
+
+    This class extends the traditional PCA model by incorporating an
+    adversarial mechanism that penalizes the representation of confounding
+    variables. This approach not only reduces dimensionality but also
+    ensures that the resulting components are more representative of the
+    true underlying signals rather than artifacts introduced by confounders.
+
+    Parameters
+    ----------
+    mu : float
+        The adversarial strength which controls the penalty for
+        representing the confounding variables in the latent representation.
+    eps : float
+        A small constant added to improve the conditioning of
+        matrix inverses during computation.
+
+    Attributes
+    ----------
+    components_ : array, shape (n_components, n_features)
+        Principal axes in feature space, representing the directions of
+        maximum variance in the data.
+
+    explained_variance_ : array, shape (n_components,)
+        The amount of variance explained by each of the selected components.
+    Notes
+    -----
+    This implementation is based on modifications to the
+    'augmented-pca' package by Carson, Talbot and Carlson
+    """
+
     def __init__(self, n_components: int = 2, mu=1.0, eps=1e-8):
         super().__init__(n_components=n_components)
         self.mu: float = mu
