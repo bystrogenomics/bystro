@@ -214,37 +214,42 @@ class ProgressReporter(abc.ABC):
 class BeanstalkdProgressReporter(ProgressReporter):
     """A Ray class to report progress to a beanstalk queue"""
 
-    def __init__(self, publisher: ProgressPublisher, update_interval: int = 40_000):
+    def __init__(self, publisher: ProgressPublisher, update_interval: int = 100_000):
         self._message = publisher.message
         self._client = BeanstalkClient(publisher.host, publisher.port, socket_timeout=10)
         self._client.use(publisher.queue)
         self._update_interval = update_interval
 
+        self._last_updated = 0
+
     def increment(self, count: int, force: bool = False):
         """Increment the counter by processed variant count and report to the beanstalk queue"""
         self._message.data.progress += count
 
-        if force or self._message.data.progress % self._update_interval == 0:
+        if force or self._message.data.progress - self._last_updated >= self._update_interval:
             self._client.put_job(json.encode(self._message))
+            self._last_updated = self._message.data.progress
 
     def increment_and_write_progress_message(
         self, count: int, msg_prefix: str, msg_suffix: str = "", force: bool = False
     ):
         """Increment the counter by processed variant count
-           and report to the beanstalk queue as a string message
+        and report to the beanstalk queue as a string message
         """
         self._message.data.progress += count
 
-        if force or self._message.data.progress % self._update_interval == 0:
+        if force or self._message.data.progress - self._last_updated >= self._update_interval:
             message = f"{msg_prefix} {self._message.data.progress} {msg_suffix}"
             progress_message = ProgressStringMessage(
                 submission_id=self._message.submission_id, data=message
             )
             self._client.put_job(json.encode(progress_message))
+            self._last_updated = self._message.data.progress
 
     def clear_progress(self):
         """Clear the progress counter"""
         self._message.data.progress = 0
+        self._last_updated = 0
 
     def message(self, msg: str):
         """Send a message to the beanstalk queue"""
@@ -285,8 +290,10 @@ class DebugProgressReporter(ProgressReporter):
         return self._value
 
 
-def get_progress_reporter(publisher: ProgressPublisher | None = None) -> ProgressReporter:
+def get_progress_reporter(
+    publisher: ProgressPublisher | None = None, update_interval: int = 100_000
+) -> ProgressReporter:
     if publisher:
-        return BeanstalkdProgressReporter.remote(publisher)  # type: ignore
+        return BeanstalkdProgressReporter.remote(publisher, update_interval=update_interval)  # type: ignore
 
     return DebugProgressReporter.remote()  # type: ignore

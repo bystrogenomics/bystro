@@ -36,8 +36,8 @@ SAVE_FILTER_BATCH_READ_SIZE = int(os.getenv("SAVE_FILTER_BATCH_READ_SIZE", 200_0
 # How many scroll requests for each worker to handle
 PARALLEL_SCROLL_CHUNK_INCREMENT = 2
 # Percentage of fetched records to report progress after
-REPORTING_INTERVAL = 0.1
-MINIMUM_RECORDS_TO_ENABLE_REPORTING = 10_000
+REPORTING_INTERVAL = 0.05
+MINIMUM_RECORDS_TO_ENABLE_REPORTING = 100_000
 # These are the fields that are required to define a locus
 # They are used to filter the dosage matrix
 FIELDS_TO_QUERY = ["chrom", "pos", "inputRef", "alt"]
@@ -110,7 +110,7 @@ class AsyncQueryProcessor:
             self.last_reported_count = 0
 
 
-def _get_num_slices(client, index_name, max_query_size, max_slices, query):
+def _get_num_slices(client, index_name, max_query_size, max_slices, query) -> tuple[int, int]:
     """Count number of hits for the index"""
     query_no_sort = query.copy()
     if "sort" in query_no_sort:
@@ -136,7 +136,7 @@ def _get_num_slices(client, index_name, max_query_size, max_slices, query):
             "Too many slices required to process the query. Please reduce the query size."
         )
 
-    return max(num_slices_required, 1)
+    return max(num_slices_required, 1), n_docs
 
 
 def _prepare_query_body(query, slice_id, num_slices):
@@ -236,6 +236,14 @@ def filter_annotation(
     reporter: ProgressReporter,
     reporting_interval: int,
 ):
+
+    reporter.message.remote( # type: ignore
+        (
+            "Filtering annotation and re-generating stats. "
+            f"Reporting progress every ~{reporting_interval} variants"
+        )
+    )
+
     filtered_loci = []
     with Timer() as timer:
         bgzip_cmd = get_compress_from_pipe_cmd(annotation_path)
@@ -354,7 +362,9 @@ def filter_dosage_matrix(
         pathlib.Path(dosage_out_path).touch()
         return
 
-    reporter.message.remote("Filtering dosage matrix file.")  # type: ignore
+    reporter.message.remote( # type: ignore
+        f"Filtering dosage matrix file. Reporting progress every ~{reporting_interval} variants"
+    )
 
     filtered_loci = _correct_loci_case(filtered_loci)
 
@@ -399,8 +409,6 @@ def filter_annotation_and_dosage_matrix(
 
     annotation_path = os.path.join(output_dir, outputs.annotation)
 
-    reporter.message.remote("Filtering annotation file.")  # type: ignore
-
     reporting_interval = math.ceil(n_hits * REPORTING_INTERVAL)
     if reporting_interval < MINIMUM_RECORDS_TO_ENABLE_REPORTING:
         reporting_interval = MINIMUM_RECORDS_TO_ENABLE_REPORTING
@@ -443,10 +451,16 @@ async def go(  # pylint:disable=invalid-name
     client = OpenSearch(**search_client_args)
 
     query = _clean_query(job_data.query_body)
-    num_slices = _get_num_slices(client, job_data.index_name, MAX_QUERY_SIZE, MAX_SLICES, query)
+    num_slices, num_docs = _get_num_slices(client, job_data.index_name, MAX_QUERY_SIZE, MAX_SLICES, query)
     pit_id = client.create_point_in_time(index=job_data.index_name, params={"keep_alive": KEEP_ALIVE})["pit_id"]  # type: ignore   # noqa: E501
 
-    reporter = get_progress_reporter(publisher)
+    update_interval = max(MINIMUM_RECORDS_TO_ENABLE_REPORTING, math.ceil(num_docs * REPORTING_INTERVAL))
+    reporter = get_progress_reporter(publisher, update_interval)
+
+    reporter.message.remote( # type: ignore
+        f"Fetching variants from search engine, Reporting progress every ~{update_interval} variants."
+    )
+
     query["pit"] = {"id": pit_id}
     query["size"] = MAX_QUERY_SIZE
     query["fields"] = FIELDS_TO_QUERY
