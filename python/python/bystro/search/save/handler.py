@@ -5,6 +5,7 @@
 # TODO 2023-05-08: Support sort queries
 # TODO 2023-05-08: get max_slices from opensearch index settings
 
+import gc
 import logging
 import math
 import os
@@ -36,7 +37,7 @@ SAVE_FILTER_BATCH_READ_SIZE = int(os.getenv("SAVE_FILTER_BATCH_READ_SIZE", 200_0
 # How many scroll requests for each worker to handle
 PARALLEL_SCROLL_CHUNK_INCREMENT = 2
 # Percentage of fetched records to report progress after
-REPORTING_INTERVAL = 0.05
+REPORTING_INTERVAL = 0.01
 MINIMUM_RECORDS_TO_ENABLE_REPORTING = 100_000
 # These are the fields that are required to define a locus
 # They are used to filter the dosage matrix
@@ -146,22 +147,26 @@ def _prepare_query_body(query, slice_id, num_slices):
     return body
 
 
-def _correct_loci_case(loci):
-    corrected_loci = []
+def correct_loci_case_generator(loci: list[str]):
     for locus in loci:
         # Check and replace the prefix as needed
         if locus.startswith("chrx"):
-            corrected_loci.append("chrX" + locus[4:])
+            yield "chrX" + locus[4:]
         elif locus.startswith("chry"):
-            corrected_loci.append("chrY" + locus[4:])
+            yield "chrY" + locus[4:]
         elif locus.startswith("chrm"):
-            corrected_loci.append("chrM" + locus[4:])
+            yield "chrM" + locus[4:]
         elif locus.startswith("chrmt"):
-            corrected_loci.append("chrMT" + locus[5:])
+            yield "chrMT" + locus[5:]
         else:
-            corrected_loci.append(locus)
-    return corrected_loci
+            yield locus
 
+def write_corrected_loci_to_file(loci: list[str], output_dir: str, basename: str):
+    loci_file_path = os.path.join(output_dir, f"{basename}_loci.txt")
+    with open(loci_file_path, "w") as loci_fh:
+        for corrected_locus in correct_loci_case_generator(loci):
+            loci_fh.write(corrected_locus + "\n")
+    return loci_file_path
 
 def run_dosage_filter(
     parent_dosage_matrix_path: str,
@@ -366,18 +371,17 @@ def filter_dosage_matrix(
         f"Filtering dosage matrix file. Reporting progress every ~{reporting_interval} variants"
     )
 
-    filtered_loci = _correct_loci_case(filtered_loci)
+    loci_path = write_corrected_loci_to_file(filtered_loci, output_dir, basename)
 
-    # We always want to write the loci file, even if no loci remain, to make sure outputs are consistent
-    with open(os.path.join(output_dir, f"{basename}_loci.txt"), "w") as loci_fh:
-        for locus in filtered_loci:
-            loci_fh.write(locus + "\n")
+    # Clean up filtered_loci, because they may be billions of entries
+    del filtered_loci
+    gc.collect()
 
     with Timer() as timer:
         run_dosage_filter(
             parent_dosage_matrix_path=parent_dosage_matrix_path,
             dosage_out_path=dosage_out_path,
-            loci_path=loci_fh.name,
+            loci_path=loci_path,
             queue_config_path=queue_config_path,
             progress_frequency=reporting_interval,
             submission_id=str(job_data.submission_id),
@@ -409,9 +413,7 @@ def filter_annotation_and_dosage_matrix(
 
     annotation_path = os.path.join(output_dir, outputs.annotation)
 
-    reporting_interval = math.ceil(n_hits * REPORTING_INTERVAL)
-    if reporting_interval < MINIMUM_RECORDS_TO_ENABLE_REPORTING:
-        reporting_interval = MINIMUM_RECORDS_TO_ENABLE_REPORTING
+    reporting_interval = max(MINIMUM_RECORDS_TO_ENABLE_REPORTING, math.ceil(n_hits * REPORTING_INTERVAL))
 
     filtered_loci = filter_annotation(
         stats=stats,
