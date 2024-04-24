@@ -67,42 +67,65 @@ async def test_process_query(OpenSearchMock, search_client_args, query_args, moc
 
 
 def test_empty_input():
-    assert sort_loci_and_doc_ids([]) == (np.array([]), np.array([]), 0)
+    print('sort_loci_and_doc_ids([]) ', sort_loci_and_doc_ids([]) )
+    doc_ids_sorted, loci_sorted, n_hits = sort_loci_and_doc_ids([])
+    assert np.array_equal(doc_ids_sorted, np.array([], dtype=np.int32))
+    assert np.array_equal(loci_sorted, np.array([], dtype=object))
+    assert n_hits == 0
 
 
 def test_all_none_values():
-    assert sort_loci_and_doc_ids([None, None, None]) == ([], 0)
+    doc_ids_sorted, loci_sorted, n_hits = sort_loci_and_doc_ids([None, None, None])
+    assert np.array_equal(doc_ids_sorted, np.array([], dtype=np.int32))
+    assert np.array_equal(loci_sorted, np.array([], dtype=object))
+    assert n_hits == 0
 
 
 def test_mixed_none_and_non_none_values():
-    input_data = [None, [(1, "doc1"), (2, "doc2")], None, [(3, "doc3")]]
-    expected_output = ([(1, "doc1"), (2, "doc2"), (3, "doc3")], 3)
-    assert sort_loci_and_doc_ids(input_data) == expected_output
+    input_data = [None, (np.array([1, 2], dtype=np.int32), np.array(["doc1", "doc2"], dtype=object)), None, (np.array([3], dtype=np.int32), np.array(["doc3"], dtype=object))]
+    expected_output = (np.array([1, 2, 3], dtype=np.int32), np.array(["doc1", "doc2", "doc3"], dtype=object), 3)
+
+    doc_ids_sorted, loci_sorted, n_hits = sort_loci_and_doc_ids(input_data)
+    assert np.array_equal(doc_ids_sorted, expected_output[0])
+    assert np.array_equal(loci_sorted, expected_output[1])
+    assert n_hits == expected_output[2]
 
 
 def test_single_element():
-    assert sort_loci_and_doc_ids([[(1, "doc1")]]) == ([(1, "doc1")], 1)
+    input_data = [(np.array([1], dtype=np.int32), np.array(["doc1"], dtype=object))]
+    expected_output = (np.array([1], dtype=np.int32), np.array(["doc1"], dtype=object), 1)
+    doc_ids_sorted, loci_sorted, n_hits = sort_loci_and_doc_ids(input_data)
+    assert np.array_equal(doc_ids_sorted, expected_output[0])
+    assert np.array_equal(loci_sorted, expected_output[1])
+    assert n_hits == expected_output[2]
 
 
 def test_multiple_elements():
-    input_data: list[list[tuple[int, str]] | None] = [[(2, "doc2")], [(1, "doc1"), (3, "doc3")]]
-    expected_output = ([(1, "doc1"), (2, "doc2"), (3, "doc3")], 3)
-    assert sort_loci_and_doc_ids(input_data) == expected_output
+    input_data = [(np.array([2,1,3], dtype=np.int32), np.array(["doc2", "doc1", "doc3"], dtype=object))]
+    expected_output = (np.array([1, 2, 3], dtype=np.int32), np.array(["doc1", "doc2", "doc3"], dtype=object), 3)
+    doc_ids_sorted, loci_sorted, n_hits = sort_loci_and_doc_ids(input_data)
+    assert np.array_equal(doc_ids_sorted, expected_output[0])
+    assert np.array_equal(loci_sorted, expected_output[1])
+    assert n_hits == expected_output[2]
 
 
 def test_sorting_order():
-    input_data: list[list[tuple[int, str]] | None] = [
-        [(2, "doc2"), (1, "doc1")],
-        [(4, "doc4"), (3, "doc3")],
-    ]
-    expected_output = ([(1, "doc1"), (2, "doc2"), (3, "doc3"), (4, "doc4")], 4)
-    assert sort_loci_and_doc_ids(input_data) == expected_output
+    input_data = [(np.array([2, 1], dtype=np.int32), np.array(["doc2", "doc1"], dtype=object)), (np.array([4, 3], dtype=np.int32), np.array(["doc4", "doc3"], dtype=object))]
+    expected_output = (np.array([1, 2, 3, 4], dtype=np.int32), np.array(["doc1", "doc2", "doc3", "doc4"], dtype=object), 4)
+
+    doc_ids_sorted, loci_sorted, n_hits = sort_loci_and_doc_ids(input_data)
+    assert np.array_equal(doc_ids_sorted, expected_output[0])
+    assert np.array_equal(loci_sorted, expected_output[1])
+    assert n_hits == expected_output[2]
 
 
 def test_counting_hits():
-    input_data = [[(1, "doc1")], [(2, "doc2"), (3, "doc3")], None]
-    expected_output = ([(1, "doc1"), (2, "doc2"), (3, "doc3")], 3)
-    assert sort_loci_and_doc_ids(input_data) == expected_output
+    input_data = [(np.array([1], dtype=np.int32), np.array(["doc1"], dtype=object)), (np.array([2, 3], dtype=np.int32), np.array(["doc2", "doc3"], dtype=object)), None]
+    expected_output = (np.array([1, 2, 3], dtype=np.int32), np.array(["doc1", "doc2", "doc3"], dtype=object), 3)
+    doc_ids_sorted, loci_sorted, n_hits = sort_loci_and_doc_ids(input_data)
+    assert np.array_equal(doc_ids_sorted, expected_output[0])
+    assert np.array_equal(loci_sorted, expected_output[1])
+    assert n_hits == expected_output[2]
 
 
 def mock_subprocess_popen():
@@ -138,40 +161,51 @@ def mock_dependencies(mocker):
     return stats, job_data, reporter
 
 
-def test_filter_annotation_excludes_correct_loci(mock_dependencies, mocker):
+def test_filter_annotation_excludes_correct_loci(mock_dependencies, mocker, tmp_path):
     stats, job_data, reporter = mock_dependencies
-    doc_ids_sorted = [(0, "locus1"), (1, "locus3")]  # Indices of rows to include if not filtered
+    doc_ids_sorted = np.array([0,1], dtype=np.int32)
+    loci_sorted = np.array(["locus1", "locus3"])
     n_hits = 2
+    loci_file_path = tmp_path / "loci.txt"
 
     # Mock filter function to exclude row2
     filter_fn = mocker.Mock(return_value=False)  # Does not filter anything
     job_data.pipeline[0].make_filter.return_value = filter_fn
 
     # Call the function
-    filtered_loci = filter_annotation(
-        stats, "path.gz", "parent_path", job_data, doc_ids_sorted, n_hits, reporter, 1
+    retained_count = filter_annotation(
+        stats, "path.gz", "parent_path", job_data, doc_ids_sorted, loci_sorted, n_hits, reporter, 10, loci_file_path
     )
 
     # Assertions
-    assert filtered_loci == ["locus1", "locus3"]
+    assert retained_count == 2
     filter_fn.assert_called()  # Ensure the filter function was called
+    assert loci_file_path.read_text() == "locus1\nlocus3\n"
 
 
-def test_filter_annotation_excludes_correct_loci2(mock_dependencies):
+def test_filter_annotation_excludes_correct_loci2(mock_dependencies, mocker, tmp_path):
     stats, job_data, reporter = mock_dependencies
-    doc_ids_sorted = [(0, "locus1"), (1, "locus3")]  # Indices of rows to include if not filtered
+    doc_ids_sorted = np.array([0,1], dtype=np.int32)
+    loci_sorted = np.array(["locus1", "locus3"])
     n_hits = 2
+    loci_file_path = tmp_path / "loci.txt"
 
+    # Mock filter function to exclude row2
     def filter_fn(row: list[bytes]) -> bool:
         """Filter out all rows."""
         return row[0].startswith(b"row2")  # Filters out row2 # noqa: E731
 
     # To simulate a row being filtered, adjust the filter function and re-run
     job_data.pipeline[0].make_filter.return_value = filter_fn
-    filtered_loci = filter_annotation(
-        stats, "path.gz", "parent_path", job_data, doc_ids_sorted, n_hits, reporter, 1
+
+    # Call the function
+    retained_count = filter_annotation(
+        stats, "path.gz", "parent_path", job_data, doc_ids_sorted, loci_sorted, n_hits, reporter, 10, loci_file_path
     )
-    assert filtered_loci == ["locus1"]  # we filtered out the 2nd locus
+
+    # Assertions
+    assert retained_count == 2
+    assert loci_file_path.read_text() == "locus1\n"
 
 
 def test_filter_annotation_excludes_correct_loci3(mock_dependencies):
