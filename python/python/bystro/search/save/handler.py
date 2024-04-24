@@ -211,6 +211,10 @@ def sort_loci_and_doc_ids(
     all_doc_ids = np.array([], dtype=np.int32)
     all_loci = np.array([], dtype=object)
 
+    logger.info(
+        "Memory usage before concatenating query results: %s (MB)",
+        psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+    )
     start = time.time()
     # Aggregate results from all actors
     n_hits = 0
@@ -224,12 +228,20 @@ def sort_loci_and_doc_ids(
         all_doc_ids = np.concatenate((all_doc_ids, doc_ids))
         all_loci = np.concatenate((all_loci, loci))
     logger.info("Aggregating results took %s seconds", time.time() - start)
+    logger.info(
+        "Memory usage after concatenating query results: %s (MB)",
+        psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+    )
 
     start = time.time()
     # Get the indices that would sort the loci array
     sorted_indices = np.argsort(all_doc_ids)
 
     logger.info("Sorting indices took %s seconds", time.time() - start)
+    logger.info(
+        "Memory usage after sorting indices: %s (MB)",
+        psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+    )
 
     start = time.time()
     # Perform in-place sorting by reassigning sorted values back into the original arrays
@@ -237,6 +249,10 @@ def sort_loci_and_doc_ids(
     all_loci = all_loci[sorted_indices]
 
     logger.info("Sorting results using sorted indices took %s seconds", time.time() - start)
+    logger.info(
+        "Memory usage after sorting query results: %s (MB)",
+        psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+    )
 
     return all_doc_ids, all_loci, n_hits
 
