@@ -38,7 +38,7 @@ SAVE_LOCI_BATCH_WRITE_SIZE = int(os.getenv("SAVE_LOCI_BATCH_WRITE_SIZE", 500_000
 # this is very rapid, so to avoid spamming the user with messages,
 # we only report every 5 million rows by default
 ANNOTATION_MINIMUM_REPORTING_INTERVAL = int(
-    os.getenv("ANNOTATION_MINIMUM_REPORTING_INTERVAL", 5_000_0000)
+    os.getenv("ANNOTATION_MINIMUM_REPORTING_INTERVAL", 5_000_000)
 )
 
 # How many scroll requests for each worker to handle
