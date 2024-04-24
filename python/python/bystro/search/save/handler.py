@@ -15,6 +15,8 @@ import subprocess
 
 from opensearchpy import OpenSearch, AsyncOpenSearch
 
+from numpy.typing import NDArray
+import numpy as np
 import ray
 
 from bystro.beanstalkd.worker import ProgressPublisher, ProgressReporter, get_progress_reporter
@@ -31,8 +33,7 @@ MAX_QUERY_SIZE = 10_000
 MAX_SLICES = 1e6
 KEEP_ALIVE = "1d"
 MAX_CONCURRENCY_PER_THREAD = 4
-SAVE_FILTER_BATCH_READAHEAD = int(os.getenv("SAVE_FILTER_BATCH_READAHEAD", 0))
-SAVE_FILTER_BATCH_READ_SIZE = int(os.getenv("SAVE_FILTER_BATCH_READ_SIZE", 200_000))
+SAVE_LOCI_BATCH_WRITE_SIZE = int(os.getenv("SAVE_LOCI_BATCH_WRITE_SIZE", 500_000))
 
 # How many scroll requests for each worker to handle
 PARALLEL_SCROLL_CHUNK_INCREMENT = 2
@@ -77,8 +78,9 @@ class AsyncQueryProcessor:
         self.last_reported_count = 0
         self.reporter = reporter
 
-    async def process_query(self, query: dict) -> list[tuple[int, str]] | None:
-        results: list[tuple[int, str]] = []
+    async def process_query(self, query: dict) -> tuple[NDArray[np.int32], NDArray] | None:
+        doc_ids: list[int] = []
+        loci: list[str] = []
 
         # Perform the search operation asynchronously using the pre-initialized client
         resp = await self.client.search(**query)
@@ -86,11 +88,11 @@ class AsyncQueryProcessor:
         for doc in resp["hits"]["hits"]:
             src = doc["fields"]
             doc_id = int(doc["_id"])
-            locus = f"{src['chrom'][0]}:{src['pos'][0]}:{src['inputRef'][0]}:{src['alt'][0]}"
+            locus = f"{upper_chr(src['chrom'][0])}:{src['pos'][0]}:{src['inputRef'][0]}:{src['alt'][0]}"
+            doc_ids.append(doc_id)
+            loci.append(locus)
 
-            results.append((doc_id, locus))
-
-        if len(results) == 0:
+        if len(doc_ids) == 0:
             return None
 
         if self.last_reported_count > self.REPORT_INCREMENT:
@@ -99,9 +101,9 @@ class AsyncQueryProcessor:
             )
             self.last_reported_count = 0
 
-        self.last_reported_count += len(results)
+        self.last_reported_count += len(doc_ids)
 
-        return results
+        return np.array(doc_ids, dtype=np.int32), np.array(loci, dtype=object)
 
     def close(self):
         if self.last_reported_count > 0:
@@ -147,26 +149,9 @@ def _prepare_query_body(query, slice_id, num_slices):
     return body
 
 
-def correct_loci_case_generator(loci: list[str]):
-    for locus in loci:
-        # Check and replace the prefix as needed
-        if locus.startswith("chrx"):
-            yield "chrX" + locus[4:]
-        elif locus.startswith("chry"):
-            yield "chrY" + locus[4:]
-        elif locus.startswith("chrm"):
-            yield "chrM" + locus[4:]
-        elif locus.startswith("chrmt"):
-            yield "chrMT" + locus[5:]
-        else:
-            yield locus
+def upper_chr(chrom: str):
+    return chrom[0:3] + chrom[3:].upper()
 
-def write_corrected_loci_to_file(loci: list[str], output_dir: str, basename: str):
-    loci_file_path = os.path.join(output_dir, f"{basename}_loci.txt")
-    with open(loci_file_path, "w") as loci_fh:
-        for corrected_locus in correct_loci_case_generator(loci):
-            loci_fh.write(corrected_locus + "\n")
-    return loci_file_path
 
 def run_dosage_filter(
     parent_dosage_matrix_path: str,
@@ -213,22 +198,31 @@ def run_dosage_filter(
 
 
 def sort_loci_and_doc_ids(
-    results: list[list[tuple[int, str]] | None]
-) -> tuple[list[tuple[int, str]], int]:
-    # Process and aggregate results from all actors...
-    doc_ids = []
+    results: list[tuple[NDArray[np.int32], NDArray] | None]
+) -> tuple[NDArray[np.int32], NDArray, int]:
+    # Initialize empty numpy arrays for document loci and IDs
+    all_loci = np.array([], dtype=np.int32)
+    all_doc_ids = np.array([], dtype=object)
+
+    # Aggregate results from all actors
     n_hits = 0
-    for doc_ids_chunk in results:
-        if doc_ids_chunk is None:
+    for chunk in results:
+        if chunk is None:
             continue
 
-        n_hits += len(doc_ids_chunk)
-        doc_ids.extend(doc_ids_chunk)
+        loci, doc_ids = chunk
+        n_hits += len(doc_ids)
+        all_loci = np.concatenate((all_loci, loci))
+        all_doc_ids = np.concatenate((all_doc_ids, doc_ids))
 
-    # Sort the combined list by document ID (the first element of each tuple)
-    doc_ids.sort(key=lambda x: x[0])
+    # Get the indices that would sort the loci array
+    sorted_indices = np.argsort(all_doc_ids)
 
-    return doc_ids, n_hits
+    # Perform in-place sorting by reassigning sorted values back into the original arrays
+    all_loci[:] = all_loci[sorted_indices]
+    all_doc_ids[:] = all_doc_ids[sorted_indices]
+
+    return all_doc_ids, all_loci, n_hits
 
 
 def filter_annotation(
@@ -236,10 +230,12 @@ def filter_annotation(
     annotation_path: str,
     parent_annotation_path: str,
     job_data: SaveJobData,
-    doc_ids_sorted: list[tuple[int, str]],
+    doc_ids_sorted: NDArray[np.int32],
+    loci_sorted: NDArray,
     n_hits: int,
     reporter: ProgressReporter,
     reporting_interval: int,
+    loci_file_path: str,
 ):
 
     reporter.message.remote(  # type: ignore
@@ -249,8 +245,10 @@ def filter_annotation(
         )
     )
 
-    filtered_loci = []
+    filtered_loci = ""
+    n_retained = 0
     with Timer() as timer:
+        loci_fh = open(loci_file_path, "w")
         bgzip_cmd = get_compress_from_pipe_cmd(annotation_path)
         bgzip_decompress_cmd = get_decompress_to_pipe_cmd(parent_annotation_path)
         bystro_stats_cmd = stats.stdin_cli_stats_command
@@ -303,7 +301,7 @@ def filter_annotation(
                 # i is less than doc_ids_sorted[current_target_index]
                 # or we have reached the end of doc_ids_sorted
 
-                if i == doc_ids_sorted[current_target_index][0]:
+                if i == doc_ids_sorted[current_target_index]:
                     filtered = False
                     if len(filters) > 0:
                         src = line.rstrip().split(b"\t")
@@ -319,10 +317,16 @@ def filter_annotation(
                                 f"Annotation: Filtered {current_target_index} of {n_hits} variants."
                             )
 
+                        n_retained += 1
+
                         p.stdin.write(line)
                         stats_fh.stdin.write(line)
 
-                        filtered_loci.append(doc_ids_sorted[current_target_index][1])
+                        filtered_loci += loci_sorted[current_target_index] + "\n"
+
+                        if current_target_index % SAVE_LOCI_BATCH_WRITE_SIZE == 0:
+                            loci_fh.write(filtered_loci)
+                            filtered_loci = ""
 
                     # Move to the next target line number, if any
                     current_target_index += 1
@@ -336,6 +340,11 @@ def filter_annotation(
                         )
                         break
 
+            if len(filtered_loci) > 0:
+                loci_fh.write(filtered_loci)
+                filtered_loci = ""
+
+            loci_fh.close()
             p.stdin.close()  # Close the stdin to signal that we're done sending input
             stats_fh.stdin.close()  # Close the stdin to signal that we're done sending input
 
@@ -344,19 +353,17 @@ def filter_annotation(
 
     logger.info("Filtering annotation and generating stats took %s seconds", timer.elapsed_time)
 
-    return filtered_loci
+    return n_retained
 
 
 def filter_dosage_matrix(
     dosage_out_path: str,
     parent_dosage_matrix_path: str,
-    filtered_loci: list[str],
     job_data: SaveJobData,
     reporter: ProgressReporter,
     queue_config_path: str,
     reporting_interval: int,
-    output_dir: str,
-    basename: str,
+    loci_file_path: str,
 ):
     if not (
         os.path.exists(parent_dosage_matrix_path) and os.stat(parent_dosage_matrix_path).st_size > 0
@@ -371,17 +378,11 @@ def filter_dosage_matrix(
         f"Filtering dosage matrix file. Reporting progress every ~{reporting_interval} variants"
     )
 
-    loci_path = write_corrected_loci_to_file(filtered_loci, output_dir, basename)
-
-    # Clean up filtered_loci, because they may be billions of entries
-    del filtered_loci
-    gc.collect()
-
     with Timer() as timer:
         run_dosage_filter(
             parent_dosage_matrix_path=parent_dosage_matrix_path,
             dosage_out_path=dosage_out_path,
-            loci_path=loci_path,
+            loci_path=loci_file_path,
             queue_config_path=queue_config_path,
             progress_frequency=reporting_interval,
             submission_id=str(job_data.submission_id),
@@ -392,7 +393,8 @@ def filter_dosage_matrix(
 def filter_annotation_and_dosage_matrix(
     job_data: SaveJobData,
     reporter: ProgressReporter,
-    doc_ids_sorted: list[tuple[int, str]],
+    doc_ids_sorted: NDArray[np.int32],
+    loci_sorted: NDArray,
     n_hits: int,
     queue_config_path: str,
 ) -> AnnotationOutputs:
@@ -415,15 +417,19 @@ def filter_annotation_and_dosage_matrix(
 
     reporting_interval = max(MINIMUM_RECORDS_TO_ENABLE_REPORTING, math.ceil(n_hits * REPORTING_INTERVAL))
 
-    filtered_loci = filter_annotation(
+    loci_file_path = os.path.join(output_dir, f"{basename}_loci.txt")
+
+    n_results = filter_annotation(
         stats=stats,
         annotation_path=annotation_path,
         parent_annotation_path=parent_annotation_path,
         job_data=job_data,
         doc_ids_sorted=doc_ids_sorted,
+        loci_sorted=loci_sorted,
         n_hits=n_hits,
         reporter=reporter,
         reporting_interval=reporting_interval,
+        loci_file_path=loci_file_path,
     )
 
     del doc_ids_sorted
@@ -431,16 +437,14 @@ def filter_annotation_and_dosage_matrix(
     filter_dosage_matrix(
         dosage_out_path=dosage_out_path,
         parent_dosage_matrix_path=parent_dosage_matrix_path,
-        filtered_loci=filtered_loci,
+        loci_file_path=loci_file_path,
         job_data=job_data,
         reporter=reporter,
         queue_config_path=queue_config_path,
         reporting_interval=reporting_interval,
-        output_dir=output_dir,
-        basename=basename,
     )
 
-    reporter.increment.remote(len(filtered_loci), True)  # type: ignore
+    reporter.increment.remote(n_results, True)  # type: ignore
 
     return outputs
 
@@ -518,7 +522,7 @@ async def go(  # pylint:disable=invalid-name
 
     logger.info("Querying took %s seconds", timer.elapsed_time)
 
-    doc_ids_sorted, n_hits = sort_loci_and_doc_ids(results)
+    doc_ids_sorted, loci_sorted, n_hits = sort_loci_and_doc_ids(results)
 
     reporter.increment_and_write_progress_message.remote(  # type: ignore
         0, "Fetched", "variants", force=True
@@ -529,6 +533,7 @@ async def go(  # pylint:disable=invalid-name
         job_data=job_data,
         reporter=reporter,
         doc_ids_sorted=doc_ids_sorted,
+        loci_sorted=loci_sorted,
         n_hits=n_hits,
         queue_config_path=queue_config_path,
     )
