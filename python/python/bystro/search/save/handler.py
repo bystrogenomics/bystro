@@ -5,6 +5,7 @@
 # TODO 2023-05-08: Support sort queries
 # TODO 2023-05-08: get max_slices from opensearch index settings
 
+import gc
 import logging
 import math
 import os
@@ -508,6 +509,8 @@ def filter_annotation_and_dosage_matrix(
     )
 
     del doc_ids_sorted
+    del loci_sorted
+    gc.collect()
 
     logger.info(
         "Memory usage after filter_annotation: %s (MB)",
