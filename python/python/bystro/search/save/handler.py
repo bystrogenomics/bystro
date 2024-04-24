@@ -11,6 +11,7 @@ import os
 import psutil
 import pathlib
 import subprocess
+import time
 from typing import Callable
 
 from opensearchpy import OpenSearch, AsyncOpenSearch
@@ -279,7 +280,7 @@ def filter_annotation(
             header_written = False
             header_fields = None
             filters: list[Callable[[list[bytes]], bool]] = []
-
+            start = time.time()
             for line in iter(in_fh.stdout.readline, b""):
                 if not header_written:
                     p.stdin.write(line)
@@ -337,9 +338,14 @@ def filter_annotation(
                         break
 
                 if i > 0 and i % reporting_interval == 0:
-                    reporter.message.remote(   # type: ignore
-                        f"Annotation: Filtered {i} rows. {current_target_index} survived filtering."
+                    end = time.time()
+                    reporter.message.remote(  # type: ignore
+                        (
+                            f"Annotation: Filtered {i} rows. {current_target_index} survived filtering. "
+                            f"Took {end - start:.2f} seconds."
+                        )
                     )
+                    start = time.time()
 
             if len(filtered_loci) > 0:
                 loci_fh.write(filtered_loci)
