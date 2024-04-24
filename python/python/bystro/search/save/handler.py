@@ -309,6 +309,7 @@ def filter_annotation(
     # avoid having to i + 1 every iteration
     reporting_interval = reporting_interval - 1
     current_target_index = 0
+    n_retained = 0
     with Timer() as timer:
         bgzip_cmd = get_compress_from_pipe_cmd(annotation_path)
         bgzip_decompress_cmd = get_decompress_to_pipe_cmd(parent_annotation_path)
@@ -376,6 +377,7 @@ def filter_annotation(
                         p.stdin.write(line)
                         stats_fh.stdin.write(line)
 
+                        n_retained += 1
                         filtered_loci += loci_sorted[current_target_index] + "\n"
 
                         if current_target_index % SAVE_LOCI_BATCH_WRITE_SIZE == 0:
@@ -393,7 +395,7 @@ def filter_annotation(
 
                     reporter.message.remote(  # type: ignore
                         (
-                            f"Annotation: Filtered {i+1} variants. {current_target_index} kept. "
+                            f"Annotation: Filtered {i+1} variants. {n_retained} kept. "
                             f"Took {end - start:.0f} seconds."
                         )
                     )
@@ -413,12 +415,12 @@ def filter_annotation(
             reporter.message.remote(f"Annotation: Completed filtering of {i} variants.")  # type: ignore
 
     reporter.message.remote(  # type: ignore
-        f"Annotation: {current_target_index} variants survived filtering."
+        f"Annotation: {n_retained} variants survived filtering."
     )
 
     logger.info("Filtering annotation and generating stats took %s seconds", timer.elapsed_time)
 
-    return current_target_index
+    return n_retained
 
 
 def filter_dosage_matrix(
