@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"bystro/beanstalkd"
 
-	"github.com/dolthub/swiss"
+	csmap "github.com/mhmtszr/concurrent-swiss-map"
 
 	"flag"
 	"fmt"
@@ -99,17 +99,18 @@ func validateArgs(args *CLIArgs) error {
 }
 
 // readLociFile reads a file containing loci and stores them in a map with their hash values as keys.
-func readLociFile(filePath string) (*swiss.Map[string, void], error) {
+func readLociFile(filePath string) (*csmap.CsMap[string, void], error) {
+	loci := csmap.Create[string, void]()
+
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
-	loci := swiss.NewMap[string, void](100000)
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		loci.Put(scanner.Text(), member)
+		loci.Store(scanner.Text(), member)
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, err
@@ -119,7 +120,7 @@ func readLociFile(filePath string) (*swiss.Map[string, void], error) {
 
 // processRecordAt processes a record at the given index, filters the rows based on the loci,
 // and writes the filtered rows to the arrowWriter.
-func processRecordAt(fr *ipc.FileReader, loci *swiss.Map[string, void], arrowWriter *bystroArrow.ArrowWriter, queue chan int, complete chan bool, count *atomic.Int64) {
+func processRecordAt(fr *ipc.FileReader, loci *csmap.CsMap[string, void], arrowWriter *bystroArrow.ArrowWriter, queue chan int, complete chan bool, count *atomic.Int64) {
 	pool := memory.NewGoAllocator()
 	builder := array.NewRecordBuilder(pool, arrowWriter.Schema)
 	defer builder.Release()
