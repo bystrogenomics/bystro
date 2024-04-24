@@ -26,6 +26,8 @@ require (
 	github.com/mhmtszr/concurrent-swiss-map v1.0.8 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/raviqqe/hamt/v2 v2.0.0 // indirect
+	github.com/scylladb/go-set v1.0.2 // indirect
+	github.com/tidwall/btree v1.7.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	golang.org/x/arch v0.6.0 // indirect

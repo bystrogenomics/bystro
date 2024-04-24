@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"bystro/beanstalkd"
 
-	csmap "github.com/mhmtszr/concurrent-swiss-map"
+	"github.com/tidwall/btree"
 
 	"flag"
 	"fmt"
@@ -99,8 +99,8 @@ func validateArgs(args *CLIArgs) error {
 }
 
 // readLociFile reads a file containing loci and stores them in a map with their hash values as keys.
-func readLociFile(filePath string) (*csmap.CsMap[string, void], error) {
-	loci := csmap.Create[string, void]()
+func readLociFile(filePath string) (*btree.Set[string], error) {
+	var loci btree.Set[string]
 
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -110,17 +110,17 @@ func readLociFile(filePath string) (*csmap.CsMap[string, void], error) {
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		loci.Store(scanner.Text(), member)
+		loci.Insert(scanner.Text())
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
-	return loci, nil
+	return &loci, nil
 }
 
 // processRecordAt processes a record at the given index, filters the rows based on the loci,
 // and writes the filtered rows to the arrowWriter.
-func processRecordAt(fr *ipc.FileReader, loci *csmap.CsMap[string, void], arrowWriter *bystroArrow.ArrowWriter, queue chan int, complete chan bool, count *atomic.Int64) {
+func processRecordAt(fr *ipc.FileReader, loci *btree.Set[string], arrowWriter *bystroArrow.ArrowWriter, queue chan int, complete chan bool, count *atomic.Int64) {
 	pool := memory.NewGoAllocator()
 	builder := array.NewRecordBuilder(pool, arrowWriter.Schema)
 	defer builder.Release()
@@ -138,7 +138,7 @@ func processRecordAt(fr *ipc.FileReader, loci *csmap.CsMap[string, void], arrowW
 		rowsAccepted := 0
 		for j := 0; j < int(record.NumRows()); j++ {
 			locusValue := locusCol.Value(j)
-			if loci.Has(locusValue) {
+			if loci.Contains(locusValue) {
 				rowsAccumulated += 1
 				rowsAccepted += 1
 				// Fill the builder with values from the original columns, filtering by selectedIndices
@@ -301,7 +301,7 @@ func main() {
 		log.Fatalf("Couldn't create message sender due to: [%s]\n", err)
 	}
 
-	totalRows := int64(loci.Count())
+	totalRows := int64(loci.Len())
 	quit := make(chan bool)
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
