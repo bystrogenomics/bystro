@@ -224,31 +224,41 @@ def run_dosage_filter(
 def sort_loci_and_doc_ids(
     results: list[tuple[NDArray[np.int32], NDArray]]
 ) -> tuple[NDArray[np.int32], NDArray, int]:
-    # Initialize empty numpy arrays for document loci and IDs
-    all_doc_ids = np.array([], dtype=np.int32)
-    all_loci = np.array([], dtype=object)
+    # Log the memory usage at the start
+    process = psutil.Process(os.getpid())
+    initial_memory = process.memory_info().rss / 1024**2
+    logger.info("Memory usage before concatenating query results: %s MB", initial_memory)
 
-    logger.info(
-        "Memory usage before concatenating query results: %s (MB)",
-        psutil.Process(os.getpid()).memory_info().rss / 1024**2,
-    )
     start = time.time()
-    # Aggregate results from all actors
+
+    # Initialize lists to collect all document IDs and loci
+    all_doc_ids = []
+    all_loci = []
+
+    # Collect results
     n_hits = 0
     for doc_ids, loci in results:
+        all_doc_ids.append(doc_ids)
+        all_loci.append(loci)
         n_hits += len(doc_ids)
 
-        all_doc_ids = np.concatenate((all_doc_ids, doc_ids))
-        all_loci = np.concatenate((all_loci, loci))
-    logger.info("Aggregating results took %s seconds", time.time() - start)
-    logger.info(
-        "Memory usage after concatenating query results: %s (MB)",
-        psutil.Process(os.getpid()).memory_info().rss / 1024**2,
-    )
+    # Concatenate all results into a single array
+    all_doc_ids_np = np.concatenate(all_doc_ids)
+    del all_doc_ids
+    all_loci_np = np.concatenate(all_loci)
+    del all_loci
+
+    # Log the memory usage after concatenation
+    final_memory = process.memory_info().rss / 1024**2
+    logger.info("Memory usage after concatenating query results: %s MB", final_memory)
+
+    # Calculate elapsed time
+    elapsed_time = time.time() - start
+    logger.info("Time to process and concatenate: %s seconds", elapsed_time)
 
     start = time.time()
     # Get the indices that would sort the loci array
-    sorted_indices = np.argsort(all_doc_ids, kind="stable")
+    sorted_indices = np.argsort(all_doc_ids_np)
 
     logger.info("Sorting indices took %s seconds", time.time() - start)
     logger.info(
@@ -258,8 +268,8 @@ def sort_loci_and_doc_ids(
 
     start = time.time()
     # Perform in-place sorting by reassigning sorted values back into the original arrays
-    all_doc_ids = all_doc_ids[sorted_indices]
-    all_loci = all_loci[sorted_indices]
+    all_doc_ids_np = all_doc_ids_np[sorted_indices]
+    all_loci_np = all_loci_np[sorted_indices]
 
     logger.info("Sorting results using sorted indices took %s seconds", time.time() - start)
     logger.info(
@@ -267,7 +277,7 @@ def sort_loci_and_doc_ids(
         psutil.Process(os.getpid()).memory_info().rss / 1024**2,
     )
 
-    return all_doc_ids, all_loci, n_hits
+    return all_doc_ids_np, all_loci_np, n_hits
 
 
 def filter_annotation(
