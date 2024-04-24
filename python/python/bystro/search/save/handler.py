@@ -208,8 +208,8 @@ def sort_loci_and_doc_ids(
     results: list[tuple[NDArray[np.int32], NDArray] | None]
 ) -> tuple[NDArray[np.int32], NDArray, int]:
     # Initialize empty numpy arrays for document loci and IDs
-    all_loci = np.array([], dtype=np.int32)
-    all_doc_ids = np.array([], dtype=object)
+    all_doc_ids = np.array([], dtype=np.int32)
+    all_loci = np.array([], dtype=object)
 
     # Aggregate results from all actors
     n_hits = 0
@@ -219,15 +219,16 @@ def sort_loci_and_doc_ids(
 
         doc_ids, loci = chunk
         n_hits += len(doc_ids)
-        all_loci = np.concatenate((all_loci, loci))
+
         all_doc_ids = np.concatenate((all_doc_ids, doc_ids))
+        all_loci = np.concatenate((all_loci, loci))
 
     # Get the indices that would sort the loci array
     sorted_indices = np.argsort(all_doc_ids)
 
     # Perform in-place sorting by reassigning sorted values back into the original arrays
-    all_loci = all_loci[sorted_indices]
     all_doc_ids = all_doc_ids[sorted_indices]
+    all_loci = all_loci[sorted_indices]
 
     return all_doc_ids, all_loci, n_hits
 

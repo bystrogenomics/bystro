@@ -67,7 +67,7 @@ async def test_process_query(OpenSearchMock, search_client_args, query_args, moc
 
 
 def test_empty_input():
-    assert sort_loci_and_doc_ids([]) == ([], 0)
+    assert sort_loci_and_doc_ids([]) == (np.array([]), np.array([]), 0)
 
 
 def test_all_none_values():
