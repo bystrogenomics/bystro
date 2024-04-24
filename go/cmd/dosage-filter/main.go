@@ -5,6 +5,7 @@ import (
 	"bystro/beanstalkd"
 	"flag"
 	"fmt"
+	"hash/fnv"
 	"log"
 	"os"
 	"runtime"
@@ -18,7 +19,11 @@ import (
 	bystroArrow "github.com/bystrogenomics/bystro-vcf/arrow"
 )
 
-var WRITE_CHUNK_SIZE = 1000
+var WRITE_CHUNK_SIZE = 5000
+
+type void struct{}
+
+var member void
 
 type CLIArgs struct {
 	inputPath           string
@@ -91,19 +96,29 @@ func validateArgs(args *CLIArgs) error {
 	return nil
 }
 
-// readLociFile reads a file containing loci to filter and returns a map of loci.
-// Each line in the file represents a locus.
-func readLociFile(filePath string) (map[string]bool, error) {
+// HashLocus converts a string to a 64-bit hash using FNV-1a algorithm.
+func HashLocus(locus string) uint64 {
+	hasher := fnv.New64a()
+	_, err := hasher.Write([]byte(locus))
+	if err != nil {
+		panic("hash write failed: " + err.Error())
+	}
+	return hasher.Sum64()
+}
+
+// readLociFile reads a file containing loci and stores them in a map with their hash values as keys.
+func readLociFile(filePath string) (map[uint64]void, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
-	loci := make(map[string]bool)
+	loci := make(map[uint64]void)
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		loci[scanner.Text()] = true
+		hashedKey := HashLocus(scanner.Text())
+		loci[hashedKey] = member
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, err
@@ -113,7 +128,7 @@ func readLociFile(filePath string) (map[string]bool, error) {
 
 // processRecordAt processes a record at the given index, filters the rows based on the loci,
 // and writes the filtered rows to the arrowWriter.
-func processRecordAt(fr *ipc.FileReader, loci map[string]bool, arrowWriter *bystroArrow.ArrowWriter, queue chan int, complete chan bool, count *atomic.Int64) {
+func processRecordAt(fr *ipc.FileReader, loci map[uint64]void, arrowWriter *bystroArrow.ArrowWriter, queue chan int, complete chan bool, count *atomic.Int64) {
 	pool := memory.NewGoAllocator()
 	builder := array.NewRecordBuilder(pool, arrowWriter.Schema)
 	defer builder.Release()
@@ -130,7 +145,7 @@ func processRecordAt(fr *ipc.FileReader, loci map[string]bool, arrowWriter *byst
 
 		rowsAccepted := 0
 		for j := 0; j < int(record.NumRows()); j++ {
-			locusValue := locusCol.Value(j)
+			locusValue := HashLocus(locusCol.Value(j))
 			if _, exists := loci[locusValue]; exists {
 				rowsAccumulated += 1
 				rowsAccepted += 1
@@ -166,11 +181,25 @@ func processRecordAt(fr *ipc.FileReader, loci map[string]bool, arrowWriter *byst
 						log.Fatalf("Unsupported column type: %T", column)
 					}
 				}
-			}
-		}
 
-		if rowsAccepted == 0 {
-			continue
+				if rowsAccumulated >= WRITE_CHUNK_SIZE {
+
+					// Create a new record from the row
+					filteredRecord := builder.NewRecord()
+
+					// Write the new record to the output file
+					if err := arrowWriter.WriteChunk(filteredRecord); err != nil {
+						log.Fatal(err)
+					}
+
+					filteredRecord.Release()
+					builder.Release()
+
+					builder = array.NewRecordBuilder(pool, arrowWriter.Schema)
+
+					rowsAccumulated = 0
+				}
+			}
 		}
 
 		record.Release()
@@ -200,6 +229,8 @@ func processRecordAt(fr *ipc.FileReader, loci map[string]bool, arrowWriter *byst
 		}
 	}
 
+	// Write the remaining rows if the loop is terminated early
+	// TODO 2024-04-24 @akotlar confirm whether this is necessary
 	if rowsAccumulated > 0 {
 		filteredRecord := builder.NewRecord()
 
@@ -220,10 +251,18 @@ func main() {
 
 	cliargs := setup(nil)
 
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	log.Printf("Memory usage before reading loci file: %d MB\n", m.Alloc/1024/1024)
+
 	loci, err := readLociFile(cliargs.lociPath)
 	if err != nil {
 		log.Fatalf("Could not read loci file: %v", err)
 	}
+
+	// Get memory usage after reading loci file:
+	runtime.ReadMemStats(&m)
+	log.Printf("Memory usage after reading loci file: %d MB\n", m.Alloc/1024/1024)
 
 	// Open Arrow IPC file
 	file, err := os.Open(cliargs.inputPath)
