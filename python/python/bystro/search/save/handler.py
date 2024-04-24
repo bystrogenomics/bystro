@@ -211,6 +211,7 @@ def sort_loci_and_doc_ids(
     all_doc_ids = np.array([], dtype=np.int32)
     all_loci = np.array([], dtype=object)
 
+    start = time.time()
     # Aggregate results from all actors
     n_hits = 0
     for chunk in results:
@@ -222,13 +223,20 @@ def sort_loci_and_doc_ids(
 
         all_doc_ids = np.concatenate((all_doc_ids, doc_ids))
         all_loci = np.concatenate((all_loci, loci))
+    logger.info("Aggregating results took %s seconds", time.time() - start)
 
+    start = time.time()
     # Get the indices that would sort the loci array
     sorted_indices = np.argsort(all_doc_ids)
 
+    logger.info("Sorting indices took %s seconds", time.time() - start)
+
+    start = time.time()
     # Perform in-place sorting by reassigning sorted values back into the original arrays
     all_doc_ids = all_doc_ids[sorted_indices]
     all_loci = all_loci[sorted_indices]
+
+    logger.info("Sorting results using sorted indices took %s seconds", time.time() - start)
 
     return all_doc_ids, all_loci, n_hits
 
@@ -558,6 +566,11 @@ async def go(  # pylint:disable=invalid-name
         client.delete_point_in_time(body={"pit_id": pit_id})
         client.close()
 
+    reporter.increment_and_write_progress_message.remote(  # type: ignore
+        0, "Fetched", "variants", force=True
+    )
+    reporter.clear_progress.remote()  # type: ignore
+
     logger.info("Querying took %s seconds", timer.elapsed_time)
 
     logger.info(
@@ -571,11 +584,6 @@ async def go(  # pylint:disable=invalid-name
         "Memory usage after query result sorting: %s (MB)",
         psutil.Process(os.getpid()).memory_info().rss / 1024**2,
     )
-
-    reporter.increment_and_write_progress_message.remote(  # type: ignore
-        0, "Fetched", "variants", force=True
-    )
-    reporter.clear_progress.remote()  # type: ignore
 
     outputs = filter_annotation_and_dosage_matrix(
         job_data=job_data,
