@@ -255,7 +255,6 @@ def filter_annotation(
     )
 
     filtered_loci = ""
-    n_retained = 0
 
     # avoid having to i + 1 every iteration
     reporting_interval = reporting_interval - 1
