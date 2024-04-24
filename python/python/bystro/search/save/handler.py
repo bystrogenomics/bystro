@@ -259,6 +259,7 @@ def filter_annotation(
 
     # avoid having to i + 1 every iteration
     reporting_interval = reporting_interval - 1
+    current_target_index = 0
     with Timer() as timer:
         bgzip_cmd = get_compress_from_pipe_cmd(annotation_path)
         bgzip_decompress_cmd = get_decompress_to_pipe_cmd(parent_annotation_path)
@@ -280,7 +281,6 @@ def filter_annotation(
                 raise IOError("Failed to open stats file for writing.")
 
             i = -1
-            current_target_index = 0
             header_written = False
             header_fields = None
             filters: list[Callable[[list[bytes]], bool]] = []
@@ -324,8 +324,6 @@ def filter_annotation(
                                 break
 
                     if not filtered:
-                        n_retained += 1
-
                         p.stdin.write(line)
                         stats_fh.stdin.write(line)
 
@@ -346,7 +344,7 @@ def filter_annotation(
 
                     reporter.message.remote(  # type: ignore
                         (
-                            f"Annotation: Filtered {i+1} rows. {current_target_index} rows kept. "
+                            f"Annotation: Filtered {i+1} variants. {current_target_index} kept. "
                             f"Took {end - start:.0f} seconds."
                         )
                     )
@@ -363,13 +361,15 @@ def filter_annotation(
             p.wait()
             stats_fh.wait()
 
-            reporter.message.remote(f"Annotation: Completed filtering of {i} rows.")  # type: ignore
+            reporter.message.remote(f"Annotation: Completed filtering of {i} variants.")  # type: ignore
 
-    reporter.message.remote(f"Annotation: {n_retained} variants survived filtering.")  # type: ignore
+    reporter.message.remote(  # type: ignore
+        f"Annotation: {current_target_index} variants survived filtering."
+    )
 
     logger.info("Filtering annotation and generating stats took %s seconds", timer.elapsed_time)
 
-    return n_retained
+    return current_target_index
 
 
 def filter_dosage_matrix(
