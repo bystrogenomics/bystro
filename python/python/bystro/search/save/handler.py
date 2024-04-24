@@ -5,13 +5,13 @@
 # TODO 2023-05-08: Support sort queries
 # TODO 2023-05-08: get max_slices from opensearch index settings
 
-import gc
 import logging
 import math
 import os
-from typing import Callable
+import psutil
 import pathlib
 import subprocess
+from typing import Callable
 
 from opensearchpy import OpenSearch, AsyncOpenSearch
 
@@ -248,7 +248,6 @@ def filter_annotation(
     filtered_loci = ""
     n_retained = 0
     with Timer() as timer:
-        loci_fh = open(loci_file_path, "w")
         bgzip_cmd = get_compress_from_pipe_cmd(annotation_path)
         bgzip_decompress_cmd = get_decompress_to_pipe_cmd(parent_annotation_path)
         bystro_stats_cmd = stats.stdin_cli_stats_command
@@ -257,6 +256,7 @@ def filter_annotation(
             subprocess.Popen(bystro_stats_cmd, shell=True, stdin=subprocess.PIPE) as stats_fh,
             subprocess.Popen(bgzip_cmd, shell=True, stdin=subprocess.PIPE) as p,
             subprocess.Popen(bgzip_decompress_cmd, shell=True, stdout=subprocess.PIPE) as in_fh,
+            open(loci_file_path, "w") as loci_fh
         ):
             if in_fh.stdout is None:
                 raise IOError("Failed to open annotation file for reading.")
@@ -419,6 +419,11 @@ def filter_annotation_and_dosage_matrix(
 
     loci_file_path = os.path.join(output_dir, f"{basename}_loci.txt")
 
+    logger.info(
+        "Memory usage before filter_annotation: %s (MB)",
+        psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+    )
+
     n_results = filter_annotation(
         stats=stats,
         annotation_path=annotation_path,
@@ -434,6 +439,11 @@ def filter_annotation_and_dosage_matrix(
 
     del doc_ids_sorted
 
+    logger.info(
+        "Memory usage after filter_annotation: %s (MB)",
+        psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+    )
+
     filter_dosage_matrix(
         dosage_out_path=dosage_out_path,
         parent_dosage_matrix_path=parent_dosage_matrix_path,
@@ -442,6 +452,11 @@ def filter_annotation_and_dosage_matrix(
         reporter=reporter,
         queue_config_path=queue_config_path,
         reporting_interval=reporting_interval,
+    )
+
+    logger.info(
+        "Memory usage after filter_dosage_matrix: %s (MB)",
+        psutil.Process(os.getpid()).memory_info().rss / 1024**2,
     )
 
     reporter.increment.remote(n_results, True)  # type: ignore
@@ -522,7 +537,17 @@ async def go(  # pylint:disable=invalid-name
 
     logger.info("Querying took %s seconds", timer.elapsed_time)
 
+    logger.info(
+        "Memory usage before query result sorting: %s (MB)",
+        psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+    )
+
     doc_ids_sorted, loci_sorted, n_hits = sort_loci_and_doc_ids(results)
+
+    logger.info(
+        "Memory usage after query result sorting: %s (MB)",
+        psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+    )
 
     reporter.increment_and_write_progress_message.remote(  # type: ignore
         0, "Fetched", "variants", force=True
