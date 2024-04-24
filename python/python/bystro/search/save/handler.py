@@ -359,9 +359,9 @@ def filter_annotation(
             p.wait()
             stats_fh.wait()
 
-    reporter.message.remote(f"Annotation: {n_retained} variants survived filtering.")  # type: ignore
+            reporter.message.remote(f"Annotation: Completed filtering of {i} rows.")  # type: ignore
 
-    reporter.message.remote("Annotation: Completed filtering.")  # type: ignore
+    reporter.message.remote(f"Annotation: {n_retained} variants survived filtering.")  # type: ignore
 
     logger.info("Filtering annotation and generating stats took %s seconds", timer.elapsed_time)
 
@@ -379,6 +379,8 @@ def filter_dosage_matrix(
 ):
     if not (
         os.path.exists(parent_dosage_matrix_path) and os.stat(parent_dosage_matrix_path).st_size > 0
+        and
+        os.path.exists(loci_file_path) and os.stat(loci_file_path).st_size > 0
     ):
         logger.info("No dosage matrix to filter")
         reporter.message.remote("No dosage matrix to filter.")  # type: ignore

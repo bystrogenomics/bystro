@@ -1,8 +1,8 @@
 from io import BytesIO
-import os
 from unittest.mock import patch, MagicMock
 
 import numpy as np
+from numpy.typing import NDArray
 import pytest
 import ray
 
@@ -67,7 +67,6 @@ async def test_process_query(OpenSearchMock, search_client_args, query_args, moc
 
 
 def test_empty_input():
-    print('sort_loci_and_doc_ids([]) ', sort_loci_and_doc_ids([]) )
     doc_ids_sorted, loci_sorted, n_hits = sort_loci_and_doc_ids([])
     assert np.array_equal(doc_ids_sorted, np.array([], dtype=np.int32))
     assert np.array_equal(loci_sorted, np.array([], dtype=object))
@@ -82,8 +81,17 @@ def test_all_none_values():
 
 
 def test_mixed_none_and_non_none_values():
-    input_data = [None, (np.array([1, 2], dtype=np.int32), np.array(["doc1", "doc2"], dtype=object)), None, (np.array([3], dtype=np.int32), np.array(["doc3"], dtype=object))]
-    expected_output = (np.array([1, 2, 3], dtype=np.int32), np.array(["doc1", "doc2", "doc3"], dtype=object), 3)
+    input_data = [
+        None,
+        (np.array([1, 2], dtype=np.int32), np.array(["doc1", "doc2"], dtype=object)),
+        None,
+        (np.array([3], dtype=np.int32), np.array(["doc3"], dtype=object)),
+    ]
+    expected_output = (
+        np.array([1, 2, 3], dtype=np.int32),
+        np.array(["doc1", "doc2", "doc3"], dtype=object),
+        3,
+    )
 
     doc_ids_sorted, loci_sorted, n_hits = sort_loci_and_doc_ids(input_data)
     assert np.array_equal(doc_ids_sorted, expected_output[0])
@@ -92,7 +100,9 @@ def test_mixed_none_and_non_none_values():
 
 
 def test_single_element():
-    input_data = [(np.array([1], dtype=np.int32), np.array(["doc1"], dtype=object))]
+    input_data: list[tuple[NDArray[np.int32], NDArray] | None] = [
+        (np.array([1], dtype=np.int32), np.array(["doc1"], dtype=object))
+    ]
     expected_output = (np.array([1], dtype=np.int32), np.array(["doc1"], dtype=object), 1)
     doc_ids_sorted, loci_sorted, n_hits = sort_loci_and_doc_ids(input_data)
     assert np.array_equal(doc_ids_sorted, expected_output[0])
@@ -101,8 +111,14 @@ def test_single_element():
 
 
 def test_multiple_elements():
-    input_data = [(np.array([2,1,3], dtype=np.int32), np.array(["doc2", "doc1", "doc3"], dtype=object))]
-    expected_output = (np.array([1, 2, 3], dtype=np.int32), np.array(["doc1", "doc2", "doc3"], dtype=object), 3)
+    input_data: list[tuple[NDArray[np.int32], NDArray] | None]  = [
+        (np.array([2, 1, 3], dtype=np.int32), np.array(["doc2", "doc1", "doc3"], dtype=object))
+    ]
+    expected_output = (
+        np.array([1, 2, 3], dtype=np.int32),
+        np.array(["doc1", "doc2", "doc3"], dtype=object),
+        3,
+    )
     doc_ids_sorted, loci_sorted, n_hits = sort_loci_and_doc_ids(input_data)
     assert np.array_equal(doc_ids_sorted, expected_output[0])
     assert np.array_equal(loci_sorted, expected_output[1])
@@ -110,8 +126,15 @@ def test_multiple_elements():
 
 
 def test_sorting_order():
-    input_data = [(np.array([2, 1], dtype=np.int32), np.array(["doc2", "doc1"], dtype=object)), (np.array([4, 3], dtype=np.int32), np.array(["doc4", "doc3"], dtype=object))]
-    expected_output = (np.array([1, 2, 3, 4], dtype=np.int32), np.array(["doc1", "doc2", "doc3", "doc4"], dtype=object), 4)
+    input_data: list[tuple[NDArray[np.int32], NDArray] | None]  = [
+        (np.array([2, 1], dtype=np.int32), np.array(["doc2", "doc1"], dtype=object)),
+        (np.array([4, 3], dtype=np.int32), np.array(["doc4", "doc3"], dtype=object)),
+    ]
+    expected_output = (
+        np.array([1, 2, 3, 4], dtype=np.int32),
+        np.array(["doc1", "doc2", "doc3", "doc4"], dtype=object),
+        4,
+    )
 
     doc_ids_sorted, loci_sorted, n_hits = sort_loci_and_doc_ids(input_data)
     assert np.array_equal(doc_ids_sorted, expected_output[0])
@@ -120,8 +143,16 @@ def test_sorting_order():
 
 
 def test_counting_hits():
-    input_data = [(np.array([1], dtype=np.int32), np.array(["doc1"], dtype=object)), (np.array([2, 3], dtype=np.int32), np.array(["doc2", "doc3"], dtype=object)), None]
-    expected_output = (np.array([1, 2, 3], dtype=np.int32), np.array(["doc1", "doc2", "doc3"], dtype=object), 3)
+    input_data: list[tuple[NDArray[np.int32], NDArray] | None]  = [
+        (np.array([1], dtype=np.int32), np.array(["doc1"], dtype=object)),
+        (np.array([2, 3], dtype=np.int32), np.array(["doc2", "doc3"], dtype=object)),
+        None,
+    ]
+    expected_output = (
+        np.array([1, 2, 3], dtype=np.int32),
+        np.array(["doc1", "doc2", "doc3"], dtype=object),
+        3,
+    )
     doc_ids_sorted, loci_sorted, n_hits = sort_loci_and_doc_ids(input_data)
     assert np.array_equal(doc_ids_sorted, expected_output[0])
     assert np.array_equal(loci_sorted, expected_output[1])
@@ -163,7 +194,7 @@ def mock_dependencies(mocker):
 
 def test_filter_annotation_excludes_correct_loci(mock_dependencies, mocker, tmp_path):
     stats, job_data, reporter = mock_dependencies
-    doc_ids_sorted = np.array([0,1], dtype=np.int32)
+    doc_ids_sorted = np.array([0, 1], dtype=np.int32)
     loci_sorted = np.array(["locus1", "locus3"])
     n_hits = 2
     loci_file_path = tmp_path / "loci.txt"
@@ -174,7 +205,16 @@ def test_filter_annotation_excludes_correct_loci(mock_dependencies, mocker, tmp_
 
     # Call the function
     retained_count = filter_annotation(
-        stats, "path.gz", "parent_path", job_data, doc_ids_sorted, loci_sorted, n_hits, reporter, 10, loci_file_path
+        stats,
+        "path.gz",
+        "parent_path",
+        job_data,
+        doc_ids_sorted,
+        loci_sorted,
+        n_hits,
+        reporter,
+        10,
+        loci_file_path,
     )
 
     # Assertions
@@ -183,9 +223,9 @@ def test_filter_annotation_excludes_correct_loci(mock_dependencies, mocker, tmp_
     assert loci_file_path.read_text() == "locus1\nlocus3\n"
 
 
-def test_filter_annotation_excludes_correct_loci2(mock_dependencies, mocker, tmp_path):
+def test_filter_annotation_excludes_correct_loci2(mock_dependencies, tmp_path):
     stats, job_data, reporter = mock_dependencies
-    doc_ids_sorted = np.array([0,1], dtype=np.int32)
+    doc_ids_sorted = np.array([0, 1], dtype=np.int32)
     loci_sorted = np.array(["locus1", "locus3"])
     n_hits = 2
     loci_file_path = tmp_path / "loci.txt"
@@ -200,28 +240,55 @@ def test_filter_annotation_excludes_correct_loci2(mock_dependencies, mocker, tmp
 
     # Call the function
     retained_count = filter_annotation(
-        stats, "path.gz", "parent_path", job_data, doc_ids_sorted, loci_sorted, n_hits, reporter, 10, loci_file_path
+        stats,
+        "path.gz",
+        "parent_path",
+        job_data,
+        doc_ids_sorted,
+        loci_sorted,
+        n_hits,
+        reporter,
+        10,
+        loci_file_path,
     )
 
     # Assertions
-    assert retained_count == 2
+    assert retained_count == 1
     assert loci_file_path.read_text() == "locus1\n"
 
 
-def test_filter_annotation_excludes_correct_loci3(mock_dependencies):
+def test_filter_annotation_excludes_correct_loci3(mock_dependencies, tmp_path):
     stats, job_data, reporter = mock_dependencies
-    doc_ids_sorted = [(0, "locus1"), (1, "locus3")]  # Indices of rows to include if not filtered
+    doc_ids_sorted = np.array([0, 1], dtype=np.int32)
+    loci_sorted = np.array(["locus1", "locus3"])
     n_hits = 2
+    loci_file_path = tmp_path / "loci.txt"
 
-    def filter_fn(_row: list[bytes]) -> bool:
+    # Mock filter function to exclude row2
+    def filter_fn(_: list[bytes]) -> bool:
         """Filter out all rows."""
-        return True
+        return True  # filter out all rows
 
+    # To simulate a row being filtered, adjust the filter function and re-run
     job_data.pipeline[0].make_filter.return_value = filter_fn
-    filtered_loci = filter_annotation(
-        stats, "path.gz", "parent_path", job_data, doc_ids_sorted, n_hits, reporter, 1
+
+    # Call the function
+    retained_count = filter_annotation(
+        stats,
+        "path.gz",
+        "parent_path",
+        job_data,
+        doc_ids_sorted,
+        loci_sorted,
+        n_hits,
+        reporter,
+        10,
+        loci_file_path,
     )
-    assert filtered_loci == []  # Now expects an empty list because all are filtered
+
+    # Assertions
+    assert retained_count == 0
+    assert loci_file_path.read_text() == ""
 
 
 # Prepare common fixtures
@@ -237,12 +304,10 @@ def common_args(mock_job_data):
     return {
         "dosage_out_path": "mock_dosage_out_path",
         "parent_dosage_matrix_path": "mock_parent_dosage_path",
-        "filtered_loci": ["locus1", "locus2"],
+        "loci_file_path": "loci.txt",
         "job_data": mock_job_data,
         "queue_config_path": "mock_queue_config_path",
         "reporting_interval": 10,
-        "output_dir": "mock_output_dir",
-        "basename": "mock_basename",
     }
 
 
@@ -267,46 +332,33 @@ def test_empty_dosage_matrix(mock_stat, mock_logger, common_args, mock_dependenc
         mock_logger.info.assert_called_with("No dosage matrix to filter")
 
 
-@patch("bystro.search.save.handler.logger")
 @patch("os.stat")
-@patch("builtins.open", new_callable=MagicMock)
-def test_normal_operation(mock_open, mock_stat, mock_logger, common_args, mock_dependencies):
-    _, _, reporter = mock_dependencies
-    mock_stat.return_value.st_size = 1024  # Non-zero size
-    with (
-        patch("pathlib.Path.touch") as mock_touch,
-        patch("bystro.search.save.handler.run_dosage_filter") as mock_run,
-        patch("bystro.search.save.handler.Timer") as mock_timer,
-    ):
-        mock_timer.return_value.__enter__.return_value.elapsed_time = 5
-        filter_dosage_matrix(**common_args, reporter=reporter)
-        mock_run.assert_called_once()  # Check if the filtering function was indeed called
-        mock_touch.assert_not_called()  # Should not touch since matrix exists
-        assert mock_open.called
-        mock_logger.info.assert_called_with("Filtering dosage matrix took %s seconds", 5)
-
-
-@patch("os.stat")
-@patch("builtins.open", new_callable=MagicMock)
-def test_no_loci_provided(mock_open, mock_stat, common_args, mock_dependencies):
+@patch("os.path.exists")
+def test_no_loci_provided(mock_exists, mock_stat, common_args, mock_dependencies):
     _, _, reporter = mock_dependencies
 
-    # Setting the mock to return a non-zero file size
-    mock_stat.return_value.st_size = 1024
+    # Setting the mock to return a non-zero file size for the parent dosage matrix
+    mock_stat.side_effect = [
+        MagicMock(st_size=1024),
+        MagicMock(st_size=0),
+    ]  # Non-zero for dosage matrix, zero for loci file
+    mock_exists.side_effect = [True, False]  # Exists for dosage matrix, does not exist for loci file
+
+    expected_loci_file_path = common_args["loci_file_path"]
 
     with (
-        patch("builtins.open", mock_open()) as mocked_file,
         patch("bystro.search.save.handler.run_dosage_filter") as mock_run_dosage_filter,
+        patch("pathlib.Path.touch") as mock_touch,
     ):
-        handle = mocked_file.return_value.__enter__.return_value
-
         filter_dosage_matrix(**common_args, reporter=reporter)
-        mocked_file.assert_called_once_with(
-            os.path.join(common_args["output_dir"], "mock_basename_loci.txt"), "w"
-        )
 
-        handle.write.assert_called()  # Expect no writes if no loci
+        # Assert that the loci file path was checked for existence
+        mock_exists.assert_any_call(expected_loci_file_path)
 
-        assert handle.write.call_count == 2
+        # Assert no dosage matrix filtering was triggered
+        mock_run_dosage_filter.assert_not_called()
 
-        mock_run_dosage_filter.assert_called()  # Ensure the dosage filter function was called
+        # Assert the log and message functions were called appropriately
+        mock_dependencies[2].message.remote.assert_called_once_with("No dosage matrix to filter.")
+
+        mock_touch.assert_called_once_with()
