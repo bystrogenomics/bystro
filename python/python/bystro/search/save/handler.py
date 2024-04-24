@@ -489,6 +489,11 @@ async def go(  # pylint:disable=invalid-name
     query["fields"] = FIELDS_TO_QUERY
     query["_source"] = False
 
+    logger.info(
+        "Memory usage before querying: %s (MB)",
+        psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+    )
+
     try:
         num_cpus = ray.available_resources().get("CPU", 1)
 
