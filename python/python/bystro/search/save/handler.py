@@ -224,6 +224,9 @@ def run_dosage_filter(
 def sort_loci_and_doc_ids(
     results: list[tuple[NDArray[np.int32], NDArray]]
 ) -> tuple[NDArray[np.int32], NDArray, int]:
+    if len(results) == 0:
+        return np.array([], dtype=np.int32), np.array([], dtype=object), 0
+
     # Log the memory usage at the start
     process = psutil.Process(os.getpid())
     initial_memory = process.memory_info().rss / 1024**2

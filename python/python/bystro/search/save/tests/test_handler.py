@@ -74,7 +74,13 @@ def test_empty_input():
 
 
 def test_all_none_values():
-    doc_ids_sorted, loci_sorted, n_hits = sort_loci_and_doc_ids([None, None, None])
+    doc_ids_sorted, loci_sorted, n_hits = sort_loci_and_doc_ids(
+        [
+            (np.array([], dtype=np.int32), np.array([], dtype=object)),
+            (np.array([], dtype=np.int32), np.array([], dtype=object)),
+            (np.array([], dtype=np.int32), np.array([], dtype=object)),
+        ]
+    )
     assert np.array_equal(doc_ids_sorted, np.array([], dtype=np.int32))
     assert np.array_equal(loci_sorted, np.array([], dtype=object))
     assert n_hits == 0
@@ -82,9 +88,9 @@ def test_all_none_values():
 
 def test_mixed_none_and_non_none_values():
     input_data = [
-        None,
+        (np.array([], dtype=np.int32), np.array([], dtype=object)),
         (np.array([1, 2], dtype=np.int32), np.array(["doc1", "doc2"], dtype=object)),
-        None,
+        (np.array([], dtype=np.int32), np.array([], dtype=object)),
         (np.array([3], dtype=np.int32), np.array(["doc3"], dtype=object)),
     ]
     expected_output = (
@@ -100,7 +106,7 @@ def test_mixed_none_and_non_none_values():
 
 
 def test_single_element():
-    input_data: list[tuple[NDArray[np.int32], NDArray] | None] = [
+    input_data: list[tuple[NDArray[np.int32], NDArray]] = [
         (np.array([1], dtype=np.int32), np.array(["doc1"], dtype=object))
     ]
     expected_output = (np.array([1], dtype=np.int32), np.array(["doc1"], dtype=object), 1)
@@ -111,7 +117,7 @@ def test_single_element():
 
 
 def test_multiple_elements():
-    input_data: list[tuple[NDArray[np.int32], NDArray] | None]  = [
+    input_data: list[tuple[NDArray[np.int32], NDArray]] = [
         (np.array([2, 1, 3], dtype=np.int32), np.array(["doc2", "doc1", "doc3"], dtype=object))
     ]
     expected_output = (
@@ -126,7 +132,7 @@ def test_multiple_elements():
 
 
 def test_sorting_order():
-    input_data: list[tuple[NDArray[np.int32], NDArray] | None]  = [
+    input_data: list[tuple[NDArray[np.int32], NDArray]] = [
         (np.array([2, 1], dtype=np.int32), np.array(["doc2", "doc1"], dtype=object)),
         (np.array([4, 3], dtype=np.int32), np.array(["doc4", "doc3"], dtype=object)),
     ]
@@ -143,10 +149,10 @@ def test_sorting_order():
 
 
 def test_counting_hits():
-    input_data: list[tuple[NDArray[np.int32], NDArray] | None]  = [
+    input_data: list[tuple[NDArray[np.int32], NDArray]] = [
         (np.array([1], dtype=np.int32), np.array(["doc1"], dtype=object)),
         (np.array([2, 3], dtype=np.int32), np.array(["doc2", "doc3"], dtype=object)),
-        None,
+        (np.array([], dtype=np.int32), np.array([], dtype=object)),
     ]
     expected_output = (
         np.array([1, 2, 3], dtype=np.int32),
