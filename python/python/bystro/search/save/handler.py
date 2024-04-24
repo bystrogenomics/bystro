@@ -34,6 +34,12 @@ MAX_SLICES = 1e6
 KEEP_ALIVE = "1d"
 MAX_CONCURRENCY_PER_THREAD = 4
 SAVE_LOCI_BATCH_WRITE_SIZE = int(os.getenv("SAVE_LOCI_BATCH_WRITE_SIZE", 500_000))
+# Annotations are reported by filtered input row;
+# this is very rapid, so to avoid spamming the user with messages,
+# we only report every 5 million rows by default
+ANNOTATION_MINIMUM_REPORTING_INTERVAL = int(
+    os.getenv("ANNOTATION_MINIMUM_REPORTING_INTERVAL", 5_000_0000)
+)
 
 # How many scroll requests for each worker to handle
 PARALLEL_SCROLL_CHUNK_INCREMENT = 2
@@ -210,7 +216,7 @@ def sort_loci_and_doc_ids(
         if chunk is None:
             continue
 
-        loci, doc_ids = chunk
+        doc_ids, loci = chunk
         n_hits += len(doc_ids)
         all_loci = np.concatenate((all_loci, loci))
         all_doc_ids = np.concatenate((all_doc_ids, doc_ids))
@@ -219,8 +225,8 @@ def sort_loci_and_doc_ids(
     sorted_indices = np.argsort(all_doc_ids)
 
     # Perform in-place sorting by reassigning sorted values back into the original arrays
-    all_loci[:] = all_loci[sorted_indices]
-    all_doc_ids[:] = all_doc_ids[sorted_indices]
+    all_loci = all_loci[sorted_indices]
+    all_doc_ids = all_doc_ids[sorted_indices]
 
     return all_doc_ids, all_loci, n_hits
 
@@ -237,11 +243,12 @@ def filter_annotation(
     reporting_interval: int,
     loci_file_path: str,
 ):
+    reporting_interval = max(ANNOTATION_MINIMUM_REPORTING_INTERVAL, reporting_interval)
 
     reporter.message.remote(  # type: ignore
         (
-            "Filtering annotation and re-generating stats. "
-            f"Reporting progress every ~{reporting_interval} variants"
+            "Filtering annotation file and re-generating stats. "
+            f"Reporting progress every ~{reporting_interval} rows."
         )
     )
 
@@ -256,7 +263,7 @@ def filter_annotation(
             subprocess.Popen(bystro_stats_cmd, shell=True, stdin=subprocess.PIPE) as stats_fh,
             subprocess.Popen(bgzip_cmd, shell=True, stdin=subprocess.PIPE) as p,
             subprocess.Popen(bgzip_decompress_cmd, shell=True, stdout=subprocess.PIPE) as in_fh,
-            open(loci_file_path, "w") as loci_fh
+            open(loci_file_path, "w") as loci_fh,
         ):
             if in_fh.stdout is None:
                 raise IOError("Failed to open annotation file for reading.")
@@ -312,11 +319,6 @@ def filter_annotation(
                                 break
 
                     if not filtered:
-                        if current_target_index > 0 and current_target_index % reporting_interval == 0:
-                            reporter.message.remote(  # type: ignore
-                                f"Annotation: Filtered {current_target_index} of {n_hits} variants."
-                            )
-
                         n_retained += 1
 
                         p.stdin.write(line)
@@ -332,13 +334,12 @@ def filter_annotation(
                     current_target_index += 1
 
                     if current_target_index >= n_hits:
-                        reporter.message.remote(  # type: ignore
-                            f"Annotation: Filtered {current_target_index} of {n_hits} variants."
-                        )
-                        reporter.message.remote(  # type: ignore
-                            f"Annotation: {len(filtered_loci)} variants survived filtering."
-                        )
                         break
+
+                if i > 0 and i % reporting_interval == 0:
+                    reporter.message.remote(   # type: ignore
+                        f"Annotation: Filtered {i} rows. {current_target_index} survived filtering."
+                    )
 
             if len(filtered_loci) > 0:
                 loci_fh.write(filtered_loci)
@@ -350,6 +351,10 @@ def filter_annotation(
 
             p.wait()
             stats_fh.wait()
+
+    reporter.message.remote(f"Annotation: {n_retained} variants survived filtering.")  # type: ignore
+
+    reporter.message.remote("Annotation: Completed filtering.")  # type: ignore
 
     logger.info("Filtering annotation and generating stats took %s seconds", timer.elapsed_time)
 
