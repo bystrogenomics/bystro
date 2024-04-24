@@ -85,7 +85,7 @@ class AsyncQueryProcessor:
         self.last_reported_count = 0
         self.reporter = reporter
 
-    async def process_query(self, query: dict) -> tuple[NDArray[np.int32], NDArray] | None:
+    async def process_query(self, query: dict) -> tuple[NDArray[np.int32], NDArray]:
         doc_ids: list[int] = []
         loci: list[str] = []
 
@@ -100,7 +100,7 @@ class AsyncQueryProcessor:
             loci.append(locus)
 
         if len(doc_ids) == 0:
-            return None
+            return np.array([], dtype=np.int32), np.array([], dtype=object)
 
         if self.last_reported_count > self.REPORT_INCREMENT:
             self.reporter.increment_and_write_progress_message.remote(  # type: ignore
@@ -110,7 +110,24 @@ class AsyncQueryProcessor:
 
         self.last_reported_count += len(doc_ids)
 
-        return np.array(doc_ids, dtype=np.int32), np.array(loci, dtype=object)
+        all_doc_ids = np.array(doc_ids, dtype=np.int32)
+        all_loci = np.array(loci, dtype=object)
+
+        start = time.time()
+
+        sorted_indices = np.argsort(all_doc_ids, kind="stable")
+
+        # Perform in-place sorting by reassigning sorted values back into the original arrays
+        all_doc_ids = all_doc_ids[sorted_indices]
+        all_loci = all_loci[sorted_indices]
+
+        logger.info("Sorting indices took %s seconds", time.time() - start)
+        logger.info(
+            "Memory usage after sorting indices: %s (MB)",
+            psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+        )
+
+        return all_doc_ids, all_loci
 
     def close(self):
         if self.last_reported_count > 0:
@@ -205,7 +222,7 @@ def run_dosage_filter(
 
 
 def sort_loci_and_doc_ids(
-    results: list[tuple[NDArray[np.int32], NDArray] | None]
+    results: list[tuple[NDArray[np.int32], NDArray]]
 ) -> tuple[NDArray[np.int32], NDArray, int]:
     # Initialize empty numpy arrays for document loci and IDs
     all_doc_ids = np.array([], dtype=np.int32)
@@ -218,11 +235,7 @@ def sort_loci_and_doc_ids(
     start = time.time()
     # Aggregate results from all actors
     n_hits = 0
-    for chunk in results:
-        if chunk is None:
-            continue
-
-        doc_ids, loci = chunk
+    for doc_ids, loci in results:
         n_hits += len(doc_ids)
 
         all_doc_ids = np.concatenate((all_doc_ids, doc_ids))
@@ -235,7 +248,7 @@ def sort_loci_and_doc_ids(
 
     start = time.time()
     # Get the indices that would sort the loci array
-    sorted_indices = np.argsort(all_doc_ids)
+    sorted_indices = np.argsort(all_doc_ids, kind="stable")
 
     logger.info("Sorting indices took %s seconds", time.time() - start)
     logger.info(
