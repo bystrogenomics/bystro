@@ -256,6 +256,9 @@ def filter_annotation(
 
     filtered_loci = ""
     n_retained = 0
+
+    # avoid having to i + 1 every iteration
+    reporting_interval = reporting_interval - 1
     with Timer() as timer:
         bgzip_cmd = get_compress_from_pipe_cmd(annotation_path)
         bgzip_decompress_cmd = get_decompress_to_pipe_cmd(parent_annotation_path)
@@ -340,10 +343,11 @@ def filter_annotation(
 
                 if i > 0 and i % reporting_interval == 0:
                     end = time.time()
+
                     reporter.message.remote(  # type: ignore
                         (
-                            f"Annotation: Filtered {i} rows. {current_target_index} survived filtering. "
-                            f"Took {end - start:.2f} seconds."
+                            f"Annotation: Filtered {i+1} rows. {current_target_index} rows kept. "
+                            f"Took {end - start:.0f} seconds."
                         )
                     )
                     start = time.time()
@@ -378,9 +382,10 @@ def filter_dosage_matrix(
     loci_file_path: str,
 ):
     if not (
-        os.path.exists(parent_dosage_matrix_path) and os.stat(parent_dosage_matrix_path).st_size > 0
-        and
-        os.path.exists(loci_file_path) and os.stat(loci_file_path).st_size > 0
+        os.path.exists(parent_dosage_matrix_path)
+        and os.stat(parent_dosage_matrix_path).st_size > 0
+        and os.path.exists(loci_file_path)
+        and os.stat(loci_file_path).st_size > 0
     ):
         logger.info("No dosage matrix to filter")
         reporter.message.remote("No dosage matrix to filter.")  # type: ignore
