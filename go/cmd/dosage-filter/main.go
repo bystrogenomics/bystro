@@ -3,9 +3,11 @@ package main
 import (
 	"bufio"
 	"bystro/beanstalkd"
+
+	"github.com/dolthub/swiss"
+
 	"flag"
 	"fmt"
-	"hash/fnv"
 	"log"
 	"os"
 	"runtime"
@@ -96,29 +98,18 @@ func validateArgs(args *CLIArgs) error {
 	return nil
 }
 
-// HashLocus converts a string to a 64-bit hash using FNV-1a algorithm.
-func HashLocus(locus string) uint64 {
-	hasher := fnv.New64a()
-	_, err := hasher.Write([]byte(locus))
-	if err != nil {
-		panic("hash write failed: " + err.Error())
-	}
-	return hasher.Sum64()
-}
-
 // readLociFile reads a file containing loci and stores them in a map with their hash values as keys.
-func readLociFile(filePath string) (map[uint64]void, error) {
+func readLociFile(filePath string) (*swiss.Map[string, void], error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
-	loci := make(map[uint64]void)
+	loci := swiss.NewMap[string, void](100000)
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		hashedKey := HashLocus(scanner.Text())
-		loci[hashedKey] = member
+		loci.Put(scanner.Text(), member)
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, err
@@ -128,7 +119,7 @@ func readLociFile(filePath string) (map[uint64]void, error) {
 
 // processRecordAt processes a record at the given index, filters the rows based on the loci,
 // and writes the filtered rows to the arrowWriter.
-func processRecordAt(fr *ipc.FileReader, loci map[uint64]void, arrowWriter *bystroArrow.ArrowWriter, queue chan int, complete chan bool, count *atomic.Int64) {
+func processRecordAt(fr *ipc.FileReader, loci *swiss.Map[string, void], arrowWriter *bystroArrow.ArrowWriter, queue chan int, complete chan bool, count *atomic.Int64) {
 	pool := memory.NewGoAllocator()
 	builder := array.NewRecordBuilder(pool, arrowWriter.Schema)
 	defer builder.Release()
@@ -145,8 +136,8 @@ func processRecordAt(fr *ipc.FileReader, loci map[uint64]void, arrowWriter *byst
 
 		rowsAccepted := 0
 		for j := 0; j < int(record.NumRows()); j++ {
-			locusValue := HashLocus(locusCol.Value(j))
-			if _, exists := loci[locusValue]; exists {
+			locusValue := locusCol.Value(j)
+			if loci.Has(locusValue) {
 				rowsAccumulated += 1
 				rowsAccepted += 1
 				// Fill the builder with values from the original columns, filtering by selectedIndices
@@ -309,7 +300,7 @@ func main() {
 		log.Fatalf("Couldn't create message sender due to: [%s]\n", err)
 	}
 
-	totalRows := int64(len(loci))
+	totalRows := int64(loci.Count())
 	quit := make(chan bool)
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
