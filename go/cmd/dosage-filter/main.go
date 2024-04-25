@@ -39,32 +39,34 @@ type CLIArgs struct {
 // setup parses the command-line arguments and returns a CLIArgs struct.
 func setup(args []string) *CLIArgs {
 	cliargs := &CLIArgs{}
-	flag.StringVar(&cliargs.inputPath, "input", "", "The path to the input Arrow IPC/Feather file")
-	flag.StringVar(&cliargs.inputPath, "in", "", "The path to the input Arrow IPC/Feather file")
+	fs := flag.NewFlagSet("CLIArgs", flag.ExitOnError)
 
-	flag.StringVar(&cliargs.lociPath, "loci", "", "The path to a file containing loci to filter, one locus per line")
+	fs.StringVar(&cliargs.inputPath, "input", "", "The path to the input Arrow IPC/Feather file")
+	fs.StringVar(&cliargs.inputPath, "in", "", "The path to the input Arrow IPC/Feather file")
+	fs.StringVar(&cliargs.lociPath, "loci", "", "The path to a file containing loci to filter, one locus per line")
+	fs.StringVar(&cliargs.outputPath, "output", "", "The path to the output Arrow IPC/Feather file")
+	fs.StringVar(&cliargs.outputPath, "out", "", "The path to the output Arrow IPC/Feather file (alias)")
 
-	flag.StringVar(&cliargs.outputPath, "output", "", "The path to the output Arrow IPC/Feather file")
-	flag.StringVar(&cliargs.outputPath, "out", "", "The path to the output Arrow IPC/Feather file")
+	fs.StringVar(&cliargs.beanstalkConfigPath, "queue-config", "", "The path to the Beanstalkd queue connection config (e.g., config/beanstalk.yml)")
+	fs.StringVar(&cliargs.beanstalkConfigPath, "q", "", "The path to the Beanstalkd queue connection config (short form)")
 
-	flag.StringVar(&cliargs.beanstalkConfigPath, "queue-config", "", "The path to the Beanstalkd queue connection config (e.g. config/beanstalk.yml)")
-	flag.StringVar(&cliargs.beanstalkConfigPath, "q", "", "The path to the Beanstalkd queue connection config (short form)")
-	flag.Int64Var(&cliargs.progressFrequency, "progress-frequency", int64(5e3), "Print progress every N variants processed")
-	flag.Int64Var(&cliargs.progressFrequency, "p", int64(5e3), "Print progress every N variants processed (short form)")
+	fs.Int64Var(&cliargs.progressFrequency, "progress-frequency", int64(5e3), "Print progress every N variants processed")
+	fs.Int64Var(&cliargs.progressFrequency, "p", int64(5e3), "Print progress every N variants processed (short form)")
 
-	flag.StringVar(&cliargs.jobSubmissionID, "job-submission-id", "", "The job submission ID")
-	flag.StringVar(&cliargs.jobSubmissionID, "j", "", "The job submission ID (short form)")
+	fs.StringVar(&cliargs.jobSubmissionID, "job-submission-id", "", "The job submission ID")
+	fs.StringVar(&cliargs.jobSubmissionID, "j", "", "The job submission ID (short form)")
 
+	// Parsing custom args or os.Args based on context
 	a := os.Args[1:]
 	if args != nil {
 		a = args
 	}
 
-	flag.CommandLine.Parse(a)
+	fs.Parse(a)
 
 	if err := validateArgs(cliargs); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
-		flag.Usage()
+		fs.Usage()
 		os.Exit(1)
 	}
 
@@ -239,9 +241,13 @@ func processRecordAt(fr *ipc.FileReader, loci *btree.Set[string], arrowWriter *b
 }
 
 func main() {
+	runProgram(nil)
+}
+
+func runProgram(args []string) {
 	var totalCount atomic.Int64
 
-	cliargs := setup(nil)
+	cliargs := setup(args)
 
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)

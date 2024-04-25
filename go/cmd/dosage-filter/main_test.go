@@ -121,8 +121,8 @@ func TestArrowWriteRead(t *testing.T) {
 	outFilePath := path.Join(t.TempDir(), "output.feather")
 
 	// Call main
-	os.Args = []string{"cmd", "-in", filePath, "-out", outFilePath, "-loci", lociFilePath}
-	main()
+	args := []string{"-in", filePath, "-out", outFilePath, "-loci", lociFilePath}
+	runProgram(args)
 
 	// Read outFilePath and ensure it is missing chr2 locus entry
 	file, err = os.Open(outFilePath)
@@ -200,7 +200,7 @@ func TestArrowWriteRead(t *testing.T) {
 
 // test 0 loci retained
 func TestArrowWriteRead0Loci(t *testing.T) {
-	filePath := path.Join(t.TempDir(), "test.feather")
+	filePath := path.Join(t.TempDir(), "test0.feather")
 
 	// Define the data types for the fields
 	fieldTypes := []arrow.DataType{arrow.BinaryTypes.String, arrow.PrimitiveTypes.Uint8, arrow.PrimitiveTypes.Uint8}
@@ -216,7 +216,7 @@ func TestArrowWriteRead0Loci(t *testing.T) {
 	}
 
 	// write loci file to temp dir
-	lociFilePath := filepath.Join(t.TempDir(), "loci.txt")
+	lociFilePath := filepath.Join(t.TempDir(), "loci0.txt")
 	lociFile, err := os.Create(lociFilePath)
 	if err != nil {
 		t.Fatal(err)
@@ -224,10 +224,10 @@ func TestArrowWriteRead0Loci(t *testing.T) {
 
 	lociFile.Close()
 
-	outFilePath := filepath.Join(t.TempDir(), "output.feather")
+	outFilePath := filepath.Join("output0.feather")
 
-	os.Args = []string{"cmd", "-in", filePath, "-out", outFilePath, "-loci", lociFilePath}
-	main()
+	args := []string{"-in", filePath, "-out", outFilePath, "-loci", lociFilePath}
+	runProgram(args)
 
 	// assert that the outputFile exists
 	if _, err := os.Stat(outFilePath); os.IsNotExist(err) {
