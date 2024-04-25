@@ -307,8 +307,6 @@ def filter_annotation(
 
     filtered_loci = ""
 
-    # avoid having to i + 1 every iteration
-    reporting_interval = reporting_interval - 1
     current_target_index = 0
     n_retained = 0
     with Timer() as timer:
@@ -353,7 +351,6 @@ def filter_annotation(
                     continue
 
                 i += 1
-
                 # doc_ids_sorted is a sorted list of document_ids, which are the indices in the
                 # annotation file that we wish to keep
                 # we iterate over input file lines (indexed by i), finding those lines that
@@ -391,12 +388,12 @@ def filter_annotation(
                     if current_target_index >= n_hits:
                         break
 
-                if i > 0 and i % reporting_interval == 0:
+                if (i + 1) % reporting_interval == 0:
                     end = time.time()
 
                     reporter.message.remote(  # type: ignore
                         (
-                            f"Annotation: Filtered {i+1} variants. {n_retained} kept. "
+                            f"Annotation: Filtered {i + 1} variants. {n_retained} kept. "
                             f"Took {end - start:.0f} seconds."
                         )
                     )
