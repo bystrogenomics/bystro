@@ -6,7 +6,7 @@ require (
 	github.com/apache/arrow/go/v14 v14.0.2
 	github.com/beanstalkd/go-beanstalk v0.2.0
 	github.com/biogo/hts v1.4.4
-	github.com/bystrogenomics/bystro-vcf v0.0.0-20240406002905-a9a245f1ffb0
+	github.com/bystrogenomics/bystro-vcf v0.0.0-20240425204515-a3bed256638d
 	github.com/bytedance/sonic v1.10.2
 	github.com/dolthub/swiss v0.2.1
 	github.com/klauspost/compress v1.17.4

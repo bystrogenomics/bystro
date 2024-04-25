@@ -6,7 +6,7 @@ ENV GOBIN=/app/bin
 
 # Install the specific versions of the Go programs
 RUN go install github.com/akotlar/bystro-stats@1.0.0
-RUN go install github.com/bystrogenomics/bystro-vcf@2.2.1
+RUN go install github.com/bystrogenomics/bystro-vcf@2.2.2
 RUN go install github.com/akotlar/bystro-snp@1.0.0
 RUN go install github.com/mikefarah/yq@2.4.1
 

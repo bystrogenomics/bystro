@@ -146,33 +146,37 @@ func processRecordAt(fr *ipc.FileReader, loci *btree.Set[string], arrowWriter *b
 				// Fill the builder with values from the original columns, filtering by selectedIndices
 				for colIdx := 0; colIdx < int(record.NumCols()); colIdx++ {
 					column := record.Column(colIdx)
-					switch column := column.(type) {
-					case *array.String:
-						builder.Field(colIdx).(*array.StringBuilder).Append(column.Value(j))
-					case *array.Uint8:
-						builder.Field(colIdx).(*array.Uint8Builder).Append(column.Value(j))
-					case *array.Uint16:
-						builder.Field(colIdx).(*array.Uint16Builder).Append(column.Value(j))
-					case *array.Uint32:
-						builder.Field(colIdx).(*array.Uint32Builder).Append(column.Value(j))
-					case *array.Uint64:
-						builder.Field(colIdx).(*array.Uint64Builder).Append(column.Value(j))
-					case *array.Int8:
-						builder.Field(colIdx).(*array.Int8Builder).Append(column.Value(j))
-					case *array.Int16:
-						builder.Field(colIdx).(*array.Int16Builder).Append(column.Value(j))
-					case *array.Int32:
-						builder.Field(colIdx).(*array.Int32Builder).Append(column.Value(j))
-					case *array.Int64:
-						builder.Field(colIdx).(*array.Int64Builder).Append(column.Value(j))
-					case *array.Float16:
-						builder.Field(colIdx).(*array.Float16Builder).Append(column.Value(j))
-					case *array.Float32:
-						builder.Field(colIdx).(*array.Float32Builder).Append(column.Value(j))
-					case *array.Float64:
-						builder.Field(colIdx).(*array.Float64Builder).Append(column.Value(j))
-					default:
-						log.Fatalf("Unsupported column type: %T", column)
+					if column.IsNull(j) {
+						builder.Field(colIdx).AppendNull() // Appends a null value to the field
+					} else {
+						switch column := column.(type) {
+						case *array.String:
+							builder.Field(colIdx).(*array.StringBuilder).Append(column.Value(j))
+						case *array.Uint8:
+							builder.Field(colIdx).(*array.Uint8Builder).Append(column.Value(j))
+						case *array.Uint16:
+							builder.Field(colIdx).(*array.Uint16Builder).Append(column.Value(j))
+						case *array.Uint32:
+							builder.Field(colIdx).(*array.Uint32Builder).Append(column.Value(j))
+						case *array.Uint64:
+							builder.Field(colIdx).(*array.Uint64Builder).Append(column.Value(j))
+						case *array.Int8:
+							builder.Field(colIdx).(*array.Int8Builder).Append(column.Value(j))
+						case *array.Int16:
+							builder.Field(colIdx).(*array.Int16Builder).Append(column.Value(j))
+						case *array.Int32:
+							builder.Field(colIdx).(*array.Int32Builder).Append(column.Value(j))
+						case *array.Int64:
+							builder.Field(colIdx).(*array.Int64Builder).Append(column.Value(j))
+						case *array.Float16:
+							builder.Field(colIdx).(*array.Float16Builder).Append(column.Value(j))
+						case *array.Float32:
+							builder.Field(colIdx).(*array.Float32Builder).Append(column.Value(j))
+						case *array.Float64:
+							builder.Field(colIdx).(*array.Float64Builder).Append(column.Value(j))
+						default:
+							log.Fatalf("Unsupported column type: %T", column)
+						}
 					}
 				}
 

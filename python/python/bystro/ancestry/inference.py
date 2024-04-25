@@ -273,7 +273,7 @@ def infer_ancestry(ancestry_models: AncestryModels, genotypes: Dataset) -> Ances
                 )
                 genotypes_df = pd.concat([genotypes_df, missing_rows_df])
 
-            genotypes_df[genotypes_df.isna()] = 1
+            genotypes_df[genotypes_df.isna() | (genotypes_df < 0)] = 1
 
             pcs_for_plotting, pop_probs_df = ancestry_model.predict_proba(genotypes_df)
 
