@@ -1,22 +1,26 @@
 """Provide a CLI for proteomics analysis."""
 
+import json
 from pathlib import Path
 from typing import Any, BinaryIO
+import uuid
 
 import requests
+
 from bystro.api.auth import authenticate
-import json
-import uuid
+from bystro.proteomics.somascan import SomascanDataset
 
 # ruff: noqa: T201
 
 UPLOAD_PROTEIN_ENDPOINT = "/api/jobs/proteomics/"
 GET_ANNOTATION = "/api/jobs/:id"
+EXPERIMENT_ENDPOINT = "/api/jobs/experiment"
+
 HTTP_STATUS_OK = 200
 ONE_HOUR_IN_SECONDS = 60 * 60
 FRAGPIPE_GENE_ABUNDANCE_HEADERS = ["Index", "NumberPSM", "ProteinID", "MaxPepProb", "ReferenceIntensity"]
 EXPERIMENT_ANNOTATION_HEADERS = ["Experiment Name", "Sample ID", "Subject ID"]
-EXPERIMENT_ENDPOINT = "/api/jobs/experiment"
+SOMASCAN_EXTENSION = ".adat"
 
 
 def _package_filename(filename: str) -> tuple[str, tuple[str, BinaryIO, str]]:
@@ -30,9 +34,6 @@ def _package_filename(filename: str) -> tuple[str, tuple[str, BinaryIO, str]]:
             "application/octet-stream",
         ),
     )
-
-
-#class DatasetTypes(Enum):
 
 
 def upload_proteomics_dataset(
@@ -68,16 +69,22 @@ def upload_proteomics_dataset(
     if annotation_job_id is not None and not isinstance(annotation_job_id, str):
         raise ValueError("annotation job id must be a string.")
 
-    with open(protein_abundance_file, "r") as file:
-        first_line = file.readline().strip().lower()
-        if not all(header.lower() in first_line for header in FRAGPIPE_GENE_ABUNDANCE_HEADERS):
-            raise ValueError(
-                "The protein abundance file does not contain the expected headers: %s"
-                % FRAGPIPE_GENE_ABUNDANCE_HEADERS
-            )
+    if not protein_abundance_file.endswith(SOMASCAN_EXTENSION):
+        with open(protein_abundance_file, "r", encoding="utf8") as file:
+            first_line = file.readline().strip().lower()
+            if not all(header.lower() in first_line for header in FRAGPIPE_GENE_ABUNDANCE_HEADERS):
+                raise ValueError(
+                    "The protein abundance file does not contain the expected headers: %s"
+                    % FRAGPIPE_GENE_ABUNDANCE_HEADERS
+                )
+    else:
+        try:
+            SomascanDataset.from_paths(protein_abundance_file)
+        except ValueError as e:
+            raise ValueError("Failed to read the somascan dataset") from e
 
     if experiment_annotation_file:
-        with open(experiment_annotation_file, "r") as file:
+        with open(experiment_annotation_file, "r", encoding="utf8") as file:
             first_line = file.readline().strip().lower()
             if not all(header.lower() in first_line for header in EXPERIMENT_ANNOTATION_HEADERS):
                 raise ValueError(
@@ -102,13 +109,14 @@ def upload_proteomics_dataset(
 
         state, auth_header = authenticate()
         experiment_file = _package_filename(experiment_annotation_file)
-
         experiment_response = requests.post(
             state.url + EXPERIMENT_ENDPOINT,
             headers=auth_header,
             files={"file": experiment_file[1]},
             data={"experimentName": experiment_name},
+            timeout=ONE_HOUR_IN_SECONDS,
         )
+
         if experiment_response.status_code != HTTP_STATUS_OK:
             raise RuntimeError(
                 "Experiment annotation upload failed with status "
@@ -126,24 +134,23 @@ def upload_proteomics_dataset(
     proteomics_uuid = str(uuid.uuid4())
 
     if annotation_job_id:
-            annotation_url = state.url + GET_ANNOTATION.replace(":id", str(annotation_job_id))
-            annotation_response = requests.get(annotation_url, headers=auth_header)
+        annotation_url = state.url + GET_ANNOTATION.replace(":id", str(annotation_job_id))
+        annotation_response = requests.get(annotation_url, headers=auth_header, timeout=30)
 
-            if annotation_response.status_code != HTTP_STATUS_OK:
-                raise RuntimeError(
-                    f"The annotation with ID {annotation_job_id} "
-                    "does not exist or you do not have permissions to access this annotation."
-                )
+        if annotation_response.status_code != HTTP_STATUS_OK:
+            raise RuntimeError(
+                f"The annotation with ID {annotation_job_id} "
+                "does not exist or you do not have permissions to access this annotation."
+            )
 
-            proteomics_uuid = str(uuid.uuid4())
-            annotation_uuid = str(uuid.uuid4())
+        annotation_uuid = str(uuid.uuid4())
 
-            job_payload = {
-                "assembly": "NA",
-                "annotationID": annotation_uuid,
-                "proteomicsID": proteomics_uuid,
-                "experimentName": experiment_name,
-            }
+        job_payload = {
+            "assembly": "NA",
+            "annotationID": annotation_uuid,
+            "proteomicsID": proteomics_uuid,
+            "experimentName": experiment_name,
+        }
     else:
         job_payload = {
             "assembly": "NA",
@@ -152,7 +159,11 @@ def upload_proteomics_dataset(
     protein_files = [_package_filename(protein_abundance_file)]
 
     response = requests.post(
-        url, headers=auth_header, files=protein_files, data={"job": json.dumps(job_payload)}
+        url,
+        headers=auth_header,
+        files=protein_files,
+        data={"job": json.dumps(job_payload)},
+        timeout=ONE_HOUR_IN_SECONDS,
     )
 
     if response.status_code != HTTP_STATUS_OK:
@@ -163,11 +174,9 @@ def upload_proteomics_dataset(
         print("\nProteomics Upload Response:", json.dumps(proteomics_response_data, indent=4))
 
     if annotation_job_id:
-        update_annotation_payload = {
-            "proteomicsID": proteomics_uuid,
-            "annotationID": annotation_uuid}
+        update_annotation_payload = {"proteomicsID": proteomics_uuid, "annotationID": annotation_uuid}
         update_annotation_response = requests.post(
-            annotation_url, headers=auth_header, json=update_annotation_payload
+            annotation_url, headers=auth_header, json=update_annotation_payload, timeout=30
         )
 
         if update_annotation_response.status_code == HTTP_STATUS_OK:
@@ -184,6 +193,5 @@ def upload_proteomics_dataset(
             )
     elif print_result:
         print("\nProteomics submission completed successfully without annotation linkage.\n")
-    
-    return proteomics_response_data
 
+    return proteomics_response_data

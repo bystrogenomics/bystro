@@ -30,7 +30,8 @@ from tqdm import trange
 import torch
 from torch import Tensor, nn
 from torch.distributions.multivariate_normal import MultivariateNormal
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, Ridge
+from bystro.supervised_ppca._misc_np import softplus_inverse_np
 
 from bystro.supervised_ppca.gf_generative_pt import PPCA
 from bystro.supervised_ppca._base import _get_projection_matrix
@@ -138,6 +139,7 @@ class PPCADropout(PPCA):
 
         W_, sigmal_ = self._initialize_variables(device, X)
         X_, y_ = self._transform_training_data(device, X, 1.0 * y)
+        softplus = nn.Softplus()
 
         if task == "classification":
             sigm = nn.Sigmoid()
@@ -148,13 +150,30 @@ class PPCADropout(PPCA):
             mod = LogisticRegression(max_iter=1000)
             mod.fit(X, 1.0 * y)
             b_ = torch.tensor(mod.intercept_.astype(np.float32), device=device)
+            trainable_variables = [W_, sigmal_]
         elif task == "regression":
             supervision_loss = nn.MSELoss()
+
+            # Now initializing the predictive coefficients
+            sigma = softplus(sigmal_)
+            P_x, Cov = _get_projection_matrix(W_, sigma, device)
+            mean_z = torch.matmul(X_, torch.transpose(P_x, 0, 1))
+            eps = torch.rand_like(mean_z)
+            C1_2 = torch.linalg.cholesky(Cov)
+            z_samples = mean_z + torch.matmul(eps, C1_2)
+            zs = z_samples.detach().cpu().numpy()
+            mod = Ridge(fit_intercept=False)
+            mod.fit(zs, y)
+            beta_init = softplus_inverse_np(np.squeeze(np.abs(mod.coef_)))
+            beta_l = torch.tensor(
+                beta_init.astype(np.float32).T,
+                device=device,
+                requires_grad=True,
+            )
+            trainable_variables = [W_, sigmal_, beta_l]
         else:
             err_msg = f"unrecognized_task {task}, must be regression or classification"
             raise ValueError(err_msg)
-
-        trainable_variables = [W_, sigmal_]
 
         optimizer = torch.optim.SGD(
             trainable_variables,
@@ -166,7 +185,6 @@ class PPCADropout(PPCA):
         one_s = torch.tensor(
             np.ones(self.n_supervised).astype(np.float32), device=device
         )
-        softplus = nn.Softplus()
 
         _prior = self._create_prior(device)
 
@@ -197,7 +215,8 @@ class PPCADropout(PPCA):
             z_samples = mean_z + torch.matmul(eps, C1_2)
 
             if task == "regression":
-                y_hat = torch.matmul(z_samples[:, : self.n_supervised], one_s)
+                beta_ = softplus(beta_l)
+                y_hat = torch.matmul(z_samples[:, : self.n_supervised], beta_)
                 loss_y = supervision_loss(y_hat, y_batch)
             else:
                 y_hat = (
@@ -226,10 +245,16 @@ class PPCADropout(PPCA):
 
         self._store_instance_variables(device, trainable_variables)
 
-        if device.type == "cuda":
-            self.B_ = b_.detach().cpu().numpy()
+        if task == "classification":
+            if device.type == "cuda":
+                self.B_ = b_.detach().cpu().numpy()
+            else:
+                self.B_ = b_.detach().numpy()
         else:
-            self.B_ = b_.detach().numpy()
+            if device.type == "cuda":
+                self.beta_ = beta_.detach().cpu().numpy()
+            else:
+                self.beta_ = beta_.detach().numpy()
 
         return self
 

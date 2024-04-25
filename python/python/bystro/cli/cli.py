@@ -6,6 +6,8 @@ from bystro.api.annotation import get_jobs, create_jobs, query, JobBasicResponse
 
 from bystro.cli.proteomics_cli import add_proteomics_subparser
 
+from bystro.api.streaming import stream_file
+
 from bystro.cli.ancestry import add_ancestry_subparser
 
 def signup_cli(args: argparse.Namespace, print_result=True) -> CachedAuth:
@@ -151,6 +153,29 @@ def query_cli(args: argparse.Namespace) -> None:
     )
 
 
+def stream_file_cli(args: argparse.Namespace) -> None:
+    """
+    Fetch the file from the /api/jobs/streamFile endpoint.
+
+    Parameters
+    ----------
+    job_id : str
+        The ID of the job of the job being fetched.
+    output : bool, optional
+        Whether to fetch the output file (True) or the input file (False), by default False.
+    key_path : str, optional
+        The key path for the output file, required if `output` is True.
+    print_result : bool
+        Whether to print the result of the fetch operation, by default True.
+    """
+    stream_file(
+        job_id=args.job_id,
+        output=args.output,
+        key_path=args.key_path,
+        print_result=True,
+    )
+
+
 def main():
     """
     The main function for the CLI tool.
@@ -280,6 +305,17 @@ def main():
     )
     query_parser.add_argument("--job_id", required=True, type=str, help="The job id to query")
     query_parser.set_defaults(func=query_cli)
+
+    fetch_parser = subparsers.add_parser("fetch", help="Fetch a file")
+    fetch_parser.add_argument("--job_id", help="ID of the job to fetch the file from")
+    fetch_parser.add_argument(
+        "--output", action="store_true", help="Fetch from output dir instead of the input dir"
+    )
+    fetch_parser.add_argument(
+        "--key_path", help="Key path for the output and input dir, required if --output is used"
+    )
+    fetch_parser.set_defaults(func=stream_file_cli)
+
     add_proteomics_subparser(subparsers)
     add_ancestry_subparser(subparsers)
 
