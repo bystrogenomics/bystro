@@ -26,7 +26,7 @@ All matrices are assumed to be provided as numpy arrays.
 
 import numpy as np
 from numpy import ndarray
-from scipy.linalg import logm, expm, fractional_matrix_power
+from scipy.linalg import logm, expm, fractional_matrix_power # type: ignore
 from typing import List
 
 
