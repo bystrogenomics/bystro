@@ -409,7 +409,7 @@ def filter_annotation(
             p.wait()
             stats_fh.wait()
 
-            reporter.message.remote(f"Annotation: Completed filtering of {n_hits} variants.")  # type: ignore
+            reporter.message.remote(f"Annotation: Completed filtering.")  # type: ignore
 
     reporter.message.remote(f"Annotation: {n_retained} variants survived filtering.")  # type: ignore
 
