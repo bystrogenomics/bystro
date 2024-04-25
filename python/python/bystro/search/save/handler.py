@@ -1,12 +1,11 @@
 """A module to handle the saving of search results into a new annotation"""
 
 # TODO 2023-05-08: Track number of skipped entries
-# TODO 2023-05-08: Write to Arrow IPC or Parquet, alongside tsv.
 # TODO 2023-05-08: Implement distributed pipeline/filters/transforms
 # TODO 2023-05-08: Support sort queries
 # TODO 2023-05-08: get max_slices from opensearch index settings
-# TODO 2023-05-08: concatenate chunks in a different ray worker
 
+import gc
 import logging
 import math
 import os
@@ -14,24 +13,21 @@ import psutil
 import pathlib
 import subprocess
 import time
+from typing import Callable
 
-from numpy._typing import NDArray
-
-import numpy as np
 from opensearchpy import OpenSearch, AsyncOpenSearch
 
-import pyarrow as pa  # type: ignore
-import pyarrow.compute as pc  # type: ignore
-import pyarrow.dataset as ds  # type: ignore
-import pyarrow.ipc as ipc  # type: ignore
+from numpy.typing import NDArray
+import numpy as np
 import ray
 
-from bystro.beanstalkd.worker import ProgressPublisher, get_progress_reporter
-from bystro.search.utils.annotation import AnnotationOutputs
+from bystro.beanstalkd.worker import ProgressPublisher, ProgressReporter, get_progress_reporter
+from bystro.search.utils.annotation import AnnotationOutputs, Statistics
 from bystro.search.utils.messages import SaveJobData
 from bystro.search.utils.opensearch import gather_opensearch_args
 from bystro.utils.compress import get_compress_from_pipe_cmd, get_decompress_to_pipe_cmd
 from bystro.utils.timer import Timer
+
 
 logger = logging.getLogger(__name__)
 
@@ -39,19 +35,26 @@ MAX_QUERY_SIZE = 10_000
 MAX_SLICES = 1e6
 KEEP_ALIVE = "1d"
 MAX_CONCURRENCY_PER_THREAD = 4
-SAVE_FILTER_BATCH_READAHEAD = int(os.getenv("SAVE_FILTER_BATCH_READAHEAD", 0))
-SAVE_FILTER_BATCH_READ_SIZE = int(os.getenv("SAVE_FILTER_BATCH_READ_SIZE", 200_000))
+SAVE_LOCI_BATCH_WRITE_SIZE = int(os.getenv("SAVE_LOCI_BATCH_WRITE_SIZE", 500_000))
+# Annotations are reported by filtered input row;
+# this is very rapid, so to avoid spamming the user with messages,
+# we only report every 5 million rows by default
+ANNOTATION_MINIMUM_REPORTING_INTERVAL = int(
+    os.getenv("ANNOTATION_MINIMUM_REPORTING_INTERVAL", 5_000_000)
+)
 
 # How many scroll requests for each worker to handle
 PARALLEL_SCROLL_CHUNK_INCREMENT = 2
 # Percentage of fetched records to report progress after
-REPORTING_INTERVAL = 0.1
-MINIMUM_RECORDS_TO_ENABLE_REPORTING = 10_000
+REPORTING_INTERVAL = 0.01
+MINIMUM_RECORDS_TO_ENABLE_REPORTING = 100_000
 # These are the fields that are required to define a locus
 # They are used to filter the dosage matrix
 FIELDS_TO_QUERY = ["chrom", "pos", "inputRef", "alt"]
 
 ray.init(ignore_reinit_error=True, address="auto")
+
+_GO_HANDLER_BINARY_PATH = "dosage-filter"
 
 
 def _clean_query(input_query_body: dict):
@@ -83,36 +86,59 @@ class AsyncQueryProcessor:
         self.last_reported_count = 0
         self.reporter = reporter
 
-    async def process_query(self, query: dict) -> tuple[NDArray[np.uint32] | None, list[str] | None]:
-        doc_ids = []
-        loci = []
+    async def process_query(self, query: dict) -> tuple[NDArray[np.int32], NDArray]:
+        doc_ids: list[int] = []
+        loci: list[str] = []
 
         # Perform the search operation asynchronously using the pre-initialized client
         resp = await self.client.search(**query)
 
         for doc in resp["hits"]["hits"]:
-            doc_ids.append(int(doc["_id"]))
-
             src = doc["fields"]
-            loci.append(f"{src['chrom'][0]}:{src['pos'][0]}:{src['inputRef'][0]}:{src['alt'][0]}")
+            doc_id = int(doc["_id"])
+            locus = f"{upper_chr(src['chrom'][0])}:{src['pos'][0]}:{src['inputRef'][0]}:{src['alt'][0]}"
+            doc_ids.append(doc_id)
+            loci.append(locus)
 
-        if len(loci) == 0:
-            return None, None
+        if len(doc_ids) == 0:
+            return np.array([], dtype=np.int32), np.array([], dtype=object)
 
         if self.last_reported_count > self.REPORT_INCREMENT:
-            self.reporter.increment.remote(self.last_reported_count)
+            self.reporter.increment_and_write_progress_message.remote(  # type: ignore
+                self.last_reported_count, "Fetched", "variants"
+            )
             self.last_reported_count = 0
 
-        self.last_reported_count += len(loci)
+        self.last_reported_count += len(doc_ids)
 
-        return np.array(doc_ids), loci
+        all_doc_ids = np.array(doc_ids, dtype=np.int32)
+        all_loci = np.array(loci, dtype=object)
+
+        start = time.time()
+
+        sorted_indices = np.argsort(all_doc_ids, kind="stable")
+
+        # Perform in-place sorting by reassigning sorted values back into the original arrays
+        all_doc_ids = all_doc_ids[sorted_indices]
+        all_loci = all_loci[sorted_indices]
+
+        logger.info("Sorting indices took %s seconds", time.time() - start)
+        logger.info(
+            "Memory usage after sorting indices: %s (MB)",
+            psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+        )
+
+        return all_doc_ids, all_loci
 
     def close(self):
         if self.last_reported_count > 0:
-            self.reporter.increment.remote(self.last_reported_count)
+            self.reporter.increment_and_write_progress_message.remote(  # type: ignore
+                self.last_reported_count, "Fetched", "variants"
+            )
+            self.last_reported_count = 0
 
 
-def _get_num_slices(client, index_name, max_query_size, max_slices, query):
+def _get_num_slices(client, index_name, max_query_size, max_slices, query) -> tuple[int, int]:
     """Count number of hits for the index"""
     query_no_sort = query.copy()
     if "sort" in query_no_sort:
@@ -138,7 +164,7 @@ def _get_num_slices(client, index_name, max_query_size, max_slices, query):
             "Too many slices required to process the query. Please reduce the query size."
         )
 
-    return max(num_slices_required, 1)
+    return max(num_slices_required, 1), n_docs
 
 
 def _prepare_query_body(query, slice_id, num_slices):
@@ -148,27 +174,295 @@ def _prepare_query_body(query, slice_id, num_slices):
     return body
 
 
-def _correct_loci_case(loci):
-    corrected_loci = []
-    for locus in loci:
-        # Check and replace the prefix as needed
-        if locus.startswith("chrx"):
-            corrected_loci.append("chrX" + locus[4:])
-        elif locus.startswith("chry"):
-            corrected_loci.append("chrY" + locus[4:])
-        elif locus.startswith("chrm"):
-            corrected_loci.append("chrM" + locus[4:])
-        elif locus.startswith("chrmt"):
-            corrected_loci.append("chrMT" + locus[5:])
-        else:
-            corrected_loci.append(locus)
-    return corrected_loci
+def upper_chr(chrom: str):
+    return chrom[0:3] + chrom[3:].upper()
 
 
-async def go(  # pylint:disable=invalid-name
-    job_data: SaveJobData, search_conf: dict, publisher: ProgressPublisher
+def run_dosage_filter(
+    parent_dosage_matrix_path: str,
+    dosage_out_path: str,
+    loci_path: str,
+    queue_config_path: str,
+    progress_frequency: int,
+    submission_id: str,
+):
+    """
+    Run the dosage_filter binary
+
+    Args:
+        binary_path (str): The path to the binary executable.
+        args (list[str]): The list of arguments to pass to the binary.
+
+    Returns:
+        None
+
+    Raises:
+        RuntimeError: If the binary execution fails or if there is an error in the stderr output.
+    """
+
+    # call the dosage-filter program, which takes an --input --output --loci
+    # --progress-frequency --queue-config --job-submission-id args
+    # and filters the dosage matrix to only include the loci in the loci file
+    dosage_filter_cmd = (
+        f"{_GO_HANDLER_BINARY_PATH} --input {parent_dosage_matrix_path} --output {dosage_out_path} "
+        f"--loci {loci_path} --progress-frequency {progress_frequency} "
+        f"--queue-config {queue_config_path} "
+        f"--job-submission-id {submission_id}"
+    )
+
+    logger.info("Beginning to filter genotypes using command `%s`", dosage_filter_cmd)
+
+    # Run the command and capture stderr
+    process = subprocess.Popen(dosage_filter_cmd, stderr=subprocess.PIPE, shell=True, text=True)
+    _, stderr = process.communicate()
+
+    if process.returncode != 0:
+        raise RuntimeError(f"Binary execution failed: {stderr}")
+
+    return
+
+
+def sort_loci_and_doc_ids(
+    results: list[tuple[NDArray[np.int32], NDArray]]
+) -> tuple[NDArray[np.int32], NDArray, int]:
+    if len(results) == 0:
+        return np.array([], dtype=np.int32), np.array([], dtype=object), 0
+
+    process = psutil.Process(os.getpid())
+    start = time.time()
+
+    # Initialize lists to collect all document IDs and loci
+    all_doc_ids = []
+    all_loci = []
+
+    # Collect results
+    n_hits = 0
+    for doc_ids, loci in results:
+        all_doc_ids.append(doc_ids)
+        all_loci.append(loci)
+        n_hits += len(doc_ids)
+
+    logger.info("Memory usage after query collection loop: %s MB", process.memory_info().rss / 1024**2)
+
+    # Concatenate all results into a single array
+    all_doc_ids_np = np.concatenate(all_doc_ids)
+    del all_doc_ids
+    all_loci_np = np.concatenate(all_loci)
+    del all_loci
+
+    # Log the memory usage after concatenation
+    logger.info(
+        "Memory usage after concatenating query results: %s MB", process.memory_info().rss / 1024**2
+    )
+
+    # Calculate elapsed time
+    elapsed_time = time.time() - start
+    logger.info("Time to process and concatenate: %s seconds", elapsed_time)
+
+    start = time.time()
+    # Get the indices that would sort the loci array
+    sorted_indices = np.argsort(all_doc_ids_np, kind="stable")
+
+    logger.info("Sorting indices took %s seconds", time.time() - start)
+    logger.info(
+        "Memory usage after sorting indices: %s (MB)",
+        process.memory_info().rss / 1024**2,
+    )
+
+    start = time.time()
+    # Perform in-place sorting by reassigning sorted values back into the original arrays
+    all_doc_ids_np = all_doc_ids_np[sorted_indices]
+    all_loci_np = all_loci_np[sorted_indices]
+
+    logger.info("Sorting results using sorted indices took %s seconds", time.time() - start)
+    logger.info(
+        "Memory usage after sorting query results: %s (MB)",
+        process.memory_info().rss / 1024**2,
+    )
+
+    return all_doc_ids_np, all_loci_np, n_hits
+
+
+def filter_annotation(
+    stats: Statistics,
+    annotation_path: str,
+    parent_annotation_path: str,
+    job_data: SaveJobData,
+    doc_ids_sorted: NDArray[np.int32],
+    loci_sorted: NDArray,
+    n_hits: int,
+    reporter: ProgressReporter,
+    reporting_interval: int,
+    loci_file_path: str,
+):
+    reporting_interval = max(ANNOTATION_MINIMUM_REPORTING_INTERVAL, reporting_interval)
+
+    reporter.message.remote(  # type: ignore
+        (
+            "Filtering annotation file and re-generating stats. "
+            f"Reporting progress every ~{reporting_interval} rows."
+        )
+    )
+
+    filtered_loci = ""
+
+    current_target_index = 0
+    n_retained = 0
+    with Timer() as timer:
+        bgzip_cmd = get_compress_from_pipe_cmd(annotation_path)
+        bgzip_decompress_cmd = get_decompress_to_pipe_cmd(parent_annotation_path)
+        bystro_stats_cmd = stats.stdin_cli_stats_command
+
+        with (
+            subprocess.Popen(bystro_stats_cmd, shell=True, stdin=subprocess.PIPE) as stats_fh,
+            subprocess.Popen(bgzip_cmd, shell=True, stdin=subprocess.PIPE) as p,
+            subprocess.Popen(bgzip_decompress_cmd, shell=True, stdout=subprocess.PIPE) as in_fh,
+            open(loci_file_path, "w") as loci_fh,
+        ):
+            if in_fh.stdout is None:
+                raise IOError("Failed to open annotation file for reading.")
+
+            if p.stdin is None:
+                raise IOError("Failed to open filtered annotation file for writing.")
+
+            if stats_fh.stdin is None:
+                raise IOError("Failed to open stats file for writing.")
+
+            i = -1
+            header_written = False
+            header_fields = None
+            filters: list[Callable[[list[bytes]], bool]] = []
+            start = time.time()
+            for line in iter(in_fh.stdout.readline, b""):
+                if not header_written:
+                    p.stdin.write(line)
+                    stats_fh.stdin.write(line)
+                    header_written = True
+
+                    if job_data.pipeline is not None and len(job_data.pipeline) > 0:
+                        header_fields = line.rstrip().split(b"\t")
+                        filters = []
+                        for filter_msg in job_data.pipeline:
+                            filter_fn = filter_msg.make_filter(header_fields)
+
+                            if filter_fn is not None:
+                                filters.append(filter_fn)
+                    continue
+
+                i += 1
+                # doc_ids_sorted is a sorted list of document_ids, which are the indices in the
+                # annotation file that we wish to keep
+                # we iterate over input file lines (indexed by i), finding those lines that
+                # are in doc_ids_sorted
+                # because doc_ids_sorted is sorted in ascending order,
+                # and we are reading the file from the beginning, we are guaranteed
+                # that if i != doc_ids_sorted[current_target_index]
+                # i is less than doc_ids_sorted[current_target_index]
+                # or we have reached the end of doc_ids_sorted
+
+                if i == doc_ids_sorted[current_target_index]:
+                    filtered = False
+                    if len(filters) > 0:
+                        src = line.rstrip().split(b"\t")
+
+                        for filter_fn in filters:
+                            if filter_fn(src):
+                                filtered = True
+                                break
+
+                    if not filtered:
+                        p.stdin.write(line)
+                        stats_fh.stdin.write(line)
+
+                        n_retained += 1
+                        filtered_loci += loci_sorted[current_target_index] + "\n"
+
+                        if current_target_index % SAVE_LOCI_BATCH_WRITE_SIZE == 0:
+                            loci_fh.write(filtered_loci)
+                            filtered_loci = ""
+
+                    # Move to the next target line number, if any
+                    current_target_index += 1
+
+                    if current_target_index >= n_hits:
+                        break
+
+                if (i + 1) % reporting_interval == 0:
+                    end = time.time()
+
+                    reporter.message.remote(  # type: ignore
+                        (
+                            f"Annotation: Filtered {i + 1} variants. {n_retained} kept. "
+                            f"Took {end - start:.0f} seconds."
+                        )
+                    )
+                    start = time.time()
+
+            if len(filtered_loci) > 0:
+                loci_fh.write(filtered_loci)
+                filtered_loci = ""
+
+            loci_fh.close()
+            p.stdin.close()  # Close the stdin to signal that we're done sending input
+            stats_fh.stdin.close()  # Close the stdin to signal that we're done sending input
+
+            p.wait()
+            stats_fh.wait()
+
+            reporter.message.remote(f"Annotation: Completed filtering of {i} variants.")  # type: ignore
+
+    reporter.message.remote(f"Annotation: {n_retained} variants survived filtering.")  # type: ignore
+
+    logger.info("Filtering annotation and generating stats took %s seconds", timer.elapsed_time)
+
+    return n_retained
+
+
+def filter_dosage_matrix(
+    dosage_out_path: str,
+    parent_dosage_matrix_path: str,
+    job_data: SaveJobData,
+    reporter: ProgressReporter,
+    queue_config_path: str,
+    reporting_interval: int,
+    loci_file_path: str,
+):
+    if not (
+        os.path.exists(parent_dosage_matrix_path)
+        and os.stat(parent_dosage_matrix_path).st_size > 0
+        and os.path.exists(loci_file_path)
+        and os.stat(loci_file_path).st_size > 0
+    ):
+        logger.info("No dosage matrix to filter")
+        reporter.message.remote("No dosage matrix to filter.")  # type: ignore
+        # Touch the output file to avoid errors downstream
+        pathlib.Path(dosage_out_path).touch()
+        return
+
+    reporter.message.remote(  # type: ignore
+        f"Filtering dosage matrix file. Reporting progress every ~{reporting_interval} variants"
+    )
+
+    with Timer() as timer:
+        run_dosage_filter(
+            parent_dosage_matrix_path=parent_dosage_matrix_path,
+            dosage_out_path=dosage_out_path,
+            loci_path=loci_file_path,
+            queue_config_path=queue_config_path,
+            progress_frequency=reporting_interval,
+            submission_id=str(job_data.submission_id),
+        )
+    logger.info("Filtering dosage matrix took %s seconds", timer.elapsed_time)
+
+
+def filter_annotation_and_dosage_matrix(
+    job_data: SaveJobData,
+    reporter: ProgressReporter,
+    doc_ids_sorted: NDArray[np.int32],
+    loci_sorted: NDArray,
+    n_hits: int,
+    queue_config_path: str,
 ) -> AnnotationOutputs:
-    """Main function for running the query and writing the output"""
     output_dir = os.path.dirname(job_data.output_base_path)
     basename = os.path.basename(job_data.output_base_path)
 
@@ -184,18 +478,88 @@ async def go(  # pylint:disable=invalid-name
 
     dosage_out_path = os.path.join(output_dir, outputs.dosage_matrix_out_path)
 
+    annotation_path = os.path.join(output_dir, outputs.annotation)
+
+    reporting_interval = max(MINIMUM_RECORDS_TO_ENABLE_REPORTING, math.ceil(n_hits * REPORTING_INTERVAL))
+
+    loci_file_path = os.path.join(output_dir, f"{basename}_loci.txt")
+
+    logger.info(
+        "Memory usage before filter_annotation: %s (MB)",
+        psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+    )
+
+    n_results = filter_annotation(
+        stats=stats,
+        annotation_path=annotation_path,
+        parent_annotation_path=parent_annotation_path,
+        job_data=job_data,
+        doc_ids_sorted=doc_ids_sorted,
+        loci_sorted=loci_sorted,
+        n_hits=n_hits,
+        reporter=reporter,
+        reporting_interval=reporting_interval,
+        loci_file_path=loci_file_path,
+    )
+
+    del doc_ids_sorted
+    del loci_sorted
+    gc.collect()
+
+    logger.info(
+        "Memory usage after filter_annotation: %s (MB)",
+        psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+    )
+
+    filter_dosage_matrix(
+        dosage_out_path=dosage_out_path,
+        parent_dosage_matrix_path=parent_dosage_matrix_path,
+        loci_file_path=loci_file_path,
+        job_data=job_data,
+        reporter=reporter,
+        queue_config_path=queue_config_path,
+        reporting_interval=reporting_interval,
+    )
+
+    logger.info(
+        "Memory usage after filter_dosage_matrix: %s (MB)",
+        psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+    )
+
+    reporter.increment.remote(n_results, True)  # type: ignore
+
+    return outputs
+
+
+async def go(  # pylint:disable=invalid-name
+    job_data: SaveJobData, search_conf: dict, publisher: ProgressPublisher, queue_config_path: str
+) -> AnnotationOutputs:
+    """Main function for running the query and writing the output"""
     search_client_args = gather_opensearch_args(search_conf)
     client = OpenSearch(**search_client_args)
 
     query = _clean_query(job_data.query_body)
-    num_slices = _get_num_slices(client, job_data.index_name, MAX_QUERY_SIZE, MAX_SLICES, query)
+    num_slices, num_docs = _get_num_slices(
+        client, job_data.index_name, MAX_QUERY_SIZE, MAX_SLICES, query
+    )
     pit_id = client.create_point_in_time(index=job_data.index_name, params={"keep_alive": KEEP_ALIVE})["pit_id"]  # type: ignore   # noqa: E501
 
-    reporter = get_progress_reporter(publisher)
+    update_interval = max(MINIMUM_RECORDS_TO_ENABLE_REPORTING, math.ceil(num_docs * REPORTING_INTERVAL))
+    reporter = get_progress_reporter(publisher, update_interval)
+
+    reporter.message.remote(  # type: ignore
+        f"Fetching variants from search engine, Reporting progress every ~{update_interval} variants."
+    )
+
     query["pit"] = {"id": pit_id}
     query["size"] = MAX_QUERY_SIZE
     query["fields"] = FIELDS_TO_QUERY
     query["_source"] = False
+
+    logger.info(
+        "Memory usage before querying: %s (MB)",
+        psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+    )
 
     try:
         num_cpus = ray.available_resources().get("CPU", 1)
@@ -209,7 +573,6 @@ async def go(  # pylint:disable=invalid-name
         )
 
         with Timer() as timer:
-
             if num_slices == 1:
                 actor = actor_constructor.remote(search_client_args, reporter)  # type: ignore
 
@@ -239,222 +602,37 @@ async def go(  # pylint:disable=invalid-name
 
                 results = ray.get(reqs)
                 ray.get([actor.close.remote() for actor in actors])
-
-        logger.info("Querying took %s seconds", timer.elapsed_time)
-
-        with Timer() as timer:
-            # Process and aggregate results from all actors...
-            doc_ids = []
-            loci = []
-            n_hits = 0
-            for doc_ids_chunk, loci_chunk in results:
-                if doc_ids_chunk is None:
-                    continue
-
-                n_hits += doc_ids_chunk.shape[0]
-                doc_ids.append(doc_ids_chunk)
-                loci.extend(loci_chunk)
-
-            doc_ids_nd = np.concatenate(doc_ids)
-            doc_ids_nd.sort()
-
-        logger.info("Concatenating document ids took %s seconds", timer.elapsed_time)
-
-        logger.info(
-            "Memory usage before genotype filtering: %s (MB)",
-            psutil.Process(os.getpid()).memory_info().rss / 1024**2,
-        )
-
-        annotation_path = os.path.join(output_dir, outputs.annotation)
-
-        reporter.message.remote("About to filter dosage matrix and annotation tsv.gz.")  # type: ignore
-
-        report_progress = n_hits >= MINIMUM_RECORDS_TO_ENABLE_REPORTING
-        reporting_interval = math.ceil(n_hits * REPORTING_INTERVAL)
-
-        if report_progress:
-            reporter.message.remote(  # type: ignore
-                f"Reporting filtering progress every {reporting_interval} records."
-            )
-
-        # Filter the dosage matrix, if it has rows
-        if os.path.exists(parent_dosage_matrix_path) and os.stat(parent_dosage_matrix_path).st_size > 0:
-            loci = _correct_loci_case(loci)
-            # Write requested loci to disk for logging purposes
-            with open(os.path.join(output_dir, f"{basename}_loci.txt"), "w") as loci_fh:
-                for locus in loci:
-                    loci_fh.write(locus + "\n")
-
-            pool = pa.default_memory_pool()
-            with Timer() as timer:
-                dataset = ds.dataset(parent_dosage_matrix_path, format="arrow")
-                mask = pc.field("locus").isin(loci)
-
-                # Use the dataset's scanner to stream batches through a filter
-                scanner = dataset.scanner(
-                    filter=mask,
-                    use_threads=True,
-                    batch_size=SAVE_FILTER_BATCH_READ_SIZE,
-                    batch_readahead=SAVE_FILTER_BATCH_READAHEAD,
-                    fragment_readahead=0,
-                    memory_pool=pool,
-                )
-
-                # Initialize a RecordBatchFileWriter to write to the specified output path
-                with ipc.RecordBatchFileWriter(
-                    dosage_out_path,
-                    schema=dataset.schema,
-                    options=ipc.IpcWriteOptions(compression="zstd"),
-                ) as writer:
-                    total_since_last_mentioned = 0
-                    total_rows_filtered = 0
-
-                    report_chunk_start_time = time.time()
-                    for batch in scanner.to_batches():
-                        # The scanner filters in-memory after it reads a batch of rows
-                        # of size SAVE_FILTER_BATCH_READ_SIZE, so we may have far fewer
-                        # than SAVE_FILTER_BATCH_READ_SIZE rows here, including 0
-                        # TODO: 2024-04-03 @akotlar: Remove this once confirmed not needed
-                        if batch.num_rows == 0:
-                            continue
-
-                        writer.write_batch(batch)
-
-                        total_rows_filtered += batch.num_rows
-                        total_since_last_mentioned += batch.num_rows
-
-                        if report_progress and total_since_last_mentioned >= reporting_interval:
-                            reporter.message.remote(  # type: ignore
-                                (f"Dosage: filtered and wrote {total_rows_filtered} of {n_hits} rows.")
-                            )
-
-                            logger.debug(
-                                "Time to filter %d dosage matrix rows (total: %d): %s",
-                                total_since_last_mentioned,
-                                total_rows_filtered,
-                                time.time() - report_chunk_start_time,
-                            )
-
-                            total_since_last_mentioned = 0
-                            report_chunk_start_time = time.time()
-
-                        # TODO: 2024-04-03 @akotlar: Remove this once confirmed not needed
-                        if total_rows_filtered >= n_hits:
-                            break
-
-                if report_progress and total_since_last_mentioned > 0:
-                    reporter.message.remote(  # type: ignore
-                        (f"Dosage: filtered and wrote {total_rows_filtered} of {n_hits}) rows.")
-                    )
-
-                    total_since_last_mentioned = 0
-
-                logger.debug(
-                    "Memory usage after genotype filtering: %s (MB)",
-                    psutil.Process(os.getpid()).memory_info().rss / 1024**2,
-                )
-
-                reporter.message.remote(  # type: ignore
-                    "Filtered dosage matrix written. Filtering annotation & generating stats."
-                )
-
-            logger.info("Filtering dosage matrix took %s seconds", timer.elapsed_time)
-
-        with Timer() as timer:
-            bgzip_cmd = get_compress_from_pipe_cmd(annotation_path)
-            bgzip_decompress_cmd = get_decompress_to_pipe_cmd(parent_annotation_path)
-            bystro_stats_cmd = stats.stdin_cli_stats_command
-
-            filters = None
-
-            with (
-                subprocess.Popen(bystro_stats_cmd, shell=True, stdin=subprocess.PIPE) as stats,
-                subprocess.Popen(bgzip_cmd, shell=True, stdin=subprocess.PIPE) as p,
-                subprocess.Popen(bgzip_decompress_cmd, shell=True, stdout=subprocess.PIPE) as in_fh,
-            ):
-                if in_fh.stdout is None:
-                    raise IOError("Failed to open annotation file for reading.")
-
-                if p.stdin is None:
-                    raise IOError("Failed to open filtered annotation file for writing.")
-
-                if stats.stdin is None:
-                    raise IOError("Failed to open stats file for writing.")
-
-                i = -1
-                current_target_index = 0
-                header_written = False
-                header_fields = None
-
-                for line in iter(in_fh.stdout.readline, b""):
-                    if not header_written:
-                        p.stdin.write(line)
-                        stats.stdin.write(line)
-                        header_written = True
-
-                        if filters is not None:
-                            header_fields = line.rstrip().split(b"\t")
-
-                            if job_data.pipeline is not None and len(job_data.pipeline) > 0:
-                                filters = []
-                                for filter_msg in job_data.pipeline:
-                                    filter_fn = filter_msg.make_filter(header_fields)
-
-                                    if filter_fn is not None:
-                                        filters.append(filter_fn)
-                        continue
-
-                    i += 1
-                    if i == doc_ids_nd[current_target_index]:
-                        filtered = False
-                        if filters is not None:
-                            src = line.rstrip().split(b"\t")
-                            for filter_fn in filters:
-                                if filter_fn(src):
-                                    filtered = True
-                                    break
-
-                        if not filtered:
-                            if (
-                                current_target_index > 0
-                                and report_progress
-                                and current_target_index % reporting_interval == 0
-                            ):
-                                reporter.message.remote(  # type: ignore
-                                    (
-                                        "Annotation/stats: Filtered & wrote "
-                                        f"{current_target_index} of {n_hits} rows."
-                                    )
-                                )
-
-                            p.stdin.write(line)
-                            stats.stdin.write(line)
-
-                        # Move to the next target line number, if any
-                        current_target_index += 1
-
-                        if current_target_index >= n_hits:
-                            if report_progress:
-                                reporter.message.remote(  # type: ignore
-                                    (
-                                        "Annotation/stats: Filtered & wrote "
-                                        f"{current_target_index} of {n_hits} rows."
-                                    )
-                                )
-                            reporter.message.remote("Done, cleaning up.")  # type: ignore
-                            break
-
-                p.stdin.close()  # Close the stdin to signal that we're done sending input
-                stats.stdin.close()  # Close the stdin to signal that we're done sending input
-
-                p.wait()
-                stats.wait()
-        logger.info("Filtering annotation and stats took %s seconds", timer.elapsed_time)
-    except Exception as e:
-        # Handle exceptions and cleanup, including deleting the PIT ID
+    finally:
+        # Cleanup the PIT ID
         client.delete_point_in_time(body={"pit_id": pit_id})
-        raise e
+        client.close()
 
-    client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore
+    reporter.increment_and_write_progress_message.remote(  # type: ignore
+        0, "Fetched", "variants", force=True
+    )
+    reporter.clear_progress.remote()  # type: ignore
+
+    logger.info("Querying took %s seconds", timer.elapsed_time)
+
+    logger.info(
+        "Memory usage before query result sorting: %s (MB)",
+        psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+    )
+
+    doc_ids_sorted, loci_sorted, n_hits = sort_loci_and_doc_ids(results)
+
+    logger.info(
+        "Memory usage after query result sorting: %s (MB)",
+        psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+    )
+
+    outputs = filter_annotation_and_dosage_matrix(
+        job_data=job_data,
+        reporter=reporter,
+        doc_ids_sorted=doc_ids_sorted,
+        loci_sorted=loci_sorted,
+        n_hits=n_hits,
+        queue_config_path=queue_config_path,
+    )
 
     return outputs

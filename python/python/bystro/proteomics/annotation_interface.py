@@ -139,7 +139,7 @@ def _get_num_slices(
     client: OpenSearch,
     index_name: str,
     query: dict[str, Any],
-) -> int:
+) -> tuple[int, int]:
     """Count number of hits for the index."""
     get_num_slices_query = query["body"].copy()
     get_num_slices_query.pop("sort", None)
@@ -156,7 +156,7 @@ def _get_num_slices(
 
     num_slices_necessary = math.ceil(n_docs / OPENSEARCH_QUERY_CONFIG.max_query_size)
     num_slices_planned = min(num_slices_necessary, OPENSEARCH_QUERY_CONFIG.max_slices)
-    return max(num_slices_planned, 1)
+    return max(num_slices_planned, 1), n_docs
 
 
 def _run_annotation_query(
@@ -165,7 +165,7 @@ def _run_annotation_query(
     client: OpenSearch,
 ) -> pd.DataFrame:
     """Given query and index contained in SaveJobData, run query and return results as dataframe."""
-    num_slices = _get_num_slices(client, index_name, query)
+    num_slices, _ = _get_num_slices(client, index_name, query)
     point_in_time = client.create_point_in_time(  # type: ignore[attr-defined]
         index=index_name, params={"keep_alive": OPENSEARCH_QUERY_CONFIG.keep_alive}
     )
