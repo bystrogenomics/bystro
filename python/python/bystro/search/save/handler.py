@@ -228,11 +228,7 @@ def sort_loci_and_doc_ids(
     if len(results) == 0:
         return np.array([], dtype=np.int32), np.array([], dtype=object), 0
 
-    # Log the memory usage at the start
     process = psutil.Process(os.getpid())
-    initial_memory = process.memory_info().rss / 1024**2
-    logger.info("Memory usage before concatenating query results: %s MB", initial_memory)
-
     start = time.time()
 
     # Initialize lists to collect all document IDs and loci
@@ -246,6 +242,8 @@ def sort_loci_and_doc_ids(
         all_loci.append(loci)
         n_hits += len(doc_ids)
 
+    logger.info("Memory usage after query collection loop: %s MB", process.memory_info().rss / 1024**2)
+
     # Concatenate all results into a single array
     all_doc_ids_np = np.concatenate(all_doc_ids)
     del all_doc_ids
@@ -253,8 +251,9 @@ def sort_loci_and_doc_ids(
     del all_loci
 
     # Log the memory usage after concatenation
-    final_memory = process.memory_info().rss / 1024**2
-    logger.info("Memory usage after concatenating query results: %s MB", final_memory)
+    logger.info(
+        "Memory usage after concatenating query results: %s MB", process.memory_info().rss / 1024**2
+    )
 
     # Calculate elapsed time
     elapsed_time = time.time() - start
@@ -262,12 +261,12 @@ def sort_loci_and_doc_ids(
 
     start = time.time()
     # Get the indices that would sort the loci array
-    sorted_indices = np.argsort(all_doc_ids_np)
+    sorted_indices = np.argsort(all_doc_ids_np, kind="stable")
 
     logger.info("Sorting indices took %s seconds", time.time() - start)
     logger.info(
         "Memory usage after sorting indices: %s (MB)",
-        psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+        process.memory_info().rss / 1024**2,
     )
 
     start = time.time()
@@ -278,7 +277,7 @@ def sort_loci_and_doc_ids(
     logger.info("Sorting results using sorted indices took %s seconds", time.time() - start)
     logger.info(
         "Memory usage after sorting query results: %s (MB)",
-        psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+        process.memory_info().rss / 1024**2,
     )
 
     return all_doc_ids_np, all_loci_np, n_hits
@@ -412,9 +411,7 @@ def filter_annotation(
 
             reporter.message.remote(f"Annotation: Completed filtering of {i} variants.")  # type: ignore
 
-    reporter.message.remote(  # type: ignore
-        f"Annotation: {n_retained} variants survived filtering."
-    )
+    reporter.message.remote(f"Annotation: {n_retained} variants survived filtering.")  # type: ignore
 
     logger.info("Filtering annotation and generating stats took %s seconds", timer.elapsed_time)
 
