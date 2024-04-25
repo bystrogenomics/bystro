@@ -23,8 +23,6 @@ None
 """
 import numpy as np
 import numpy.linalg as la
-import cvxpy as cp
-import time
 from typing import List, Optional, Union
 
 from bystro.covariance._covariance_np import (
@@ -36,6 +34,11 @@ from bystro.covariance.covariance_cov_shrinkage import (
     GeometricInverseShrinkage,
     LinearInverseShrinkage,
     QuadraticInverseShrinkage,
+)
+from bystro.covariance.positive_definite_average import (
+    pd_mean_harmonic,
+    pd_mean_karcher,
+    log_euclidean_mean,
 )
 
 
@@ -205,9 +208,6 @@ class RotationAdaptation:
 
     Attributes
     ----------
-    norm : str
-        The norm to use for the optimization problem when computing the
-        centroid covariance. Defaults to the Frobenius norm.
 
     J : int
         The number of datasets.
@@ -247,7 +247,7 @@ class RotationAdaptation:
 
     def __init__(
         self,
-        norm: str = "fro",
+        centroid: str = "log_euclidean",
         regularization: str = "Linear",
         projection_regularization: str = "Linear",
     ) -> None:
@@ -267,8 +267,8 @@ class RotationAdaptation:
             The regularization for estimating the covariance in the
             transform method with new group
         """
-        self.norm: str = norm
         self.J: int = 0
+        self.centroid = centroid
         self.mu_0: np.ndarray = np.array([])
         self.Sigma_0: np.ndarray = np.array([])
         self.L_0_inv: np.ndarray = np.array([])
@@ -312,21 +312,15 @@ class RotationAdaptation:
 
         self.mu_0 = np.sum(mu_list, axis=0) / self.J
 
-        Sigma_0_ = cp.Variable(Sigma_list[0].shape, symmetric=True)
-        constraints = [Sigma_0_ >> 0]
-        objective = cp.Minimize(
-            cp.sum(
-                [
-                    cp.norm(Sigma_list[i] - Sigma_0_, self.norm)
-                    for i in range(self.J)
-                ]
-            )
-        )
-        problem = cp.Problem(objective, constraints)
-        startTime = time.time()
-        problem.solve()
-        self.elapsed_time = time.time() - startTime
-        self.Sigma_0 = Sigma_0_.value
+        if self.centroid == "log_euclidean":
+            self.Sigma_0 = log_euclidean_mean(Sigma_list)
+        elif self.centroid == "harmonic":
+            self.Sigma_0 = pd_mean_harmonic(Sigma_list)
+        elif self.centroid == "karcher":
+            self.Sigma_0 = pd_mean_karcher(Sigma_list)
+        else:
+            raise ValueError("Unrecognized option %s" % self.centroid)
+
         self.L_0 = la.cholesky(self.Sigma_0)
         self.L_0_inv = la.inv(self.L_0)
         self.Sigma_list = Sigma_list
@@ -355,7 +349,8 @@ class RotationAdaptation:
             model_cov = _select_covariance_estimator(
                 self.projection_regularization
             )
-            Sigma = np.cov(X_dm.T)
+            model_cov.fit(X_dm)
+            Sigma = model_cov.covariance
             L = la.cholesky(Sigma)
             L_inv = la.inv(L)
             X_w = np.dot(X_dm, L_inv.T)
@@ -391,7 +386,7 @@ class RotationAdaptation:
 
 def _select_covariance_estimator(regularization):
     """
-    This is a tiny method for selecting the estimator for the covariance 
+    This is a tiny method for selecting the estimator for the covariance
     matrix.
     """
     model_cov: Union[
