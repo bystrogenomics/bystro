@@ -156,7 +156,7 @@ def _get_num_slices(client, index_name, max_query_size, max_slices, query) -> tu
     # Opensearch does not always query the requested number of documents, and
     # we have observed up to 3% loss; to be safe, assume 15% max and then round
     # number of slices requested up
-    expected_query_size_with_loss = max_query_size * 0.85
+    expected_query_size_with_loss = max_query_size * 0.5
 
     num_slices_required = math.ceil(n_docs / expected_query_size_with_loss)
     if num_slices_required > max_slices:
