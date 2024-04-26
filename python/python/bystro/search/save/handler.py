@@ -114,19 +114,11 @@ class AsyncQueryProcessor:
         all_doc_ids = np.array(doc_ids, dtype=np.int32)
         all_loci = np.array(loci, dtype=object)
 
-        start = time.time()
-
         sorted_indices = np.argsort(all_doc_ids, kind="stable")
 
         # Perform in-place sorting by reassigning sorted values back into the original arrays
         all_doc_ids = all_doc_ids[sorted_indices]
         all_loci = all_loci[sorted_indices]
-
-        logger.info("Sorting %d query hits took %s seconds", len(doc_ids), time.time() - start)
-        logger.info(
-            "Memory usage after sorting query hits: %s (MB)",
-            psutil.Process(os.getpid()).memory_info().rss / 1024**2,
-        )
 
         return all_doc_ids, all_loci
 
@@ -162,7 +154,7 @@ def _get_num_slices(client, index_name, max_query_size, max_slices, query) -> tu
     # but somehow got less than 8500 records in 1 slice
     # A 0.5 fudge factor worked fine
     # TODO 2024-04-26 @akotlar find a more reliable solution
-    expected_query_size_with_loss = max_query_size * 0.5
+    expected_query_size_with_loss = max_query_size * 0.85
 
     num_slices_required = math.ceil(n_docs / expected_query_size_with_loss)
     if num_slices_required > max_slices:
@@ -228,6 +220,22 @@ def run_dosage_filter(
     return
 
 
+def count_in_ranges_numpy(numbers):
+    # Define the edges of the bins
+    bins = np.arange(0, 11000, 200)  # 0, 500, 1000, etc
+
+    # Create the histogram
+    counts, edges = np.histogram(numbers, bins=bins)
+
+    # Build a string with non-zero bins
+    result = ""
+    for i in range(len(counts)):
+        if counts[i] > 0:
+            result += f"{int(edges[i])}-{int(edges[i+1]-1)}: {counts[i]}\n"
+
+    return result.strip()  # Remove the last newline character
+
+
 def sort_loci_and_doc_ids(
     results: list[tuple[NDArray[np.int32], NDArray]]
 ) -> tuple[NDArray[np.int32], NDArray, int]:
@@ -243,10 +251,20 @@ def sort_loci_and_doc_ids(
 
     # Collect results
     n_hits = 0
+    n_hits_list: list[int] = []
     for doc_ids, loci in results:
         all_doc_ids.append(doc_ids)
         all_loci.append(loci)
         n_hits += len(doc_ids)
+        n_hits_list.append(len(doc_ids))
+
+    try:
+        n_hits_list_np: NDArray[np.uint16] = np.array(n_hits_list, dtype=np.uint16)
+        del n_hits_list
+        logger.info("Query hits per slice distribution:\n%s", count_in_ranges_numpy(n_hits_list_np))
+        del n_hits_list_np
+    except Exception as e:
+        logger.warning("Failed to calculate bins due to %s", e)
 
     logger.info("Memory usage after query collection loop: %s MB", process.memory_info().rss / 1024**2)
 
