@@ -122,10 +122,9 @@ class AsyncQueryProcessor:
         all_doc_ids = all_doc_ids[sorted_indices]
         all_loci = all_loci[sorted_indices]
 
-        logger.info(f"Query returned {len(doc_ids)} hits")
-        logger.info("Sorting indices took %s seconds", time.time() - start)
+        logger.info("Sorting %d query hits took %s seconds", len(doc_ids), time.time() - start)
         logger.info(
-            "Memory usage after sorting indices: %s (MB)",
+            "Memory usage after sorting query hits: %s (MB)",
             psutil.Process(os.getpid()).memory_info().rss / 1024**2,
         )
 
@@ -156,7 +155,9 @@ def _get_num_slices(client, index_name, max_query_size, max_slices, query) -> tu
 
     # Opensearch does not always query the requested number of documents, and
     # in the worst case, a 28686 hit query failed even with max_query_size * 0.85
-    # because not enough slices were specified (ceil (28686 / 8500) = 4, but for some reason more slices required )
+    # because not enough slices were specified (ceil (28686 / 8500) = 4,
+    # but for some reason more slices required. Lowering slop to 0.5 worked
+    # TODO 2024-04-26 @akotlar find a more reliable solution
     expected_query_size_with_loss = max_query_size * 0.5
 
     num_slices_required = math.ceil(n_docs / expected_query_size_with_loss)
