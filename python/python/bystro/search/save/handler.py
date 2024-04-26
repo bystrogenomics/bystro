@@ -154,7 +154,7 @@ def _get_num_slices(client, index_name, max_query_size, max_slices, query) -> tu
     # but somehow got less than 8500 records in 1 slice
     # A 0.5 fudge factor worked fine
     # TODO 2024-04-26 @akotlar find a more reliable solution
-    expected_query_size_with_loss = max_query_size * 0.85
+    expected_query_size_with_loss = max_query_size * 0.5
 
     num_slices_required = math.ceil(n_docs / expected_query_size_with_loss)
     if num_slices_required > max_slices:
