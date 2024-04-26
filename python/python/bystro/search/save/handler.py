@@ -154,9 +154,13 @@ def _get_num_slices(client, index_name, max_query_size, max_slices, query) -> tu
         raise RuntimeError("No documents found for the query")
 
     # Opensearch does not always query the requested number of documents, and
-    # in the worst case, a 28686 hit query failed even with max_query_size * 0.85
-    # because not enough slices were specified (ceil (28686 / 8500) = 4,
-    # but for some reason more slices required. Lowering slop to 0.5 worked
+    # in the worst case, a 26868 hit query failed even with max_query_size * 0.85
+    # because not enough slices were specified (ceil (26868 / 8500) = 4,
+    # but for some reason more slices required, with only 25982 records returned
+    # meaning we had a fifth slice of 886 records required, meaning at worst
+    # we should have expected 9114 records in the smallest slice
+    # but somehow got less than 8500 records in 1 slice
+    # A 0.5 fudge factor worked fine
     # TODO 2024-04-26 @akotlar find a more reliable solution
     expected_query_size_with_loss = max_query_size * 0.5
 
