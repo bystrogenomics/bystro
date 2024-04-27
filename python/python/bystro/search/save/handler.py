@@ -101,9 +101,8 @@ class AsyncQueryProcessor:
 
         while True:
             if search_after:
-                query["body"]["search_after"] = search_after  # Append search_after to the query
+                query["body"]["search_after"] = search_after
 
-            # Perform the search operation asynchronously using the pre-initialized client
             resp = await self.client.search(**query)
 
             if not resp["hits"]["hits"]:
