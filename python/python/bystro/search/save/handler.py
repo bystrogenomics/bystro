@@ -684,7 +684,7 @@ async def go(  # pylint:disable=invalid-name
         )
 
     reporter.message.remote(  # type: ignore
-        f"OK: The number of fetched variants ({n_hits}) the number expected ({num_docs})"
+        f"OK: The number of fetched variants ({n_hits}) equals the number expected ({num_docs})"
     )
 
     outputs = filter_annotation_and_dosage_matrix(
