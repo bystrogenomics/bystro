@@ -4,6 +4,7 @@ import pytest
 
 from bystro.utils.config import (
     BYSTRO_PROJECT_ROOT,
+    BYSTRO_CONFIG_DIR,
     get_opensearch_config,
     _get_bystro_project_root,
     get_mapping_config,
@@ -22,7 +23,7 @@ def test_get_bystro_project_root_error_case(mocked_glob):  # noqa: ARG001  (arg 
     with pytest.raises(FileNotFoundError, match="this is a bug"):
         _get_bystro_project_root()
 
-
+@patch("bystro.utils.config.OPENSEARCH_CONFIG_PATH", BYSTRO_CONFIG_DIR / "opensearch.clean.yml")
 def test_get_opensearch_config():
     opensearch_config = get_opensearch_config()
     expected_keys = {"connection", "auth"}
