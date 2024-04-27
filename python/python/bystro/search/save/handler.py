@@ -32,7 +32,9 @@ from bystro.utils.timer import Timer
 logger = logging.getLogger(__name__)
 
 MAX_QUERY_SIZE = 10_000
-MAX_SLICES = 1e6
+# TODO 2024-04-26 @akotlar Investigate the impact of large numbers of slices
+# and whether 20_000 slices is a reasonable limit
+MAX_SLICES = 20_000
 KEEP_ALIVE = "1d"
 MAX_CONCURRENCY_PER_THREAD = 4
 SAVE_LOCI_BATCH_WRITE_SIZE = int(os.getenv("SAVE_LOCI_BATCH_WRITE_SIZE", 500_000))
@@ -170,9 +172,7 @@ def _get_num_slices(client, index_name, max_query_size, max_slices, query) -> tu
 
     num_slices_required = math.ceil(n_docs / expected_query_size_with_loss)
     if num_slices_required > max_slices:
-        raise RuntimeError(
-            "Too many slices required to process the query. Please reduce the query size."
-        )
+        num_slices_required = max_slices
 
     logger.info("Constructed query with %d slices for %d hits", num_slices_required, n_docs)
 
