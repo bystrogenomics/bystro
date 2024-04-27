@@ -147,6 +147,7 @@ tracks:
         - rfamAcc
         - tRnaName
         - ensemblID
+        - isCanonical
       local_files:
         - hg38.kgXref.chr1.gz
         - hg38.kgXref.chr2.gz
