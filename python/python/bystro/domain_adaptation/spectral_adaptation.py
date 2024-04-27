@@ -38,7 +38,7 @@ from bystro.covariance.covariance_cov_shrinkage import (
 from bystro.covariance.positive_definite_average import (
     pd_mean_harmonic,
     pd_mean_karcher,
-    log_euclidean_mean,
+    pd_mean_log_euclidean,
 )
 
 
@@ -313,7 +313,7 @@ class RotationAdaptation:
         self.mu_0 = np.sum(mu_list, axis=0) / self.J
 
         if self.centroid == "log_euclidean":
-            self.Sigma_0 = log_euclidean_mean(Sigma_list)
+            self.Sigma_0 = pd_mean_log_euclidean(Sigma_list)
         elif self.centroid == "harmonic":
             self.Sigma_0 = pd_mean_harmonic(Sigma_list)
         elif self.centroid == "karcher":
