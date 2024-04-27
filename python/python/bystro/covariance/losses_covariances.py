@@ -28,7 +28,7 @@ References:
 
 import numpy as np
 import numpy.linalg as la
-from scipy.linalg import logm # type: ignore 
+from scipy.linalg import logm  # type: ignore
 
 
 def schatten_norm(X: np.ndarray, p: float) -> float:
@@ -302,11 +302,12 @@ def logdet_divergence(A: np.ndarray, B: np.ndarray) -> float:
     n = A.shape[0]
     return trace_X - log_det_X - n
 
-def loss_harmonic(A: np.ndarray, B: np.ndarray) -> float:
-    distance = la.norm(la.inv(A)-la.inv(B),ord='fro')
+
+def loss_harmonic(A: np.ndarray, B: np.ndarray):
+    distance = la.norm(la.inv(A) - la.inv(B), ord="fro")
     return distance
 
-def loss_logeuclidean(A: np.ndarray, B: np.ndarray) -> float:
-    distance = la.norm(logm(A)-logm(B),ord='fro')
-    return distance
 
+def loss_logeuclidean(A: np.ndarray, B: np.ndarray):
+    distance = la.norm(logm(A) - logm(B), ord="fro")
+    return distance
