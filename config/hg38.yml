@@ -28,7 +28,7 @@ chromosomes:
   - chrM
   - chrX
   - chrY
-database_dir: /mnt/annotator/hg38_v4
+database_dir: /mnt/annotator/hg38_v5
 fileProcessors:
   snp:
     args: --emptyField NA --minGq .95
@@ -36,7 +36,7 @@ fileProcessors:
   vcf:
     args: --emptyField NA --sample %sampleList% --keepPos --keepId --dosageOutput %dosageMatrixOutPath%
     program: bystro-vcf
-files_dir: null
+files_dir: /mnt/files1/bystro_annotator/raw_files/hg38
 statistics:
   dbSNPnameField: dbSNP.name
   exonicAlleleFunctionField: refSeq.exonicAlleleFunction
@@ -179,22 +179,27 @@ tracks:
         - args:
             connection:
               database: hg38
-            sql:
-              SELECT r.*, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.kgID, '')) SEPARATOR
-              ';') FROM kgXref x WHERE x.refseq=r.name) AS kgID, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.description,
-              '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS description,
-              (SELECT GROUP_CONCAT(DISTINCT(NULLIF(e.value, '')) SEPARATOR ';') FROM knownToEnsembl
-              e JOIN kgXref x ON x.kgID = e.name WHERE x.refseq = r.name) AS ensemblID,
-              (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.tRnaName, '')) SEPARATOR ';') FROM
-              kgXref x WHERE x.refseq=r.name) AS tRnaName, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.spID,
-              '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS spID, (SELECT
-              GROUP_CONCAT(DISTINCT(NULLIF(x.spDisplayID, '')) SEPARATOR ';') FROM kgXref
-              x WHERE x.refseq=r.name) AS spDisplayID, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.protAcc,
-              '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS protAcc, (SELECT
-              GROUP_CONCAT(DISTINCT(NULLIF(x.mRNA, '')) SEPARATOR ';') FROM kgXref x WHERE
-              x.refseq=r.name) AS mRNA, (SELECT GROUP_CONCAT(DISTINCT(NULLIF(x.rfamAcc,
-              '')) SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS rfamAcc FROM
-              refGene r WHERE chrom=%chromosomes%;
+            sql: |
+              SELECT
+                  r.*,
+                  (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.kgID, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS kgID,
+                  (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.description, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS description,
+                  (SELECT GROUP_CONCAT(DISTINCT NULLIF(e.value, '') SEPARATOR ';') FROM knownToEnsembl e JOIN kgXref x ON x.kgID = e.name WHERE x.refseq = r.name) AS ensemblID,
+                  (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.tRnaName, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS tRnaName,
+                  (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.spID, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS spID,
+                  (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.spDisplayID, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS spDisplayID,
+                  (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.protAcc, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS protAcc,
+                  (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.mRNA, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS mRNA,
+                  (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.rfamAcc, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS rfamAcc,
+                  CASE WHEN k.transcript IS NOT NULL THEN TRUE ELSE FALSE END AS IsCanonical
+              FROM
+                  refGene r
+              LEFT JOIN
+                  kgXref x ON x.refseq = r.name
+              LEFT JOIN
+                  knownCanonical k ON k.transcript = x.kgID
+              WHERE
+                  r.chrom = %chromosomes%;
           completed: 2024-03-10T18:58:00
           name: fetch
       version: 34
