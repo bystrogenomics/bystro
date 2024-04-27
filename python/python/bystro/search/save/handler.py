@@ -286,7 +286,7 @@ def sort_loci_and_doc_ids(
         n_hits_list.append(len(doc_ids))
 
     try:
-        n_hits_list_np: NDArray[np.uint16] = np.array(n_hits_list, dtype=np.uint16)
+        n_hits_list_np: NDArray[np.uint32] = np.array(n_hits_list, dtype=np.uint32)
         del n_hits_list
         logger.info("Query hits per slice distribution:\n%s", count_in_ranges_numpy(n_hits_list_np))
         del n_hits_list_np
