@@ -112,7 +112,7 @@ class AsyncQueryProcessor:
             for doc in resp["hits"]["hits"]:
                 src = doc["fields"]
                 doc_id = int(doc["_id"])
-                locus = f"{src['chrom'][0].upper()}:{src['pos'][0]}:{src['inputRef'][0]}:{src['alt'][0]}"
+                locus = f"{upper_chr(src['chrom'][0])}:{src['pos'][0]}:{src['inputRef'][0]}:{src['alt'][0]}"
                 doc_ids.append(doc_id)
                 loci.append(locus)
 
