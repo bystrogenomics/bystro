@@ -17,11 +17,7 @@ from opensearchpy import OpenSearch
 
 logger = logging.getLogger(__file__)
 
-opensearch_config = get_opensearch_config()
-opensearch_client = OpenSearch(**gather_opensearch_args(opensearch_config))
-
-
-def ensure_annotation_file_present(index_name: str) -> None:
+def ensure_annotation_file_present(index_name: str, opensearch_client: OpenSearch) -> None:
     if not opensearch_client.indices.exists(index_name):
         msg = f"Didn't find {index_name} on server, uploading..."
         logger.debug(msg)
@@ -56,8 +52,11 @@ def index_test_annotation_file(index_name: str) -> None:
 @pytest.mark.integration()
 @flaky(max_runs=2, min_passes=1)
 def test_get_annotation_result_from_query_integration():
+    opensearch_config = get_opensearch_config()
+    opensearch_client = OpenSearch(**gather_opensearch_args(opensearch_config))
+
     index_name = "trio_trim_vep_annotation_for_integration_testing_purposes"
-    ensure_annotation_file_present(index_name)
+    ensure_annotation_file_present(index_name, opensearch_client)
     user_query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
     samples_genes_df = get_annotation_result_from_query(user_query_string, index_name, opensearch_client)
     assert samples_genes_df.shape == (1610, 7)
