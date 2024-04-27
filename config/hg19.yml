@@ -191,7 +191,7 @@ tracks:
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.protAcc, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS protAcc,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.mRNA, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS mRNA,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.rfamAcc, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS rfamAcc,
-                  CASE WHEN k.transcript IS NOT NULL THEN TRUE ELSE FALSE END AS IsCanonical
+                  CASE WHEN k.transcript IS NOT NULL THEN 'TRUE' ELSE 'FALSE' END AS isCanonical
               FROM
                   refGene r
               LEFT JOIN
