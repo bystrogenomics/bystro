@@ -26,7 +26,7 @@ All matrices are assumed to be provided as numpy arrays.
 
 import numpy as np
 from numpy import ndarray
-from scipy.linalg import logm, expm, fractional_matrix_power # type: ignore
+from scipy.linalg import logm, expm, fractional_matrix_power  # type: ignore
 from typing import List
 
 
@@ -130,7 +130,7 @@ def pd_mean_karcher(
     return current
 
 
-def log_euclidean_mean(matrices: List[ndarray]) -> ndarray:
+def pd_mean_log_euclidean(matrices: List[ndarray]) -> ndarray:
     """
     Compute the log-Euclidean mean of positive definite matrices.
 
@@ -156,66 +156,6 @@ def log_euclidean_mean(matrices: List[ndarray]) -> ndarray:
         )
     log_sum = sum(logm(C) for C in matrices)
     return expm(log_sum / len(matrices))
-
-
-def pd_median_riemann(
-    matrices: List[ndarray], tol: float = 1e-6, max_iter: int = 100
-) -> ndarray:
-    """
-    Compute the median of positive definite matrices using an iterative
-    approach.
-
-    Parameters
-    ----------
-    matrices : List[ndarray]
-        A list of positive definite matrices.
-    tol : float, default=1e-6
-        The tolerance for convergence.
-    max_iter : int, default=100
-        The maximum number of iterations.
-
-    Returns
-    -------
-    ndarray
-        The median of the matrices.
-
-    Raises
-    ------
-    ValueError
-        If any input is invalid or convergence is not reached.
-    """
-    if tol <= 0 or max_iter <= 0:
-        raise ValueError("Tolerance and max iterations must be positive.")
-    if not matrices or any(not is_positive_definite(C) for C in matrices):
-        raise ValueError(
-            "All matrices must be positive definite and non-empty."
-        )
-    n = len(matrices)
-    current = np.mean(matrices, axis=0)
-
-    for _ in range(max_iter):
-        sum_logs = np.zeros_like(current)
-        for C in matrices:
-            sum_logs += logm(
-                fractional_matrix_power(current, -0.5)
-                @ C
-                @ fractional_matrix_power(current, -0.5)
-            )
-        avg_logs = sum_logs / n
-        update = expm(avg_logs)
-        next_median = (
-            fractional_matrix_power(current, 0.5)
-            @ update
-            @ fractional_matrix_power(current, 0.5)
-        )
-
-        if np.linalg.norm(next_median - current, "fro") < tol:
-            print(f"Converged after {_+1} iterations.")
-            return next_median
-        current = next_median
-
-    print("Max iterations reached without convergence.")
-    return current
 
 
 """
