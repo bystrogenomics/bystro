@@ -11,7 +11,6 @@ latent variables. Two key parameters, 'mu' and 'eps', control the strength
 of the adversarial component and the conditioning of inverses, 
 respectively, enhancing the robustness and stability of the model.
 """
-from typing import Union
 import numpy as np
 import numpy.linalg as la
 
@@ -106,9 +105,7 @@ class PPCAadversarial(BaseGaussianFactorModel):
         p = self.p
         q = Y.shape[1]
 
-        model_cov: Union[
-            LinearShrinkageCovariance, NonLinearShrinkageCovariance
-        ]
+        model_cov: LinearShrinkageCovariance | NonLinearShrinkageCovariance
         if regularization_options["method"] == "Empirical":
             B_11 = X_dm.T @ X_dm
             B_12 = X_dm.T @ Y_dm
