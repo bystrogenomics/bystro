@@ -701,3 +701,7 @@ mappings:
               type: integer
             AF_eas_kor:
               type: half_float
+            controls_AN:
+              type: integer
+            controls_AF:
+              type: half_float
