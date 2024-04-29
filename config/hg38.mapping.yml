@@ -387,6 +387,8 @@ mappings:
         name:
           type: keyword
           normalizer: uppercase_normalizer
+        isCanonical:
+          type: boolean
     nearest:
       properties:
         refSeq:
