@@ -23,14 +23,22 @@ None
 """
 import numpy as np
 import numpy.linalg as la
-import cvxpy as cp
-import time
 from typing import List, Optional, Union
 
 from bystro.covariance._covariance_np import (
     EmpiricalCovariance,
     LinearShrinkageCovariance,
     NonLinearShrinkageCovariance,
+)
+from bystro.covariance.covariance_cov_shrinkage import (
+    GeometricInverseShrinkage,
+    LinearInverseShrinkage,
+    QuadraticInverseShrinkage,
+)
+from bystro.covariance.positive_definite_average import (
+    pd_mean_harmonic,
+    pd_mean_karcher,
+    pd_mean_log_euclidean,
 )
 
 
@@ -92,7 +100,7 @@ class MeanAdaptation:
         self.weighted: bool = weighted
         self.J: int = 0
         self.mu_list: List[np.ndarray] = []
-        self.mu_0: np.ndarray = np.array([])  # Placeholder until set
+        self.mu_0: np.ndarray = np.array([])
         self.n_covariates: int = 0
 
     def fit(self, X_list: List[np.ndarray]) -> "MeanAdaptation":
@@ -200,9 +208,6 @@ class RotationAdaptation:
 
     Attributes
     ----------
-    norm : str
-        The norm to use for the optimization problem when computing the
-        centroid covariance. Defaults to the Frobenius norm.
 
     J : int
         The number of datasets.
@@ -241,7 +246,10 @@ class RotationAdaptation:
     """
 
     def __init__(
-        self, norm: str = "fro", regularization: str = "Linear"
+        self,
+        centroid: str = "log_euclidean",
+        regularization: str = "Linear",
+        projection_regularization: str = "Linear",
     ) -> None:
         """
         Initializes the RotationAdaptation instance with the specified norm.
@@ -251,9 +259,16 @@ class RotationAdaptation:
         norm : str, optional
             The norm to use for the optimization problem. Defaults to
             the Frobenius norm.
+
+        regularization: str,default="Linear",
+            The regularization for estimating the covariance in each group
+
+        projection_regularization: str,default="Linear",
+            The regularization for estimating the covariance in the
+            transform method with new group
         """
-        self.norm: str = norm
         self.J: int = 0
+        self.centroid = centroid
         self.mu_0: np.ndarray = np.array([])
         self.Sigma_0: np.ndarray = np.array([])
         self.L_0_inv: np.ndarray = np.array([])
@@ -262,6 +277,7 @@ class RotationAdaptation:
         self.mu_list: List[np.ndarray] = []
         self.elapsed_time: float = 0.0
         self.regularization = regularization
+        self.projection_regularization = projection_regularization
 
     def fit(self, X_list: List[np.ndarray]) -> "RotationAdaptation":
         """
@@ -282,23 +298,7 @@ class RotationAdaptation:
         Sigma_list = []
         L_i_cholesky_list = []
 
-        model_cov: Union[
-            EmpiricalCovariance,
-            LinearShrinkageCovariance,
-            NonLinearShrinkageCovariance,
-        ]
-        if self.regularization == "Empirical":
-            model_cov = EmpiricalCovariance()
-        elif self.regularization == "Linear":
-            model_cov = LinearShrinkageCovariance()
-        elif self.regularization == "NonLinear":
-            model_cov = NonLinearShrinkageCovariance()
-        elif self.regularization == "Bayesian":
-            raise ValueError("Bayesian currently not supported")
-        else:
-            raise ValueError(
-                "Unrecognized regularization %s" % self.regularization
-            )
+        model_cov = _select_covariance_estimator(self.regularization)
 
         for j in range(self.J):
             X_dm = X_list[j] - mu_list[j]
@@ -312,21 +312,15 @@ class RotationAdaptation:
 
         self.mu_0 = np.sum(mu_list, axis=0) / self.J
 
-        Sigma_0_ = cp.Variable(Sigma_list[0].shape, symmetric=True)
-        constraints = [Sigma_0_ >> 0]
-        objective = cp.Minimize(
-            cp.sum(
-                [
-                    cp.norm(Sigma_list[i] - Sigma_0_, self.norm)
-                    for i in range(self.J)
-                ]
-            )
-        )
-        problem = cp.Problem(objective, constraints)
-        startTime = time.time()
-        problem.solve()
-        self.elapsed_time = time.time() - startTime
-        self.Sigma_0 = Sigma_0_.value
+        if self.centroid == "log_euclidean":
+            self.Sigma_0 = pd_mean_log_euclidean(Sigma_list)
+        elif self.centroid == "harmonic":
+            self.Sigma_0 = pd_mean_harmonic(Sigma_list)
+        elif self.centroid == "karcher":
+            self.Sigma_0 = pd_mean_karcher(Sigma_list)
+        else:
+            raise ValueError("Unrecognized option %s" % self.centroid)
+
         self.L_0 = la.cholesky(self.Sigma_0)
         self.L_0_inv = la.inv(self.L_0)
         self.Sigma_list = Sigma_list
@@ -352,7 +346,11 @@ class RotationAdaptation:
         """
         if j is None:
             X_dm = X - np.mean(X, axis=0)
-            Sigma = np.cov(X_dm.T)
+            model_cov = _select_covariance_estimator(
+                self.projection_regularization
+            )
+            model_cov.fit(X_dm)
+            Sigma = model_cov.covariance
             L = la.cholesky(Sigma)
             L_inv = la.inv(L)
             X_w = np.dot(X_dm, L_inv.T)
@@ -384,3 +382,35 @@ class RotationAdaptation:
         for X in X_list:
             if X.shape[1] != self.n_covariates:
                 raise ValueError("Mismatch in number of covariates")
+
+
+def _select_covariance_estimator(regularization):
+    """
+    This is a tiny method for selecting the estimator for the covariance
+    matrix.
+    """
+    model_cov: Union[
+        EmpiricalCovariance,
+        LinearShrinkageCovariance,
+        NonLinearShrinkageCovariance,
+        LinearInverseShrinkage,
+        GeometricInverseShrinkage,
+        QuadraticInverseShrinkage,
+    ]
+    if regularization == "Empirical":
+        model_cov = EmpiricalCovariance()
+    elif regularization == "Linear":
+        model_cov = LinearShrinkageCovariance()
+    elif regularization == "LinearInverse":
+        model_cov = LinearInverseShrinkage()
+    elif regularization == "QuadraticInverse":
+        model_cov = QuadraticInverseShrinkage()
+    elif regularization == "GeometricInverse":
+        model_cov = GeometricInverseShrinkage()
+    elif regularization == "NonLinear":
+        model_cov = NonLinearShrinkageCovariance()
+    elif regularization == "Bayesian":
+        raise ValueError("Bayesian currently not supported")
+    else:
+        raise ValueError("Unrecognized regularization %s" % regularization)
+    return model_cov
