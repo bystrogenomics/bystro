@@ -115,7 +115,6 @@ class PPCAadversarial(BaseGaussianFactorModel):
             diag_reg = self.eps * np.eye(X_dm.shape[1])
             XtX = X_dm.T @ X_dm + diag_reg
             B_22 = B_12.T @ la.solve(XtX, B_12)
-
         elif regularization_options["method"] == "NonLinearShrinkage":
             if q == 1:
                 XX = np.zeros((N, p + 1))
