@@ -21,7 +21,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger()
 
-ANCESTRY_BUCKET = os.getenv("ANCESTRY_BUCKET", "bystro-ancestry")
+ANCESTRY_BUCKET = os.getenv("ANCESTRY_BUCKET", "bystro-ancestry-public")
 ANCESTRY_MODEL_DIR = os.getenv("ANCESTRY_MODEL_DIR", str(Path(__file__).parent / "data"))
 GNOMAD_PCA_FILE = "gnomadset_pca.csv"
 GNOMAD_RFC_FILE = "gnomadset_rfc.skop"

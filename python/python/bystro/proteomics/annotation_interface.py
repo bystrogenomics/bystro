@@ -8,12 +8,10 @@ import numpy as np
 import pandas as pd
 from opensearchpy import OpenSearch
 
-from bystro.utils.config import get_opensearch_config
 from bystro.proteomics.fragpipe_tandem_mass_tag import TandemMassTagDataset
 
 logger = logging.getLogger(__file__)
 
-OPENSEARCH_CONFIG = get_opensearch_config()
 HETEROZYGOTE_DOSAGE = 1
 HOMOZYGOTE_DOSAGE = 2
 MISSING_GENO_DOSAGE = np.nan

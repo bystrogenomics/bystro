@@ -32,7 +32,9 @@ from bystro.utils.timer import Timer
 logger = logging.getLogger(__name__)
 
 MAX_QUERY_SIZE = 10_000
-MAX_SLICES = 1e6
+# TODO 2024-04-26 @akotlar Investigate the impact of large numbers of slices
+# and whether 20_000 slices is a reasonable limit
+MAX_SLICES = 20_000
 KEEP_ALIVE = "1d"
 MAX_CONCURRENCY_PER_THREAD = 4
 SAVE_LOCI_BATCH_WRITE_SIZE = int(os.getenv("SAVE_LOCI_BATCH_WRITE_SIZE", 500_000))
@@ -89,44 +91,52 @@ class AsyncQueryProcessor:
     async def process_query(self, query: dict) -> tuple[NDArray[np.int32], NDArray]:
         doc_ids: list[int] = []
         loci: list[str] = []
+        search_after = None  # Initialize search_after for pagination
 
-        # Perform the search operation asynchronously using the pre-initialized client
-        resp = await self.client.search(**query)
+        # Ensure there is a sort parameter in the query
+        if "sort" not in query.get("body", {}):
+            query.setdefault("body", {}).update(
+                {"sort": [{"_id": "asc"}]}  # Sorting by ID in ascending order
+            )
 
-        for doc in resp["hits"]["hits"]:
-            src = doc["fields"]
-            doc_id = int(doc["_id"])
-            locus = f"{upper_chr(src['chrom'][0])}:{src['pos'][0]}:{src['inputRef'][0]}:{src['alt'][0]}"
-            doc_ids.append(doc_id)
-            loci.append(locus)
+        while True:
+            if search_after:
+                query["body"]["search_after"] = search_after
 
-        if len(doc_ids) == 0:
+            resp = await self.client.search(**query)
+
+            if not resp["hits"]["hits"]:
+                break  # Exit the loop if no more documents are found
+
+            for doc in resp["hits"]["hits"]:
+                src = doc["fields"]
+                doc_id = int(doc["_id"])
+                locus = (
+                    f"{upper_chr(src['chrom'][0])}:{src['pos'][0]}:{src['inputRef'][0]}:{src['alt'][0]}"
+                )
+                doc_ids.append(doc_id)
+                loci.append(locus)
+
+            # Update search_after to the sort value of the last document retrieved
+            search_after = resp["hits"]["hits"][-1]["sort"]
+
+        if not doc_ids:
             return np.array([], dtype=np.int32), np.array([], dtype=object)
 
+        self.last_reported_count += len(doc_ids)
+
         if self.last_reported_count > self.REPORT_INCREMENT:
-            self.reporter.increment_and_write_progress_message.remote(  # type: ignore
+            self.reporter.increment_and_write_progress_message.remote(
                 self.last_reported_count, "Fetched", "variants"
             )
             self.last_reported_count = 0
 
-        self.last_reported_count += len(doc_ids)
-
         all_doc_ids = np.array(doc_ids, dtype=np.int32)
         all_loci = np.array(loci, dtype=object)
 
-        start = time.time()
-
         sorted_indices = np.argsort(all_doc_ids, kind="stable")
-
-        # Perform in-place sorting by reassigning sorted values back into the original arrays
         all_doc_ids = all_doc_ids[sorted_indices]
         all_loci = all_loci[sorted_indices]
-
-        logger.info("Sorting indices took %s seconds", time.time() - start)
-        logger.info(
-            "Memory usage after sorting indices: %s (MB)",
-            psutil.Process(os.getpid()).memory_info().rss / 1024**2,
-        )
 
         return all_doc_ids, all_loci
 
@@ -153,16 +163,19 @@ def _get_num_slices(client, index_name, max_query_size, max_slices, query) -> tu
     if n_docs == 0:
         raise RuntimeError("No documents found for the query")
 
-    # Opensearch does not always query the requested number of documents, and
-    # we have observed up to 3% loss; to be safe, assume 15% max and then round
-    # number of slices requested up
+    # TODO 2024-04-26 @akotlar now that we use search_after within process_query,
+    # it appears we no logner need to worry about slop
+    # however, for now we will keep it, just in case there are hidden consequences
+    # such as inflating the number of slices required past OpenSearch comfort for
+    # the index size
+    # or inflating the query size to the maximum allowed, which stresses OpenSearch too much
     expected_query_size_with_loss = max_query_size * 0.85
 
     num_slices_required = math.ceil(n_docs / expected_query_size_with_loss)
     if num_slices_required > max_slices:
-        raise RuntimeError(
-            "Too many slices required to process the query. Please reduce the query size."
-        )
+        num_slices_required = max_slices
+
+    logger.info("Constructed query with %d slices for %d hits", num_slices_required, n_docs)
 
     return max(num_slices_required, 1), n_docs
 
@@ -222,6 +235,35 @@ def run_dosage_filter(
     return
 
 
+def count_in_ranges_numpy(numbers):
+    if len(numbers) == 0:
+        return "No data provided"
+
+    max_value = numbers.max() + 1  # Ensure the highest value is included in the range
+    min_bin_size = 100  # Minimum bin size
+    max_bins = 100  # Maximum number of bins
+
+    # Calculate optimal bin size
+    optimal_bin_size = max(min_bin_size, np.ceil(max_value / max_bins))
+
+    # Calculate the number of bins using the optimal bin size
+    num_bins = int(np.ceil(max_value / optimal_bin_size))
+
+    # Define the edges of the bins
+    bins = np.linspace(0, num_bins * optimal_bin_size, num_bins + 1)
+
+    # Create the histogram
+    counts, edges = np.histogram(numbers, bins=bins)
+
+    # Build a string with non-zero bins
+    result = ""
+    for i in range(len(counts)):
+        if counts[i] > 0:
+            result += f"{int(edges[i])}-{int(edges[i+1]-1)}: {counts[i]}\n"
+
+    return result.strip()  # Remove the last newline character
+
+
 def sort_loci_and_doc_ids(
     results: list[tuple[NDArray[np.int32], NDArray]]
 ) -> tuple[NDArray[np.int32], NDArray, int]:
@@ -237,10 +279,20 @@ def sort_loci_and_doc_ids(
 
     # Collect results
     n_hits = 0
+    n_hits_list: list[int] = []
     for doc_ids, loci in results:
         all_doc_ids.append(doc_ids)
         all_loci.append(loci)
         n_hits += len(doc_ids)
+        n_hits_list.append(len(doc_ids))
+
+    try:
+        n_hits_list_np: NDArray[np.uint32] = np.array(n_hits_list, dtype=np.uint32)
+        del n_hits_list
+        logger.info("Query hits per slice distribution:\n%s", count_in_ranges_numpy(n_hits_list_np))
+        del n_hits_list_np
+    except Exception as e:
+        logger.warning("Failed to calculate bins due to %s", e)
 
     logger.info("Memory usage after query collection loop: %s MB", process.memory_info().rss / 1024**2)
 
@@ -624,6 +676,16 @@ async def go(  # pylint:disable=invalid-name
     logger.info(
         "Memory usage after query result sorting: %s (MB)",
         psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+    )
+
+    if n_hits != num_docs:
+        raise RuntimeError(
+            "Number of hits does not match the number of documents. Expected %d, got %d"
+            % (num_docs, n_hits)
+        )
+
+    reporter.message.remote(  # type: ignore
+        f"OK: The number of fetched variants ({n_hits}) equals the number expected ({num_docs})"
     )
 
     outputs = filter_annotation_and_dosage_matrix(
