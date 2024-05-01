@@ -30,7 +30,7 @@ Standalone Functions:
 - inv_sherman_woodbury_fa: Invert a matrix with diagonal and low-rank structure.
 - inv_sherman_woodbury_full: Invert a complex matrix structured as A + UBV.
 """
-from typing import Any, Tuple
+from typing import Tuple
 
 import numpy as np
 from numpy.typing import NDArray
