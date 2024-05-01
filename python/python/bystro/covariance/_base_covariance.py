@@ -610,7 +610,7 @@ def _marginal_score_samples_sherman_woodbury(
     W: NDArray[np.float_],
     X: NDArray[np.float_],
     idxs: NDArray[np.float_],
-) -> np.float_:
+) -> NDArray[np.float_]:
     """
     Returns the marginal log-likelihood of a subset of data
     per window given that Sigma = WWT + Lambda
@@ -752,7 +752,7 @@ def _score_samples(
 
 def _score_samples_sherman_woodbury(
     Lambda: NDArray[np.float_], W: NDArray[np.float_], X: NDArray[np.float_]
-) -> np.float_:
+) -> NDArray[np.float_]:
     """
     Return the log likelihood of each sample
 

@@ -374,7 +374,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         X: NDArray[np.float_],
         observed_feature_idxs: NDArray[np.float_],
         sherman_woodbury: bool = False,
-    ) -> np.float_:
+    ) -> NDArray[np.float_]:
         """
         Return the conditional log likelihood of each sample, that is
 
@@ -519,7 +519,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
 
     def score_samples(
         self, X: NDArray[np.float_], sherman_woodbury: bool = False
-    ) -> np.float_:
+    )  -> NDArray[np.float_]:
         """
         Return the log likelihood of each sample
 
