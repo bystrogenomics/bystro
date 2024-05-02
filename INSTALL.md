@@ -95,47 +95,41 @@ Once Bystro is installed, it needs to be configured. The easiest step is choosin
 
 1. Download the Bystro database for your species/assembly
 
-- **Example:** hg38 (human reference GRCh38): `wget https://s3.amazonaws.com/bystro-db/hg38.tar.gz`</strong>
-  - You need ~270GB of free space for human and mouse databases (less for all other species by at least half)
-  - Databases are ~4.5x their compressed size when unpacked
+- **Example:** hg38 (human reference GRCh38): `wget https://s3.amazonaws.com/bystro-db/hg38_v7.tar.gz`</strong>
+  - You need ~700GB of free space for hg38 and  ~400GB of free space for hg19, including the space for the tar.gz archives
 
-The downloaded databases are tar balls, in which the database files that Bystro needs to access are located in `<assembly>/index`
-
-2. Expand within some folder:
+2. To install the database:
 
    **Example:**
 
    ```shell
-   pigz -d -c hg38.tar.gz | (cd /where/to/ && tar xvf -)
+   cd /mnt/annotator/
+   wget https://s3.amazonaws.com/bystro-db/hg38_v7.tar.gz
+   bgzip -d -c --threads 32 hg38_v7.tar.gz | tar xvf -
    ```
 
-   In this example the hg38 database would located in `/where/to/hg38/index`
+   In this example the hg38 database would located in `/mnt/annotator/hg38`
 
-3. Create a copy of the assembly config YAML file, and update its `database_dir` property to point to `index` folder
+3. Update the YAML configuration for the species/assembly to point to the database.
 
-   - Since in our downloaded tarballs, the database is within a folder called `index`
+   For human genome assemblies, we provide pre-configured hg19.yml and hg38.yml, which assume `/mnt/annotator/hg19_v9` and `/mnt/annotator/hg38_v7` database directories respectively.
 
-   **Example:**
+   If using a different mount point, different database folder name, or a different (or custom-built) database altogether,
+   you will need to update the `database_dir` property of the yaml config.
+     - Note for a custom database, you would also need to ensure the track `outputOrder` lists all tracks, and that each track has all desired `features` listed
+
+   For instance, using `yq` to can configure the `database_dir` and set `temp_dir` to have in-progress annotations written to local disk
 
    ```shell
-   cp config/hg38.clean.yml config/hg38.yml;
-   yq write -i config/hg38.yml database_dir /mnt/annotator/hg38/index
-   yq write -i config/hg38.yml temp_dir /mnt/annotator/tmp
+   yq write -i config/hg38.yml database_dir /mnt/my_fast_local_storage/hg38_v7
+   yq write -i config/hg38.yml temp_dir /mnt/my_fast_local_storage/tmp
    ```
-
-   The config file editing could of course be also done using vim/nano/vi/emacs
 
 ## Databases:
 
-1. Human (hg38): https://s3.amazonaws.com/bystro-db/hg38.tar.gz
-2. Human (hg19): https://s3.amazonaws.com/bystro-db/hg19.tar.gz
-3. Mouse (mm10): https://s3.amazonaws.com/bystro-db/mm10.tar.gz
-4. Mouse (mm9): https://s3.amazonaws.com/bystro-db/mm9.tar.gz
-5. Fly (dm6): https://s3.amazonaws.com/bystro-db/dm6.tar.gz
-6. Rat (rn6): https://s3.amazonaws.com/bystro-db/rn6.tar.gz
-7. Rhesus (rheMac8): https://s3.amazonaws.com/bystro-db/rheMac8.tar.gz
-8. S.cerevisae (sacCer3): https://s3.amazonaws.com/bystro-db/sacCer3.tar.gz
-9. C.elegans (ce11): https://s3.amazonaws.com/bystro-db/ce11.tar.gz
+1. Human (hg38): https://s3.amazonaws.com/bystro-db/hg38_v7.tar.gz
+2. Human (hg19): https://s3.amazonaws.com/bystro-db/hg19_v9.tar.gz
+3. There are no restrictions on species support, but we currently only build human genomes. Please create a GitHub issue if you would like us to support others.
 
 ## Running your first annotation
 

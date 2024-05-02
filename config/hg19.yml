@@ -28,7 +28,7 @@ chromosomes:
   - chrM
   - chrX
   - chrY
-database_dir: /mnt/annotator/hg19_v9
+database_dir: /mnt/ssd2/annotator/hg19_v9
 fileProcessors:
   snp:
     args: --emptyField NA --minGq .95
@@ -189,10 +189,10 @@ tracks:
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.tRnaName, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS tRnaName,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.spID, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS spID,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.spDisplayID, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS spDisplayID,
-                  (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.protAcc, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS protAcc,
+                  (SELECT GROUP_CONCAT(DISTINCT NULLIF(rl.protAcc, '') SEPARATOR ';') FROM hgFixed.refLink rl WHERE rl.mrnaAcc=r.name) AS protAcc,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.mRNA, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS mRNA,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.rfamAcc, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS rfamAcc,
-                  CASE WHEN k.transcript IS NOT NULL THEN 'TRUE' ELSE 'FALSE' END AS isCanonical
+                  CASE WHEN k.transcript IS NOT NULL THEN 'true' ELSE 'false' END AS isCanonical
               FROM
                   refGene r
               LEFT JOIN
@@ -200,8 +200,8 @@ tracks:
               LEFT JOIN
                   knownCanonical k ON k.transcript = x.kgID
               WHERE
-                  r.chrom = %chromosomes%;
-          completed: 2023-11-09T20:18:00
+                  r.chrom = %chromosomes%
+          completed: 2024-05-02T01:01:00
           name: fetch
       version: 4
     - build_author: alexkotlar
@@ -397,31 +397,31 @@ tracks:
         - Qatari: number
         - MGP: number
       local_files:
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.1.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.2.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.3.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.4.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.5.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.6.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.7.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.8.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.9.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.10.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.11.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.12.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.13.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.14.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.15.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.16.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.17.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.18.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.19.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.20.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.21.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.22.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.X.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.Y.vcf.gz
-        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155_processed.vcf.MT.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.1_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.2_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.3_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.4_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.5_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.6_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.7_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.8_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.9_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.10_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.11_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.12_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.13_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.14_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.15_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.16_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.17_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.18_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.19_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.20_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.21_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.22_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.X_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.Y_processed.vcf.gz
+        - /mnt/files1/bystro_annotator/raw_files/hg19/dbSNP/GRCh37.dbSNP155.vcf.MT_processed.vcf.gz
       name: dbSNP
       type: vcf
       utils:
@@ -461,7 +461,7 @@ tracks:
         - args:
             remoteFiles:
               - https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh37/clinvar.vcf.gz
-          completed: 2024-03-07T12:50:00
+          completed: 2024-05-02T01:02:00
           name: fetch
       version: 4
     - build_author: alexkotlar
