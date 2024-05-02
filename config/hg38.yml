@@ -200,8 +200,6 @@ tracks:
               LEFT JOIN
                   kgXref x ON x.refseq = r.name
               LEFT JOIN
-                  hgFixed.refLink rl ON rl.mrnaAcc = r.name
-              LEFT JOIN
                   knownCanonical k ON k.transcript = x.kgID
               WHERE
                   r.chrom = %chromosomes%
