@@ -387,6 +387,8 @@ mappings:
         name:
           type: keyword
           normalizer: uppercase_normalizer
+        isCanonical:
+          type: boolean
     nearest:
       properties:
         refSeq:
@@ -698,4 +700,8 @@ mappings:
             AN_eas_kor:
               type: integer
             AF_eas_kor:
+              type: half_float
+            controls_AN:
+              type: integer
+            controls_AF:
               type: half_float
