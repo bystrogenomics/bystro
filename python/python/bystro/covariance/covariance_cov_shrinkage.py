@@ -91,7 +91,10 @@ SOFTWARE.
 from typing import Optional
 import numpy as np
 from numpy.typing import NDArray
-from bystro.covariance._base_covariance import BaseCovariance
+from bystro.covariance._base_covariance import (
+    BaseCovariance,
+    _symmeterize_and_warning,
+)
 import math
 
 
@@ -116,7 +119,8 @@ class GeometricInverseShrinkage(BaseCovariance):
         self : GeometricInverseShrinkage
             The instance itself.
         """
-        self.covariance = gis(X)
+        covariance = gis(X)
+        self.covariance = _symmeterize_and_warning(covariance)
         return self
 
 
@@ -141,7 +145,8 @@ class LinearInverseShrinkage(BaseCovariance):
         self : LinearInverseShrinkage
             The instance itself.
         """
-        self.covariance = lis(X)
+        covariance = lis(X)
+        self.covariance = _symmeterize_and_warning(covariance)
         return self
 
 
@@ -166,7 +171,8 @@ class QuadraticInverseShrinkage(BaseCovariance):
         self : QuadraticInverseShrinkage
             The instance itself.
         """
-        self.covariance = qis(X)
+        covariance = qis(X)
+        self.covariance = _symmeterize_and_warning(covariance)
         return self
 
 

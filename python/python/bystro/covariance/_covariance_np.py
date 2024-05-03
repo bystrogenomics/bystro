@@ -1,7 +1,28 @@
+"""
+This module provides classes for fitting covariance matrices using various
+approaches, including empirical, Bayesian, linear shrinkage, and nonlinear
+shrinkage methods. These classes extend BaseCovariance, handling missing data
+checks and employing advanced statistical methods for optimal estimation.
+
+Classes:
+- EmpiricalCovariance: Fits standard sample covariance.
+- BayesianCovariance: Implements MAP estimation with priors.
+- LinearShrinkageCovariance: Combines empirical covariance with a structured
+  estimator.
+- NonLinearShrinkageCovariance: Adjusts eigenvalues using a nonlinear
+  shrinkage based on sample spectral density.
+
+Dependencies:
+- numpy for matrix operations.
+- Preprocessed input data as centered, non-missing values.
+"""
 from typing import Any
 import numpy as np
 from numpy.typing import NDArray
-from bystro.covariance._base_covariance import BaseCovariance
+from bystro.covariance._base_covariance import (
+    BaseCovariance,
+    _symmeterize_and_warning,
+)
 
 
 class EmpiricalCovariance(BaseCovariance):
@@ -29,13 +50,14 @@ class EmpiricalCovariance(BaseCovariance):
         Raises
         ------
         ValueError:
-            A value error will be raised if missing data is found in X ( 
+            A value error will be raised if missing data is found in X (
             np.isnan(X) evaluates to true ), or if X is not an NDArray
         """
         self._test_inputs(X)
         self.N, self.p = X.shape
         XTX = np.dot(X.T, X)
-        self.covariance = XTX / self.N
+        covariance = XTX / self.N
+        self.covariance = _symmeterize_and_warning(covariance)
 
         return self
 
@@ -69,7 +91,7 @@ class BayesianCovariance(BaseCovariance):
         Raises
         ------
         ValueError:
-            A value error will be raised if missing data is found in X ( 
+            A value error will be raised if missing data is found in X (
             np.isnan(X) evaluates to true ), or if X is not an NDArray
         """
         self._test_inputs(X)
@@ -82,7 +104,8 @@ class BayesianCovariance(BaseCovariance):
         posterior_cov = cov_prior + covariance_empirical
         posterior_nu = nu + self.N
 
-        self.covariance = posterior_cov / (posterior_nu + self.p + 1)
+        covariance = posterior_cov / (posterior_nu + self.p + 1)
+        self.covariance = _symmeterize_and_warning(covariance)
 
         return self
 
@@ -129,7 +152,7 @@ class LinearShrinkageCovariance(BaseCovariance):
         Raises
         ------
         ValueError:
-            A value error will be raised if missing data is found in X ( 
+            A value error will be raised if missing data is found in X (
             np.isnan(X) evaluates to true ), or if X is not an NDArray
         """
 
@@ -154,9 +177,8 @@ class LinearShrinkageCovariance(BaseCovariance):
 
         # Shrink covariance matrix
         lambda_bar = np.trace(S) / self.p
-        self.covariance = (
-            rho_hat * lambda_bar * np.eye(self.p) + (1 - rho_hat) * S
-        )
+        covariance = rho_hat * lambda_bar * np.eye(self.p) + (1 - rho_hat) * S
+        self.covariance = _symmeterize_and_warning(covariance)
 
         return self
 
@@ -177,19 +199,19 @@ class NonLinearShrinkageCovariance(BaseCovariance):
     The theoretical basis of this approach is built around the optimal
     estimation of p parameters, which balances between overfitting p^2
     parameters and underfitting with only 1 parameter. The nonlinear shrinkage
-    is calculated using an oracle estimator that depends on a sample 
+    is calculated using an oracle estimator that depends on a sample
     spectral density
     function approximated via kernel estimation using the Epanechnikov kernel.
     This estimation facilitates the derivation of shrinkage intensities for each
     eigenvalue, tailoring the adjustment to improve estimations under various
-    data conditions. 
+    data conditions.
 
     https://www.jstor.org/stable/27028732
     """
 
     def fit(self, X: NDArray[np.float_]) -> "NonLinearShrinkageCovariance":
         """
-        This fits a covariance matrix using the nonlinear shrinkage approach, 
+        This fits a covariance matrix using the nonlinear shrinkage approach,
         which adjusts the empirical eigenvalues based on asymptotic results.
 
         Parameters
@@ -205,7 +227,7 @@ class NonLinearShrinkageCovariance(BaseCovariance):
         Raises
         ------
         ValueError:
-            A value error will be raised if missing data is found in X ( 
+            A value error will be raised if missing data is found in X (
             np.isnan(X) evaluates to true ), or if X is not an NDArray
         """
         self._test_inputs(X)
@@ -258,6 +280,7 @@ class NonLinearShrinkageCovariance(BaseCovariance):
             )
             dtilde = np.concatenate([dtilde0 * np.ones((p - N)), dtilde1])
 
-        self.covariance = np.dot(np.dot(u, np.diag(dtilde)), u.T)
+        covariance = np.dot(np.dot(u, np.diag(dtilde)), u.T)
+        self.covariance = _symmeterize_and_warning(covariance)
 
         return self
