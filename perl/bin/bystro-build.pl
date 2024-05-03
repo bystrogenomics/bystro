@@ -38,7 +38,7 @@ GetOptions(
   'skipCompletionCheck|skip_completion_check' => \$skipCompletionCheck,
   'dry_run_insertions|dry|dryRun'             => \$dryRunInsertions,
   'log_dir=s'                                 => \$logDir,
-  'maxThreads=i'                              => \$maxThreads,
+  'threads=i'                                 => \$maxThreads,
   'meta_only'                                 => \$metaOnly,
 );
 
@@ -76,7 +76,6 @@ if ($debug) {
 
 # read config file to determine genome name for log and check validity
 my $config_href = LoadFile($yaml_config);
-
 # get absolute path for YAML file and db_location
 $yaml_config = path($yaml_config)->absolute->stringify;
 
