@@ -65,7 +65,7 @@ def _symmeterize_and_warning(cov: np.ndarray) -> np.ndarray:
     diff_mse = np.mean((cov_new - cov) ** 2)
     cov_mse = np.mean(cov**2)
     if diff_mse / cov_mse > 0.02:
-        print("Warning: covariance matrix symmeterization difficulties")
+        print("Warning: original matrix estimate deviated substantially from symmetric")
     return cov_new
 
 
