@@ -4,7 +4,7 @@ from typing import Callable
 
 
 def optimal_shrinkage(
-    eigenvals: np.ndarray, gamma: float, loss: str = "N_1", sigma: float = None
+    eigenvals: np.ndarray, gamma: float, loss: str = "N_1", sigma: float = -1.0
 ) -> tuple[np.ndarray, float]:
     """
     Perform optimal shrinkage on data eigenvalues under various loss functions.
@@ -72,7 +72,7 @@ def optimal_shrinkage(
     assert np.prod(np.shape(eigenvals)) == len(eigenvals)
 
     # Estimate sigma if needed
-    if sigma is None:
+    if sigma == -1.0:
         MPmedian = median_marcenko_pastur(gamma)
         sigma = np.sqrt(np.median(eigenvals) / MPmedian)
 
@@ -267,7 +267,9 @@ def marcenko_pastur_integral(x: float, gamma: float) -> float:
     if (x < lobnd) or (x > hibnd):
         raise ValueError("x beyond")
 
-    def dens(t: np.ndarray, gamma: float, lobnd: float, hibnd: float) -> np.ndarray:
+    def dens(
+        t: np.ndarray, gamma: float = gamma, lobnd: float = lobnd, hibnd: float = hibnd
+    ) -> np.ndarray:
         """
         Compute the Marcenko-Pastur density function.
 
@@ -375,7 +377,7 @@ def inc_mar_pas(x0: float, gamma: float, alpha: float) -> float:
 
     This function computes the integral of the Marcenko-Pastur distribution using numerical integration.
     """
-    if gamma > 1:
+    if gamma <= 0 or gamma > 1:
         raise ValueError("gammaBeyond")
 
     top_spec = (1 + np.sqrt(gamma)) ** 2
@@ -431,7 +433,7 @@ def inc_mar_pas(x0: float, gamma: float, alpha: float) -> float:
         )
         return dist
 
-    def fun(x: np.ndarray, alpha: float, mar_pas: Callable) -> np.ndarray:
+    def fun(x: np.ndarray, alpha: float = alpha, mar_pas: Callable = mar_pas) -> np.ndarray:
         """
         Compute the Marcenko-Pastur function.
 
@@ -453,7 +455,5 @@ def inc_mar_pas(x0: float, gamma: float, alpha: float) -> float:
         """
         return x**alpha * mar_pas(x)
 
-    # Numerical integration using the trapezoidal rule
-    x_values = np.linspace(x0, top_spec, 1000)
-    integral = np.trapz(fun(x_values, alpha, mar_pas), x_values)
+    integral, _ = quad(fun, x0, top_spec)
     return integral

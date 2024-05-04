@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 from scipy.integrate import quad
-from numerical_shrinkage import *
+from bystro.covariance.numerical_shrinkage import *
 
 def test_numerical_shrinkage():
     eigenvalues = [2.1,3,8]
