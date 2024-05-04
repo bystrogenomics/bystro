@@ -1,6 +1,5 @@
 import numpy as np
-from scipy.integrate import quad
-from typing import Callable
+from scipy.integrate import quad  # type: ignore
 
 
 def optimal_shrinkage(
@@ -140,7 +139,9 @@ def ell(lam: np.ndarray, gamma: float) -> np.ndarray:
 def c(lam: np.ndarray, gamma: float) -> np.ndarray:
     """Calculate the c component for shrinkage based on lambda."""
     ell_val = ell(lam, gamma)
-    return np.sqrt((1 - gamma / ((ell_val - 1) ** 2)) / (1 + gamma / (ell_val - 1)))
+    return np.sqrt(
+        (1 - gamma / ((ell_val - 1) ** 2)) / (1 + gamma / (ell_val - 1))
+    )
 
 
 def s(lam: np.ndarray, gamma: float) -> np.ndarray:
@@ -154,22 +155,32 @@ def shrinkage_frobenius_1(ell: np.ndarray, c: np.ndarray) -> np.ndarray:
     return np.maximum(1 + (c**2) * (ell - 1), 0)
 
 
-def shrinkage_frobenius_2(ell: np.ndarray, c: np.ndarray, s: np.ndarray) -> np.ndarray:
+def shrinkage_frobenius_2(
+    ell: np.ndarray, c: np.ndarray, s: np.ndarray
+) -> np.ndarray:
     """max(ell / ((c^2) + ell * (s^2)), 0)"""
     return np.maximum(ell / ((c**2) + ell * (s**2)), 0)
 
 
-def shrinkage_frobenius_3(ell: np.ndarray, c: np.ndarray, s: np.ndarray) -> np.ndarray:
+def shrinkage_frobenius_3(
+    ell: np.ndarray, c: np.ndarray, s: np.ndarray
+) -> np.ndarray:
     """max(1 + (ell - 1) * ((c^2) / ((ell^2) * (s^2) + c^2)), 1)"""
-    return np.maximum(1 + (ell - 1) * ((c**2) / ((ell**2) * (s**2) + c**2)), 1)
+    return np.maximum(
+        1 + (ell - 1) * ((c**2) / ((ell**2) * (s**2) + c**2)), 1
+    )
 
 
-def shrinkage_frobenius_4(ell: np.ndarray, c: np.ndarray, s: np.ndarray) -> np.ndarray:
+def shrinkage_frobenius_4(
+    ell: np.ndarray, c: np.ndarray, s: np.ndarray
+) -> np.ndarray:
     """(s^2 + (ell^2) * (c^2)) / ((s^2) + (ell * (c^2)))"""
     return (s**2 + (ell**2) * (c**2)) / ((s**2) + (ell * (c**2)))
 
 
-def shrinkage_frobenius_6(ell: np.ndarray, c: np.ndarray, s: np.ndarray) -> np.ndarray:
+def shrinkage_frobenius_6(
+    ell: np.ndarray, c: np.ndarray, s: np.ndarray
+) -> np.ndarray:
     """1 + ((ell - 1) * (c^2)) / (((c^2) + ell * (s^2))^2)"""
     return 1 + ((ell - 1) * (c**2)) / (((c**2) + ell * (s**2)) ** 2)
 
@@ -184,7 +195,9 @@ def shrinkage_operator_2(ell: np.ndarray) -> np.ndarray:
     return ell
 
 
-def shrinkage_operator_6(ell: np.ndarray, c: np.ndarray, s: np.ndarray) -> np.ndarray:
+def shrinkage_operator_6(
+    ell: np.ndarray, c: np.ndarray, s: np.ndarray
+) -> np.ndarray:
     """1 + ((ell - 1) / (c^2 + ell * (s^2)))"""
     return 1 + ((ell - 1) / (c**2 + ell * (s**2)))
 
@@ -194,50 +207,71 @@ def shrinkage_nuclear_1(ell: np.ndarray, s: np.ndarray) -> np.ndarray:
     return np.maximum(1 + (ell - 1) * (1 - 2 * (s**2)), 1)
 
 
-def shrinkage_nuclear_2(ell: np.ndarray, c: np.ndarray, s: np.ndarray) -> np.ndarray:
+def shrinkage_nuclear_2(
+    ell: np.ndarray, c: np.ndarray, s: np.ndarray
+) -> np.ndarray:
     """max(ell / ((2 * ell - 1) * (s^2) + c^2), 1)"""
     return np.maximum(ell / ((2 * ell - 1) * (s**2) + c**2), 1)
 
 
-def shrinkage_nuclear_3(ell: np.ndarray, c: np.ndarray, s: np.ndarray) -> np.ndarray:
+def shrinkage_nuclear_3(
+    ell: np.ndarray, c: np.ndarray, s: np.ndarray
+) -> np.ndarray:
     """max(ell / (c^2 + (ell^2) * (s^2)), 1)"""
     return np.maximum(ell / (c**2 + (ell**2) * (s**2)), 1)
 
 
-def shrinkage_nuclear_4(ell: np.ndarray, c: np.ndarray, s: np.ndarray) -> np.ndarray:
+def shrinkage_nuclear_4(
+    ell: np.ndarray, c: np.ndarray, s: np.ndarray
+) -> np.ndarray:
     """max(ell * (c^2) + (s^2) / ell, 1)"""
     return np.maximum(ell * (c**2) + (s**2) / ell, 1)
 
 
-def shrinkage_nuclear_6(ell: np.ndarray, c: np.ndarray, s: np.ndarray) -> np.ndarray:
+def shrinkage_nuclear_6(
+    ell: np.ndarray, c: np.ndarray, s: np.ndarray
+) -> np.ndarray:
     """max((ell - ((ell - 1)^2) * (c^2) * (s^2)) / (((c^2) + ell * (s^2))^2), 1)"""
     return np.maximum(
-        (ell - ((ell - 1) ** 2) * (c**2) * (s**2)) / (((c**2) + ell * (s**2)) ** 2),
+        (ell - ((ell - 1) ** 2) * (c**2) * (s**2))
+        / (((c**2) + ell * (s**2)) ** 2),
         1,
     )
 
 
-def shrinkage_stein(ell: np.ndarray, c: np.ndarray, s: np.ndarray) -> np.ndarray:
+def shrinkage_stein(
+    ell: np.ndarray, c: np.ndarray, s: np.ndarray
+) -> np.ndarray:
     """ell / (c^2 + ell * (s^2))"""
     return ell / (c**2 + ell * (s**2))
 
 
-def shrinkage_entropy(ell: np.ndarray, c: np.ndarray, s: np.ndarray) -> np.ndarray:
+def shrinkage_entropy(
+    ell: np.ndarray, c: np.ndarray, s: np.ndarray
+) -> np.ndarray:
     """ell * (c^2) + s^2"""
     return ell * (c**2) + s**2
 
 
-def shrinkage_divergence(ell: np.ndarray, c: np.ndarray, s: np.ndarray) -> np.ndarray:
+def shrinkage_divergence(
+    ell: np.ndarray, c: np.ndarray, s: np.ndarray
+) -> np.ndarray:
     """sqrt(((ell^2) * (c^2) + ell * (s^2)) / (c^2 + (s^2) * ell))"""
-    return np.sqrt(((ell**2) * (c**2) + ell * (s**2)) / (c**2 + (s**2) * ell))
+    return np.sqrt(
+        ((ell**2) * (c**2) + ell * (s**2)) / (c**2 + (s**2) * ell)
+    )
 
 
-def shrinkage_frechet(ell: np.ndarray, c: np.ndarray, s: np.ndarray) -> np.ndarray:
+def shrinkage_frechet(
+    ell: np.ndarray, c: np.ndarray, s: np.ndarray
+) -> np.ndarray:
     """((sqrt(ell) * (c^2) + s^2)^2)"""
     return (np.sqrt(ell) * (c**2) + s**2) ** 2
 
 
-def shrinkage_affine(ell: np.ndarray, c: np.ndarray, s: np.ndarray) -> np.ndarray:
+def shrinkage_affine(
+    ell: np.ndarray, c: np.ndarray, s: np.ndarray
+) -> np.ndarray:
     """((1 + c^2) * ell + (s^2)) / (1 + (c^2) + ell * (s^2))"""
     return ((1 + c**2) * ell + (s**2)) / (1 + (c**2) + ell * (s**2))
 
@@ -268,7 +302,10 @@ def marcenko_pastur_integral(x: float, gamma: float) -> float:
         raise ValueError("x beyond")
 
     def dens(
-        t: np.ndarray, gamma: float = gamma, lobnd: float = lobnd, hibnd: float = hibnd
+        t: np.ndarray,
+        gamma: float = gamma,
+        lobnd: float = lobnd,
+        hibnd: float = hibnd,
     ) -> np.ndarray:
         """
         Compute the Marcenko-Pastur density function.
@@ -315,37 +352,13 @@ def median_marcenko_pastur(gamma: float) -> float:
     This function iteratively computes the median of the Marcenko-Pastur distribution
     using a binary search algorithm.
     """
-
-    def mar_pas_ccdf(x: float) -> float:
-        """
-        Compute the complementary cumulative distribution function (CCDF) of the Marcenko-Pastur
-        distribution.
-
-        Parameters
-        ----------
-        x : float
-            Input value.
-
-        Returns
-        -------
-        ccdf : float
-            Complementary cumulative distribution function (1 - CDF) of the Marcenko-Pastur
-            distribution corresponding to input value.
-
-        This function computes the complementary cumulative distribution function (CCDF) of
-        the Marcenko-Pastur distribution by subtracting the cumulative distribution function
-        (CDF) computed by the `inc_mar_pas` function from 1.
-        """
-        ccdf = 1 - inc_mar_pas(x, gamma, 0)
-        return ccdf
-
     lobnd = (1 - np.sqrt(gamma)) ** 2
     hibnd = (1 + np.sqrt(gamma)) ** 2
     change = True
     while change and (hibnd - lobnd > 0.001):
         change = False
         x = np.linspace(lobnd, hibnd, 5)
-        y = np.array([mar_pas_ccdf(xi) for xi in x])
+        y = np.array([1 - inc_mar_pas(xi, gamma, 0) for xi in x])
         if np.any(y < 0.5):
             lobnd = np.max(x[y < 0.5])
             change = True
@@ -355,6 +368,58 @@ def median_marcenko_pastur(gamma: float) -> float:
 
     med = (hibnd + lobnd) / 2
     return med
+
+
+def mar_pas(x: np.ndarray, gamma: float) -> np.ndarray:
+    """
+    Compute the Marcenko-Pastur distribution.
+
+    Parameters
+    ----------
+    x : array_like
+        Input values.
+    gamma : float
+        Parameter of the Marcenko-Pastur distribution.
+
+    Returns
+    -------
+    dist: array_like
+        Marcenko-Pastur distribution values corresponding to input values.
+    """
+    top_spec = (1 + np.sqrt(gamma)) ** 2
+    bot_spec = (1 - np.sqrt(gamma)) ** 2
+
+    positive_part = (top_spec - x) * (x - bot_spec) > 0
+    dist = np.zeros_like(x)
+    valid_x = x[positive_part]
+    if valid_x.size > 0:
+        dist[positive_part] = (
+            np.sqrt((top_spec - valid_x) * (valid_x - bot_spec))
+            / (gamma * valid_x)
+            / (2 * np.pi)
+        )
+    return dist
+
+
+def mar_pas_function(x: float, alpha: float, gamma: float) -> float:
+    """
+    Compute the power of x times the Marcenko-Pastur distribution.
+
+    Parameters
+    ----------
+    x : float
+        Input value.
+    alpha : float
+        Exponent of the power function.
+    gamma : float
+        Parameter of the Marcenko-Pastur distribution.
+
+    Returns
+    -------
+    float
+        Value of x raised to the power alpha times the Marcenko-Pastur distribution.
+    """
+    return x**alpha * mar_pas(np.array([x]), gamma)
 
 
 def inc_mar_pas(x0: float, gamma: float, alpha: float) -> float:
@@ -374,86 +439,10 @@ def inc_mar_pas(x0: float, gamma: float, alpha: float) -> float:
     -------
     integral : float
         The computed integral of the Marcenko-Pastur distribution.
-
-    This function computes the integral of the Marcenko-Pastur distribution using numerical integration.
     """
     if gamma <= 0 or gamma > 1:
-        raise ValueError("gammaBeyond")
+        raise ValueError("Gamma should be between 0 and 1, exclusive of 0.")
 
     top_spec = (1 + np.sqrt(gamma)) ** 2
-    bot_spec = (1 - np.sqrt(gamma)) ** 2
-
-    def if_else(Q: np.ndarray, point: np.ndarray, counter_point: np.ndarray) -> np.ndarray:
-        """
-        Choose between two values based on a condition.
-
-        Parameters
-        ----------
-        Q : array_like
-            Boolean condition array.
-        point : array_like
-            Values to choose when the condition is True.
-        counter_point : array_like or float
-            Values to choose when the condition is False.
-
-        Returns
-        -------
-        y : array_like
-            Selected values based on the condition.
-
-        This function selects values from `point` or `counter_point` based on the boolean condition `Q`.
-        """
-        y = point.copy()
-        if np.any(~Q):
-            if len(counter_point) == 1:
-                counter_point = np.ones_like(Q) * counter_point
-            y[~Q] = counter_point[~Q]
-        return y
-
-    def mar_pas(x: np.ndarray) -> np.ndarray:
-        """
-        Compute the Marcenko-Pastur distribution.
-
-        Parameters
-        ----------
-        x : array_like
-            Input values.
-
-        Returns
-        -------
-        dist: array_like
-            Marcenko-Pastur distribution values corresponding to input values.
-
-        This function computes the Marcenko-Pastur distribution using the if_else function.
-        """
-        dist = if_else(
-            (top_spec - x) * (x - bot_spec) > 0,
-            np.sqrt((top_spec - x) * (x - bot_spec)) / (gamma * x) / (2 * np.pi),
-            np.array([0]),
-        )
-        return dist
-
-    def fun(x: np.ndarray, alpha: float = alpha, mar_pas: Callable = mar_pas) -> np.ndarray:
-        """
-        Compute the Marcenko-Pastur function.
-
-        Parameters
-        ----------
-        x : array_like
-            Input values.
-        alpha : float
-            Exponent of the power function.
-        mar_pas : callable
-            Function computing the Marcenko-Pastur distribution.
-
-        Returns
-        -------
-        array_like
-            Marcenko-Pastur function values corresponding to input values.
-
-        This function computes the Marcenko-Pastur function.
-        """
-        return x**alpha * mar_pas(x)
-
-    integral, _ = quad(fun, x0, top_spec)
+    integral, _ = quad(mar_pas_function, x0, top_spec, args=(alpha, gamma))
     return integral

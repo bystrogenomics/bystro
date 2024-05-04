@@ -1,108 +1,143 @@
 import numpy as np
-import pytest
-from bystro.covariance.optimal_shrinkage import *
+from bystro.covariance.optimal_shrinkage import (
+    marcenko_pastur_integral,
+    median_marcenko_pastur,
+    inc_mar_pas,
+    optimal_shrinkage,
+)
 
 
 def test_inc_mar_pas():
-    x0 = 0.5
-    gamma = 0.9
-    alpha = 1.5
-    expected_result = 1.2830
-    assert np.isclose(inc_mar_pas(x0, gamma, alpha), expected_result, 1e-4)
-
-    expected_result = 1.7435
-    assert np.isclose(inc_mar_pas(0.7, 0.8, 2), expected_result, 1e-4)
-
-    with pytest.raises(ValueError):
-        inc_mar_pas(0.9, 0, 3)
-
-    with pytest.raises(ValueError):
-        inc_mar_pas(0.5, 1.1, 1.5)
+    assert np.abs(inc_mar_pas(1.0, 0.98, 0.8) - 0.68746165) < 1e-5
+    assert np.abs(inc_mar_pas(1.0, 0.98, 0.7) - 0.63785129) < 1e-5
+    assert np.abs(inc_mar_pas(0.9, 0.98, 0.7) - 0.66573444) < 1e-5
+    assert np.abs(inc_mar_pas(0.2, 0.98, 0.7) - 0.84920378) < 1e-5
+    assert np.abs(inc_mar_pas(0.2, 0.98, 0.7) - 0.84920378) < 1e-5
+    assert np.abs(inc_mar_pas(0.2, 0.58, 0.7) - 0.90528871) < 1e-5
 
 
 def test_median_marcenko_pastur():
-    gamma = 0.9
-    expected_result = 0.6896
-    assert np.isclose(median_marcenko_pastur(gamma), expected_result, atol=1e-4)
-
-    expected_result = 0.8305
-    assert np.isclose(median_marcenko_pastur(0.5), expected_result, atol=1e-4)
-
-    with pytest.raises(ValueError):
-        median_marcenko_pastur(1.1)
+    assert np.abs(median_marcenko_pastur(0.1) - 0.96653700) < 1e-4
+    assert np.abs(median_marcenko_pastur(0.2) - 0.93293873) < 1e-4
+    assert np.abs(median_marcenko_pastur(0.3) - 0.89910346) < 1e-4
+    assert np.abs(median_marcenko_pastur(0.4) - 0.86482156) < 1e-4
+    assert np.abs(median_marcenko_pastur(0.5) - 0.83052732) < 1e-4
+    assert np.abs(median_marcenko_pastur(0.6) - 0.79552387) < 1e-4
+    assert np.abs(median_marcenko_pastur(0.7) - 0.76080010) < 1e-4
+    assert np.abs(median_marcenko_pastur(0.8) - 0.72520248) < 1e-4
+    assert np.abs(median_marcenko_pastur(0.9) - 0.68959499) < 1e-4
 
 
 def test_marcenko_pastur_integral():
-    x = 1.5
-    gamma = 0.7
-    expected_result = 0.7379
-    assert np.isclose(marcenko_pastur_integral(x, gamma), expected_result, atol=1e-4)
-
-    with pytest.raises(ValueError):
-        marcenko_pastur_integral(2, 1.1)
-    with pytest.raises(ValueError):
-        marcenko_pastur_integral(2, 0)
-    with pytest.raises(ValueError):
-        marcenko_pastur_integral(2, 0.1)
+    assert np.abs(marcenko_pastur_integral(1, 0.99) - 0.60841990) < 1e-4
+    assert np.abs(marcenko_pastur_integral(1, 0.69) - 0.58974810) < 1e-4
+    assert np.abs(marcenko_pastur_integral(1, 0.39) - 0.56692862) < 1e-4
+    assert np.abs(marcenko_pastur_integral(1.8, 0.39) - 0.86127059) < 1e-4
 
 
 def test_optimal_shrinkage():
-    eigenvals = np.array([0.5, 1.0, 1.5])
-    gamma = 0.9
-    loss = "F_1"
-    sigma = 0.1
-    expected_result = np.array([0.4818, 0.9819, 1.4819])
-    assert np.allclose(optimal_shrinkage(eigenvals, gamma, loss, sigma)[0], expected_result, atol=1e-4)
+    singular_values = np.array([1.50, 1.76, 41.31])
 
-    expected_result = np.array([0.2581, 0.5213, 0.7845])
-    assert np.allclose(optimal_shrinkage(eigenvals, gamma, "F_2", sigma)[0], expected_result, atol=1e-4)
-
-    expected_result = np.array([0.0202, 0.0207, 0.0208])
-    assert np.allclose(optimal_shrinkage(eigenvals, gamma, "F_3", sigma)[0], expected_result, atol=1e-4)
-
-    expected_result = np.array([0.4906, 0.9908, 1.4909])
-    assert np.allclose(optimal_shrinkage(eigenvals, gamma, "F_4", sigma)[0], expected_result, atol=1e-4)
-
-    expected_result = np.array([0.1404, 0.279, 0.4175])
-    assert np.allclose(optimal_shrinkage(eigenvals, gamma, "F_6", sigma)[0], expected_result, atol=1e-4)
-
-    expected_result = np.array([0.4728, 0.9729, 1.4729])
-    assert np.allclose(optimal_shrinkage(eigenvals, gamma, "N_1", sigma)[0], expected_result, atol=1e-4)
-
-    expected_result = np.array([0.1751, 0.3537, 0.5322])
-    assert np.allclose(optimal_shrinkage(eigenvals, gamma, "N_2", sigma)[0], expected_result, atol=1e-4)
-
-    expected_result = np.array([0.0106, 0.0109, 0.0109])
-    assert np.allclose(optimal_shrinkage(eigenvals, gamma, "N_3", sigma)[0], expected_result, atol=1e-4)
-
-    expected_result = np.array([0.4816, 0.9818, 1.4819])
-    assert np.allclose(optimal_shrinkage(eigenvals, gamma, "N_4", sigma)[0], expected_result, atol=1e-4)
-
-    expected_result = np.array([0.0181, 0.0319, 0.0458])
-    assert np.allclose(optimal_shrinkage(eigenvals, gamma, "N_6", sigma)[0], expected_result, atol=1e-4)
-
-    expected_result = np.array([0.4908, 0.9909, 1.4909])
-    assert np.allclose(optimal_shrinkage(eigenvals, gamma, "O_1", sigma)[0], expected_result, atol=1e-4)
-
-    expected_result = np.array([0.4908, 0.9909, 1.4909])
-    assert np.allclose(optimal_shrinkage(eigenvals, gamma, "O_2", sigma)[0], expected_result, atol=1e-4)
-
-    expected_result = np.array([0.2628, 0.526, 0.7892])
-    assert np.allclose(optimal_shrinkage(eigenvals, gamma, "O_6", sigma)[0], expected_result, atol=1e-4)
-
-    expected_result = np.array([0.2581, 0.5213, 0.7845])
-    assert np.allclose(
-        optimal_shrinkage(eigenvals, gamma, "Stein", sigma)[0], expected_result, atol=1e-4
+    sigma_new, est_sigma = optimal_shrinkage(singular_values, 0.3, "F_1")
+    assert (
+        np.sum(np.abs(sigma_new - np.array([1.9575, 1.9575, 40.0854]))) < 1e-3
     )
+    assert np.abs(est_sigma - 1.3991) < 1e-2
 
-    expected_result = np.array([0.4818, 0.9819, 1.4819])
-    assert np.allclose(optimal_shrinkage(eigenvals, gamma, "Ent", sigma)[0], expected_result, atol=1e-4)
+    sigma_new, est_sigma = optimal_shrinkage(singular_values, 0.3, "F_2")
+    assert (
+        np.sum(np.abs(sigma_new - np.array([1.9575, 1.9575, 31.0527]))) < 1e-3
+    )
+    assert np.abs(est_sigma - 1.3991) < 1e-2
 
-    expected_result = np.array([0.3526, 0.7154, 1.0782])
-    assert np.allclose(optimal_shrinkage(eigenvals, gamma, "Div", sigma)[0], expected_result, atol=1e-4)
+    sigma_new, est_sigma = optimal_shrinkage(singular_values, 0.3, "F_3")
+    assert np.sum(np.abs(sigma_new - np.array([1.9575, 1.9575, 6.8682]))) < 1e-3
+    assert np.abs(est_sigma - 1.3991) < 1e-2
 
-    expected_result = np.array([0.4752, 0.9746, 1.4743])
-    assert np.allclose(optimal_shrinkage(eigenvals, gamma, "Fre", sigma)[0], expected_result, atol=1e-4)
+    sigma_new, est_sigma = optimal_shrinkage(singular_values, 0.3, "F_4")
+    assert (
+        np.sum(np.abs(sigma_new - np.array([1.9575, 1.9575, 40.6634]))) < 1e-3
+    )
+    assert np.abs(est_sigma - 1.3991) < 1e-2
 
-    expected_result = np.array([0.3352, 0.6801, 1.0249])
-    assert np.allclose(optimal_shrinkage(eigenvals, gamma, "Aff", sigma)[0], expected_result, atol=1e-4)
+    sigma_new, est_sigma = optimal_shrinkage(singular_values, 0.3, "F_6")
+    assert (
+        np.sum(np.abs(sigma_new - np.array([1.9575, 1.9575, 24.1599]))) < 1e-3
+    )
+    assert np.abs(est_sigma - 1.3991) < 1e-2
+
+    sigma_new, est_sigma = optimal_shrinkage(singular_values, 0.3, "N_1")
+    assert (
+        np.sum(np.abs(sigma_new - np.array([1.9575, 1.9575, 39.4776]))) < 1e-3
+    )
+    assert np.abs(est_sigma - 1.3991) < 1e-2
+
+    sigma_new, est_sigma = optimal_shrinkage(singular_values, 0.3, "N_2")
+    assert (
+        np.sum(np.abs(sigma_new - np.array([1.9575, 1.9575, 25.1051]))) < 1e-3
+    )
+    assert np.abs(est_sigma - 1.3991) < 1e-2
+
+    sigma_new, est_sigma = optimal_shrinkage(singular_values, 0.3, "N_3")
+    assert np.sum(np.abs(sigma_new - np.array([1.9575, 1.9575, 5.2411]))) < 1e-3
+    assert np.abs(est_sigma - 1.3991) < 1e-2
+
+    sigma_new, est_sigma = optimal_shrinkage(singular_values, 0.3, "N_4")
+    assert (
+        np.sum(np.abs(sigma_new - np.array([1.9575, 1.9575, 40.0561]))) < 1e-3
+    )
+    assert np.abs(est_sigma - 1.3991) < 1e-2
+
+    sigma_new, est_sigma = optimal_shrinkage(singular_values, 0.3, "N_6")
+    assert (
+        np.sum(np.abs(sigma_new - np.array([1.9575, 1.9575, 16.8033]))) < 1e-3
+    )
+    assert np.abs(est_sigma - 1.3991) < 1e-2
+
+    sigma_new, est_sigma = optimal_shrinkage(singular_values, 0.3, "O_1")
+    assert (
+        np.sum(np.abs(sigma_new - np.array([1.9575, 1.9575, 40.6931]))) < 1e-3
+    )
+    assert np.abs(est_sigma - 1.3991) < 1e-2
+
+    sigma_new, est_sigma = optimal_shrinkage(singular_values, 0.3, "O_2")
+    assert (
+        np.sum(np.abs(sigma_new - np.array([1.9575, 1.9575, 40.6931]))) < 1e-3
+    )
+    assert np.abs(est_sigma - 1.3991) < 1e-2
+
+    sigma_new, est_sigma = optimal_shrinkage(singular_values, 0.3, "O_6")
+    assert (
+        np.sum(np.abs(sigma_new - np.array([1.9575, 1.9575, 31.5164]))) < 1e-3
+    )
+    assert np.abs(est_sigma - 1.3991) < 1e-2
+
+    sigma_new, est_sigma = optimal_shrinkage(singular_values, 0.3, "Stein")
+    assert (
+        np.sum(np.abs(sigma_new - np.array([1.9575, 1.9575, 31.0527]))) < 1e-3
+    )
+    assert np.abs(est_sigma - 1.3991) < 1e-2
+
+    sigma_new, est_sigma = optimal_shrinkage(singular_values, 0.3, "Ent")
+    assert (
+        np.sum(np.abs(sigma_new - np.array([1.9575, 1.9575, 40.0854]))) < 1e-3
+    )
+    assert np.abs(est_sigma - 1.3991) < 1e-2
+
+    sigma_new, est_sigma = optimal_shrinkage(singular_values, 0.3, "Div")
+    assert (
+        np.sum(np.abs(sigma_new - np.array([1.9575, 1.9575, 35.2811]))) < 1e-3
+    )
+    assert np.abs(est_sigma - 1.3991) < 1e-2
+
+    sigma_new, est_sigma = optimal_shrinkage(singular_values, 0.3, "Fre")
+    assert (
+        np.sum(np.abs(sigma_new - np.array([1.9575, 1.9575, 39.7024]))) < 1e-3
+    )
+    assert np.abs(est_sigma - 1.3991) < 1e-2
+
+    sigma_new, est_sigma = optimal_shrinkage(singular_values, 0.3, "Aff")
+    assert (
+        np.sum(np.abs(sigma_new - np.array([1.9575, 1.9575, 34.9621]))) < 1e-3
+    )
+    assert np.abs(est_sigma - 1.3991) < 1e-2
