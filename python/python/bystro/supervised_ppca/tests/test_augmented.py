@@ -1,6 +1,6 @@
 import numpy as np
 import numpy.linalg as la
-from bystro.supervised_ppca.ppca_adversarial import PPCAadversarial
+from bystro.supervised_ppca.ppca_augmented import PPCAadversarial
 
 
 def cosine_similarity(vec1, vec2):
@@ -35,8 +35,7 @@ def test_fit():
 
     Y = S[:, 0].reshape((-1, 1))
 
-    reg_ops = {"method":"Empirical"}
-    pca_model = PPCAadversarial(n_components=2, mu=10000.0,regularization_options=reg_ops)
+    pca_model = PPCAadversarial(n_components=2, mu=10000.0)
     pca_model.fit(X, Y)
 
     assert pca_model.W_ is not None, "W_ should be set after fitting."
@@ -47,11 +46,32 @@ def test_fit():
     assert np.abs(cosine_similarity(pca_model.W_[0], W[0])) < 0.1
     assert np.abs(cosine_similarity(pca_model.W_[1], W[0])) < 0.1
 
-    reg_ops = {"method":"LinearShrinkage"}
-    pca_model = PPCAadversarial(n_components=2, mu=10000.0,regularization_options=reg_ops)
+    pca_model = PPCAadversarial(
+        n_components=2, mu=10000.0, regularization="Empirical"
+    )
     pca_model.fit(X, Y)
 
-    reg_ops = {"method":"NonLinearShrinkage"}
-    pca_model = PPCAadversarial(n_components=2, mu=10000.0,regularization_options=reg_ops)
+    pca_model = PPCAadversarial(
+        n_components=2, mu=10000.0, regularization="Linear"
+    )
     pca_model.fit(X, Y)
 
+    pca_model = PPCAadversarial(
+        n_components=2, mu=10000.0, regularization="LinearInverse"
+    )
+    pca_model.fit(X, Y)
+
+    pca_model = PPCAadversarial(
+        n_components=2, mu=10000.0, regularization="QuadraticInverse"
+    )
+    pca_model.fit(X, Y)
+
+    pca_model = PPCAadversarial(
+        n_components=2, mu=10000.0, regularization="GeometricInverse"
+    )
+    pca_model.fit(X, Y)
+
+    pca_model = PPCAadversarial(
+        n_components=2, mu=10000.0, regularization="NonLinear"
+    )
+    pca_model.fit(X, Y)

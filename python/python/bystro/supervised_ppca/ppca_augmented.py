@@ -11,6 +11,7 @@ latent variables. Two key parameters, 'mu' and 'eps', control the strength
 of the adversarial component and the conditioning of inverses, 
 respectively, enhancing the robustness and stability of the model.
 """
+from typing import Union
 import numpy as np
 import numpy.linalg as la
 
@@ -18,8 +19,14 @@ from bystro.supervised_ppca._base import BaseGaussianFactorModel
 from numpy.typing import NDArray
 
 from bystro.covariance._covariance_np import (
+    EmpiricalCovariance,
     LinearShrinkageCovariance,
     NonLinearShrinkageCovariance,
+)
+from bystro.covariance.covariance_cov_shrinkage import (
+    GeometricInverseShrinkage,
+    LinearInverseShrinkage,
+    QuadraticInverseShrinkage,
 )
 
 
@@ -62,14 +69,10 @@ class PPCAadversarial(BaseGaussianFactorModel):
         n_components: int = 2,
         mu=1.0,
         eps=1e-8,
-        regularization_options=None,
+        regularization="Linear",
     ):
         super().__init__(n_components=n_components)
-        if regularization_options is None:
-            regularization_options = {}
-        self.regularization_options = self._fill_regularization_options(
-            regularization_options
-        )
+        self.regularization = regularization
         self.mu: float = mu
         self.eps: float = eps
         self.W_: NDArray[np.float_] | None = None
@@ -96,7 +99,6 @@ class PPCAadversarial(BaseGaussianFactorModel):
         self : PPCAadversarial
             The model
         """
-        regularization_options = self.regularization_options
         self.mean_x = np.mean(X, axis=0)
         self.mean_y = np.mean(Y, axis=0)
         X_dm = X - self.mean_x
@@ -105,52 +107,20 @@ class PPCAadversarial(BaseGaussianFactorModel):
         p = self.p
         q = Y.shape[1]
 
-        model_cov: LinearShrinkageCovariance | NonLinearShrinkageCovariance
-        if regularization_options["method"] == "Empirical":
-            B_11 = X_dm.T @ X_dm
-            B_12 = X_dm.T @ Y_dm
-            diag_reg = self.eps * np.eye(X_dm.shape[1])
-            XtX = X_dm.T @ X_dm + diag_reg
-            B_22 = B_12.T @ la.solve(XtX, B_12)
-        elif regularization_options["method"] == "NonLinearShrinkage":
-            if q == 1:
-                XX = np.zeros((N, p + 1))
-                XX[:, :p] = X_dm
-                XX[:, -1] = np.squeeze(Y_dm)
-            else:
-                XX = np.vstack((X_dm, Y_dm))
-            model_cov = NonLinearShrinkageCovariance()
-            model_cov.fit(XX)
-            cov = model_cov.covariance
-            if cov is None:
-                raise ValueError("Covariance matrix failed to fit")
-            B_11 = cov[:p, :p]
-            B_12 = cov[:p, p:]
-            B_22 = B_12.T @ la.solve(
-                B_11 + self.eps * np.eye(X_dm.shape[1]), B_12
-            )
-        elif regularization_options["method"] == "LinearShrinkage":
-            if q == 1:
-                XX = np.zeros((N, p + 1))
-                XX[:, :p] = X_dm
-                XX[:, -1] = np.squeeze(Y_dm)
-            else:
-                XX = np.vstack((X_dm, Y_dm))
-            model_cov = LinearShrinkageCovariance()
-            model_cov.fit(XX)
-            cov = model_cov.covariance
-            if cov is None:
-                raise ValueError("Covariance matrix failed to fit")
-            B_11 = cov[:p, :p]
-            B_12 = cov[:p, p:]
-            B_22 = B_12.T @ la.solve(
-                B_11 + self.eps * np.eye(X_dm.shape[1]), B_12
-            )
+        model_cov = _select_covariance_estimator(self.regularization)
+        XX = np.zeros((N, p + q))
+        XX[:, :p] = X_dm
+        if q == 1:
+            XX[:, -1] = np.squeeze(Y_dm)
         else:
-            raise ValueError(
-                "Unrecognized regularization option %s"
-                % regularization_options["method"]
-            )
+            XX[:, p:] = Y_dm
+        model_cov.fit(XX)
+        cov = model_cov.covariance
+        if cov is None:
+            raise ValueError("Covariance matrix failed to fit")
+        B_11 = cov[:p, :p]
+        B_12 = cov[:p, p:]
+        B_22 = B_12.T @ la.solve(B_11 + self.eps * np.eye(p), B_12)
 
         B = np.zeros((p + q, p + q))
         B[:p, :p] = B_11
@@ -249,10 +219,35 @@ class PPCAadversarial(BaseGaussianFactorModel):
     def _save_variables(self):
         pass
 
-    def _fill_regularization_options(self, regularization_options):
-        default_options = {
-            "method": "LinearShrinkage",
-            "prior_options": {"iw_params": {"pnu": 2, "sigma": 3}},
-        }
-        rops = {**default_options, **regularization_options}
-        return rops
+
+
+def _select_covariance_estimator(regularization):
+    """
+    This is a tiny method for selecting the estimator for the covariance
+    matrix.
+    """
+    model_cov: Union[
+        EmpiricalCovariance,
+        LinearShrinkageCovariance,
+        NonLinearShrinkageCovariance,
+        LinearInverseShrinkage,
+        GeometricInverseShrinkage,
+        QuadraticInverseShrinkage,
+    ]
+    if regularization == "Empirical":
+        model_cov = EmpiricalCovariance()
+    elif regularization == "Linear":
+        model_cov = LinearShrinkageCovariance()
+    elif regularization == "LinearInverse":
+        model_cov = LinearInverseShrinkage()
+    elif regularization == "QuadraticInverse":
+        model_cov = QuadraticInverseShrinkage()
+    elif regularization == "GeometricInverse":
+        model_cov = GeometricInverseShrinkage()
+    elif regularization == "NonLinear":
+        model_cov = NonLinearShrinkageCovariance()
+    elif regularization == "Bayesian":
+        raise ValueError("Bayesian currently not supported")
+    else:
+        raise ValueError("Unrecognized regularization %s" % regularization)
+    return model_cov
