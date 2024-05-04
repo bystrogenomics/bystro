@@ -70,7 +70,7 @@ def optimal_shrinkage(eigenvals, gamma, loss="N_1", sigma=None):
 
     # Estimate sigma if needed
     if sigma is None:
-        MPmedian = MedianMarcenkoPastur(gamma)
+        MPmedian = median_marcenko_pastur(gamma)
         sigma = np.sqrt(np.median(eigenvals) / MPmedian)
 
         int(f"estimated sigma={sigma:.2f}")
@@ -78,15 +78,15 @@ def optimal_shrinkage(eigenvals, gamma, loss="N_1", sigma=None):
     sigma2 = sigma**2
     lam_plus = (1 + np.sqrt(gamma)) ** 2
     eigenvals_new = eigenvals / sigma2
-    I = eigenvals_new > lam_plus
-    eigenvals_new[~I] = 1
+    ind = eigenvals_new > lam_plus
+    eigenvals_new[~ind] = 1
 
-    ell_vals = ell()
-    c_vals = c()
-    s_vals = np.sqrt(1 - c(lam, lam_plus, gamma) ** 2)
+    ell_vals = ell(eigenvals_new[ind], gamma)
+    c_vals = c(eigenvals_new[ind], gamma)
+    s_vals = s(eigenvals_new[ind], gamma)
 
     if loss == "F_1":
-        shrunk_vals = shrinkage_frobenius_1(ell_vals, c_vals, s_vals)
+        shrunk_vals = shrinkage_frobenius_1(ell_vals, c_vals)
     elif loss == "F_2":
         shrunk_vals = shrinkage_frobenius_2(ell_vals, c_vals, s_vals)
     elif loss == "F_3":
@@ -96,19 +96,19 @@ def optimal_shrinkage(eigenvals, gamma, loss="N_1", sigma=None):
     elif loss == "F_6":
         shrunk_vals = shrinkage_frobenius_6(ell_vals, c_vals, s_vals)
     elif loss == "N_1":
-        shrunk_vals = shrinkage_nuclear_1(ell_vals, c_vals, s_vals)
+        shrunk_vals = shrinkage_nuclear_1(ell_vals, s_vals)
     elif loss == "N_2":
         shrunk_vals = shrinkage_nuclear_2(ell_vals, c_vals, s_vals)
     elif loss == "N_3":
         shrunk_vals = shrinkage_nuclear_3(ell_vals, c_vals, s_vals)
-    elif loss == "N_5":
-        shrunk_vals = shrinkage_nuclear_5(ell_vals, c_vals, s_vals)
+    elif loss == "N_4":
+        shrunk_vals = shrinkage_nuclear_4(ell_vals, c_vals, s_vals)
     elif loss == "N_6":
         shrunk_vals = shrinkage_nuclear_6(ell_vals, c_vals, s_vals)
     elif loss == "O_1":
-        shrunk_vals = shrinkage_operator_1(ell_vals, c_vals, s_vals)
+        shrunk_vals = shrinkage_operator_1(ell_vals)
     elif loss == "O_2":
-        shrunk_vals = shrinkage_operator_2(ell_vals, c_vals, s_vals)
+        shrunk_vals = shrinkage_operator_2(ell_vals)
     elif loss == "O_6":
         shrunk_vals = shrinkage_operator_6(ell_vals, c_vals, s_vals)
     elif loss == "Stein":
@@ -124,37 +124,31 @@ def optimal_shrinkage(eigenvals, gamma, loss="N_1", sigma=None):
     else:
         raise ValueError("Unrecognized shrinkage %s" % loss)
 
-    eigenvals_new[I] = shrunk_vals
+    eigenvals_new[ind] = shrunk_vals
     eigenvals_new *= sigma2
 
-    eigenvals = optshrink_impl(eigenvals, gamma, loss, sigma)
-    return eigenvals, sigma
+    return eigenvals_new, sigma
 
 
-def ell(lam, lam_plus, gamma):
-    return np.where(
-        lam >= lam_plus,
-        ((lam + 1 - gamma) + np.sqrt((lam + 1 - gamma) ** 2 - 4 * lam)) / 2.0,
-        0,
-    )
+def ell(lam, gamma):
+    """Calculate a transformation of lambda with parameter gamma."""
+    term = lam + 1 - gamma
+    return (term + np.sqrt(term**2 - 4 * lam)) / 2
 
 
-def c(lam, lam_plus, gamma):
-    return np.where(
-        lam >= lam_plus,
-        np.sqrt(
-            (1 - gamma / ((ell(lam, lam_plus, gamma) - 1) ** 2))
-            / (1 + gamma / (ell(lam, lam_plus, gamma) - 1))
-        ),
-        0,
-    )
+def c(lam, gamma):
+    """Calculate the c component for shrinkage based on lambda."""
+    ell_val = ell(lam, gamma)
+    return np.sqrt((1 - gamma / ((ell_val - 1) ** 2)) / (1 + gamma / (ell_val - 1)))
 
 
-def s(lam, lam_plus, gamma):
-    return np.sqrt(1 - c(lam, lam_plus, gamma) ** 2)
+def s(lam, gamma):
+    """Calculate the s component for shrinkage based on lambda."""
+    c_val = c(lam, gamma)
+    return np.sqrt(1 - c_val**2)
 
 
-def shrinkage_frobenius_1(ell, c, s):
+def shrinkage_frobenius_1(ell, c):
     """max(1 + (c^2) * (ell - 1), 0)"""
     return np.maximum(1 + (c**2) * (ell - 1), 0)
 
@@ -179,12 +173,12 @@ def shrinkage_frobenius_6(ell, c, s):
     return 1 + ((ell - 1) * (c**2)) / (((c**2) + ell * (s**2)) ** 2)
 
 
-def shrinkage_operator_1(ell, c, s):
+def shrinkage_operator_1(ell):
     """ell"""
     return ell
 
 
-def shrinkage_operator_2(ell, c, s):
+def shrinkage_operator_2(ell):
     """ell  # Debiasing to population eigenvalues"""
     return ell
 
@@ -194,7 +188,7 @@ def shrinkage_operator_6(ell, c, s):
     return 1 + ((ell - 1) / (c**2 + ell * (s**2)))
 
 
-def shrinkage_nuclear_1(ell, c, s):
+def shrinkage_nuclear_1(ell, s):
     """max(1 + (ell - 1) * (1 - 2 * (s^2)), 1)"""
     return np.maximum(1 + (ell - 1) * (1 - 2 * (s**2)), 1)
 
@@ -247,55 +241,21 @@ def shrinkage_affine(ell, c, s):
     return ((1 + c**2) * ell + (s**2)) / (1 + (c**2) + ell * (s**2))
 
 
-def optshrink_impl(eigenvals, gamma, loss, sigma):
-    """
-    Apply optimal shrinkage to the eigenvalues.
-
-    Parameters:
-    - eigenvals : array_like, shape (n,)
-        Eigenvalues to be processed.
-    - gamma : float
-        Parameter for shrinkage.
-    - loss : str
-        Type of loss function to be applied.
-    - sigma : float
-        Standard deviation.
-
-    Returns:
-    - array_like, shape (n,)
-        Processed eigenvalues.
-
-    Apply optimal shrinkage to the given eigenvalues using the specified loss function and parameters.
-    """
-
-    sigma2 = sigma**2
-    lam_plus = (1 + np.sqrt(gamma)) ** 2
-    assert sigma > 0
-    assert np.prod(np.shape(sigma)) == 1
-    eigenvals = eigenvals / sigma2
-    I = eigenvals > lam_plus
-    eigenvals[~I] = 1
-    str1 = f"{loss}_func = lambda lam: np.maximum(1, impl_{loss}(ell(lam), c(lam), s(lam)))"
-    str2 = f"eigenvals[I] = {loss}_func(eigenvals[I])"
-    exec(str1)
-    exec(str2)
-    eigenvals = sigma2 * eigenvals
-    return eigenvals
-
-
-def MarcenkoPasturIntegral(x, gamma):
+def marcenko_pastur_integral(x, gamma):
     """
     Compute the integral of the Marcenko-Pastur distribution.
 
-    Parameters:
-    - x : float
+    Parameters
+    ----------
+    x : float
         Upper limit of integration.
-    - gamma : float
+    gamma : float
         Parameter of the distribution.
 
-    Returns:
-    - float
-        The computed integral.
+    Returns
+    -------
+    integral : float
+        The computed integral of the Marcenko-Pastur distribution.
 
     Compute the integral of the Marcenko-Pastur distribution up to the given upper limit.
     """
@@ -306,28 +266,73 @@ def MarcenkoPasturIntegral(x, gamma):
     if (x < lobnd) or (x > hibnd):
         raise ValueError("x beyond")
 
-    dens = lambda t: np.sqrt((hibnd - t) * (t - lobnd)) / (2 * np.pi * gamma * t)
-    I, _ = quad(dens, lobnd, x)
-    return I
+    def dens(t, gamma, lobnd, hibnd):
+        """
+        Compute the Marcenko-Pastur density function.
+
+        Parameters
+        ----------
+        t : array_like
+            Input values.
+        gamma : float
+            Parameter of the Marcenko-Pastur distribution.
+        lobnd : float
+            Lower bound of the distribution.
+        hibnd : float
+            Upper bound of the distribution.
+
+        Returns
+        -------
+        array_like
+            Marcenko-Pastur density function values corresponding to input values.
+
+        This function computes the Marcenko-Pastur density function.
+        """
+        return np.sqrt((hibnd - t) * (t - lobnd)) / (2 * np.pi * gamma * t)
+
+    integral, _ = quad(dens, lobnd, x)
+    return integral
 
 
-def MedianMarcenkoPastur(gamma):
+def median_marcenko_pastur(gamma):
     """
     Compute the median of the Marcenko-Pastur distribution.
 
-    Parameters:
-    - gamma : float
-        Parameter of the distribution.
+    Parameters
+    ----------
+    gamma : float
+        Parameter of the Marcenko-Pastur distribution.
 
-    Returns:
-    - float
-        The computed median.
+    Returns
+    -------
+    med : float
+        The computed median of the Marcenko-Pastur distribution.
 
-    Iteratively compute the median of the Marcenko-Pastur distribution using a binary search algorithm.
+    This function iteratively computes the median of the Marcenko-Pastur distribution
+    using a binary search algorithm.
     """
 
-    def MarPas(x):
-        return 1 - incMarPas(x, gamma, 0)
+    def mar_pas(x):
+        """
+        Compute the complementary cumulative distribution function (CCDF) of the Marcenko-Pastur
+        distribution.
+
+        Parameters
+        ----------
+        x : array_like
+            Input values.
+
+        Returns
+        -------
+        ccdf : array_like
+            Complementary cumulative distribution function (1 - CDF) of the Marcenko-Pastur
+            distribution corresponding to input values.
+
+        This function computes the complementary cumulative distribution function (CCDF) of
+        the Marcenko-Pastur distribution by subtracting the cumulative distribution function
+        (CDF) computed by the `inc_mar_pas` function from 1.
+        """
+        return 1 - inc_mar_pas(x, gamma, 0)
 
     lobnd = (1 - np.sqrt(gamma)) ** 2
     hibnd = (1 + np.sqrt(gamma)) ** 2
@@ -335,7 +340,7 @@ def MedianMarcenkoPastur(gamma):
     while change and (hibnd - lobnd > 0.001):
         change = False
         x = np.linspace(lobnd, hibnd, 5)
-        y = np.array([MarPas(xi) for xi in x])
+        y = np.array([mar_pas(xi) for xi in x])
         if np.any(y < 0.5):
             lobnd = np.max(x[y < 0.5])
             change = True
@@ -347,77 +352,104 @@ def MedianMarcenkoPastur(gamma):
     return med
 
 
-def incMarPas(x0, gamma, alpha):
+def inc_mar_pas(x0, gamma, alpha):
     """
     Compute the integral of the Marcenko-Pastur distribution.
 
-    Parameters:
+    Parameters
+    ----------
     x0 : float
         Lower limit of integration.
     gamma : float
-        Parameter of the distribution.
+        Parameter of the Marcenko-Pastur distribution.
     alpha : float
         Exponent of the power function.
 
-    Returns:
-    float
-        The computed integral.
+    Returns
+    -------
+    integral : float
+        The computed integral of the Marcenko-Pastur distribution.
 
-    Compute the integral of the Marcenko-Pastur distribution using numerical integration.
+    This function computes the integral of the Marcenko-Pastur distribution using numerical integration.
     """
     if gamma > 1:
         raise ValueError("gammaBeyond")
 
-    topSpec = (1 + np.sqrt(gamma)) ** 2
-    botSpec = (1 - np.sqrt(gamma)) ** 2
+    top_spec = (1 + np.sqrt(gamma)) ** 2
+    bot_spec = (1 - np.sqrt(gamma)) ** 2
 
-    def IfElse(Q, point, counterPoint):
+    def if_else(Q, point, counter_point):
         """
         Choose between two values based on a condition.
 
-        Parameters:
-        - Q : array_like
+        Parameters
+        ----------
+        Q : array_like
             Boolean condition array.
-        - point : array_like
+        point : array_like
             Values to choose when the condition is True.
-        - counterPoint : array_like or float
+        counter_point : array_like or float
             Values to choose when the condition is False.
 
-        Returns:
-        - array_like
+        Returns
+        -------
+        y : array_like
             Selected values based on the condition.
+
+        This function selects values from `point` or `counter_point` based on the boolean condition `Q`.
         """
         y = point.copy()
         if np.any(~Q):
-            if len(counterPoint) == 1:
-                counterPoint = np.ones_like(Q) * counterPoint
-            y[~Q] = counterPoint[~Q]
+            if len(counter_point) == 1:
+                counter_point = np.ones_like(Q) * counter_point
+            y[~Q] = counter_point[~Q]
         return y
 
-    def MarPas(x):
+    def mar_pas(x):
         """
         Compute the Marcenko-Pastur distribution.
 
-        Parameters:
-        - x : array_like
+        Parameters
+        ----------
+        x : array_like
             Input values.
 
-        Returns:
-        - array_like
+        Returns
+        -------
+        array_like
             Marcenko-Pastur distribution values corresponding to input values.
+
+        This function computes the Marcenko-Pastur distribution using the if_else function.
         """
-        return IfElse(
-            (topSpec - x) * (x - botSpec) > 0,
-            np.sqrt((topSpec - x) * (x - botSpec)) / (gamma * x) / (2 * np.pi),
+        return if_else(
+            (top_spec - x) * (x - bot_spec) > 0,
+            np.sqrt((top_spec - x) * (x - bot_spec)) / (gamma * x) / (2 * np.pi),
             np.array([0]),
         )
 
-    if alpha != 0:
-        fun = lambda x: x**alpha * MarPas(x)
-    else:
-        fun = MarPas
+    def fun(x, alpha, mar_pas):
+        """
+        Compute the Marcenko-Pastur function.
+
+        Parameters
+        ----------
+        x : array_like
+            Input values.
+        alpha : float
+            Exponent of the power function.
+        mar_pas : callable
+            Function computing the Marcenko-Pastur distribution.
+
+        Returns
+        -------
+        array_like
+            Marcenko-Pastur function values corresponding to input values.
+
+        This function computes the Marcenko-Pastur function.
+        """
+        return x**alpha * mar_pas(x)
 
     # Numerical integration using the trapezoidal rule
-    x_values = np.linspace(x0, topSpec, 1000)
-    integral = np.trapz(fun(x_values), x_values)
+    x_values = np.linspace(x0, top_spec, 1000)
+    integral = np.trapz(fun(x_values, alpha, mar_pas), x_values)
     return integral

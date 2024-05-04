@@ -18,8 +18,6 @@ def test_numerical_shrinkage():
     assert np.allclose(best_loss, expected_best_loss)
     assert np.allclose(default_loss, expected_default_loss)
 
-
-
 def test_numerical_shrinkage_impl():
     lam = 3
     gamma = 0.5
@@ -55,6 +53,3 @@ def test_SteinLoss():
     J_value = SteinLoss(A, B)
     expected_J = 0.3454
     assert np.allclose(J_value,expected_J)
-    
-if __name__ == "__main__":
-    pytest.main([__file__])
