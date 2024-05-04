@@ -170,7 +170,10 @@ class PPCAadversarial(BaseGaussianFactorModel):
         return self.sigma2_ * np.eye(self.p)
 
     def _store_instance_variables(
-        self, trainable_variables: tuple[NDArray[np.float_], np.float_]
+        self,
+        trainable_variables: tuple[
+            NDArray[np.float_], np.float_, NDArray[np.float_]
+        ],
     ) -> None:
         """
         Saves the learned variables
@@ -363,7 +366,10 @@ class PPCAsupervised(BaseGaussianFactorModel):
         return self.sigma2_ * np.eye(self.p)
 
     def _store_instance_variables(
-        self, trainable_variables: tuple[NDArray[np.float_], np.float_]
+        self,
+        trainable_variables: tuple[
+            NDArray[np.float_], np.float_, NDArray[np.float_]
+        ],
     ) -> None:
         """
         Saves the learned variables
@@ -401,7 +407,7 @@ class PPCAsupervised(BaseGaussianFactorModel):
         pass
 
 
-class PPCA_sup_adversarial(BaseGaussianFactorModel):
+class PPCASupAdversarial(BaseGaussianFactorModel):
     """
     Probabilistic PCA that mitigates the influence of confounding
     variables in the latent representation.
@@ -458,7 +464,7 @@ class PPCA_sup_adversarial(BaseGaussianFactorModel):
         X: NDArray[np.float_],
         Y: NDArray[np.float_],
         Z: NDArray[np.float_],
-    ) -> "PPCA_sup_adversarial":
+    ) -> "PPCASupAdversarial":
         """
         Fits a model given covariates X
 
@@ -536,13 +542,14 @@ class PPCA_sup_adversarial(BaseGaussianFactorModel):
         self.eigvals_ = eigvals[idx]
         V = eigvecs[:, idx]
         W = V[:p, : self.n_components]
-        D = V[p:, : self.n_components]
+        D1 = V[p : (p + q1), : self.n_components]
+        D2 = V[(p + q1) :, : self.n_components]
         A = W.T @ W
         B = W.T @ X_dm.T
         S = la.solve(A, B).T
         X_recon = S @ W.T
         var = np.mean((X - X_recon) ** 2)
-        self._store_instance_variables((W, var, D))
+        self._store_instance_variables((W, var, D1, D2))
 
         return self
 
@@ -585,7 +592,13 @@ class PPCA_sup_adversarial(BaseGaussianFactorModel):
         return self.sigma2_ * np.eye(self.p)
 
     def _store_instance_variables(
-        self, trainable_variables: tuple[NDArray[np.float_], np.float_]
+        self,
+        trainable_variables: tuple[
+            NDArray[np.float_],
+            np.float_,
+            NDArray[np.float_],
+            NDArray[np.float_],
+        ],
     ) -> None:
         """
         Saves the learned variables

@@ -3,7 +3,7 @@ import numpy.linalg as la
 from bystro.supervised_ppca.ppca_augmented import (
     PPCAadversarial,
     PPCAsupervised,
-    PPCA_sup_adversarial,
+    PPCASupAdversarial,
 )
 
 
@@ -105,7 +105,7 @@ def test_fit_supervised():
 
     # Ensure that the learned components are orthogonal to the
     # sensitive information.
-    assert np.abs(cosine_similarity(pca_model.W_[0], W[2])) > .8
+    assert np.abs(cosine_similarity(pca_model.W_[0], W[2])) > 0.8
 
     pca_model = PPCAsupervised(
         n_components=2, mu=10000.0, regularization="Empirical"
@@ -136,6 +136,7 @@ def test_fit_supervised():
         n_components=2, mu=10000.0, regularization="NonLinear"
     )
     pca_model.fit(X, Y)
+
 
 def test_fit_supervised_adversarial():
     """Test the fitting process of the PPCAadversarial model."""
@@ -155,8 +156,7 @@ def test_fit_supervised_adversarial():
     Y = S[:, 3].reshape((-1, 1))
     Z = S[:, 0].reshape((-1, 1))
 
-    pca_model = PPCA_sup_adversarial(n_components=2, mu_s=10000.0,
-                                    mu_a=100000.0)
+    pca_model = PPCASupAdversarial(n_components=2, mu_s=10000.0, mu_a=100000.0)
     pca_model.fit(X, Y, Z)
 
     assert pca_model.W_ is not None, "W_ should be set after fitting."
@@ -165,35 +165,34 @@ def test_fit_supervised_adversarial():
     assert np.abs(cosine_similarity(pca_model.W_[0], W[0])) < 0.2
     assert np.abs(cosine_similarity(pca_model.W_[1], W[0])) < 0.2
 
-    assert np.abs(cosine_similarity(pca_model.W_[1], W[3])) > .8
+    assert np.abs(cosine_similarity(pca_model.W_[1], W[3])) > 0.8
 
-    pca_model = PPCAsupervised(
-        n_components=2, mu=10000.0, regularization="Empirical"
+    pca_model = PPCASupAdversarial(
+        n_components=2, mu_s=10000.0, regularization="Empirical"
     )
-    pca_model.fit(X, Y)
+    pca_model.fit(X, Y, Z)
 
-    pca_model = PPCAsupervised(
-        n_components=2, mu=10000.0, regularization="Linear"
+    pca_model = PPCASupAdversarial(
+        n_components=2, mu_s=10000.0, regularization="Linear"
     )
-    pca_model.fit(X, Y)
+    pca_model.fit(X, Y, Z)
 
-    pca_model = PPCAsupervised(
-        n_components=2, mu=10000.0, regularization="LinearInverse"
+    pca_model = PPCASupAdversarial(
+        n_components=2, mu_s=10000.0, regularization="LinearInverse"
     )
-    pca_model.fit(X, Y)
+    pca_model.fit(X, Y, Z)
 
-    pca_model = PPCAsupervised(
-        n_components=2, mu=10000.0, regularization="QuadraticInverse"
+    pca_model = PPCASupAdversarial(
+        n_components=2, mu_s=10000.0, regularization="QuadraticInverse"
     )
-    pca_model.fit(X, Y)
+    pca_model.fit(X, Y, Z)
 
-    pca_model = PPCAsupervised(
-        n_components=2, mu=10000.0, regularization="GeometricInverse"
+    pca_model = PPCASupAdversarial(
+        n_components=2, mu_s=10000.0, regularization="GeometricInverse"
     )
-    pca_model.fit(X, Y)
+    pca_model.fit(X, Y, Z)
 
-    pca_model = PPCAsupervised(
-        n_components=2, mu=10000.0, regularization="NonLinear"
+    pca_model = PPCASupAdversarial(
+        n_components=2, mu_s=10000.0, regularization="NonLinear"
     )
-    pca_model.fit(X, Y)
-
+    pca_model.fit(X, Y, Z)
