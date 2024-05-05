@@ -199,7 +199,7 @@ tracks:
                   refGene r
               WHERE
                   chrom=%chromosomes%;
-          completed: 2024-05-05T18:40:00
+          completed: 2024-05-05T19:09:00
           name: fetch
       version: 36
     - build_author: alexkotlar
