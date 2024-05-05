@@ -28,7 +28,7 @@ chromosomes:
   - chrM
   - chrX
   - chrY
-database_dir: /mnt/ssd2/annotator/hg19_v9
+database_dir: /mnt/annotator/hg19_v9
 fileProcessors:
   snp:
     args: --emptyField NA --minGq .95
