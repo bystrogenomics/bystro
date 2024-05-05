@@ -34,7 +34,9 @@ fileProcessors:
     args: --emptyField NA --minGq .95
     program: bystro-snp
   vcf:
-    args: --emptyField NA --sample %sampleList% --keepPos --keepId --dosageOutput %dosageMatrixOutPath%
+    args:
+      --emptyField NA --sample %sampleList% --keepPos --keepId --dosageOutput
+      %dosageMatrixOutPath%
     program: bystro-vcf
 files_dir: /mnt/files1/bystro_annotator/raw_files/hg19
 statistics:
@@ -185,23 +187,19 @@ tracks:
                   r.*,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.kgID, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS kgID,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.description, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS description,
-                  (SELECT GROUP_CONCAT(DISTINCT NULLIF(e.value, '') SEPARATOR ';') FROM knownToEnsembl e JOIN kgXref x ON x.kgID = e.name WHERE x.refseq = r.name) AS ensemblID,
+                  (SELECT GROUP_CONCAT(DISTINCT NULLIF(e.value, '') SEPARATOR ';') FROM knownToEnsembl e JOIN kgXref x ON x.kgID=e.name WHERE x.refseq=r.name) AS ensemblID,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.tRnaName, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS tRnaName,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.spID, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS spID,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.spDisplayID, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS spDisplayID,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(rl.protAcc, '') SEPARATOR ';') FROM hgFixed.refLink rl WHERE rl.mrnaAcc=r.name) AS protAcc,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.mRNA, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS mRNA,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.rfamAcc, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS rfamAcc,
-                  CASE WHEN k.transcript IS NOT NULL THEN 'true' ELSE 'false' END AS isCanonical
+                  COALESCE((SELECT MAX(CASE WHEN k.transcript IS NOT NULL THEN 'true' ELSE 'false' END) FROM knownCanonical k WHERE k.transcript IN (SELECT kgID FROM kgXref x WHERE x.refseq=r.name)), 'false') AS isCanonical
               FROM
                   refGene r
-              LEFT JOIN
-                  kgXref x ON x.refseq = r.name
-              LEFT JOIN
-                  knownCanonical k ON k.transcript = x.kgID
               WHERE
-                  r.chrom = %chromosomes%
-          completed: 2024-05-02T01:01:00
+                  chrom=%chromosomes%;
+          completed: 2024-05-05T18:41:00
           name: fetch
       version: 4
     - build_author: alexkotlar
