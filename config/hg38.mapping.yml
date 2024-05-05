@@ -153,14 +153,6 @@ index_settings:
           - catenate_filter_split
           - english_stemmer
           - autocomplete_filter
-      autocomplete_english_split_clinsig:
-        type: custom
-        tokenizer: whitespace
-        filter:
-          - lowercase
-          - exclude_pathogenic
-          - asciifolding
-          - catenate_filter_split
       autocomplete_english_graph:
         type: custom
         tokenizer: keyword
