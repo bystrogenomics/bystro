@@ -2,3 +2,7 @@
 #   (only \n, not \r\n), even on Windows
 
 * text eol=lf
+
+# Explicitly declare Feather files as binary to avoid CRLF to LF issues
+
+*.feather binary
