@@ -34,9 +34,7 @@ fileProcessors:
     args: --emptyField NA --minGq .95
     program: bystro-snp
   vcf:
-    args:
-      --emptyField NA --sample %sampleList% --keepPos --keepId --dosageOutput
-      %dosageMatrixOutPath%
+    args: --emptyField NA --sample %sampleList% --keepPos --keepId --dosageOutput %dosageMatrixOutPath%
     program: bystro-vcf
 files_dir: /mnt/files1/bystro_annotator/raw_files/hg38
 statistics:
