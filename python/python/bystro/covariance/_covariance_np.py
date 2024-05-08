@@ -19,6 +19,7 @@ Dependencies:
 from typing import Any
 import numpy as np
 from numpy.typing import NDArray
+import cvxpy as cp
 from bystro.covariance._base_covariance import (
     BaseCovariance,
     _symmeterize_and_warning,
@@ -282,5 +283,75 @@ class NonLinearShrinkageCovariance(BaseCovariance):
 
         covariance = np.dot(np.dot(u, np.diag(dtilde)), u.T)
         self.covariance = _symmeterize_and_warning(covariance)
+
+        return self
+
+
+class NonnegativeCovariance(BaseCovariance):
+    def fit(
+        self, X: NDArray[np.float_], tol: float = 1e-10
+    ) -> "NonnegativeCovariance":
+        """
+        Fit a nonnegative covariance matrix.
+
+        This method estimates a covariance matrix subject to the constraints that all
+        elements must be non-negative and the matrix must be positive semidefinite.
+        It optimizes the Frobenius norm between the variable matrix and the sample
+        covariance matrix derived from the input data. The optimization problem is
+        solved using the cvxpy library.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            The centered data
+        tol : float, default=1e-10
+            Solver tolerance for the optimization. Lower values of `tol` increase the
+            precision of the solution but may lead to longer computation times. The
+            tolerance also ensures that no entry in the covariance matrix is less than
+            `-1e-8`, which would indicate a precision issue.
+
+        Returns
+        -------
+        self : NonnegativeCovariance
+            The model, with updated covariance attribute
+
+        Raises
+        ------
+        ValueError
+            If `X` contains missing values (`np.isnan(X)` evaluates to True).
+            If `X` is not an `np.ndarray`.
+            If the computed covariance matrix contains values less than a threshold of
+            `-1e-8`, suggesting that the tolerance is too high and there are precision
+            issues with the optimization.
+        """
+
+        self._test_inputs(X)
+        N, p = X.shape
+        S = (X.T @ X) / (N - 1)
+
+        Sigma = cp.Variable((p, p), symmetric=True)
+
+        objective = cp.Minimize(cp.norm(Sigma - S, "fro"))
+
+        constraints = [Sigma >> 0]
+        constraints += [Sigma[i, j] >= 0 for i in range(p) for j in range(p)]
+
+        prob = cp.Problem(objective, constraints)
+        prob.solve(solver=cp.SCS, eps=tol)
+
+        covariance = Sigma.value
+
+        if np.any(covariance < -1e-8):
+            raise ValueError(
+                "Tolerance too large, negative covariance values found."
+            )
+
+        lambd, u = np.linalg.eigh(covariance)
+        if np.any(lambd < 0):
+            lambd[lambd < 0] = 0
+            covariance = u @ np.diag(lambd) @ u.T
+
+        covariance[covariance < 0] = 0
+        self.covariance = covariance
 
         return self
