@@ -15,9 +15,11 @@ logger = logging.getLogger(__name__)
 
 AD_SCORE_FILEPATH = "gwas_summary_stats/AD_sumstats_hg38_PMID35379992.feather"
 
+
 class StrEnum(str, Enum):
     def __str__(self):
         return self.value
+
 
 class GwasStatsLocusKind(StrEnum):
     MATCH = "Direct Match"
@@ -83,17 +85,17 @@ def _extract_nomiss_dosage_loci(dosage_matrix_path: str) -> pd.DataFrame:
     pd.DataFrame: A DataFrame with a single 'locus' column containing loci with no missing
     dosage values across all other columns.
     """
-    dataset = ds.dataset(dosage_matrix_path, format='feather')
+    dataset = ds.dataset(dosage_matrix_path, format="feather")
     conditions = []
     for column in dataset.schema.names:
-        if column != 'locus':
-            condition = (ds.field(column) != -1)
+        if column != "locus":
+            condition = ds.field(column) != -1
             conditions.append(condition)
     combined_condition = conditions[0]
     for condition in conditions[1:]:
         combined_condition = combined_condition & condition
     filtered_dataset = dataset.filter(combined_condition)
-    filtered_loci = filtered_dataset.to_table(columns=['locus']).to_pandas()
+    filtered_loci = filtered_dataset.to_table(columns=["locus"]).to_pandas()
     return filtered_loci
 
 
@@ -163,18 +165,17 @@ def _preprocess_genetic_maps(map_directory_path: str) -> dict[int, list[int]]:
 
 
 def read_feather_in_chunks(file_path, columns=None, chunk_size=1000):
-    # Read only the necessary columns to filter by P-value
+    """Read a Feather file in chunks as pandas Dataframes."""
     table = feather.read_table(file_path, columns=columns)
     for i in range(0, table.num_rows, chunk_size):
         chunk = table.slice(i, chunk_size).to_pandas()
-        # Ensure the chunk maintains its original index
         chunk.index = range(i, i + len(chunk))
         yield chunk
 
 
 def get_p_value_thresholded_indices(df, p_value_threshold):
     """Return indices of rows with P-values less than the specified threshold."""
-    return df.index[df['P'] < p_value_threshold].tolist()
+    return df.index[df["P"] < p_value_threshold].tolist()
 
 
 def generate_thresholded_overlap_scores_dosage(
@@ -183,7 +184,7 @@ def generate_thresholded_overlap_scores_dosage(
     """Compare and restrict to overlapping loci between dosage matrix and thresholded scores."""
     scores = _preprocess_scores(gwas_scores_path)
     dosage_loci_nomiss = _extract_nomiss_dosage_loci(dosage_matrix_path)
-    
+
     # TODO: Add customizable p value threshold and option for multiple thresholds
     p_value_threshold = 0.05
     thresholded_indices_set = set()
@@ -206,8 +207,7 @@ def generate_thresholded_overlap_scores_dosage(
         raise ValueError(
             "No SNPs match between base and target dataset; cannot proceed with PRS calculation."
         )
-    else:
-        remaining_snps_frac = (len(thresholded_scores) - len(overlap_snps)) / len(thresholded_scores)
+    remaining_snps_frac = (len(thresholded_scores) - len(overlap_snps)) / len(thresholded_scores)
     low_snps_frac = 0.20
     if remaining_snps_frac < low_snps_frac:
         logger.warning
@@ -234,9 +234,9 @@ def compare_alleles(row: pd.Series, col1: str, col2: str) -> GwasStatsLocusKind:
 
 
 def adjust_dosages(row):
-    if row['allele_comparison'] == 'reversed match':
+    if row["allele_comparison"] == "reversed match":
         for col in row.index:
-            if col != 'allele_comparison' and row[col] != -1:
+            if col != "allele_comparison" and row[col] != -1:
                 row[col] = 2 - row[col]
     return row
 
@@ -257,9 +257,7 @@ def find_bin_for_row(row: pd.Series, bin_mappings: dict[int, list[int]]) -> Opti
 
 def assign_bins(scores_overlap: pd.DataFrame, bin_mappings: dict) -> pd.DataFrame:
     """Assign bins to each row in the DataFrame."""
-    scores_overlap["bin"] = scores_overlap.apply(
-        find_bin_for_row, bin_mappings=bin_mappings, axis=1
-    )
+    scores_overlap["bin"] = scores_overlap.apply(find_bin_for_row, bin_mappings=bin_mappings, axis=1)
     return scores_overlap
 
 
@@ -276,32 +274,40 @@ def select_max_effect_per_bin(scores_overlap_abs_val: pd.DataFrame) -> pd.DataFr
     ]
 
 
-def clean_scores_for_analysis(max_effect_per_bin: pd.DataFrame, column_to_drop: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+def clean_scores_for_analysis(
+    max_effect_per_bin: pd.DataFrame, column_to_drop: str
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Drop extra columns and prepare df with final set of loci for dosage matrix filtering."""
-    scores_overlap_adjusted = max_effect_per_bin.drop(columns=['bin', 'abs_effect_weight'])
-    scores_overlap_adjusted = scores_overlap_adjusted.set_index('SNPID')
+    scores_overlap_adjusted = max_effect_per_bin.drop(columns=["bin", "abs_effect_weight"])
+    scores_overlap_adjusted = scores_overlap_adjusted.set_index("SNPID")
     format_col_index = scores_overlap_adjusted.columns.get_loc(column_to_drop)
-    columns_to_keep = ['allele_comparison'] + list(scores_overlap_adjusted.columns[format_col_index + 1:])
+    columns_to_keep = ["allele_comparison"] + list(
+        scores_overlap_adjusted.columns[format_col_index + 1 :]
+    )
     loci_and_allele_comparison = scores_overlap_adjusted[columns_to_keep]
     return scores_overlap_adjusted, loci_and_allele_comparison
 
 
 def ld_clump(scores_overlap: pd.DataFrame, map_directory_path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Bin using genetic map, clump, and adjust dosages and determine if effect allele is alt or ref."""
-    bin_mappings = _preprocess_genetic_maps(map_directory_path)    
+    bin_mappings = _preprocess_genetic_maps(map_directory_path)
     scores_overlap = scores_overlap.reset_index()
-    allele_comparison_results = scores_overlap.apply(compare_alleles, col1='SNPID', col2='ID_effect_as_alt', axis=1)
-    scores_overlap.insert(0, 'allele_comparison', allele_comparison_results)   
+    allele_comparison_results = scores_overlap.apply(
+        compare_alleles, col1="SNPID", col2="ID_effect_as_alt", axis=1
+    )
+    scores_overlap.insert(0, "allele_comparison", allele_comparison_results)
     scores_overlap_w_bins = assign_bins(scores_overlap, bin_mappings)
     scores_overlap_abs_val = calculate_abs_effect_weights(scores_overlap_w_bins)
     max_effect_per_bin = select_max_effect_per_bin(scores_overlap_abs_val)
     return clean_scores_for_analysis(max_effect_per_bin, "ID_effect_as_ref")
 
 
-def extract_clumped_thresholded_genos(dosage_matrix_path, scores_after_c_t):
-    dosage_dataset = ds.dataset(dosage_matrix_path, format='feather')
+def extract_clumped_thresholded_genos(
+    dosage_matrix_path: str, scores_after_c_t: pd.DataFrame
+) -> pd.DataFrame:
+    dosage_dataset = ds.dataset(dosage_matrix_path, format="feather")
     loci_list = scores_after_c_t.index.tolist()
-    loci_filter = ds.field('locus').isin(loci_list)
+    loci_filter = ds.field("locus").isin(loci_list)
     filtered_dataset = dosage_dataset.filter(loci_filter)
     filtered_df = filtered_dataset.to_table().to_pandas()
     return filtered_df
@@ -311,16 +317,13 @@ def finalize_dosage_scores_after_c_t(
     gwas_scores_path: str, dosage_matrix_path: str, map_directory_path: str
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Finalize dosage matrix and scores for PRS calculation."""
-    scores_overlap = generate_thresholded_overlap_scores_dosage(
-        gwas_scores_path, dosage_matrix_path
-    )
+    scores_overlap = generate_thresholded_overlap_scores_dosage(gwas_scores_path, dosage_matrix_path)
     scores_after_c_t, loci_and_allele_comparison = ld_clump(scores_overlap, map_directory_path)
     dosage_overlap = extract_clumped_thresholded_genos(dosage_matrix_path, scores_after_c_t)
-    dosage_overlap = dosage_overlap.set_index('locus')
-    merged_allele_comparison_genos = loci_and_allele_comparison.join(dosage_overlap,how='inner')
+    dosage_overlap = dosage_overlap.set_index("locus")
+    merged_allele_comparison_genos = loci_and_allele_comparison.join(dosage_overlap, how="inner")
     merged_allele_comparison_genos = merged_allele_comparison_genos.sort_index()
     scores_after_c_t = scores_after_c_t.sort_index()
-    
     genos_adjusted = merged_allele_comparison_genos.apply(adjust_dosages, axis=1)
     genotypes_adjusted_only = genos_adjusted.iloc[:, 1:]
     genos_transpose = genotypes_adjusted_only.T
