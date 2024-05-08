@@ -109,7 +109,7 @@ def create_jobs_cli(args: argparse.Namespace) -> list[dict]:
     )
 
 
-def get_user_cli() -> UserProfile:
+def get_user_cli(_args: argparse.Namespace) -> UserProfile:
     """
     Fetches the user profile.
 
