@@ -338,8 +338,7 @@ def query(job_id, query, size=10, from_=0):
 
         query_results = response.json()
 
-        print("\nQuery Results:")
-        print(mjson.format(mjson.encode(query_results), indent=4))
+        return query_results
 
     except Exception as e:
         sys.stderr.write(f"Query failed: {e}\n")
