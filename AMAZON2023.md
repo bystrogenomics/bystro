@@ -6,7 +6,8 @@
 3. [Configuring the Bystro Annotator](#configuring-the-bystro-annotator)
 4. [Databases](#databases)
 5. [Running Your First Annotation](#running-your-first-annotation)
-6. [FAQ](#faq)
+6. [EFS Joint Drive](#efs-joint-drive)
+7. [FAQ](#faq)
 
 ## Installing the Bystro Perl Annotator
 #### Amazon 2023
@@ -45,13 +46,10 @@ We recommend using Miniconda to manage Python dependencies for Bystro. After ins
     ```
 
 3. To manage local operations:
-    ```sh
-    make run-local # Starts a local Ray server
-    ray stop # To stop Ray
-    make develop # For faster builds during development
-    make serve-local # Start a local beanstalkd listener in a product environment
-    make serve-dev # Start in a development environment
-    ```
+   - Run `make run-local` to install the Bystro library and Bystro-API CLI tool, and start a local Ray server.
+   - If you are also setting up the Bystro webapp and API server, run `make serve-local` to start queue listeners for annotation, ancestry, PRS, and proteomics.
+   - If you are planning to contribute to Bystro and need faster iteration time, use `make develop` or `make serve-dev` to create a Bystro wheel that is installed into your local environment.
+
 
 ## Configuring the Bystro annotator
 
@@ -111,6 +109,19 @@ The outputs will be:
 - Statistics tab-separated file: `outPrefix.statistics.tsv`
   - Removing the `--run_statistics` flag will skip the generation of `outPrefix.statistics.*` files
 
+## EFS JOINT DRIVE
+
+- If you are installing this for the bystro api server integration, you need a shared drive jointly accessible to the bystro api server and the instance that is running
+
+1. First create a joint drive, so go to amazon web services and create an EFS
+2. Then create a root directory, for example `/seqant`
+3. Finally mount the EFS to the root directory you created
+
+```sh
+sudo mount -t efs -o tls fs-xxxxxxxxxx:/ efs
+```
+
+NOTE: You might need to set the directory's permissions before use
 
 ## FAQ
 
