@@ -2,6 +2,7 @@
 
 echo -e "\n\nInstalling Debian (rpm) dependencies\n";
 
+sudo yum update -y;
 sudo yum install gcc -y;
 sudo yum install openssl -y;
 sudo yum install openssl-devel -y;
