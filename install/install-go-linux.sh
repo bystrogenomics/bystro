@@ -16,6 +16,8 @@ fi
 echo -e "\n\nInstalling Go in /usr/local\n"
 
 # Clean in case somethign left over from old installation
+mkdir BYSTRO_GO_INSTALL && cd BYSTRO_GO_INSTALL
+
 GOFILE=go1.21.4.linux-amd64.tar.gz
 wget https://dl.google.com/go/$GOFILE;
 tar -xf $GOFILE;
@@ -23,5 +25,7 @@ echo "Deleting go in /usr/local"
 sudo rm -rf /usr/local/go
 sudo mv go /usr/local;
 rm $GOFILE;
+cd ../
+rm -rf BYSTRO_GO_INSTALL
 
 . install/export-go-path-linux.sh $DIR $PROFILE
