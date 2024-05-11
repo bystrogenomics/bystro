@@ -9,38 +9,38 @@ jobs:
       matrix:
         python-version: ["3.11.7"]
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
-      with:
-        python-version: ${{ matrix.python-version }}
-    # Set up cache for Python packages
-    - name: Cache Python dependencies
-      uses: actions/cache@v3
-      with:
-        path: ~/.venv/ci-venv
-        key: ${{ runner.os }}-venv-${{ hashFiles('**/requirements.txt', '**/requirements-dev.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-venv-
-    - name: Install dependencies
-      run: |
-        python -m venv ~/.venv/ci-venv
-        source ~/.venv/ci-venv/bin/activate
-        python -m pip install --upgrade pip
-        pip install -r **/requirements.txt
-        pip install -r **/requirements-dev.txt
-    - name: Linting with ruff
-      run: |
-        source ~/.venv/ci-venv/bin/activate
-        ruff $(git ls-files '*.py')
-    - name: Static analysis with mypy
-      run: |
-        source ~/.venv/ci-venv/bin/activate
-        mypy --config-file python/mypy.ini $(git ls-files '*.py')
-    - name: Tests
-      run: |
-        source ~/.venv/ci-venv/bin/activate
-        cd python
-        maturin develop
-        ray start --head
-        pytest
+      - uses: actions/checkout@v3
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+      # Set up cache for Python packages
+      - name: Cache Python dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.venv/ci-venv
+          key: ${{ runner.os }}-venv-${{ hashFiles('python/pyproject.toml', 'python/requirements-dev.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-venv-
+      - name: Install dependencies
+        run: |
+          python -m venv ~/.venv/ci-venv
+          source ~/.venv/ci-venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install python/
+          pip install -r python/requirements-dev.txt
+      - name: Linting with ruff
+        run: |
+          source ~/.venv/ci-venv/bin/activate
+          ruff $(git ls-files '*.py')
+      - name: Static analysis with mypy
+        run: |
+          source ~/.venv/ci-venv/bin/activate
+          mypy --config-file python/mypy.ini $(git ls-files '*.py')
+      - name: Tests
+        run: |
+          source ~/.venv/ci-venv/bin/activate
+          cd python
+          maturin develop
+          ray start --head
+          pytest
