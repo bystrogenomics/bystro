@@ -14,3 +14,4 @@ unipressed==1.2.0
 Cython==3.0.10
 maturin[zig]==1.5.1
 setuptools==65.5.0
+wheel==0.41.2
