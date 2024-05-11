@@ -105,7 +105,7 @@ jobs:
     strategy:
       matrix:
         platform:
-          - runner: macos-13
+          - runner: macos-12
             target: x86_64
           - runner: macos-14
             target: aarch64
@@ -129,8 +129,6 @@ jobs:
           set -e
           python --version
           ls -la dist
-          wheel unpack bystro-1.0.3-cp311-cp311-macosx_10_12_x86_64.whl -d unpacked
-          cat unpacked/bystro-1.0.3.dist-info/METADATA
           pip install bystro --verbose --find-links dist --force-reinstall
           pip install pytest
           ray start --head
