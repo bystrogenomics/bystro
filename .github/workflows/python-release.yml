@@ -3,7 +3,7 @@
 #
 #    maturin generate-ci -m python/Cargo.toml github --pytest --zig --platform linux windows macos
 #
-name: CI
+name: Python Release
 
 on:
   push:
