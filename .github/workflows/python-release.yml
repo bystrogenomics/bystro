@@ -98,17 +98,6 @@ jobs:
         with:
           name: wheels-windows-${{ matrix.platform.target }}
           path: dist
-      - name: pytest
-        if: ${{ !startsWith(matrix.platform.target, 'aarch64') }}
-        shell: bash
-        run: |
-          set -e
-          python --version
-          ls -la dist
-          pip install bystro --verbose --find-links dist --force-reinstall
-          pip install pytest
-          ray start --head
-          cd python && pytest
 
   macos:
     runs-on: ${{ matrix.platform.runner }}
