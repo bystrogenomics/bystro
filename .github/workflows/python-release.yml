@@ -42,7 +42,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install Python dependencies
-        run: pip install -r python/requirements.txt
+        run: pip install -r python/requirements-dev.txt
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
