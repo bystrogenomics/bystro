@@ -219,6 +219,11 @@ def select_max_effect_per_bin(merged_scores_genos: pd.DataFrame) -> pd.DataFrame
 def clean_dosage_for_analysis(merged_scores_genos: pd.DataFrame, column_to_drop: str) -> pd.DataFrame:
     """Drop missing values and adjust scores."""
     column_to_drop_index = merged_scores_genos.columns.get_loc(column_to_drop)
+
+    # If there is more than 1 column found, our "columns_to_keep" function will not work
+    if not isinstance(column_to_drop_index, int):
+        raise ValueError(f"Column {column_to_drop} was not found uniquely in the dataframe.")
+
     columns_to_keep = [
         "allele_comparison",
         *list(merged_scores_genos.columns[column_to_drop_index + 1 :]),
