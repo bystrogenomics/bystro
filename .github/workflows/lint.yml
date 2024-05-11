@@ -43,5 +43,4 @@ jobs:
         run: |
           source ~/.venv/ci-venv/bin/activate
           make develop
-          ray start --head
           cd python && pytest
