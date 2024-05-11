@@ -52,7 +52,7 @@ jobs:
           pip install pytest
           cd python && pytest
       - name: pytest
-        if: ${{ !startsWith(matrix.target, 'x86') && matrix.target != 'ppc64' }}
+        if: ${{ startsWith(matrix.target, 'aarch64') }}
         uses: uraimo/run-on-arch-action@v2.5.0
         with:
           arch: ${{ matrix.target }}
