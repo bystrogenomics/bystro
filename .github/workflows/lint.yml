@@ -14,14 +14,6 @@ jobs:
         uses: actions/setup-python@v3
         with:
           python-version: ${{ matrix.python-version }}
-      # Set up cache for Python packages
-      - name: Cache Python dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.venv/ci-venv
-          key: ${{ runner.os }}-venv-${{ hashFiles('python/pyproject.toml', 'python/requirements-dev.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-venv-
       - name: Install dependencies
         run: |
           python -m venv ~/.venv/ci-venv
