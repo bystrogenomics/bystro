@@ -21,9 +21,10 @@ The web app provides full functionality for any size experiment, a convenient se
 Bystro consists of 2 main components:
 
 1. The Bystro annotator (Perl) which is a command line tool for building new Bystro annotation databases, and for annotating VCF files with those databases.
-2. The `bystro` Python package, which contains general purpose machine learning / statistical methods, as well as bioinformatics methods like global ancestry, polygenic risk score calculation, and proteomic analysis (data cleaning, pQTL, joining/filtering on genetic data).
-3. The `bystro-api` command line tool, which is a command line interface for the Bystro API server. This is used to login to Bystro cluster, submit jobs, and check job status. It has most of the functionality of the web application, but is more convenient for batch processing.
-4. For enterprise users that have their own Bystro cluster, the Bystro Python package also gives the ability to launch workers to handle Bystro API server requests (`bystro-save-worker`, `bystro-index-worker`).
+2. The `bystro` Python package, which contains:
+   1. The `bystro` library, which contains general purpose machine learning / statistical methods as well as applications of these methods in biology, with methods like global ancestry, polygenic risk score calculation, and proteomic analysis (data cleaning, pQTL, joining/filtering on genetic data).
+   2. The `bystro-api` command line tool, which is a command line interface for the Bystro API server. This is used to login to Bystro cluster, submit jobs, and check job status. It has most of the functionality of the web application, but is more convenient for batch processing.
+   3. For enterprise users that have their own Bystro cluster, the Bystro Python package also gives the ability to launch workers to handle Bystro API server requests (`bystro-save-worker`, `bystro-index-worker`).
 
 To install the Bystro Python package, run:
 
