@@ -55,6 +55,8 @@ jobs:
         with:
           name: wheels-linux-${{ matrix.platform.target }}
           path: dist
+      - name: List contents of dist directory
+        run: ls -l dist
       - name: pytest
         if: ${{ startsWith(matrix.platform.target, 'x86_64') }}
         shell: bash
@@ -107,6 +109,8 @@ jobs:
         with:
           name: wheels-windows-${{ matrix.platform.target }}
           path: dist
+      - name: List contents of dist directory
+        run: ls -l dist
       - name: pytest
         if: ${{ !startsWith(matrix.platform.target, 'aarch64') }}
         shell: bash
@@ -143,12 +147,14 @@ jobs:
         with:
           name: wheels-macos-${{ matrix.platform.target }}
           path: dist
+      - name: List contents of dist directory
+        run: ls -l dist
       - name: pytest
         if: ${{ !startsWith(matrix.platform.target, 'aarch64') }}
         shell: bash
         run: |
           set -e
-          pip install python/ --find-links dist --force-reinstall
+          pip install bystro --find-links dist --force-reinstall
           pip install pytest
           cd python && pytest
 
