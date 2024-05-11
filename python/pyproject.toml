@@ -12,7 +12,6 @@ classifiers = [
 ]
 version = "1.0.3"
 dependencies = [
-    "Cython==3.0.10",
     "attrs==23.1.0",
     "boto3==1.28.9",
     "pyliftover==0.4.1",

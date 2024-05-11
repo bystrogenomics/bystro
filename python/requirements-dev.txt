@@ -11,3 +11,4 @@ types-tqdm==4.65.0.1
 types-requests==2.31.0.2
 types-psutil==5.9.5
 unipressed==1.2.0
+Cython==3.0.10
