@@ -1,16 +1,16 @@
 # Table of Contents
 
 1. [Installing Bystro Python Libraries and CLI Tools](#installing-the-bystro-python-libraries-and-cli-tools)
-   2, [Installing Bystro Using Docker](#installing-bystro-using-docker)
+2. [Installing Bystro Using Docker](#installing-bystro-using-docker)
    - [Building the Latest Version of Bystro in Docker](#building-the-latest-version-of-bystro-in-docker)
-2. [Direct (Non-Docker) Installation](#direct-non-docker-installation)
+3. [Direct (Non-Docker) Installation](#direct-non-docker-installation)
    - [Installing the Bystro Annotator (Perl/CLI)](#installing-the-bystro-annotator-perlcli)
      - [For RPM-based Distros (Fedora, Red Hat, CentOS, etc.)](#fedora-redhat-centos-opensuse-mandriva)
      - [For MacOS (Tested on High Sierra)](#macos-tested-on-highsierra-interactive)
      - [For Ubuntu](#ubuntu)
-3. [Configuring the Bystro Annotator](#configuring-the-bystro-annotator)
-4. [Databases](#databases)
-5. [Running Your First Annotation](#running-your-first-annotation)
+4. [Configuring the Bystro Annotator](#configuring-the-bystro-annotator)
+5. [Databases](#databases)
+6. [Running Your First Annotation](#running-your-first-annotation)
 
 For most users, we recommend not installing the software, and using https://bystro.io, where the software is hosted
 
