@@ -19,7 +19,7 @@ fn annotator(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
 }
 
 #[pymodule]
-fn bystro(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
+fn _rs(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(sum_as_string, m)?)?;
     m.add_wrapped(wrap_pymodule!(annotator))?;
 
