@@ -148,7 +148,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          pip install bystro --find-links dist --force-reinstall
+          pip install python/ --find-links dist --force-reinstall
           pip install pytest
           cd python && pytest
 
