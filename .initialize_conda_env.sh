@@ -6,7 +6,7 @@ version="3.11"
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 BYSTRO_PYTHON_PATH="${SCRIPT_DIR}/python"
-ENV_NAME='bystro3'
+ENV_NAME='bystro'
 
 echo "Script directory: $SCRIPT_DIR, python path $BYSTRO_PYTHON_PATH";
 
@@ -22,8 +22,8 @@ else
     conda activate ${ENV_NAME}
 fi
 
-echo -e "\n====                         Installing Python requirements                             ====\n"
-pip install -q ${BYSTRO_PYTHON_PATH};
 echo -e "\n====                         Installing Python development requirements                 ====\n"
 find . -name 'requirements-dev.txt' -exec pip install -q -r {} \;
+echo -e "\n====                         Setting up development environment                             ====\n"
+(cd ${BYSTRO_PYTHON_PATH} && maturin develop -q)
 echo -e "\n====                                       Done                                         ====\n"
