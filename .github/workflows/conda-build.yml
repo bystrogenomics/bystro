@@ -9,30 +9,23 @@ jobs:
       matrix:
         python-version: ["3.11"]
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-    - name: Build Miniconda
-      uses: conda-incubator/setup-miniconda@v2
-      with:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Build Miniconda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
           auto-update-conda: true
           auto-activate-base: true
           activate-environment: true
-          python-version: ${{ matrix.python-version }}   
-    - name: Install Bystro using Maturin
-      run: |
-        . .initialize_conda_env.sh
-        make install
-        echo "PATH=$CONDA/bin:$PATH" >> $GITHUB_ENV
-      shell: bash
-    - name: Verify Bystro wheel exists
-      run: |
-        if [[ ! -f "python/target/wheels/bystro-1.0.0-cp311-cp311-manylinux_2_34_x86_64.whl" ]]; then
-          echo "Expected Bystro wheel not found!"
-          exit 1
-        fi
-        echo "Bystro wheel found! Build succeeded."
-    - name: Verify bystro-api is installed
-      run: |
-        set -e
-        bystro-api --help
-        echo "bystro-api installed successfully"
+          python-version: ${{ matrix.python-version }}
+      - name: Install Bystro using Maturin
+        run: |
+          . .initialize_conda_env.sh
+          make develop
+          echo "PATH=$CONDA/bin:$PATH" >> $GITHUB_ENV
+        shell: bash
+      - name: Verify bystro-api is installed
+        run: |
+          set -e
+          bystro-api --help
+          echo "bystro-api installed successfully"
