@@ -21,9 +21,17 @@ jobs:
       - name: Install Bystro using Maturin
         run: |
           . .initialize_conda_env.sh
-          make develop
+          make install
           echo "PATH=$CONDA/bin:$PATH" >> $GITHUB_ENV
         shell: bash
+      - name: Verify Bystro wheel exists
+        run: |
+          WHEEL_FILE=$(find python/target/wheels -name 'bystro-*-cp311-cp311-manylinux*x86_64.whl' | head -n 1)
+          if [[ -z "$WHEEL_FILE" ]]; then
+            echo "Expected Bystro manylinux x86_64 wheel not found!"
+            exit 1
+          fi
+          echo "Bystro wheel found! Build succeeded."
       - name: Verify bystro-api is installed
         run: |
           set -e

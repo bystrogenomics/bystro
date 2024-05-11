@@ -40,7 +40,6 @@ dependencies = [
 python-source = "python"
 include = ["bystro/**/**/*.so"]
 features = ["pyo3/extension-module"]
-module-name = "bystro_rs"
 
 [tool.black]
 line-length = 105
