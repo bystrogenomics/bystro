@@ -18,9 +18,12 @@ The web app provides full functionality for any size experiment, a convenient se
 
 # Installing the Bystro Python libraries and cli tools
 
-Bystro consists of 2 main components: the Bystro annotator (Perl) and the Bystro Python package. The Python package contains the Bystro API command line interface, and the Bystro library consisting of general purpose machine learning / statistical methods, bioinformatics modules like global ancestry.
+Bystro consists of 2 main components:
 
-- The Bystro Python package also gives the ability to launch workers to process jobs from the Bystro API server, but this is not necessary for most users.
+1. The Bystro annotator (Perl) which is a command line tool for building new Bystro annotation databases, and for annotating VCF files with those databases.
+2. The `bystro` Python package, which contains general purpose machine learning / statistical methods, as well as bioinformatics methods like global ancestry, polygenic risk score calculation, and proteomic analysis (data cleaning, pQTL, joining/filtering on genetic data).
+3. The `bystro-api` command line tool, which is a command line interface for the Bystro API server. This is used to login to Bystro cluster, submit jobs, and check job status. It has most of the functionality of the web application, but is more convenient for batch processing.
+4. For enterprise users that have their own Bystro cluster, the Bystro Python package also gives the ability to launch workers to handle Bystro API server requests (`bystro-save-worker`, `bystro-index-worker`).
 
 To install the Bystro Python package, run:
 
@@ -28,7 +31,7 @@ To install the Bystro Python package, run:
 pip install bystro
 ```
 
-Bystro is compatible with Linux and MacOS. Windows support is experimental. If you are installing on MacOS as a native binary (Arm), you will need to install the following additional dependencies:
+Bystro is compatible with Linux and MacOS. Windows support is experimental. If you are installing on MacOS as a native binary (Apple ARM Architecture), you will need to install the following additional dependencies:
 
 ```sh
 brew install cmake
