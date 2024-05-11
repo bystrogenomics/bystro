@@ -6,7 +6,7 @@ build = "build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
-name = "bystro"
+name = "bystro_rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]

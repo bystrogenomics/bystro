@@ -19,17 +19,9 @@ fn annotator(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
 }
 
 #[pymodule]
-fn bystro(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
+fn bystro_rs(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(sum_as_string, m)?)?;
     m.add_wrapped(wrap_pymodule!(annotator))?;
-
-    // https://github.com/PyO3/pyo3/issues/2644
-    // https://github.com/PyO3/pyo3/tree/main/examples/maturin-starter
-    // Inserting to sys.modules allows importing submodules nicely from Python
-    let sys = PyModule::import(_py, "sys")?;
-    let sys_modules: &PyDict = sys.getattr("modules")?.downcast()?;
-
-    sys_modules.set_item("bystro.annotator", m.getattr("annotator")?)?;
 
     Ok(())
 }
