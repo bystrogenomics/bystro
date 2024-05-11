@@ -1,7 +1,7 @@
 ---
 assembly: hg19
 build_author: alexkotlar
-build_date: 2024-05-02T01:08:00
+build_date: 2024-05-06T12:19:00
 chromosomes:
   - chr1
   - chr2
@@ -28,7 +28,7 @@ chromosomes:
   - chrM
   - chrX
   - chrY
-database_dir: /mnt/annotator/hg19_v9
+database_dir: /mnt/annotator/hg19_v10
 fileProcessors:
   snp:
     args: --emptyField NA --minGq .95
@@ -62,7 +62,7 @@ tracks:
     - caddIndel
   tracks:
     - build_author: alexkotlar
-      build_date: 2024-05-02T01:08:00
+      build_date: 2024-05-06T12:19:00
       local_files:
         - chr1.fa.gz
         - chr2.fa.gz
@@ -124,7 +124,7 @@ tracks:
           name: fetch
       version: 36
     - build_author: alexkotlar
-      build_date: 2024-05-02T01:08:00
+      build_date: 2024-05-06T12:19:00
       build_field_transformations:
         description: split [;]
         ensemblID: split [;]
@@ -185,27 +185,23 @@ tracks:
                   r.*,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.kgID, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS kgID,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.description, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS description,
-                  (SELECT GROUP_CONCAT(DISTINCT NULLIF(e.value, '') SEPARATOR ';') FROM knownToEnsembl e JOIN kgXref x ON x.kgID = e.name WHERE x.refseq = r.name) AS ensemblID,
+                  (SELECT GROUP_CONCAT(DISTINCT NULLIF(e.value, '') SEPARATOR ';') FROM knownToEnsembl e JOIN kgXref x ON x.kgID=e.name WHERE x.refseq=r.name) AS ensemblID,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.tRnaName, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS tRnaName,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.spID, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS spID,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.spDisplayID, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS spDisplayID,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(rl.protAcc, '') SEPARATOR ';') FROM hgFixed.refLink rl WHERE rl.mrnaAcc=r.name) AS protAcc,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.mRNA, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS mRNA,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.rfamAcc, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS rfamAcc,
-                  CASE WHEN k.transcript IS NOT NULL THEN 'true' ELSE 'false' END AS isCanonical
+                  COALESCE((SELECT MAX(CASE WHEN k.transcript IS NOT NULL THEN 'true' ELSE 'false' END) FROM knownCanonical k WHERE k.transcript IN (SELECT kgID FROM kgXref x WHERE x.refseq=r.name)), 'false') AS isCanonical
               FROM
                   refGene r
-              LEFT JOIN
-                  kgXref x ON x.refseq = r.name
-              LEFT JOIN
-                  knownCanonical k ON k.transcript = x.kgID
               WHERE
-                  r.chrom = %chromosomes%
-          completed: 2024-05-02T01:01:00
+                  chrom=%chromosomes%;
+          completed: 2024-05-06T11:47:00
           name: fetch
       version: 5
     - build_author: alexkotlar
-      build_date: 2024-05-02T01:08:00
+      build_date: 2024-05-06T12:19:00
       build_row_filters:
         AS_FilterStatus: == PASS
       features:
@@ -274,7 +270,7 @@ tracks:
       type: vcf
       version: 5
     - build_author: alexkotlar
-      build_date: 2024-05-02T01:08:00
+      build_date: 2024-05-06T12:19:00
       local_files:
         - whole_genome_SNVs.tsv.chr1.organized-by-chr.txt.sorted.txt.gz
         - whole_genome_SNVs.tsv.chr10.organized-by-chr.txt.sorted.txt.gz
@@ -305,7 +301,7 @@ tracks:
       type: cadd
       version: 7
     - build_author: alexkotlar
-      build_date: 2024-05-02T01:08:00
+      build_date: 2024-05-06T12:19:00
       dist: true
       features:
         - name2
@@ -317,7 +313,7 @@ tracks:
       type: nearest
       version: 5
     - build_author: alexkotlar
-      build_date: 2024-05-02T01:08:00
+      build_date: 2024-05-06T12:19:00
       dist: true
       features:
         - name2
@@ -328,7 +324,7 @@ tracks:
       type: nearest
       version: 5
     - build_author: alexkotlar
-      build_date: 2024-05-02T01:08:00
+      build_date: 2024-05-06T12:19:00
       features:
         - alt
         - id
@@ -370,7 +366,7 @@ tracks:
       type: vcf
       version: 5
     - build_author: alexkotlar
-      build_date: 2024-05-02T01:08:00
+      build_date: 2024-05-06T12:19:00
       features:
         - id
         - alt
@@ -429,7 +425,7 @@ tracks:
           name: DbSnp2FormatInfo
       version: 5
     - build_author: alexkotlar
-      build_date: 2024-05-02T01:08:00
+      build_date: 2024-05-06T12:19:00
       build_field_transformations:
         CLNDISDB: split [|]
         CLNDN: split [|]
@@ -465,7 +461,7 @@ tracks:
           name: fetch
       version: 5
     - build_author: alexkotlar
-      build_date: 2024-05-02T01:08:00
+      build_date: 2024-05-06T12:19:00
       features:
         - alt
         - PHRED: number

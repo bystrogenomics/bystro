@@ -1,7 +1,7 @@
 ---
 assembly: hg38
 build_author: alexkotlar
-build_date: 2024-05-01T01:58:00
+build_date: 2024-05-05T22:08:00
 chromosomes:
   - chr1
   - chr2
@@ -28,15 +28,13 @@ chromosomes:
   - chrM
   - chrX
   - chrY
-database_dir: /mnt/annotator/hg38_v7
+database_dir: /mnt/annotator/hg38_v8
 fileProcessors:
   snp:
     args: --emptyField NA --minGq .95
     program: bystro-snp
   vcf:
-    args:
-      --emptyField NA --sample %sampleList% --keepPos --keepId --dosageOutput
-      %dosageMatrixOutPath%
+    args: --emptyField NA --sample %sampleList% --keepPos --keepId --dosageOutput %dosageMatrixOutPath%
     program: bystro-vcf
 files_dir: /mnt/files1/bystro_annotator/raw_files/hg38
 statistics:
@@ -64,7 +62,7 @@ tracks:
     - clinvarVcf
   tracks:
     - build_author: alexkotlar
-      build_date: 2024-05-01T01:58:00
+      build_date: 2024-05-05T22:08:00
       local_files:
         - chr1.fa.gz
         - chr2.fa.gz
@@ -124,9 +122,9 @@ tracks:
               - chrM.fa.gz
           completed: 2024-03-11T12:19:00
           name: fetch
-      version: 36
+      version: 37
     - build_author: alexkotlar
-      build_date: 2024-05-01T01:58:00
+      build_date: 2024-05-05T22:08:00
       build_field_transformations:
         description: split [;]
         ensemblID: split [;]
@@ -187,27 +185,23 @@ tracks:
                   r.*,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.kgID, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS kgID,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.description, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS description,
-                  (SELECT GROUP_CONCAT(DISTINCT NULLIF(e.value, '') SEPARATOR ';') FROM knownToEnsembl e JOIN kgXref x ON x.kgID = e.name WHERE x.refseq = r.name) AS ensemblID,
+                  (SELECT GROUP_CONCAT(DISTINCT NULLIF(e.value, '') SEPARATOR ';') FROM knownToEnsembl e JOIN kgXref x ON x.kgID=e.name WHERE x.refseq=r.name) AS ensemblID,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.tRnaName, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS tRnaName,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.spID, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS spID,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.spDisplayID, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS spDisplayID,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(rl.protAcc, '') SEPARATOR ';') FROM hgFixed.refLink rl WHERE rl.mrnaAcc=r.name) AS protAcc,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.mRNA, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS mRNA,
                   (SELECT GROUP_CONCAT(DISTINCT NULLIF(x.rfamAcc, '') SEPARATOR ';') FROM kgXref x WHERE x.refseq=r.name) AS rfamAcc,
-                  CASE WHEN k.transcript IS NOT NULL THEN 'true' ELSE 'false' END AS isCanonical
+                  COALESCE((SELECT MAX(CASE WHEN k.transcript IS NOT NULL THEN 'true' ELSE 'false' END) FROM knownCanonical k WHERE k.transcript IN (SELECT kgID FROM kgXref x WHERE x.refseq=r.name)), 'false') AS isCanonical
               FROM
                   refGene r
-              LEFT JOIN
-                  kgXref x ON x.refseq = r.name
-              LEFT JOIN
-                  knownCanonical k ON k.transcript = x.kgID
               WHERE
-                  r.chrom = %chromosomes%
-          completed: 2024-04-30T01:28:00
+                  chrom=%chromosomes%;
+          completed: 2024-05-05T21:56:00
           name: fetch
-      version: 36
+      version: 37
     - build_author: alexkotlar
-      build_date: 2024-05-01T01:58:00
+      build_date: 2024-05-05T22:08:00
       features:
         - alt
         - id
@@ -322,7 +316,7 @@ tracks:
               - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chrY.vcf.bgz
           completed: 2024-03-07T14:23:00
           name: fetch
-      version: 31
+      version: 32
     - based: 1
       build_author: alexkotlar
       build_date: 2023-09-20T00:17:00
@@ -372,7 +366,7 @@ tracks:
           name: fetch
       version: 24
     - build_author: alexkotlar
-      build_date: 2024-05-01T01:58:00
+      build_date: 2024-05-05T22:08:00
       local_files:
         - whole_genome_SNVs.tsv.chr1.organized-by-chr.txt.sorted.txt.gz
         - whole_genome_SNVs.tsv.chr10.organized-by-chr.txt.sorted.txt.gz
@@ -404,9 +398,9 @@ tracks:
       utils:
         - completed: 2023-09-09T11:18:00
           name: SortCadd
-      version: 6
+      version: 7
     - build_author: alexkotlar
-      build_date: 2024-05-01T01:58:00
+      build_date: 2024-05-05T22:08:00
       features:
         - alt
         - PHRED: number
@@ -414,9 +408,9 @@ tracks:
         - /mnt/files1/bystro_annotator/raw_files/hg38/caddIndel/gnomad.genomes.r4.0.indel.vcf.gz
       name: caddIndel
       type: vcf
-      version: 8
+      version: 9
     - build_author: alexkotlar
-      build_date: 2024-05-01T01:58:00
+      build_date: 2024-05-05T22:08:00
       dist: true
       features:
         - name2
@@ -426,9 +420,9 @@ tracks:
       ref: refSeq
       to: txEnd
       type: nearest
-      version: 11
+      version: 12
     - build_author: alexkotlar
-      build_date: 2024-05-01T01:58:00
+      build_date: 2024-05-05T22:08:00
       dist: true
       features:
         - name2
@@ -437,9 +431,9 @@ tracks:
       name: nearestTss.refSeq
       ref: refSeq
       type: nearest
-      version: 6
+      version: 7
     - build_author: alexkotlar
-      build_date: 2024-05-01T01:58:00
+      build_date: 2024-05-05T22:08:00
       features:
         - alt
         - id
@@ -560,9 +554,9 @@ tracks:
               - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chrY.vcf.bgz
           completed: 2024-03-07T15:59:00
           name: fetch
-      version: 29
+      version: 30
     - build_author: alexkotlar
-      build_date: 2024-05-01T01:58:00
+      build_date: 2024-05-05T22:08:00
       features:
         - id
         - alt
@@ -619,9 +613,9 @@ tracks:
       utils:
         - completed: 2024-03-10T16:30:00
           name: DbSnp2FormatInfo
-      version: 8
+      version: 9
     - build_author: alexkotlar
-      build_date: 2024-05-01T01:58:00
+      build_date: 2024-05-05T22:08:00
       build_field_transformations:
         CLNDN: split [|]
         CLNSIGCONF: split [|]
@@ -654,5 +648,5 @@ tracks:
               - https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh38/clinvar.vcf.gz
           completed: 2024-03-07T22:09:00
           name: fetch
-      version: 4
-version: 231
+      version: 5
+version: 232
