@@ -12,5 +12,5 @@ types-requests==2.31.0.2
 types-psutil==5.9.5
 unipressed==1.2.0
 Cython==3.0.10
-maturin==1.5.1
-setuptools==69.5.1
+maturin[zig]==1.5.1
+setuptools==65.5.0
