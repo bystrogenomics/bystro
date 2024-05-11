@@ -30,12 +30,6 @@ jobs:
             target: x86
           - runner: ubuntu-latest
             target: aarch64
-          - runner: ubuntu-latest
-            target: armv7
-          - runner: ubuntu-latest
-            target: s390x
-          - runner: ubuntu-latest
-            target: ppc64le
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -61,6 +55,7 @@ jobs:
         run: |
           set -e
           python --version
+          ls -la dist
           pip install bystro --verbose --find-links dist --force-reinstall
           pip install pytest
           cd python && pytest
@@ -87,8 +82,6 @@ jobs:
         platform:
           - runner: windows-latest
             target: x64
-          - runner: windows-latest
-            target: x86
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -114,6 +107,7 @@ jobs:
         run: |
           set -e
           python --version
+          ls -la dist
           pip install bystro --verbose --find-links dist --force-reinstall
           pip install pytest
           cd python && pytest
@@ -151,6 +145,7 @@ jobs:
         run: |
           set -e
           python --version
+          ls -la dist
           pip install bystro --verbose --find-links dist --force-reinstall
           pip install pytest
           cd python && pytest
