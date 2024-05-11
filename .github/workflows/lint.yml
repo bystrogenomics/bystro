@@ -40,7 +40,6 @@ jobs:
       - name: Tests
         run: |
           source ~/.venv/ci-venv/bin/activate
-          cd python
-          maturin develop
+          make develop
           ray start --head
-          pytest
+          cd python && pytest
