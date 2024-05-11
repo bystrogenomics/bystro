@@ -48,7 +48,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          pip install bystro --find-links dist --force-reinstall
+          pip install bystro --verbose --find-links dist --force-reinstall
           pip install pytest
           cd python && pytest
       - name: pytest
@@ -96,7 +96,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          pip install bystro --find-links dist --force-reinstall
+          pip install bystro --verbose --find-links dist --force-reinstall
           pip install pytest
           cd python && pytest
 
@@ -128,7 +128,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          pip install bystro --find-links dist --force-reinstall
+          pip install bystro --verbose --find-links dist --force-reinstall
           pip install pytest
           cd python && pytest
 
