@@ -36,7 +36,8 @@ jobs:
       - name: Static analysis with mypy
         run: |
           source ~/.venv/ci-venv/bin/activate
-          mypy --config-file python/mypy.ini $(git ls-files '*.py')
+          mypy --version
+          mypy --config-file python/mypy.ini $(git ls-files '*.py') -v
       - name: Tests
         run: |
           source ~/.venv/ci-venv/bin/activate
