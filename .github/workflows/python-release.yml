@@ -53,6 +53,7 @@ jobs:
           ls -la dist
           pip install bystro --verbose --find-links dist --force-reinstall
           pip install pytest
+          ray start --head
           cd python && pytest
       - name: pytest
         if: ${{ !startsWith(matrix.platform.target, 'x86') && matrix.platform.target != 'ppc64' }}
@@ -100,6 +101,7 @@ jobs:
           ls -la dist
           pip install bystro --verbose --find-links dist --force-reinstall
           pip install pytest
+          ray start --head
           cd python && pytest
 
   macos:
@@ -133,6 +135,7 @@ jobs:
           ls -la dist
           pip install bystro --verbose --find-links dist --force-reinstall
           pip install pytest
+          ray start --head
           cd python && pytest
 
   sdist:
