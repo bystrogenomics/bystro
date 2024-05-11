@@ -118,7 +118,7 @@ Once Bystro is installed, it needs to be configured. The easiest step is choosin
 
 1. Download the Bystro database for your species/assembly
 
-- **Example:** hg38 (human reference GRCh38): `wget https://s3.amazonaws.com/bystro-db/hg38_v7.tar.gz`</strong>
+- **Example:** hg38 (human reference GRCh38): `wget https://s3.amazonaws.com/bystro-db/hg38_v8.tar.gz`</strong>
   - You need ~700GB of free space for hg38 and ~400GB of free space for hg19, including the space for the tar.gz archives
 
 2. To install the database:
@@ -127,15 +127,15 @@ Once Bystro is installed, it needs to be configured. The easiest step is choosin
 
    ```shell
    cd /mnt/annotator/
-   wget https://s3.amazonaws.com/bystro-db/hg38_v7.tar.gz
-   bgzip -d -c --threads 32 hg38_v7.tar.gz | tar xvf -
+   wget https://s3.amazonaws.com/bystro-db/hg38_v8.tar.gz
+   bgzip -d -c --threads 32 hg38_v8.tar.gz | tar xvf -
    ```
 
    In this example the hg38 database would located in `/mnt/annotator/hg38`
 
 3. Update the YAML configuration for the species/assembly to point to the database.
 
-   For human genome assemblies, we provide pre-configured hg19.yml and hg38.yml, which assume `/mnt/annotator/hg19_v9` and `/mnt/annotator/hg38_v7` database directories respectively.
+   For human genome assemblies, we provide pre-configured hg19.yml and hg38.yml, which assume `/mnt/annotator/hg19_v10` and `/mnt/annotator/hg38_v8` database directories respectively.
 
    If using a different mount point, different database folder name, or a different (or custom-built) database altogether,
    you will need to update the `database_dir` property of the yaml config.
@@ -145,14 +145,14 @@ Once Bystro is installed, it needs to be configured. The easiest step is choosin
    For instance, using `yq` to can configure the `database_dir` and set `temp_dir` to have in-progress annotations written to local disk
 
    ```shell
-   yq write -i config/hg38.yml database_dir /mnt/my_fast_local_storage/hg38_v7
+   yq write -i config/hg38.yml database_dir /mnt/my_fast_local_storage/hg38_v8
    yq write -i config/hg38.yml temp_dir /mnt/my_fast_local_storage/tmp
    ```
 
 ## Databases:
 
-1. Human (hg38): https://s3.amazonaws.com/bystro-db/hg38_v7.tar.gz
-2. Human (hg19): https://s3.amazonaws.com/bystro-db/hg19_v9.tar.gz
+1. Human (hg38): https://s3.amazonaws.com/bystro-db/hg38_v8.tar.gz
+2. Human (hg19): https://s3.amazonaws.com/bystro-db/hg19_v10.tar.gz
 3. There are no restrictions on species support, but we currently only build human genomes. Please create a GitHub issue if you would like us to support others.
 
 ## Running your first annotation
