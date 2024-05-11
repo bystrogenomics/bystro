@@ -17,7 +17,13 @@ def test_Timer():
     relative_error = (average_elapsed - sleep_time) / sleep_time
 
     # Log diagnostic info
-    print(f"Expected Sleep Time: {sleep_time}, Average Elapsed Time: {average_elapsed}, Relative Error: {relative_error}")
+    print(
+        (
+            f"Expected Sleep Time: {sleep_time}, "
+            f"Average Elapsed Time: {average_elapsed}, "
+            f"Relative Error: {relative_error}"
+        )
+    )
 
     # Use a higher tolerance to account for CI environment variations
     assert abs(relative_error) < 0.3
