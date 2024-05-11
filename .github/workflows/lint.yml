@@ -20,7 +20,7 @@ jobs:
           path: |
             ~/.cache/pip
             ~/.cache/pypoetry
-          key: ${{ runner.os }}-pip-${{ hashFiles('python/pyproject.toml', 'python/requirements-dev.txt') }}
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('python/pyproject.toml', 'python/requirements-dev.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
       - name: Install dependencies
@@ -28,8 +28,8 @@ jobs:
           python -m venv ~/.venv/ci-venv
           source ~/.venv/ci-venv/bin/activate
           python -m pip install --upgrade pip
-          pip install ./python
           pip install -r python/requirements-dev.txt
+          make develop
       - name: Linting with ruff
         run: |
           source ~/.venv/ci-venv/bin/activate
@@ -42,5 +42,4 @@ jobs:
       - name: Tests
         run: |
           source ~/.venv/ci-venv/bin/activate
-          make develop
           cd python && pytest
