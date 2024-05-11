@@ -1,7 +1,7 @@
 black==23.3.0
 flaky==3.7.0
 mypy==1.8.0
-pandas-stubs==2.0.2.230605
+pandas-stubs==2.2.1.240316
 pytest==7.3.1
 pytest-cov==4.1.0
 pytest-mock==3.11.1
