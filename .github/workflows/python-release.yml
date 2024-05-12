@@ -49,7 +49,7 @@ jobs:
           name: wheels-linux-${{ matrix.platform.target }}
           path: dist
       - name: pytest
-        if: ${{ startsWith(matrix.platform.target, 'aarch64') }}
+        if: ${{ !startsWith(matrix.platform.target, 'x86') }}
         uses: uraimo/run-on-arch-action@v2.7.2
         with:
           arch: ${{ matrix.platform.target }}
@@ -62,10 +62,11 @@ jobs:
             apt update
             apt install -y python3.11
             apt install -y python3.11-distutils
+            apt install -y curl
             curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
           run: |
             set -e
-            python --version
+            python3 --version
             ls -la dist
 
             pip install bystro --verbose --find-links dist --force-reinstall
@@ -75,7 +76,7 @@ jobs:
             ray start --head
             cd python && pytest
       - name: pytest
-        if: ${{ startsWith(matrix.platform.target, 'x86_64') }}
+        if: ${{ startsWith(matrix.platform.target, 'x86') }}
         shell: bash
         run: |
           set -e
