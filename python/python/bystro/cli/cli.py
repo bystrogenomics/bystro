@@ -10,6 +10,8 @@ from bystro.api.streaming import stream_file
 
 from bystro.cli.ancestry import add_ancestry_subparser
 
+import json
+
 def signup_cli(args: argparse.Namespace, print_result=True) -> CachedAuth:
     """
     Signs up for Bystro with the given email, name, and password. Additionally, logs in and
@@ -109,7 +111,7 @@ def create_jobs_cli(args: argparse.Namespace) -> list[dict]:
     )
 
 
-def get_user_cli() -> UserProfile:
+def get_user_cli(_args: argparse.Namespace) -> UserProfile:
     """
     Fetches the user profile.
 
@@ -145,12 +147,14 @@ def query_cli(args: argparse.Namespace) -> None:
         The queried results
     """
 
-    return query(
+    res =  query(
         job_id=args.job_id,
         query=args.query,
         size=args.size,
         from_=args.from_,
     )
+
+    print(json.dumps(res))
 
 
 def stream_file_cli(args: argparse.Namespace) -> None:

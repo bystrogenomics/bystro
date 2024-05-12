@@ -28,9 +28,24 @@ index_settings:
           - uppercase
           - asciifolding
     filter:
-      exclude_pathogenic:
+      clnsig_conditional_underscore_split:
+        type: condition
+        filter: ["clnsig_underscore_split_filter"]
+        script:
+          source: "token.getTerm().toString().startsWith('conflicting') == false"
+      clnsig_conditional_filter:
+        type: condition
+        filter: ["clnsig_edge_ngram_filter"]
+        script:
+          source: "token.getTerm().toString().startsWith('conflicting') == false"
+      clnsig_edge_ngram_filter:
+        type: edge_ngram
+        min_gram: 1
+        max_gram: 20
+      clnsig_underscore_split_filter:
         type: pattern_capture
-        patterns: ["conflicting_interpretations_of_pathogenicity"]
+        patterns: ["([^_]+)"]
+        preserve_original: false
       catenate_filter:
         type: word_delimiter
         catenate_words: true
@@ -95,6 +110,9 @@ index_settings:
           - digit
           - punctuation
     tokenizer:
+      comma_tokenizer:
+          type: pattern
+          pattern: ","
       hgvs_tokenizer:
         type: pattern
       edge_ngram_tokenizer:
@@ -106,6 +124,12 @@ index_settings:
           - digit
           - punctuation
     analyzer:
+      clnsig_analyzer:
+          tokenizer: comma_tokenizer
+          filter:
+            - lowercase
+            - clnsig_conditional_underscore_split
+            - clnsig_conditional_filter
       hgvs_analyzer:
         type: custom
         tokenizer: hgvs_tokenizer
@@ -129,14 +153,6 @@ index_settings:
           - catenate_filter_split
           - english_stemmer
           - autocomplete_filter
-      autocomplete_english_split_clinsig:
-        type: custom
-        tokenizer: whitespace
-        filter:
-          - lowercase
-          - exclude_pathogenic
-          - asciifolding
-          - catenate_filter_split
       autocomplete_english_graph:
         type: custom
         tokenizer: keyword
@@ -450,7 +466,7 @@ mappings:
           normalizer: lowercase_normalizer
         CLNSIG:
           type: text
-          analyzer: autocomplete_english_split_clinsig
+          analyzer: clnsig_analyzer
           search_analyzer: search_english_simple
           fields:
             exact:

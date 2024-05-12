@@ -87,7 +87,7 @@ class UserProfile(Struct, rename="camel"):
     email: str
     accounts: list[str]
     role: str
-    last_login: datetime.datetime
+    last_login: datetime.datetime | None = None
 
 
 def _fq_host(host: str, port: int | None = None) -> str:
