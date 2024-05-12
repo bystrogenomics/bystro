@@ -52,27 +52,22 @@ jobs:
         uses: uraimo/run-on-arch-action@v2.7.2
         with:
           arch: ${{ matrix.platform.target }}
-          distro: ubuntu22.04
+          distro: ubuntu_latest
           githubToken: ${{ github.token }}
           install: |
-            apt update
-            apt install -y software-properties-common
-            add-apt-repository ppa:deadsnakes/ppa
-            apt update
+            apt-get update
+            apt-get install -y --no-install-recommends python3 python3-pip
             apt install -y git
-            apt install -y python3.11
-            apt install -y python3.11-distutils
-            apt install -y curl
-            curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
+            pip3 install -U pip pytest
           run: |
             set -e
-            python3.11 --version
+            python --version
             ls -la dist
 
-            python3.11 -m pip install bystro --verbose --find-links dist --force-reinstall
+            pip install bystro --verbose --find-links dist --force-reinstall
             bystro-api --help
 
-            python3.11 -m pip install pytest
+            pip install pytest
             ray start --head
             cd python && pytest
       - name: pytest
