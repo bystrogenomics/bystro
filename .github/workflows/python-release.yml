@@ -53,7 +53,7 @@ jobs:
         uses: uraimo/run-on-arch-action@v2.7.2
         with:
           arch: ${{ matrix.platform.target }}
-          distro: ${{ matrix.platform.distro }}
+          distro: ubuntu22.04
           githubToken: ${{ github.token }}
           install: |
             apt update
