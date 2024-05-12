@@ -28,7 +28,6 @@ jobs:
             target: x86_64
           - runner: ubuntu-latest
             target: aarch64
-            distro: ubuntu22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -60,19 +59,20 @@ jobs:
             apt install -y software-properties-common
             add-apt-repository ppa:deadsnakes/ppa
             apt update
+            apt install -y git
             apt install -y python3.11
             apt install -y python3.11-distutils
             apt install -y curl
             curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
           run: |
             set -e
-            python3 --version
+            python3.11 --version
             ls -la dist
 
-            pip install bystro --verbose --find-links dist --force-reinstall
+            python3.11 -m pip install bystro --verbose --find-links dist --force-reinstall
             bystro-api --help
 
-            pip install pytest
+            python3.11 -m pip install pytest
             ray start --head
             cd python && pytest
       - name: pytest
