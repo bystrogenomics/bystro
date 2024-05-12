@@ -28,6 +28,7 @@ jobs:
             target: x86_64
           - runner: ubuntu-latest
             target: aarch64
+            distro: ubuntu_latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -52,12 +53,11 @@ jobs:
         uses: uraimo/run-on-arch-action@v2.7.2
         with:
           arch: ${{ matrix.platform.target }}
-          distro: ${{ matrix.platform.runner }}
+          distro: ${{ matrix.platform.distro }}
           githubToken: ${{ github.token }}
           install: |
             add-apt-repository ppa:deadsnakes/ppa
             apt update
-            apt install -y sudo
             apt install -y python3.11
             apt install -y python3.11-distutils
             curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
