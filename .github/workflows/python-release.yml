@@ -52,13 +52,14 @@ jobs:
         uses: uraimo/run-on-arch-action@v2.7.2
         with:
           arch: ${{ matrix.platform.target }}
-          distro: ubuntu22.04
+          distro: ${{ matrix.platform.runner }}
           githubToken: ${{ github.token }}
           install: |
-            sudo add-apt-repository ppa:deadsnakes/ppa
-            sudo apt update
-            sudo apt install python3.11
-            sudo apt install python3.11-distutils
+            add-apt-repository ppa:deadsnakes/ppa
+            apt update
+            apt install -y sudo
+            apt install -y python3.11
+            apt install -y python3.11-distutils
             curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
           run: |
             set -e
