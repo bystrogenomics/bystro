@@ -28,7 +28,7 @@ jobs:
             target: x86_64
           - runner: ubuntu-latest
             target: aarch64
-            distro: ubuntu_latest
+            distro: ubuntu22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -56,6 +56,8 @@ jobs:
           distro: ${{ matrix.platform.distro }}
           githubToken: ${{ github.token }}
           install: |
+            apt update
+            apt install -y software-properties-common
             add-apt-repository ppa:deadsnakes/ppa
             apt update
             apt install -y python3.11
