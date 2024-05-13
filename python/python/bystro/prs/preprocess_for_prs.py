@@ -281,6 +281,11 @@ def clean_scores_for_analysis(
     scores_overlap_adjusted = max_effect_per_bin.drop(columns=["bin", "abs_effect_weight"])
     scores_overlap_adjusted = scores_overlap_adjusted.set_index("SNPID")
     format_col_index = scores_overlap_adjusted.columns.get_loc(column_to_drop)
+
+    # If there is more than 1 column found, our "columns_to_keep" function will not work
+    if not isinstance(format_col_index, int):
+        raise ValueError(f"Column {column_to_drop} was not found uniquely in the dataframe.")
+
     columns_to_keep = ["allele_comparison"] + list(
         scores_overlap_adjusted.columns[format_col_index + 1 :]
     )
