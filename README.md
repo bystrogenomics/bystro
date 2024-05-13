@@ -20,7 +20,7 @@ The web app gives full access to all of Bystro's capabilities, provides a conven
 
 ## Installing Bystro
 
-Bystro consists of 2 main components: the Bystro Python package, which consists of the Bystro ML library, CLI tool, and a collection of easy to use biology methods like globaly ancestry, and the Bystro annotator (Perl).
+Bystro consists of 2 main components: the Bystro Python package, which consists of the Bystro ML library, CLI tool, and a collection of easy to use biology tools including global ancestry and the Bystro annotator (Perl).
 
 The Bystro Python package also gives the ability to launch workers to process jobs from the Bystro API server, but this is not necessary for most users.
 
