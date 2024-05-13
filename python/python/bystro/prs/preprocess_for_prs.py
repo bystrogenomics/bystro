@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt  # type: ignore
 from enum import Enum
 import pandas as pd
 from pyarrow import feather  # type: ignore
-import pyarrow.dataset as ds
+import pyarrow.dataset as ds  # type: ignore
 
 logger = logging.getLogger(__name__)
 

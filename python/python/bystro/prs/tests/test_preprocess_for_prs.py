@@ -1,7 +1,7 @@
 from unittest.mock import patch, MagicMock
 
 import pandas as pd
-import pyarrow as pa
+import pyarrow as pa  # type: ignore
 import pytest
 from bystro.prs.preprocess_for_prs import (
     _load_association_scores,
