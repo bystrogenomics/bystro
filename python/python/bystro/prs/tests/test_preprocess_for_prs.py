@@ -10,11 +10,9 @@ from bystro.prs.preprocess_for_prs import (
     _preprocess_scores,
     calculate_abs_effect_weights,
     compare_alleles,
-    read_feather_in_chunks,
     get_p_value_thresholded_indices,
     find_bin_for_row,
     generate_c_and_t_prs_scores,
-    generate_thresholded_overlap_scores_dosage,
     select_max_effect_per_bin,
 )
 
@@ -23,25 +21,17 @@ AD_SCORE_FILEPATH = "fake_file.txt"
 
 @pytest.fixture()
 def mock_scores_df() -> pd.DataFrame:
-    # This DataFrame simulates the initial state of the data as it might appear in a feather file
-    return pd.DataFrame({
-        "SNPID": ['1:566875:C:T', '1:728951:A:G'],  # SNPID as a regular column
-        "CHR": [1, 1],
-        "POS": [566875, 728951],
-        "OTHER_ALLELE": ["C", "G"],  # Adjusted to match alleles accurately
-        "EFFECT_ALLELE": ["T", "A"],  # Adjusted to match alleles accurately
-        "P": [0.699009, 0.030673],
-        "BETA": [0.007630, -0.020671],
-    })
-
-
-@pytest.fixture()
-def setup_mock_read_chunks(monkeypatch, mock_scores_df):
-    def mock_read_feather_in_chunks(file_path, columns=None, chunk_size=1000):
-        for start in range(0, len(mock_scores_df), chunk_size):
-            yield mock_scores_df.iloc[start:start + chunk_size]
-
-    monkeypatch.setattr('bystro.prs.preprocess_for_prs.read_feather_in_chunks', mock_read_feather_in_chunks)
+    return pd.DataFrame(
+        {
+            "SNPID": ["1:566875:C:T", "1:728951:A:G"],
+            "CHR": [1, 1],
+            "POS": [566875, 728951],
+            "OTHER_ALLELE": ["C", "G"],
+            "EFFECT_ALLELE": ["T", "A"],
+            "P": [0.699009, 0.030673],
+            "BETA": [0.007630, -0.020671],
+        }
+    )
 
 
 @pytest.fixture()
@@ -73,11 +63,13 @@ def mock_dosage_df():
 
 @pytest.fixture()
 def mock_dosage_df_clean():
-    return pd.DataFrame({
-        "locus": ["chr1:566875:C:T", "chr1:728951:A:G", "chr1:917492:C:T"],
-        "ID00096": [1, 1, 2],
-        "ID00097": [0, 1, 1],
-    })
+    return pd.DataFrame(
+        {
+            "locus": ["chr1:566875:C:T", "chr1:728951:A:G", "chr1:917492:C:T"],
+            "ID00096": [1, 1, 2],
+            "ID00097": [0, 1, 1],
+        }
+    )
 
 
 @pytest.fixture()
@@ -122,9 +114,9 @@ def mock_final_dosage_scores():
 
 
 def test_extract_nomiss_dosage_loci(mock_dosage_df):
-    filtered_df = mock_dosage_df[mock_dosage_df['ID00096'] != -1]
+    filtered_df = mock_dosage_df[mock_dosage_df["ID00096"] != -1]
     mock_table = pa.Table.from_pandas(filtered_df)
-    with patch('pyarrow.dataset.dataset') as mock_dataset:
+    with patch("pyarrow.dataset.dataset") as mock_dataset:
         mock_ds = MagicMock()
         mock_ds.schema.names = mock_dosage_df.columns.tolist()
         mock_ds.filter.return_value = mock_ds
@@ -134,8 +126,10 @@ def test_extract_nomiss_dosage_loci(mock_dosage_df):
 
         assert not result.empty, "The DataFrame should not be empty."
         assert "locus" in result.columns, "'locus' column should be present in the DataFrame."
-        assert len(result) == 3, "The number of rows in the DataFrame should be 3."  # Verify if this count matches expected result
-        mock_dataset.assert_called_once_with("mock/path/to/dosage.feather", format='feather')
+        assert (
+            len(result) == 3
+        ), "The number of rows in the DataFrame should be 3."
+        mock_dataset.assert_called_once_with("mock/path/to/dosage.feather", format="feather")
 
 
 def test_load_genetic_maps_from_feather(tmp_path):
@@ -147,7 +141,7 @@ def test_load_genetic_maps_from_feather(tmp_path):
     genetic_maps = _load_genetic_maps_from_feather(str(test_dir))
     assert isinstance(genetic_maps, dict), "The function should return a dictionary."
     assert "GeneticMap1" in genetic_maps, "The dictionary should contain keys in the expected format."
-    assert not genetic_maps["GeneticMap1"].empty, "The DataFrame for chromosome 1 should not be empty."
+    assert not genetic_maps["GeneticMap1"].empty, "The DataFrame for chr 1 should not be empty."
     assert len(genetic_maps) == 1, "There should be exactly one genetic map loaded."
     assert all(
         column in genetic_maps["GeneticMap1"].columns for column in mock_map.columns
@@ -161,7 +155,9 @@ def test_load_scores(mock_read_feather, mock_scores_df: pd.DataFrame):
     result_df = _load_association_scores("fake_file_path.feather")
     expected_columns = ["CHR", "POS", "OTHER_ALLELE", "EFFECT_ALLELE", "P", "SNPID", "BETA"]
     assert not result_df.empty, "The DataFrame should not be empty."
-    assert list(result_df.columns) == expected_columns, "DataFrame columns do not match expected columns."
+    assert (
+        list(result_df.columns) == expected_columns
+    ), "DataFrame columns do not match expected columns."
     assert len(result_df) == len(mock_scores_df), "DataFrame length does not match expected length."
 
 
@@ -189,7 +185,7 @@ def test_get_p_value_thresholded_indices(mock_processed_scores_df: pd.DataFrame)
     assert (
         set(filtered_scores["SNPID"]) == expected_snps
     ), "Filtered scores should contain expected SNP(s)."
-    
+
 
 def test_compare_alleles():
     data = {
