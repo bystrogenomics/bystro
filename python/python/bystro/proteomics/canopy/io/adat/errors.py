@@ -1,2 +1,0 @@
-class AdatReadError(Exception):
-    pass

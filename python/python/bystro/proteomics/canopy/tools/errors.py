@@ -1,2 +1,0 @@
-class AdatConcatError(Exception):
-    pass
