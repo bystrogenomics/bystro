@@ -99,7 +99,7 @@ def test_median_euclid():
     X = rng.normal(size=(5, 3, 3))
     tol = 1e-6
     maxiter = 50
-    weights = np.abs(rng.normal(size=(3)))
+    weights = np.abs(rng.normal(size=(5)))
     init = np.zeros_like(X[0])
 
     result = median_euclid(
