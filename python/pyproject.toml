@@ -46,6 +46,7 @@ line-length = 105
 
 [tool.ruff]
 line-length = 105
+exclude = ["python/bystro/proteomics/canopy"]
 
 # commented codes are ones we're not currently passing-- these are
 # aspirationally left in so that we can gradually enforce them as well.
