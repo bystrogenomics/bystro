@@ -9,5 +9,5 @@ setup(
         build_dir="build",
         compiler_directives={"language_level": "3"},
     ),
-    zip_safe=False,
+    zip_safe=False
 )
