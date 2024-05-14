@@ -18,6 +18,8 @@ from bystro.ancestry.define_callset import (
         ("chr1:900000000:G:A", None),
     ],
 )
+
+@pytest.mark.integration
 def test_liftover_38_from_37(test_input: str, expected: str | None):
     assert expected == liftover_38_from_37(test_input)
 
