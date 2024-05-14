@@ -33,6 +33,7 @@ dependencies = [
     "matplotlib==3.7.1",
     "ecos==2.0.13",
     "cvxpy==1.5.0",
+    "openpyxl==3.1.2",
 ]
 
 [tool.maturin]
