@@ -52,6 +52,7 @@ jobs:
           python --version
           ls -la dist
 
+          pip install git+https://github.com/SomaLogic/canopy.git#egg=canopy
           pip install bystro --verbose --find-links dist --force-reinstall
           bystro-api --help
 
@@ -92,6 +93,7 @@ jobs:
           python --version
           ls -la dist
 
+          pip install git+https://github.com/SomaLogic/canopy.git#egg=canopy
           pip install bystro --verbose --find-links dist --force-reinstall
           bystro-api --help
 
@@ -129,6 +131,7 @@ jobs:
           python --version
           ls -la dist
 
+          pip install git+https://github.com/SomaLogic/canopy.git#egg=canopy
           pip install bystro --verbose --find-links dist --force-reinstall
           bystro-api --help
 
