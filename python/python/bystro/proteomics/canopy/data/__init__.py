@@ -1,0 +1,1 @@
+from .lift import getSomaScanLiftCCC

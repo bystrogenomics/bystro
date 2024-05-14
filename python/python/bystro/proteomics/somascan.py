@@ -1,6 +1,6 @@
 """Load and prep fragpipe tandem mass Tag datasets."""
 
-import canopy  # type: ignore
+import bystro.proteomics.canopy as canopy  # type: ignore
 
 from msgspec import Struct
 

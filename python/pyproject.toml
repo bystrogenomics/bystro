@@ -10,7 +10,7 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-version = "1.0.3"
+version = "2.0.0-beta10"
 dependencies = [
     "attrs==23.1.0",
     "boto3==1.28.9",
@@ -31,7 +31,6 @@ dependencies = [
     "torch==2.2",
     "psutil==5.9.6",
     "matplotlib==3.7.1",
-    "canopy@git+https://github.com/bystrogenomics/canopy.git@f6d3031494a692db040492fa1dead5faf19fef5a",
     "ecos==2.0.13",
     "cvxpy==1.5.0",
 ]
