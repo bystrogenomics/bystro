@@ -21,9 +21,11 @@ Methods
 -------
 None
 """
+
+from typing import List, Optional, Union
+
 import numpy as np
 import numpy.linalg as la
-from typing import List, Optional, Union
 
 from bystro.covariance._covariance_np import (
     EmpiricalCovariance,
@@ -76,9 +78,7 @@ class MeanAdaptation:
         The number of features (covariates) in the datasets.
     """
 
-    def __init__(
-        self, prior_mu: bool = True, lamb: float = 0.1, weighted: bool = False
-    ) -> None:
+    def __init__(self, prior_mu: bool = True, lamb: float = 0.1, weighted: bool = False) -> None:
         """
         Initializes the MeanAdaptation instance with the specified
         parameters
@@ -140,9 +140,7 @@ class MeanAdaptation:
         mu_avg = mu_avg / self.J
 
         if self.prior_mu:
-            self.mu_0 = mu_avg * (1 - self.lamb) + self.lamb * np.zeros(
-                X_list[0].shape[1]
-            )
+            self.mu_0 = mu_avg * (1 - self.lamb) + self.lamb * np.zeros(X_list[0].shape[1])
         else:
             self.mu_0 = mu_avg
         return self
@@ -346,9 +344,7 @@ class RotationAdaptation:
         """
         if j is None:
             X_dm = X - np.mean(X, axis=0)
-            model_cov = _select_covariance_estimator(
-                self.projection_regularization
-            )
+            model_cov = _select_covariance_estimator(self.projection_regularization)
             model_cov.fit(X_dm)
             Sigma = model_cov.covariance
             L = la.cholesky(Sigma)
