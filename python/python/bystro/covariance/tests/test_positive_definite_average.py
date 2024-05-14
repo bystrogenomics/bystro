@@ -134,7 +134,7 @@ def test_median_riemann():
             [0.10328062, 0.0447306, 1.14538742],
         ]
     )
-    np.testing.assert_array_almost_equal(result, expected_result, decimal=1)
+    np.testing.assert_array_almost_equal(result, expected_result, decimal=6)
 
     rng = np.random.default_rng(2021)
     X = rng.normal(size=(50, 3, 3))
@@ -153,7 +153,7 @@ def test_median_riemann():
             [0.00918335, 0.00601193, 1.19651782],
         ]
     )
-    np.testing.assert_array_almost_equal(result, expected_result, decimal=1)
+    np.testing.assert_array_almost_equal(result, expected_result, decimal=6)
 
     rng = np.random.default_rng(2021)
     X = rng.normal(size=(5, 3, 3))
@@ -171,4 +171,4 @@ def test_median_riemann():
             [-0.20124625, -0.74517954, 2.21098985],
         ]
     )
-    np.testing.assert_array_almost_equal(result, expected_result, decimal=0)
+    np.testing.assert_array_almost_equal(result, expected_result, decimal=5)

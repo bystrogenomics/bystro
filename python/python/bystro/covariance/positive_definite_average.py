@@ -22,12 +22,42 @@ Reference:
   2007.
 
 All matrices are assumed to be provided as numpy arrays.
+
+LICENSE FROM pyRiemann
+
+https://github.com/pyRiemann/pyRiemann/blob/master/LICENSE
+
+Copyright (c) 2015-2024, authors of pyRiemann
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of the copyright holder nor the names of its
+      contributors may be used to endorse or promote products derived from
+      this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 import numpy as np
 from numpy import ndarray
-from scipy.linalg import logm, expm, fractional_matrix_power  # type: ignore
+from scipy.linalg import sqrtm, logm, expm, fractional_matrix_power, eigvalsh  # type: ignore
 from typing import List, Optional
+import warnings
 
 
 def is_positive_definite(matrix: np.ndarray) -> bool:
@@ -212,7 +242,7 @@ def median_euclid(
         )
 
     for _ in range(maxiter):
-        distances = np.linalg.norm(X - M, axis=(1, 2))
+        distances = np.linalg.norm(X - M, ord="fro", axis=(1, 2))
 
         adjusted_distances = np.maximum(distances, tol)
         weight_factors = weights / adjusted_distances
@@ -224,7 +254,7 @@ def median_euclid(
 
         M = M_new
 
-    return M
+    return M_new
 
 
 def median_riemann(
@@ -264,13 +294,20 @@ def median_riemann(
         The estimated Riemannian median of the input matrices.
 
     Raises
+
     ------
     ValueError
         If any matrix in X is not positive definite.
+        If step size is not within (0,2]
     """
     n_matrices, n, _ = X.shape
     if any(not is_positive_definite(C) for C in X):
         raise ValueError("All matrices must be positive definite.")
+    if not 0 < step_size <= 2:
+        raise ValueError(
+            f"Value step_size must be included in (0, 2] (Got {step_size})"
+        )
+    n_matrices, _, _ = X.shape
     weights = np.ones(n_matrices) if weights is None else np.array(weights)
 
     if init is not None:
@@ -282,27 +319,26 @@ def median_riemann(
         )
 
     for _ in range(maxiter):
-        V = np.zeros((n, n))
-        total_weighted_distance = 0
+        dists = np.sqrt(
+            (np.log(np.array([eigvalsh(a, M) for a in X])) ** 2).sum(axis=-1)
+        )
+        is_zero = dists == 0
+        w = weights[~is_zero] / dists[~is_zero]
 
-        for i in range(n_matrices):
-            logM_Xi = np.linalg.inv(M) @ logm(X[i])
-            distance = np.linalg.norm(logM_Xi)
-            if distance > 0:
-                V += weights[i] * logM_Xi / distance
-                total_weighted_distance += weights[i] / distance
+        M12 = sqrtm(M)
+        Mm12 = np.linalg.inv(M12)
+        tangvecs = np.array([logm(Mm12 @ m @ Mm12) for m in X[~is_zero]])
 
-        if total_weighted_distance > 0:
-            V /= total_weighted_distance
+        J = np.einsum("a,abc->bc", w / np.sum(w), tangvecs)
+        M = M12 @ expm(step_size * J) @ M12
 
-        M_new = expm(M @ (step_size * V))
-
-        if np.linalg.norm(M - M_new) < tol:
+        crit = np.linalg.norm(J, ord="fro")
+        if crit <= tol:
             break
+    else:
+        warnings.warn("Convergence not reached")
 
-        M = M_new
-
-    return M_new
+    return M
 
 
 """
