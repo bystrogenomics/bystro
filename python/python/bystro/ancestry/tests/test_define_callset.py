@@ -19,7 +19,7 @@ from bystro.ancestry.define_callset import (
     ],
 )
 
-@pytest.mark.integration
+@pytest.mark.skip(reason="UCSC liftover service may be down.")
 def test_liftover_38_from_37(test_input: str, expected: str | None):
     assert expected == liftover_38_from_37(test_input)
 
