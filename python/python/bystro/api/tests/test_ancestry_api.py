@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from msgspec import json
+import pytest
 
 from bystro.ancestry.listener import (
     AncestryJobData,
@@ -16,6 +17,7 @@ from bystro.ancestry.tests.test_inference import (
 from bystro.api.ancestry import calculate_ancestry_scores
 
 
+@pytest.mark.integration("requires bystro-vcf to be installed")
 def test_calculate_ancestry_scores_happy_path(mocker, tmpdir):
     mocker.patch(
         "bystro.ancestry.model.get_models_from_s3",
