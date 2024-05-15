@@ -82,7 +82,6 @@ def test_infer_ancestry():
     assert len(samples) == len(ancestry_response.results)
 
 
-@pytest.mark.integration()
 def test_infer_ancestry_from_model():
     ancestry_models = get_models_from_s3("hg38")
 
