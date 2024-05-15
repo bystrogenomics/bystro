@@ -29,7 +29,6 @@ The Bystro Python package also gives the ability to launch workers to process jo
 To install the Bystro Python package, run:
 
 ```sh
-pip install git+https://github.com/SomaLogic/canopy.git#egg=canopy
 pip install bystro
 ```
 
