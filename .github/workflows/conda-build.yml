@@ -21,6 +21,7 @@ jobs:
       - name: Install Bystro using Maturin
         run: |
           . .initialize_conda_env.sh
+          pip install git+https://github.com/SomaLogic/canopy.git#egg=canopy
           make install
           echo "PATH=$CONDA/bin:$PATH" >> $GITHUB_ENV
         shell: bash
