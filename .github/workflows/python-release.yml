@@ -58,7 +58,7 @@ jobs:
 
           go install github.com/bystrogenomics/bystro-vcf@2.2.2
 
-          pip install bystro --verbose --find-links dist --force-reinstall
+          pip install --no-index --find-links dist bystro --verbose --force-reinstall
           bystro-api --help
 
           pip install pytest
@@ -98,7 +98,7 @@ jobs:
           python --version
           ls -la dist
 
-          pip install bystro --verbose --find-links dist --force-reinstall
+          pip install --no-index --find-links dist bystro --verbose --force-reinstall
           bystro-api --help
 
   macos:
@@ -141,8 +141,8 @@ jobs:
 
           go install github.com/bystrogenomics/bystro-vcf@2.2.2
 
-          pip install bystro --verbose --find-links dist --force-reinstall
-          bystro-api --help
+          pip install --no-index --find-links dist bystro --verbose --force-reinstall
+          bystro-api --help 
 
           pip install pytest
           ray start --head
