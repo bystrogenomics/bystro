@@ -34,6 +34,7 @@ dependencies = [
     "matplotlib==3.7.1",
     "ecos==2.0.13",
     "cvxpy==1.5.0",
+    "somadata==1.0.0",
 ]
 
 [tool.maturin]
