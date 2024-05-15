@@ -29,7 +29,6 @@ Bystro consists of 2 main components:
 To install the Bystro Python package, run:
 
 ```sh
-pip install git+https://github.com/SomaLogic/canopy.git#egg=canopy
 pip install bystro
 ```
 

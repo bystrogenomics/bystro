@@ -26,6 +26,7 @@ jobs:
         platform:
           - runner: ubuntu-latest
             target: x86_64
+            local_name: x86_64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -58,8 +59,18 @@ jobs:
 
           go install github.com/bystrogenomics/bystro-vcf@2.2.2
 
-          pip install git+https://github.com/SomaLogic/canopy.git#egg=canopy
-          pip install bystro --verbose --find-links dist --force-reinstall
+          PYTHON_VERSION=$(python -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
+          ARCHITECTURE=${{ matrix.platform.local_name }}
+
+          echo "PYTHON_VERSION: $PYTHON_VERSION"
+          echo "ARCHITECTURE: $ARCHITECTURE"
+
+          WHEEL_FILE=$(find dist -name "*${PYTHON_VERSION}*${ARCHITECTURE}*.whl" | head -n 1)
+
+          echo "WHEEL_FILE: $WHEEL_FILE"
+
+          pip install $WHEEL_FILE --verbose --force-reinstall
+
           bystro-api --help
 
           pip install pytest
@@ -73,6 +84,7 @@ jobs:
         platform:
           - runner: windows-latest
             target: x64
+            local_name: amd64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -99,8 +111,18 @@ jobs:
           python --version
           ls -la dist
 
-          pip install git+https://github.com/SomaLogic/canopy.git#egg=canopy
-          pip install bystro --verbose --find-links dist --force-reinstall
+          PYTHON_VERSION=$(python -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
+          ARCHITECTURE=${{ matrix.platform.local_name }}
+
+          echo "PYTHON_VERSION: $PYTHON_VERSION"
+          echo "ARCHITECTURE: $ARCHITECTURE"
+
+          WHEEL_FILE=$(find dist -name "*${PYTHON_VERSION}*${ARCHITECTURE}*.whl" | head -n 1)
+
+          echo "WHEEL_FILE: $WHEEL_FILE"
+
+          pip install $WHEEL_FILE --verbose --force-reinstall
+
           bystro-api --help
 
   macos:
@@ -110,8 +132,10 @@ jobs:
         platform:
           - runner: macos-12
             target: x86_64
+            local_name: x86_64
           - runner: macos-14
             target: aarch64
+            local_name: arm64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -143,9 +167,19 @@ jobs:
 
           go install github.com/bystrogenomics/bystro-vcf@2.2.2
 
-          pip install git+https://github.com/SomaLogic/canopy.git#egg=canopy
-          pip install bystro --verbose --find-links dist --force-reinstall
-          bystro-api --help
+          PYTHON_VERSION=$(python -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
+          ARCHITECTURE=${{ matrix.platform.local_name }}
+
+          echo "PYTHON_VERSION: $PYTHON_VERSION"
+          echo "ARCHITECTURE: $ARCHITECTURE"
+
+          WHEEL_FILE=$(find dist -name "*${PYTHON_VERSION}*${ARCHITECTURE}*.whl" | head -n 1)
+
+          echo "WHEEL_FILE: $WHEEL_FILE"
+
+          pip install $WHEEL_FILE --verbose --force-reinstall
+
+          bystro-api --help 
 
           pip install pytest
           ray start --head
