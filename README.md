@@ -29,7 +29,15 @@ The Bystro Python package also gives the ability to launch workers to process jo
 To install the Bystro Python package, run:
 
 ```sh
+pip install git+https://github.com/SomaLogic/canopy.git#egg=canopy
 pip install bystro
+```
+
+The Bystro ancestry CLI `score` tool (`bystro-api ancestry score`) parses VCF files to generate dosage matrices. This requires `bystro-vcf`, a Go program which can be installed with:
+
+```sh
+# Requires Go: install from https://golang.org/doc/install
+go install github.com/bystrogenomics/bystro-vcf@2.2.2
 ```
 
 Bystro is compatible with Linux and MacOS. Windows support is experimental. If you are installing on MacOS as a native binary (Arm), you will need to install the following additional dependencies:

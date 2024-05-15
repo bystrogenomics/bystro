@@ -6,3 +6,5 @@
 # Explicitly declare Feather files as binary to avoid CRLF to LF issues
 
 *.feather binary
+
+*.zip binary

@@ -29,11 +29,12 @@ jobs:
           source ~/.venv/ci-venv/bin/activate
           python -m pip install --upgrade pip
           pip install -r python/requirements-dev.txt
+          pip install git+https://github.com/SomaLogic/canopy.git#egg=canopy
           make develop
       - name: Linting with ruff
         run: |
           source ~/.venv/ci-venv/bin/activate
-          ruff $(git ls-files '*.py')
+          cd python && ruff $(git ls-files '*.py')
       - name: Static analysis with mypy
         run: |
           source ~/.venv/ci-venv/bin/activate

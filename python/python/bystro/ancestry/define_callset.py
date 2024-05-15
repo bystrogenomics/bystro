@@ -12,7 +12,6 @@ from bystro.ancestry.train import DATA_DIR, INTERMEDIATE_DATA_DIR
 from bystro.ancestry.train_utils import is_autosomal_variant
 
 logger = logging.getLogger(__name__)
-converter = get_lifter("hg19", "hg38")
 
 ILLUMINA_FILEPATH = DATA_DIR / "Human660W-Quad_v1_H.csv"
 AFFYMETRIX_FILEPATH = DATA_DIR / "Axiom_PMRA.na35.annot.csv"
@@ -30,6 +29,7 @@ def liftover_38_from_37(variant: str) -> str | None:
     """Liftover a variant to genome build 38 from 37."""
     chrom, pos, ref, alt = variant.split(":")
     # liftover doesn't deal gracefully with MT variants, but we don't need them anyway
+    converter = get_lifter("hg19", "hg38")
     locations = converter[chrom][int(pos)]
     if locations is None or len(locations) != 1:
         logger.debug("Variant %s had a non-unique location, couldn't lift over", variant)
