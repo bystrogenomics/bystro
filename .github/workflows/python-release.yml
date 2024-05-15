@@ -62,8 +62,13 @@ jobs:
           PYTHON_VERSION=$(python -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
           ARCHITECTURE=${{ matrix.platform.target }}
 
+          echo "PYTHON_VERSION: $PYTHON_VERSION"
+          echo "ARCHITECTURE: $ARCHITECTURE"
+
           # Find the correct wheel
           WHEEL_FILE=$(ls dist | grep ${PYTHON_VERSION} | grep ${ARCHITECTURE})
+
+          echo "WHEEL_FILE: $WHEEL_FILE"
 
           # Install the matching wheel
           pip install dist/$WHEEL_FILE --verbose --force-reinstall
@@ -111,8 +116,13 @@ jobs:
           PYTHON_VERSION=$(python -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
           ARCHITECTURE=${{ matrix.platform.target }}
 
+          echo "PYTHON_VERSION: $PYTHON_VERSION"
+          echo "ARCHITECTURE: $ARCHITECTURE"
+
           # Find the correct wheel
           WHEEL_FILE=$(ls dist | grep ${PYTHON_VERSION} | grep ${ARCHITECTURE})
+
+          echo "WHEEL_FILE: $WHEEL_FILE"
 
           # Install the matching wheel
           pip install dist/$WHEEL_FILE --verbose --force-reinstall
@@ -163,8 +173,13 @@ jobs:
           PYTHON_VERSION=$(python -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
           ARCHITECTURE=${{ matrix.platform.target }}
 
+          echo "PYTHON_VERSION: $PYTHON_VERSION"
+          echo "ARCHITECTURE: $ARCHITECTURE"
+
           # Find the correct wheel
           WHEEL_FILE=$(ls dist | grep ${PYTHON_VERSION} | grep ${ARCHITECTURE})
+
+          echo "WHEEL_FILE: $WHEEL_FILE"
 
           # Install the matching wheel
           pip install dist/$WHEEL_FILE --verbose --force-reinstall

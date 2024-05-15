@@ -27,7 +27,10 @@ class SomascanDataset(Struct):
     def __post_init__(self) -> None:
         if not isinstance(self.adat, somadata.Adat):
             raise ValueError(
-                f"`adat` argument to SomascanDataset must be a somadata.Adat object, not {type(self.adat)}"
+                (
+                    "`adat` argument to SomascanDataset must be a "
+                    f"somadata.Adat object, not {type(self.adat)}"
+                )
             )
 
         if self.annotations and not isinstance(self.annotations, somadata.Annotations):
