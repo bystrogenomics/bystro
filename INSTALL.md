@@ -29,7 +29,7 @@ Bystro consists of 2 main components:
 To install the Bystro Python package, run:
 
 ```sh
-pip install bystro
+pip install --pre bystro
 ```
 
 The Bystro ancestry CLI `score` tool (`bystro-api ancestry score`) parses VCF files to generate dosage matrices. This requires `bystro-vcf`, a Go program which can be installed with:

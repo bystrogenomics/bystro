@@ -29,7 +29,7 @@ The Bystro Python package also gives the ability to launch workers to process jo
 To install the Bystro Python package, run:
 
 ```sh
-pip install bystro
+pip install --pre bystro
 ```
 
 The Bystro ancestry CLI `score` tool (`bystro-api ancestry score`) parses VCF files to generate dosage matrices. This requires `bystro-vcf`, a Go program which can be installed with:
