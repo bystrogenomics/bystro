@@ -23,18 +23,6 @@ HOMOZYGOTE_DOSAGE = 2
 MISSING_GENO_DOSAGE = np.nan
 ONE_DAY = "1d"  # default keep_alive time for opensearch point in time index
 
-# The fields to return for each variant matched by the query
-OUTPUT_FIELDS = [
-    "chrom",
-    "pos",
-    "ref",
-    "alt",
-    "refSeq.name2",
-    "homozygotes",
-    "heterozygotes",
-    "missingGenos",
-]
-
 
 class OpenSearchQueryConfig(Struct):
     """Represent parameters for configuring OpenSearch queries."""
