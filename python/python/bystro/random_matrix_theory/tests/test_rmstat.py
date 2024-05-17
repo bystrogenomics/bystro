@@ -91,7 +91,7 @@ def test_p_wishart_max():
 
 
 def test_q_wishart_spike():
-    print(q_wishart_spike(.4,8,ndf=3,pdim=2))
+    print(q_wishart_spike(0.4, 8, ndf=3, pdim=2))
 
 
 def test_d_wishart_spike():
@@ -102,4 +102,3 @@ def test_d_wishart_spike():
 def test_p_wishart_spike():
     assert np.abs(p_wishart_spike(-1.9, 10.0, ndf=1, pdim=3) - 0.1451744) < 1e-4
     assert np.abs(p_wishart_spike(0.8, 10.0, ndf=1, pdim=3) - 0.1891236) < 1e-4
-

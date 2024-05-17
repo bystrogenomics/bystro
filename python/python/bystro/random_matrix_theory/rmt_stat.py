@@ -1,8 +1,8 @@
 import numpy as np
-from scipy.stats import uniform # type: ignore 
-from scipy.stats import norm # type: ignore 
-from scipy.optimize import root_scalar # type: ignore 
-from scipy.integrate import quad # type: ignore 
+from scipy.stats import uniform  # type: ignore
+from scipy.stats import norm  # type: ignore
+from scipy.optimize import root_scalar  # type: ignore
+from scipy.integrate import quad  # type: ignore
 import warnings
 from bystro.random_matrix_theory.tracy_widom import TracyWidom
 
@@ -184,7 +184,7 @@ def rmp(n, ndf=None, pdim=None, var=1, svr=None):
 
 
 def dtw(x, beta=1, log_p=False):
-    if beta not in [1, 2, 4 ]:
+    if beta not in [1, 2, 4]:
         raise ValueError("'beta' must be '1', '2', or '4'.")
     mod = TracyWidom(beta=beta)
     if log_p:
@@ -193,7 +193,7 @@ def dtw(x, beta=1, log_p=False):
 
 
 def ptw(q, beta=1, lower_tail=True, log_p=False):
-    if beta not in [1, 2, 4 ]:
+    if beta not in [1, 2, 4]:
         raise ValueError("'beta' must be '1', '2', or '4'.")
     mod = TracyWidom(beta=beta)
 
@@ -205,7 +205,7 @@ def ptw(q, beta=1, lower_tail=True, log_p=False):
 
 
 def qtw(p, beta=1, lower_tail=True, log_p=False):
-    if beta not in [1, 2, 4 ]:
+    if beta not in [1, 2, 4]:
         raise ValueError("'beta' must be '1', '2', or '4'.")
     mod = TracyWidom(beta=beta)
     if log_p:
