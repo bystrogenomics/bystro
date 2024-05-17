@@ -1,7 +1,7 @@
 """
-LICENSE FROM CovShrinkage
+LICENSE FROM pyRiemann
 
-https://github.com/pald22/covShrinkage/blob/main/LICENSE
+https://github.com/pyRiemann/pyRiemann/blob/master/LICENSE
 
 Copyright (c) 2015-2024, authors of pyRiemann
 All rights reserved.
