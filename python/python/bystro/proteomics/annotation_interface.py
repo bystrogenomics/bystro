@@ -6,7 +6,6 @@ from typing import Any, Callable
 
 from msgspec import Struct
 import numpy as np
-from numpy.typing import NDArray
 
 import pandas as pd
 from opensearchpy import OpenSearch
@@ -70,15 +69,17 @@ def _get_nested_field(data, field_path):
 def _get_samples_genes_dosages_from_hit(
     hit: dict[str, any], additional_fields: list[str] = ["refSeq.name"]
 ) -> pd.DataFrame:
-    """Given a document hit, return a dataframe of samples, genes and dosages with specified additional fields."""
+    """Given a document hit, return a dataframe of samples,
+       genes and dosages with specified additional fields.
+    """
     source = hit["_source"]
     # Base required fields
     chrom = _flatten(source["chrom"])[0]
 
     pos = _flatten(source["pos"])[0]
     _id = _flatten(source["id"])[0]
-    vcfPos = _flatten(source["vcfPos"])[0]
-    inputRef = _flatten(source["inputRef"])[0]
+    vcf_pos = _flatten(source["vcfPos"])[0]
+    input_ref = _flatten(source["inputRef"])[0]
     ref = _flatten(source["ref"])[0]
     alt = _flatten(source["alt"])[0]
     gene_names = _flatten(
@@ -89,8 +90,8 @@ def _get_samples_genes_dosages_from_hit(
     is_canonical = [
         x == "true" or x is True if x else False for x in _flatten(source["refSeq"].get("isCanonical"))
     ]
-    gnomad_genomes_af = _flatten(_get_nested_field(source,"gnomad.genomes.AF"))[0]
-    gnomad_exomes_af = _flatten(_get_nested_field(source,"gnomad.exomes.AF"))[0]
+    gnomad_genomes_af = _flatten(_get_nested_field(source, "gnomad.genomes.AF"))[0]
+    gnomad_exomes_af = _flatten(_get_nested_field(source, "gnomad.exomes.AF"))[0]
 
     if len(is_canonical) != len(transcript_names):
         is_canonical = [is_canonical[0]] * len(transcript_names)
@@ -148,11 +149,11 @@ def _get_samples_genes_dosages_from_hit(
                 row = {
                     "sample_id": sample_id,
                     "chrom": chrom,
-                    "vcfPos": vcfPos,
+                    "vcf_pos": vcf_pos,
                     "pos": pos,
                     "id": _id,
                     "ref": ref,
-                    "inputRef": inputRef,
+                    "input_ref": input_ref,
                     "alt": alt,
                     "gene_name": gene_name,
                     "transcript_name": transcript_names[gene_idx],
