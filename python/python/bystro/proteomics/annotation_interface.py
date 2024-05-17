@@ -1,10 +1,13 @@
 """Query an annotation file and return a list of sample_ids and genes meeting the query criteria."""
+
 import logging
 import math
 from typing import Any, Callable
 
 from msgspec import Struct
 import numpy as np
+from numpy.typing import NDArray
+
 import pandas as pd
 from opensearchpy import OpenSearch
 
@@ -52,81 +55,168 @@ def _extract_samples(samples):
     return [sample[0] for sample in samples]
 
 
-def _get_samples_genes_dosages_from_hit(hit: dict[str, Any]) -> pd.DataFrame:
-    """Given a document hit, return a dataframe of samples, genes and dosages."""
+def _get_nested_field(data, field_path):
+    """Recursively fetch nested field values using dot notation."""
+    keys = field_path.split(".")
+    value = data
+    for key in keys:
+        try:
+            value = value[key]
+        except (KeyError, TypeError):
+            return None  # Returns None if the field path is not found
+    return value
+
+
+def _get_samples_genes_dosages_from_hit(
+    hit: dict[str, any], additional_fields: list[str] = ["refSeq.name"]
+) -> pd.DataFrame:
+    """Given a document hit, return a dataframe of samples, genes and dosages with specified additional fields."""
     source = hit["_source"]
+    # Base required fields
     chrom = _flatten(source["chrom"])[0]
+
     pos = _flatten(source["pos"])[0]
+    _id = _flatten(source["id"])[0]
+    vcfPos = _flatten(source["vcfPos"])[0]
+    inputRef = _flatten(source["inputRef"])[0]
     ref = _flatten(source["ref"])[0]
     alt = _flatten(source["alt"])[0]
-    unique_gene_names = set(_flatten(source["refSeq"]["name2"]))
-    # homozygotes, heterozygotes may not be present in response, so
-    # represent them as empty lists if not.
+    gene_names = _flatten(
+        source["refSeq"]["name2"]
+    )  # guaranteed to be unique or to belong to different transcripts
+    transcript_names = _flatten(source["refSeq"]["name"])
+    protein_names = _flatten(source["refSeq"]["protAcc"])
+    is_canonical = [
+        x == "true" or x is True if x else False for x in _flatten(source["refSeq"].get("isCanonical"))
+    ]
+    gnomad_genomes_af = _flatten(_get_nested_field(source,"gnomad.genomes.AF"))[0]
+    gnomad_exomes_af = _flatten(_get_nested_field(source,"gnomad.exomes.AF"))[0]
+
+    if len(is_canonical) != len(transcript_names):
+        is_canonical = [is_canonical[0]] * len(transcript_names)
+
+    if len(protein_names) != len(transcript_names):
+        protein_names = [protein_names[0]] * len(transcript_names)
+
+    if len(gene_names) != len(transcript_names):
+        gene_names = [gene_names[0]] * len(transcript_names)
 
     heterozygotes = _flatten(source.get("heterozygotes", []))
     homozygotes = _flatten(source.get("homozygotes", []))
     missing_genos = _flatten(source.get("missingGenos", []))
+
+    heterozygosity = _flatten(source["heterozygosity"])[0]
+    homozygosity = _flatten(source["homozygosity"])[0]
+    missingness = _flatten(source["missingness"])[0]
+
+    fields_to_add = list(
+        filter(
+            lambda x: x
+            not in [
+                "chrom",
+                "pos",
+                "id",
+                "vcfPos",
+                "inputRef",
+                "ref",
+                "alt",
+                "refSeq.name2",
+                "refSeq.name",
+                "refSeq.protAcc",
+                "refSeq.isCanonical",
+                "heterozygotes",
+                "homozygotes",
+                "missingGenos",
+                "heterozygosity",
+                "homozygosity",
+                "missingness",
+                "gnomad.genomes.AF",
+                "gnomad.exomes.AF",
+            ],
+            additional_fields,
+        )
+    )
+
     rows = []
-    for gene_name in unique_gene_names:
-        for heterozygote in heterozygotes:
-            rows.append(
-                {
-                    "sample_id": heterozygote,
+    for gene_idx, gene_name in enumerate(gene_names):
+        for sample_list, dosage_label in [
+            (heterozygotes, 1),
+            (homozygotes, 2),
+            (missing_genos, -1),
+        ]:
+            for sample_id in sample_list:
+                row = {
+                    "sample_id": sample_id,
                     "chrom": chrom,
+                    "vcfPos": vcfPos,
                     "pos": pos,
+                    "id": _id,
                     "ref": ref,
+                    "inputRef": inputRef,
                     "alt": alt,
                     "gene_name": gene_name,
-                    "dosage": HETEROZYGOTE_DOSAGE,
+                    "transcript_name": transcript_names[gene_idx],
+                    "protein_name": protein_names[gene_idx],
+                    "is_canonical": is_canonical[gene_idx],
+                    "dosage": dosage_label,
+                    "heterozygosity": heterozygosity,
+                    "homozygosity": homozygosity,
+                    "missingness": missingness,
+                    "gnomad_genomes_af": gnomad_genomes_af,
+                    "gnomad_exomes_af": gnomad_exomes_af,
                 }
-            )
-        for homozygote in homozygotes:
-            rows.append(
-                {
-                    "sample_id": homozygote,
-                    "chrom": chrom,
-                    "pos": pos,
-                    "ref": ref,
-                    "alt": alt,
-                    "gene_name": gene_name,
-                    "dosage": HOMOZYGOTE_DOSAGE,
-                }
-            )
-        for missing_geno in missing_genos:
-            rows.append(
-                {
-                    "sample_id": missing_geno,
-                    "chrom": chrom,
-                    "pos": pos,
-                    "ref": ref,
-                    "alt": alt,
-                    "gene_name": gene_name,
-                    "dosage": MISSING_GENO_DOSAGE,
-                }
-            )
+                # Add additional fields
+                for field in fields_to_add:
+                    row[field] = _get_nested_field(source, field)
+
+                    if row[field] is not None:
+                        row[field] = _flatten(row[field])
+
+                        if len(row[field]) == 1:
+                            row[field] = row[field][0]
+                        else:
+                            row[field] = tuple(row[field])
+                rows.append(row)
 
     return pd.DataFrame(rows)
 
 
-def _execute_query(
-    client: OpenSearch,
-    query_args: dict,
-) -> pd.DataFrame:
-    """Process OpenSearch query and return results."""
-    resp = client.search(**query_args)
-    return _process_response(resp)
+def _execute_query(client, query: dict, additional_fields: list[str]) -> pd.DataFrame:
+    results: list[dict] = []
+    search_after = None  # Initialize search_after for pagination
+
+    # Ensure there is a sort parameter in the query
+    if "sort" not in query.get("body", {}):
+        query.setdefault("body", {}).update(
+            {"sort": [{"_id": "asc"}]}  # Sorting by ID in ascending order
+        )
+
+    while True:
+        if search_after:
+            query["body"]["search_after"] = search_after
+
+        resp = client.search(**query)
+
+        if not resp["hits"]["hits"]:
+            break  # Exit the loop if no more documents are found
+
+        results.extend(resp["hits"]["hits"])
+
+        # Update search_after to the sort value of the last document retrieved
+        search_after = resp["hits"]["hits"][-1]["sort"]
+
+    return _process_response(results, additional_fields)
 
 
-def _process_response(resp: dict[str, Any]) -> pd.DataFrame:
+def _process_response(hits: list[dict[str, Any]], additional_fields: list[str]) -> pd.DataFrame:
     """Postprocess query response from opensearch client."""
-    num_hits = len(resp["hits"]["hits"])
-    total_value = resp["hits"]["total"]["value"]
-    if num_hits != total_value:
-        err_msg = f"Number of hits: {num_hits} didn't equal total value: {total_value}. This is a bug."
-        raise ValueError(err_msg)
+    num_hits = len(hits)
+
+    if num_hits == 0:
+        return pd.DataFrame()
 
     samples_genes_dosages_df = pd.concat(
-        [_get_samples_genes_dosages_from_hit(hit) for hit in resp["hits"]["hits"]]
+        [_get_samples_genes_dosages_from_hit(hit, additional_fields) for hit in hits]
     )
     # we may have multiple variants per gene in the results, so we
     # need to drop duplicates here.
@@ -161,6 +251,7 @@ def _run_annotation_query(
     query: dict[str, Any],
     index_name: str,
     client: OpenSearch,
+    additional_fields: list[str] = [],
 ) -> pd.DataFrame:
     """Given query and index contained in SaveJobData, run query and return results as dataframe."""
     num_slices, _ = _get_num_slices(client, index_name, query)
@@ -177,10 +268,7 @@ def _run_annotation_query(
             if num_slices > 1:
                 # Slice queries require max > 1
                 slice_query["slice"] = {"id": slice_id, "max": num_slices}
-            query_result = _execute_query(
-                client,
-                query_args=query,
-            )
+            query_result = _execute_query(client, query=query, additional_fields=additional_fields)
             query_results.append(query_result)
     except Exception as e:
         err_msg = (
@@ -194,10 +282,24 @@ def _run_annotation_query(
         client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore[attr-defined]
         raise
     client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore[attr-defined]
+    print("query_results", query_results)
     return pd.concat(query_results)
 
 
-def _build_opensearch_query_from_query_string(query_string: str) -> dict[str, Any]:
+def get_annotation_result_from_query(
+    user_query_string: str,
+    index_name: str,
+    client: OpenSearch,
+    additional_fields: list[str] = [],
+) -> pd.DataFrame:
+    """Given a query and index, return a dataframe of variant / sample_id records matching query."""
+    query = _build_opensearch_query_from_query_string(user_query_string)
+    return _run_annotation_query(query, index_name, client, additional_fields)
+
+
+def _build_opensearch_query_from_query_string(
+    query_string: str, output_fields: list[str] | None = None
+) -> dict[str, Any]:
     base_query = {
         "body": {
             "query": {
@@ -214,20 +316,13 @@ def _build_opensearch_query_from_query_string(query_string: str) -> dict[str, An
                 },
             },
             "sort": "_doc",
-        },
-        "_source_includes": OUTPUT_FIELDS,
+        }
     }
+
+    if output_fields is not None:
+        base_query["_source_includes"] = output_fields
+
     return base_query
-
-
-def get_annotation_result_from_query(
-    user_query_string: str,
-    index_name: str,
-    client: OpenSearch,
-) -> pd.DataFrame:
-    """Given a query and index, return a dataframe of variant / sample_id records matching query."""
-    query = _build_opensearch_query_from_query_string(user_query_string)
-    return _run_annotation_query(query, index_name, client)
 
 
 def join_annotation_result_to_proteomics_dataset(
