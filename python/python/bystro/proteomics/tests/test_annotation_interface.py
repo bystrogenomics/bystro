@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Any
 
 import msgspec
 import numpy as np
@@ -10,6 +9,7 @@ from bystro.proteomics.annotation_interface import (
     join_annotation_result_to_proteomics_dataset,
     get_annotation_result_from_query,
 )
+
 from bystro.proteomics.fragpipe_tandem_mass_tag import (
     ABUNDANCE_COLS,
     TandemMassTagDataset,
@@ -21,13 +21,11 @@ with TEST_RESPONSE_FILENAME.open("rb") as f:
     TEST_RESPONSE = msgspec.msgpack.decode(f.read())  # noqa: S301 (data is safe)
 
 
-class MockOpenSearch:
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        del args, kwargs
+class MockAsyncOpenSearch:
+    def __init__(self):
         self.has_sent_hits = False
 
-    def search(self, *args, **kwargs) -> dict:
-        del args, kwargs
+    async def search(self, *_args, **_kw_args) -> dict:
         if not self.has_sent_hits:
             self.has_sent_hits = True
             return TEST_RESPONSE
@@ -37,26 +35,38 @@ class MockOpenSearch:
 
         return response
 
-    def count(*args, **kwargs) -> dict:
-        del args, kwargs
+    async def count(self, *_args, **_kw_args) -> dict:
         return {"count": 1}
 
-    def create_point_in_time(*args, **kwargs) -> dict:
-        del args, kwargs
-        return {"pit_id": 12345}
+    async def create_point_in_time(self, *_args, **_kw_args) -> dict:
+        return {"pit_id": "12345"}
 
-    def delete_point_in_time(*args, **kwargs) -> None:
-        del args, kwargs
+    async def delete_point_in_time(self, *_args, **_kw_args) -> None:
+        return
+
+    async def close(self) -> None:
         return
 
 
-def test_get_annotation_results_from_query():
+def test_get_annotation_results_from_query(mocker):
+    mocker.patch(
+        "bystro.proteomics.annotation_interface.AsyncOpenSearch",
+        return_value=MockAsyncOpenSearch(),
+    )
     user_query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
     index_name = "mock_index_name"
 
-    mock_client = MockOpenSearch()
     samples_and_genes_df = get_annotation_result_from_query(
-        user_query_string, index_name, mock_client  # type: ignore
+        user_query_string,
+        index_name,
+        {
+            "connection": {
+                "nodes": ["http://localhost:9200"],
+                "request_timeout": 1200,
+                "use_ssl": False,
+                "verify_certs": False,
+            },
+        },
     )
     assert (4645, 18) == samples_and_genes_df.shape
 
@@ -75,13 +85,27 @@ def test_process_response():
     assert expected_dosage_values == actual_dosage_values
 
 
-def test_join_annotation_result_to_proteomics_dataset():
+def test_join_annotation_result_to_proteomics_dataset(mocker):
+    mocker.patch(
+        "bystro.proteomics.annotation_interface.AsyncOpenSearch",
+        return_value=MockAsyncOpenSearch(),
+    )
+
     # Step 1: Get an annotation query result
     user_query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
-    index_name = None
-    mock_client = MockOpenSearch()
+    index_name = "foo"
+
     query_result_df = get_annotation_result_from_query(
-        user_query_string, index_name, mock_client  # type: ignore
+        user_query_string,
+        index_name,
+        {
+            "connection": {
+                "nodes": ["http://localhost:9200"],
+                "request_timeout": 1200,
+                "use_ssl": False,
+                "verify_certs": False,
+            },
+        },
     )
 
     # Step 2: Construct a proteomics dataset with some shared sampled_ids and gene_names
