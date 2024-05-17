@@ -301,7 +301,7 @@ def get_annotation_result_from_query(
 def _build_opensearch_query_from_query_string(
     query_string: str, output_fields: list[str] | None = None
 ) -> dict[str, Any]:
-    base_query = {
+    base_query: dict[str, Any]= {
         "body": {
             "query": {
                 "bool": {
