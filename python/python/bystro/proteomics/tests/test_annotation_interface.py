@@ -22,13 +22,20 @@ with TEST_RESPONSE_FILENAME.open("rb") as f:
 
 
 class MockOpenSearch:
-    def __init__(*args: Any, **kwargs: Any) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         del args, kwargs
-        pass
+        self.has_sent_hits = False
 
-    def search(*args, **kwargs) -> dict:
+    def search(self, *args, **kwargs) -> dict:
         del args, kwargs
-        return TEST_RESPONSE
+        if not self.has_sent_hits:
+            self.has_sent_hits = True
+            return TEST_RESPONSE
+
+        response = TEST_RESPONSE.copy()
+        response["hits"] = {"hits": []}
+
+        return response
 
     def count(*args, **kwargs) -> dict:
         del args, kwargs
@@ -49,14 +56,15 @@ def test_get_annotation_results_from_query():
 
     mock_client = MockOpenSearch()
     samples_and_genes_df = get_annotation_result_from_query(
-        user_query_string, index_name, mock_client # type: ignore
+        user_query_string, index_name, mock_client  # type: ignore
     )
-    assert (1610, 7) == samples_and_genes_df.shape
+    assert (4645, 18) == samples_and_genes_df.shape
 
 
-def tests__process_response():
-    ans = _process_response(TEST_RESPONSE)
-    assert (1610, 7) == ans.shape
+def test_process_response():
+    ans = _process_response(TEST_RESPONSE["hits"]["hits"])
+
+    assert (4645, 18) == ans.shape
     assert {"1805", "1847", "4805"} == set(ans.sample_id.unique())
     assert 689 == len(ans.gene_name.unique())
     # it's awkward to test for equality of NaN objects, so fill them
@@ -99,6 +107,6 @@ def test_join_annotation_result_to_proteomics_dataset():
     joined_df = join_annotation_result_to_proteomics_dataset(query_result_df, mock_tmt_dataset)
 
     # Step 4: Test the joined result
-    assert (140, 8) == joined_df.shape
+    assert (478, 19) == joined_df.shape
     assert set(shared_proteomics_sample_ids) == set(joined_df.sample_id)
     assert set(shared_proteomics_gene_names) == set(joined_df.gene_name)

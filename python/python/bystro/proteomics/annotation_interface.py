@@ -72,6 +72,7 @@ def _get_samples_genes_dosages_from_hit(
     """Given a document hit, return a dataframe of samples,
     genes and dosages with specified additional fields.
     """
+
     source = hit["_source"]
     # Base required fields
     chrom = _flatten(source["chrom"])[0]
@@ -79,14 +80,14 @@ def _get_samples_genes_dosages_from_hit(
     pos = _flatten(source["pos"])[0]
     _id = _flatten(source["id"])[0]
     vcf_pos = _flatten(source["vcfPos"])[0]
-    input_ref = _flatten(source["inputRef"])[0]
+    input_ref = _flatten(source.get("inputRef", [None]))[0]
     ref = _flatten(source["ref"])[0]
     alt = _flatten(source["alt"])[0]
     gene_names = _flatten(
         source["refSeq"]["name2"]
     )  # guaranteed to be unique or to belong to different transcripts
     transcript_names = _flatten(source["refSeq"]["name"])
-    protein_names = _flatten(source["refSeq"]["protAcc"])
+    protein_names = _flatten(source["refSeq"].get("protAcc", [None]))
     is_canonical = [
         x == "true" or x is True if x else False for x in _flatten(source["refSeq"].get("isCanonical"))
     ]
@@ -285,7 +286,7 @@ def _run_annotation_query(
         client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore[attr-defined]
         raise
     client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore[attr-defined]
-    print("query_results", query_results)
+
     return pd.concat(query_results)
 
 
