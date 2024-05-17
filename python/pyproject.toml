@@ -35,6 +35,7 @@ dependencies = [
     "ecos==2.0.13",
     "cvxpy==1.5.0",
     "somadata==1.0.0",
+    "statsmodels==0.14.2",
 ]
 
 [tool.maturin]
