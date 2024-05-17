@@ -1,6 +1,6 @@
 [package]
 name = "bystro"
-version = "0.1.0"
+version = "1.0.3"
 edition = "2021"
 build = "build.rs"
 
@@ -10,4 +10,4 @@ name = "bystro"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-pyo3 = { version = "0.20.3", features = ["extension-module"] }
+pyo3 = { version = "0.21.2", features = ["extension-module"] }
