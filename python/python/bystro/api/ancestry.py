@@ -6,7 +6,7 @@ import msgspec
 from pyarrow import dataset as ds  # type: ignore
 
 from bystro.utils.compress import get_decompress_to_pipe_cmd
-from bystro.ancestry.model import get_models_from_file_system
+from bystro.ancestry.model import get_models_from_s3
 from bystro.ancestry.inference import AncestryResults, infer_ancestry
 
 
@@ -79,7 +79,7 @@ def calculate_ancestry_scores_from_dosage(
     # Ancestry command
     dataset = ds.dataset(dosage_matrix_path, format="arrow")
 
-    ancestry_models = get_models_from_file_system(assembly)
+    ancestry_models = get_models_from_s3(assembly)
 
     results = infer_ancestry(ancestry_models, dataset)
 

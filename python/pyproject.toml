@@ -10,11 +10,12 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-version = "1.0.3"
+version = "2.0.0-beta11"
 dependencies = [
+    "openpyxl==3.1.2",
     "attrs==23.1.0",
     "boto3==1.28.9",
-    "liftover==1.1.17",
+    "liftover==1.2.2",
     "msgspec==0.18.6",
     "opensearch-py[async]==2.5.0",
     "numpy==1.26.4",
@@ -31,9 +32,9 @@ dependencies = [
     "torch==2.2",
     "psutil==5.9.6",
     "matplotlib==3.7.1",
-    "canopy@git+https://github.com/bystrogenomics/canopy.git@f6d3031494a692db040492fa1dead5faf19fef5a",
     "ecos==2.0.13",
     "cvxpy==1.5.0",
+    "somadata==1.0.0",
 ]
 
 [tool.maturin]

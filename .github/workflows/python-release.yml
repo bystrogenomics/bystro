@@ -26,11 +26,16 @@ jobs:
         platform:
           - runner: ubuntu-latest
             target: x86_64
+            local_name: x86_64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install Golang
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.22"
       - name: Install Python dependencies
         run: pip install -r python/requirements-dev.txt
       - name: Build wheels
@@ -38,7 +43,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter --manifest-path python/Cargo.toml --zig
-          sccache: "true"
+          sccache: "false"
           manylinux: auto
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -52,7 +57,20 @@ jobs:
           python --version
           ls -la dist
 
-          pip install bystro --verbose --find-links dist --force-reinstall
+          go install github.com/bystrogenomics/bystro-vcf@2.2.2
+
+          PYTHON_VERSION=$(python -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
+          ARCHITECTURE=${{ matrix.platform.local_name }}
+
+          echo "PYTHON_VERSION: $PYTHON_VERSION"
+          echo "ARCHITECTURE: $ARCHITECTURE"
+
+          WHEEL_FILE=$(find dist -name "*${PYTHON_VERSION}*${ARCHITECTURE}*.whl" | head -n 1)
+
+          echo "WHEEL_FILE: $WHEEL_FILE"
+
+          pip install $WHEEL_FILE --verbose --force-reinstall
+
           bystro-api --help
 
           pip install pytest
@@ -66,6 +84,7 @@ jobs:
         platform:
           - runner: windows-latest
             target: x64
+            local_name: amd64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -79,7 +98,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter --manifest-path python/Cargo.toml
-          sccache: "true"
+          sccache: "false"
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -92,7 +111,18 @@ jobs:
           python --version
           ls -la dist
 
-          pip install bystro --verbose --find-links dist --force-reinstall
+          PYTHON_VERSION=$(python -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
+          ARCHITECTURE=${{ matrix.platform.local_name }}
+
+          echo "PYTHON_VERSION: $PYTHON_VERSION"
+          echo "ARCHITECTURE: $ARCHITECTURE"
+
+          WHEEL_FILE=$(find dist -name "*${PYTHON_VERSION}*${ARCHITECTURE}*.whl" | head -n 1)
+
+          echo "WHEEL_FILE: $WHEEL_FILE"
+
+          pip install $WHEEL_FILE --verbose --force-reinstall
+
           bystro-api --help
 
   macos:
@@ -102,13 +132,19 @@ jobs:
         platform:
           - runner: macos-12
             target: x86_64
+            local_name: x86_64
           - runner: macos-14
             target: aarch64
+            local_name: arm64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install Golang
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.22"
       - name: Install Python dependencies
         run: pip install -r python/requirements-dev.txt
       - name: Build wheels
@@ -116,7 +152,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter --manifest-path python/Cargo.toml
-          sccache: "true"
+          sccache: "false"
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -129,8 +165,21 @@ jobs:
           python --version
           ls -la dist
 
-          pip install bystro --verbose --find-links dist --force-reinstall
-          bystro-api --help
+          go install github.com/bystrogenomics/bystro-vcf@2.2.2
+
+          PYTHON_VERSION=$(python -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
+          ARCHITECTURE=${{ matrix.platform.local_name }}
+
+          echo "PYTHON_VERSION: $PYTHON_VERSION"
+          echo "ARCHITECTURE: $ARCHITECTURE"
+
+          WHEEL_FILE=$(find dist -name "*${PYTHON_VERSION}*${ARCHITECTURE}*.whl" | head -n 1)
+
+          echo "WHEEL_FILE: $WHEEL_FILE"
+
+          pip install $WHEEL_FILE --verbose --force-reinstall
+
+          bystro-api --help 
 
           pip install pytest
           ray start --head
