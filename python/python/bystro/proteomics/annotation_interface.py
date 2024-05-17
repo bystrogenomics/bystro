@@ -1,16 +1,20 @@
 """Query an annotation file and return a list of sample_ids and genes meeting the query criteria."""
 
+import copy
 import logging
 import math
 from typing import Any, Callable
 
+import asyncio
 from msgspec import Struct
 import numpy as np
 
 import pandas as pd
-from opensearchpy import OpenSearch
+from opensearchpy import AsyncOpenSearch
 
 from bystro.proteomics.fragpipe_tandem_mass_tag import TandemMassTagDataset
+
+from bystro.search.utils.opensearch import gather_opensearch_args
 
 logger = logging.getLogger(__file__)
 
@@ -48,10 +52,6 @@ def _flatten(xs: Any) -> list[Any]:  # noqa: ANN401 (`Any` is really correct her
     if not isinstance(xs, list):
         return [xs]
     return sum([_flatten(x) for x in xs], [])
-
-
-def _extract_samples(samples):
-    return [sample[0] for sample in samples]
 
 
 def _get_nested_field(data, field_path):
@@ -183,7 +183,16 @@ def _get_samples_genes_dosages_from_hit(
     return pd.DataFrame(rows)
 
 
-def _execute_query(client, query: dict, additional_fields: list[str]) -> pd.DataFrame:
+def _prepare_query_body(query, slice_id, num_slices):
+    """Prepare the query body for the slice"""
+    body = query.copy()
+    body["slice"] = {"id": slice_id, "max": num_slices}
+    return body
+
+
+async def _execute_query(
+    client: AsyncOpenSearch, query: dict, additional_fields: list[str] | None = None
+) -> pd.DataFrame:
     results: list[dict] = []
     search_after = None  # Initialize search_after for pagination
 
@@ -197,7 +206,7 @@ def _execute_query(client, query: dict, additional_fields: list[str]) -> pd.Data
         if search_after:
             query["body"]["search_after"] = search_after
 
-        resp = client.search(**query)
+        resp = await client.search(**query)
 
         if not resp["hits"]["hits"]:
             break  # Exit the loop if no more documents are found
@@ -227,8 +236,8 @@ def _process_response(
     return samples_genes_dosages_df.drop_duplicates()
 
 
-def _get_num_slices(
-    client: OpenSearch,
+async def _get_num_slices(
+    client: AsyncOpenSearch,
     index_name: str,
     query: dict[str, Any],
 ) -> tuple[int, int]:
@@ -237,7 +246,7 @@ def _get_num_slices(
     get_num_slices_query.pop("sort", None)
     get_num_slices_query.pop("track_total_hits", None)
 
-    response = client.count(body=get_num_slices_query, index=index_name)
+    response = await client.count(body=get_num_slices_query, index=index_name)
 
     n_docs: int = response["count"]
     if n_docs < 1:
@@ -251,15 +260,19 @@ def _get_num_slices(
     return max(num_slices_planned, 1), n_docs
 
 
-def _run_annotation_query(
+async def _run_annotation_query(
     query: dict[str, Any],
     index_name: str,
-    client: OpenSearch,
-    additional_fields: list[str] = [],
+    opensearch_config: dict[str, Any],
+    additional_fields: list[str] | None = None,
 ) -> pd.DataFrame:
     """Given query and index contained in SaveJobData, run query and return results as dataframe."""
-    num_slices, _ = _get_num_slices(client, index_name, query)
-    point_in_time = client.create_point_in_time(  # type: ignore[attr-defined]
+    search_client_args = gather_opensearch_args(opensearch_config)
+    client = AsyncOpenSearch(**search_client_args)
+
+    num_slices, _ = await _get_num_slices(client, index_name, query)
+
+    point_in_time = await client.create_point_in_time(  # type: ignore[attr-defined]
         index=index_name, params={"keep_alive": OPENSEARCH_QUERY_CONFIG.keep_alive}
     )
     try:  # make sure we clean up the PIT index properly no matter what happens in this block
@@ -268,12 +281,16 @@ def _run_annotation_query(
         query["body"]["size"] = OPENSEARCH_QUERY_CONFIG.max_query_size
         query_results = []
         for slice_id in range(num_slices):
-            slice_query = query.copy()
+            slice_query = copy.deepcopy(query)
             if num_slices > 1:
                 # Slice queries require max > 1
-                slice_query["slice"] = {"id": slice_id, "max": num_slices}
-            query_result = _execute_query(client, query=query, additional_fields=additional_fields)
+                slice_query["body"]["slice"] = {"id": slice_id, "max": num_slices}
+
+            query_result = _execute_query(client, query=slice_query, additional_fields=additional_fields)
             query_results.append(query_result)
+
+        res = await asyncio.gather(*query_results)
+        return pd.concat(res)
     except Exception as e:
         err_msg = (
             f"Encountered exception: {e!r} while running opensearch_query, "
@@ -283,22 +300,38 @@ def _run_annotation_query(
             f"opensearch_query_config: {OPENSEARCH_QUERY_CONFIG}\n"
         )
         logger.exception(err_msg, exc_info=e)
-        client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore[attr-defined]
-        raise
-    client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore[attr-defined]
+        raise RuntimeError(err_msg) from e
+    finally:
+        await client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore[attr-defined]
+        await client.close()
 
-    return pd.concat(query_results)
+
+async def get_annotation_result_from_query_async(
+    user_query_string: str,
+    index_name: str,
+    opensearch_config: dict[str, Any],
+    additional_fields: list[str] | None = None,
+) -> pd.DataFrame:
+    """Given a query and index, return a dataframe of variant / sample_id records matching query."""
+    query = _build_opensearch_query_from_query_string(user_query_string)
+    return await _run_annotation_query(query, index_name, opensearch_config, additional_fields)
 
 
 def get_annotation_result_from_query(
     user_query_string: str,
     index_name: str,
-    client: OpenSearch,
+    opensearch_config: dict[str, Any],
     additional_fields: list[str] = [],
 ) -> pd.DataFrame:
     """Given a query and index, return a dataframe of variant / sample_id records matching query."""
-    query = _build_opensearch_query_from_query_string(user_query_string)
-    return _run_annotation_query(query, index_name, client, additional_fields)
+    loop = asyncio.get_event_loop()
+    coroutine = get_annotation_result_from_query_async(
+        user_query_string, index_name, opensearch_config, additional_fields
+    )
+    if loop.is_running():
+        # If the event loop is already running, use a workaround
+        return asyncio.run_coroutine_threadsafe(coroutine, loop).result()
+    return loop.run_until_complete(coroutine)
 
 
 def _build_opensearch_query_from_query_string(
@@ -329,7 +362,7 @@ def _build_opensearch_query_from_query_string(
     return base_query
 
 
-def join_annotation_result_to_proteomics_dataset(
+async def join_annotation_result_to_proteomics_dataset(
     query_result_df: pd.DataFrame,
     tmt_dataset: TandemMassTagDataset,
     get_tracking_id_from_genomic_sample_id: Callable[[str], str] = (lambda x: x),
