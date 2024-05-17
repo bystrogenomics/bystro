@@ -362,7 +362,7 @@ def _build_opensearch_query_from_query_string(
     return base_query
 
 
-async def join_annotation_result_to_proteomics_dataset(
+def join_annotation_result_to_proteomics_dataset(
     query_result_df: pd.DataFrame,
     tmt_dataset: TandemMassTagDataset,
     get_tracking_id_from_genomic_sample_id: Callable[[str], str] = (lambda x: x),
