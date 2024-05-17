@@ -111,8 +111,8 @@ index_settings:
           - punctuation
     tokenizer:
       comma_tokenizer:
-          type: pattern
-          pattern: ","
+        type: pattern
+        pattern: ","
       hgvs_tokenizer:
         type: pattern
       edge_ngram_tokenizer:
