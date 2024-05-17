@@ -67,7 +67,7 @@ def _get_nested_field(data, field_path):
 
 
 def _get_samples_genes_dosages_from_hit(
-    hit: dict[str, Any], additional_fields: list[str] = ["refSeq.name"]
+    hit: dict[str, Any], additional_fields: list[str] | None = None
 ) -> pd.DataFrame:
     """Given a document hit, return a dataframe of samples,
     genes and dosages with specified additional fields.
@@ -134,7 +134,7 @@ def _get_samples_genes_dosages_from_hit(
                 "gnomad.genomes.AF",
                 "gnomad.exomes.AF",
             ],
-            additional_fields,
+            additional_fields if additional_fields is not None else [],
         )
     )
 
@@ -209,7 +209,9 @@ def _execute_query(client, query: dict, additional_fields: list[str]) -> pd.Data
     return _process_response(results, additional_fields)
 
 
-def _process_response(hits: list[dict[str, Any]], additional_fields: list[str]) -> pd.DataFrame:
+def _process_response(
+    hits: list[dict[str, Any]], additional_fields: list[str] | None = None
+) -> pd.DataFrame:
     """Postprocess query response from opensearch client."""
     num_hits = len(hits)
 
@@ -301,7 +303,7 @@ def get_annotation_result_from_query(
 def _build_opensearch_query_from_query_string(
     query_string: str, output_fields: list[str] | None = None
 ) -> dict[str, Any]:
-    base_query: dict[str, Any]= {
+    base_query: dict[str, Any] = {
         "body": {
             "query": {
                 "bool": {
