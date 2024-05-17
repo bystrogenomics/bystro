@@ -67,10 +67,10 @@ def _get_nested_field(data, field_path):
 
 
 def _get_samples_genes_dosages_from_hit(
-    hit: dict[str, any], additional_fields: list[str] = ["refSeq.name"]
+    hit: dict[str, Any], additional_fields: list[str] = ["refSeq.name"]
 ) -> pd.DataFrame:
     """Given a document hit, return a dataframe of samples,
-       genes and dosages with specified additional fields.
+    genes and dosages with specified additional fields.
     """
     source = hit["_source"]
     # Base required fields
