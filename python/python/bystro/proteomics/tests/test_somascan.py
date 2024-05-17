@@ -18,13 +18,13 @@ def test_passed_bad_arguments():
 
     with pytest.raises(
         ValueError,
-        match="`adat` argument to SomascanDataset must be a canopy.Adat object",
+        match="`adat` argument to SomascanDataset must be a somadata.Adat object",
     ):
         SomascanDataset("foo")
 
     with pytest.raises(
         ValueError,
-        match="`annotations` argument to SomascanDataset must be a canopy.Annotations object",
+        match="`annotations` argument to SomascanDataset must be a somadata.Annotations object",
     ):
         SomascanDataset(valid.adat, "bar")  # type: ignore
 

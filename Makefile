@@ -1,14 +1,46 @@
-# Assumes you have run ". .initialize-conda-env.sh"; since each make command runs in a separate subshell we need this to happen first
+ray-start-local:
+	ray stop && ray start --head --disable-usage-stats
 
-build:
-	cd python && maturin build --release && cd ../
+ray-stop-local:
+	ray stop
 
-develop:
-	cd go/cmd/opensearch && go build && cd ../../../
-	cd python && maturin develop && cd ../
+build-python:
+	(cd python && maturin build --release)
 
-# Ray must be started with make serve-dev
-# without ray start, make serve-dev will succeed, but the handlers that rely on Ray will fail to start
-serve-dev: develop
-	ray stop && ray start --head
+build-python-dev:
+	(cd python && maturin develop)
+
+install-python: build-python
+	@WHEEL_FILE=$$(ls python/target/wheels/*cp311-cp311-manylinux*x86_64.whl | head -n 1) && \
+	if [ -z "$$WHEEL_FILE" ]; then \
+		echo "No manylinux x86_64 wheel found for installation."; \
+		exit 1; \
+	else \
+		echo "Installing $$WHEEL_FILE..."; \
+		pip install "$$WHEEL_FILE"; \
+	fi
+
+install-go:
+	go install github.com/bystrogenomics/bystro-vcf@2.2.2
+	(cd ./go && go install bystro/cmd/dosage)
+	(cd ./go && go install bystro/cmd/dosage-filter)
+	(cd ./go && go install bystro/cmd/opensearch)
+
+install: install-python install-go
+
+uninstall:
+	pip uninstall -y bystro
+	(cd ./go && go clean -i bystro/cmd/opensearch)
+
+develop: install-go build-python-dev ray-start-local
+
+run-local: install ray-start-local
+
+pm2:
 	pm2 delete all 2> /dev/null || true && pm2 start startup.yml
+
+# Currently assumes that Perl package has been separately installed
+serve-local: ray-stop-local run-local pm2
+
+# Currently assumes that Perl package has been separately installed
+serve-dev: ray-stop-local develop pm2

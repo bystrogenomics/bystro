@@ -7,7 +7,7 @@ my $test_db_dir = Path::Tiny->tempdir();
 
 my %baseArgs = (
   database_dir     => 't/tracks/gene/db/raw',
-  input_file       => 'foo',
+  input_files      => [ 'foo/bar.vcf.gz', 'baz/qux.vcf' ],
   config           => 't/tracks/gene/db/raw/config.yaml',
   output_file_base => 'bar',
   tracks           => {
@@ -48,7 +48,8 @@ sub test_preparePreprocessorProgram {
     }
   );
 
-  my ( $finalProgram, $errPath ) = $object->_preparePreprocessorProgram('vcf');
+  my ( $finalProgram, $errPath ) =
+    $object->_preparePreprocessorProgram( 'vcf', 'foo/bar.vcf.gz' );
 
   like(
     $finalProgram,

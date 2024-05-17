@@ -66,6 +66,80 @@ from bystro.covariance._base_covariance import (
 from bystro._template_sgd_np import BaseSGDModel
 
 
+def _get_projection_matrix(W_: Tensor, sigma_: Tensor, device: Any):
+    """
+    This is currently just implemented for PPCA due to nicer formula. Will
+    modify for broader application later.
+
+    Computes the parameters for p(S|X)
+
+    Description in future to be released paper
+
+    Parameters
+    ----------
+    W_ : Tensor(n_components,p)
+        The loadings
+
+    sigma_ : Tensor
+        Isotropic noise
+
+    Returns
+    -------
+    Proj_X : Tensor(n_components,p)
+        Beta such that np.dot(Proj_X, X) = E[S|X]
+
+    Cov : Tensor(n_components,n_components)
+        Var(S|X)
+    """
+    n_components = int(W_.shape[0])
+    eye = torch.tensor(np.eye(n_components).astype(np.float32), device=device)
+    M_init = torch.matmul(W_, torch.transpose(W_, 0, 1))
+    M_end = sigma_ * eye
+    M = M_init + M_end
+    Proj_X = torch.linalg.solve(M, W_)
+    Cov = torch.linalg.inv(M) * sigma_
+    return Proj_X, Cov
+
+
+def kl_divergence_vae(
+    mu1: torch.Tensor,
+    sigma1: torch.Tensor,
+) -> torch.Tensor:
+    """
+    Computes the Kullback-Leibler divergence between two multivariate
+    normal distributions.
+
+    This function assumes the first distribution, N(mu1, sigma1),
+    represents the conditional distribution of latent variables given
+    observations (approximate posterior), and the second distribution
+    is the standard multivariate normal distribution N(0, I) representing
+    the marginal latent distribution (prior).
+
+    The KL divergence is computed using the formula:
+    KL(N(mu1, sigma1) || N(0, I)) = 0.5 * (tr(sigma1) +
+                            mu1^T * mu1 - log(det(sigma1)) - d)
+    where `d` is the dimensionality of the latent space.
+
+    Parameters:
+    - mu1 (torch.Tensor): Mean vector of the first Gaussian
+      distribution (approximate posterior), shape (batch_size, d).
+    - sigma1 (torch.Tensor): Covariance matrix of the first Gaussian
+      distribution (approximate posterior), expected to be a diagonal
+      matrix represented as a tensor of shape (batch_size, d).
+
+    Returns:
+    - torch.Tensor: A tensor containing the KL divergence for each
+      instance in the batch, shape (batch_size,).
+    """
+    d = sigma1.shape[1]  # Dimensionality of the latent space
+    term1 = -1 * torch.logdet(sigma1)  # Log determinant
+    term2 = -d  # Negative of the latent space dimensionality
+    term3 = torch.trace(sigma1)  # Trace of the covariance matrix
+    term4 = torch.sum(torch.square(mu1), dim=1)  # Sum of squares
+    kl_div = 0.5 * (term1 + term2 + term3 + term4)
+    return kl_div
+
+
 class BaseGaussianFactorModel(BaseSGDModel, ABC):
     def __init__(self, n_components=2):
         """
@@ -300,7 +374,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         X: NDArray[np.float_],
         observed_feature_idxs: NDArray[np.float_],
         sherman_woodbury: bool = False,
-    ) -> np.float_:
+    ) -> NDArray[np.float_]:
         """
         Return the conditional log likelihood of each sample, that is
 
@@ -445,7 +519,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
 
     def score_samples(
         self, X: NDArray[np.float_], sherman_woodbury: bool = False
-    ) -> np.float_:
+    )  -> NDArray[np.float_]:
         """
         Return the log likelihood of each sample
 
@@ -601,7 +675,7 @@ class BasePCASGDModel(BaseGaussianFactorModel):
         default_options = {
             "n_iterations": 3000,
             "learning_rate": 1e-2,
-            "gpu_memory": 1024,
+            "use_gpu": True,
             "method": "Nadam",
             "batch_size": 100,
             "momentum": 0.9,
@@ -646,6 +720,7 @@ class BasePCASGDModel(BaseGaussianFactorModel):
     def _save_losses(
         self,
         i: int,
+        device: Any,
         log_likelihood: Tensor,
         log_prior: Tensor | NDArray[np.float_],
         log_posterior: Tensor,
@@ -655,6 +730,9 @@ class BasePCASGDModel(BaseGaussianFactorModel):
 
         Parameters
         -----------
+        device ; pytorch.device
+            The device used for trainging (gpu or cpu)
+
         i : int
             Current training iteration
 
@@ -667,24 +745,34 @@ class BasePCASGDModel(BaseGaussianFactorModel):
         losses_posterior : Tensor
             The log posterior
         """
-        self.losses_likelihood[i] = log_likelihood.detach().numpy()
-        if isinstance(log_prior, np.ndarray):
-            self.losses_prior[i] = log_prior
+        if device.type == "cuda":
+            self.losses_likelihood[i] = log_likelihood.detach().cpu().numpy()
+            if isinstance(log_prior, np.ndarray):
+                self.losses_prior[i] = log_prior
+            else:
+                self.losses_prior[i] = log_prior.detach().cpu().numpy()
+            self.losses_posterior[i] = log_posterior.detach().cpu().numpy()
         else:
-            self.losses_prior[i] = log_prior.detach().numpy()
-        self.losses_posterior[i] = log_posterior.detach().numpy()
+            self.losses_likelihood[i] = log_likelihood.detach().numpy()
+            if isinstance(log_prior, np.ndarray):
+                self.losses_prior[i] = log_prior
+            else:
+                self.losses_prior[i] = log_prior.detach().numpy()
+            self.losses_posterior[i] = log_posterior.detach().numpy()
 
-    def _transform_training_data(self, *args: NDArray) -> list[Tensor]:
+    def _transform_training_data(
+        self, device: Any, *args: NDArray
+    ) -> list[Tensor]:
         """
         Convert a list of numpy arrays to tensors
         """
         out = []
         for arg in args:
-            out.append(torch.tensor(arg))
+            out.append(torch.tensor(arg.astype(np.float32)).to(device))
         return out
 
     @abstractmethod
-    def _create_prior(self):
+    def _create_prior(self, device: Any):
         """
         Creates a prior on the parameters taking your trainable variable
         dictionary as input

@@ -14,55 +14,43 @@ from bystro.beanstalkd.messages import SubmissionID, SubmittedJobMessage
 from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, listen
 from bystro.search.utils.annotation import get_config_file_path
 from bystro.search.utils.messages import IndexJobCompleteMessage, IndexJobData, IndexJobResults
-from bystro.utils.config import _get_bystro_project_root
 
 from msgspec import json
 
 TUBE = "index"
 
-_GO_HANDLER_BINARY_PATH = None
-
-
-def get_go_handler_binary_path() -> str:
-    """Return path to go handler binary."""
-    global _GO_HANDLER_BINARY_PATH
-    if _GO_HANDLER_BINARY_PATH is None:
-        _GO_HANDLER_BINARY_PATH = os.path.join(
-            _get_bystro_project_root(), "go/cmd/opensearch/opensearch"
-        )
-
-    if not os.path.exists(_GO_HANDLER_BINARY_PATH):
-        raise ValueError(
-            (
-                f"Binary not found at {_GO_HANDLER_BINARY_PATH}. "
-                "Please ensure to build the binary first, by running "
-                "`go build` in the `go/cmd/opensearch` directory."
-            )
-        )
-
-    return _GO_HANDLER_BINARY_PATH
+_INDEXER_BINARY = "opensearch"
 
 
 def run_binary_with_args(binary_path: str, args: list[str]) -> list[str]:
     """
-    Run the binary with specified arguments and handle errors.
-    :param binary_path: Path to the binary file.
-    :param args: List of arguments for the binary.
-    :return: None
-    """
-    # Construct the command
-    command = [binary_path] + args
+    Run a binary with the specified arguments and return the output as a list of strings.
 
-    # Run the command and capture stderr
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    Args:
+        binary_path (str): The path to the binary executable.
+        args (list[str]): The list of arguments to pass to the binary.
+
+    Returns:
+        list[str]: The output of the binary as a list of strings.
+
+    Raises:
+        RuntimeError: If the binary execution fails or if there is an error in the stderr output.
+    """
+
+    # Construct the command
+    command = " ".join([binary_path] + args)
+
+    process = subprocess.Popen(
+        command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, text=True
+    )
     stdout, stderr = process.communicate()
 
     if process.returncode != 0 or stderr:
-        raise Exception(f"Binary execution failed: {stderr.decode('utf-8')}")
+        raise RuntimeError(f"Binary execution failed: {stderr}")
 
-    headerFieldsStr = stdout.decode("utf-8")
+    header_fields = stdout
 
-    return json.decode(headerFieldsStr, type=list[str])
+    return json.decode(header_fields, type=list[str])
 
 
 def run_handler_with_config(
@@ -74,7 +62,27 @@ def run_handler_with_config(
     submission_id: SubmissionID | None = None,
     queue_config: str | None = None,
 ) -> list[str]:
-    binary_path = get_go_handler_binary_path()
+    """
+    Run the handler with the specified configuration.
+
+    Args:
+        index_name (str): The name of the index.
+        mapping_config (str): The path to the mapping configuration file.
+        opensearch_config (str): The path to the OpenSearch configuration file.
+        annotation_path (str): The path to the annotation file.
+        no_queue (bool, optional): Whether to disable the queue. Defaults to False.
+        submission_id (SubmissionID | None, optional):
+            The submission ID. Required when no_queue is not False (optional).
+        queue_config (str | None, optional):
+            The path to the queue configuration file. Required when no_queue is not False (optional).
+
+    Returns:
+        list[str]: The header fields.
+
+    Raises:
+        ValueError: If submission_id and queue_config are not specified when no_queue is not False.
+    """
+
     args = [
         "--index-name",
         index_name,
@@ -100,7 +108,7 @@ def run_handler_with_config(
         args.append("--job-submission-id")
         args.append(str(submission_id))
 
-    header_fields = run_binary_with_args(binary_path, args)
+    header_fields = run_binary_with_args(_INDEXER_BINARY, args)
 
     return header_fields
 

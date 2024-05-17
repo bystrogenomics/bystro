@@ -11,6 +11,7 @@ index_settings:
     refresh_interval: -1
     number_of_replicas: 0
     codec: best_compression
+    max_slices_per_pit: 50000
     mapping:
       total_fields:
         limit: 5000
@@ -27,15 +28,30 @@ index_settings:
           - uppercase
           - asciifolding
     filter:
-      exclude_pathogenic:
+      clnsig_conditional_underscore_split:
+        type: condition
+        filter: ["clnsig_underscore_split_filter"]
+        script:
+          source: "token.getTerm().toString().startsWith('conflicting') == false"
+      clnsig_conditional_filter:
+        type: condition
+        filter: ["clnsig_edge_ngram_filter"]
+        script:
+          source: "token.getTerm().toString().startsWith('conflicting') == false"
+      clnsig_edge_ngram_filter:
+        type: edge_ngram
+        min_gram: 1
+        max_gram: 20
+      clnsig_underscore_split_filter:
         type: pattern_capture
-        patterns: ["conflicting_interpretations_of_pathogenicity"]
+        patterns: ["([^_]+)"]
+        preserve_original: false
       catenate_filter:
         type: word_delimiter
         catenate_words: true
         catenate_numbers: true
         catenate_all: true
-        preserve_original: false
+        preserve_original: true
         generate_word_parts: false
         stem_english_possessive: true
         generate_number_parts: false
@@ -46,7 +62,7 @@ index_settings:
         catenate_words: true
         catenate_numbers: true
         catenate_all: true
-        preserve_original: false
+        preserve_original: true
         generate_word_parts: true
         stem_english_possessive: true
         generate_number_parts: false
@@ -94,6 +110,9 @@ index_settings:
           - digit
           - punctuation
     tokenizer:
+      comma_tokenizer:
+          type: pattern
+          pattern: ","
       hgvs_tokenizer:
         type: pattern
       edge_ngram_tokenizer:
@@ -105,6 +124,12 @@ index_settings:
           - digit
           - punctuation
     analyzer:
+      clnsig_analyzer:
+          tokenizer: comma_tokenizer
+          filter:
+            - lowercase
+            - clnsig_conditional_underscore_split
+            - clnsig_conditional_filter
       hgvs_analyzer:
         type: custom
         tokenizer: hgvs_tokenizer
@@ -128,14 +153,6 @@ index_settings:
           - catenate_filter_split
           - english_stemmer
           - autocomplete_filter
-      autocomplete_english_split_clinsig:
-        type: custom
-        tokenizer: whitespace
-        filter:
-          - lowercase
-          - exclude_pathogenic
-          - asciifolding
-          - catenate_filter_split
       autocomplete_english_graph:
         type: custom
         tokenizer: keyword
@@ -203,6 +220,14 @@ index_settings:
           - english_stemmer
           - description_synonyms
           - disease_synonyms
+      search_english_simple:
+        type: custom
+        tokenizer: whitespace
+        filter:
+          - lowercase
+          - asciifolding
+          - catenate_filter_split
+          - english_stemmer
       search_english_class:
         type: custom
         tokenizer: standard
@@ -242,13 +267,25 @@ index_settings:
           - amino_synonym_filter
 mappings:
   properties:
+    id:
+      type: keyword
+      normalizer: lowercase_normalizer
     chrom:
       type: keyword
       normalizer: lowercase_normalizer
     pos:
       type: integer
-    trTv:
-      type: byte
+    vcfPos:
+      type: integer
+    ref:
+      type: keyword
+      normalizer: uppercase_normalizer
+    inputRef:
+      type: keyword
+      normalizer: uppercase_normalizer
+    alt:
+      type: keyword
+      normalizer: uppercase_normalizer
     type:
       type: text
       analyzer: autocomplete_english
@@ -257,6 +294,8 @@ mappings:
         exact:
           type: keyword
           normalizer: lowercase_normalizer
+    trTv:
+      type: byte
     discordant:
       type: boolean
     heterozygotes:
@@ -277,11 +316,6 @@ mappings:
       type: integer
     sampleMaf:
       type: half_float
-    alt:
-      type: text
-    ref:
-      type: keyword
-      normalizer: uppercase_normalizer
     refSeq:
       properties:
         siteType:
@@ -369,6 +403,8 @@ mappings:
         name:
           type: keyword
           normalizer: uppercase_normalizer
+        isCanonical:
+          type: boolean
     nearest:
       properties:
         refSeq:
@@ -394,8 +430,7 @@ mappings:
             dist:
               type: integer
     cadd:
-      type: scaled_float
-      scaling_factor: 10
+      type: half_float
     caddIndel:
       properties:
         alt:
@@ -405,14 +440,7 @@ mappings:
           type: keyword
           normalizer: lowercase_normalizer
         PHRED:
-          type: scaled_float
-          scaling_factor: 10
-    phastCons:
-      type: scaled_float
-      scaling_factor: 100
-    phyloP:
-      type: scaled_float
-      scaling_factor: 100
+          type: half_float
     clinvarVcf:
       properties:
         alt:
@@ -438,8 +466,8 @@ mappings:
           normalizer: lowercase_normalizer
         CLNSIG:
           type: text
-          analyzer: autocomplete_english_split_clinsig
-          search_analyzer: search_english_split
+          analyzer: clnsig_analyzer
+          search_analyzer: search_english_simple
           fields:
             exact:
               type: keyword
@@ -447,7 +475,7 @@ mappings:
         CLNSIGCONF:
           type: text
           analyzer: autocomplete_english_split
-          search_analyzer: search_english_split
+          search_analyzer: search_english_simple
           fields:
             exact:
               type: keyword
@@ -455,7 +483,7 @@ mappings:
         CLNREVSTAT:
           type: text
           analyzer: autocomplete_english_split
-          search_analyzer: search_english_description_synonyms
+          search_analyzer: search_english_simple
           fields:
             exact:
               type: keyword
@@ -463,7 +491,7 @@ mappings:
         CLNDN:
           type: text
           analyzer: autocomplete_english_split
-          search_analyzer: search_english_description_synonyms
+          search_analyzer: search_english_simple
           fields:
             exact:
               type: keyword
@@ -471,6 +499,7 @@ mappings:
         CLNDNINCL:
           type: text
           analyzer: search_english_split
+          search_analyzer: search_english_simple
           fields:
             exact:
               type: keyword
@@ -687,4 +716,8 @@ mappings:
             AN_eas_kor:
               type: integer
             AF_eas_kor:
+              type: half_float
+            controls_AN:
+              type: integer
+            controls_AF:
               type: half_float

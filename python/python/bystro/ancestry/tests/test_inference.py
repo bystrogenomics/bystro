@@ -10,7 +10,7 @@ import pyarrow.dataset as ds  # type: ignore
 
 from bystro.ancestry.inference import AncestryModel, AncestryModels, infer_ancestry
 from bystro.ancestry.train import POPS
-from bystro.ancestry.listener import _get_models_from_s3
+from bystro.ancestry.model import get_models_from_s3
 
 SAMPLES = [f"sample{i}" for i in range(len(POPS))]
 VARIANTS = ["variant1", "variant2", "variant3"]
@@ -82,9 +82,9 @@ def test_infer_ancestry():
     assert len(samples) == len(ancestry_response.results)
 
 
-@pytest.mark.integration()
+@pytest.mark.integration("Requires AWS credentials.")
 def test_infer_ancestry_from_model():
-    ancestry_models = _get_models_from_s3("hg38")
+    ancestry_models = get_models_from_s3("hg38")
 
     # Generate an arrow table that contains genotype dosages for 1000 samples
     variants = list(ancestry_models.gnomad_model.pca_loadings_df.index)
@@ -95,10 +95,10 @@ def test_infer_ancestry_from_model():
         columns=samples,  # noqa: NPY002
     )
     # randomly set 10% of the genotypes to missing to ensure we test missing data handling
-    genotypes = genotypes.mask(np.random.random(genotypes.shape) < 0.1)
-
-    # get missingness per sample
-    missingness = genotypes.isna().mean(axis=0)
+    drop_snps_n = int(0.1 * len(genotypes))
+    retained_snps_n = len(genotypes) - drop_snps_n
+    drop_indices = np.random.choice(genotypes.index, size=drop_snps_n, replace=False) # noqa: NPY002
+    genotypes = genotypes.drop(list(drop_indices))
 
     genotypes = genotypes.reset_index()
     genotypes = genotypes.rename(columns={"index": "locus"})
@@ -119,7 +119,7 @@ def test_infer_ancestry_from_model():
 
         samples_seen.add(result.sample_id)
 
-        assert result.missingness == missingness[result.sample_id]
+        assert result.n_snps == retained_snps_n
 
     assert samples_seen == sample_set
     assert len(top_hits) > 1

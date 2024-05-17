@@ -64,6 +64,7 @@ def test_expected_population_vector():
     }
     assert msgspec.structs.asdict(PopulationVector(**pop_kwargs)) == expected
 
+
 def test_ProbabilityInterval_accepts_valid_bounds() -> None:
     """Ensure we can instantiate, validate ProbabilityInterval correctly."""
     prob_int = ProbabilityInterval(lower_bound=0.1, upper_bound=0.9)
@@ -136,28 +137,28 @@ def test_AncestryScoresOneSample_accepts_valid_args() -> None:
         top_hit=AncestryTopHit(probability=0.6, populations=["SAS"]),
         populations=PopulationVector(**pop_kwargs),
         superpops=SuperpopVector(**superpop_kwargs),
-        missingness=0.5,
+        n_snps=10,
     )
-    assert type(ancestry_result.missingness) is float
+    assert type(ancestry_result.n_snps) is int
 
 
-def test_AncestryScoresOneSample_rejects_invalid_missingness() -> None:
-    with pytest.raises(TypeError, match="missingness must be between 0.0 and 1.0"):
+def test_AncestryScoresOneSample_rejects_invalid_n_snps() -> None:
+    with pytest.raises(TypeError, match="n_snps must be non-negative"):
         AncestryScoresOneSample(
             sample_id="my_sample_id",
             top_hit=AncestryTopHit(probability=0.6, populations=["SAS"]),
             populations=PopulationVector(**pop_kwargs),
             superpops=SuperpopVector(**superpop_kwargs),
-            missingness=1.1,
+            n_snps=-10,
         )
 
-    with pytest.raises(TypeError, match="missingness must be a float, not <class 'int'>"):
+    with pytest.raises(TypeError, match="n_snps must be an int, not <class 'float'>"):
         AncestryScoresOneSample(
             sample_id="my_sample_id",
             top_hit=AncestryTopHit(probability=0.6, populations=["SAS"]),
             populations=PopulationVector(**pop_kwargs),
             superpops=SuperpopVector(**superpop_kwargs),
-            missingness=int(1),
+            n_snps=float(10), # type: ignore
         )
 
 
@@ -169,21 +170,21 @@ def test_AncestryResults_accepts_valid_args() -> None:
                 top_hit=AncestryTopHit(probability=0.6, populations=["EAS"]),
                 populations=PopulationVector(**pop_kwargs),
                 superpops=SuperpopVector(**superpop_kwargs),
-                missingness=0.5,
+                n_snps=5
             ),
             AncestryScoresOneSample(
                 sample_id="bar",
                 top_hit=AncestryTopHit(probability=0.7, populations=["EUR"]),
                 populations=PopulationVector(**pop_kwargs),
                 superpops=SuperpopVector(**superpop_kwargs),
-                missingness=0.5,
+                n_snps=5
             ),
             AncestryScoresOneSample(
                 sample_id="baz",
                 top_hit=AncestryTopHit(probability=0.5, populations=["AFR", "AMR"]),
                 populations=PopulationVector(**pop_kwargs),
                 superpops=SuperpopVector(**superpop_kwargs),
-                missingness=0.5,
+                n_snps=5
             ),
         ],
         pcs={"SampleID1": [0.1, 0.2, 0.3], "SampleID2": [0.4, 0.5, 0.6], "SampleID3": [0.7, 0.8, 0.9]},
@@ -203,7 +204,7 @@ def test_AncestryResults_rejects_invalid_pcs() -> None:
                     top_hit=AncestryTopHit(probability=0.6, populations=["EAS"]),
                     populations=PopulationVector(**pop_kwargs),
                     superpops=SuperpopVector(**superpop_kwargs),
-                    missingness=0.5,
+                    n_snps=0,
                 ),
             ],
             pcs=({"SampleID1": [0.1]}, {"SampleID2": [0.4]}, {"SampleID3": [0.7]}),  # type: ignore

@@ -57,7 +57,7 @@ my %requiredForAll = (
   assembly         => 'assembly',
 );
 
-my $requiredForType = { input_file => 'inputFilePath' };
+my $requiredForType = { input_files => 'inputFilePath' };
 
 say "Running Annotation queue server";
 

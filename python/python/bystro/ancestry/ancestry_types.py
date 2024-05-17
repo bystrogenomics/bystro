@@ -110,23 +110,22 @@ class AncestryScoresOneSample(Struct, frozen=True, rename="camel"):
 
     Represents ancestry model output for an individual study
     participant (identified by sample_id) with estimates for
-    populations and superpopulations, and the overall fraction of
-    expected variants found missing in the sample.
+    populations and superpopulations, and the overall number of snps
+    retained for calculating ancestry
     """
 
     sample_id: str
     top_hit: AncestryTopHit
     populations: PopulationVector
     superpops: SuperpopVector
-    missingness: float
+    n_snps: int
 
     def __post_init__(self):
-        if not isinstance(self.missingness, float):
-            raise TypeError(f"missingness must be a float, not {type(self.missingness)}")
+        if not isinstance(self.n_snps, int):
+            raise TypeError(f"n_snps must be an int, not {type(self.n_snps)}")
 
-        if self.missingness < LOWER_UNIT_BOUND or self.missingness > UPPER_UNIT_BOUND:
-            raise TypeError(f"missingness must be between {LOWER_UNIT_BOUND} and {UPPER_UNIT_BOUND}")
-
+        if self.n_snps < 0:
+            raise TypeError("n_snps must be non-negative")
 
 class AncestryResults(Struct, frozen=True):
     """An outgoing response from the ancestry worker.

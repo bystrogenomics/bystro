@@ -12,7 +12,6 @@ CREDENTIALS_PATH = os.path.join(DEFAULT_DIR, STATE_FILE)
 
 if not os.path.exists(DEFAULT_DIR):
     os.makedirs(DEFAULT_DIR, exist_ok=True)
-    print(f"Created default credentials path: {CREDENTIALS_PATH}")
 
 
 class SignupResponse(Struct):
@@ -88,7 +87,7 @@ class UserProfile(Struct, rename="camel"):
     email: str
     accounts: list[str]
     role: str
-    last_login: datetime.datetime
+    last_login: datetime.datetime | None = None
 
 
 def _fq_host(host: str, port: int | None = None) -> str:

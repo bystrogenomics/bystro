@@ -54,6 +54,6 @@ def test_create_jobs_cli(mocker):
 def test_get_user_cli(mocker):
     mocker.patch("bystro.cli.cli.get_user", return_value="user_profile")
 
-    result = get_user_cli()
+    result = get_user_cli(mocker.Mock())
 
     assert result == "user_profile"
