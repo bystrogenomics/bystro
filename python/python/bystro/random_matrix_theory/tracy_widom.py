@@ -10,16 +10,17 @@ http://opensource.org/licenses/MIT
 """
 
 import numpy as np
-from scipy.interpolate import interp1d # type: ignore
-from scipy.misc import derivative # type: ignore
-from scipy.optimize import brentq # type: ignore
+from scipy.interpolate import interp1d  # type: ignore
+from scipy.misc import derivative  # type: ignore
+from scipy.optimize import brentq  # type: ignore
 import pickle
 
+from pathlib import Path
 
-with open(
-    "/home/austin/Forks/bystro/python/python/bystro/random_matrix_theory/binary_string_tw.p",
-    "rb",
-) as f:
+SCRIPT_DIR = Path(__file__).parent  # folder of the script
+BINARY_STRING_TW_PATH = str(SCRIPT_DIR / "binary_string_tw.p")
+
+with open(BINARY_STRING_TW_PATH, "rb") as f:
     ddict = pickle.load(f)
 
 _digits_1 = ddict["d1"]
