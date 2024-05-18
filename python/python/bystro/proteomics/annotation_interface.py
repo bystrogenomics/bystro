@@ -170,14 +170,6 @@ def _get_samples_genes_dosages_from_hit(
 
     return pd.DataFrame(rows)
 
-
-def _prepare_query_body(query, slice_id, num_slices):
-    """Prepare the query body for the slice"""
-    body = query.copy()
-    body["slice"] = {"id": slice_id, "max": num_slices}
-    return body
-
-
 async def _execute_query(
     client: AsyncOpenSearch, query: dict, additional_fields: list[str] | None = None
 ) -> pd.DataFrame:

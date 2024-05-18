@@ -1,10 +1,10 @@
 import argparse
 
 import logging
+from typing import Any
 from ruamel.yaml import YAML
 from pathlib import Path
-import pyarrow.dataset as ds    # type: ignore
-from opensearchpy import OpenSearch
+import pyarrow.dataset as ds  # type: ignore
 import pandas as pd
 from datetime import datetime, timezone
 
@@ -53,56 +53,56 @@ def _load_queue_conf(queue_conf_path: str) -> QueueConf:
     return QueueConf(addresses=beanstalk_conf["addresses"], tubes=beanstalk_conf["tubes"])
 
 
-def handler_fn(_publisher: ProgressPublisher, job_data: ProteomicsJobData) -> str:
-    logger.info("Processing Proteomics job: %s", job_data)
-
-    Path(job_data.out_dir).mkdir(parents=True, exist_ok=True)
-
-    try:
-        dataset = ds.dataset(job_data.data_path, format="arrow")
-        gene_abundance_df = dataset.to_table().to_pandas()
-    except Exception as arrow_exception:
-        logger.exception(arrow_exception)
-        try:
-            gene_abundance_df = pd.read_csv(job_data.data_path, sep="\t")
-        except Exception as pandas_exception:
-            logger.exception(pandas_exception)
-            raise ValueError(f"Failed to read {job_data.data_path}; not arrow feather or .tsv")
-
-    client = OpenSearch()
-    annotation_df = get_annotation_result_from_query(
-        job_data.annotation_query, job_data.index_name, client
-    )
-
-    joined_df = join_annotation_result_to_proteomics_dataset(annotation_df, gene_abundance_df)
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-
-    result_path = Path(job_data.out_dir) / f"joined.{timestamp}.feather"
-    joined_df.to_feather(result_path)
-
-    logger.info("Proteomics job completed. Results saved to %s", result_path)
-    return str(result_path)
-
-def submit_msg_fn(proteomics_job_data: ProteomicsJobData) -> SubmittedJobMessage:
-    logger.debug("Received ProteomicsJobData: %s", proteomics_job_data)
-    return SubmittedJobMessage(proteomics_job_data.submission_id)
-
-
-def completed_msg_fn(
-    proteomics_job_data: ProteomicsJobData, result_path: str
-) -> ProteomicsJobCompleteMessage:
-    logger.debug("Proteomics job completed: %s, results at %s", proteomics_job_data, result_path)
-    return ProteomicsJobCompleteMessage(
-        submission_id=proteomics_job_data.submission_id, result_path=result_path
-    )
-
-
-def main(queue_conf: QueueConf) -> None:
+def main(queue_conf: QueueConf, search_conf: dict[str, Any]) -> None:
     logger.info(
         "Proteomics worker is listening on addresses: %s, tube: %s...",
         queue_conf.addresses,
         PROTEOMICS_TUBE,
     )
+
+    def handler_fn(_publisher: ProgressPublisher, job_data: ProteomicsJobData) -> str:
+        logger.info("Processing Proteomics job: %s", job_data)
+
+        Path(job_data.out_dir).mkdir(parents=True, exist_ok=True)
+
+        try:
+            dataset = ds.dataset(job_data.data_path, format="arrow")
+            gene_abundance_df = dataset.to_table().to_pandas()
+        except Exception as arrow_exception:
+            logger.exception(arrow_exception)
+            try:
+                gene_abundance_df = pd.read_csv(job_data.data_path, sep="\t")
+            except Exception as e:
+                logger.exception(e)
+                raise ValueError(
+                    f"Failed to read {job_data.data_path}; not arrow feather or .tsv"
+                ) from e
+
+        annotation_df = get_annotation_result_from_query(
+            job_data.annotation_query, job_data.index_name, search_conf
+        )
+
+        joined_df = join_annotation_result_to_proteomics_dataset(annotation_df, gene_abundance_df)
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+
+        result_path = Path(job_data.out_dir) / f"joined.{timestamp}.feather"
+        joined_df.to_feather(result_path)
+
+        logger.info("Proteomics job completed. Results saved to %s", result_path)
+        return str(result_path)
+
+    def submit_msg_fn(proteomics_job_data: ProteomicsJobData) -> SubmittedJobMessage:
+        logger.debug("Received ProteomicsJobData: %s", proteomics_job_data)
+        return SubmittedJobMessage(proteomics_job_data.submission_id)
+
+    def completed_msg_fn(
+        proteomics_job_data: ProteomicsJobData, result_path: str
+    ) -> ProteomicsJobCompleteMessage:
+        logger.debug("Proteomics job completed: %s, results at %s", proteomics_job_data, result_path)
+        return ProteomicsJobCompleteMessage(
+            submission_id=proteomics_job_data.submission_id, result_path=result_path
+        )
+
     listen(
         ProteomicsJobData,
         handler_fn,
@@ -117,11 +117,23 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Start proteomics data processing listener.")
     parser.add_argument(
         "--queue_conf",
-        type=Path,
-        help="Path to the beanstalkd queue config yaml file (e.g., beanstalk1.yml)",
+        type=str,
+        help="Path to the beanstalkd queue config yaml file (e.g beanstalk1.yml)",
+        required=True,
+    )
+    parser.add_argument(
+        "--search_conf",
+        type=str,
+        help="Path to the opensearch config yaml file (e.g. elasticsearch.yml)",
         required=True,
     )
     args = parser.parse_args()
 
+    with open(args.queue_conf, "r", encoding="utf-8") as queue_config_file:
+        queue_conf = YAML(typ="safe").load(queue_config_file)
+
+    with open(args.search_conf, "r", encoding="utf-8") as search_config_file:
+        search_conf = YAML(typ="safe").load(search_config_file)
+
     queue_conf = _load_queue_conf(args.queue_conf)
-    main(queue_conf)
+    main(queue_conf, search_conf)
