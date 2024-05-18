@@ -1,7 +1,7 @@
 import argparse
 
 import logging
-from typing import Any
+from typing import Any, Callable
 from ruamel.yaml import YAML
 from pathlib import Path
 import pyarrow.dataset as ds  # type: ignore
@@ -53,13 +53,9 @@ def _load_queue_conf(queue_conf_path: str) -> QueueConf:
     return QueueConf(addresses=beanstalk_conf["addresses"], tubes=beanstalk_conf["tubes"])
 
 
-def main(queue_conf: QueueConf, search_conf: dict[str, Any]) -> None:
-    logger.info(
-        "Proteomics worker is listening on addresses: %s, tube: %s...",
-        queue_conf.addresses,
-        PROTEOMICS_TUBE,
-    )
-
+def make_handler_fn(
+    search_conf: dict[str, Any]
+) -> Callable[[ProgressPublisher, ProteomicsJobData], str]:
     def handler_fn(_publisher: ProgressPublisher, job_data: ProteomicsJobData) -> str:
         logger.info("Processing Proteomics job: %s", job_data)
 
@@ -91,17 +87,31 @@ def main(queue_conf: QueueConf, search_conf: dict[str, Any]) -> None:
         logger.info("Proteomics job completed. Results saved to %s", result_path)
         return str(result_path)
 
-    def submit_msg_fn(proteomics_job_data: ProteomicsJobData) -> SubmittedJobMessage:
-        logger.debug("Received ProteomicsJobData: %s", proteomics_job_data)
-        return SubmittedJobMessage(proteomics_job_data.submission_id)
+    return handler_fn
 
-    def completed_msg_fn(
-        proteomics_job_data: ProteomicsJobData, result_path: str
-    ) -> ProteomicsJobCompleteMessage:
-        logger.debug("Proteomics job completed: %s, results at %s", proteomics_job_data, result_path)
-        return ProteomicsJobCompleteMessage(
-            submission_id=proteomics_job_data.submission_id, result_path=result_path
-        )
+
+def submit_msg_fn(proteomics_job_data: ProteomicsJobData) -> SubmittedJobMessage:
+    logger.debug("Received ProteomicsJobData: %s", proteomics_job_data)
+    return SubmittedJobMessage(proteomics_job_data.submission_id)
+
+
+def completed_msg_fn(
+    proteomics_job_data: ProteomicsJobData, result_path: str
+) -> ProteomicsJobCompleteMessage:
+    logger.debug("Proteomics job completed: %s, results at %s", proteomics_job_data, result_path)
+    return ProteomicsJobCompleteMessage(
+        submission_id=proteomics_job_data.submission_id, result_path=result_path
+    )
+
+
+def main(queue_conf: QueueConf, search_conf: dict[str, Any]) -> None:
+    logger.info(
+        "Proteomics worker is listening on addresses: %s, tube: %s...",
+        queue_conf.addresses,
+        PROTEOMICS_TUBE,
+    )
+
+    handler_fn = make_handler_fn(search_conf)
 
     listen(
         ProteomicsJobData,
