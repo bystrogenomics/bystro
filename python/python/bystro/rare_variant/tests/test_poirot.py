@@ -1,11 +1,11 @@
 import pandas as pd
 from pandas.testing import assert_frame_equal
 import pickle
-from bystro.covariance.poirot import extract_residuals, do_poirot_by_snp
+from python.python.bystro.rare_variant.poirot import extract_residuals, do_poirot_by_snp
 
 
 def test_do_poirot_by_snp():
-    with open("python/bystro/covariance/tests/poirot_data.pkl", "rb") as f:
+    with open("python/bystro/rare_variant/tests/poirot_data.pkl", "rb") as f:
         loaded_data_dict = pickle.load(f)
     PHENO = loaded_data_dict["phenotypes"]
     GENO = loaded_data_dict["variants"]
