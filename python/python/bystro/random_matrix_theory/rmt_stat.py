@@ -1,13 +1,231 @@
+"""
+Copyright (c) 2009-2016 Iain M. Johnstone, Zongming Ma, Patrick O. Perry, and Morteza Shahram
+
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice,
+      this list of conditions and the following disclaimer.
+
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+    * Neither the name of the authors nor the names of the contributors
+      may be used to endorse or promote products derived from this software
+      without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+"""
 import numpy as np
-from scipy.stats import uniform  # type: ignore
-from scipy.stats import norm  # type: ignore
+from scipy.stats import norm, uniform, rv_continuous  # type: ignore
 from scipy.optimize import root_scalar  # type: ignore
 from scipy.integrate import quad  # type: ignore
 import warnings
 from bystro.random_matrix_theory.tracy_widom import TracyWidom
+from typing import Tuple
 
 
-def wishart_max_par(ndf, pdim, var=1, beta=1):
+class MarchenkoPastur(rv_continuous):
+    def __init__(self, ndf: int, pdim: int, var: float = 1, svr: float = None):
+        """
+        Initialize the Marchenko-Pastur distribution.
+
+        Args:
+            ndf (int): Degrees of freedom.
+            pdim (int): Dimensionality of the matrix.
+            var (float, optional): Variance. Defaults to 1.
+            svr (float, optional): Shape variance ratio. Defaults to None.
+        """
+        super().__init__()
+        self.ndf = ndf
+        self.pdim = pdim
+        self.var = var
+        self.svr = svr if svr is not None else ndf / pdim
+        self.params = marchenko_pastur_par(ndf, pdim, var, self.svr)
+
+    def _pdf(self, x: float) -> float:
+        """
+        Probability density function of the Marchenko-Pastur distribution.
+
+        Args:
+            x (float): Value at which to calculate the density.
+
+        Returns:
+            float: Density of the Marchenko-Pastur distribution.
+        """
+        return dmp(x, self.ndf, self.pdim, self.var, self.svr)
+
+    def _cdf(self, x: float) -> float:
+        """
+        Cumulative distribution function of the Marchenko-Pastur distribution.
+
+        Args:
+            x (float): Value at which to calculate the CDF.
+
+        Returns:
+            float: CDF of the Marchenko-Pastur distribution.
+        """
+        return pmp(x, self.ndf, self.pdim, self.var, self.svr)
+
+    def _ppf(self, q: float) -> float:
+        """
+        Percent point function (inverse of CDF) of the Marchenko-Pastur
+        distribution.
+
+        Args:
+            q (float): Probability.
+
+        Returns:
+            float: Quantile of the Marchenko-Pastur distribution.
+        """
+        return qmp(q, self.ndf, self.pdim, self.var, self.svr)
+
+
+class WishartMax(rv_continuous):
+    def __init__(self, ndf: int, pdim: int, var: float = 1, beta: int = 1):
+        """ """
+        super().__init__()
+        self.ndf = ndf
+        self.pdim = pdim
+        self.var = var
+        self.beta = beta
+        self.params = wishart_spike_par
+
+    def _pdf(self, x: float) -> float:
+        """
+        Probability density function of the ?? distribution.
+
+        Args:
+            x (float): Value at which to calculate the density.
+
+        Returns:
+            float: Density of the ?? distribution.
+        """
+        center, scale = self.params["centering"], self.params["scaling"]
+        x_transformed = (x - center) / scale
+        density = dtw(x_transformed, beta=self.beta)
+        out = density / scale
+        return out
+
+    def _cdf(self, x: float) -> float:
+        """
+        Cumulative distribution function of the ?? distribution.
+
+        Args:
+            x (float): Value at which to calculate the CDF.
+
+        Returns:
+            float: CDF of the ?? distribution.
+        """
+        center, scale = self.params["centering"], self.params["scaling"]
+        x_tw = (x - center) / scale
+        p = ptw(x_tw, self.beta, lower_tail=True)
+        return p
+
+    def _ppf(self, q: float) -> float:
+        """
+        Percent point function (inverse of CDF) of the ??
+        distribution.
+
+        Args:
+            q (float): Probability.
+
+        Returns:
+            float: Quantile of the ?? distribution.
+        """
+        center, scale = self.params["centering"], self.params["scaling"]
+        q_tw = qtw(q, beta=self.beta, lower_tail=True)
+        q = center + q_tw * scale
+        return q
+
+
+class WishartSpike(rv_continuous):
+    def __init__(
+        self, spike: float, ndf: int, pdim: int, var: float = 1, beta: int = 1
+    ):
+        """ """
+        super().__init__()
+        self.spike = spike
+        self.ndf = ndf
+        self.pdim = pdim
+        self.var = var
+        self.beta = beta
+        self.params = wishart_spike_par(spike, ndf, pdim, var, beta)
+
+    def _pdf(self, x: float) -> float:
+        """
+        Probability density function of the ?? distribution.
+
+        Args:
+            x (float): Value at which to calculate the density.
+
+        Returns:
+            float: Density of the ?? distribution.
+        """
+        d = norm.pdf(
+            x, loc=self.params["centering"], scale=self.params["scaling"]
+        )
+        return d
+
+    def _cdf(self, x: float) -> float:
+        """
+        Cumulative distribution function of the ?? distribution.
+
+        Args:
+            x (float): Value at which to calculate the CDF.
+
+        Returns:
+            float: CDF of the ?? distribution.
+        """
+        p = norm.cdf(x, loc=self.params["centering"], scale=self.params["scaling"])
+        return p
+
+    def _ppf(self, q: float) -> float:
+        """
+        Percent point function (inverse of CDF) of the ??
+        distribution.
+
+        Args:
+            q (float): Probability.
+
+        Returns:
+            float: Quantile of the ?? distribution.
+        """
+        q = norm.ppf(
+            q, loc=self.params["centering"], scale=self.params["scaling"]
+        )
+        return q
+
+
+def wishart_max_par(
+    ndf: int, pdim: int, var: float = 1, beta: int = 1
+) -> Tuple[float, float]:
+    """
+    Calculate the parameters for the Wishart distribution's maximum
+    eigenvalue.
+
+    Args:
+        ndf (int): Degrees of freedom.
+        pdim (int): Dimensionality of the matrix.
+        var (float, optional): Variance. Defaults to 1.
+        beta (int, optional): Beta parameter (1 or 2). Defaults to 1.
+
+    Returns:
+        Tuple[float, float]: Center and scale of the distribution.
+    """
+
     def mu(n, p):
         return (np.sqrt(n) + np.sqrt(p)) ** 2
 
@@ -33,7 +251,30 @@ def wishart_max_par(ndf, pdim, var=1, beta=1):
     return center, scale
 
 
-def d_wishart_max(x, ndf, pdim, var=1, beta=1, log=False):
+def d_wishart_max(
+    x: float,
+    ndf: int,
+    pdim: int,
+    var: float = 1,
+    beta: int = 1,
+    log: bool = False,
+) -> float:
+    """
+    Calculate the density of the maximum eigenvalue of the Wishart
+    distribution.
+
+    Args:
+        x (float): Value at which to calculate the density.
+        ndf (int): Degrees of freedom.
+        pdim (int): Dimensionality of the matrix.
+        var (float, optional): Variance. Defaults to 1.
+        beta (int, optional): Beta parameter (1 or 2). Defaults to 1.
+        log (bool, optional): If True, return the log density. Defaults
+        to False.
+
+    Returns:
+        float: Density or log density of the maximum eigenvalue.
+    """
     center, scale = wishart_max_par(ndf, pdim, var, beta)
     x_transformed = (x - center) / scale
     density = dtw(x_transformed, beta=beta)
@@ -43,7 +284,30 @@ def d_wishart_max(x, ndf, pdim, var=1, beta=1, log=False):
     return out
 
 
-def p_wishart_max(q, ndf, pdim, var=1, beta=1, lower_tail=True, log_p=False):
+def p_wishart_max(
+    q: float,
+    ndf: int,
+    pdim: int,
+    var: float = 1,
+    beta: int = 1,
+    lower_tail: bool = True,
+    log_p: bool = False,
+) -> float:
+    """
+    Calculate the cumulative distribution function of the maximum eigenvalue of the Wishart distribution.
+
+    Args:
+        q (float): Quantile.
+        ndf (int): Degrees of freedom.
+        pdim (int): Dimensionality of the matrix.
+        var (float, optional): Variance. Defaults to 1.
+        beta (int, optional): Beta parameter (1 or 2). Defaults to 1.
+        lower_tail (bool, optional): If True, return P(X <= q). Defaults to True.
+        log_p (bool, optional): If True, return the log CDF. Defaults to False.
+
+    Returns:
+        float: CDF or log CDF of the maximum eigenvalue.
+    """
     center, scale = wishart_max_par(ndf, pdim, var, beta)
     q_tw = (q - center) / scale
     p = ptw(q_tw, beta, lower_tail)
@@ -53,14 +317,52 @@ def p_wishart_max(q, ndf, pdim, var=1, beta=1, lower_tail=True, log_p=False):
     return p
 
 
-def q_wishart_max(p, ndf, pdim, var=1, beta=1, lower_tail=True, log_p=False):
+def q_wishart_max(
+    p: float,
+    ndf: int,
+    pdim: int,
+    var: float = 1,
+    beta: int = 1,
+    lower_tail: bool = True,
+    log_p: bool = False,
+) -> float:
+    """
+    Calculate the quantile function of the maximum eigenvalue of the Wishart distribution.
+
+    Args:
+        p (float): Probability.
+        ndf (int): Degrees of freedom.
+        pdim (int): Dimensionality of the matrix.
+        var (float, optional): Variance. Defaults to 1.
+        beta (int, optional): Beta parameter (1 or 2). Defaults to 1.
+        lower_tail (bool, optional): If True, return the lower tail quantile. Defaults to True.
+        log_p (bool, optional): If True, p is given as a log probability. Defaults to False.
+
+    Returns:
+        float: Quantile of the maximum eigenvalue.
+    """
     center, scale = wishart_max_par(ndf, pdim, var, beta)
     q_tw = qtw(p, beta=beta, lower_tail=lower_tail, log_p=log_p)
     q = center + q_tw * scale
     return q
 
 
-def wishart_spike_par(spike, ndf=None, pdim=None, var=1, beta=1):
+def wishart_spike_par(
+    spike: float, ndf: int, pdim: int, var: float = 1, beta: int = 1
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Calculate the parameters for the spike of the Wishart distribution.
+
+    Args:
+        spike (float): Spike value.
+        ndf (int): Degrees of freedom.
+        pdim (int): Dimensionality of the matrix.
+        var (float, optional): Variance. Defaults to 1.
+        beta (int, optional): Beta parameter (1 or 2). Defaults to 1.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: Center and scale for the spike.
+    """
     ratio = pdim / ndf
     above = spike > np.sqrt(ratio) * var
     center = np.where(
@@ -78,15 +380,62 @@ def wishart_spike_par(spike, ndf=None, pdim=None, var=1, beta=1):
     return {"centering": center, "scaling": scale}
 
 
-def d_wishart_spike(x, spike, ndf=None, pdim=None, var=1, beta=1, log=False):
+def d_wishart_spike(
+    x: float,
+    spike: float,
+    ndf: int,
+    pdim: int,
+    var: float = 1,
+    beta: int = 1,
+    log: bool = False,
+) -> float:
+    """
+    Calculate the density of the spike of the Wishart distribution.
+
+    Args:
+        x (float): Value at which to calculate the density.
+        spike (float): Spike value.
+        ndf (int): Degrees of freedom.
+        pdim (int): Dimensionality of the matrix.
+        var (float, optional): Variance. Defaults to 1.
+        beta (int, optional): Beta parameter (1 or 2). Defaults to 1.
+        log (bool, optional): If True, return the log density. Defaults to False.
+
+    Returns:
+        float: Density or log density of the spike.
+    """
     params = wishart_spike_par(spike, ndf, pdim, var, beta)
     d = norm.pdf(x, loc=params["centering"], scale=params["scaling"])
     return np.log(d) if log else d
 
 
 def p_wishart_spike(
-    q, spike, ndf=None, pdim=None, var=1, beta=1, lower_tail=True, log_p=False
-):
+    q: float,
+    spike: float,
+    ndf: int,
+    pdim: int,
+    var: float = 1,
+    beta: int = 1,
+    lower_tail: bool = True,
+    log_p: bool = False,
+) -> float:
+    """
+    Calculate the cumulative distribution function of the spike of
+    the Wishart distribution.
+
+    Args:
+        q (float): Quantile.
+        spike (float): Spike value.
+        ndf (int): Degrees of freedom.
+        pdim (int): Dimensionality of the matrix.
+        var (float, optional): Variance. Defaults to 1.
+        beta (int, optional): Beta parameter (1 or 2). Defaults to 1.
+        lower_tail (bool, optional): If True, return P(X <= q). Defaults to True.
+        log_p (bool, optional): If True, return the log CDF. Defaults to False.
+
+    Returns:
+        float: CDF or log CDF of the spike.
+    """
     params = wishart_spike_par(spike, ndf, pdim, var, beta)
     p = norm.cdf(q, loc=params["centering"], scale=params["scaling"])
     if not lower_tail:
@@ -95,8 +444,31 @@ def p_wishart_spike(
 
 
 def q_wishart_spike(
-    p, spike, ndf=None, pdim=None, var=1, beta=1, lower_tail=True, log_p=False
-):
+    p: float,
+    spike: float,
+    ndf: int,
+    pdim: int,
+    var: float = 1,
+    beta: int = 1,
+    lower_tail: bool = True,
+    log_p: bool = False,
+) -> float:
+    """
+    Calculate the quantile function of the spike of the Wishart distribution.
+
+    Args:
+        p (float): Probability.
+        spike (float): Spike value.
+        ndf (int): Degrees of freedom.
+        pdim (int): Dimensionality of the matrix.
+        var (float, optional): Variance. Defaults to 1.
+        beta (int, optional): Beta parameter (1 or 2). Defaults to 1.
+        lower_tail (bool, optional): If True, return the lower tail quantile. Defaults to True.
+        log_p (bool, optional): If True, p is given as a log probability. Defaults to False.
+
+    Returns:
+        float: Quantile of the spike.
+    """
     params = wishart_spike_par(spike, ndf, pdim, var, beta)
     if log_p:
         p = np.exp(p)
@@ -112,7 +484,21 @@ def r_wishart_spike(n, spike, ndf=None, pdim=None, var=1, beta=1):
     return x
 
 
-def marchenko_pastur_par(ndf=None, pdim=None, var=1, svr=None):
+def marchenko_pastur_par(
+    ndf: int, pdim: int, var: float = 1, svr: float = None
+) -> dict:
+    """
+    Calculate the parameters for the Marchenko-Pastur distribution.
+
+    Args:
+        ndf (int): Degrees of freedom.
+        pdim (int): Dimensionality of the matrix.
+        var (float, optional): Variance. Defaults to 1.
+        svr (float, optional): Shape variance ratio. Defaults to None.
+
+    Returns:
+        dict: Lower and upper bounds of the distribution.
+    """
     if svr is None:
         svr = ndf / pdim
     inv_gamma_sqrt = np.sqrt(1 / svr)
@@ -121,7 +507,28 @@ def marchenko_pastur_par(ndf=None, pdim=None, var=1, svr=None):
     return {"lower": a, "upper": b}
 
 
-def dmp(x, ndf=None, pdim=None, var=1, svr=None, log=False):
+def dmp(
+    x: float,
+    ndf: int,
+    pdim: int,
+    var: float = 1,
+    svr: float = None,
+    log: bool = False,
+) -> float:
+    """
+    Calculate the density of the Marchenko-Pastur distribution.
+
+    Args:
+        x (float): Value at which to calculate the density.
+        ndf (int): Degrees of freedom.
+        pdim (int): Dimensionality of the matrix.
+        var (float, optional): Variance. Defaults to 1.
+        svr (float, optional): Shape variance ratio. Defaults to None.
+        log (bool, optional): If True, return the log density. Defaults to False.
+
+    Returns:
+        float: Density or log density of the Marchenko-Pastur distribution.
+    """
     if svr is None:
         svr = ndf / pdim
     params = marchenko_pastur_par(ndf, pdim, var, svr)
@@ -139,7 +546,30 @@ def dmp(x, ndf=None, pdim=None, var=1, svr=None, log=False):
     return density
 
 
-def pmp(q, ndf=None, pdim=None, var=1, svr=None, lower_tail=True, log_p=False):
+def pmp(
+    q: float,
+    ndf: int,
+    pdim: int,
+    var: float = 1,
+    svr: float = None,
+    lower_tail: bool = True,
+    log_p: bool = False,
+) -> float:
+    """
+    Calculate the cumulative distribution function of the Marchenko-Pastur distribution.
+
+    Args:
+        q (float): Quantile.
+        ndf (int): Degrees of freedom.
+        pdim (int): Dimensionality of the matrix.
+        var (float, optional): Variance. Defaults to 1.
+        svr (float, optional): Shape variance ratio. Defaults to None.
+        lower_tail (bool, optional): If True, return P(X <= q). Defaults to True.
+        log_p (bool, optional): If True, return the log CDF. Defaults to False.
+
+    Returns:
+        float: CDF or log CDF of the Marchenko-Pastur distribution.
+    """
     if svr is None:
         svr = ndf / pdim
     params = marchenko_pastur_par(ndf, pdim, var, svr)
@@ -160,7 +590,30 @@ def pmp(q, ndf=None, pdim=None, var=1, svr=None, lower_tail=True, log_p=False):
     return p
 
 
-def qmp(p, ndf=None, pdim=None, var=1, svr=None, lower_tail=True, log_p=False):
+def qmp(
+    p: float,
+    ndf: int,
+    pdim: int,
+    var: float = 1,
+    svr: float = None,
+    lower_tail: bool = True,
+    log_p: bool = False,
+) -> float:
+    """
+    Calculate the quantile function of the Marchenko-Pastur distribution.
+
+    Args:
+        p (float): Probability.
+        ndf (int): Degrees of freedom.
+        pdim (int): Dimensionality of the matrix.
+        var (float, optional): Variance. Defaults to 1.
+        svr (float, optional): Shape variance ratio. Defaults to None.
+        lower_tail (bool, optional): If True, return the lower tail quantile. Defaults to True.
+        log_p (bool, optional): If True, p is given as a log probability. Defaults to False.
+
+    Returns:
+        float: Quantile of the Marchenko-Pastur distribution.
+    """
     if svr is None:
         svr = ndf / pdim
     params = marchenko_pastur_par(ndf, pdim, var, svr)
