@@ -1,7 +1,7 @@
 import pandas as pd
 from pandas.testing import assert_frame_equal
 import pickle
-from python.python.bystro.rare_variant.poirot import extract_residuals, do_poirot_by_snp
+from bystro.rare_variant.poirot import extract_residuals, do_poirot_by_snp
 
 
 def test_do_poirot_by_snp():
