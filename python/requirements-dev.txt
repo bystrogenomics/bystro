@@ -5,6 +5,7 @@ pandas-stubs==2.2.1.240316
 pytest==7.3.1
 pytest-cov==4.1.0
 pytest-mock==3.11.1
+pytest-asyncio==0.23.7
 pyright==1.1.349
 ruff==0.0.270
 types-tqdm==4.65.0.1
