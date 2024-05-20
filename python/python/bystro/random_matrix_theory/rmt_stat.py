@@ -474,8 +474,8 @@ def q_wishart_spike(
 
 
 def r_wishart_spike(n, spike, ndf=None, pdim=None, var=1, beta=1):
-    params = wishart_spike_par(spike, ndf, pdim, var, beta)
-    x = norm.rvs(loc=params["centering"], scale=params["scaling"], size=n)
+    center,scale = wishart_spike_par(spike, ndf, pdim, var, beta)
+    x = norm.rvs(loc=center, scale=scale, size=n)
     return x
 
 
