@@ -34,11 +34,13 @@ from scipy.optimize import root_scalar  # type: ignore
 from scipy.integrate import quad  # type: ignore
 import warnings
 from bystro.random_matrix_theory.tracy_widom import TracyWidom
-from typing import Tuple
+from typing import Optional, Tuple
 
 
 class MarchenkoPastur(rv_continuous):
-    def __init__(self, ndf: int, pdim: int, var: float = 1, svr: float = None):
+    def __init__(
+        self, ndf: int, pdim: int, var: float = 1, svr: Optional[float] = None
+    ):
         """
         Initialize the Marchenko-Pastur distribution.
 
@@ -101,7 +103,7 @@ class WishartMax(rv_continuous):
         self.pdim = pdim
         self.var = var
         self.beta = beta
-        self.params = wishart_spike_par
+        self.center, self.scale = wishart_max_par(ndf, pdim, var, beta)
 
     def _pdf(self, x: float) -> float:
         """
@@ -113,10 +115,9 @@ class WishartMax(rv_continuous):
         Returns:
             float: Density of the ?? distribution.
         """
-        center, scale = self.params["centering"], self.params["scaling"]
-        x_transformed = (x - center) / scale
+        x_transformed = (x - self.center) / self.scale
         density = dtw(x_transformed, beta=self.beta)
-        out = density / scale
+        out = density / self.scale
         return out
 
     def _cdf(self, x: float) -> float:
@@ -129,8 +130,7 @@ class WishartMax(rv_continuous):
         Returns:
             float: CDF of the ?? distribution.
         """
-        center, scale = self.params["centering"], self.params["scaling"]
-        x_tw = (x - center) / scale
+        x_tw = (x - self.center) / self.scale
         p = ptw(x_tw, self.beta, lower_tail=True)
         return p
 
@@ -145,9 +145,8 @@ class WishartMax(rv_continuous):
         Returns:
             float: Quantile of the ?? distribution.
         """
-        center, scale = self.params["centering"], self.params["scaling"]
         q_tw = qtw(q, beta=self.beta, lower_tail=True)
-        q = center + q_tw * scale
+        q = self.center + q_tw * self.scale
         return q
 
 
@@ -162,7 +161,7 @@ class WishartSpike(rv_continuous):
         self.pdim = pdim
         self.var = var
         self.beta = beta
-        self.params = wishart_spike_par(spike, ndf, pdim, var, beta)
+        self.center, self.scale = wishart_spike_par(spike, ndf, pdim, var, beta)
 
     def _pdf(self, x: float) -> float:
         """
@@ -174,9 +173,7 @@ class WishartSpike(rv_continuous):
         Returns:
             float: Density of the ?? distribution.
         """
-        d = norm.pdf(
-            x, loc=self.params["centering"], scale=self.params["scaling"]
-        )
+        d = norm.pdf(x, loc=self.center, scale=self.scale)
         return d
 
     def _cdf(self, x: float) -> float:
@@ -189,7 +186,7 @@ class WishartSpike(rv_continuous):
         Returns:
             float: CDF of the ?? distribution.
         """
-        p = norm.cdf(x, loc=self.params["centering"], scale=self.params["scaling"])
+        p = norm.cdf(x, loc=self.center, scale=self.scale)
         return p
 
     def _ppf(self, q: float) -> float:
@@ -203,9 +200,7 @@ class WishartSpike(rv_continuous):
         Returns:
             float: Quantile of the ?? distribution.
         """
-        q = norm.ppf(
-            q, loc=self.params["centering"], scale=self.params["scaling"]
-        )
+        q = norm.ppf(q, loc=self.center, scale=self.scale)
         return q
 
 
@@ -377,7 +372,7 @@ def wishart_spike_par(
         ),
         np.nan,
     )
-    return {"centering": center, "scaling": scale}
+    return center, scale
 
 
 def d_wishart_spike(
@@ -404,8 +399,8 @@ def d_wishart_spike(
     Returns:
         float: Density or log density of the spike.
     """
-    params = wishart_spike_par(spike, ndf, pdim, var, beta)
-    d = norm.pdf(x, loc=params["centering"], scale=params["scaling"])
+    centering, scaling = wishart_spike_par(spike, ndf, pdim, var, beta)
+    d = norm.pdf(x, loc=centering, scale=scaling)
     return np.log(d) if log else d
 
 
@@ -436,8 +431,8 @@ def p_wishart_spike(
     Returns:
         float: CDF or log CDF of the spike.
     """
-    params = wishart_spike_par(spike, ndf, pdim, var, beta)
-    p = norm.cdf(q, loc=params["centering"], scale=params["scaling"])
+    centering, scaling = wishart_spike_par(spike, ndf, pdim, var, beta)
+    p = norm.cdf(q, loc=centering, scale=scaling)
     if not lower_tail:
         p = 1 - p
     return np.log(p) if log_p else p
@@ -469,12 +464,12 @@ def q_wishart_spike(
     Returns:
         float: Quantile of the spike.
     """
-    params = wishart_spike_par(spike, ndf, pdim, var, beta)
+    centering, scaling = wishart_spike_par(spike, ndf, pdim, var, beta)
     if log_p:
         p = np.exp(p)
     if not lower_tail:
         p = 1 - p
-    q = norm.ppf(p, loc=params["centering"], scale=params["scaling"])
+    q = norm.ppf(p, loc=centering, scale=scaling)
     return q
 
 
@@ -485,7 +480,7 @@ def r_wishart_spike(n, spike, ndf=None, pdim=None, var=1, beta=1):
 
 
 def marchenko_pastur_par(
-    ndf: int, pdim: int, var: float = 1, svr: float = None
+    ndf: int, pdim: int, var: float = 1, svr: Optional[float] = None
 ) -> dict:
     """
     Calculate the parameters for the Marchenko-Pastur distribution.
@@ -512,7 +507,7 @@ def dmp(
     ndf: int,
     pdim: int,
     var: float = 1,
-    svr: float = None,
+    svr: Optional[float] = None,
     log: bool = False,
 ) -> float:
     """
@@ -551,7 +546,7 @@ def pmp(
     ndf: int,
     pdim: int,
     var: float = 1,
-    svr: float = None,
+    svr: Optional[float] = None,
     lower_tail: bool = True,
     log_p: bool = False,
 ) -> float:
@@ -595,7 +590,7 @@ def qmp(
     ndf: int,
     pdim: int,
     var: float = 1,
-    svr: float = None,
+    svr: Optional[float] = None,
     lower_tail: bool = True,
     log_p: bool = False,
 ) -> float:
