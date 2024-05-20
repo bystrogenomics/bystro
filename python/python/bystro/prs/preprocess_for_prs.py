@@ -173,20 +173,18 @@ def read_feather_in_chunks(file_path, columns=None, chunk_size=1000):
         yield chunk
 
 
-def get_p_value_thresholded_indices(df, p_value_threshold):
+def get_p_value_thresholded_indices(df, p_value_threshold: float):
     """Return indices of rows with P-values less than the specified threshold."""
     return df.index[df["P"] < p_value_threshold].tolist()
 
 
 def generate_thresholded_overlap_scores_dosage(
-    gwas_scores_path: str, dosage_matrix_path: str
+    gwas_scores_path: str, dosage_matrix_path: str, p_value_threshold: float
 ) -> pd.DataFrame:
     """Compare and restrict to overlapping loci between dosage matrix and thresholded scores."""
     scores = _preprocess_scores(gwas_scores_path)
     dosage_loci_nomiss = _extract_nomiss_dosage_loci(dosage_matrix_path)
 
-    # TODO: Add customizable p value threshold and option for multiple thresholds
-    p_value_threshold = 0.05
     thresholded_indices_set = set()
     for chunk in read_feather_in_chunks(gwas_scores_path, columns=["P"], chunk_size=1000):
         thresholded_indices = get_p_value_thresholded_indices(chunk, p_value_threshold)
@@ -281,11 +279,9 @@ def clean_scores_for_analysis(
     scores_overlap_adjusted = max_effect_per_bin.drop(columns=["bin", "abs_effect_weight"])
     scores_overlap_adjusted = scores_overlap_adjusted.set_index("SNPID")
     format_col_index = scores_overlap_adjusted.columns.get_loc(column_to_drop)
-
     # If there is more than 1 column found, our "columns_to_keep" function will not work
     if not isinstance(format_col_index, int):
         raise ValueError(f"Column {column_to_drop} was not found uniquely in the dataframe.")
-
     columns_to_keep = ["allele_comparison"] + list(
         scores_overlap_adjusted.columns[format_col_index + 1 :]
     )
@@ -319,10 +315,12 @@ def extract_clumped_thresholded_genos(
 
 
 def finalize_dosage_scores_after_c_t(
-    gwas_scores_path: str, dosage_matrix_path: str, map_directory_path: str
+    gwas_scores_path: str, dosage_matrix_path: str, map_directory_path: str, p_value_threshold: float
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Finalize dosage matrix and scores for PRS calculation."""
-    scores_overlap = generate_thresholded_overlap_scores_dosage(gwas_scores_path, dosage_matrix_path)
+    scores_overlap = generate_thresholded_overlap_scores_dosage(
+        gwas_scores_path, dosage_matrix_path, p_value_threshold
+    )
     scores_after_c_t, loci_and_allele_comparison = ld_clump(scores_overlap, map_directory_path)
     dosage_overlap = extract_clumped_thresholded_genos(dosage_matrix_path, scores_after_c_t)
     dosage_overlap = dosage_overlap.set_index("locus")
@@ -336,12 +334,15 @@ def finalize_dosage_scores_after_c_t(
 
 
 def generate_c_and_t_prs_scores(
-    gwas_scores_path: str, dosage_matrix_path: str, map_directory_path: str
+    gwas_scores_path: str,
+    dosage_matrix_path: str,
+    map_directory_path: str,
+    p_value_threshold: float = 0.05,
 ) -> pd.Series:
     """Calculate PRS."""
     # TODO: Add covariates to model
     genos_transpose, scores_after_c_t = finalize_dosage_scores_after_c_t(
-        gwas_scores_path, dosage_matrix_path, map_directory_path
+        gwas_scores_path, dosage_matrix_path, map_directory_path, p_value_threshold
     )
     return genos_transpose @ scores_after_c_t["BETA"]
 
