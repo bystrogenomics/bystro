@@ -175,6 +175,8 @@ def read_feather_in_chunks(file_path, columns=None, chunk_size=1000):
 
 def get_p_value_thresholded_indices(df, p_value_threshold: float):
     """Return indices of rows with P-values less than the specified threshold."""
+    if not (0 <= p_value_threshold <= 1):
+        raise ValueError("p_value_threshold must be between 0 and 1")
     return df.index[df["P"] < p_value_threshold].tolist()
 
 
