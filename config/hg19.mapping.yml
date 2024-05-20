@@ -111,8 +111,8 @@ index_settings:
           - punctuation
     tokenizer:
       comma_tokenizer:
-          type: pattern
-          pattern: ","
+        type: pattern
+        pattern: ","
       hgvs_tokenizer:
         type: pattern
       edge_ngram_tokenizer:
@@ -125,11 +125,11 @@ index_settings:
           - punctuation
     analyzer:
       clnsig_analyzer:
-          tokenizer: comma_tokenizer
-          filter:
-            - lowercase
-            - clnsig_conditional_underscore_split
-            - clnsig_conditional_filter
+        tokenizer: comma_tokenizer
+        filter:
+          - lowercase
+          - clnsig_conditional_underscore_split
+          - clnsig_conditional_filter
       hgvs_analyzer:
         type: custom
         tokenizer: hgvs_tokenizer

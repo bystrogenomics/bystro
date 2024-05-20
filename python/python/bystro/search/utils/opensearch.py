@@ -1,7 +1,7 @@
 """Utility functions for Opensearch 2.*"""
 
 
-def gather_opensearch_args(search_conf: dict):
+def gather_opensearch_args(search_conf: dict) -> dict:
     """
     Return arguments required to instantiate OpenSearch Client
     Supports both https and http protocols

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from bystro.proteomics.listener_annotation_interface import (
     ProteomicsJobData,
-    handler_fn,
+    make_handler_fn,
     submit_msg_fn,
     completed_msg_fn,
     SubmittedJobMessage,
@@ -54,7 +54,7 @@ def test_handler_fn_happy_path(tmpdir, mocker):
         return_value=pd.DataFrame()
     )
     mocker.patch(
-        "bystro.proteomics.listener_annotation_interface.OpenSearch",
+        "bystro.proteomics.annotation_interface.AsyncOpenSearch",
         return_value=mocker.Mock()
     )
 
@@ -68,6 +68,7 @@ def test_handler_fn_happy_path(tmpdir, mocker):
 
     publisher = mocker.Mock(spec=ProgressPublisher)
 
+    handler_fn = make_handler_fn({})
     result = handler_fn(publisher, job_data)
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
