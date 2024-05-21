@@ -7,6 +7,7 @@ from typing import Any, Callable
 
 import asyncio
 from msgspec import Struct
+import nest_asyncio
 import numpy as np
 
 import pandas as pd
@@ -25,6 +26,7 @@ HOMOZYGOTE_DOSAGE = 2
 MISSING_GENO_DOSAGE = np.nan
 ONE_DAY = "1d"  # default keep_alive time for opensearch point in time index
 
+nest_asyncio.apply()
 
 class OpenSearchQueryConfig(Struct):
     """Represent parameters for configuring OpenSearch queries."""
@@ -253,12 +255,13 @@ async def _run_annotation_query(
 ) -> pd.DataFrame:
     """Given query and index contained in SaveJobData, run query and return results as dataframe."""
 
+    search_client_args = gather_opensearch_args(opensearch_config)
     if proxy:
         if auth is None:
             raise ValueError("auth must be provided when proxy is True.")
-        client = get_async_proxied_opensearch_client(auth, index_name)
+        job_id = index_name.split("_")[0]
+        client = get_async_proxied_opensearch_client(auth, job_id, search_client_args)
     else:
-        search_client_args = gather_opensearch_args(opensearch_config)
         client = AsyncOpenSearch(**search_client_args)
 
     num_slices, _ = await _get_num_slices(client, index_name, query)
@@ -268,6 +271,7 @@ async def _run_annotation_query(
     )
     try:  # make sure we clean up the PIT index properly no matter what happens in this block
         pit_id = point_in_time["pit_id"]
+
         query["body"]["pit"] = {"id": pit_id}
         query["body"]["size"] = OPENSEARCH_QUERY_CONFIG.max_query_size
         query_results = []
@@ -325,9 +329,7 @@ def get_annotation_result_from_query(
     coroutine = get_annotation_result_from_query_async(
         user_query_string, index_name, opensearch_config, additional_fields, proxy=proxy, auth=auth
     )
-    if loop.is_running():
-        # If the event loop is already running, use a workaround
-        return asyncio.run_coroutine_threadsafe(coroutine, loop).result()
+
     return loop.run_until_complete(coroutine)
 
 
