@@ -212,7 +212,6 @@ def get_async_proxied_opensearch_client(auth: CachedAuth, job_id: str, client_ar
 
     # Initialize OpenSearch client with custom connection class
 
-    print(client_args)
     client = AsyncOpenSearch(
         hosts=[{"host": host, "port": int(port)}],
         use_ssl=bool(protocol == "https" or int(port) == 443),
