@@ -12,10 +12,11 @@ import numpy as np
 import pandas as pd
 from opensearchpy import AsyncOpenSearch
 
-from bystro.proteomics.fragpipe_tandem_mass_tag import TandemMassTagDataset
-
-from bystro.search.utils.opensearch import gather_opensearch_args
+from bystro.api.auth import CachedAuth
 from bystro.api.search import get_async_proxied_opensearch_client
+from bystro.proteomics.fragpipe_tandem_mass_tag import TandemMassTagDataset
+from bystro.search.utils.opensearch import gather_opensearch_args
+
 
 logger = logging.getLogger(__file__)
 
@@ -248,13 +249,17 @@ async def _run_annotation_query(
     opensearch_config: dict[str, Any],
     additional_fields: list[str] | None = None,
     proxy: bool = True,
+    auth: CachedAuth | None = None,
 ) -> pd.DataFrame:
     """Given query and index contained in SaveJobData, run query and return results as dataframe."""
-    search_client_args = gather_opensearch_args(opensearch_config)
 
     if proxy:
-        client = get_async_proxied_opensearch_client(search_client_args, index_name)
-    client = AsyncOpenSearch(**search_client_args)
+        if auth is None:
+            raise ValueError("auth must be provided when proxy is True.")
+        client = get_async_proxied_opensearch_client(auth, index_name)
+    else:
+        search_client_args = gather_opensearch_args(opensearch_config)
+        client = AsyncOpenSearch(**search_client_args)
 
     num_slices, _ = await _get_num_slices(client, index_name, query)
 
@@ -298,11 +303,12 @@ async def get_annotation_result_from_query_async(
     opensearch_config: dict[str, Any],
     additional_fields: list[str] | None = None,
     proxy: bool = True,
+    auth: CachedAuth | None = None,
 ) -> pd.DataFrame:
     """Given a query and index, return a dataframe of variant / sample_id records matching query."""
     query = _build_opensearch_query_from_query_string(user_query_string)
     return await _run_annotation_query(
-        query, index_name, opensearch_config, additional_fields, proxy=proxy
+        query, index_name, opensearch_config, additional_fields, proxy=proxy, auth=auth
     )
 
 
@@ -312,11 +318,12 @@ def get_annotation_result_from_query(
     opensearch_config: dict[str, Any],
     additional_fields: list[str] = [],
     proxy: bool = True,
+    auth: CachedAuth | None = None,
 ) -> pd.DataFrame:
     """Given a query and index, return a dataframe of variant / sample_id records matching query."""
     loop = asyncio.get_event_loop()
     coroutine = get_annotation_result_from_query_async(
-        user_query_string, index_name, opensearch_config, additional_fields, proxy
+        user_query_string, index_name, opensearch_config, additional_fields, proxy=proxy, auth=auth
     )
     if loop.is_running():
         # If the event loop is already running, use a workaround
