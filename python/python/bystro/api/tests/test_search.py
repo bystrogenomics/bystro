@@ -62,7 +62,10 @@ def test_get_async_proxied_opensearch_client(cached_auth, job_id):
             use_ssl=True,
             connection_class=BystroProxyAsyncHttpConnection,
             path_prefix=f"/api/jobs/{job_id}/opensearch",
-            http_auth=mock_auth.return_value,  # Ensure the mock instance is used
+            http_auth=mock_auth.return_value,
+            http_compress=True,
+            pool_maxsize=16,
+            timeout=1200,
         )
 
 
@@ -149,4 +152,30 @@ def test_get_proxied_opensearch_client(cached_auth, job_id):
             connection_class=BystroProxyHttpConnection,
             path_prefix=f"/api/jobs/{job_id}/opensearch",
             http_auth=mock_auth.return_value,  # Ensure the mock instance is used
+            http_compress=True,
+            pool_maxsize=16,
+            timeout=1200,
         )
+
+def test_get_proxied_opensearch_client_nondefault_params(cached_auth, job_id):
+    with (
+        patch("bystro.api.search.OpenSearch", new_callable=Mock) as mock_client,
+        patch("bystro.api.search.JWTAuth", new_callable=Mock) as mock_auth,
+    ):
+        client = get_proxied_opensearch_client(cached_auth, job_id, {
+            "timeout": 600,
+            "pool_maxsize": 8
+        })
+
+        assert isinstance(client, Mock)
+        mock_client.assert_called_once_with(
+            hosts=[{"host": "testhost", "port": 9200}],
+            use_ssl=True,
+            connection_class=BystroProxyHttpConnection,
+            path_prefix=f"/api/jobs/{job_id}/opensearch",
+            http_auth=mock_auth.return_value,  # Ensure the mock instance is used
+            http_compress=True,
+            pool_maxsize=8,
+            timeout=600,
+        )
+
