@@ -15,6 +15,7 @@ from opensearchpy import AsyncOpenSearch
 from bystro.proteomics.fragpipe_tandem_mass_tag import TandemMassTagDataset
 
 from bystro.search.utils.opensearch import gather_opensearch_args
+from bystro.api.search import get_async_proxied_opensearch_client
 
 logger = logging.getLogger(__file__)
 
@@ -170,6 +171,7 @@ def _get_samples_genes_dosages_from_hit(
 
     return pd.DataFrame(rows)
 
+
 async def _execute_query(
     client: AsyncOpenSearch, query: dict, additional_fields: list[str] | None = None
 ) -> pd.DataFrame:
@@ -245,9 +247,13 @@ async def _run_annotation_query(
     index_name: str,
     opensearch_config: dict[str, Any],
     additional_fields: list[str] | None = None,
+    proxy: bool = True,
 ) -> pd.DataFrame:
     """Given query and index contained in SaveJobData, run query and return results as dataframe."""
     search_client_args = gather_opensearch_args(opensearch_config)
+
+    if proxy:
+        client = get_async_proxied_opensearch_client(search_client_args, index_name)
     client = AsyncOpenSearch(**search_client_args)
 
     num_slices, _ = await _get_num_slices(client, index_name, query)
@@ -291,10 +297,13 @@ async def get_annotation_result_from_query_async(
     index_name: str,
     opensearch_config: dict[str, Any],
     additional_fields: list[str] | None = None,
+    proxy: bool = True,
 ) -> pd.DataFrame:
     """Given a query and index, return a dataframe of variant / sample_id records matching query."""
     query = _build_opensearch_query_from_query_string(user_query_string)
-    return await _run_annotation_query(query, index_name, opensearch_config, additional_fields)
+    return await _run_annotation_query(
+        query, index_name, opensearch_config, additional_fields, proxy=proxy
+    )
 
 
 def get_annotation_result_from_query(
@@ -302,11 +311,12 @@ def get_annotation_result_from_query(
     index_name: str,
     opensearch_config: dict[str, Any],
     additional_fields: list[str] = [],
+    proxy: bool = True,
 ) -> pd.DataFrame:
     """Given a query and index, return a dataframe of variant / sample_id records matching query."""
     loop = asyncio.get_event_loop()
     coroutine = get_annotation_result_from_query_async(
-        user_query_string, index_name, opensearch_config, additional_fields
+        user_query_string, index_name, opensearch_config, additional_fields, proxy
     )
     if loop.is_running():
         # If the event loop is already running, use a workaround

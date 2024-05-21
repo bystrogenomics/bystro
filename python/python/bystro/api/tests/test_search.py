@@ -1,14 +1,18 @@
 import pytest
+from requests import Request
 from unittest.mock import AsyncMock, Mock, patch
 
+from opensearchpy.connection import RequestsHttpConnection
 from opensearchpy import AsyncHttpConnection
-
 
 from bystro.api.auth import CachedAuth
 from bystro.api.search import (
     AsyncConnectorJWTAuth,
     BystroProxyAsyncHttpConnection,
     get_async_proxied_opensearch_client,
+    JWTAuth,
+    BystroProxyHttpConnection,
+    get_proxied_opensearch_client,
 )
 
 
@@ -54,13 +58,12 @@ def test_get_async_proxied_opensearch_client(cached_auth, job_id):
 
         assert isinstance(client, Mock)
         mock_client.assert_called_once_with(
-            hosts=[{"host": "testhost", "port": "9200"}],
+            hosts=[{"host": "testhost", "port": 9200}],
             use_ssl=True,
             connection_class=BystroProxyAsyncHttpConnection,
             path_prefix=f"/api/jobs/{job_id}/opensearch",
             http_auth=mock_auth.return_value,  # Ensure the mock instance is used
         )
-
 
 
 @pytest.mark.asyncio
@@ -82,4 +85,68 @@ async def test_bystro_proxy_async_http_connection_perform_request(auth_token):
             headers=None,
             timeout=None,
             ignore=(),
+        )
+
+
+def test_jwt_auth():
+    token = "test_token"
+    auth = JWTAuth(token)
+
+    request = Request()
+    request.headers = {}
+
+    # Call the JWTAuth instance
+    auth(request)
+
+    assert "Authorization" in request.headers
+    assert request.headers["Authorization"] == f"Bearer {token}"
+
+
+def test_perform_request_with_prefix(mocker):
+    connection = BystroProxyHttpConnection(
+        host="localhost", port=9200, path_prefix="/test_prefix", http_auth="test_token"
+    )
+
+    mock_perform_request = mocker.patch.object(RequestsHttpConnection, "perform_request")
+    connection.perform_request("GET", "/_search")
+    mock_perform_request.assert_called_once_with(
+        "GET",
+        "/test_prefix/_search",
+        params=None,
+        body=None,
+        headers=None,
+        timeout=None,
+        ignore=(),
+    )
+
+
+def test_auth_integration():
+    connection = BystroProxyHttpConnection(
+        host="localhost", port=9200, path_prefix="/test_prefix", http_auth="test_token"
+    )
+
+    # Create a mock request object with a headers dictionary
+    request = Mock()
+    request.headers = {}
+
+    connection.auth(request)
+
+    assert "Authorization" in request.headers
+    assert request.headers["Authorization"] == "Bearer test_token"
+
+
+def test_get_proxied_opensearch_client(cached_auth, job_id):
+    with (
+        patch("bystro.api.search.OpenSearch", new_callable=Mock) as mock_client,
+        patch("bystro.api.search.JWTAuth", new_callable=Mock) as mock_auth,
+    ):
+        client = get_proxied_opensearch_client(cached_auth, job_id)
+
+        assert isinstance(client, Mock)
+        mock_client.assert_called_once_with(
+            hosts=[{"host": "testhost", "port": 9200}],
+            use_ssl=True,
+            connection_class=BystroProxyHttpConnection,
+            path_prefix=f"/api/jobs/{job_id}/opensearch",
+            http_auth=mock_auth.return_value,  # Ensure the mock instance is used
         )
