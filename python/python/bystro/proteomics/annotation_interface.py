@@ -7,7 +7,7 @@ from typing import Any, Callable
 
 import asyncio
 from msgspec import Struct
-import nest_asyncio
+import nest_asyncio # type: ignore
 import numpy as np
 
 import pandas as pd
