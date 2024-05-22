@@ -10,6 +10,9 @@ from enum import Enum
 import pandas as pd
 from pyarrow import feather  # type: ignore
 import pyarrow.dataset as ds  # type: ignore
+import pyarrow.compute as pc  # type: ignore
+import tempfile
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -71,14 +74,18 @@ def _load_genetic_maps_from_feather(map_directory_path: str) -> dict[str, pd.Dat
     return genetic_maps
 
 
-def _extract_nomiss_dosage_loci(dosage_matrix_path: str) -> pd.DataFrame:
+def _extract_nomiss_dosage_loci(
+    dosage_matrix_path: str, score_loci: Optional[set] = None
+) -> pd.DataFrame:
     """
     Reads a dataset from the provided dosage matrix Feather file path and filters out
-    rows where any column other than 'locus' contains a missing dosage value (represented by -1).
+    rows where any column other than 'locus' contains a missing dosage value (represented by -1)
+    and loci not in the base GWAS summary statistics dataset.
 
     Args:
     ----
-    dosage_matrix_path (str): The path to the Feather file containing the dataset.
+    dosage_matrix_path (str): The path to the Feather file containing the target dataset.
+    score_loci (set): An optional set of loci from a base GWAS summary statistics dataset.
 
     Returns:
     -------
@@ -89,21 +96,23 @@ def _extract_nomiss_dosage_loci(dosage_matrix_path: str) -> pd.DataFrame:
     conditions = []
     for column in dataset.schema.names:
         if column != "locus":
-            condition = ds.field(column) != -1
+            condition = ~pc.is_null(ds.field(column)) & (ds.field(column) >= 0)
             conditions.append(condition)
     combined_condition = conditions[0]
     for condition in conditions[1:]:
         combined_condition = combined_condition & condition
     filtered_dataset = dataset.filter(combined_condition)
-    filtered_loci = filtered_dataset.to_table(columns=["locus"]).to_pandas()
-    return filtered_loci
+    if score_loci is not None:
+        loci_condition = ds.field("locus").isin(score_loci)
+        filtered_dataset = filtered_dataset.filter(loci_condition)
+    filtered_dosage_loci = filtered_dataset.to_table(columns=["locus"]).to_pandas()
+    return filtered_dosage_loci
 
 
-def _preprocess_scores(AD_SCORE_FILEPATH: str) -> pd.DataFrame:
+def _preprocess_scores(ad_scores: pd.DataFrame) -> pd.DataFrame:
     """Process GWAS summary statistics to use effect scores for PRS."""
     # For now, we are supporting one AD dataset PMID:35379992
 
-    ad_scores = _load_association_scores(AD_SCORE_FILEPATH)
     columns_to_include = ["CHR", "POS", "OTHER_ALLELE", "EFFECT_ALLELE", "P", "SNPID", "BETA"]
     preprocessed_scores = ad_scores[columns_to_include].copy()
 
@@ -166,6 +175,8 @@ def _preprocess_genetic_maps(map_directory_path: str) -> dict[int, list[int]]:
 
 def read_feather_in_chunks(file_path, columns=None, chunk_size=1000):
     """Read a Feather file in chunks as pandas Dataframes."""
+    if columns is not None:
+        columns = list(columns)
     table = feather.read_table(file_path, columns=columns)
     for i in range(0, table.num_rows, chunk_size):
         chunk = table.slice(i, chunk_size).to_pandas()
@@ -184,39 +195,41 @@ def generate_thresholded_overlap_scores_dosage(
     gwas_scores_path: str, dosage_matrix_path: str, p_value_threshold: float
 ) -> pd.DataFrame:
     """Compare and restrict to overlapping loci between dosage matrix and thresholded scores."""
-    scores = _preprocess_scores(gwas_scores_path)
-    dosage_loci_nomiss = _extract_nomiss_dosage_loci(dosage_matrix_path)
+    thresholded_scores_chunks = []
 
-    thresholded_indices_set = set()
-    for chunk in read_feather_in_chunks(gwas_scores_path, columns=["P"], chunk_size=1000):
+    for chunk in read_feather_in_chunks(gwas_scores_path, chunk_size=1000):
         thresholded_indices = get_p_value_thresholded_indices(chunk, p_value_threshold)
-        thresholded_indices_set.update(thresholded_indices)
-    scores_filtered_indices = sorted(list(thresholded_indices_set))
-    thresholded_scores = scores.iloc[scores_filtered_indices]
-    thresholded_scores = thresholded_scores.set_index("SNPID")
+        if thresholded_indices:
+            thresholded_scores_chunks.append(chunk.loc[thresholded_indices])
 
-    if len(thresholded_scores) == 0:
+    if not thresholded_scores_chunks:
         raise ValueError("No thresholded scores available; cannot proceed with PRS calculation.")
 
-    set_A = set(thresholded_scores.index)
-    set_B = set(dosage_loci_nomiss["locus"])
+    thresholded_scores = pd.concat(thresholded_scores_chunks)
+    preprocessed_thresholded_scores = _preprocess_scores(thresholded_scores)
+    preprocessed_thresholded_scores = preprocessed_thresholded_scores.set_index("SNPID")
+    thresholded_score_loci = set(preprocessed_thresholded_scores.index)
+    dosage_loci_nomiss = _extract_nomiss_dosage_loci(dosage_matrix_path, thresholded_score_loci)
+    filtered_dosage_loci = set(dosage_loci_nomiss["locus"])
 
-    overlap_snps = set_A.intersection(set_B)
-    remaining_snps_scores = len(thresholded_scores) - len(overlap_snps)
-    if remaining_snps_scores == 0:
+    overlap_loci = thresholded_score_loci.intersection(filtered_dosage_loci)
+    remaining_loci = len(preprocessed_thresholded_scores) - len(overlap_loci)
+    if remaining_loci == 0:
         raise ValueError(
-            "No SNPs match between base and target dataset; cannot proceed with PRS calculation."
+            "No loci match between base and target dataset; cannot proceed with PRS calculation."
         )
-    remaining_snps_frac = (len(thresholded_scores) - len(overlap_snps)) / len(thresholded_scores)
+    remaining_snps_frac = (len(thresholded_scores) - len(overlap_loci)) / len(thresholded_scores)
     low_snps_frac = 0.20
     if remaining_snps_frac < low_snps_frac:
         logger.warning
         (
-            "Only %s of SNPs out of %s SNPs remain which may limit scoring accuracy",
-            remaining_snps_scores,
+            "Only %s of variants out of %s variants remain for PRS, which may limit scoring accuracy",
+            remaining_loci,
             len(thresholded_scores),
         )
-    scores_overlap = thresholded_scores[thresholded_scores.index.isin(overlap_snps)]
+    scores_overlap = preprocessed_thresholded_scores[
+        preprocessed_thresholded_scores.index.isin(overlap_loci)
+    ]
     return scores_overlap
 
 
@@ -306,19 +319,21 @@ def ld_clump(scores_overlap: pd.DataFrame, map_directory_path: str) -> tuple[pd.
 
 
 def extract_clumped_thresholded_genos(
-    dosage_matrix_path: str, scores_after_c_t: pd.DataFrame
+    dosage_matrix_path: str, scores_after_c_t: pd.DataFrame, chunk_size: int = 1000
 ) -> pd.DataFrame:
-    dosage_dataset = ds.dataset(dosage_matrix_path, format="feather")
     loci_list = scores_after_c_t.index.tolist()
-    loci_filter = ds.field("locus").isin(loci_list)
-    filtered_dataset = dosage_dataset.filter(loci_filter)
-    filtered_df = filtered_dataset.to_table().to_pandas()
-    return filtered_df
+
+    filtered_dfs = []
+    for chunk in read_feather_in_chunks(dosage_matrix_path, chunk_size=chunk_size):
+        filtered_chunk = chunk[chunk["locus"].isin(loci_list)]
+        filtered_dfs.append(filtered_chunk)
+    final_filtered_genos = pd.concat(filtered_dfs, ignore_index=True)
+    return final_filtered_genos
 
 
 def finalize_dosage_scores_after_c_t(
     gwas_scores_path: str, dosage_matrix_path: str, map_directory_path: str, p_value_threshold: float
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+) -> tuple[str, pd.DataFrame]:
     """Finalize dosage matrix and scores for PRS calculation."""
     scores_overlap = generate_thresholded_overlap_scores_dosage(
         gwas_scores_path, dosage_matrix_path, p_value_threshold
@@ -332,7 +347,10 @@ def finalize_dosage_scores_after_c_t(
     genos_adjusted = merged_allele_comparison_genos.apply(adjust_dosages, axis=1)
     genotypes_adjusted_only = genos_adjusted.iloc[:, 1:]
     genos_transpose = genotypes_adjusted_only.T
-    return genos_transpose, scores_after_c_t
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".feather") as tmpfile:
+        adjusted_dosage_path = tmpfile.name
+        feather.write_feather(genos_transpose, adjusted_dosage_path)
+    return adjusted_dosage_path, scores_after_c_t
 
 
 def generate_c_and_t_prs_scores(
@@ -343,10 +361,25 @@ def generate_c_and_t_prs_scores(
 ) -> pd.Series:
     """Calculate PRS."""
     # TODO: Add covariates to model
-    genos_transpose, scores_after_c_t = finalize_dosage_scores_after_c_t(
+    adjusted_dosage_path, scores_after_c_t = finalize_dosage_scores_after_c_t(
         gwas_scores_path, dosage_matrix_path, map_directory_path, p_value_threshold
     )
-    return genos_transpose @ scores_after_c_t["BETA"]
+    try:
+        prs_scores = pd.Series(dtype=float)
+        beta_values = scores_after_c_t["BETA"]
+        loci = scores_after_c_t.index
+        for chunk in read_feather_in_chunks(adjusted_dosage_path, columns=loci, chunk_size=1000):
+            prs_scores_chunk = chunk @ beta_values.loc[chunk.columns]
+            prs_scores = prs_scores.add(prs_scores_chunk, fill_value=0)
+    finally:
+        cleanup_temp_file(adjusted_dosage_path)
+
+    return prs_scores
+
+
+def cleanup_temp_file(file_path):
+    if os.path.exists(file_path):
+        os.remove(file_path)
 
 
 def prs_histogram(
