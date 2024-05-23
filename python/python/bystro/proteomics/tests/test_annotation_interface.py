@@ -29,10 +29,10 @@ TEST_RESPONSES_WITHOUT_SAMPLES_PATH = (
     Path(__file__).parent / "example_query_response_without_samples.json"
 )
 
-with TEST_RESPONSES_WITH_SAMPLES_PATH.open("r") as f:
+with TEST_RESPONSES_WITH_SAMPLES_PATH.open("r") as f: # type: ignore
     TEST_RESPONSES_WITH_SAMPLES = json.load(f)
 
-with TEST_RESPONSES_WITHOUT_SAMPLES_PATH.open("r") as f:
+with TEST_RESPONSES_WITHOUT_SAMPLES_PATH.open("r") as f: # type: ignore
     TEST_RESPONSES_WITHOUT_SAMPLES = json.load(f)
 
 

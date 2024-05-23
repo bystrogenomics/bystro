@@ -607,7 +607,7 @@ async def execute_query(
 
 def _transpose_array_of_structs(array_of_structs):
     keys = array_of_structs[0].keys()
-    transposed_struct = {key: [] for key in keys}
+    transposed_struct: dict[str, Any] = {key: [] for key in keys}
 
     for struct in array_of_structs:
         for key in keys:
