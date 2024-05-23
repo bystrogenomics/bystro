@@ -13,7 +13,7 @@ from bystro.proteomics.annotation_interface import (
     ALWAYS_INCLUDED_FIELDS,
     SAMPLE_COLUMNS,
     LINK_GENERATED_COLUMN,
-    FRAGPIPE_PROTEIN_ABUNDANCE_COLUMN
+    FRAGPIPE_PROTEIN_ABUNDANCE_COLUMN,
 )
 
 from bystro.proteomics.fragpipe_tandem_mass_tag import (
@@ -30,10 +30,10 @@ TEST_RESPONSES_WITHOUT_SAMPLES_PATH = (
     Path(__file__).parent / "example_query_response_without_samples.json"
 )
 
-with TEST_RESPONSES_WITH_SAMPLES_PATH.open("r") as f: # type: ignore
+with TEST_RESPONSES_WITH_SAMPLES_PATH.open("r") as f:  # type: ignore
     TEST_RESPONSES_WITH_SAMPLES = json.load(f)
 
-with TEST_RESPONSES_WITHOUT_SAMPLES_PATH.open("r") as f: # type: ignore
+with TEST_RESPONSES_WITHOUT_SAMPLES_PATH.open("r") as f:  # type: ignore
     TEST_RESPONSES_WITHOUT_SAMPLES = json.load(f)
 
 
@@ -147,6 +147,7 @@ async def test_get_annotation_results_from_query_with_samples(mocker):
     query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
     index_name = "mock_index_name"
 
+    # We melt by default
     samples_and_genes_df = await async_get_annotation_result_from_query(
         query_string,
         index_name,
@@ -161,6 +162,46 @@ async def test_get_annotation_results_from_query_with_samples(mocker):
     )
 
     assert (397, 12) == samples_and_genes_df.shape
+
+    assert list(samples_and_genes_df.columns) == ALWAYS_INCLUDED_FIELDS + [LINK_GENERATED_COLUMN] + [
+        "sample",
+        "dosage",
+    ] + ["gnomad.exomes.AF", "refSeq.name2"]
+
+
+@pytest.mark.asyncio
+async def test_get_annotation_results_from_query_with_sample_no_melt(mocker):
+    mocker.patch(
+        "bystro.proteomics.annotation_interface.AsyncOpenSearch",
+        return_value=MockAsyncOpenSearch(TEST_RESPONSES_WITH_SAMPLES),
+    )
+
+    query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
+    index_name = "mock_index_name"
+
+    # We melt by default
+    samples_and_genes_df = await async_get_annotation_result_from_query(
+        query_string,
+        index_name,
+        cluster_opensearch_config={
+            "connection": {
+                "nodes": ["http://localhost:9200"],
+                "request_timeout": 1200,
+                "use_ssl": False,
+                "verify_certs": False,
+            },
+        },
+        melt_by_samples=False,
+    )
+
+    assert (177, 13) == samples_and_genes_df.shape
+
+    additional_columns = SAMPLE_COLUMNS + ["gnomad.exomes.AF", "refSeq.name2"]
+    additional_columns.sort()
+    assert (
+        list(samples_and_genes_df.columns)
+        == ALWAYS_INCLUDED_FIELDS + [LINK_GENERATED_COLUMN] + additional_columns
+    )
 
 
 @pytest.mark.asyncio
@@ -186,6 +227,10 @@ async def test_get_annotation_results_from_query_without_samples(mocker):
         },
     )
     assert (3698, 10) == samples_and_genes_df.shape
+    assert list(samples_and_genes_df.columns) == ALWAYS_INCLUDED_FIELDS + [LINK_GENERATED_COLUMN] + [
+        "gnomad.exomes.AF",
+        "refSeq.name2",
+    ]
 
 
 def test_process_response():
