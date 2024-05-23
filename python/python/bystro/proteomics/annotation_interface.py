@@ -560,7 +560,7 @@ def process_query_response(
     # sort columns
     default_columns = ALWAYS_INCLUDED_FIELDS + [LINK_GENERATED_COLUMN]
     cols = default_columns + sorted(df.columns.difference(default_columns))
-    print("cols", cols)
+
     return df[cols]
 
 
