@@ -5,7 +5,7 @@ from opensearchpy import OpenSearch, RequestsHttpConnection, AsyncOpenSearch, As
 
 from bystro.api.auth import CachedAuth
 
-QUERY_ENDPONIT = "/api/jobs/{job_id}/opensearch"
+QUERY_ENDPOINT = "/api/jobs/{job_id}/opensearch"
 
 
 class JWTAuth(AuthBase):
@@ -216,7 +216,7 @@ def get_async_proxied_opensearch_client(auth: CachedAuth, job_id: str, client_ar
         hosts=[{"host": host, "port": int(port)}],
         use_ssl=bool(protocol == "https" or int(port) == 443),
         connection_class=BystroProxyAsyncHttpConnection,
-        path_prefix=QUERY_ENDPONIT.format(job_id=job_id),
+        path_prefix=QUERY_ENDPOINT.format(job_id=job_id),
         http_auth=AsyncConnectorJWTAuth(auth.access_token),
         http_compress=True,
         timeout=client_args.get("timeout", 1200),
@@ -254,7 +254,7 @@ def get_proxied_opensearch_client(auth: CachedAuth, job_id: str, client_args: di
         hosts=[{"host": host, "port": int(port)}],
         use_ssl=bool(protocol == "https" or int(port) == 443),
         connection_class=BystroProxyHttpConnection,
-        path_prefix=QUERY_ENDPONIT.format(job_id=job_id),
+        path_prefix=QUERY_ENDPOINT.format(job_id=job_id),
         http_auth=JWTAuth(auth.access_token),
         http_compress=True,
         timeout=client_args.get("timeout", 1200),
