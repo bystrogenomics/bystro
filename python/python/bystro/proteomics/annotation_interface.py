@@ -776,7 +776,6 @@ async def async_run_annotation_query(
     finally:
         await client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore[attr-defined]
         await client.close()
-        print("CLOSED CLIENT")
 
 
 async def async_get_annotation_result_from_query(
