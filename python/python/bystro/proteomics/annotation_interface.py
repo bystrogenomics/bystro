@@ -238,6 +238,7 @@ def transform_fields_with_dynamic_arity(
                         value = value[0]
 
                 item_info[key] = value
+
             position_result.append(item_info)
 
         return position_result
@@ -469,9 +470,8 @@ def process_dict_based_on_pos_length(
     for i in range(pos_length):
         new_row = {}
         for track, value in row.items():
-            if isinstance(value[i], list) and len(value[i]) == 1:
-                if track not in multi_valued_tracks or value[i][0] is None:
-                    new_row[track] = value[i][0]
+            if isinstance(value[i], list) and len(value[i]) == 1 and track not in multi_valued_tracks or value[i][0] is None:
+                new_row[track] = value[i][0]
             else:
                 new_row[track] = value[i]
 
@@ -536,7 +536,7 @@ def _flatten(xs: Any) -> list[Any]:  # noqa: ANN401 (`Any` is really correct her
     if not isinstance(xs, list):
         return [xs]
     return sum([_flatten(x) for x in xs], [])
-
+import json
 
 async def execute_query(
     client: AsyncOpenSearch,
@@ -602,7 +602,6 @@ def _transpose_array_of_structs(array_of_structs):
 
     return transposed_struct
 
-
 def process_query_response(
     hits: list[dict[str, Any]],
     fields: list[str] | None = None,
@@ -611,6 +610,8 @@ def process_query_response(
 ) -> pd.DataFrame:
     """Postprocess query response from opensearch client."""
     num_hits = len(hits)
+
+    hits = copy.deepcopy(hits)
 
     if num_hits == 0:
         return pd.DataFrame()
@@ -665,7 +666,7 @@ def process_query_response(
             cols += [SAMPLE_GENERATED_COLUMN, DOSAGE_GENERATED_COLUMN]
             rows = melted_rows
 
-    df = pd.DataFrame(rows)
+    df = pd.DataFrame(rows) # noqa: PD901
 
     if fields is not None:
         cols += [field for field in fields if field not in cols]
