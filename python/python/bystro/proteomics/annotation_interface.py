@@ -414,8 +414,9 @@ def process_dict_based_on_pos_length(
     for i in range(pos_length):
         new_row = {}
         for track, value in row.items():
-            if track not in multi_valued_tracks and isinstance(value[i], list) and len(value[i]) == 1:
-                new_row[track] = value[i][0]
+            if isinstance(value[i], list) and len(value[i]) == 1:
+                if track not in multi_valued_tracks or value[i][0] is None:
+                    new_row[track] = value[i][0]
             else:
                 new_row[track] = value[i]
 
