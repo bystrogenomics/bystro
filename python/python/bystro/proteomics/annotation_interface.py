@@ -65,6 +65,8 @@ DEFAULT_MULTI_VALUED_TRACKS = [
     "nearestTss.refSeq",
 ]
 
+DEFAULT_FIELDS_TO_MELT_BY = ["homozygotes", "heterozygotes"]
+
 ALWAYS_INCLUDED_FIELDS = ["chrom", "pos", "vcfPos", "inputRef", "alt", "type", "id"]
 LINK_GENERATED_COLUMN = "locus"
 
@@ -73,6 +75,8 @@ POS_FIELD = "pos"
 INPUT_REF_FIELD = "inputRef"
 ALT_FIELD = "alt"
 TYPE_FIELD = "type"
+
+SAMPLE_COLUMNS = ["heterozygotes", "homozygotes", "missingGenos"]
 
 
 def looks_like_float(val):
@@ -480,7 +484,11 @@ def _flatten(xs: Any) -> list[Any]:  # noqa: ANN401 (`Any` is really correct her
 
 
 async def execute_query(
-    client: AsyncOpenSearch, query: dict, fields: list[str] | None = None, structs_of_arrays: bool = True
+    client: AsyncOpenSearch,
+    query: dict,
+    fields: list[str] | None = None,
+    structs_of_arrays: bool = True,
+    melt_by_samples: bool = False,
 ) -> pd.DataFrame:
     f"""
     Execute an OpenSearch query and return the results as a DataFrame.
@@ -516,7 +524,9 @@ async def execute_query(
         # Update search_after to the sort value of the last document retrieved
         search_after = resp["hits"]["hits"][-1]["sort"]
 
-    return process_query_response(results, fields, structs_of_arrays=structs_of_arrays)
+    return process_query_response(
+        results, fields, structs_of_arrays=structs_of_arrays, melt_by_samples=melt_by_samples
+    )
 
 
 def transpose_array_of_structs(array_of_structs):
@@ -530,8 +540,32 @@ def transpose_array_of_structs(array_of_structs):
     return transposed_struct
 
 
+def _melt_df(df, melt_by):
+    df_explode = df[melt_by].apply(lambda col: col.explode().reset_index(drop=True))
+
+    # Merge exploded dataframe with the rest of the columns (preserving the order and alignment)
+    df_rest = df.drop(columns=melt_by).reset_index(drop=True)
+    df_combined = pd.concat([df_rest, df_explode], axis=1)
+
+    # Melting the exploded part of the DataFrame
+    df_melted = df_combined.melt(
+        id_vars=df_rest.columns.tolist(), value_name="sample", var_name="variable"
+    )
+    df_melted = df_melted.dropna(subset=["sample"])  # Drop rows where 'sample' is NaN
+
+    # Mapping 'variable' to 'dosage'
+    dosage_map = {"heterozygotes": 1, "homozygotes": 2, "missingGenos": -1}
+    df_melted["dosage"] = df_melted["variable"].map(dosage_map)
+
+    # Dropping the 'variable' column as it's no longer needed
+    return df_melted.drop(columns="variable")
+
+
 def process_query_response(
-    hits: list[dict[str, Any]], fields: list[str] | None = None, structs_of_arrays: bool = True
+    hits: list[dict[str, Any]],
+    fields: list[str] | None = None,
+    structs_of_arrays: bool = True,
+    melt_by_samples: bool = False,
 ) -> pd.DataFrame:
     """Postprocess query response from opensearch client."""
     num_hits = len(hits)
@@ -550,17 +584,18 @@ def process_query_response(
 
     # we may have multiple variants per gene in the results, so we
     # need to drop duplicates here.
-    if fields is not None:
-        cols = ALWAYS_INCLUDED_FIELDS + [LINK_GENERATED_COLUMN]
-
-        cols += [field for field in fields if field not in cols]
-
-        return pd.DataFrame(rows, columns=cols)
+    cols = ALWAYS_INCLUDED_FIELDS + [LINK_GENERATED_COLUMN]
 
     df = pd.DataFrame(rows)  # noqa: PD901
-    # sort columns
-    default_columns = ALWAYS_INCLUDED_FIELDS + [LINK_GENERATED_COLUMN]
-    cols = default_columns + sorted(df.columns.difference(default_columns))
+
+    if melt_by_samples is True:
+        df = _melt_df(df, SAMPLE_COLUMNS)  # noqa: PD901
+        cols += ["sample", "dosage"]
+
+    if fields is not None:
+        cols += [field for field in fields if field not in cols]
+    else:
+        cols += sorted(df.columns.difference(cols))
 
     return df[cols]
 
@@ -597,6 +632,7 @@ async def async_run_annotation_query(
     bystro_api_auth: CachedAuth | None = None,
     additional_client_args: dict[str, Any] | None = None,
     structs_of_arrays: bool = True,
+    melt_by_samples: bool = False,
 ) -> pd.DataFrame:
     """
     Run an annotation query and return a DataFrame of results.
@@ -645,7 +681,11 @@ async def async_run_annotation_query(
                 slice_query["body"]["slice"] = {"id": slice_id, "max": num_slices}
 
             query_result = execute_query(
-                client, query=slice_query, fields=fields, structs_of_arrays=structs_of_arrays
+                client,
+                query=slice_query,
+                fields=fields,
+                structs_of_arrays=structs_of_arrays,
+                melt_by_samples=melt_by_samples,
             )
             query_results.append(query_result)
 
@@ -674,6 +714,7 @@ async def async_get_annotation_result_from_query(
     bystro_api_auth: CachedAuth | None = None,
     additional_client_args: dict[str, Any] | None = None,
     structs_of_arrays: bool = True,
+    melt_by_samples: bool = True,
 ) -> pd.DataFrame:
     """Given a query and index, return a dataframe of variant / sample_id records matching query."""
 
@@ -682,7 +723,9 @@ async def async_get_annotation_result_from_query(
             "Cannot provide both cluster_opensearch_config and bystro_api_auth. Select one."
         )
 
-    query = _build_opensearch_query_from_query_string(query_string, fields=fields)
+    query = _build_opensearch_query_from_query_string(
+        query_string, fields=fields, melt_by_samples=melt_by_samples
+    )
 
     return await async_run_annotation_query(
         query,
@@ -692,6 +735,7 @@ async def async_get_annotation_result_from_query(
         bystro_api_auth=bystro_api_auth,
         additional_client_args=additional_client_args,
         structs_of_arrays=structs_of_arrays,
+        melt_by_samples=melt_by_samples,
     )
 
 
@@ -703,6 +747,7 @@ def get_annotation_result_from_query(
     bystro_api_auth: CachedAuth | None = None,
     additional_client_args: dict[str, Any] | None = None,
     structs_of_arrays: bool = True,
+    melt_by_samples: bool = True,
 ) -> pd.DataFrame:
     """Given a query and index, return a dataframe of variant / sample_id records matching query."""
     loop = asyncio.get_event_loop()
@@ -714,13 +759,16 @@ def get_annotation_result_from_query(
         bystro_api_auth=bystro_api_auth,
         additional_client_args=additional_client_args,
         structs_of_arrays=structs_of_arrays,
+        melt_by_samples=melt_by_samples,
     )
 
     return loop.run_until_complete(coroutine)
 
 
 def _build_opensearch_query_from_query_string(
-    query_string: str, fields: list[str] | None = None
+    query_string: str,
+    fields: list[str] | None = None,
+    melt_by_samples: bool = False,
 ) -> dict[str, Any]:
     base_query: dict[str, Any] = {
         "body": {
@@ -742,6 +790,10 @@ def _build_opensearch_query_from_query_string(
     }
 
     all_fields = ALWAYS_INCLUDED_FIELDS.copy()
+
+    if melt_by_samples:
+        all_fields += SAMPLE_COLUMNS
+
     for field in fields or []:
         if field not in all_fields:
             all_fields.append(field)
