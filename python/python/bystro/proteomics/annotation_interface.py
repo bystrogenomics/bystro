@@ -186,7 +186,7 @@ def transform_fields_with_dynamic_arity(
             # TODO 2024-05-23 @akotlar, remove "position_data[arity_key] is None" check
             # this should only be necssary for legacy datasets
             # as we now always output identical structure for all keys, even if no value is present
-            # [[[None]]]
+            # [[[None]]] # noqa
             if arity_key not in position_data or position_data[arity_key] is None:
                 # Return 1 because the primary key was not selected
                 # which means that the key values are relative to is not present
@@ -207,7 +207,7 @@ def transform_fields_with_dynamic_arity(
                 # TODO 2024-05-23 @akotlar, if field is None check,
                 # this should only be necssary for legacy datasets
                 # as we now always output identical structure for all keys, even if no value is present
-                # [[[None]]]
+                # [[[None]]] # noqa
                 if field is None:
                     continue
 
