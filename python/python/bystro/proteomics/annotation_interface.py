@@ -57,6 +57,14 @@ DEFAULT_PRIMARY_KEYS = {
     "refSeq": "name",
 }
 
+# Tracks that may have more than 1 value per position
+# These we will leave as array-valued, rather than flattening
+DEFAULT_MULTI_VALUED_TRACKS = [
+    "refSeq",
+    "nearest.refSeq",
+    "nearestTss.refSeq",
+]
+
 ALWAYS_INCLUDED_FIELDS = ["chrom", "pos", "vcfPos", "inputRef", "alt", "type", "id"]
 LINK_GENERATED_COLUMN = "locus"
 
@@ -93,7 +101,10 @@ def looks_like_number(val):
 
 
 def transform_fields_with_dynamic_arity(
-    data_structure, alt_field, track, primary_keys: dict[str, str] | None = None
+    data_structure,
+    alt_field,
+    track,
+    primary_keys: dict[str, str] | None = None,
 ):
     if primary_keys is None:
         primary_keys = DEFAULT_PRIMARY_KEYS
@@ -124,7 +135,7 @@ def transform_fields_with_dynamic_arity(
                 if not isinstance(position_data[arity_key], list):
                     raise RuntimeError(
                         (
-                            f"Expected list for track {track}, key {arity_key},"
+                            f"Expected list for track {track}, key {arity_key}, "
                             f"found {position_data[arity_key]}"
                         )
                     )
@@ -379,38 +390,9 @@ def query_results_to_array_of_structs(results_obj: dict[str, Any]) -> list[dict[
     ]
 
 
-def flatten_2d_array(d):
-    """
-    Flatten 2D arrays in a dictionary.
-
-    Args:
-        d: Dictionary
-
-    Returns:
-        Flattened dictionary
-    """
-
-    def is_2d_array(value):
-        if isinstance(value, list) and all(isinstance(i, list) for i in value):
-            return True
-        return False
-
-    def recurse(d):
-        for key, value in d.items():
-            if is_2d_array(value):
-                d[key] = _flatten(value)
-            elif isinstance(value, dict):
-                recurse(value)
-            elif isinstance(value, list):
-                for item in value:
-                    if isinstance(item, dict):
-                        recurse(item)
-
-    recurse(d)
-    return d
-
-
-def process_dict_based_on_pos_length(d: dict[str, Any]):
+def process_dict_based_on_pos_length(
+    row: dict[str, Any], multi_valued_tracks: list[str] | None = None
+) -> list[dict[str, Any]]:
     """
     Process a dictionary based on the length of the "pos" field.
 
@@ -420,29 +402,28 @@ def process_dict_based_on_pos_length(d: dict[str, Any]):
     Returns:
         Processed dictionary
     """
-    # Process 2D arrays to join or convert to single values
+
+    if multi_valued_tracks is None:
+        multi_valued_tracks = DEFAULT_MULTI_VALUED_TRACKS
 
     # Determine the length of the "pos" field
-    pos_length = len(d["pos"])
+    pos_length = len(row[POS_FIELD])
 
     # Create an array of dictionaries, each corresponding to one index
     result = []
     for i in range(pos_length):
-        new_dict = {}
-        for key, value in d.items():
-            if isinstance(value, list) and i < len(value):
-                if isinstance(value[i], list) and len(value[i]) == 1:
-                    new_dict[key] = value[i][0]
-                else:
-                    new_dict[key] = value[i]
+        new_row = {}
+        for track, value in row.items():
+            if track not in DEFAULT_MULTI_VALUED_TRACKS and isinstance(value, list) and len(value) == 1:
+                new_row[track] = value[i][0]
             else:
-                new_dict[key] = value
+                new_row[track] = value[i]
 
-        new_dict[LINK_GENERATED_COLUMN] = (
-            f"{new_dict[CHROM_FIELD]}:{new_dict[POS_FIELD]}:{new_dict[INPUT_REF_FIELD]}:{new_dict[ALT_FIELD]}"
+        new_row[LINK_GENERATED_COLUMN] = (
+            f"{new_row[CHROM_FIELD]}:{new_row[POS_FIELD]}:{new_row[INPUT_REF_FIELD]}:{new_row[ALT_FIELD]}"
         )
 
-        result.append(new_dict)
+        result.append(new_row)
 
     return result
 
@@ -466,6 +447,9 @@ def flatten_nested_dicts(dicts: list[dict[str, Any]]) -> list[dict[str, Any]]:
             new_key = f"{parent_key}{sep}{k}" if parent_key else k
             if isinstance(v, dict):
                 items.extend(flatten_dict(v, new_key, sep=sep).items())
+            elif isinstance(v, list) and isinstance(v[0], dict):
+                vals = transpose_array_of_structs(v)
+                items.extend(flatten_dict(vals, new_key, sep=sep).items())
             else:
                 items.append((new_key, v))
         return dict(items)
@@ -494,137 +478,8 @@ def _flatten(xs: Any) -> list[Any]:  # noqa: ANN401 (`Any` is really correct her
     return sum([_flatten(x) for x in xs], [])
 
 
-def _get_nested_field(data, field_path):
-    """Recursively fetch nested field values using dot notation."""
-    keys = field_path.split(".")
-    value = data
-    for key in keys:
-        try:
-            value = value[key]
-        except (KeyError, TypeError):
-            return None  # Returns None if the field path is not found
-    return value
-
-
-def _get_samples_genes_dosages_from_hit(
-    hit: dict[str, Any], fields: list[str] | None = None
-) -> pd.DataFrame:
-    """Given a document hit, return a dataframe of samples,
-    genes and dosages with specified additional fields.
-    """
-
-    source = hit["_source"]
-    # Base required fields
-    chrom = _flatten(source["chrom"])[0]
-
-    pos = _flatten(source["pos"])[0]
-    _id = _flatten(source["id"])[0]
-    vcf_pos = _flatten(source["vcfPos"])[0]
-    input_ref = _flatten(source.get("inputRef", [None]))[0]
-    ref = _flatten(source["ref"])[0]
-    alt = _flatten(source["alt"])[0]
-    gene_names = _flatten(
-        source["refSeq"]["name2"]
-    )  # guaranteed to be unique or to belong to different transcripts
-    transcript_names = _flatten(source["refSeq"]["name"])
-    protein_names = _flatten(source["refSeq"].get("protAcc", [None]))
-    is_canonical = [
-        x == "true" or x is True if x else False for x in _flatten(source["refSeq"].get("isCanonical"))
-    ]
-    gnomad_genomes_af = _flatten(_get_nested_field(source, "gnomad.genomes.AF"))[0]
-    gnomad_exomes_af = _flatten(_get_nested_field(source, "gnomad.exomes.AF"))[0]
-
-    if len(is_canonical) != len(transcript_names):
-        is_canonical = [is_canonical[0]] * len(transcript_names)
-
-    if len(protein_names) != len(transcript_names):
-        protein_names = [protein_names[0]] * len(transcript_names)
-
-    if len(gene_names) != len(transcript_names):
-        gene_names = [gene_names[0]] * len(transcript_names)
-
-    heterozygotes = _flatten(source.get("heterozygotes", []))
-    homozygotes = _flatten(source.get("homozygotes", []))
-    missing_genos = _flatten(source.get("missingGenos", []))
-
-    heterozygosity = _flatten(source["heterozygosity"])[0]
-    homozygosity = _flatten(source["homozygosity"])[0]
-    missingness = _flatten(source["missingness"])[0]
-
-    fields_to_add = list(
-        filter(
-            lambda x: x
-            not in [
-                "chrom",
-                "pos",
-                "id",
-                "vcfPos",
-                "inputRef",
-                "ref",
-                "alt",
-                "refSeq.name2",
-                "refSeq.name",
-                "refSeq.protAcc",
-                "refSeq.isCanonical",
-                "heterozygotes",
-                "homozygotes",
-                "missingGenos",
-                "heterozygosity",
-                "homozygosity",
-                "missingness",
-                "gnomad.genomes.AF",
-                "gnomad.exomes.AF",
-            ],
-            fields if fields is not None else [],
-        )
-    )
-
-    rows = []
-    for gene_idx, gene_name in enumerate(gene_names):
-        for sample_list, dosage_label in [
-            (heterozygotes, 1),
-            (homozygotes, 2),
-            (missing_genos, -1),
-        ]:
-            for sample_id in sample_list:
-                row = {
-                    "sample_id": sample_id,
-                    "chrom": chrom,
-                    "vcf_pos": vcf_pos,
-                    "pos": pos,
-                    "id": _id,
-                    "ref": ref,
-                    "input_ref": input_ref,
-                    "alt": alt,
-                    "gene_name": gene_name,
-                    "transcript_name": transcript_names[gene_idx],
-                    "protein_name": protein_names[gene_idx],
-                    "is_canonical": is_canonical[gene_idx],
-                    "dosage": dosage_label,
-                    "heterozygosity": heterozygosity,
-                    "homozygosity": homozygosity,
-                    "missingness": missingness,
-                    "gnomad_genomes_af": gnomad_genomes_af,
-                    "gnomad_exomes_af": gnomad_exomes_af,
-                }
-                # Add additional fields
-                for field in fields_to_add:
-                    row[field] = _get_nested_field(source, field)
-
-                    if row[field] is not None:
-                        row[field] = _flatten(row[field])
-
-                        if len(row[field]) == 1:
-                            row[field] = row[field][0]
-                        else:
-                            row[field] = tuple(row[field])
-                rows.append(row)
-
-    return pd.DataFrame(rows)
-
-
 async def execute_query(
-    client: AsyncOpenSearch, query: dict, fields: list[str] | None = None
+    client: AsyncOpenSearch, query: dict, fields: list[str] | None = None, structs_of_arrays: bool = True
 ) -> pd.DataFrame:
     f"""
     Execute an OpenSearch query and return the results as a DataFrame.
@@ -660,20 +515,24 @@ async def execute_query(
         # Update search_after to the sort value of the last document retrieved
         search_after = resp["hits"]["hits"][-1]["sort"]
 
-    return process_query_response(results, fields)
+    return process_query_response(results, fields, structs_of_arrays=structs_of_arrays)
 
 
-def process_query_response(hits: list[dict[str, Any]], fields: list[str] | None = None) -> pd.DataFrame:
-    """
-    Process the query response and return a DataFrame.
+def transpose_array_of_structs(array_of_structs):
+    keys = array_of_structs[0].keys()
+    transposed_struct = {key: [] for key in keys}
 
-    Args:
-        hits: List of hits from OpenSearch query
-        fields: Fields to include in the DataFrame
+    for struct in array_of_structs:
+        for key in keys:
+            transposed_struct[key].append(struct[key])
 
-    Returns:
-        DataFrame of query results
-    """
+    return transposed_struct
+
+
+def process_query_response(
+    hits: list[dict[str, Any]], fields: list[str] | None = None, structs_of_arrays: bool = True
+) -> pd.DataFrame:
+    """Postprocess query response from opensearch client."""
     num_hits = len(hits)
 
     if num_hits == 0:
@@ -685,7 +544,8 @@ def process_query_response(hits: list[dict[str, Any]], fields: list[str] | None 
     for row in results_obj:
         rows.extend(process_dict_based_on_pos_length(row))
 
-    rows = flatten_nested_dicts(rows)
+    if structs_of_arrays:
+        rows = flatten_nested_dicts(rows)
 
     # we may have multiple variants per gene in the results, so we
     # need to drop duplicates here.
@@ -695,7 +555,13 @@ def process_query_response(hits: list[dict[str, Any]], fields: list[str] | None 
         cols += [field for field in fields if field not in cols]
 
         return pd.DataFrame(rows, columns=cols)
-    return pd.DataFrame(rows)
+
+    df = pd.DataFrame(rows)  # noqa: PD901
+    # sort columns
+    default_columns = ALWAYS_INCLUDED_FIELDS + [LINK_GENERATED_COLUMN]
+    cols = default_columns + sorted(df.columns.difference(default_columns))
+    print("cols", cols)
+    return df[cols]
 
 
 async def async_get_num_slices(
@@ -729,6 +595,7 @@ async def async_run_annotation_query(
     cluster_opensearch_config: dict[str, Any] | None = None,
     bystro_api_auth: CachedAuth | None = None,
     additional_client_args: dict[str, Any] | None = None,
+    structs_of_arrays: bool = True,
 ) -> pd.DataFrame:
     """
     Run an annotation query and return a DataFrame of results.
@@ -776,7 +643,9 @@ async def async_run_annotation_query(
                 # Slice queries require max > 1
                 slice_query["body"]["slice"] = {"id": slice_id, "max": num_slices}
 
-            query_result = execute_query(client, query=slice_query, fields=fields)
+            query_result = execute_query(
+                client, query=slice_query, fields=fields, structs_of_arrays=structs_of_arrays
+            )
             query_results.append(query_result)
 
         res = await asyncio.gather(*query_results)
@@ -803,6 +672,7 @@ async def async_get_annotation_result_from_query(
     cluster_opensearch_config: dict[str, Any] | None = None,
     bystro_api_auth: CachedAuth | None = None,
     additional_client_args: dict[str, Any] | None = None,
+    structs_of_arrays: bool = True,
 ) -> pd.DataFrame:
     """Given a query and index, return a dataframe of variant / sample_id records matching query."""
 
@@ -820,6 +690,7 @@ async def async_get_annotation_result_from_query(
         cluster_opensearch_config=cluster_opensearch_config,
         bystro_api_auth=bystro_api_auth,
         additional_client_args=additional_client_args,
+        structs_of_arrays=structs_of_arrays,
     )
 
 
@@ -830,6 +701,7 @@ def get_annotation_result_from_query(
     cluster_opensearch_config: dict[str, Any] | None = None,
     bystro_api_auth: CachedAuth | None = None,
     additional_client_args: dict[str, Any] | None = None,
+    structs_of_arrays: bool = True,
 ) -> pd.DataFrame:
     """Given a query and index, return a dataframe of variant / sample_id records matching query."""
     loop = asyncio.get_event_loop()
@@ -840,6 +712,7 @@ def get_annotation_result_from_query(
         cluster_opensearch_config=cluster_opensearch_config,
         bystro_api_auth=bystro_api_auth,
         additional_client_args=additional_client_args,
+        structs_of_arrays=structs_of_arrays,
     )
 
     return loop.run_until_complete(coroutine)
