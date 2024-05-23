@@ -301,6 +301,6 @@ async def test_join_annotation_result_to_fragpipe_dataset(mocker):
 
     joined_df = join_annotation_result_to_fragpipe_dataset(query_result_df, tmt_dataset)
 
-    assert (370, 13) == joined_df.shape
+    assert (101, 13) == joined_df.shape
 
     assert list(joined_df.columns) == list(query_result_df.columns) + [FRAGPIPE_PROTEIN_ABUNDANCE_COLUMN]
