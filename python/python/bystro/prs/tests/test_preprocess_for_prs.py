@@ -28,7 +28,7 @@ def mock_scores_df() -> pd.DataFrame:
             "POS": [566875, 728951],
             "OTHER_ALLELE": ["C", "G"],
             "EFFECT_ALLELE": ["T", "A"],
-            "P": [0.699009, 0.0030673],
+            "P": [0.699009, 0.030673],
             "BETA": [0.007630, -0.020671],
         }
     )
@@ -41,7 +41,7 @@ def mock_processed_scores_df() -> pd.DataFrame:
         "POS": [566875, 728951],
         "OTHER_ALLELE": ["C", "G"],
         "EFFECT_ALLELE": ["T", "A"],
-        "P": [0.699009, 0.0030673],
+        "P": [0.699009, 0.030673],
         "SNPID": ["1:566875:C:T", "1:728951:A:G"],
         "BETA": [0.007630, -0.020671],
         "ID_effect_as_alt": ["chr1:566875:C:T", "chr1:728951:G:A"],
@@ -172,12 +172,12 @@ def test_preprocess_scores(mock_load_association_scores, mock_scores_df: pd.Data
 
 
 def test_get_p_value_thresholded_indices(mock_processed_scores_df: pd.DataFrame):
-    p_value_threshold = 0.005
+    p_value_threshold = 0.05
     thresholded_indices = get_p_value_thresholded_indices(mock_processed_scores_df, p_value_threshold)
     filtered_scores = mock_processed_scores_df.loc[thresholded_indices]
     assert (
         len(filtered_scores) == 1
-    ), "Filtered scores should only contain 1 row for p_value_threshold=0.005."
+    ), "Filtered scores should only contain 1 row for p_value_threshold=0.05."
     assert all(
         filtered_scores["P"] < p_value_threshold
     ), "All rows should have P-values less than the threshold."
