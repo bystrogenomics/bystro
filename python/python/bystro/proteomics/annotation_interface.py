@@ -57,7 +57,7 @@ DEFAULT_PRIMARY_KEYS = {
 }
 
 ALWAYS_INCLUDED_FIELDS = ["chrom", "pos", "vcfPos", "inputRef", "alt", "type", "id"]
-LINK_GENERATED_COLUMN = "link"
+LINK_GENERATED_COLUMN = "locus"
 
 CHROM_FIELD = "chrom"
 POS_FIELD = "pos"
