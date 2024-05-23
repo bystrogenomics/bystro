@@ -108,6 +108,29 @@ DEFAULT_MULTI_VALUED_TRACKS = [
     "nearestTss.refSeq",
 ]
 
+# The refSeq.clinvar is a legacy track, which has been removed in all recent database versions
+# During join, the refSeq.clinvar track excludes missing values
+# resulting in a reduction in dimension relative to the primary key
+# This libarary assumes that the length of the primary key array
+# Meaning we expect that if the primary key is "foo", this is allowed
+# {  # noqa
+#   "foo": ["a", "b", "c"],  # noqa
+#   "bar": ["x", "y", "z"]   # noqa
+# } # noqa
+# or
+# {  # noqa
+#   "foo": ["a", "b", "c"],  # noqa
+#   "bar": [["x1", "x2"], ["y1", "y2"], ["z1", "z2"]]  # noqa
+# }  # noqa
+# but not
+# {  # noqa
+#  "foo": ["a", "b", "c"],  # noqa
+#  "bar": ["x", "y"]  # noqa
+# }  # noqa
+# because we no longer know which value of bar corresponds to which value of foo
+NOT_SUPPORTED_TRACKS = ["refSeq.clinvar"]
+
+
 def _looks_like_float(val):
     try:
         val = float(val)
@@ -158,7 +181,11 @@ def transform_fields_with_dynamic_arity(
 
         max_arity = 0
         if arity_key is not None:
-            if arity_key not in position_data:
+            # TODO 2024-05-23 @akotlar, remove "position_data[arity_key] is None" check
+            # this should only be necssary for legacy datasets
+            # as we now always output identical structure for all keys, even if no value is present
+            # [[[None]]]
+            if arity_key not in position_data or position_data[arity_key] is None:
                 # Return 1 because the primary key was not selected
                 # which means that the key values are relative to is not present
                 # so we cannot separate the values into multiple records based on the primary key
@@ -175,6 +202,13 @@ def transform_fields_with_dynamic_arity(
                 max_arity = len(position_data[arity_key])
         else:
             for field in position_data.values():
+                # TODO 2024-05-23 @akotlar, if field is None check,
+                # this should only be necssary for legacy datasets
+                # as we now always output identical structure for all keys, even if no value is present
+                # [[[None]]]
+                if field is None:
+                    continue
+
                 max_arity = max(max_arity, len(field))
 
         return max_arity
@@ -387,12 +421,19 @@ def fill_query_results_object(hits: list[dict[str, Any]]) -> list[dict[str, Any]
     """
     query_results_unique = []
 
+    has_warned = {}
     for row_result_obj in hits:
         row = {}
 
         flattened_data = generate_desired_structs_of_arrays(row_result_obj["_source"])
 
         for track_name, value in flattened_data.items():
+            if track_name in NOT_SUPPORTED_TRACKS:
+                if track_name not in has_warned:
+                    logger.warning("Track %s is not currently supported, excluding", track_name)
+                    has_warned[track_name] = True
+                continue
+
             if not value:
                 continue
             row[track_name] = transform_fields_with_dynamic_arity(
@@ -462,7 +503,11 @@ def flatten_nested_dicts(dicts: list[dict[str, Any]]) -> list[dict[str, Any]]:
             new_key = f"{parent_key}{sep}{k}" if parent_key else k
             if isinstance(v, dict):
                 items.extend(flatten_dict(v, new_key, sep=sep).items())
-            elif isinstance(v, list) and isinstance(v[0], dict):
+
+            # TODO 2024-05-23 @akotlar, remove the len(v) > 0 check
+            # this should only be necssary for legacy datasets
+            # as we now consistently return [[[None]]] if no values are present for a given field
+            elif isinstance(v, list) and len(v) > 0 and isinstance(v[0], dict):
                 vals = _transpose_array_of_structs(v)
                 items.extend(flatten_dict(vals, new_key, sep=sep).items())
             else:
@@ -584,17 +629,23 @@ def process_query_response(
     cols = ALWAYS_INCLUDED_FIELDS + [LINK_GENERATED_COLUMN]
 
     if melt_by_samples is True:
-        cols += [SAMPLE_GENERATED_COLUMN, DOSAGE_GENERATED_COLUMN]
-
         melted_rows = []
         for row in rows:
             heterozygotes = _flatten(row.get(HETEROZYGOTES_FIELD, []))
             homozygotes = _flatten(row.get(HOMOZYGOTES_FIELD, []))
             missing_genos = _flatten(row.get(MISSING_GENOS_FIELD, []))
 
-            del row[HETEROZYGOTES_FIELD]
-            del row[HOMOZYGOTES_FIELD]
-            del row[MISSING_GENOS_FIELD]
+            if not heterozygotes and not homozygotes and not missing_genos:
+                continue
+
+            if HETEROZYGOTES_FIELD in row:
+                del row[HETEROZYGOTES_FIELD]
+
+            if HOMOZYGOTES_FIELD in row:
+                del row[HOMOZYGOTES_FIELD]
+
+            if MISSING_GENOS_FIELD in row:
+                del row[MISSING_GENOS_FIELD]
 
             for samples, dosage in [
                 (heterozygotes, HETEROZYGOTE_DOSAGE),
@@ -610,7 +661,9 @@ def process_query_response(
                                 DOSAGE_GENERATED_COLUMN: int(dosage),
                             }
                         )
-        rows = melted_rows
+        if melted_rows:
+            cols += [SAMPLE_GENERATED_COLUMN, DOSAGE_GENERATED_COLUMN]
+            rows = melted_rows
 
     df = pd.DataFrame(rows)
 
@@ -717,6 +770,7 @@ async def async_run_annotation_query(
             query_results.append(query_result)
 
         res = await asyncio.gather(*query_results)
+
         return pd.concat(res)
     except Exception as e:
         err_msg = (
@@ -822,7 +876,19 @@ def _build_opensearch_query_from_query_string(
         all_fields += SAMPLE_COLUMNS
 
     for field in fields or []:
-        if field not in all_fields:
+        skip_field = False
+        has_warned = {}
+        for track in NOT_SUPPORTED_TRACKS:
+            if field.startswith(track):
+                if track not in has_warned:
+                    has_warned[track] = True
+                    logger.warning(
+                        "Track %s is not currently supported, excluding associated fields", track
+                    )
+                skip_field = True
+                break
+
+        if not skip_field and field not in all_fields:
             all_fields.append(field)
 
     if fields is not None:
