@@ -226,6 +226,7 @@ async def test_get_annotation_results_from_query_without_samples(mocker):
             },
         },
     )
+
     assert (3698, 10) == samples_and_genes_df.shape
     assert list(samples_and_genes_df.columns) == ALWAYS_INCLUDED_FIELDS + [LINK_GENERATED_COLUMN] + [
         "gnomad.exomes.AF",
