@@ -129,8 +129,10 @@ def transform_fields_with_dynamic_arity(
             item_info = {}
             for key in keys:
                 if max_arity == 1:
-                    # Due to deduplication, where we output 1 value when all values are identical for a key
-                    # it is possible to have max_arity 1 for a primary_key, but higher arity in other fields
+                    # Due to deduplication, where we output 1 value
+                    # when all values are identical for a key
+                    # it is possible to have max_arity 1 for a primary_key,
+                    # but higher arity in other fields
                     value = position_data[key]
                 else:
                     value = (
@@ -186,13 +188,22 @@ def transform_fields_with_dynamic_arity(
     return transformed_data
 
 
-def generate_desired_structs_of_arrays(document):
+def generate_desired_structs_of_arrays(document: dict[str, Any]):
+    """
+    Generate desired structures of arrays.
+
+    Args:
+        document: Document
+
+    Returns:
+        Desired structures of arrays
+    """
     result = {}
 
     def transform_object(obj):
         return obj
 
-    def traverse_and_transform(obj, current_path=""):
+    def traverse_and_transform(obj: dict[str, Any], current_path=""):
         has_nested_objects = False
 
         for key, value in obj.items():
@@ -213,7 +224,7 @@ def generate_desired_structs_of_arrays(document):
             result[key] = document[key]
 
     for key in list(result.keys()):
-        nested_keys = [k for k in result.keys() if k.startswith(f"{key}.")]
+        nested_keys = [k for k in result if k.startswith(f"{key}.")]
         for nested_key in nested_keys:
             sub_key = nested_key[len(key) + 1 :]
             if sub_key in result[key]:
@@ -222,12 +233,21 @@ def generate_desired_structs_of_arrays(document):
     return result
 
 
-def sort_keys(result, drop_alt=False):
+def sort_keys(result: dict[str, Any], drop_alt=False) -> list[str]:
+    """
+    Sort keys in a dictionary.
+
+    Args:
+        result: Result dictionary
+        drop_alt: Drop the "alt" key
+
+    Returns:
+        Sorted keys
+    """
     keys = list(result.keys())
 
-    if drop_alt:
-        if "alt" in keys:
-            keys.remove("alt")
+    if drop_alt and "alt" in keys:
+        keys.remove("alt")
 
     keys.sort(key=str.lower)
 
@@ -238,40 +258,20 @@ def sort_keys(result, drop_alt=False):
     return keys
 
 
-def hit_to_sorted_array_of_objects(result, drop_alt=False):
-    keys = list(result.keys())
-
-    if drop_alt:
-        if "alt" in keys:
-            keys.remove("alt")
-
-    keys.sort(key=str.lower)
-
-    if "id" in keys:
-        keys.remove("id")
-        keys.insert(0, "id")
-
-    return [[key, result[key]] for key in keys]
-
-
-def sort_track_keys(hit):
-    keys = sort_keys(hit)
-
-    bystro_main_track_idx = []
-    keys_to_add = []
-    for key in BYSTRO_MAIN_TRACK_KEYS:
-        if key in keys:
-            idx = keys.index(key)
-            keys.pop(idx)
-            bystro_main_track_idx.append(idx)
-            keys_to_add.append(key)
-
-    return keys_to_add + keys
-
-
-def tracks_of_objects_to_track_of_arrays(
+def track_of_objects_to_track_of_arrays(
     data, track_name="", not_numeric_fields: list[str] | None = None
-):
+) -> list | int | float | str | None:
+    """
+    Convert a track of objects to a track of arrays.
+
+    Args:
+        data: Track of objects
+        track_name: Track name
+        not_numeric_fields: Fields that are not numeric
+
+    Returns:
+        Track of arrays
+    """
     if not_numeric_fields is None:
         not_numeric_fields = DEFAULT_NOT_NUMERIC_FIELDS
 
@@ -279,7 +279,7 @@ def tracks_of_objects_to_track_of_arrays(
         if obj is None:
             return None
 
-        if not (isinstance(obj, dict) or isinstance(obj, list)):
+        if not isinstance(obj, (dict, list)):
             if convert_key not in not_numeric_fields:
                 num = obj
 
@@ -318,12 +318,21 @@ def tracks_of_objects_to_track_of_arrays(
 
 
 def fill_query_results_object(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Fill the query results object with the desired structure.
+
+    Args:
+        hits: List of hits from OpenSearch query
+
+    Returns:
+        List of query results objects
+    """
     query_results_unique = []
 
     for row_result_obj in hits:
         row = {}
 
-        flattened_data = generate_desired_structs_of_arrays(row_result_obj["_source"].copy())
+        flattened_data = generate_desired_structs_of_arrays(row_result_obj["_source"])
 
         for track_name, value in flattened_data.items():
             if not value:
@@ -337,20 +346,36 @@ def fill_query_results_object(hits: list[dict[str, Any]]) -> list[dict[str, Any]
     return query_results_unique
 
 
-def process_data(hits: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    results_obj = fill_query_results_object(hits)
-    results = [
+def query_results_to_array_of_structs(results_obj: dict[str, Any]) -> list[dict[str, Any]]:
+    """
+    Convert query results to a struct of arrays.
+
+    Args:
+        results_obj: Query results object
+
+    Returns:
+        Struct of arrays
+    """
+    return [
         {
-            track_name: tracks_of_objects_to_track_of_arrays(row[track_name], track_name)
+            track_name: track_of_objects_to_track_of_arrays(row[track_name], track_name)
             for track_name in row
         }
         for row in results_obj
     ]
 
-    return results, results_obj
-
 
 def flatten_2d_array(d):
+    """
+    Flatten 2D arrays in a dictionary.
+
+    Args:
+        d: Dictionary
+
+    Returns:
+        Flattened dictionary
+    """
+
     def is_2d_array(value):
         if isinstance(value, list) and all(isinstance(i, list) for i in value):
             return True
@@ -371,26 +396,16 @@ def flatten_2d_array(d):
     return d
 
 
-def flatten_nested_dicts(dicts):
-    flattened_dicts = []
+def process_dict_based_on_pos_length(d: dict[str, Any]):
+    """
+    Process a dictionary based on the length of the "pos" field.
 
-    def flatten_dict(d, parent_key="", sep="_"):
-        items = []
-        for k, v in d.items():
-            new_key = f"{parent_key}{sep}{k}" if parent_key else k
-            if isinstance(v, dict):
-                items.extend(flatten_dict(v, new_key, sep=sep).items())
-            else:
-                items.append((new_key, v))
-        return dict(items)
+    Args:
+        d: Dictionary
 
-    for d in dicts:
-        flattened_dicts.append(flatten_dict(d))
-
-    return flattened_dicts
-
-
-def process_dict_based_on_pos_length(d):
+    Returns:
+        Processed dictionary
+    """
     # Process 2D arrays to join or convert to single values
     flatten_2d_array(d)
 
@@ -399,33 +414,43 @@ def process_dict_based_on_pos_length(d):
 
     if pos_length == 1:
         # Convert all array values to scalars
-        for key in d.keys():
+        for key in d:
             if isinstance(d[key], list):
                 d[key] = d[key][0]
         d["link"] = f"{d['chrom']}:{d['pos']}:{d['ref']}:{d['alt']}:{d['type']}"
         return [d]
-    else:
-        # Create an array of dictionaries, each corresponding to one index
-        result = []
-        for i in range(pos_length):
-            new_dict = {}
-            for key, value in d.items():
-                if isinstance(value, list) and i < len(value):
-                    if isinstance(value[i], list) and len(value[i]) == 1:
-                        new_dict[key] = value[i][0]
-                    else:
-                        new_dict[key] = value[i]
+
+    # Create an array of dictionaries, each corresponding to one index
+    result = []
+    for i in range(pos_length):
+        new_dict = {}
+        for key, value in d.items():
+            if isinstance(value, list) and i < len(value):
+                if isinstance(value[i], list) and len(value[i]) == 1:
+                    new_dict[key] = value[i][0]
                 else:
-                    new_dict[key] = value
-            # Add the "link" field
-            new_dict["link"] = (
-                f"{new_dict['chrom']}:{new_dict['pos']}:{new_dict['ref']}:{new_dict['alt']}:{new_dict['type']}"
-            )
-            result.append(new_dict)
-        return result
+                    new_dict[key] = value[i]
+            else:
+                new_dict[key] = value
+
+        new_dict["link"] = (
+            f"{new_dict['chrom']}:{new_dict['pos']}:{new_dict['ref']}:{new_dict['alt']}:{new_dict['type']}"
+        )
+        result.append(new_dict)
+
+    return result
 
 
-def flatten_nested_dicts(dicts):
+def flatten_nested_dicts(dicts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Flatten nested dictionaries.
+
+    Args:
+        dicts: List of dictionaries
+
+    Returns:
+        Flattened list of dictionaries
+    """
     flattened_dicts = []
 
     def flatten_dict(d, parent_key="", sep="."):
@@ -476,7 +501,7 @@ def _get_nested_field(data, field_path):
 
 
 def _get_samples_genes_dosages_from_hit(
-    hit: dict[str, Any], additional_fields: list[str] | None = None
+    hit: dict[str, Any], fields: list[str] | None = None
 ) -> pd.DataFrame:
     """Given a document hit, return a dataframe of samples,
     genes and dosages with specified additional fields.
@@ -544,7 +569,7 @@ def _get_samples_genes_dosages_from_hit(
                 "gnomad.genomes.AF",
                 "gnomad.exomes.AF",
             ],
-            additional_fields if additional_fields is not None else [],
+            fields if fields is not None else [],
         )
     )
 
@@ -592,9 +617,20 @@ def _get_samples_genes_dosages_from_hit(
     return pd.DataFrame(rows)
 
 
-async def _execute_query(
-    client: AsyncOpenSearch, query: dict, additional_fields: list[str] | None = None
+async def execute_query(
+    client: AsyncOpenSearch, query: dict, fields: list[str] | None = None
 ) -> pd.DataFrame:
+    """
+    Execute an OpenSearch query and return the results as a DataFrame.
+
+    Args:
+        client: OpenSearch client
+        query: OpenSearch query
+        fields: Additional fields to include in the DataFrame
+
+    Returns:
+        DataFrame of query results
+    """
     results: list[dict] = []
     search_after = None  # Initialize search_after for pagination
 
@@ -618,35 +654,33 @@ async def _execute_query(
         # Update search_after to the sort value of the last document retrieved
         search_after = resp["hits"]["hits"][-1]["sort"]
 
-    return _process_response(results, additional_fields)
+    return process_query_response(results, fields)
 
 
-def _process_response(
-    hits: list[dict[str, Any]], additional_fields: list[str] | None = None
-) -> pd.DataFrame:
+def process_query_response(hits: list[dict[str, Any]], fields: list[str] | None = None) -> pd.DataFrame:
     """Postprocess query response from opensearch client."""
     num_hits = len(hits)
 
     if num_hits == 0:
         return pd.DataFrame()
 
-    rows = []
-    results, results_obj = process_data(hits)
+    results_obj = fill_query_results_object(hits)
 
+    rows = []
     for row in results_obj:
         rows.extend(process_dict_based_on_pos_length(row))
 
     rows = flatten_nested_dicts(rows)
 
     # samples_genes_dosages_df = pd.concat(
-    #     [_get_samples_genes_dosages_from_hit(hit, additional_fields) for hit in hits]
+    #     [_get_samples_genes_dosages_from_hit(hit, fields) for hit in hits]
     # )
     # we may have multiple variants per gene in the results, so we
     # need to drop duplicates here.
     return pd.DataFrame(rows)
 
 
-async def _get_num_slices(
+async def async_get_num_slices(
     client: AsyncOpenSearch,
     index_name: str,
     query: dict[str, Any],
@@ -670,24 +704,44 @@ async def _get_num_slices(
     return max(num_slices_planned, 1), n_docs
 
 
-async def _run_annotation_query(
+async def async_run_annotation_query(
     query: dict[str, Any],
     index_name: str,
-    opensearch_config: dict[str, Any],
-    additional_fields: list[str] | None = None,
+    fields: list[str] | None = None,
+    cluster_opensearch_config: dict[str, Any] | None = None,
     bystro_api_auth: CachedAuth | None = None,
+    additional_client_args: dict[str, Any] | None = None,
 ) -> pd.DataFrame:
-    """Given query and index contained in SaveJobData, run query and return results as dataframe."""
+    """
+    Run an annotation query and return a DataFrame of results.
 
-    search_client_args = gather_opensearch_args(opensearch_config)
+    Args:
+        query: OpenSearch query
+        index_name: Index name
+        fields: Additional fields to include in the DataFrame
+        cluster_opensearch_config: Cluster OpenSearch configuration
+        bystro_api_auth: Bystro API authentication
+        additional_client_args: Additional arguments for OpenSearch client
+
+    Returns:
+        DataFrame of query results
+    """
+    if cluster_opensearch_config is not None and bystro_api_auth is not None:
+        raise ValueError(
+            "Cannot provide both cluster_opensearch_config and bystro_api_auth. Select one."
+        )
+
     if bystro_api_auth is not None:
         # If auth is provided, use the proxied client
         job_id = index_name.split("_")[0]
-        client = get_async_proxied_opensearch_client(bystro_api_auth, job_id, search_client_args)
-    else:
+        client = get_async_proxied_opensearch_client(bystro_api_auth, job_id, additional_client_args)
+    elif cluster_opensearch_config is not None:
+        search_client_args = gather_opensearch_args(cluster_opensearch_config)
         client = AsyncOpenSearch(**search_client_args)
+    else:
+        raise ValueError("Must provide either cluster_opensearch_config or bystro_api_auth.")
 
-    num_slices, _ = await _get_num_slices(client, index_name, query)
+    num_slices, _ = await async_get_num_slices(client, index_name, query)
 
     point_in_time = await client.create_point_in_time(  # type: ignore[attr-defined]
         index=index_name, params={"keep_alive": OPENSEARCH_QUERY_CONFIG.keep_alive}
@@ -704,7 +758,7 @@ async def _run_annotation_query(
                 # Slice queries require max > 1
                 slice_query["body"]["slice"] = {"id": slice_id, "max": num_slices}
 
-            query_result = _execute_query(client, query=slice_query, additional_fields=additional_fields)
+            query_result = execute_query(client, query=slice_query, fields=fields)
             query_results.append(query_result)
 
         res = await asyncio.gather(*query_results)
@@ -725,35 +779,49 @@ async def _run_annotation_query(
         print("CLOSED CLIENT")
 
 
-async def get_annotation_result_from_query_async(
-    user_query_string: str,
+async def async_get_annotation_result_from_query(
+    query_string: str,
     index_name: str,
-    opensearch_config: dict[str, Any],
-    additional_fields: list[str] | None = None,
+    fields: list[str] | None = None,
+    cluster_opensearch_config: dict[str, Any] | None = None,
     bystro_api_auth: CachedAuth | None = None,
+    additional_client_args: dict[str, Any] | None = None,
 ) -> pd.DataFrame:
     """Given a query and index, return a dataframe of variant / sample_id records matching query."""
-    query = _build_opensearch_query_from_query_string(user_query_string)
-    return await _run_annotation_query(
-        query, index_name, opensearch_config, additional_fields, bystro_api_auth=bystro_api_auth
+
+    if cluster_opensearch_config is not None and bystro_api_auth is not None:
+        raise ValueError(
+            "Cannot provide both cluster_opensearch_config and bystro_api_auth. Select one."
+        )
+
+    query = _build_opensearch_query_from_query_string(query_string)
+    return await async_run_annotation_query(
+        query,
+        index_name,
+        fields=fields,
+        cluster_opensearch_config=cluster_opensearch_config,
+        bystro_api_auth=bystro_api_auth,
+        additional_client_args=additional_client_args,
     )
 
 
 def get_annotation_result_from_query(
-    user_query_string: str,
+    query_string: str,
     index_name: str,
-    opensearch_config: dict[str, Any],
-    additional_fields: list[str] = [],
+    fields: list[str] | None = None,
+    cluster_opensearch_config: dict[str, Any] | None = None,
     bystro_api_auth: CachedAuth | None = None,
+    additional_client_args: dict[str, Any] | None = None,
 ) -> pd.DataFrame:
     """Given a query and index, return a dataframe of variant / sample_id records matching query."""
     loop = asyncio.get_event_loop()
-    coroutine = get_annotation_result_from_query_async(
-        user_query_string,
+    coroutine = async_get_annotation_result_from_query(
+        query_string,
         index_name,
-        opensearch_config,
-        additional_fields,
+        fields=fields,
+        cluster_opensearch_config=cluster_opensearch_config,
         bystro_api_auth=bystro_api_auth,
+        additional_client_args=additional_client_args,
     )
 
     return loop.run_until_complete(coroutine)

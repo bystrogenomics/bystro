@@ -53,13 +53,13 @@ def test_get_annotation_results_from_query(mocker):
         "bystro.proteomics.annotation_interface.AsyncOpenSearch",
         return_value=MockAsyncOpenSearch(),
     )
-    user_query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
+    query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
     index_name = "mock_index_name"
 
     samples_and_genes_df = get_annotation_result_from_query(
-        user_query_string,
+        query_string,
         index_name,
-        {
+        cluster_opensearch_config={
             "connection": {
                 "nodes": ["http://localhost:9200"],
                 "request_timeout": 1200,
@@ -92,13 +92,13 @@ def test_join_annotation_result_to_proteomics_dataset(mocker):
     )
 
     # Step 1: Get an annotation query result
-    user_query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
+    query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
     index_name = "foo"
 
     query_result_df = get_annotation_result_from_query(
-        user_query_string,
+        query_string,
         index_name,
-        {
+        cluster_opensearch_config={
             "connection": {
                 "nodes": ["http://localhost:9200"],
                 "request_timeout": 1200,

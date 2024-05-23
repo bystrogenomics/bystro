@@ -75,7 +75,9 @@ def make_handler_fn(
                 ) from e
 
         annotation_df = get_annotation_result_from_query(
-            job_data.annotation_query, job_data.index_name, search_conf
+            query_string=job_data.annotation_query,
+            index_name=job_data.index_name,
+            cluster_opensearch_config=search_conf
         )
 
         joined_df = join_annotation_result_to_proteomics_dataset(annotation_df, gene_abundance_df)
