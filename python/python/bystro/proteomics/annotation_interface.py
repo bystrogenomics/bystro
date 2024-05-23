@@ -3,6 +3,7 @@
 import copy
 import logging
 import math
+
 from typing import Any, Callable
 
 import asyncio
@@ -122,7 +123,10 @@ def transform_fields_with_dynamic_arity(
             else:
                 if not isinstance(position_data[arity_key], list):
                     raise RuntimeError(
-                        f"Expected list for track {track}, key {arity_key}, found {position_data[arity_key]}"
+                        (
+                            f"Expected list for track {track}, key {arity_key},"
+                            f"found {position_data[arity_key]}"
+                        )
                     )
                 max_arity = len(position_data[arity_key])
         else:
@@ -417,20 +421,9 @@ def process_dict_based_on_pos_length(d: dict[str, Any]):
         Processed dictionary
     """
     # Process 2D arrays to join or convert to single values
-    flatten_2d_array(d)
 
     # Determine the length of the "pos" field
     pos_length = len(d["pos"])
-
-    if pos_length == 1:
-        # Convert all array values to scalars
-        for key in d:
-            if isinstance(d[key], list):
-                d[key] = d[key][0]
-        d[LINK_GENERATED_COLUMN] = (
-            f"{d[CHROM_FIELD]}:{d[POS_FIELD]}:{d[INPUT_REF_FIELD]}:{d[ALT_FIELD]}:{d[TYPE_FIELD]}"
-        )
-        return [d]
 
     # Create an array of dictionaries, each corresponding to one index
     result = []
@@ -446,8 +439,9 @@ def process_dict_based_on_pos_length(d: dict[str, Any]):
                 new_dict[key] = value
 
         new_dict[LINK_GENERATED_COLUMN] = (
-            f"{new_dict[CHROM_FIELD]}:{new_dict[POS_FIELD]}:{new_dict[INPUT_REF_FIELD]}:{new_dict[ALT_FIELD]}:{new_dict[TYPE_FIELD]}"
+            f"{new_dict[CHROM_FIELD]}:{new_dict[POS_FIELD]}:{new_dict[INPUT_REF_FIELD]}:{new_dict[ALT_FIELD]}"
         )
+
         result.append(new_dict)
 
     return result
@@ -670,7 +664,16 @@ async def execute_query(
 
 
 def process_query_response(hits: list[dict[str, Any]], fields: list[str] | None = None) -> pd.DataFrame:
-    """Postprocess query response from opensearch client."""
+    """
+    Process the query response and return a DataFrame.
+
+    Args:
+        hits: List of hits from OpenSearch query
+        fields: Fields to include in the DataFrame
+
+    Returns:
+        DataFrame of query results
+    """
     num_hits = len(hits)
 
     if num_hits == 0:
@@ -684,17 +687,12 @@ def process_query_response(hits: list[dict[str, Any]], fields: list[str] | None 
 
     rows = flatten_nested_dicts(rows)
 
-    # samples_genes_dosages_df = pd.concat(
-    #     [_get_samples_genes_dosages_from_hit(hit, fields) for hit in hits]
-    # )
     # we may have multiple variants per gene in the results, so we
     # need to drop duplicates here.
     if fields is not None:
         cols = ALWAYS_INCLUDED_FIELDS + [LINK_GENERATED_COLUMN]
 
-        cols += [
-            field for field in fields if field not in cols
-        ]
+        cols += [field for field in fields if field not in cols]
 
         return pd.DataFrame(rows, columns=cols)
     return pd.DataFrame(rows)
