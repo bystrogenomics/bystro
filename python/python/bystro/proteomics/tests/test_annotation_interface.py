@@ -13,6 +13,7 @@ from bystro.proteomics.annotation_interface import (
     ALWAYS_INCLUDED_FIELDS,
     SAMPLE_COLUMNS,
     LINK_GENERATED_COLUMN,
+    FRAGPIPE_PROTEIN_ABUNDANCE_COLUMN
 )
 
 from bystro.proteomics.fragpipe_tandem_mass_tag import (
@@ -45,11 +46,12 @@ class MockAsyncOpenSearchLegacy:
             self.has_sent_hits = True
             return TEST_LEGACY_RESPONSE
 
-        response = copy.deepcopy(TEST_LEGACY_RESPONSE)
-        response["hits"]["total"] = 0
-        response["hits"]["hits"] = []
-
-        return response
+        return {
+            "hits": {
+                "hits": [],
+                "total": 0,
+            }
+        }
 
     async def count(self, *_args, **_kw_args) -> dict:
         return {"count": 1}
@@ -67,7 +69,7 @@ class MockAsyncOpenSearchLegacy:
 class MockAsyncOpenSearch:
     def __init__(self, responses: list[dict]):
         self.pages_seen = 0
-        self.responses = responses
+        self.responses = copy.deepcopy(responses)
 
     async def search(self, *_args, **_kw_args) -> dict:
         if self.pages_seen < len(self.responses):
@@ -158,7 +160,7 @@ async def test_get_annotation_results_from_query_with_samples(mocker):
         },
     )
 
-    assert (397, 11) == samples_and_genes_df.shape
+    assert (397, 12) == samples_and_genes_df.shape
 
 
 @pytest.mark.asyncio
@@ -183,7 +185,7 @@ async def test_get_annotation_results_from_query_without_samples(mocker):
             },
         },
     )
-    assert (3698, 9) == samples_and_genes_df.shape
+    assert (3698, 10) == samples_and_genes_df.shape
 
 
 def test_process_response():
@@ -301,4 +303,4 @@ async def test_join_annotation_result_to_fragpipe_dataset(mocker):
 
     assert (370, 13) == joined_df.shape
 
-    assert list(joined_df.columns) == list(query_result_df.columns) + ["abundance"]
+    assert list(joined_df.columns) == list(query_result_df.columns) + [FRAGPIPE_PROTEIN_ABUNDANCE_COLUMN]

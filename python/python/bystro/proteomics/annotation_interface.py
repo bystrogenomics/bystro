@@ -132,6 +132,8 @@ NOT_SUPPORTED_TRACKS = ["refSeq.clinvar"]
 
 DEFAULT_GENE_NAME_COLUMN = "refSeq.name2"
 
+FRAGPIPE_PROTEIN_ABUNDANCE_COLUMN = "protein_abundance"
+
 
 def _looks_like_float(val):
     try:
@@ -475,8 +477,7 @@ def process_dict_based_on_pos_length(
             if (
                 isinstance(value[i], list)
                 and len(value[i]) == 1
-                and track not in multi_valued_tracks
-                or value[i][0] is None
+                and (track not in multi_valued_tracks or value[i][0] is None)
             ):
                 new_row[track] = value[i][0]
             else:
@@ -601,7 +602,6 @@ async def execute_query(
         structs_of_arrays=structs_of_arrays,
         melt_by_samples=melt_by_samples,
         melt_by_fields=melt_by_fields,
-        no_copy=True,
     )
 
 
@@ -622,13 +622,11 @@ def process_query_response(
     structs_of_arrays: bool = True,
     melt_by_samples: bool = False,
     melt_by_fields: list["str"] | None = None,
-    no_copy: bool = False,
 ) -> pd.DataFrame:
     """Postprocess query response from opensearch client."""
     num_hits = len(hits)
 
-    if not no_copy:
-        hits = copy.deepcopy(hits)
+    hits = copy.deepcopy(hits)
 
     if num_hits == 0:
         return pd.DataFrame()
@@ -960,12 +958,14 @@ def join_annotation_result_to_fragpipe_dataset(
         get_tracking_id_from_proteomic_sample_id
     )
 
-    joined_df = query_result_df.merge(
-        proteomics_df,
-        left_on=[SAMPLE_GENERATED_COLUMN, gene_name_column],
-        right_on=[fragpipe_sample_id_column, fragpipe_gene_name_column],
-    ).drop(columns=[fragpipe_sample_id_column, fragpipe_gene_name_column]).rename(columns={
-        "value": "abundance"
-    })
+    joined_df = (
+        query_result_df.merge(
+            proteomics_df,
+            left_on=[SAMPLE_GENERATED_COLUMN, gene_name_column],
+            right_on=[fragpipe_sample_id_column, fragpipe_gene_name_column],
+        )
+        .drop(columns=[fragpipe_sample_id_column, fragpipe_gene_name_column])
+        .rename(columns={"value": FRAGPIPE_PROTEIN_ABUNDANCE_COLUMN})
+    )
 
     return joined_df
