@@ -7,14 +7,17 @@ from typing import Any, Callable
 
 import asyncio
 from msgspec import Struct
+import nest_asyncio # type: ignore
 import numpy as np
 
 import pandas as pd
 from opensearchpy import AsyncOpenSearch
 
+from bystro.api.auth import CachedAuth
+from bystro.api.search import get_async_proxied_opensearch_client
 from bystro.proteomics.fragpipe_tandem_mass_tag import TandemMassTagDataset
-
 from bystro.search.utils.opensearch import gather_opensearch_args
+
 
 logger = logging.getLogger(__file__)
 
@@ -23,6 +26,7 @@ HOMOZYGOTE_DOSAGE = 2
 MISSING_GENO_DOSAGE = np.nan
 ONE_DAY = "1d"  # default keep_alive time for opensearch point in time index
 
+nest_asyncio.apply()
 
 class OpenSearchQueryConfig(Struct):
     """Represent parameters for configuring OpenSearch queries."""
@@ -170,6 +174,7 @@ def _get_samples_genes_dosages_from_hit(
 
     return pd.DataFrame(rows)
 
+
 async def _execute_query(
     client: AsyncOpenSearch, query: dict, additional_fields: list[str] | None = None
 ) -> pd.DataFrame:
@@ -245,10 +250,17 @@ async def _run_annotation_query(
     index_name: str,
     opensearch_config: dict[str, Any],
     additional_fields: list[str] | None = None,
+    bystro_api_auth: CachedAuth | None = None,
 ) -> pd.DataFrame:
     """Given query and index contained in SaveJobData, run query and return results as dataframe."""
+
     search_client_args = gather_opensearch_args(opensearch_config)
-    client = AsyncOpenSearch(**search_client_args)
+    if bystro_api_auth is not None:
+        # If auth is provided, use the proxied client
+        job_id = index_name.split("_")[0]
+        client = get_async_proxied_opensearch_client(bystro_api_auth, job_id, search_client_args)
+    else:
+        client = AsyncOpenSearch(**search_client_args)
 
     num_slices, _ = await _get_num_slices(client, index_name, query)
 
@@ -257,6 +269,7 @@ async def _run_annotation_query(
     )
     try:  # make sure we clean up the PIT index properly no matter what happens in this block
         pit_id = point_in_time["pit_id"]
+
         query["body"]["pit"] = {"id": pit_id}
         query["body"]["size"] = OPENSEARCH_QUERY_CONFIG.max_query_size
         query_results = []
@@ -291,10 +304,13 @@ async def get_annotation_result_from_query_async(
     index_name: str,
     opensearch_config: dict[str, Any],
     additional_fields: list[str] | None = None,
+    bystro_api_auth: CachedAuth | None = None,
 ) -> pd.DataFrame:
     """Given a query and index, return a dataframe of variant / sample_id records matching query."""
     query = _build_opensearch_query_from_query_string(user_query_string)
-    return await _run_annotation_query(query, index_name, opensearch_config, additional_fields)
+    return await _run_annotation_query(
+        query, index_name, opensearch_config, additional_fields, bystro_api_auth=bystro_api_auth
+    )
 
 
 def get_annotation_result_from_query(
@@ -302,15 +318,15 @@ def get_annotation_result_from_query(
     index_name: str,
     opensearch_config: dict[str, Any],
     additional_fields: list[str] = [],
+    bystro_api_auth: CachedAuth | None = None,
 ) -> pd.DataFrame:
     """Given a query and index, return a dataframe of variant / sample_id records matching query."""
     loop = asyncio.get_event_loop()
     coroutine = get_annotation_result_from_query_async(
-        user_query_string, index_name, opensearch_config, additional_fields
+        user_query_string, index_name, opensearch_config, additional_fields,
+        bystro_api_auth=bystro_api_auth
     )
-    if loop.is_running():
-        # If the event loop is already running, use a workaround
-        return asyncio.run_coroutine_threadsafe(coroutine, loop).result()
+
     return loop.run_until_complete(coroutine)
 
 
