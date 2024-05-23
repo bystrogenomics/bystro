@@ -7,7 +7,7 @@ from typing import Any, Callable
 
 import asyncio
 from msgspec import Struct
-import nest_asyncio # type: ignore
+import nest_asyncio  # type: ignore
 import numpy as np
 
 import pandas as pd
@@ -27,6 +27,423 @@ MISSING_GENO_DOSAGE = np.nan
 ONE_DAY = "1d"  # default keep_alive time for opensearch point in time index
 
 nest_asyncio.apply()
+
+# Fields that may look numeric but are lexical
+DEFAULT_NOT_NUMERIC_FIELDS = [
+    "pos",
+    "vcfPos",
+    "clinvarVcf.RS",
+    "id",
+    "gnomad.exomes.id",
+    "gnomad.genomes.id",
+    "clinvarVcf.id",
+    "refSeq.codonNumber",
+    "homozygotes",
+    "heterozygotes",
+    "missingGenos",
+    "clinvarVcf.ALLELEID",
+    "clinvarVcf.DBVARID",
+    "clinvarVcf.ORIGIN",
+]
+
+DEFAULT_PRIMARY_KEYS = {
+    "gnomad.genomes": "id",
+    "gnomad.exomes": "id",
+    "clinvarVcf": "id",
+    "dbSNP": "id",
+    "nearestTss.refSeq": "name",
+    "nearest.refSeq": "name",
+    "refSeq": "name",
+}
+
+
+def flatten(value):
+    if not isinstance(value, list) or not isinstance(value[0], list):
+        return value
+    return [item for sublist in value for item in sublist]
+
+
+def looks_like_float(val):
+    try:
+        val = float(val)
+    except ValueError:
+        return False
+
+    return True
+
+
+def looks_like_number(val):
+    not_float = False
+    not_int = False
+    try:
+        return True, float(val)
+    except ValueError:
+        not_float = True
+
+    try:
+        return True, int(val)
+    except ValueError:
+        not_int = True
+
+    return not (not_float and not_int), val
+
+
+def transform_fields_with_dynamic_arity(
+    data_structure, alt_field, track, primary_keys: dict[str, str] | None = None
+):
+    if primary_keys is None:
+        primary_keys = DEFAULT_PRIMARY_KEYS
+
+    def calculate_number_of_positions():
+        is_number, val = looks_like_number(alt_field)
+        if is_number:
+            return int(min(abs(val), 32))
+        return 2 if len(alt_field) >= 2 else 1
+
+    positions_count = calculate_number_of_positions()
+
+    def calculate_max_arity_for_position(position_data):
+        if isinstance(position_data, list):
+            return len(position_data)
+
+        arity_key = primary_keys.get(track)
+
+        max_arity = 0
+        if arity_key is not None:
+            if not isinstance(position_data[arity_key], list):
+                raise RuntimeError(
+                    f"Expected list for track {track}, key {arity_key}, found {position_data[arity_key]}"
+                )
+            max_arity = len(position_data[arity_key])
+        else:
+            for field in position_data.values():
+                max_arity = max(max_arity, len(field))
+
+        return max_arity
+
+    def transform_position_data(position_data, keys):
+        max_arity = calculate_max_arity_for_position(position_data)
+        position_result = []
+
+        for i in range(max_arity):
+            item_info = {}
+            for key in keys:
+                if max_arity == 1:
+                    # Due to deduplication, where we output 1 value when all values are identical for a key
+                    # it is possible to have max_arity 1 for a primary_key, but higher arity in other fields
+                    value = position_data[key]
+                else:
+                    value = (
+                        position_data[key][0] if len(position_data[key]) == 1 else position_data[key][i]
+                    )
+
+                if isinstance(value, list):
+                    value = flatten(value)
+
+                    if len(value) == 1:
+                        value = value[0]
+
+                item_info[key] = value
+            position_result.append(item_info)
+
+        return position_result
+
+    def transform_position_data_for_no_key_data(position_data):
+        max_arity = calculate_max_arity_for_position(position_data)
+        position_result = []
+
+        for i in range(max_arity):
+            value = position_data[0] if len(position_data) == 1 else position_data[i]
+            position_result.append(value[0] if isinstance(value, list) and len(value) == 1 else value)
+
+        return position_result
+
+    keys = None
+    if not isinstance(data_structure, list):
+        keys = list(data_structure.keys())
+
+    transformed_data = []
+
+    for position_index in range(positions_count):
+        if keys is None:
+            transformed_data.append(
+                transform_position_data_for_no_key_data(
+                    data_structure[0] if len(data_structure) == 1 else data_structure[position_index]
+                )
+            )
+            continue
+
+        position_data = {
+            key: (
+                data_structure[key][0]
+                if len(data_structure[key]) == 1
+                else data_structure[key][position_index]
+            )
+            for key in keys
+        }
+        transformed_data.append(transform_position_data(position_data, keys))
+
+    return transformed_data
+
+
+def generate_desired_structs_of_arrays(document):
+    result = {}
+
+    def transform_object(obj):
+        return obj
+
+    def traverse_and_transform(obj, current_path=""):
+        has_nested_objects = False
+
+        for key, value in obj.items():
+            new_path = f"{current_path}.{key}" if current_path else key
+
+            if isinstance(value, dict):
+                has_nested_objects = True
+                traverse_and_transform(value, new_path)
+
+        if not has_nested_objects or current_path:
+            result[current_path] = transform_object(obj)
+
+    traverse_and_transform(document)
+
+    all_keys = document.keys()
+    for key in all_keys:
+        if key not in result:
+            result[key] = document[key]
+
+    for key in list(result.keys()):
+        nested_keys = [k for k in result.keys() if k.startswith(f"{key}.")]
+        for nested_key in nested_keys:
+            sub_key = nested_key[len(key) + 1 :]
+            if sub_key in result[key]:
+                del result[key][sub_key]
+
+    return result
+
+
+def sort_keys(result, drop_alt=False):
+    keys = list(result.keys())
+
+    if drop_alt:
+        if "alt" in keys:
+            keys.remove("alt")
+
+    keys.sort(key=str.lower)
+
+    if "id" in keys:
+        keys.remove("id")
+        keys.insert(0, "id")
+
+    return keys
+
+
+def hit_to_sorted_array_of_objects(result, drop_alt=False):
+    keys = list(result.keys())
+
+    if drop_alt:
+        if "alt" in keys:
+            keys.remove("alt")
+
+    keys.sort(key=str.lower)
+
+    if "id" in keys:
+        keys.remove("id")
+        keys.insert(0, "id")
+
+    return [[key, result[key]] for key in keys]
+
+
+def sort_track_keys(hit):
+    keys = sort_keys(hit)
+
+    bystro_main_track_idx = []
+    keys_to_add = []
+    for key in BYSTRO_MAIN_TRACK_KEYS:
+        if key in keys:
+            idx = keys.index(key)
+            keys.pop(idx)
+            bystro_main_track_idx.append(idx)
+            keys_to_add.append(key)
+
+    return keys_to_add + keys
+
+
+def tracks_of_objects_to_track_of_arrays(
+    data, track_name="", not_numeric_fields: list[str] | None = None
+):
+    if not_numeric_fields is None:
+        not_numeric_fields = DEFAULT_NOT_NUMERIC_FIELDS
+
+    def convert_and_sort(obj, convert_key=""):
+        if obj is None:
+            return None
+
+        if not (isinstance(obj, dict) or isinstance(obj, list)):
+            if convert_key not in not_numeric_fields:
+                num = obj
+
+                if convert_key not in not_numeric_fields and looks_like_float(obj):
+                    num = float(obj)
+                if not isinstance(num, (int, float)):
+                    return obj
+                if num == 0:
+                    return 0
+                abs_num = abs(num)
+                if abs_num < 0.0001 or abs_num > 1000000:
+                    return f"{num:.4e}"
+                return round(num, 4)
+            return obj
+
+        if isinstance(obj, list):
+            return [convert_and_sort(element, convert_key) for element in obj]
+
+        keys = sort_keys(obj, True)
+
+        if not keys:
+            return []
+
+        if len(keys) == 1:
+            return [
+                keys[0],
+                convert_and_sort(obj[keys[0]], f"{convert_key}.{keys[0]}" if convert_key else keys[0]),
+            ]
+
+        return [
+            [key, convert_and_sort(obj[key], f"{convert_key}.{key}" if convert_key else key)]
+            for key in keys
+        ]
+
+    return convert_and_sort(data, track_name)
+
+
+def fill_query_results_object(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    query_results_unique = []
+
+    for row_result_obj in hits:
+        row = {}
+
+        flattened_data = generate_desired_structs_of_arrays(row_result_obj["_source"].copy())
+
+        for track_name, value in flattened_data.items():
+            if not value:
+                continue
+            row[track_name] = transform_fields_with_dynamic_arity(
+                value, row_result_obj["_source"]["alt"][0][0][0], track_name
+            )
+
+        query_results_unique.append(row)
+
+    return query_results_unique
+
+
+def process_data(hits: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    results_obj = fill_query_results_object(hits)
+    results = [
+        {
+            track_name: tracks_of_objects_to_track_of_arrays(row[track_name], track_name)
+            for track_name in row
+        }
+        for row in results_obj
+    ]
+
+    return results, results_obj
+
+
+def flatten_2d_array(d):
+    def is_2d_array(value):
+        if isinstance(value, list) and all(isinstance(i, list) for i in value):
+            return True
+        return False
+
+    def recurse(d):
+        for key, value in d.items():
+            if is_2d_array(value):
+                d[key] = flatten(value)
+            elif isinstance(value, dict):
+                recurse(value)
+            elif isinstance(value, list):
+                for item in value:
+                    if isinstance(item, dict):
+                        recurse(item)
+
+    recurse(d)
+    return d
+
+
+def flatten_nested_dicts(dicts):
+    flattened_dicts = []
+
+    def flatten_dict(d, parent_key="", sep="_"):
+        items = []
+        for k, v in d.items():
+            new_key = f"{parent_key}{sep}{k}" if parent_key else k
+            if isinstance(v, dict):
+                items.extend(flatten_dict(v, new_key, sep=sep).items())
+            else:
+                items.append((new_key, v))
+        return dict(items)
+
+    for d in dicts:
+        flattened_dicts.append(flatten_dict(d))
+
+    return flattened_dicts
+
+
+def process_dict_based_on_pos_length(d):
+    # Process 2D arrays to join or convert to single values
+    flatten_2d_array(d)
+
+    # Determine the length of the "pos" field
+    pos_length = len(d["pos"])
+
+    if pos_length == 1:
+        # Convert all array values to scalars
+        for key in d.keys():
+            if isinstance(d[key], list):
+                d[key] = d[key][0]
+        d["link"] = f"{d['chrom']}:{d['pos']}:{d['ref']}:{d['alt']}:{d['type']}"
+        return [d]
+    else:
+        # Create an array of dictionaries, each corresponding to one index
+        result = []
+        for i in range(pos_length):
+            new_dict = {}
+            for key, value in d.items():
+                if isinstance(value, list) and i < len(value):
+                    if isinstance(value[i], list) and len(value[i]) == 1:
+                        new_dict[key] = value[i][0]
+                    else:
+                        new_dict[key] = value[i]
+                else:
+                    new_dict[key] = value
+            # Add the "link" field
+            new_dict["link"] = (
+                f"{new_dict['chrom']}:{new_dict['pos']}:{new_dict['ref']}:{new_dict['alt']}:{new_dict['type']}"
+            )
+            result.append(new_dict)
+        return result
+
+
+def flatten_nested_dicts(dicts):
+    flattened_dicts = []
+
+    def flatten_dict(d, parent_key="", sep="."):
+        items = []
+
+        for k, v in d.items():
+            new_key = f"{parent_key}{sep}{k}" if parent_key else k
+            if isinstance(v, dict):
+                items.extend(flatten_dict(v, new_key, sep=sep).items())
+            else:
+                items.append((new_key, v))
+        return dict(items)
+
+    for d in dicts:
+        flattened_dicts.append(flatten_dict(d))
+
+    return flattened_dicts
+
 
 class OpenSearchQueryConfig(Struct):
     """Represent parameters for configuring OpenSearch queries."""
@@ -213,12 +630,20 @@ def _process_response(
     if num_hits == 0:
         return pd.DataFrame()
 
-    samples_genes_dosages_df = pd.concat(
-        [_get_samples_genes_dosages_from_hit(hit, additional_fields) for hit in hits]
-    )
+    rows = []
+    results, results_obj = process_data(hits)
+
+    for row in results_obj:
+        rows.extend(process_dict_based_on_pos_length(row))
+
+    rows = flatten_nested_dicts(rows)
+
+    # samples_genes_dosages_df = pd.concat(
+    #     [_get_samples_genes_dosages_from_hit(hit, additional_fields) for hit in hits]
+    # )
     # we may have multiple variants per gene in the results, so we
     # need to drop duplicates here.
-    return samples_genes_dosages_df.drop_duplicates()
+    return pd.DataFrame(rows)
 
 
 async def _get_num_slices(
@@ -297,6 +722,7 @@ async def _run_annotation_query(
     finally:
         await client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore[attr-defined]
         await client.close()
+        print("CLOSED CLIENT")
 
 
 async def get_annotation_result_from_query_async(
@@ -323,8 +749,11 @@ def get_annotation_result_from_query(
     """Given a query and index, return a dataframe of variant / sample_id records matching query."""
     loop = asyncio.get_event_loop()
     coroutine = get_annotation_result_from_query_async(
-        user_query_string, index_name, opensearch_config, additional_fields,
-        bystro_api_auth=bystro_api_auth
+        user_query_string,
+        index_name,
+        opensearch_config,
+        additional_fields,
+        bystro_api_auth=bystro_api_auth,
     )
 
     return loop.run_until_complete(coroutine)
