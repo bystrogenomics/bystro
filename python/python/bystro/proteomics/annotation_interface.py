@@ -56,11 +56,14 @@ DEFAULT_PRIMARY_KEYS = {
     "refSeq": "name",
 }
 
+ALWAYS_INCLUDED_FIELDS = ["chrom", "pos", "vcfPos", "inputRef", "alt", "type", "id"]
+LINK_GENERATED_COLUMN = "link"
 
-def flatten(value):
-    if not isinstance(value, list) or not isinstance(value[0], list):
-        return value
-    return [item for sublist in value for item in sublist]
+CHROM_FIELD = "chrom"
+POS_FIELD = "pos"
+INPUT_REF_FIELD = "inputRef"
+ALT_FIELD = "alt"
+TYPE_FIELD = "type"
 
 
 def looks_like_float(val):
@@ -110,11 +113,18 @@ def transform_fields_with_dynamic_arity(
 
         max_arity = 0
         if arity_key is not None:
-            if not isinstance(position_data[arity_key], list):
-                raise RuntimeError(
-                    f"Expected list for track {track}, key {arity_key}, found {position_data[arity_key]}"
-                )
-            max_arity = len(position_data[arity_key])
+            if arity_key not in position_data:
+                # Return 1 because the primary key was not selected
+                # which means that the key values are relative to is not present
+                # so we cannot separate the values into multiple records based on the primary key
+                # so the best we can do is flatten the array of output values
+                max_arity = 1
+            else:
+                if not isinstance(position_data[arity_key], list):
+                    raise RuntimeError(
+                        f"Expected list for track {track}, key {arity_key}, found {position_data[arity_key]}"
+                    )
+                max_arity = len(position_data[arity_key])
         else:
             for field in position_data.values():
                 max_arity = max(max_arity, len(field))
@@ -140,7 +150,7 @@ def transform_fields_with_dynamic_arity(
                     )
 
                 if isinstance(value, list):
-                    value = flatten(value)
+                    value = _flatten(value)
 
                     if len(value) == 1:
                         value = value[0]
@@ -384,7 +394,7 @@ def flatten_2d_array(d):
     def recurse(d):
         for key, value in d.items():
             if is_2d_array(value):
-                d[key] = flatten(value)
+                d[key] = _flatten(value)
             elif isinstance(value, dict):
                 recurse(value)
             elif isinstance(value, list):
@@ -417,7 +427,9 @@ def process_dict_based_on_pos_length(d: dict[str, Any]):
         for key in d:
             if isinstance(d[key], list):
                 d[key] = d[key][0]
-        d["link"] = f"{d['chrom']}:{d['pos']}:{d['ref']}:{d['alt']}:{d['type']}"
+        d[LINK_GENERATED_COLUMN] = (
+            f"{d[CHROM_FIELD]}:{d[POS_FIELD]}:{d[INPUT_REF_FIELD]}:{d[ALT_FIELD]}:{d[TYPE_FIELD]}"
+        )
         return [d]
 
     # Create an array of dictionaries, each corresponding to one index
@@ -433,8 +445,8 @@ def process_dict_based_on_pos_length(d: dict[str, Any]):
             else:
                 new_dict[key] = value
 
-        new_dict["link"] = (
-            f"{new_dict['chrom']}:{new_dict['pos']}:{new_dict['ref']}:{new_dict['alt']}:{new_dict['type']}"
+        new_dict[LINK_GENERATED_COLUMN] = (
+            f"{new_dict[CHROM_FIELD]}:{new_dict[POS_FIELD]}:{new_dict[INPUT_REF_FIELD]}:{new_dict[ALT_FIELD]}:{new_dict[TYPE_FIELD]}"
         )
         result.append(new_dict)
 
@@ -620,13 +632,13 @@ def _get_samples_genes_dosages_from_hit(
 async def execute_query(
     client: AsyncOpenSearch, query: dict, fields: list[str] | None = None
 ) -> pd.DataFrame:
-    """
+    f"""
     Execute an OpenSearch query and return the results as a DataFrame.
 
     Args:
         client: OpenSearch client
         query: OpenSearch query
-        fields: Additional fields to include in the DataFrame
+        fields: Fields to include in the DataFrame. {ALWAYS_INCLUDED_FIELDS} will always be included
 
     Returns:
         DataFrame of query results
@@ -677,6 +689,14 @@ def process_query_response(hits: list[dict[str, Any]], fields: list[str] | None 
     # )
     # we may have multiple variants per gene in the results, so we
     # need to drop duplicates here.
+    if fields is not None:
+        cols = ALWAYS_INCLUDED_FIELDS + [LINK_GENERATED_COLUMN]
+
+        cols += [
+            field for field in fields if field not in cols
+        ]
+
+        return pd.DataFrame(rows, columns=cols)
     return pd.DataFrame(rows)
 
 
@@ -793,7 +813,8 @@ async def async_get_annotation_result_from_query(
             "Cannot provide both cluster_opensearch_config and bystro_api_auth. Select one."
         )
 
-    query = _build_opensearch_query_from_query_string(query_string)
+    query = _build_opensearch_query_from_query_string(query_string, fields=fields)
+
     return await async_run_annotation_query(
         query,
         index_name,
@@ -827,7 +848,7 @@ def get_annotation_result_from_query(
 
 
 def _build_opensearch_query_from_query_string(
-    query_string: str, output_fields: list[str] | None = None
+    query_string: str, fields: list[str] | None = None
 ) -> dict[str, Any]:
     base_query: dict[str, Any] = {
         "body": {
@@ -848,8 +869,13 @@ def _build_opensearch_query_from_query_string(
         }
     }
 
-    if output_fields is not None:
-        base_query["_source_includes"] = output_fields
+    all_fields = ALWAYS_INCLUDED_FIELDS.copy()
+    for field in fields or []:
+        if field not in all_fields:
+            all_fields.append(field)
+
+    if fields is not None:
+        base_query["_source_includes"] = all_fields
 
     return base_query
 
