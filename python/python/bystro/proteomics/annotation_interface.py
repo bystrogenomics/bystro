@@ -130,6 +130,8 @@ DEFAULT_MULTI_VALUED_TRACKS = [
 # because we no longer know which value of bar corresponds to which value of foo
 NOT_SUPPORTED_TRACKS = ["refSeq.clinvar"]
 
+DEFAULT_GENE_NAME_COLUMN = "refSeq.name2"
+
 
 def _looks_like_float(val):
     try:
@@ -470,7 +472,12 @@ def process_dict_based_on_pos_length(
     for i in range(pos_length):
         new_row = {}
         for track, value in row.items():
-            if isinstance(value[i], list) and len(value[i]) == 1 and track not in multi_valued_tracks or value[i][0] is None:
+            if (
+                isinstance(value[i], list)
+                and len(value[i]) == 1
+                and track not in multi_valued_tracks
+                or value[i][0] is None
+            ):
                 new_row[track] = value[i][0]
             else:
                 new_row[track] = value[i]
@@ -536,7 +543,7 @@ def _flatten(xs: Any) -> list[Any]:  # noqa: ANN401 (`Any` is really correct her
     if not isinstance(xs, list):
         return [xs]
     return sum([_flatten(x) for x in xs], [])
-import json
+
 
 async def execute_query(
     client: AsyncOpenSearch,
@@ -544,6 +551,7 @@ async def execute_query(
     fields: list[str] | None = None,
     structs_of_arrays: bool = True,
     melt_by_samples: bool = False,
+    melt_by_fields: list[str] | None = None,
 ) -> pd.DataFrame:
     """
     Execute an OpenSearch query and return the results as a DataFrame.
@@ -588,7 +596,12 @@ async def execute_query(
         search_after = resp["hits"]["hits"][-1]["sort"]
 
     return process_query_response(
-        results, fields, structs_of_arrays=structs_of_arrays, melt_by_samples=melt_by_samples
+        results,
+        fields,
+        structs_of_arrays=structs_of_arrays,
+        melt_by_samples=melt_by_samples,
+        melt_by_fields=melt_by_fields,
+        no_copy=True,
     )
 
 
@@ -602,16 +615,20 @@ def _transpose_array_of_structs(array_of_structs):
 
     return transposed_struct
 
+
 def process_query_response(
     hits: list[dict[str, Any]],
     fields: list[str] | None = None,
     structs_of_arrays: bool = True,
     melt_by_samples: bool = False,
+    melt_by_fields: list["str"] | None = None,
+    no_copy: bool = False,
 ) -> pd.DataFrame:
     """Postprocess query response from opensearch client."""
     num_hits = len(hits)
 
-    hits = copy.deepcopy(hits)
+    if not no_copy:
+        hits = copy.deepcopy(hits)
 
     if num_hits == 0:
         return pd.DataFrame()
@@ -666,7 +683,20 @@ def process_query_response(
             cols += [SAMPLE_GENERATED_COLUMN, DOSAGE_GENERATED_COLUMN]
             rows = melted_rows
 
-    df = pd.DataFrame(rows) # noqa: PD901
+        if melt_by_fields is not None:
+            melted_rows = []
+            for row in rows:
+                for field in melt_by_fields:
+                    if field in row:
+                        value = row[field]
+                        for val in _flatten(value):
+                            if val is None:
+                                continue
+                            melted_rows.append({**row, field: val})
+            if melted_rows:
+                rows = melted_rows
+
+    df = pd.DataFrame(rows)  # noqa: PD901
 
     if fields is not None:
         cols += [field for field in fields if field not in cols]
@@ -714,6 +744,7 @@ async def async_run_annotation_query(
     additional_client_args: dict[str, Any] | None = None,
     structs_of_arrays: bool = True,
     melt_by_samples: bool = False,
+    melt_by_fields: list[str] | None = None,
 ) -> pd.DataFrame:
     """
     Run an annotation query and return a DataFrame of results.
@@ -767,6 +798,7 @@ async def async_run_annotation_query(
                 fields=fields,
                 structs_of_arrays=structs_of_arrays,
                 melt_by_samples=melt_by_samples,
+                melt_by_fields=melt_by_fields,
             )
             query_results.append(query_result)
 
@@ -797,6 +829,7 @@ async def async_get_annotation_result_from_query(
     additional_client_args: dict[str, Any] | None = None,
     structs_of_arrays: bool = True,
     melt_by_samples: bool = True,
+    melt_by_fields: list[str] | None = None,
 ) -> pd.DataFrame:
     """Given a query and index, return a dataframe of variant / sample_id records matching query."""
 
@@ -818,6 +851,7 @@ async def async_get_annotation_result_from_query(
         additional_client_args=additional_client_args,
         structs_of_arrays=structs_of_arrays,
         melt_by_samples=melt_by_samples,
+        melt_by_fields=melt_by_fields,
     )
 
 
@@ -830,6 +864,7 @@ def get_annotation_result_from_query(
     additional_client_args: dict[str, Any] | None = None,
     structs_of_arrays: bool = True,
     melt_by_samples: bool = True,
+    melt_by_fields: list[str] | None = None,
 ) -> pd.DataFrame:
     """Given a query and index, return a dataframe of variant / sample_id records matching query."""
     loop = asyncio.get_event_loop()
@@ -842,6 +877,7 @@ def get_annotation_result_from_query(
         additional_client_args=additional_client_args,
         structs_of_arrays=structs_of_arrays,
         melt_by_samples=melt_by_samples,
+        melt_by_fields=melt_by_fields,
     )
 
     return loop.run_until_complete(coroutine)
@@ -898,11 +934,14 @@ def _build_opensearch_query_from_query_string(
     return base_query
 
 
-def join_annotation_result_to_proteomics_dataset(
+def join_annotation_result_to_fragpipe_dataset(
     query_result_df: pd.DataFrame,
     tmt_dataset: TandemMassTagDataset,
     get_tracking_id_from_genomic_sample_id: Callable[[str], str] = (lambda x: x),
     get_tracking_id_from_proteomic_sample_id: Callable[[str], str] = (lambda x: x),
+    gene_name_column: str = DEFAULT_GENE_NAME_COLUMN,
+    fragpipe_sample_id_column: str = "sample_id",
+    fragpipe_gene_name_column: str = "gene_name",
 ) -> pd.DataFrame:
     """
     Args:
@@ -914,12 +953,19 @@ def join_annotation_result_to_proteomics_dataset(
     query_result_df = query_result_df.copy()
     proteomics_df = tmt_dataset.get_melted_abundance_df()
 
-    query_result_df.sample_id = query_result_df.sample_id.apply(get_tracking_id_from_genomic_sample_id)
-    proteomics_df.sample_id = proteomics_df.sample_id.apply(get_tracking_id_from_proteomic_sample_id)
+    query_result_df[SAMPLE_GENERATED_COLUMN] = query_result_df[SAMPLE_GENERATED_COLUMN].apply(
+        get_tracking_id_from_genomic_sample_id
+    )
+    proteomics_df[fragpipe_sample_id_column] = proteomics_df[fragpipe_sample_id_column].apply(
+        get_tracking_id_from_proteomic_sample_id
+    )
 
     joined_df = query_result_df.merge(
         proteomics_df,
-        left_on=["sample_id", "gene_name"],
-        right_on=["sample_id", "gene_name"],
-    )
+        left_on=[SAMPLE_GENERATED_COLUMN, gene_name_column],
+        right_on=[fragpipe_sample_id_column, fragpipe_gene_name_column],
+    ).drop(columns=[fragpipe_sample_id_column, fragpipe_gene_name_column]).rename(columns={
+        "value": "abundance"
+    })
+
     return joined_df
