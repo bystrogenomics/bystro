@@ -3,10 +3,10 @@
 import copy
 import logging
 import math
-
 from typing import Any, Callable
 
 import asyncio
+
 from msgspec import Struct
 import nest_asyncio  # type: ignore
 import numpy as np
@@ -22,26 +22,69 @@ from bystro.search.utils.opensearch import gather_opensearch_args
 
 logger = logging.getLogger(__file__)
 
+nest_asyncio.apply()
+
 HETEROZYGOTE_DOSAGE = 1
 HOMOZYGOTE_DOSAGE = 2
-MISSING_GENO_DOSAGE = np.nan
+MISSING_GENO_DOSAGE = -1
 ONE_DAY = "1d"  # default keep_alive time for opensearch point in time index
 
-nest_asyncio.apply()
+CHROM_FIELD = "chrom"
+POS_FIELD = "pos"
+VCF_POS_FIELD = "vcfPos"
+INPUT_REF_FIELD = "inputRef"
+ALT_FIELD = "alt"
+TYPE_FIELD = "type"
+ID_FIELD = "id"
+HETEROZYGOTES_FIELD = "heterozygotes"
+HOMOZYGOTES_FIELD = "homozygotes"
+MISSING_GENOS_FIELD = "missingGenos"
+
+SAMPLE_COLUMNS = HETEROZYGOTES_FIELD, HOMOZYGOTES_FIELD, MISSING_GENOS_FIELD]
+
+ALWAYS_INCLUDED_FIELDS = [
+    CHROM_FIELD,
+    POS_FIELD,
+    VCF_POS_FIELD,
+    INPUT_REF_FIELD,
+    ALT_FIELD,
+    TYPE_FIELD,
+    ID_FIELD,
+]
+LINK_GENERATED_COLUMN = "locus"
+SAMPLE_GENERATED_COLUMN = "sample"
+DOSAGE_GENERATED_COLUMN = "dosage"
+
+DEFAULT_COLUMN_TYPES = {
+    HETEROZYGOTES_FIELD: str,
+    HOMOZYGOTES_FIELD: str,
+    MISSING_GENOS_FIELD: str,
+    CHROM_FIELD: str,
+    POS_FIELD: np.int64,
+    VCF_POS_FIELD: np.int64,
+    INPUT_REF_FIELD: str,
+    ALT_FIELD: str,
+    TYPE_FIELD: str,
+    ID_FIELD: str,
+    LINK_GENERATED_COLUMN: str,
+    SAMPLE_GENERATED_COLUMN: str,
+    DOSAGE_GENERATED_COLUMN: np.int8,
+}
+
 
 # Fields that may look numeric but are lexical
 DEFAULT_NOT_NUMERIC_FIELDS = [
-    "pos",
-    "vcfPos",
+    POS_FIELD,
+    VCF_POS_FIELD,
+    ID_FIELD,
+    HETEROZYGOTES_FIELD,
+    HOMOZYGOTES_FIELD,
+    MISSING_GENOS_FIELD,
     "clinvarVcf.RS",
-    "id",
     "gnomad.exomes.id",
     "gnomad.genomes.id",
     "clinvarVcf.id",
     "refSeq.codonNumber",
-    "homozygotes",
-    "heterozygotes",
-    "missingGenos",
     "clinvarVcf.ALLELEID",
     "clinvarVcf.DBVARID",
     "clinvarVcf.ORIGIN",
@@ -65,21 +108,7 @@ DEFAULT_MULTI_VALUED_TRACKS = [
     "nearestTss.refSeq",
 ]
 
-DEFAULT_FIELDS_TO_MELT_BY = ["homozygotes", "heterozygotes"]
-
-ALWAYS_INCLUDED_FIELDS = ["chrom", "pos", "vcfPos", "inputRef", "alt", "type", "id"]
-LINK_GENERATED_COLUMN = "locus"
-
-CHROM_FIELD = "chrom"
-POS_FIELD = "pos"
-INPUT_REF_FIELD = "inputRef"
-ALT_FIELD = "alt"
-TYPE_FIELD = "type"
-
-SAMPLE_COLUMNS = ["heterozygotes", "homozygotes", "missingGenos"]
-
-
-def looks_like_float(val):
+def _looks_like_float(val):
     try:
         val = float(val)
     except ValueError:
@@ -88,7 +117,7 @@ def looks_like_float(val):
     return True
 
 
-def looks_like_number(val):
+def _looks_like_number(val):
     not_float = False
     not_int = False
     try:
@@ -114,7 +143,7 @@ def transform_fields_with_dynamic_arity(
         primary_keys = DEFAULT_PRIMARY_KEYS
 
     def calculate_number_of_positions():
-        is_number, val = looks_like_number(alt_field)
+        is_number, val = _looks_like_number(alt_field)
         if is_number:
             return int(min(abs(val), 32))
         return 2 if len(alt_field) >= 2 else 1
@@ -312,7 +341,7 @@ def track_of_objects_to_track_of_arrays(
             if convert_key not in not_numeric_fields:
                 num = obj
 
-                if convert_key not in not_numeric_fields and looks_like_float(obj):
+                if convert_key not in not_numeric_fields and _looks_like_float(obj):
                     num = float(obj)
                 if not isinstance(num, (int, float)):
                     return obj
@@ -375,25 +404,6 @@ def fill_query_results_object(hits: list[dict[str, Any]]) -> list[dict[str, Any]
     return query_results_unique
 
 
-def query_results_to_array_of_structs(results_obj: dict[str, Any]) -> list[dict[str, Any]]:
-    """
-    Convert query results to a struct of arrays.
-
-    Args:
-        results_obj: Query results object
-
-    Returns:
-        Struct of arrays
-    """
-    return [
-        {
-            track_name: track_of_objects_to_track_of_arrays(row[track_name], track_name)
-            for track_name in row
-        }
-        for row in results_obj
-    ]
-
-
 def process_dict_based_on_pos_length(
     row: dict[str, Any], multi_valued_tracks: list[str] | None = None
 ) -> list[dict[str, Any]]:
@@ -453,7 +463,7 @@ def flatten_nested_dicts(dicts: list[dict[str, Any]]) -> list[dict[str, Any]]:
             if isinstance(v, dict):
                 items.extend(flatten_dict(v, new_key, sep=sep).items())
             elif isinstance(v, list) and isinstance(v[0], dict):
-                vals = transpose_array_of_structs(v)
+                vals = _transpose_array_of_structs(v)
                 items.extend(flatten_dict(vals, new_key, sep=sep).items())
             else:
                 items.append((new_key, v))
@@ -490,13 +500,21 @@ async def execute_query(
     structs_of_arrays: bool = True,
     melt_by_samples: bool = False,
 ) -> pd.DataFrame:
-    f"""
+    """
     Execute an OpenSearch query and return the results as a DataFrame.
 
     Args:
         client: OpenSearch client
         query: OpenSearch query
-        fields: Fields to include in the DataFrame. {ALWAYS_INCLUDED_FIELDS} will always be included
+        fields: Fields to include in the DataFrame.
+            The following fields will always be included:
+                chrom, pos, vcfPos, inputRef, alt, type, id, locus
+            When melt_by_samples is True, the following fields will also be included:
+                sample, dosage
+                - These fields are generated based on the heterozygotes,
+                  homozygotes, and missingGenos fields.
+        structs_of_arrays: Whether to return structs of arrays.
+        melt_by_samples: Whether to melt the DataFrame by samples.
 
     Returns:
         DataFrame of query results
@@ -529,7 +547,7 @@ async def execute_query(
     )
 
 
-def transpose_array_of_structs(array_of_structs):
+def _transpose_array_of_structs(array_of_structs):
     keys = array_of_structs[0].keys()
     transposed_struct = {key: [] for key in keys}
 
@@ -538,27 +556,6 @@ def transpose_array_of_structs(array_of_structs):
             transposed_struct[key].append(struct[key])
 
     return transposed_struct
-
-
-def _melt_df(df, melt_by):
-    df_explode = df[melt_by].apply(lambda col: col.explode().reset_index(drop=True))
-
-    # Merge exploded dataframe with the rest of the columns (preserving the order and alignment)
-    df_rest = df.drop(columns=melt_by).reset_index(drop=True)
-    df_combined = pd.concat([df_rest, df_explode], axis=1)
-
-    # Melting the exploded part of the DataFrame
-    df_melted = df_combined.melt(
-        id_vars=df_rest.columns.tolist(), value_name="sample", var_name="variable"
-    )
-    df_melted = df_melted.dropna(subset=["sample"])  # Drop rows where 'sample' is NaN
-
-    # Mapping 'variable' to 'dosage'
-    dosage_map = {"heterozygotes": 1, "homozygotes": 2, "missingGenos": -1}
-    df_melted["dosage"] = df_melted["variable"].map(dosage_map)
-
-    # Dropping the 'variable' column as it's no longer needed
-    return df_melted.drop(columns="variable")
 
 
 def process_query_response(
@@ -586,16 +583,46 @@ def process_query_response(
     # need to drop duplicates here.
     cols = ALWAYS_INCLUDED_FIELDS + [LINK_GENERATED_COLUMN]
 
-    df = pd.DataFrame(rows)  # noqa: PD901
-
     if melt_by_samples is True:
-        df = _melt_df(df, SAMPLE_COLUMNS)  # noqa: PD901
-        cols += ["sample", "dosage"]
+        cols += [SAMPLE_GENERATED_COLUMN, DOSAGE_GENERATED_COLUMN]
+
+        melted_rows = []
+        for row in rows:
+            heterozygotes = _flatten(row.get(HETEROZYGOTES_FIELD, []))
+            homozygotes = _flatten(row.get(HOMOZYGOTES_FIELD, []))
+            missing_genos = _flatten(row.get(MISSING_GENOS_FIELD, []))
+
+            del row[HETEROZYGOTES_FIELD]
+            del row[HOMOZYGOTES_FIELD]
+            del row[MISSING_GENOS_FIELD]
+
+            for samples, dosage in [
+                (heterozygotes, HETEROZYGOTE_DOSAGE),
+                (homozygotes, HOMOZYGOTE_DOSAGE),
+                (missing_genos, MISSING_GENO_DOSAGE),
+            ]:
+                for sample in samples:
+                    if sample is not None:
+                        melted_rows.append(
+                            {
+                                **row,
+                                SAMPLE_GENERATED_COLUMN: str(sample),
+                                DOSAGE_GENERATED_COLUMN: int(dosage),
+                            }
+                        )
+        rows = melted_rows
+
+    df = pd.DataFrame(rows)
 
     if fields is not None:
         cols += [field for field in fields if field not in cols]
     else:
         cols += sorted(df.columns.difference(cols))
+
+    known_dtypes = {}
+    for col in cols:
+        if col in DEFAULT_COLUMN_TYPES:
+            known_dtypes[col] = DEFAULT_COLUMN_TYPES[col]
 
     return df[cols]
 
