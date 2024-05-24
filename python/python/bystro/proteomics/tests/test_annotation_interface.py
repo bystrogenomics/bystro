@@ -328,10 +328,10 @@ async def test_join_annotation_result_to_fragpipe_dataset(mocker):
                 "verify_certs": False,
             },
         },
-        melt_by_fields=["refSeq.name2"],
+        melt_by_field="refSeq.name2",
     )
 
-    assert (561, 12) == query_result_df.shape
+    assert (582, 12) == query_result_df.shape
 
     sample_ids = query_result_df["sample"].unique()
 

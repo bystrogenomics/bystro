@@ -552,7 +552,8 @@ async def execute_query(
     fields: list[str] | None = None,
     structs_of_arrays: bool = True,
     melt_by_samples: bool = False,
-    melt_by_fields: list[str] | None = None,
+    melt_by_field: str | None = None,
+    force_flatten_melt_by_field: bool = False,
 ) -> pd.DataFrame:
     """
     Execute an OpenSearch query and return the results as a DataFrame.
@@ -601,7 +602,8 @@ async def execute_query(
         fields,
         structs_of_arrays=structs_of_arrays,
         melt_by_samples=melt_by_samples,
-        melt_by_fields=melt_by_fields,
+        melt_by_field=melt_by_field,
+        force_flatten_melt_by_field=force_flatten_melt_by_field
     )
 
 
@@ -621,7 +623,8 @@ def process_query_response(
     fields: list[str] | None = None,
     structs_of_arrays: bool = True,
     melt_by_samples: bool = False,
-    melt_by_fields: list["str"] | None = None,
+    melt_by_field: str | None = None,
+    force_flatten_melt_by_field: bool = True,
 ) -> pd.DataFrame:
     """Postprocess query response from opensearch client."""
     num_hits = len(hits)
@@ -681,16 +684,41 @@ def process_query_response(
             cols += [SAMPLE_GENERATED_COLUMN, DOSAGE_GENERATED_COLUMN]
             rows = melted_rows
 
-        if melt_by_fields is not None:
+        if melt_by_field is not None:
             melted_rows = []
+
+            track_name = ".".join(melt_by_field.split(".")[0:-1])
+
             for row in rows:
-                for field in melt_by_fields:
-                    if field in row:
-                        value = row[field]
-                        for val in _flatten(value):
-                            if val is None:
-                                continue
-                            melted_rows.append({**row, field: val})
+                row_fields = row.keys()
+
+                # The related fields all share the same arity, and should be split together
+                related_melt_by_fields = [
+                    field
+                    for field in row_fields
+                    if field != melt_by_field and field == f"{track_name}.{field.split('.')[-1]}"
+                ]
+
+                field_length = len(row[melt_by_field])
+
+                for i in range(field_length):
+                    melted_row = {**row}
+
+                    for field in related_melt_by_fields:
+                        melted_row[field] = row[field][i]
+
+                    melted_field_value = row[melt_by_field][i]
+
+                    if isinstance(melted_field_value, list) and force_flatten_melt_by_field:
+                        melted_field_value = _flatten(melted_field_value)
+
+                        for val in melted_field_value:
+                            melted_row[melt_by_field] = val
+                            melted_rows.append({**melted_row})
+                    else:
+                        melted_row[melt_by_field] = melted_field_value
+                        melted_rows.append({**melted_row})
+
             if melted_rows:
                 rows = melted_rows
 
@@ -742,7 +770,8 @@ async def async_run_annotation_query(
     additional_client_args: dict[str, Any] | None = None,
     structs_of_arrays: bool = True,
     melt_by_samples: bool = False,
-    melt_by_fields: list[str] | None = None,
+    melt_by_field: str | None = None,
+    force_flatten_melt_by_field: bool = True,
 ) -> pd.DataFrame:
     """
     Run an annotation query and return a DataFrame of results.
@@ -796,7 +825,8 @@ async def async_run_annotation_query(
                 fields=fields,
                 structs_of_arrays=structs_of_arrays,
                 melt_by_samples=melt_by_samples,
-                melt_by_fields=melt_by_fields,
+                melt_by_field=melt_by_field,
+                force_flatten_melt_by_field=force_flatten_melt_by_field
             )
             query_results.append(query_result)
 
@@ -827,7 +857,8 @@ async def async_get_annotation_result_from_query(
     additional_client_args: dict[str, Any] | None = None,
     structs_of_arrays: bool = True,
     melt_by_samples: bool = True,
-    melt_by_fields: list[str] | None = None,
+    melt_by_field: str | None = None,
+    force_flatten_melt_by_field: bool = True,
 ) -> pd.DataFrame:
     """Given a query and index, return a dataframe of variant / sample_id records matching query."""
 
@@ -849,7 +880,8 @@ async def async_get_annotation_result_from_query(
         additional_client_args=additional_client_args,
         structs_of_arrays=structs_of_arrays,
         melt_by_samples=melt_by_samples,
-        melt_by_fields=melt_by_fields,
+        melt_by_field=melt_by_field,
+        force_flatten_melt_by_field=force_flatten_melt_by_field
     )
 
 
@@ -862,7 +894,8 @@ def get_annotation_result_from_query(
     additional_client_args: dict[str, Any] | None = None,
     structs_of_arrays: bool = True,
     melt_by_samples: bool = True,
-    melt_by_fields: list[str] | None = None,
+    melt_by_field: str | None = None,
+    force_flatten_melt_by_field: bool = True,
 ) -> pd.DataFrame:
     """Given a query and index, return a dataframe of variant / sample_id records matching query."""
     loop = asyncio.get_event_loop()
@@ -875,7 +908,8 @@ def get_annotation_result_from_query(
         additional_client_args=additional_client_args,
         structs_of_arrays=structs_of_arrays,
         melt_by_samples=melt_by_samples,
-        melt_by_fields=melt_by_fields,
+        melt_by_field=melt_by_field,
+        force_flatten_melt_by_field=force_flatten_melt_by_field
     )
 
     return loop.run_until_complete(coroutine)
