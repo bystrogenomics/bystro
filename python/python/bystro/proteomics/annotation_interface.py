@@ -700,7 +700,8 @@ def process_query_response(
                 ]
 
                 if row[melt_by_field] is None or not isinstance(row[melt_by_field], list):
-                    melted_row = {**row}
+                    melted_rows.append(row)
+                    continue
 
                 field_length = len(row[melt_by_field])
 
