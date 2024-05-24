@@ -5,7 +5,7 @@ from pyro.infer import mcmc, SVI, Trace_ELBO
 import torch
 from torch.optim import Adam
 
-from pyro.distributions import Gamma, Normal
+from pyro.distributions import Gamma, Normal  # type: ignore
 
 
 class BasePrsCS:
@@ -172,9 +172,7 @@ class PrsCSDataVariational(BasePrsCS):
             )
 
             w = pyro.sample("w", Gamma(w_loc, w_scale))  # noqa: F841
-            phi = pyro.sample(
-                "phi", Gamma(phi_loc, phi_scale)
-            )  # noqa: F841
+            phi = pyro.sample("phi", Gamma(phi_loc, phi_scale))  # noqa: F841
             sigma2 = pyro.sample("sigma2", Gamma(sigma2_loc, sigma2_scale))
             delta = pyro.sample(  # noqa: F841
                 "delta",
