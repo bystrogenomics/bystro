@@ -135,7 +135,16 @@ DEFAULT_GENE_NAME_COLUMN = "refSeq.name2"
 FRAGPIPE_PROTEIN_ABUNDANCE_COLUMN = "protein_abundance"
 
 
-def _looks_like_float(val):
+def _looks_like_float(val: Any) -> bool:
+    """
+    Check if a value looks like a float.
+
+    Args:
+        val (Any): Any value to check.
+
+    Returns:
+        bool: True if the value can be converted to a float, False otherwise.
+    """
     try:
         val = float(val)
     except ValueError:
@@ -144,7 +153,17 @@ def _looks_like_float(val):
     return True
 
 
-def _looks_like_number(val):
+def _looks_like_number(val: Any) -> tuple[bool, Any]:
+    """
+    Check if a value looks like a number (float or int).
+
+    Args:
+        val (Any): Any value to check.
+
+    Returns:
+        tuple[bool, Any]: A tuple (is_number, value) where is_number is True if the value can be
+        converted to a number, and value is the converted number or the original value.
+    """
     not_float = False
     not_int = False
     try:
@@ -161,11 +180,24 @@ def _looks_like_number(val):
 
 
 def transform_fields_with_dynamic_arity(
-    data_structure,
-    alt_field,
-    track,
+    data_structure: dict,
+    alt_field: str,
+    track: str,
     primary_keys: dict[str, str] | None = None,
-):
+) -> list:
+    """
+    Transform fields with dynamic arity.
+
+    Args:
+        data_structure (dict): The data structure to transform.
+        alt_field (str): The alternative field.
+        track (str): The track name.
+        primary_keys (dict[str, str] | None):
+            Dictionary of primary keys for tracks, defaults to DEFAULT_PRIMARY_KEYS.
+
+    Returns:
+        list: A list of transformed data structures.
+    """
     if primary_keys is None:
         primary_keys = DEFAULT_PRIMARY_KEYS
 
@@ -285,15 +317,15 @@ def transform_fields_with_dynamic_arity(
     return transformed_data
 
 
-def generate_desired_structs_of_arrays(document: dict[str, Any]):
+def generate_desired_structs_of_arrays(document: dict[str, Any]) -> dict[str, Any]:
     """
-    Generate desired structures of arrays.
+    Generate desired structures of arrays from a document.
 
     Args:
-        document: Document
+        document (dict[str, Any]): The document to process.
 
     Returns:
-        Desired structures of arrays
+        dict[str, Any]: A dictionary with the desired structures of arrays.
     """
     result = {}
 
@@ -330,16 +362,16 @@ def generate_desired_structs_of_arrays(document: dict[str, Any]):
     return result
 
 
-def sort_keys(result: dict[str, Any], drop_alt=False) -> list[str]:
+def sort_keys(result: dict[str, Any], drop_alt: bool = False) -> list[str]:
     """
     Sort keys in a dictionary.
 
     Args:
-        result: Result dictionary
-        drop_alt: Drop the "alt" key
+        result (dict[str, Any]): The dictionary to sort keys for.
+        drop_alt (bool): Whether to drop the "alt" key from the sorted keys.
 
     Returns:
-        Sorted keys
+        list[str]: A sorted list of keys.
     """
     keys = list(result.keys())
 
@@ -356,18 +388,19 @@ def sort_keys(result: dict[str, Any], drop_alt=False) -> list[str]:
 
 
 def track_of_objects_to_track_of_arrays(
-    data, track_name="", not_numeric_fields: list[str] | None = None
-) -> list | int | float | str | None:
+    data: Any, track_name: str = "", not_numeric_fields: list[str] | None = None
+) -> Any:
     """
     Convert a track of objects to a track of arrays.
 
     Args:
-        data: Track of objects
-        track_name: Track name
-        not_numeric_fields: Fields that are not numeric
+        data (Any): The track of objects to convert.
+        track_name (str): The name of the track.
+        not_numeric_fields (list[str] | None):
+            A list of fields that are not numeric, defaults to DEFAULT_NOT_NUMERIC_FIELDS.
 
     Returns:
-        Track of arrays
+        Any: The converted track of arrays.
     """
     if not_numeric_fields is None:
         not_numeric_fields = DEFAULT_NOT_NUMERIC_FIELDS
@@ -421,11 +454,11 @@ def fill_query_results_object(
     Fill the query results object with the desired structure.
 
     Args:
-        hits: List of hits from OpenSearch query
-        primary_keys: Primary keys for tracks
+        hits (list[dict[str, Any]]): A list of hits from an OpenSearch query.
+        primary_keys (dict[str, str] | None): A dictionary of primary keys for tracks, defaults to None.
 
     Returns:
-        List of query results objects
+        list[dict[str, Any]]: A list of query results objects.
     """
     query_results_unique = []
 
@@ -463,10 +496,13 @@ def process_dict_based_on_pos_length(
     Process a dictionary based on the length of the "pos" field.
 
     Args:
-        d: Dictionary
+        row (dict[str, Any]): A dictionary to process.
+        multi_valued_tracks (list[str] | None):
+            A list of tracks that may have more than one value per position,
+            defaults to DEFAULT_MULTI_VALUED_TRACKS.
 
     Returns:
-        Processed dictionary
+        list[dict[str, Any]]: A list of processed dictionaries.
     """
 
     if multi_valued_tracks is None:
@@ -503,10 +539,10 @@ def flatten_nested_dicts(dicts: list[dict[str, Any]]) -> list[dict[str, Any]]:
     Flatten nested dictionaries.
 
     Args:
-        dicts: List of dictionaries
+        dicts (list[dict[str, Any]]): A list of dictionaries to flatten.
 
     Returns:
-        Flattened list of dictionaries
+        list[dict[str, Any]]: A flattened list of dictionaries.
     """
     flattened_dicts = []
 
@@ -535,7 +571,14 @@ def flatten_nested_dicts(dicts: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 class OpenSearchQueryConfig(Struct):
-    """Represent parameters for configuring OpenSearch queries."""
+    """
+    Represent parameters for configuring OpenSearch queries.
+
+    Attributes:
+        max_query_size (int): Maximum query size.
+        max_slices (int): Maximum number of slices.
+        keep_alive (str): Default keep_alive time for OpenSearch point in time index.
+    """
 
     max_query_size: int = 10_000
     max_slices: int = 1024
@@ -545,8 +588,16 @@ class OpenSearchQueryConfig(Struct):
 OPENSEARCH_QUERY_CONFIG = OpenSearchQueryConfig()
 
 
-def _flatten(xs: Any) -> list[Any]:  # noqa: ANN401 (`Any` is really correct here)
-    """Flatten an arbitrarily nested list."""
+def _flatten(xs: Any) -> list[Any]:
+    """
+    Flatten an arbitrarily nested list.
+
+    Args:
+        xs (Any): The list to flatten.
+
+    Returns:
+        list[Any]: A flattened list.
+    """
     if not isinstance(xs, list):
         return [xs]
     return sum([_flatten(x) for x in xs], [])
@@ -566,24 +617,18 @@ async def execute_query(
     Execute an OpenSearch query and return the results as a DataFrame.
 
     Args:
-        client: OpenSearch client
-        query: OpenSearch query
-        fields: Fields to include in the DataFrame.
-            The following fields will always be included:
-                chrom, pos, vcfPos, inputRef, alt, type, id, locus
-            When melt_by_samples is True, the following fields will also be included:
-                sample, dosage
-                - These fields are generated based on the heterozygotes,
-                  homozygotes, and missingGenos fields.
-        structs_of_arrays: Whether to return structs of arrays.
-        melt_by_samples: Whether to melt the DataFrame by samples.
-        melt_by_field: Field to melt by.
-        force_flatten_melt_by_field: When melting by a field, whether to force flatten array values,
-            potentially losing some of the structure of related fields in a track.
-        primary_keys: Primary keys for tracks.
+        client (AsyncOpenSearch): The OpenSearch client.
+        query (dict): The OpenSearch query.
+        fields (list[str] | None): A list of fields to include in the DataFrame.
+        structs_of_arrays (bool): Whether to return structs of arrays, defaults to True.
+        melt_by_samples (bool): Whether to melt the DataFrame by samples, defaults to False.
+        melt_by_field (str | None): A field to melt by, defaults to None.
+        force_flatten_melt_by_field (bool):
+            When melting by a field, whether to force flatten array values, defaults to False.
+        primary_keys (dict[str, str] | None): A dictionary of primary keys for tracks, defaults to None.
 
     Returns:
-        DataFrame of query results
+        pd.DataFrame: A DataFrame of query results.
     """
     results: list[dict] = []
     search_after = None  # Initialize search_after for pagination
@@ -631,7 +676,16 @@ async def execute_query(
     )
 
 
-def _transpose_array_of_structs(array_of_structs):
+def _transpose_array_of_structs(array_of_structs: list[dict[str, Any]]) -> dict[str, list[Any]]:
+    """
+    Transpose an array of structs to a struct of arrays.
+
+    Args:
+        array_of_structs (list[dict[str, Any]]): An array of structs to transpose.
+
+    Returns:
+        dict[str, list[Any]]: A struct of arrays.
+    """
     keys = array_of_structs[0].keys()
     transposed_struct: dict[str, Any] = {key: [] for key in keys}
 
@@ -655,36 +709,17 @@ def process_query_response(
     Process the query response and return a DataFrame.
 
     Args:
-        hits:
-            List of hits from OpenSearch query
+        hits (list[dict[str, Any]]): A list of hits from an OpenSearch query.
+        fields (list[str] | None): A list of fields to include in the DataFrame.
+        structs_of_arrays (bool): Whether to return structs of arrays, defaults to True.
+        melt_by_samples (bool): Whether to melt the DataFrame by samples, defaults to False.
+        melt_by_field (str | None): A field to melt by, defaults to None.
+        force_flatten_melt_by_field (bool):
+            When melting by a field, whether to force flatten array values, defaults to True.
+        primary_keys (dict[str, str] | None): A dictionary of primary keys for tracks, defaults to None.
 
-            Note that this value will be modified in place
-        fields:
-            Fields to include in the DataFrame
-        structs_of_arrays: bool, optional, default=True
-            Whether to return structs of arrays
-        melt_by_samples: bool, optional, default=False
-            Whether to emit 1 sample per row. If true
-            heterozygotes, homozygotes, and missingGenos columns
-            will be replaced by 2 columns: sample and dosage, and 1 sample will be found per row
-        melt_by_field: str, optional, default=None
-            Field to melt by
-        force_flatten_melt_by_field: bool, optional, default=True
-            When melting by a field, whether to force flatten array values,
-            potentially losing some of the structure of related fields in a track.
-
-            This most typically comes up when melting by a field when the
-            primary key for the field's track is not present in the results,
-            (because the primary key was not included in fields=)
-
-            For instance, if we melt_by_field='refSeq.name2', but 'refSeq.name' was not
-            selected for inclusion in the results.
-        primary_keys: dict, optional, default=None
-            Primary keys for tracks
-
-            For example, if the primary key for the 'refSeq' track is 'name'.
-
-            This is useful for more accurate flattening of nested structures
+    Returns:
+        pd.DataFrame: A DataFrame of query results.
     """
     num_hits = len(hits)
 
@@ -833,7 +868,17 @@ async def async_get_num_slices(
     index_name: str,
     query: dict[str, Any],
 ) -> tuple[int, int]:
-    """Count number of hits for the index."""
+    """
+    Count number of hits for the index.
+
+    Args:
+        client (AsyncOpenSearch): The OpenSearch client.
+        index_name (str): The name of the index.
+        query (dict[str, Any]): The OpenSearch query.
+
+    Returns:
+        tuple[int, int]: A tuple of the number of slices planned and the total number of documents.
+    """
     get_num_slices_query = query["body"].copy()
     get_num_slices_query.pop("sort", None)
     get_num_slices_query.pop("track_total_hits", None)
@@ -869,21 +914,23 @@ async def async_run_annotation_query(
     Run an annotation query and return a DataFrame of results.
 
     Args:
-        query: OpenSearch query
-        index_name: Index name
-        fields: Additional fields to include in the DataFrame
-        cluster_opensearch_config: Cluster OpenSearch configuration
-        bystro_api_auth: Bystro API authentication
-        additional_client_args: Additional arguments for OpenSearch client
-        structs_of_arrays: Whether to return structs of arrays
-        melt_by_samples: Whether to melt the DataFrame by samples
-        melt_by_field: Field to melt by
-        force_flatten_melt_by_field: When melting by a field, whether to force flatten array values,
-            potentially losing some of the structure of related fields in a track
-        primary_keys: Primary keys for tracks
+        query (dict[str, Any]): The OpenSearch query.
+        index_name (str): The name of the index.
+        fields (list[str] | None): Additional fields to include in the DataFrame, defaults to None.
+        cluster_opensearch_config (dict[str, Any] | None):
+            Configuration for the OpenSearch cluster,defaults to None.
+        bystro_api_auth (CachedAuth | None): Bystro API authentication, defaults to None.
+        additional_client_args (dict[str, Any] | None):
+            Additional arguments for the OpenSearch client, defaults to None.
+        structs_of_arrays (bool): Whether to return structs of arrays, defaults to True.
+        melt_by_samples (bool): Whether to melt the DataFrame by samples, defaults to False.
+        melt_by_field (str | None): A field to melt by, defaults to None.
+        force_flatten_melt_by_field (bool):
+            When melting by a field, whether to force flatten array values, defaults to True.
+        primary_keys (dict[str, str] | None): A dictionary of primary keys for tracks, defaults to None.
 
     Returns:
-        DataFrame of query results
+        pd.DataFrame: A DataFrame of query results.
     """
     if cluster_opensearch_config is not None and bystro_api_auth is not None:
         raise ValueError(
@@ -909,7 +956,7 @@ async def async_run_annotation_query(
 
             if primary_key_for_melt_track is not None:
                 primary_key_for_melt_track = melt_by_field_track + "." + primary_key_for_melt_track
-                
+
                 if primary_key_for_melt_track not in fields:
                     logger.warning(
                         (
@@ -990,31 +1037,23 @@ async def async_get_annotation_result_from_query(
     Given a query and index, return a dataframe of variant / sample_id records matching query.
 
     Args:
-        query_string: str
-            The query string to use for the search
-        index_name: str
-            The name of the index to search
-        fields: list, optional, default=None
-            The fields to include in the results
-        cluster_opensearch_config: dict, optional, default=None
-            The configuration for the OpenSearch cluster
-        bystro_api_auth: CachedAuth, optional, default=None
-            The authentication for the Bystro API
-        additional_client_args: dict, optional, default=None
-            Additional arguments for the OpenSearch client
-        structs_of_arrays: bool, optional, default=True
-            Whether to return structs of arrays
-        melt_by_samples: bool, optional, default=True
-            Whether to melt the DataFrame by samples
-        melt_by_field: str, optional, default=None
-            The field to melt by
-        force_flatten_melt_by_field: bool, optional, default=True
-            Whether to force flatten array values when melting by a field
-        primary_keys: dict, optional, default=None
-            The primary keys for tracks
+        query_string (str): The query string to use for the search.
+        index_name (str): The name of the index to search.
+        fields (list[str] | None): The fields to include in the results, defaults to None.
+        cluster_opensearch_config (dict[str, Any] | None):
+            The configuration for the OpenSearch cluster, defaults to None.
+        bystro_api_auth (CachedAuth | None): The authentication for the Bystro API, defaults to None.
+        additional_client_args (dict[str, Any] | None):
+            Additional arguments for the OpenSearch client, defaults to None.
+        structs_of_arrays (bool): Whether to return structs of arrays, defaults to True.
+        melt_by_samples (bool): Whether to melt the DataFrame by samples, defaults to True.
+        melt_by_field (str | None): The field to melt by, defaults to None.
+        force_flatten_melt_by_field (bool):
+            Whether to force flatten array values when melting by a field, defaults to True.
+        primary_keys (dict[str, str] | None): The primary keys for tracks, defaults to None.
 
     Returns:
-        DataFrame of variant / sample_id records matching query
+        pd.DataFrame: DataFrame of variant / sample_id records matching query.
     """
 
     if cluster_opensearch_config is not None and bystro_api_auth is not None:
@@ -1058,31 +1097,23 @@ def get_annotation_result_from_query(
     Given a query and index, return a dataframe of variant / sample_id records matching query.
 
     Args:
-        query_string: str
-            The query string to use for the search
-        index_name: str
-            The name of the index to search
-        fields: list, optional, default=None
-            The fields to include in the results
-        cluster_opensearch_config: dict, optional, default=None
-            The configuration for the OpenSearch cluster
-        bystro_api_auth: CachedAuth, optional, default=None
-            The authentication for the Bystro API
-        additional_client_args: dict, optional, default=None
-            Additional arguments for the OpenSearch client
-        structs_of_arrays: bool, optional, default=True
-            Whether to return structs of arrays
-        melt_by_samples: bool, optional, default=True
-            Whether to melt the DataFrame by samples
-        melt_by_field: str, optional, default=None
-            The field to melt by
-        force_flatten_melt_by_field: bool, optional, default=True
-            Whether to force flatten array values when melting by a field
-        primary_keys: dict, optional, default=None
-            The primary keys for tracks
+        query_string (str): The query string to use for the search.
+        index_name (str): The name of the index to search.
+        fields (list[str] | None): The fields to include in the results, defaults to None.
+        cluster_opensearch_config (dict[str, Any] | None):
+            The configuration for the OpenSearch cluster, defaults to None.
+        bystro_api_auth (CachedAuth | None): The authentication for the Bystro API, defaults to None.
+        additional_client_args (dict[str, Any] | None):
+            Additional arguments for the OpenSearch client, defaults to None.
+        structs_of_arrays (bool): Whether to return structs of arrays, defaults to True.
+        melt_by_samples (bool): Whether to melt the DataFrame by samples, defaults to True.
+        melt_by_field (str | None): The field to melt by, defaults to None.
+        force_flatten_melt_by_field (bool):
+            Whether to force flatten array values when melting by a field, defaults to True.
+        primary_keys (dict[str, str] | None): The primary keys for tracks, defaults to None.
 
     Returns:
-        DataFrame of variant / sample_id records matching query
+        pd.DataFrame: DataFrame of variant / sample_id records matching query.
     """
     loop = asyncio.get_event_loop()
     coroutine = async_get_annotation_result_from_query(
@@ -1107,6 +1138,17 @@ def _build_opensearch_query_from_query_string(
     fields: list[str] | None = None,
     melt_by_samples: bool = False,
 ) -> dict[str, Any]:
+    """
+    Build an OpenSearch query from a query string.
+
+    Args:
+        query_string (str): The query string to use for the search.
+        fields (list[str] | None): The fields to include in the query, defaults to None.
+        melt_by_samples (bool): Whether to include sample-related fields, defaults to False.
+
+    Returns:
+        dict[str, Any]: The OpenSearch query.
+    """
     base_query: dict[str, Any] = {
         "body": {
             "query": {
@@ -1163,11 +1205,26 @@ def join_annotation_result_to_fragpipe_dataset(
     fragpipe_gene_name_column: str = "gene_name",
 ) -> pd.DataFrame:
     """
+    Join annotation result to FragPipe dataset.
+
     Args:
-      query_result_df: pd.DataFrame containing result from get_annotation_result_from_query
-      tmt_dataset: TamdemMassTagDataset
-      get_tracking_id_from_proteomic_sample_id: Callable mapping proteomic sample IDs to tracking IDs
-      get_tracking_id_from_genomic_sample_id: Callable mapping genomic sample IDs to tracking IDs
+        query_result_df (pd.DataFrame):
+            DataFrame containing result from get_annotation_result_from_query.
+        tmt_dataset (TandemMassTagDataset): The TandemMassTagDataset instance.
+        get_tracking_id_from_genomic_sample_id (Callable[[str], str]):
+            Callable mapping genomic sample IDs to tracking IDs, defaults to identity function.
+        get_tracking_id_from_proteomic_sample_id (Callable[[str], str]):
+            Callable mapping proteomic sample IDs to tracking IDs, defaults to identity function.
+        gene_name_column (str):
+            The gene name column in the annotation result DataFrame,
+            defaults to DEFAULT_GENE_NAME_COLUMN.
+        fragpipe_sample_id_column (str):
+            The sample ID column in the FragPipe dataset, defaults to "sample_id".
+        fragpipe_gene_name_column (str):
+            The gene name column in the FragPipe dataset, defaults to "gene_name".
+
+    Returns:
+        pd.DataFrame: The joined DataFrame.
     """
     query_result_df = query_result_df.copy()
     proteomics_df = tmt_dataset.get_melted_abundance_df()
