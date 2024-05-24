@@ -414,12 +414,15 @@ def track_of_objects_to_track_of_arrays(
     return convert_and_sort(data, track_name)
 
 
-def fill_query_results_object(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def fill_query_results_object(
+    hits: list[dict[str, Any]], primary_keys: dict[str, str] | None = None
+) -> list[dict[str, Any]]:
     """
     Fill the query results object with the desired structure.
 
     Args:
         hits: List of hits from OpenSearch query
+        primary_keys: Primary keys for tracks
 
     Returns:
         List of query results objects
@@ -442,7 +445,10 @@ def fill_query_results_object(hits: list[dict[str, Any]]) -> list[dict[str, Any]
             if not value:
                 continue
             row[track_name] = transform_fields_with_dynamic_arity(
-                value, row_result_obj["_source"]["alt"][0][0][0], track_name
+                value,
+                row_result_obj["_source"]["alt"][0][0][0],
+                track_name,
+                primary_keys=primary_keys,
             )
 
         query_results_unique.append(row)
@@ -554,6 +560,7 @@ async def execute_query(
     melt_by_samples: bool = False,
     melt_by_field: str | None = None,
     force_flatten_melt_by_field: bool = False,
+    primary_keys: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """
     Execute an OpenSearch query and return the results as a DataFrame.
@@ -570,6 +577,10 @@ async def execute_query(
                   homozygotes, and missingGenos fields.
         structs_of_arrays: Whether to return structs of arrays.
         melt_by_samples: Whether to melt the DataFrame by samples.
+        melt_by_field: Field to melt by.
+        force_flatten_melt_by_field: When melting by a field, whether to force flatten array values,
+            potentially losing some of the structure of related fields in a track.
+        primary_keys: Primary keys for tracks.
 
     Returns:
         DataFrame of query results
@@ -577,10 +588,17 @@ async def execute_query(
     results: list[dict] = []
     search_after = None  # Initialize search_after for pagination
 
-    if melt_by_field is not None and fields is not None and melt_by_field not in fields:
-        raise ValueError(
-            f"melt_by_field={melt_by_field} is not in fields={fields}, but must be present."
-        )
+    if melt_by_field is not None:
+        if fields is not None and melt_by_field not in fields:
+            raise ValueError(
+                f"melt_by_field={melt_by_field} is not in fields={fields}, but must be present."
+            )
+
+        if structs_of_arrays is False:
+            raise ValueError(
+                "Cannot yet, melt by field when structs_of_arrays is False, "
+                "as track values are potentially dicts"
+            )
 
     # Ensure there is a sort parameter in the query
     if "sort" not in query.get("body", {}):
@@ -609,6 +627,7 @@ async def execute_query(
         melt_by_samples=melt_by_samples,
         melt_by_field=melt_by_field,
         force_flatten_melt_by_field=force_flatten_melt_by_field,
+        primary_keys=primary_keys,
     )
 
 
@@ -630,6 +649,7 @@ def process_query_response(
     melt_by_samples: bool = False,
     melt_by_field: str | None = None,
     force_flatten_melt_by_field: bool = True,
+    primary_keys: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """
     Process the query response and return a DataFrame.
@@ -659,18 +679,31 @@ def process_query_response(
 
             For instance, if we melt_by_field='refSeq.name2', but 'refSeq.name' was not
             selected for inclusion in the results.
+        primary_keys: dict, optional, default=None
+            Primary keys for tracks
+
+            For example, if the primary key for the 'refSeq' track is 'name'.
+
+            This is useful for more accurate flattening of nested structures
     """
     num_hits = len(hits)
 
     if num_hits == 0:
         return pd.DataFrame()
 
-    if melt_by_field is not None and fields is not None and melt_by_field not in fields:
-        raise ValueError(
-            f"melt_by_field={melt_by_field} is not in fields={fields}, but must be present."
-        )
+    if melt_by_field is not None:
+        if fields is not None and melt_by_field not in fields:
+            raise ValueError(
+                f"melt_by_field={melt_by_field} is not in fields={fields}, but must be present."
+            )
 
-    results_obj = fill_query_results_object(hits)
+        if structs_of_arrays is False:
+            raise ValueError(
+                "Cannot yet, melt by field when structs_of_arrays is False, "
+                "as track values are potentially dicts"
+            )
+
+    results_obj = fill_query_results_object(hits, primary_keys=primary_keys)
 
     rows = []
     for row in results_obj:
@@ -720,55 +753,55 @@ def process_query_response(
             cols += [SAMPLE_GENERATED_COLUMN, DOSAGE_GENERATED_COLUMN]
             rows = melted_rows
 
-        if melt_by_field is not None:
-            melted_rows = []
+    if melt_by_field is not None:
+        melted_rows = []
 
-            track_name = ".".join(melt_by_field.split(".")[0:-1])
+        track_name = ".".join(melt_by_field.split(".")[0:-1])
 
-            for row in rows:
-                row_fields = row.keys()
+        for row in rows:
+            row_fields = row.keys()
 
-                if melt_by_field not in row_fields:
-                    raise ValueError(
-                        (
-                            f"You set melt_by_field to `{melt_by_field}`, "
-                            f"but the only fields we've found are: {list(row_fields)}"
-                        )
+            if melt_by_field not in row_fields:
+                raise ValueError(
+                    (
+                        f"You set melt_by_field to `{melt_by_field}`, "
+                        f"but the only fields we've found are: {list(row_fields)}"
                     )
+                )
 
-                # The related fields all share the same arity, and should be split together
-                related_melt_by_fields = [
-                    field
-                    for field in row_fields
-                    if field != melt_by_field and field == f"{track_name}.{field.split('.')[-1]}"
-                ]
+            # The related fields all share the same arity, and should be split together
+            related_melt_by_fields = [
+                field
+                for field in row_fields
+                if field != melt_by_field and field == f"{track_name}.{field.split('.')[-1]}"
+            ]
 
-                if row[melt_by_field] is None or not isinstance(row[melt_by_field], list):
-                    melted_rows.append(row)
-                    continue
+            if row[melt_by_field] is None or not isinstance(row[melt_by_field], list):
+                melted_rows.append(row)
+                continue
 
-                field_length = len(row[melt_by_field])
+            field_length = len(row[melt_by_field])
 
-                for i in range(field_length):
-                    melted_row = {**row}
+            for i in range(field_length):
+                melted_row = {**row}
 
-                    for field in related_melt_by_fields:
-                        melted_row[field] = row[field][i]
+                for field in related_melt_by_fields:
+                    melted_row[field] = row[field][i]
 
-                    melted_field_value = row[melt_by_field][i]
+                melted_field_value = row[melt_by_field][i]
 
-                    if isinstance(melted_field_value, list) and force_flatten_melt_by_field:
-                        melted_field_value = _flatten(melted_field_value)
+                if isinstance(melted_field_value, list) and force_flatten_melt_by_field:
+                    melted_field_value = _flatten(melted_field_value)
 
-                        for val in melted_field_value:
-                            melted_row[melt_by_field] = val
-                            melted_rows.append({**melted_row})
-                    else:
-                        melted_row[melt_by_field] = melted_field_value
+                    for val in melted_field_value:
+                        melted_row[melt_by_field] = val
                         melted_rows.append({**melted_row})
+                else:
+                    melted_row[melt_by_field] = melted_field_value
+                    melted_rows.append({**melted_row})
 
-            if melted_rows:
-                rows = melted_rows
+        if melted_rows:
+            rows = melted_rows
 
     df = pd.DataFrame(rows)  # noqa: PD901
 
@@ -830,6 +863,7 @@ async def async_run_annotation_query(
     melt_by_samples: bool = False,
     melt_by_field: str | None = None,
     force_flatten_melt_by_field: bool = True,
+    primary_keys: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """
     Run an annotation query and return a DataFrame of results.
@@ -841,6 +875,12 @@ async def async_run_annotation_query(
         cluster_opensearch_config: Cluster OpenSearch configuration
         bystro_api_auth: Bystro API authentication
         additional_client_args: Additional arguments for OpenSearch client
+        structs_of_arrays: Whether to return structs of arrays
+        melt_by_samples: Whether to melt the DataFrame by samples
+        melt_by_field: Field to melt by
+        force_flatten_melt_by_field: When melting by a field, whether to force flatten array values,
+            potentially losing some of the structure of related fields in a track
+        primary_keys: Primary keys for tracks
 
     Returns:
         DataFrame of query results
@@ -850,10 +890,41 @@ async def async_run_annotation_query(
             "Cannot provide both cluster_opensearch_config and bystro_api_auth. Select one."
         )
 
-    if melt_by_field is not None and fields is not None and melt_by_field not in fields:
-        raise ValueError(
-            f"melt_by_field={melt_by_field} is not in fields={fields}, but must be present."
-        )
+    if melt_by_field is not None:
+        if fields is not None and melt_by_field not in fields:
+            raise ValueError(
+                f"melt_by_field={melt_by_field} is not in fields={fields}, but must be present."
+            )
+
+        if structs_of_arrays is False:
+            raise ValueError(
+                "Cannot yet, melt by field when structs_of_arrays is False, "
+                "as track values are potentially dicts"
+            )
+
+        if fields is not None:
+            melt_by_field_track = ".".join(melt_by_field.split(".")[0:-1])
+            primary_keys_to_check = primary_keys or DEFAULT_PRIMARY_KEYS
+            primary_key_for_melt_track = primary_keys_to_check.get(melt_by_field_track)
+
+            if primary_key_for_melt_track is not None:
+                primary_key_for_melt_track = melt_by_field_track + "." + primary_key_for_melt_track
+                
+                if primary_key_for_melt_track not in fields:
+                    logger.warning(
+                        (
+                            "You are melting by field `%s`, which belongs to track `%s`.\n"
+                            "Track `%s`'s primary key is `%s`,\n"
+                            "which is not your specified `fields=%s`.\n"
+                            "Consider adding `%s` to `fields` for more precise nested array melting.\n"
+                        ),
+                        melt_by_field,
+                        melt_by_field_track,
+                        melt_by_field_track,
+                        primary_key_for_melt_track,
+                        fields,
+                        primary_key_for_melt_track,
+                    )
 
     if bystro_api_auth is not None:
         # If auth is provided, use the proxied client
@@ -890,6 +961,7 @@ async def async_run_annotation_query(
                 melt_by_samples=melt_by_samples,
                 melt_by_field=melt_by_field,
                 force_flatten_melt_by_field=force_flatten_melt_by_field,
+                primary_keys=primary_keys,
             )
             query_results.append(query_result)
 
@@ -912,17 +984,42 @@ async def async_get_annotation_result_from_query(
     melt_by_samples: bool = True,
     melt_by_field: str | None = None,
     force_flatten_melt_by_field: bool = True,
+    primary_keys: dict[str, str] | None = None,
 ) -> pd.DataFrame:
-    """Given a query and index, return a dataframe of variant / sample_id records matching query."""
+    """
+    Given a query and index, return a dataframe of variant / sample_id records matching query.
+
+    Args:
+        query_string: str
+            The query string to use for the search
+        index_name: str
+            The name of the index to search
+        fields: list, optional, default=None
+            The fields to include in the results
+        cluster_opensearch_config: dict, optional, default=None
+            The configuration for the OpenSearch cluster
+        bystro_api_auth: CachedAuth, optional, default=None
+            The authentication for the Bystro API
+        additional_client_args: dict, optional, default=None
+            Additional arguments for the OpenSearch client
+        structs_of_arrays: bool, optional, default=True
+            Whether to return structs of arrays
+        melt_by_samples: bool, optional, default=True
+            Whether to melt the DataFrame by samples
+        melt_by_field: str, optional, default=None
+            The field to melt by
+        force_flatten_melt_by_field: bool, optional, default=True
+            Whether to force flatten array values when melting by a field
+        primary_keys: dict, optional, default=None
+            The primary keys for tracks
+
+    Returns:
+        DataFrame of variant / sample_id records matching query
+    """
 
     if cluster_opensearch_config is not None and bystro_api_auth is not None:
         raise ValueError(
             "Cannot provide both cluster_opensearch_config and bystro_api_auth. Select one."
-        )
-
-    if melt_by_field is not None and fields is not None and melt_by_field not in fields:
-        raise ValueError(
-            f"melt_by_field={melt_by_field} is not in fields={fields}, but must be present."
         )
 
     query = _build_opensearch_query_from_query_string(
@@ -940,6 +1037,7 @@ async def async_get_annotation_result_from_query(
         melt_by_samples=melt_by_samples,
         melt_by_field=melt_by_field,
         force_flatten_melt_by_field=force_flatten_melt_by_field,
+        primary_keys=primary_keys,
     )
 
 
@@ -954,8 +1052,38 @@ def get_annotation_result_from_query(
     melt_by_samples: bool = True,
     melt_by_field: str | None = None,
     force_flatten_melt_by_field: bool = True,
+    primary_keys: dict[str, str] | None = None,
 ) -> pd.DataFrame:
-    """Given a query and index, return a dataframe of variant / sample_id records matching query."""
+    """
+    Given a query and index, return a dataframe of variant / sample_id records matching query.
+
+    Args:
+        query_string: str
+            The query string to use for the search
+        index_name: str
+            The name of the index to search
+        fields: list, optional, default=None
+            The fields to include in the results
+        cluster_opensearch_config: dict, optional, default=None
+            The configuration for the OpenSearch cluster
+        bystro_api_auth: CachedAuth, optional, default=None
+            The authentication for the Bystro API
+        additional_client_args: dict, optional, default=None
+            Additional arguments for the OpenSearch client
+        structs_of_arrays: bool, optional, default=True
+            Whether to return structs of arrays
+        melt_by_samples: bool, optional, default=True
+            Whether to melt the DataFrame by samples
+        melt_by_field: str, optional, default=None
+            The field to melt by
+        force_flatten_melt_by_field: bool, optional, default=True
+            Whether to force flatten array values when melting by a field
+        primary_keys: dict, optional, default=None
+            The primary keys for tracks
+
+    Returns:
+        DataFrame of variant / sample_id records matching query
+    """
     loop = asyncio.get_event_loop()
     coroutine = async_get_annotation_result_from_query(
         query_string,
@@ -968,6 +1096,7 @@ def get_annotation_result_from_query(
         melt_by_samples=melt_by_samples,
         melt_by_field=melt_by_field,
         force_flatten_melt_by_field=force_flatten_melt_by_field,
+        primary_keys=primary_keys,
     )
 
     return loop.run_until_complete(coroutine)
