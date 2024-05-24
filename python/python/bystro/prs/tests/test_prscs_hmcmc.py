@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 from sklearn.preprocessing import StandardScaler
-from bystro.prs.prscs_hmcmc import PrsCSData 
+from bystro.prs.prscs_hmcmc import PrsCSData
 
 
 def generate_data_prscs(N=100000, p=25, sigma=np.sqrt(0.1)):
@@ -25,5 +25,3 @@ def test_prscs():
         model.fit(X.astype(np.float32), y.astype(np.float32))
     except Exception as e:
         pytest.fail(f"fit method raised na exception: {e}")
-    assert 1==2,"oops"
-
