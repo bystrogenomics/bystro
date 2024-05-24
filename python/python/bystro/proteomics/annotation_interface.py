@@ -764,7 +764,7 @@ def process_query_response(
 
     if fields is not None:
         for field in fields:
-            if field in df.columns:
+            if field in df.columns and field not in cols:
                 cols.append(field)
             else:
                 if field in SAMPLE_COLUMNS and melt_by_samples:
