@@ -29,8 +29,7 @@ class PRSCS(BaseSGLDModel):
             training_options=training_options, prior_options=prior_options
         )
 
-    def fit(self, X, y, progress_bar=True, seed=2021):
-        """ """
+    def fit(self, X: np.ndarray, y: np.ndarray, progress_bar: bool = True, seed: int = 2021) -> None:
         self._test_inputs(X, y)
         X_, y_ = self._transform_training_data(X, y)
         N, p = X.shape
