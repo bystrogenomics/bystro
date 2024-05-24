@@ -755,7 +755,9 @@ def process_query_response(
     df = pd.DataFrame(rows)  # noqa: PD901
 
     if fields is not None:
-        cols += [field for field in fields if field not in cols]
+        for field in fields:
+            if field in df.columns:
+                cols.append(field)
     else:
         cols += sorted(df.columns.difference(cols))
 
