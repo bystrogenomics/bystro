@@ -937,6 +937,12 @@ async def async_run_annotation_query(
             "Cannot provide both cluster_opensearch_config and bystro_api_auth. Select one."
         )
 
+    if structs_of_arrays is False and fields is not None:
+        raise ValueError(
+            "Cannot yet, return structs of arrays when fields are specified, "
+            "as track values are potentially dicts"
+        )
+
     if melt_by_field is not None:
         if fields is not None and melt_by_field not in fields:
             raise ValueError(
@@ -963,7 +969,8 @@ async def async_run_annotation_query(
                             "You are melting by field `%s`, which belongs to track `%s`.\n"
                             "Track `%s`'s primary key is `%s`,\n"
                             "which is not your specified `fields=%s`.\n"
-                            "Consider adding `%s` to `fields` for more precise nested array melting.\n"
+                            "Consider adding `%s` to `fields` for more precise nested array melting,\n"
+                            "Or disable `force_flatten_melt_by_field` to keep nested arrays intact.\n"
                         ),
                         melt_by_field,
                         melt_by_field_track,
