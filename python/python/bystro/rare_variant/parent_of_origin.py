@@ -35,6 +35,7 @@ POESingleSNP(BasePOE)
 """
 import numpy as np
 import numpy.linalg as la
+from bystro.covariance.optimal_shrinkage import optimal_shrinkage
 
 
 class BasePOE:
@@ -43,8 +44,9 @@ class BasePOE:
     implements methods to test inputs for proper dimensionality and a
     method to classify heterozygotes based on their phenotypes
     """
+
     def __init__(self):
-        self.parent_effect_ = np.empty(10) # Will be overwritten in fit
+        self.parent_effect_ = np.empty(10)  # Will be overwritten in fit
 
     def _test_inputs(self, X, y):
         if not isinstance(X, np.ndarray):
@@ -104,9 +106,17 @@ class POESingleSNP(BasePOE):
         The difference in effect between the parental or maternal allele
     """
 
-    def __init__(self, compute_pvalue=False, n_permutations=10000):
+    def __init__(
+        self,
+        compute_pvalue=False,
+        n_permutations=10000,
+        cov_regularization=None,
+        svd_loss=None,
+    ):
         self.compute_pvalue = compute_pvalue
         self.n_permutations = n_permutations
+        self.cov_reg = cov_regularization
+        self.svd_loss = svd_loss
 
     def fit(self, X, y):
         """
@@ -134,10 +144,13 @@ class POESingleSNP(BasePOE):
 
         X_homozygotes = X[y == 0]
         X_heterozygotes = X[y == 1]
-        X_homozygotes = X_homozygotes - np.mean(X_homozygotes,axis=0)
-        X_heterozygotes = X_heterozygotes - np.mean(X_heterozygotes,axis=0)
-
-        Sigma_AA = np.cov(X_homozygotes.T)
+        X_homozygotes = X_homozygotes - np.mean(X_homozygotes, axis=0)
+        X_heterozygotes = X_heterozygotes - np.mean(X_heterozygotes, axis=0)
+        if not self.cov_reg:
+            Sigma_AA = np.cov(X_homozygotes.T)
+        else:
+            self.cov_reg.fit(X_homozygotes)
+            Sigma_AA = self.cov_reg.covariance
         L = la.cholesky(Sigma_AA)
         L_inv = la.inv(L)
 
@@ -146,8 +159,14 @@ class POESingleSNP(BasePOE):
         X_het_whitened = np.dot(X_heterozygotes, L_inv.T)
         Sigma_AB_white = np.cov(X_het_whitened.T)
 
-        U,s,Vt = la.svd(Sigma_AB_white)
-        norm_a = np.maximum(s[0]-1,0)
-        parent_effect_white = Vt[0]*2*np.sqrt(norm_a)
-        self.parent_effect_ = np.dot(parent_effect_white,L.T)
+        U, s, Vt = la.svd(Sigma_AB_white)
+
+        if self.svd_loss:
+            s, _ = optimal_shrinkage(
+                s, self.n_phenotypes / self.n_permutations, self.svd_loss
+            )
+
+        norm_a = np.maximum(s[0] - 1, 0)
+        parent_effect_white = Vt[0] * 2 * np.sqrt(norm_a)
+        self.parent_effect_ = np.dot(parent_effect_white, L.T)
         return self
