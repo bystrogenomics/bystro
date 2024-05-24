@@ -896,15 +896,6 @@ async def async_run_annotation_query(
         res = await asyncio.gather(*query_results)
 
         return pd.concat(res)
-    except Exception as e:
-        err_msg = (
-            f"Encountered exception: {e!r} while running opensearch_query, "
-            "deleting PIT index and exiting.\n"
-            f"query: {query}\n"
-            f"client: {client}\n"
-            f"opensearch_query_config: {OPENSEARCH_QUERY_CONFIG}\n"
-        )
-        logger.error(err_msg, exc_info=e)
     finally:
         await client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore[attr-defined]
         await client.close()
