@@ -637,6 +637,8 @@ def process_query_response(
     Args:
         hits:
             List of hits from OpenSearch query
+
+            Note that this value will be modified in place
         fields:
             Fields to include in the DataFrame
         structs_of_arrays: bool, optional, default=True
@@ -659,8 +661,6 @@ def process_query_response(
             selected for inclusion in the results.
     """
     num_hits = len(hits)
-
-    hits = copy.deepcopy(hits)
 
     if num_hits == 0:
         return pd.DataFrame()

@@ -44,7 +44,7 @@ class MockAsyncOpenSearchLegacy:
     async def search(self, *_args, **_kw_args) -> dict:
         if not self.has_sent_hits:
             self.has_sent_hits = True
-            return TEST_LEGACY_RESPONSE
+            return copy.deepcopy(TEST_LEGACY_RESPONSE)
 
         return {
             "hits": {
@@ -83,7 +83,7 @@ class MockAsyncOpenSearch:
             }
         self.pages_seen += 1
 
-        return res
+        return copy.deepcopy(res)
 
     async def count(self, *_args, **_kw_args) -> dict:
         return {"count": 1}
@@ -239,7 +239,7 @@ def test_process_response():
     for batch in TEST_RESPONSES_WITH_SAMPLES:
         all_hits.extend(batch["hits"]["hits"])
 
-    ans = process_query_response(all_hits)
+    ans = process_query_response(copy.deepcopy(all_hits))
 
     assert (177, 13) == ans.shape
 
@@ -255,19 +255,19 @@ def test_process_response():
     # If we specify fields, only the defaults + those specified should be included
     # if the fields specified already exist in the default, they should not be duplicated
     # We don't always provide sample columns, but do always provide a generated locus/link column
-    ans = process_query_response(all_hits, fields=ALWAYS_INCLUDED_FIELDS)
+    ans = process_query_response(copy.deepcopy(all_hits), fields=ALWAYS_INCLUDED_FIELDS)
 
     assert (177, 8) == ans.shape
     assert list(ans.columns) == ALWAYS_INCLUDED_FIELDS + [LINK_GENERATED_COLUMN]
 
     # but if the fields don't exist in the default set, we will add them
-    ans = process_query_response(all_hits, fields=["refSeq.name2"])
+    ans = process_query_response(copy.deepcopy(all_hits), fields=["refSeq.name2"])
 
     assert (177, 9) == ans.shape
     assert list(ans.columns) == ALWAYS_INCLUDED_FIELDS + [LINK_GENERATED_COLUMN] + ["refSeq.name2"]
 
     # If we melt, we drop SAMPLE_COLUMNS, in favor of ['sample', 'dosage']
-    melted = process_query_response(all_hits, melt_by_samples=True)
+    melted = process_query_response(copy.deepcopy(all_hits), melt_by_samples=True)
     assert (397, 12) == melted.shape
     assert list(melted.columns) == ALWAYS_INCLUDED_FIELDS + [LINK_GENERATED_COLUMN] + [
         "sample",
@@ -276,7 +276,7 @@ def test_process_response():
 
     assert {"1805", "1847", "4805"} == set(melted[SAMPLE_GENERATED_COLUMN].unique())
 
-    ans = process_query_response(all_hits, melt_by_samples=False, fields=SAMPLE_COLUMNS)
+    ans = process_query_response(copy.deepcopy(all_hits), melt_by_samples=False, fields=SAMPLE_COLUMNS)
     # # For every sample that was a heterozygote, we should have dosage 1
     for _, row in ans.iterrows():
         locus = row[LINK_GENERATED_COLUMN]
