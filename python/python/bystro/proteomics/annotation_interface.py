@@ -603,7 +603,7 @@ async def execute_query(
         structs_of_arrays=structs_of_arrays,
         melt_by_samples=melt_by_samples,
         melt_by_field=melt_by_field,
-        force_flatten_melt_by_field=force_flatten_melt_by_field
+        force_flatten_melt_by_field=force_flatten_melt_by_field,
     )
 
 
@@ -718,6 +718,14 @@ def process_query_response(
             for row in rows:
                 row_fields = row.keys()
 
+                if melt_by_field not in row_fields:
+                    raise ValueError(
+                        (
+                            f"You set melt_by_field to `{melt_by_field}`, "
+                            f"but the only fields we've found are: {list(row_fields)}"
+                        )
+                    )
+
                 # The related fields all share the same arity, and should be split together
                 related_melt_by_fields = [
                     field
@@ -758,6 +766,14 @@ def process_query_response(
         for field in fields:
             if field in df.columns:
                 cols.append(field)
+            else:
+                if field in SAMPLE_COLUMNS and melt_by_samples:
+                    logger.warning(
+                        "Sample column %s not found in results, because melt_by_samples is enabled",
+                        field,
+                    )
+                else:
+                    logger.warning("Field %s not found in results", field)
     else:
         cols += sorted(df.columns.difference(cols))
 
@@ -858,7 +874,7 @@ async def async_run_annotation_query(
                 structs_of_arrays=structs_of_arrays,
                 melt_by_samples=melt_by_samples,
                 melt_by_field=melt_by_field,
-                force_flatten_melt_by_field=force_flatten_melt_by_field
+                force_flatten_melt_by_field=force_flatten_melt_by_field,
             )
             query_results.append(query_result)
 
@@ -913,7 +929,7 @@ async def async_get_annotation_result_from_query(
         structs_of_arrays=structs_of_arrays,
         melt_by_samples=melt_by_samples,
         melt_by_field=melt_by_field,
-        force_flatten_melt_by_field=force_flatten_melt_by_field
+        force_flatten_melt_by_field=force_flatten_melt_by_field,
     )
 
 
@@ -941,7 +957,7 @@ def get_annotation_result_from_query(
         structs_of_arrays=structs_of_arrays,
         melt_by_samples=melt_by_samples,
         melt_by_field=melt_by_field,
-        force_flatten_melt_by_field=force_flatten_melt_by_field
+        force_flatten_melt_by_field=force_flatten_melt_by_field,
     )
 
     return loop.run_until_complete(coroutine)
