@@ -699,6 +699,9 @@ def process_query_response(
                     if field != melt_by_field and field == f"{track_name}.{field.split('.')[-1]}"
                 ]
 
+                if row[melt_by_field] is None or not isinstance(row[melt_by_field], list):
+                    melted_row = {**row}
+
                 field_length = len(row[melt_by_field])
 
                 for i in range(field_length):
