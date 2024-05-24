@@ -5,6 +5,8 @@ from pyro.infer import mcmc, SVI, Trace_ELBO
 import torch
 from torch.optim import Adam
 
+from pyro.distributions import Gamma, Normal
+
 
 class BasePrsCS:
     def __init__(
@@ -61,26 +63,26 @@ class PrsCSData(BasePrsCS):
         y = torch.tensor(y)
 
         def model(Z, y):
-            w = pyro.sample("w", dist.Gamma(0.5, 1.0))
-            phi = pyro.sample("phi", dist.Gamma(0.5, w))
+            w = pyro.sample("w", Gamma(0.5, 1.0))
+            phi = pyro.sample("phi", Gamma(0.5, w))
             sigma2 = pyro.sample("sigma2", dist.InverseGamma(0.5, 0.5))
 
             delta = pyro.sample(
-                "delta", dist.Gamma(hp["b"], phi).expand([p]).to_event(1)
+                "delta", Gamma(hp["b"], phi).expand([p]).to_event(1)
             )
             psi = pyro.sample(
-                "psi", dist.Gamma(hp["a"], delta).expand([p]).to_event(1)
+                "psi", Gamma(hp["a"], delta).expand([p]).to_event(1)
             )
 
             beta_variance = sigma2 / (N * psi)
             beta = pyro.sample(
                 "beta",
-                dist.Normal(0.0, beta_variance.sqrt()).expand([p]).to_event(1),
+                Normal(0.0, beta_variance.sqrt()).expand([p]).to_event(1),
             )
 
             with pyro.plate("data", N):
                 mean = torch.matmul(Z, beta)
-                pyro.sample("obs", dist.Normal(mean, sigma2.sqrt()), obs=y)
+                pyro.sample("obs", Normal(mean, sigma2.sqrt()), obs=y)
 
         nuts_kernel = mcmc.NUTS(model)
         mcmc_run = mcmc.MCMC(nuts_kernel, num_samples=1000, warmup_steps=200)
@@ -101,28 +103,28 @@ class PrsCSDataVariational(BasePrsCS):
         y = torch.tensor(y)
 
         def model(Z, y):
-            w = pyro.sample("w", dist.Gamma(0.5, 1.0))
-            phi = pyro.sample("phi", dist.Gamma(0.5, w))
+            w = pyro.sample("w", Gamma(0.5, 1.0))
+            phi = pyro.sample("phi", Gamma(0.5, w))
             sigma2 = pyro.sample("sigma2", dist.InverseGamma(0.5, 0.5))
 
             delta = pyro.sample(
-                "delta", dist.Gamma(hp["b"], phi).expand([p]).to_event(1)
+                "delta", Gamma(hp["b"], phi).expand([p]).to_event(1)
             )
             psi = pyro.sample(
-                "psi", dist.Gamma(hp["a"], delta).expand([p]).to_event(1)
+                "psi", Gamma(hp["a"], delta).expand([p]).to_event(1)
             )
 
             beta_variance = sigma2 / (N * psi)
             beta = pyro.sample(
                 "beta",
-                dist.Normal(0.0, beta_variance.sqrt()).expand([p]).to_event(1),
+                Normal(0.0, beta_variance.sqrt()).expand([p]).to_event(1),
             )
 
             with pyro.plate("data", N):
                 mean = torch.matmul(Z, beta)
-                pyro.sample("obs", dist.Normal(mean, sigma2.sqrt()), obs=y)
+                pyro.sample("obs", Normal(mean, sigma2.sqrt()), obs=y)
 
-        def guide(Z, y): # noqa: ARG001
+        def guide(Z, y):  # noqa: ARG001
             w_loc = pyro.param(
                 "w_loc", torch.tensor(1.0), constraint=dist.constraints.positive
             )
@@ -169,15 +171,17 @@ class PrsCSDataVariational(BasePrsCS):
                 constraint=dist.constraints.positive,
             )
 
-            w = pyro.sample("w", dist.Gamma(w_loc, w_scale)) # noqa: F841
-            phi = pyro.sample("phi", dist.Gamma(phi_loc, phi_scale)) # noqa: F841
-            sigma2 = pyro.sample("sigma2", dist.Gamma(sigma2_loc, sigma2_scale))
-            delta = pyro.sample( # noqa: F841
+            w = pyro.sample("w", Gamma(w_loc, w_scale))  # noqa: F841
+            phi = pyro.sample(
+                "phi", Gamma(phi_loc, phi_scale)
+            )  # noqa: F841
+            sigma2 = pyro.sample("sigma2", Gamma(sigma2_loc, sigma2_scale))
+            delta = pyro.sample(  # noqa: F841
                 "delta",
-                dist.Gamma(delta_loc, delta_scale).expand([p]).to_event(1),
-            ) 
+                Gamma(delta_loc, delta_scale).expand([p]).to_event(1),
+            )
             psi = pyro.sample(
-                "psi", dist.Gamma(psi_loc, psi_scale).expand([p]).to_event(1)
+                "psi", Gamma(psi_loc, psi_scale).expand([p]).to_event(1)
             )
 
             beta_loc = pyro.param("beta_loc", torch.zeros(p))
@@ -186,14 +190,14 @@ class PrsCSDataVariational(BasePrsCS):
                 torch.ones(p),
                 constraint=dist.constraints.positive,
             )
-            beta_variance = sigma2 / (N * psi) # noqa: F841
-            beta = pyro.sample( # noqa: F841
+            beta_variance = sigma2 / (N * psi)  # noqa: F841
+            beta = pyro.sample(  # noqa: F841
                 "beta",
-                dist.Normal(beta_loc, beta_scale).expand([p]).to_event(1),
+                Normal(beta_loc, beta_scale).expand([p]).to_event(1),
             )
 
         pyro.clear_param_store()
-        svi = SVI(model, guide, Adam({"lr": 0.01}), loss=Trace_ELBO())
+        svi = SVI(model, guide, Adam([{"lr": 0.01}]), loss=Trace_ELBO())
 
         num_iterations = 1000
         for j in range(num_iterations):
