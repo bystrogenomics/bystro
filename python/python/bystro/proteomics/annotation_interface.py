@@ -626,7 +626,33 @@ def process_query_response(
     melt_by_field: str | None = None,
     force_flatten_melt_by_field: bool = True,
 ) -> pd.DataFrame:
-    """Postprocess query response from opensearch client."""
+    """
+    Process the query response and return a DataFrame.
+
+    Args:
+        hits:
+            List of hits from OpenSearch query
+        fields:
+            Fields to include in the DataFrame
+        structs_of_arrays: bool, optional, default=True
+            Whether to return structs of arrays
+        melt_by_samples: bool, optional, default=False
+            Whether to emit 1 sample per row. If true
+            heterozygotes, homozygotes, and missingGenos columns
+            will be replaced by 2 columns: sample and dosage, and 1 sample will be found per row
+        melt_by_field: str, optional, default=None
+            Field to melt by
+        force_flatten_melt_by_field: bool, optional, default=True
+            When melting by a field, whether to force flatten array values,
+            potentially losing some of the structure of related fields in a track.
+
+            This most typically comes up when melting by a field when the
+            primary key for the field's track is not present in the results,
+            (because the primary key was not included in fields=)
+
+            For instance, if we melt_by_field='refSeq.name2', but 'refSeq.name' was not
+            selected for inclusion in the results.
+    """
     num_hits = len(hits)
 
     hits = copy.deepcopy(hits)
