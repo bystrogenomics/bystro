@@ -889,8 +889,7 @@ async def async_run_annotation_query(
             f"client: {client}\n"
             f"opensearch_query_config: {OPENSEARCH_QUERY_CONFIG}\n"
         )
-        logger.exception(err_msg, exc_info=e)
-        raise RuntimeError(err_msg) from e
+        logger.error(err_msg, exc_info=e)
     finally:
         await client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore[attr-defined]
         await client.close()
