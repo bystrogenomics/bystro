@@ -29,7 +29,13 @@ class PRSCS(BaseSGLDModel):
             training_options=training_options, prior_options=prior_options
         )
 
-    def fit(self, X: np.ndarray, y: np.ndarray, progress_bar: bool = True, seed: int = 2021) -> None:
+    def fit(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        progress_bar: bool = True,
+        seed: int = 2021,
+    ) -> None:
         self._test_inputs(X, y)
         X_, y_ = self._transform_training_data(X, y)
         N, p = X.shape
@@ -49,7 +55,7 @@ class PRSCS(BaseSGLDModel):
         var_list = [beta_, psi_l, delta_l, sigma2_l]
 
         f_prior_delta = ptd.Gamma(
-            prior_options["b"], 1/prior_options["phi"]
+            prior_options["b"], 1 / prior_options["phi"]
         ).log_prob
 
         lr_fn = scheduler_sgld_geometric(
@@ -103,14 +109,12 @@ class PRSCS(BaseSGLDModel):
             posterior = (
                 loglike + prior_beta + prior_psi + prior_delta + prior_sigma
             )
-            loss = -1 * posterior + 100*relu(sigma2_-.3)
+            loss = -1 * posterior + 100 * relu(sigma2_ - 0.3)
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             self._store_samples(i, var_list)
-
-        return self
 
     def _fill_prior_options(self, prior_options):
         """ """
