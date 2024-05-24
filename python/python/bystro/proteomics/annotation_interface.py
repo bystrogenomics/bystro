@@ -577,6 +577,11 @@ async def execute_query(
     results: list[dict] = []
     search_after = None  # Initialize search_after for pagination
 
+    if melt_by_field is not None and fields is not None and melt_by_field not in fields:
+        raise ValueError(
+            f"melt_by_field={melt_by_field} is not in fields={fields}, but must be present."
+        )
+
     # Ensure there is a sort parameter in the query
     if "sort" not in query.get("body", {}):
         query.setdefault("body", {}).update(
@@ -659,6 +664,11 @@ def process_query_response(
 
     if num_hits == 0:
         return pd.DataFrame()
+
+    if melt_by_field is not None and fields is not None and melt_by_field not in fields:
+        raise ValueError(
+            f"melt_by_field={melt_by_field} is not in fields={fields}, but must be present."
+        )
 
     results_obj = fill_query_results_object(hits)
 
@@ -840,6 +850,11 @@ async def async_run_annotation_query(
             "Cannot provide both cluster_opensearch_config and bystro_api_auth. Select one."
         )
 
+    if melt_by_field is not None and fields is not None and melt_by_field not in fields:
+        raise ValueError(
+            f"melt_by_field={melt_by_field} is not in fields={fields}, but must be present."
+        )
+
     if bystro_api_auth is not None:
         # If auth is provided, use the proxied client
         job_id = index_name.split("_")[0]
@@ -912,6 +927,11 @@ async def async_get_annotation_result_from_query(
     if cluster_opensearch_config is not None and bystro_api_auth is not None:
         raise ValueError(
             "Cannot provide both cluster_opensearch_config and bystro_api_auth. Select one."
+        )
+
+    if melt_by_field is not None and fields is not None and melt_by_field not in fields:
+        raise ValueError(
+            f"melt_by_field={melt_by_field} is not in fields={fields}, but must be present."
         )
 
     query = _build_opensearch_query_from_query_string(
