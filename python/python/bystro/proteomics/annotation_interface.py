@@ -610,9 +610,9 @@ async def execute_query(
     query: dict,
     fields: list[str] | None = None,
     structs_of_arrays: bool = True,
-    melt_by_samples: bool = False,
-    melt_by_field: str | None = None,
-    force_flatten_melt_by_field: bool = False,
+    melt_samples: bool = False,
+    explode_field: str | None = None,
+    force_flatten_exploded_field: bool = False,
     primary_keys: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """
@@ -621,13 +621,32 @@ async def execute_query(
     Args:
         client (AsyncOpenSearch): The OpenSearch client.
         query (dict): The OpenSearch query.
-        fields (list[str] | None): A list of fields to include in the DataFrame.
-        structs_of_arrays (bool): Whether to return structs of arrays, defaults to True.
-        melt_by_samples (bool): Whether to melt the DataFrame by samples, defaults to False.
-        melt_by_field (str | None): A field to melt by, defaults to None.
-        force_flatten_melt_by_field (bool):
-            When melting by a field, whether to force flatten array values, defaults to False.
-        primary_keys (dict[str, str] | None): A dictionary of primary keys for tracks, defaults to None.
+        fields (list[str] | None):
+            A list of fields to include in the DataFrame.
+        structs_of_arrays (bool)
+             Whether to return structs of arrays, defaults to True.
+        melt_samples (bool):
+            Whether to unpivot `heterozygotes`, `homozygotes`, and `missingGenos` fields.
+            When `True` the resulting DataFrame will have 2 new columns: `samples` and `dosage`,
+            and `heterozygotes`, `homozygotes`, and `missingGenos` will be removed.
+
+            The `dosage` column will have values of 1, 2, or -1, corresponding to whether the sample was
+            found in the `heterozygotes`, `homozygotes`, and `missingGenos` columns, respectively.
+
+            The `samples` column will have the sample ID for each row, and this will always be a
+            scalar value, even if the original `heterozygotes`, `homozygotes`, or `missingGenos` columns
+            had multiple values.
+
+            Defaults to False.
+        explode_field (str | None):
+            A field to explode, converting rows with list values in this column, into
+            multiple rows with 1 value per column, defaults to None.
+        force_flatten_exploded_field (bool):
+            When exploding a field, whether to force flatten array values in cases where the
+            primary key for the track is not present, or the column's value is a list with respect
+            to the primary key. Defaults to False.
+        primary_keys (dict[str, str] | None):
+            A dictionary of primary keys for tracks, defaults to None.
 
     Returns:
         pd.DataFrame: A DataFrame of query results.
@@ -635,15 +654,15 @@ async def execute_query(
     results: list[dict] = []
     search_after = None  # Initialize search_after for pagination
 
-    if melt_by_field is not None:
-        if fields is not None and melt_by_field not in fields:
+    if explode_field is not None:
+        if fields is not None and explode_field not in fields:
             raise ValueError(
-                f"melt_by_field={melt_by_field} is not in fields={fields}, but must be present."
+                f"explode_field={explode_field} is not in fields={fields}, but must be present."
             )
 
         if structs_of_arrays is False:
             raise ValueError(
-                "Cannot yet, melt by field when structs_of_arrays is False, "
+                "Cannot yet, explode field when structs_of_arrays is False, "
                 "as track values are potentially dicts"
             )
 
@@ -671,9 +690,9 @@ async def execute_query(
         results,
         fields,
         structs_of_arrays=structs_of_arrays,
-        melt_by_samples=melt_by_samples,
-        melt_by_field=melt_by_field,
-        force_flatten_melt_by_field=force_flatten_melt_by_field,
+        melt_samples=melt_samples,
+        explode_field=explode_field,
+        force_flatten_exploded_field=force_flatten_exploded_field,
         primary_keys=primary_keys,
     )
 
@@ -702,9 +721,9 @@ def process_query_response(
     hits: list[dict[str, Any]],
     fields: list[str] | None = None,
     structs_of_arrays: bool = True,
-    melt_by_samples: bool = False,
-    melt_by_field: str | None = None,
-    force_flatten_melt_by_field: bool = True,
+    melt_samples: bool = False,
+    explode_field: str | None = None,
+    force_flatten_exploded_field: bool = False,
     primary_keys: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """
@@ -714,10 +733,26 @@ def process_query_response(
         hits (list[dict[str, Any]]): A list of hits from an OpenSearch query.
         fields (list[str] | None): A list of fields to include in the DataFrame.
         structs_of_arrays (bool): Whether to return structs of arrays, defaults to True.
-        melt_by_samples (bool): Whether to melt the DataFrame by samples, defaults to False.
-        melt_by_field (str | None): A field to melt by, defaults to None.
-        force_flatten_melt_by_field (bool):
-            When melting by a field, whether to force flatten array values, defaults to True.
+        melt_samples (bool):
+            Whether to unpivot `heterozygotes`, `homozygotes`, and `missingGenos` fields.
+            When `True` the resulting DataFrame will have 2 new columns: `samples` and `dosage`,
+            and `heterozygotes`, `homozygotes`, and `missingGenos` will be removed.
+
+            The `dosage` column will have values of 1, 2, or -1, corresponding to whether the sample was
+            found in the `heterozygotes`, `homozygotes`, and `missingGenos` columns, respectively.
+
+            The `samples` column will have the sample ID for each row, and this will always be a
+            scalar value, even if the original `heterozygotes`, `homozygotes`, or `missingGenos` columns
+            had multiple values.
+
+            Defaults to False.
+        explode_field (str | None):
+            A field to explode, converting rows with list values in this column, into
+            multiple rows with 1 value per column, defaults to None.
+        force_flatten_exploded_field (bool):
+            When exploding a field, whether to force flatten array values in cases where the
+            primary key for the track is not present, or the column's value is a list with respect
+            to the primary key. Defaults to False.
         primary_keys (dict[str, str] | None): A dictionary of primary keys for tracks, defaults to None.
 
     Returns:
@@ -728,15 +763,15 @@ def process_query_response(
     if num_hits == 0:
         return pd.DataFrame()
 
-    if melt_by_field is not None:
-        if fields is not None and melt_by_field not in fields:
+    if explode_field is not None:
+        if fields is not None and explode_field not in fields:
             raise ValueError(
-                f"melt_by_field={melt_by_field} is not in fields={fields}, but must be present."
+                f"explode_field={explode_field} is not in fields={fields}, but must be present."
             )
 
         if structs_of_arrays is False:
             raise ValueError(
-                "Cannot yet, melt by field when structs_of_arrays is False, "
+                "Cannot yet, explode field when structs_of_arrays is False, "
                 "as track values are potentially dicts"
             )
 
@@ -753,7 +788,7 @@ def process_query_response(
     # need to drop duplicates here.
     cols = ALWAYS_INCLUDED_FIELDS + [LINK_GENERATED_COLUMN]
 
-    if melt_by_samples is True:
+    if melt_samples is True:
         melted_rows = []
         for row in rows:
             heterozygotes = _flatten(row.get(HETEROZYGOTES_FIELD, []))
@@ -790,51 +825,51 @@ def process_query_response(
             cols += [SAMPLE_GENERATED_COLUMN, DOSAGE_GENERATED_COLUMN]
             rows = melted_rows
 
-    if melt_by_field is not None:
+    if explode_field is not None:
         melted_rows = []
 
-        track_name = ".".join(melt_by_field.split(".")[0:-1])
+        track_name = ".".join(explode_field.split(".")[0:-1])
 
         for row in rows:
             row_fields = row.keys()
 
-            if melt_by_field not in row_fields:
+            if explode_field not in row_fields:
                 raise ValueError(
                     (
-                        f"You set melt_by_field to `{melt_by_field}`, "
+                        f"You set explode_field to `{explode_field}`, "
                         f"but the only fields we've found are: {list(row_fields)}"
                     )
                 )
 
             # The related fields all share the same arity, and should be split together
-            related_melt_by_fields = [
+            related_explode_fields = [
                 field
                 for field in row_fields
-                if field != melt_by_field and field == f"{track_name}.{field.split('.')[-1]}"
+                if field != explode_field and field == f"{track_name}.{field.split('.')[-1]}"
             ]
 
-            if row[melt_by_field] is None or not isinstance(row[melt_by_field], list):
+            if row[explode_field] is None or not isinstance(row[explode_field], list):
                 melted_rows.append(row)
                 continue
 
-            field_length = len(row[melt_by_field])
+            field_length = len(row[explode_field])
 
             for i in range(field_length):
                 melted_row = {**row}
 
-                for field in related_melt_by_fields:
+                for field in related_explode_fields:
                     melted_row[field] = row[field][i]
 
-                melted_field_value = row[melt_by_field][i]
+                exploded_field_value = row[explode_field][i]
 
-                if isinstance(melted_field_value, list) and force_flatten_melt_by_field:
-                    melted_field_value = _flatten(melted_field_value)
+                if isinstance(exploded_field_value, list) and force_flatten_exploded_field:
+                    exploded_field_value = _flatten(exploded_field_value)
 
-                    for val in melted_field_value:
-                        melted_row[melt_by_field] = val
+                    for val in exploded_field_value:
+                        melted_row[explode_field] = val
                         melted_rows.append({**melted_row})
                 else:
-                    melted_row[melt_by_field] = melted_field_value
+                    melted_row[explode_field] = exploded_field_value
                     melted_rows.append({**melted_row})
 
         if melted_rows:
@@ -847,9 +882,9 @@ def process_query_response(
             if field in df.columns and field not in cols:
                 cols.append(field)
             else:
-                if field in SAMPLE_COLUMNS and melt_by_samples:
+                if field in SAMPLE_COLUMNS and melt_samples:
                     logger.warning(
-                        "Sample column %s not found in results, because melt_by_samples is enabled",
+                        "Sample column %s not found in results, because melt_samples is enabled",
                         field,
                     )
                 else:
@@ -907,9 +942,9 @@ async def async_run_annotation_query(
     bystro_api_auth: CachedAuth | None = None,
     additional_client_args: dict[str, Any] | None = None,
     structs_of_arrays: bool = True,
-    melt_by_samples: bool = False,
-    melt_by_field: str | None = None,
-    force_flatten_melt_by_field: bool = True,
+    melt_samples: bool = False,
+    explode_field: str | None = None,
+    force_flatten_exploded_field: bool = False,
     primary_keys: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """
@@ -925,10 +960,26 @@ async def async_run_annotation_query(
         additional_client_args (dict[str, Any] | None):
             Additional arguments for the OpenSearch client, defaults to None.
         structs_of_arrays (bool): Whether to return structs of arrays, defaults to True.
-        melt_by_samples (bool): Whether to melt the DataFrame by samples, defaults to False.
-        melt_by_field (str | None): A field to melt by, defaults to None.
-        force_flatten_melt_by_field (bool):
-            When melting by a field, whether to force flatten array values, defaults to True.
+        melt_samples (bool):
+            Whether to unpivot `heterozygotes`, `homozygotes`, and `missingGenos` fields.
+            When `True` the resulting DataFrame will have 2 new columns: `samples` and `dosage`,
+            and `heterozygotes`, `homozygotes`, and `missingGenos` will be removed.
+
+            The `dosage` column will have values of 1, 2, or -1, corresponding to whether the sample was
+            found in the `heterozygotes`, `homozygotes`, and `missingGenos` columns, respectively.
+
+            The `samples` column will have the sample ID for each row, and this will always be a
+            scalar value, even if the original `heterozygotes`, `homozygotes`, or `missingGenos` columns
+            had multiple values.
+
+            Defaults to False.
+        explode_field (str | None):
+            A field to explode, converting rows with list values in this column, into
+            multiple rows with 1 value per column, defaults to None.
+        force_flatten_exploded_field (bool):
+            When exploding a field, whether to force flatten array values in cases where the
+            primary key for the track is not present, or the column's value is a list with respect
+            to the primary key. Defaults to False.
         primary_keys (dict[str, str] | None): A dictionary of primary keys for tracks, defaults to None.
 
     Returns:
@@ -945,10 +996,10 @@ async def async_run_annotation_query(
             "as track values are potentially dicts"
         )
 
-    if melt_by_field is not None:
-        if fields is not None and melt_by_field not in fields:
+    if explode_field is not None:
+        if fields is not None and explode_field not in fields:
             raise ValueError(
-                f"melt_by_field={melt_by_field} is not in fields={fields}, but must be present."
+                f"explode_field={explode_field} is not in fields={fields}, but must be present."
             )
 
         if structs_of_arrays is False:
@@ -958,28 +1009,30 @@ async def async_run_annotation_query(
             )
 
         if fields is not None:
-            melt_by_field_track = ".".join(melt_by_field.split(".")[0:-1])
+            explode_field_track = ".".join(explode_field.split(".")[0:-1])
             primary_keys_to_check = primary_keys or DEFAULT_PRIMARY_KEYS
-            primary_key_for_melt_track = primary_keys_to_check.get(melt_by_field_track)
+            primary_key_for_explode_track = primary_keys_to_check.get(explode_field_track)
 
-            if primary_key_for_melt_track is not None:
-                primary_key_for_melt_track = melt_by_field_track + "." + primary_key_for_melt_track
+            if primary_key_for_explode_track is not None:
+                primary_key_for_explode_track = explode_field_track + "." + primary_key_for_explode_track
 
-                if primary_key_for_melt_track not in fields:
+                if primary_key_for_explode_track not in fields:
                     logger.warning(
                         (
-                            "You are melting by field `%s`, which belongs to track `%s`.\n"
+                            "You are exploding field `%s`, which belongs to track `%s`.\n"
                             "Track `%s`'s primary key is `%s`,\n"
                             "which is not your specified `fields=%s`.\n"
-                            "Consider adding `%s` to `fields` for more precise nested array melting,\n"
-                            "Or disable `force_flatten_melt_by_field` to keep nested arrays intact.\n"
+                            "Consider adding `%s` to `fields` to more precisely "
+                            "explode array values for a given track\n"
+                            "Or disable `force_flatten_exploded_field` to keep nested arrays intact "
+                            "where ambiguity exists.\n"
                         ),
-                        melt_by_field,
-                        melt_by_field_track,
-                        melt_by_field_track,
-                        primary_key_for_melt_track,
+                        explode_field,
+                        explode_field_track,
+                        explode_field_track,
+                        primary_key_for_explode_track,
                         fields,
-                        primary_key_for_melt_track,
+                        primary_key_for_explode_track,
                     )
 
     if bystro_api_auth is not None:
@@ -1014,9 +1067,9 @@ async def async_run_annotation_query(
                 query=slice_query,
                 fields=fields,
                 structs_of_arrays=structs_of_arrays,
-                melt_by_samples=melt_by_samples,
-                melt_by_field=melt_by_field,
-                force_flatten_melt_by_field=force_flatten_melt_by_field,
+                melt_samples=melt_samples,
+                explode_field=explode_field,
+                force_flatten_exploded_field=force_flatten_exploded_field,
                 primary_keys=primary_keys,
             )
             query_results.append(query_result)
@@ -1037,9 +1090,9 @@ async def async_get_annotation_result_from_query(
     bystro_api_auth: CachedAuth | None = None,
     additional_client_args: dict[str, Any] | None = None,
     structs_of_arrays: bool = True,
-    melt_by_samples: bool = True,
-    melt_by_field: str | None = None,
-    force_flatten_melt_by_field: bool = True,
+    melt_samples: bool = True,
+    explode_field: str | None = None,
+    force_flatten_exploded_field: bool = True,
     primary_keys: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """
@@ -1055,10 +1108,26 @@ async def async_get_annotation_result_from_query(
         additional_client_args (dict[str, Any] | None):
             Additional arguments for the OpenSearch client, defaults to None.
         structs_of_arrays (bool): Whether to return structs of arrays, defaults to True.
-        melt_by_samples (bool): Whether to melt the DataFrame by samples, defaults to True.
-        melt_by_field (str | None): The field to melt by, defaults to None.
-        force_flatten_melt_by_field (bool):
-            Whether to force flatten array values when melting by a field, defaults to True.
+        melt_samples (bool):
+            Whether to unpivot `heterozygotes`, `homozygotes`, and `missingGenos` fields.
+            When `True` the resulting DataFrame will have 2 new columns: `samples` and `dosage`,
+            and `heterozygotes`, `homozygotes`, and `missingGenos` will be removed.
+
+            The `dosage` column will have values of 1, 2, or -1, corresponding to whether the sample was
+            found in the `heterozygotes`, `homozygotes`, and `missingGenos` columns, respectively.
+
+            The `samples` column will have the sample ID for each row, and this will always be a
+            scalar value, even if the original `heterozygotes`, `homozygotes`, or `missingGenos` columns
+            had multiple values.
+
+            Defaults to False.
+        explode_field (str | None):
+            A field to explode, converting rows with list values in this column, into
+            multiple rows with 1 value per column, defaults to None.
+        force_flatten_exploded_field (bool):
+            When exploding a field, whether to force flatten array values in cases where the
+            primary key for the track is not present, or the column's value is a list with respect
+            to the primary key. Defaults to True.
         primary_keys (dict[str, str] | None): The primary keys for tracks, defaults to None.
 
     Returns:
@@ -1071,7 +1140,7 @@ async def async_get_annotation_result_from_query(
         )
 
     query = _build_opensearch_query_from_query_string(
-        query_string, fields=fields, melt_by_samples=melt_by_samples
+        query_string, fields=fields, melt_samples=melt_samples
     )
 
     return await async_run_annotation_query(
@@ -1082,9 +1151,9 @@ async def async_get_annotation_result_from_query(
         bystro_api_auth=bystro_api_auth,
         additional_client_args=additional_client_args,
         structs_of_arrays=structs_of_arrays,
-        melt_by_samples=melt_by_samples,
-        melt_by_field=melt_by_field,
-        force_flatten_melt_by_field=force_flatten_melt_by_field,
+        melt_samples=melt_samples,
+        explode_field=explode_field,
+        force_flatten_exploded_field=force_flatten_exploded_field,
         primary_keys=primary_keys,
     )
 
@@ -1097,9 +1166,9 @@ def get_annotation_result_from_query(
     bystro_api_auth: CachedAuth | None = None,
     additional_client_args: dict[str, Any] | None = None,
     structs_of_arrays: bool = True,
-    melt_by_samples: bool = True,
-    melt_by_field: str | None = None,
-    force_flatten_melt_by_field: bool = True,
+    melt_samples: bool = True,
+    explode_field: str | None = None,
+    force_flatten_exploded_field: bool = True,
     primary_keys: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """
@@ -1115,10 +1184,26 @@ def get_annotation_result_from_query(
         additional_client_args (dict[str, Any] | None):
             Additional arguments for the OpenSearch client, defaults to None.
         structs_of_arrays (bool): Whether to return structs of arrays, defaults to True.
-        melt_by_samples (bool): Whether to melt the DataFrame by samples, defaults to True.
-        melt_by_field (str | None): The field to melt by, defaults to None.
-        force_flatten_melt_by_field (bool):
-            Whether to force flatten array values when melting by a field, defaults to True.
+        melt_samples (bool):
+            Whether to unpivot `heterozygotes`, `homozygotes`, and `missingGenos` fields.
+            When `True` the resulting DataFrame will have 2 new columns: `samples` and `dosage`,
+            and `heterozygotes`, `homozygotes`, and `missingGenos` will be removed.
+
+            The `dosage` column will have values of 1, 2, or -1, corresponding to whether the sample was
+            found in the `heterozygotes`, `homozygotes`, and `missingGenos` columns, respectively.
+
+            The `samples` column will have the sample ID for each row, and this will always be a
+            scalar value, even if the original `heterozygotes`, `homozygotes`, or `missingGenos` columns
+            had multiple values.
+
+            Defaults to False.
+        explode_field (str | None):
+            A field to explode, converting rows with list values in this column, into
+            multiple rows with 1 value per column, defaults to None.
+        force_flatten_exploded_field (bool):
+            When exploding a field, whether to force flatten array values in cases where the
+            primary key for the track is not present, or the column's value is a list with respect
+            to the primary key. Defaults to True.
         primary_keys (dict[str, str] | None): The primary keys for tracks, defaults to None.
 
     Returns:
@@ -1133,9 +1218,9 @@ def get_annotation_result_from_query(
         bystro_api_auth=bystro_api_auth,
         additional_client_args=additional_client_args,
         structs_of_arrays=structs_of_arrays,
-        melt_by_samples=melt_by_samples,
-        melt_by_field=melt_by_field,
-        force_flatten_melt_by_field=force_flatten_melt_by_field,
+        melt_samples=melt_samples,
+        explode_field=explode_field,
+        force_flatten_exploded_field=force_flatten_exploded_field,
         primary_keys=primary_keys,
     )
 
@@ -1145,7 +1230,7 @@ def get_annotation_result_from_query(
 def _build_opensearch_query_from_query_string(
     query_string: str,
     fields: list[str] | None = None,
-    melt_by_samples: bool = False,
+    melt_samples: bool = False,
 ) -> dict[str, Any]:
     """
     Build an OpenSearch query from a query string.
@@ -1153,7 +1238,11 @@ def _build_opensearch_query_from_query_string(
     Args:
         query_string (str): The query string to use for the search.
         fields (list[str] | None): The fields to include in the query, defaults to None.
-        melt_by_samples (bool): Whether to include sample-related fields, defaults to False.
+        melt_samples (bool):
+            Whether we plan to unpivot `heterozygotes, `homozygotes`, `missingGenos`
+            columns, and add `samples` and `dosage` columns to the resulting DataFrame.
+
+            Defaults to False.
 
     Returns:
         dict[str, Any]: The OpenSearch query.
@@ -1179,7 +1268,7 @@ def _build_opensearch_query_from_query_string(
 
     all_fields = ALWAYS_INCLUDED_FIELDS.copy()
 
-    if melt_by_samples:
+    if melt_samples:
         all_fields += SAMPLE_COLUMNS
 
     for field in fields or []:
@@ -1203,8 +1292,28 @@ def _build_opensearch_query_from_query_string(
 
     return base_query
 
+def expand_rows_with_list(df, column):
+    """
+    For dataframe with column `column`, expand rows with list values in `column` into multiple rows,
+    with each row containing one value from the list.
 
-DEFAULT_GENE_NAME_COLUMN = "refSeq.name2"
+    Args:
+        df (pd.DataFrame): The DataFrame to expand.
+        column (str): The column to expand.
+
+    Returns:
+        pd.DataFrame: The expanded DataFrame.
+    """
+    rows = []
+    for _, row in df.iterrows():
+        if isinstance(row[column], list):
+            for item in row[column]:
+                new_row = row.copy()
+                new_row[column] = item
+                rows.append(new_row)
+        else:
+            rows.append(row)
+    return pd.DataFrame(rows)
 
 
 def join_annotation_result_to_fragpipe_dataset2(
