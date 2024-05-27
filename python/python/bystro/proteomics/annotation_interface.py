@@ -1293,17 +1293,17 @@ def _build_opensearch_query_from_query_string(
     return base_query
 
 
-def expand_rows_with_list(df, column):
+def explode_rows_with_list(df, column):
     """
-    For dataframe with column `column`, expand rows with list values in `column` into multiple rows,
+    For dataframe with column `column`, explode rows with list values in `column` into multiple rows,
     with each row containing one value from the list.
 
     Args:
-        df (pd.DataFrame): The DataFrame to expand.
-        column (str): The column to expand.
+        df (pd.DataFrame): The DataFrame to expand/explode.
+        column (str): The column whose list values we wish to explode.
 
     Returns:
-        pd.DataFrame: The expanded DataFrame.
+        pd.DataFrame: The DataFrame expanded/exploded on `column` values.
     """
     rows = []
     for _, row in df.iterrows():
