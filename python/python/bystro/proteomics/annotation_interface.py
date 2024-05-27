@@ -1359,6 +1359,6 @@ def join_annotation_result_to_fragpipe_dataset(
         proteomics_df,
         left_on=[SAMPLE_GENERATED_COLUMN, genetic_join_column],
         right_on=[FRAGPIPE_SAMPLE_COLUMN, fragpipe_join_column],
-    ).drop(columns=[FRAGPIPE_SAMPLE_COLUMN, fragpipe_join_column])
+    ).drop(columns=[fragpipe_join_column])
 
     return joined_df

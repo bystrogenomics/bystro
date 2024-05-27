@@ -20,6 +20,7 @@ from bystro.proteomics.fragpipe_tandem_mass_tag import (
     FRAGPIPE_RENAMED_COLUMNS,
     FRAGPIPE_SAMPLE_COLUMN,
     FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED,
+    FRAGPIPE_SAMPLE_INTENSITY_COLUMN
 )
 
 TEST_LEGACY_RESPONSE_PATH = Path(__file__).parent / "test_legacy_response.dat"
@@ -351,11 +352,13 @@ async def test_join_annotation_result_to_fragpipe_dataset(mocker):
         query_result_df, tmt_dataset, fragpipe_join_column=FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED
     )
 
-    assert (101, 16) == joined_df.shape
+    assert (101, 17) == joined_df.shape
 
     retained_fragpipe_columns = []
     for name in FRAGPIPE_RENAMED_COLUMNS:
-        if name in [FRAGPIPE_SAMPLE_COLUMN, FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED]:
+        if name in [FRAGPIPE_SAMPLE_COLUMN, FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED, "ReferenceIntensity"]:
             continue
         retained_fragpipe_columns.append(name)
+
+    retained_fragpipe_columns.append(FRAGPIPE_SAMPLE_INTENSITY_COLUMN)
     assert list(joined_df.columns) == list(query_result_df.columns) + retained_fragpipe_columns
