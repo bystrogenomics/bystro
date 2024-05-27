@@ -356,7 +356,7 @@ async def test_join_annotation_result_to_fragpipe_dataset(mocker):
 
     retained_fragpipe_columns = []
     for name in FRAGPIPE_RENAMED_COLUMNS:
-        if name in [FRAGPIPE_SAMPLE_COLUMN, FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED, "ReferenceIntensity"]:
+        if name in [FRAGPIPE_SAMPLE_COLUMN, FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED]:
             continue
         retained_fragpipe_columns.append(name)
 
