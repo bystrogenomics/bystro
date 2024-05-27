@@ -16,7 +16,11 @@ from opensearchpy import AsyncOpenSearch
 
 from bystro.api.auth import CachedAuth
 from bystro.api.search import get_async_proxied_opensearch_client
-from bystro.proteomics.fragpipe_tandem_mass_tag import TandemMassTagDataset
+from bystro.proteomics.fragpipe_tandem_mass_tag import (
+    TandemMassTagDataset,
+    FRAGPIPE_SAMPLE_COLUMN,
+    FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED,
+)
 from bystro.search.utils.opensearch import gather_opensearch_args
 
 
@@ -131,8 +135,6 @@ DEFAULT_MULTI_VALUED_TRACKS = [
 NOT_SUPPORTED_TRACKS = ["refSeq.clinvar"]
 
 DEFAULT_GENE_NAME_COLUMN = "refSeq.name2"
-
-FRAGPIPE_PROTEIN_ABUNDANCE_COLUMN = "protein_abundance"
 
 
 def _looks_like_float(val: Any) -> bool:
@@ -1202,14 +1204,16 @@ def _build_opensearch_query_from_query_string(
     return base_query
 
 
-def join_annotation_result_to_fragpipe_dataset(
+DEFAULT_GENE_NAME_COLUMN = "refSeq.name2"
+
+
+def join_annotation_result_to_fragpipe_dataset2(
     query_result_df: pd.DataFrame,
     tmt_dataset: TandemMassTagDataset,
     get_tracking_id_from_genomic_sample_id: Callable[[str], str] = (lambda x: x),
     get_tracking_id_from_proteomic_sample_id: Callable[[str], str] = (lambda x: x),
-    gene_name_column: str = DEFAULT_GENE_NAME_COLUMN,
-    fragpipe_sample_id_column: str = "sample_id",
-    fragpipe_gene_name_column: str = "gene_name",
+    genetic_join_column: str = DEFAULT_GENE_NAME_COLUMN,
+    fragpipe_join_column: str = FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED,
 ) -> pd.DataFrame:
     """
     Join annotation result to FragPipe dataset.
@@ -1222,13 +1226,10 @@ def join_annotation_result_to_fragpipe_dataset(
             Callable mapping genomic sample IDs to tracking IDs, defaults to identity function.
         get_tracking_id_from_proteomic_sample_id (Callable[[str], str]):
             Callable mapping proteomic sample IDs to tracking IDs, defaults to identity function.
-        gene_name_column (str):
-            The gene name column in the annotation result DataFrame,
-            defaults to DEFAULT_GENE_NAME_COLUMN.
-        fragpipe_sample_id_column (str):
-            The sample ID column in the FragPipe dataset, defaults to "sample_id".
-        fragpipe_gene_name_column (str):
-            The gene name column in the FragPipe dataset, defaults to "gene_name".
+        genetic_join_column (str, optional):
+            The column to join on in the genetic dataset, defaults to "refSeq.name2".
+        fragpipe_join_column (str, optional)
+            The column to join on in the FragPipe dataset, defaults to "gene_name".
 
     Returns:
         pd.DataFrame: The joined DataFrame.
@@ -1239,18 +1240,15 @@ def join_annotation_result_to_fragpipe_dataset(
     query_result_df[SAMPLE_GENERATED_COLUMN] = query_result_df[SAMPLE_GENERATED_COLUMN].apply(
         get_tracking_id_from_genomic_sample_id
     )
-    proteomics_df[fragpipe_sample_id_column] = proteomics_df[fragpipe_sample_id_column].apply(
+
+    proteomics_df[FRAGPIPE_SAMPLE_COLUMN] = proteomics_df[FRAGPIPE_SAMPLE_COLUMN].apply(
         get_tracking_id_from_proteomic_sample_id
     )
 
-    joined_df = (
-        query_result_df.merge(
-            proteomics_df,
-            left_on=[SAMPLE_GENERATED_COLUMN, gene_name_column],
-            right_on=[fragpipe_sample_id_column, fragpipe_gene_name_column],
-        )
-        .drop(columns=[fragpipe_sample_id_column, fragpipe_gene_name_column])
-        .rename(columns={"value": FRAGPIPE_PROTEIN_ABUNDANCE_COLUMN})
-    )
+    joined_df = query_result_df.merge(
+        proteomics_df,
+        left_on=[SAMPLE_GENERATED_COLUMN, genetic_join_column],
+        right_on=[FRAGPIPE_SAMPLE_COLUMN, fragpipe_join_column],
+    ).drop(columns=[FRAGPIPE_SAMPLE_COLUMN, fragpipe_join_column])
 
     return joined_df
