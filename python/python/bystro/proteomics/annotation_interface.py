@@ -1292,6 +1292,7 @@ def _build_opensearch_query_from_query_string(
 
     return base_query
 
+
 def expand_rows_with_list(df, column):
     """
     For dataframe with column `column`, expand rows with list values in `column` into multiple rows,
@@ -1316,7 +1317,7 @@ def expand_rows_with_list(df, column):
     return pd.DataFrame(rows)
 
 
-def join_annotation_result_to_fragpipe_dataset2(
+def join_annotation_result_to_fragpipe_dataset(
     query_result_df: pd.DataFrame,
     tmt_dataset: TandemMassTagDataset,
     get_tracking_id_from_genomic_sample_id: Callable[[str], str] = (lambda x: x),
