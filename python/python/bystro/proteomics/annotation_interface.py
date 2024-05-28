@@ -417,11 +417,6 @@ def track_of_objects_to_track_of_arrays(
                     num = float(obj)
                 if not isinstance(num, (int, float)):
                     return obj
-                if num == 0:
-                    return 0
-                abs_num = abs(num)
-                if abs_num < 0.0001 or abs_num > 1000000:
-                    return f"{num:.4e}"
                 return round(num, 4)
             return obj
 
