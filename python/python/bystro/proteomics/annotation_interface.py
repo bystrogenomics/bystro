@@ -115,7 +115,7 @@ DEFAULT_MULTI_VALUED_TRACKS = [
 # The refSeq.clinvar is a legacy track, which has been removed in all recent database versions
 # During join, the refSeq.clinvar track excludes missing values
 # resulting in a reduction in dimension relative to the primary key
-# This libarary assumes that the length of the primary key array
+# This library assumes that the length of the primary key array
 # Meaning we expect that if the primary key is "foo", this is allowed
 # {  # noqa
 #   "foo": ["a", "b", "c"],  # noqa
@@ -419,11 +419,6 @@ def track_of_objects_to_track_of_arrays(
                     num = float(obj)
                 if not isinstance(num, (int, float)):
                     return obj
-                if num == 0:
-                    return 0
-                abs_num = abs(num)
-                if abs_num < 0.0001 or abs_num > 1000000:
-                    return f"{num:.4e}"
                 return round(num, 4)
             return obj
 
