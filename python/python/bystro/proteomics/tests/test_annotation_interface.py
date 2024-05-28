@@ -13,11 +13,14 @@ from bystro.proteomics.annotation_interface import (
     ALWAYS_INCLUDED_FIELDS,
     SAMPLE_COLUMNS,
     LINK_GENERATED_COLUMN,
-    FRAGPIPE_PROTEIN_ABUNDANCE_COLUMN,
 )
 
 from bystro.proteomics.fragpipe_tandem_mass_tag import (
     load_tandem_mass_tag_dataset,
+    FRAGPIPE_RENAMED_COLUMNS,
+    FRAGPIPE_SAMPLE_COLUMN,
+    FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED,
+    FRAGPIPE_SAMPLE_INTENSITY_COLUMN
 )
 
 TEST_LEGACY_RESPONSE_PATH = Path(__file__).parent / "test_legacy_response.dat"
@@ -191,7 +194,7 @@ async def test_get_annotation_results_from_query_with_sample_no_melt(mocker):
                 "verify_certs": False,
             },
         },
-        melt_by_samples=False,
+        melt_samples=False,
     )
 
     assert (177, 13) == samples_and_genes_df.shape
@@ -267,7 +270,7 @@ def test_process_response():
     assert list(ans.columns) == ALWAYS_INCLUDED_FIELDS + [LINK_GENERATED_COLUMN] + ["refSeq.name2"]
 
     # If we melt, we drop SAMPLE_COLUMNS, in favor of ['sample', 'dosage']
-    melted = process_query_response(copy.deepcopy(all_hits), melt_by_samples=True)
+    melted = process_query_response(copy.deepcopy(all_hits), melt_samples=True)
     assert (397, 12) == melted.shape
     assert list(melted.columns) == ALWAYS_INCLUDED_FIELDS + [LINK_GENERATED_COLUMN] + [
         "sample",
@@ -276,7 +279,7 @@ def test_process_response():
 
     assert {"1805", "1847", "4805"} == set(melted[SAMPLE_GENERATED_COLUMN].unique())
 
-    ans = process_query_response(copy.deepcopy(all_hits), melt_by_samples=False, fields=SAMPLE_COLUMNS)
+    ans = process_query_response(copy.deepcopy(all_hits), melt_samples=False, fields=SAMPLE_COLUMNS)
     # # For every sample that was a heterozygote, we should have dosage 1
     for _, row in ans.iterrows():
         locus = row[LINK_GENERATED_COLUMN]
@@ -328,7 +331,7 @@ async def test_join_annotation_result_to_fragpipe_dataset(mocker):
                 "verify_certs": False,
             },
         },
-        melt_by_field="refSeq.name2",
+        explode_field="refSeq.name2",
     )
 
     assert (582, 12) == query_result_df.shape
@@ -345,8 +348,17 @@ async def test_join_annotation_result_to_fragpipe_dataset(mocker):
     replacements = {sample_id: sample_name for sample_id, sample_name in zip(sample_ids, sample_names)}
     query_result_df["sample"] = query_result_df["sample"].replace(replacements)
 
-    joined_df = join_annotation_result_to_fragpipe_dataset(query_result_df, tmt_dataset)
+    joined_df = join_annotation_result_to_fragpipe_dataset(
+        query_result_df, tmt_dataset, fragpipe_join_column=FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED
+    )
 
-    assert (90, 13) == joined_df.shape
+    assert (90, 17) == joined_df.shape
 
-    assert list(joined_df.columns) == list(query_result_df.columns) + [FRAGPIPE_PROTEIN_ABUNDANCE_COLUMN]
+    retained_fragpipe_columns = []
+    for name in FRAGPIPE_RENAMED_COLUMNS:
+        if name in [FRAGPIPE_SAMPLE_COLUMN, FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED]:
+            continue
+        retained_fragpipe_columns.append(name)
+
+    retained_fragpipe_columns.append(FRAGPIPE_SAMPLE_INTENSITY_COLUMN)
+    assert list(joined_df.columns) == list(query_result_df.columns) + retained_fragpipe_columns
