@@ -91,26 +91,36 @@ def mock_bin_mappings():
 def mock_final_dosage_scores():
     genos_transpose_mock = pd.DataFrame(
         {
-            "chr10:10082621:G:T": [0, 2],
-            "chr10:10528970:A:G": [1, 0],
+            "chr10:10082621:G:T": [0, 1, 2],
+            "chr10:10528970:A:G": [2, 1, 0],
+            "chr10:10954350:C:T": [1, 0, 1],
         },
-        index=["Sample1", "Sample2"],
+        index=["sample1", "sample2", "sample3"],
     )
 
     scores_overlap_adjusted_mock = pd.DataFrame(
-        {
-            "SNPID": ["chr10:10082621:G:T", "chr10:10528970:A:G"],
-            "BETA": [0.1, -0.2],
-        }
-    ).set_index("SNPID")
+        {"BETA": [0.1, 0.2, 0.3]},
+        index=["chr10:10082621:G:T", "chr10:10528970:A:G", "chr10:10954350:C:T"],
+    )
 
     expected_results = pd.Series(
-        {
-            "Sample1": (0 * 0.1) + (1 * -0.2),
-            "Sample2": (2 * 0.1) + (0 * -0.2),
-        }
+        [0.7, 0.30000000000000004, 0.5], index=["sample1", "sample2", "sample3"]
     )
+
     return genos_transpose_mock, scores_overlap_adjusted_mock, expected_results
+
+
+def mock_read_feather_in_chunks(**kwargs):
+    columns = kwargs.get("columns")
+    genos_transpose_mock = pd.DataFrame(
+        {
+            "chr10:10082621:G:T": [0, 1, 2],
+            "chr10:10528970:A:G": [2, 1, 0],
+            "chr10:10954350:C:T": [1, 0, 1],
+        },
+        index=["sample1", "sample2", "sample3"],
+    )
+    yield genos_transpose_mock[columns]
 
 
 def test_extract_nomiss_dosage_loci(mock_dosage_df):
@@ -126,9 +136,7 @@ def test_extract_nomiss_dosage_loci(mock_dosage_df):
 
         assert not result.empty, "The DataFrame should not be empty."
         assert "locus" in result.columns, "'locus' column should be present in the DataFrame."
-        assert (
-            len(result) == 3
-        ), "The number of rows in the DataFrame should be 3."
+        assert len(result) == 3, "The number of rows in the DataFrame should be 3."
         mock_dataset.assert_called_once_with("mock/path/to/dosage.feather", format="feather")
 
 
@@ -164,7 +172,7 @@ def test_load_scores(mock_read_feather, mock_scores_df: pd.DataFrame):
 @patch("bystro.prs.preprocess_for_prs._load_association_scores")
 def test_preprocess_scores(mock_load_association_scores, mock_scores_df: pd.DataFrame):
     mock_load_association_scores.return_value = mock_scores_df
-    processed_scores = _preprocess_scores(AD_SCORE_FILEPATH)
+    processed_scores = _preprocess_scores(mock_scores_df)
 
     assert "SNPID" in processed_scores.columns
     assert "ID_effect_as_alt" in processed_scores.columns
@@ -264,14 +272,22 @@ def test_select_max_effect_per_bin():
     ), "The result DataFrame should have one row per (CHR, bin) group."
 
 
+@patch("bystro.prs.preprocess_for_prs.read_feather_in_chunks", side_effect=mock_read_feather_in_chunks)
 @patch("bystro.prs.preprocess_for_prs.finalize_dosage_scores_after_c_t")
-def test_generate_c_and_t_prs_scores(mock_finalize_dosage_scores_after_c_t, mock_final_dosage_scores):
+@patch("bystro.prs.preprocess_for_prs.cleanup_temp_file")
+def test_generate_c_and_t_prs_scores(
+    _mock_cleanup_temp_file,
+    mock_finalize_dosage_scores_after_c_t,
+    _mock_read_feather_in_chunks,
+    mock_final_dosage_scores,
+):
     genos_transpose_mock, scores_overlap_adjusted_mock, expected_results = mock_final_dosage_scores
 
     def mock_finalize_func(*_, **__):
-        return genos_transpose_mock, scores_overlap_adjusted_mock
+        return "mock_path.feather", scores_overlap_adjusted_mock
 
     mock_finalize_dosage_scores_after_c_t.side_effect = mock_finalize_func
+
     prs_results = generate_c_and_t_prs_scores("dummy_gwas_path", "dummy_dosage_path", "dummy_map_path")
-    prs_series = pd.Series(prs_results, index=genos_transpose_mock.index)
-    pd.testing.assert_series_equal(prs_series, expected_results, check_dtype=False, check_names=False)
+
+    pd.testing.assert_series_equal(prs_results, expected_results, check_dtype=False, check_names=False)
