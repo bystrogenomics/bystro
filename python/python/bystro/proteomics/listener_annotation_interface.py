@@ -12,7 +12,7 @@ from bystro.beanstalkd.worker import listen, QueueConf, ProgressPublisher
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
 from bystro.proteomics.annotation_interface import (
     get_annotation_result_from_query,
-    join_annotation_result_to_proteomics_dataset,
+    join_annotation_result_to_fragpipe_dataset,
 )
 
 logger = logging.getLogger(__file__)
@@ -75,10 +75,12 @@ def make_handler_fn(
                 ) from e
 
         annotation_df = get_annotation_result_from_query(
-            job_data.annotation_query, job_data.index_name, search_conf
+            query_string=job_data.annotation_query,
+            index_name=job_data.index_name,
+            cluster_opensearch_config=search_conf
         )
 
-        joined_df = join_annotation_result_to_proteomics_dataset(annotation_df, gene_abundance_df)
+        joined_df = join_annotation_result_to_fragpipe_dataset(annotation_df, gene_abundance_df)
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
         result_path = Path(job_data.out_dir) / f"joined.{timestamp}.feather"
