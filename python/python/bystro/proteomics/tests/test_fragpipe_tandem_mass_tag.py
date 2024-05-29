@@ -70,6 +70,8 @@ expected_abundance_df = pd.DataFrame(
     }
 )
 expected_abundance_df.index.name = "Index"
+expected_abundance_df = expected_abundance_df.reset_index().rename(columns={"Index": "gene_name"})
+
 expected_annotation_df = pd.DataFrame(
     {
         "plex": {"CPT0088900003": 16, "CPT0079270003": 16, "CPT0088920001": 16},
@@ -90,5 +92,6 @@ def test_load_tandem_mass_tag_dataset():
     abundance_handle = StringIO(raw_abundance_df.to_csv(index=False, sep="\t"))
     annotation_handle = StringIO(raw_annotation_df.to_csv(index=False, sep="\t"))
     tandem_mass_tag_dataset = load_tandem_mass_tag_dataset(abundance_handle, annotation_handle)
+
     assert_frame_equal(expected_abundance_df, tandem_mass_tag_dataset.abundance_df)
     assert_frame_equal(expected_annotation_df, tandem_mass_tag_dataset.annotation_df)
