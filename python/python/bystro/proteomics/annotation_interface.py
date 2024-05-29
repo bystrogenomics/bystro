@@ -999,8 +999,9 @@ async def async_run_annotation_query(
 
         if structs_of_arrays is False:
             raise ValueError(
-                "Cannot yet, melt by field when structs_of_arrays is False, "
-                "as track values are potentially dicts"
+                "structs_of_arrays=False, which means that track values are potentially dicts, "
+                "and we do not currently support exploding these.\n"
+                "Set structs_of_arrays=True to explode fields."
             )
 
         if fields is not None:
