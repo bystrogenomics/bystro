@@ -161,7 +161,6 @@ def test_load_genetic_maps_from_feather(tmp_path):
 
 @patch("pyarrow.feather.read_feather")
 def test_load_scores(mock_read_feather, mock_scores_df: pd.DataFrame):
-    # Reset index if your actual function expects 'SNPID' as a column, not an index
     mock_read_feather.return_value = mock_scores_df.reset_index()
     result_df = _load_association_scores("fake_file_path.feather")
     expected_columns = ["CHR", "POS", "OTHER_ALLELE", "EFFECT_ALLELE", "P", "SNPID", "BETA"]
@@ -188,10 +187,7 @@ def test_get_p_value_thresholded_indices(mock_processed_scores_df: pd.DataFrame)
     thresholded_indices = get_p_value_thresholded_indices(
         mock_processed_scores_df.set_index("SNPID"), p_value_threshold
     )
-    print(thresholded_indices)
-
     filtered_scores = mock_processed_scores_df.set_index("SNPID").loc[list(thresholded_indices)]
-    print(filtered_scores)
 
     assert (
         len(filtered_scores) == 1
