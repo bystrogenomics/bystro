@@ -1,16 +1,27 @@
 """Load and prep fragpipe tandem mass Tag datasets."""
 
-from dataclasses import dataclass
 from io import StringIO
 
+from msgspec import Struct
 import pandas as pd
+
 from bystro.proteomics.fragpipe_utils import check_df_starts_with_cols, prep_annotation_df
 
-ABUNDANCE_COLS = ["Index", "NumberPSM", "ProteinID", "MaxPepProb", "ReferenceIntensity"]
+FRAGPIPE_ABUNDANCE_COLS = ["Index", "NumberPSM", "ProteinID", "MaxPepProb", "ReferenceIntensity"]
+FRAGPIPE_GENE_NAME_COLUMN_ORIGINAL = "Index"
+FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED = "gene_name"
+FRAGPIPE_GENE_COLUMN_MAPPING = {
+    FRAGPIPE_GENE_NAME_COLUMN_ORIGINAL: FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED
+}
+FRAGPIPE_RENAMED_COLUMNS = list(
+    map(lambda x: FRAGPIPE_GENE_COLUMN_MAPPING.get(x, x), FRAGPIPE_ABUNDANCE_COLS)
+)
+
+FRAGPIPE_SAMPLE_COLUMN = "sample"
+FRAGPIPE_SAMPLE_INTENSITY_COLUMN = "normalized_sample_intensity"
 
 
-@dataclass(frozen=True)
-class TandemMassTagDataset:
+class TandemMassTagDataset(Struct, frozen=True):
     """Represent a Fragpipe Tandem Mass Tag dataset."""
 
     abundance_df: pd.DataFrame
@@ -18,7 +29,7 @@ class TandemMassTagDataset:
 
     def __post_init__(self) -> None:
         try:
-            check_df_starts_with_cols(self.abundance_df, ABUNDANCE_COLS[1:])
+            check_df_starts_with_cols(self.abundance_df, FRAGPIPE_RENAMED_COLUMNS)
         except ValueError as e:
             err_msg = "Received abundance_df with unexpected columns"
             raise ValueError(err_msg) from e
@@ -26,20 +37,21 @@ class TandemMassTagDataset:
     def get_melted_abundance_df(self) -> pd.DataFrame:
         """Return a melted abundance df with columns [gene_name, sample_id, value]"""
         abundance_df = self.abundance_df
-        columns_to_drop = ["NumberPSM", "ProteinID", "MaxPepProb", "ReferenceIntensity"]
-        final_column_ordering = ["sample_id", "gene_name", "value"]
-        melted_df_with_unsorted_columns = (
-            abundance_df.drop(columns=columns_to_drop)
-            .melt(var_name=["sample_id"], ignore_index=False)  # type: ignore[arg-type]
-            .reset_index(names="gene_name")
+
+        long_format_df = abundance_df.melt(
+            id_vars=FRAGPIPE_RENAMED_COLUMNS,
+            var_name=FRAGPIPE_SAMPLE_COLUMN,
+            value_name=FRAGPIPE_SAMPLE_INTENSITY_COLUMN,
         )
-        return melted_df_with_unsorted_columns[final_column_ordering]
+
+        return long_format_df
 
 
 def _prep_abundance_df(abundance_df: pd.DataFrame) -> pd.DataFrame:
     """Prep abundance_df, setting index and normalizing abundances by ReferenceIntensity."""
-    check_df_starts_with_cols(abundance_df, ABUNDANCE_COLS)
-    abundance_df = abundance_df.set_index("Index")
+    check_df_starts_with_cols(abundance_df, FRAGPIPE_ABUNDANCE_COLS)
+    abundance_df = abundance_df.rename(columns=FRAGPIPE_GENE_COLUMN_MAPPING)
+
     first_sample_column_idx = abundance_df.columns.to_list().index("ReferenceIntensity") + 1
     sample_columns = abundance_df.columns[first_sample_column_idx:]
     for sample_column in sample_columns:

@@ -203,7 +203,7 @@ def test_marginal_score():
     score = model.marginal_score(X[:, idxs == 1], idxs)
     mvn = st.multivariate_normal(mean=np.zeros(8), cov=model.covariance[:8, :8])
     logpdf = mvn.logpdf(X[:, :8])
-    assert np.mean(logpdf) == score
+    assert np.abs(np.mean(logpdf) - score) < 1e-8
 
 
 def test_marginal_score_sherman_woodbury():
@@ -238,7 +238,7 @@ def test_score():
     score = model.score(X, weights=1.0 * np.ones(1000))
     mvn = st.multivariate_normal(mean=np.zeros(10), cov=model.covariance)
     logpdf = mvn.logpdf(X)
-    assert np.mean(logpdf) == score
+    assert np.abs(np.mean(logpdf) - score) < 1e-8
 
 
 def test_score_sherman_woodbury():
