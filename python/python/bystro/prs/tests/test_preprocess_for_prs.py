@@ -108,20 +108,6 @@ def mock_finalize_scores_after_c_t():
 
 
 @pytest.fixture()
-def mock_read_feather_in_chunks():
-    def _mock_read_feather_in_chunks(dosage_matrix_path, columns=None, chunk_size=1000):  # noqa: ARG001
-        data = {
-            "locus": ["chr1:566875:C:T", "chr1:728951:A:G", "chr1:917492:C:T", "chr2:917492:A:T"],
-            "ID00096": [1, 1, 2, -1],
-            "ID00097": [0, 1, 1, 0],
-        }
-        chunk = pd.DataFrame(data)
-        yield chunk
-
-    return _mock_read_feather_in_chunks
-
-
-@pytest.fixture()
 def mock_finalize_dosage_after_c_t():
     def _mock_finalize_dosage_after_c_t(chunk, loci_and_allele_comparison):  # noqa: ARG001
         return pd.DataFrame(
@@ -135,9 +121,9 @@ def test_extract_nomiss_dosage_loci(tmp_path, mock_dosage_df, mock_scores_loci):
     table = pa.Table.from_pandas(mock_dosage_df)
     test_file = tmp_path / "test_dosage_matrix.feather"
     pa.feather.write_feather(table, test_file)
-
     result = _extract_nomiss_dosage_loci(test_file, mock_scores_loci)
     expected_result = {"chr1:566875:C:T", "chr1:728951:A:G"}
+
     assert result == expected_result, f"Expected {expected_result}, but got {result}"
 
 
@@ -279,26 +265,26 @@ def test_select_max_effect_per_bin():
 
 
 def test_generate_c_and_t_prs_scores(
-    mock_finalize_scores_after_c_t, mock_read_feather_in_chunks, mock_finalize_dosage_after_c_t
+    tmp_path, mock_finalize_scores_after_c_t, mock_finalize_dosage_after_c_t, mock_dosage_df
 ):
+    table = pa.Table.from_pandas(mock_dosage_df)
+    test_file = tmp_path / "test_dosage_matrix.feather"
+    pa.feather.write_feather(table, test_file)
     with patch(
         "bystro.prs.preprocess_for_prs.finalize_scores_after_c_t",
         side_effect=mock_finalize_scores_after_c_t,
-    ), patch(
-        "bystro.prs.preprocess_for_prs.read_feather_in_chunks", side_effect=mock_read_feather_in_chunks
     ), patch(
         "bystro.prs.preprocess_for_prs.finalize_dosage_after_c_t",
         side_effect=mock_finalize_dosage_after_c_t,
     ):
         gwas_scores_path = "mock_gwas_scores_path"
-        dosage_matrix_path = "mock_dosage_matrix_path"
+        dosage_matrix_path = test_file
         map_directory_path = "mock_map_directory_path"
         p_value_threshold = 0.05
 
         result = generate_c_and_t_prs_scores(
             gwas_scores_path, dosage_matrix_path, map_directory_path, p_value_threshold
         )
-
         expected_result = {"ID00096": -0.013040999999999999, "ID00097": -0.020671}
 
         assert result == expected_result, f"Expected {expected_result}, but got {result}"

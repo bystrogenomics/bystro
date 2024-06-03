@@ -169,15 +169,6 @@ def _preprocess_genetic_maps(map_directory_path: str) -> dict[int, list[int]]:
     return bin_mappings
 
 
-def read_feather_in_chunks(file_path, columns=None, chunk_size=1000):
-    """Read a Feather file in chunks as pandas DataFrames."""
-    dataset = ds.dataset(file_path, format="feather")
-    if columns:
-        columns = list(columns)
-    for batch in dataset.to_batches(batch_size=chunk_size, columns=columns, batch_readahead=1):
-        yield batch.to_pandas()
-
-
 def get_p_value_thresholded_indices(df, p_value_threshold: float) -> set:
     """Return indices of rows with P-values less than the specified threshold."""
     if not (0 <= p_value_threshold <= 1):
@@ -324,16 +315,17 @@ def generate_c_and_t_prs_scores(
     # transposes genotypes, and calculates PRS
     prs_scores: pd.Series = pd.Series(dtype=float)
     beta_values = scores_after_c_t["BETA"]
-    loci = scores_after_c_t.index
-    for chunk_idx, chunk in enumerate(
-        read_feather_in_chunks(dosage_matrix_path, columns=None, chunk_size=1000)
-    ):
-        chunk = chunk[chunk["locus"].isin(loci)]
-        if not chunk.empty:
-            chunk = chunk.set_index("locus")
-            genos_transpose = finalize_dosage_after_c_t(chunk, loci_and_allele_comparison)
-            prs_scores_chunk = genos_transpose @ beta_values.loc[genos_transpose.columns]
-            prs_scores = prs_scores.add(prs_scores_chunk, fill_value=0)
+    finalized_loci = scores_after_c_t.index
+    dataset = ds.dataset(dosage_matrix_path, format="feather")
+    for batch in dataset.to_batches(batch_size=1000, columns=None, batch_readahead=1):
+        chunk = batch.to_pandas()
+        if chunk.empty:
+            continue
+        chunk = chunk[chunk["locus"].isin(finalized_loci)]
+        chunk = chunk.set_index("locus")
+        genos_transpose = finalize_dosage_after_c_t(chunk, loci_and_allele_comparison)
+        prs_scores_chunk = genos_transpose @ beta_values.loc[genos_transpose.columns]
+        prs_scores = prs_scores.add(prs_scores_chunk, fill_value=0)
     return prs_scores.to_dict()
 
 
