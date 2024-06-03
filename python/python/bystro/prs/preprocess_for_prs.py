@@ -10,6 +10,8 @@ from enum import Enum
 import pandas as pd
 from pyarrow import feather  # type: ignore
 import pyarrow.dataset as ds  # type: ignore
+import pyarrow.compute as pc  # type: ignore
+import pyarrow as pa  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -87,18 +89,21 @@ def _extract_nomiss_dosage_loci(dosage_matrix_path: str, score_loci: set, chunk_
     set: A set containing loci with no missing dosage values across all other columns.
     """
     dataset = ds.dataset(dosage_matrix_path, format="feather")
-    filtered_loci = set()
-    for batch in dataset.to_batches(batch_size=chunk_size):
-        chunk = batch.to_pandas()
-        chunk = chunk[chunk["locus"].isin(score_loci)]
-        for column in chunk.columns:
-            # Checking for missingness will be removed after imputation to the dosage matrix
-            # TODO: Add imputation preprocess step before PRS, expected 8/2024
-            if column != "locus":
-                chunk = chunk[chunk[column] >= 0]
-                chunk = chunk.dropna(subset=[column])
-        filtered_loci.update(chunk["locus"].tolist())
-    return filtered_loci
+    score_loci_filter = pc.field("locus").isin(pa.array(list(score_loci)))
+    samples = [name for name in dataset.schema.names if name != "locus"]
+    # Checking for missingness will be removed after imputation to the dosage matrix
+    # TODO: Add imputation preprocess step before PRS, expected 8/2024
+    filters = [pc.field(sample) >= 0 for sample in samples]
+    combined_filter = filters[0]
+    for f in filters[1:]:
+        combined_filter = combined_filter & f
+    total_filter = score_loci_filter & combined_filter
+    table = (
+        dataset.filter(total_filter)
+        .to_table(batch_size=chunk_size, columns=["locus"], batch_readahead=1)
+        .to_pylist()
+    )
+    return set([table[i]["locus"] for i in range(len(table))])
 
 
 def _preprocess_scores(ad_scores: pd.DataFrame) -> pd.DataFrame:
@@ -167,14 +172,10 @@ def _preprocess_genetic_maps(map_directory_path: str) -> dict[int, list[int]]:
 def read_feather_in_chunks(file_path, columns=None, chunk_size=1000):
     """Read a Feather file in chunks as pandas DataFrames."""
     dataset = ds.dataset(file_path, format="feather")
-
     if columns:
         columns = list(columns)
-    for batch in dataset.to_batches(batch_size=chunk_size):
-        chunk = batch.to_pandas()
-        if columns:
-            chunk = chunk[columns]
-        yield chunk
+    for batch in dataset.to_batches(batch_size=chunk_size, columns=columns, batch_readahead=1):
+        yield batch.to_pandas()
 
 
 def get_p_value_thresholded_indices(df, p_value_threshold: float) -> set:

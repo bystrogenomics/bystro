@@ -2,7 +2,6 @@ from unittest.mock import patch
 
 import pandas as pd
 import pyarrow as pa  # type: ignore
-import pyarrow.dataset as ds  # type: ignore
 import pytest
 from bystro.prs.preprocess_for_prs import (
     _load_association_scores,
@@ -132,14 +131,14 @@ def mock_finalize_dosage_after_c_t():
     return _mock_finalize_dosage_after_c_t
 
 
-def test_extract_nomiss_dosage_loci(mock_dosage_df, mock_scores_loci):
+def test_extract_nomiss_dosage_loci(tmp_path, mock_dosage_df, mock_scores_loci):
     table = pa.Table.from_pandas(mock_dosage_df)
-    mock_dataset = ds.dataset(table)
+    test_file = tmp_path / "test_dosage_matrix.feather"
+    pa.feather.write_feather(table, test_file)
 
-    with patch("pyarrow.dataset.dataset", return_value=mock_dataset):
-        result = _extract_nomiss_dosage_loci("mock_path", mock_scores_loci)
-        expected_result = {"chr1:566875:C:T", "chr1:728951:A:G"}
-        assert result == expected_result
+    result = _extract_nomiss_dosage_loci(test_file, mock_scores_loci)
+    expected_result = {"chr1:566875:C:T", "chr1:728951:A:G"}
+    assert result == expected_result, f"Expected {expected_result}, but got {result}"
 
 
 def test_load_genetic_maps_from_feather(tmp_path):
