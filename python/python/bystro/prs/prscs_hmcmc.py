@@ -1,9 +1,8 @@
 import pyro
 import pyro.distributions as dist
-from pyro.infer import mcmc, SVI, Trace_ELBO
+from pyro.infer import mcmc
 
 import torch
-from torch.optim import Adam
 
 from pyro.distributions import Gamma, Normal  # type: ignore
 
