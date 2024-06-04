@@ -4,7 +4,7 @@ import bisect
 import glob
 import logging
 import re
-from typing import Optional, Union
+from typing import Optional
 import matplotlib.pyplot as plt  # type: ignore
 from enum import Enum
 import pandas as pd
@@ -318,28 +318,31 @@ def generate_c_and_t_prs_scores(
     finalized_loci = scores_after_c_t.index
     score_loci_filter = pc.field("locus").isin(pa.array(list(finalized_loci)))
     dosage_ds = ds.dataset(dosage_matrix_path, format="feather").filter(score_loci_filter)
-    for batch in dosage_ds.to_batches(batch_size=1000, columns=None, batch_readahead=1):
-        chunk = batch.to_pandas()
-        if chunk.empty:
-            continue
-        chunk = chunk.set_index("locus")
-        genos_transpose = finalize_dosage_after_c_t(chunk, loci_and_allele_comparison)
+    samples = [name for name in dosage_ds.schema.names if name != "locus"]
+    sample_groups = [samples[i : i + 1000] for i in range(0, len(samples), 1000)]
+    for sample_group in sample_groups:
+        sample_genotypes = dosage_ds.to_table(["locus", *sample_group]).to_pandas()
+        sample_genotypes = sample_genotypes.set_index("locus")
+        genos_transpose = finalize_dosage_after_c_t(sample_genotypes, loci_and_allele_comparison)
         prs_scores_chunk = genos_transpose @ beta_values.loc[genos_transpose.columns]
         prs_scores = prs_scores.add(prs_scores_chunk, fill_value=0)
     return prs_scores.to_dict()
 
 
 def prs_histogram(
-    prs_scores: Union[list[float], pd.Series],
-    bins: int = 20,
+    prs_scores: dict,
+    bins: Optional[int] = None,
     color: str = "blue",
     title: str = "Histogram of PRS Scores",
     xlabel: str = "PRS Score",
     ylabel: str = "Frequency",
 ) -> None:
     """Plot for PRS score overview."""
+    prs_scores_list = list(prs_scores.values())
+    if bins is None:
+        bins = int(len(prs_scores_list) ** 0.5) + 1
     plt.figure(figsize=(10, 6))
-    plt.hist(prs_scores, bins=bins, color=color, edgecolor="black", alpha=0.7)
+    plt.hist(prs_scores_list, bins=bins, color=color, edgecolor="black", alpha=0.7)
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
