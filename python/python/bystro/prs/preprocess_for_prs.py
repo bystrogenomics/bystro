@@ -316,12 +316,12 @@ def generate_c_and_t_prs_scores(
     prs_scores: pd.Series = pd.Series(dtype=float)
     beta_values = scores_after_c_t["BETA"]
     finalized_loci = scores_after_c_t.index
-    dataset = ds.dataset(dosage_matrix_path, format="feather")
-    for batch in dataset.to_batches(batch_size=1000, columns=None, batch_readahead=1):
+    score_loci_filter = pc.field("locus").isin(pa.array(list(finalized_loci)))
+    dosage_ds = ds.dataset(dosage_matrix_path, format="feather").filter(score_loci_filter)
+    for batch in dosage_ds.to_batches(batch_size=1000, columns=None, batch_readahead=1):
         chunk = batch.to_pandas()
         if chunk.empty:
             continue
-        chunk = chunk[chunk["locus"].isin(finalized_loci)]
         chunk = chunk.set_index("locus")
         genos_transpose = finalize_dosage_after_c_t(chunk, loci_and_allele_comparison)
         prs_scores_chunk = genos_transpose @ beta_values.loc[genos_transpose.columns]
