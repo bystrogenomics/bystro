@@ -80,9 +80,8 @@ class KNNDosage(BaseImpute):
         N, p = X.shape
         X_imputed = X.copy()
 
-        myrange = trange if progress_bar else range
 
-        for i in myrange(N):
+        for i in trange(N,disable=not progress_bar):
             for j in range(p):
                 if missing_mask[i, j]:
                     # Extract the subset matrix
