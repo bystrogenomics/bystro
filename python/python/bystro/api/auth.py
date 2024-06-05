@@ -106,6 +106,9 @@ def _fq_host(host: str, port: int | None = None) -> str:
     str
         The fully qualified host.
     """
+    #strip trailing slashes
+    host = host.rstrip("/")
+
     if port is None:
         # parse the port from the host protocol
         if host.startswith("https"):
@@ -139,7 +142,7 @@ def load_state() -> CachedAuth | None:
     return None
 
 
-def save_state(data: CachedAuth, print_result=True) -> None:
+def save_state(data: CachedAuth, print_result=False) -> None:
     """
     Saves the authentication state to a file.
 
@@ -164,7 +167,7 @@ def save_state(data: CachedAuth, print_result=True) -> None:
 
 
 def signup(
-    email: str, password: str, name: str, host: str, port: int | None = None, print_result=True
+    email: str, password: str, name: str, host: str, port: int | None = None, print_result=False
 ) -> CachedAuth:
     """
     Signs up for Bystro with the given email, name, and password. Additionally, logs in and
@@ -227,7 +230,7 @@ def signup(
     return state
 
 
-def login( email: str, password: str, host: str, port: int | None = None, print_result=True,
+def login( email: str, password: str, host: str, port: int | None = None, print_result=False,
     ) -> CachedAuth:
     """
     Logs in to the server with the provided credentials and saves the authentication state to a file.
@@ -302,7 +305,7 @@ def authenticate() -> tuple[CachedAuth, dict]:
     return state, header
 
 
-def get_user(print_result=True) -> UserProfile:
+def get_user(print_result=False) -> UserProfile:
     """
     Fetches the user profile.
 
@@ -339,7 +342,7 @@ def get_user(print_result=True) -> UserProfile:
     return user_profile
 
 
-def logout(print_result=True) -> None:
+def logout(print_result=False) -> None:
     """
     Logs out of the Bystro server by deleting the authentication state file.
 
