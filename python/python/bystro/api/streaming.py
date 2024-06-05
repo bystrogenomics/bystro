@@ -46,8 +46,6 @@ def stream_file(
 
     response = requests.get(url, headers=auth_header, json=payload, stream=True)
 
-    response.raise_for_status()
-
     if response.status_code == 200:
         content_disposition = response.headers.get("Content-Disposition")
         if content_disposition:
