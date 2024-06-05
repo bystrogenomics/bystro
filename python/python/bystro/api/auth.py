@@ -106,6 +106,9 @@ def _fq_host(host: str, port: int | None = None) -> str:
     str
         The fully qualified host.
     """
+    #strip trailing slashes
+    host = host.rstrip("/")
+
     if port is None:
         # parse the port from the host protocol
         if host.startswith("https"):

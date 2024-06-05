@@ -176,7 +176,7 @@ def stream_file_cli(args: argparse.Namespace) -> None:
         job_id=args.job_id,
         output=args.output,
         key_path=args.key_path,
-        print_result=True,
+        out_dir=args.out_dir,
     )
 
 
@@ -317,6 +317,9 @@ def main():
     )
     fetch_parser.add_argument(
         "--key_path", help="Key path for the output and input dir, required if --output is used"
+    )
+    fetch_parser.add_argument(
+        "--out_dir", help="Specify --out_dir to write the file to that directory, otherwise stdout"
     )
     fetch_parser.set_defaults(func=stream_file_cli)
 
