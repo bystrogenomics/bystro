@@ -52,9 +52,9 @@ def stream_file(
 
             # If the output directory is specified, stream the file to that directory
             if out_dir:
-                out_dir = Path(out_dir)
-                out_dir.mkdir(parents=True, exist_ok=True)
-                out_file = out_dir / filename
+                out_dir_path = Path(out_dir)
+                out_dir_path.mkdir(parents=True, exist_ok=True)
+                out_file = out_dir_path / filename
                 with open(out_file, "wb") as f:
                     for chunk in response.iter_content(chunk_size=1024):
                         f.write(chunk)

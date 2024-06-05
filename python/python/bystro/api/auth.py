@@ -142,7 +142,7 @@ def load_state() -> CachedAuth | None:
     return None
 
 
-def save_state(data: CachedAuth, print_result=True) -> None:
+def save_state(data: CachedAuth, print_result=False) -> None:
     """
     Saves the authentication state to a file.
 
@@ -305,7 +305,7 @@ def authenticate() -> tuple[CachedAuth, dict]:
     return state, header
 
 
-def get_user(print_result=True) -> UserProfile:
+def get_user(print_result=False) -> UserProfile:
     """
     Fetches the user profile.
 
@@ -342,7 +342,7 @@ def get_user(print_result=True) -> UserProfile:
     return user_profile
 
 
-def logout(print_result=True) -> None:
+def logout(print_result=False) -> None:
     """
     Logs out of the Bystro server by deleting the authentication state file.
 

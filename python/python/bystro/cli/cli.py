@@ -169,8 +169,8 @@ def stream_file_cli(args: argparse.Namespace) -> None:
         Whether to fetch the output file (True) or the input file (False), by default False.
     key_path : str, optional
         The key path for the output file, required if `output` is True.
-    print_result : bool
-        Whether to print the result of the fetch operation, by default True.
+    out_dir : str, optional
+        The directory to write the file to, if not specified, the file is written to stdout.
     """
     stream_file(
         job_id=args.job_id,
