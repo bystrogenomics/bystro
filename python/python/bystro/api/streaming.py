@@ -63,6 +63,7 @@ def stream_file(
                 # Otherwise, stream the file to stdout
                 for chunk in response.iter_content(chunk_size=1024):
                     sys.stdout.buffer.write(chunk)
+                sys.stdout.buffer.flush()
         else:
             raise RuntimeError("No Content-Disposition header found in the response.")
     elif response.status_code == 400:
