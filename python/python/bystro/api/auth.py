@@ -167,7 +167,7 @@ def save_state(data: CachedAuth, print_result=False) -> None:
 
 
 def signup(
-    email: str, password: str, name: str, host: str, port: int | None = None, print_result=True
+    email: str, password: str, name: str, host: str, port: int | None = None, print_result=False
 ) -> CachedAuth:
     """
     Signs up for Bystro with the given email, name, and password. Additionally, logs in and
@@ -230,7 +230,7 @@ def signup(
     return state
 
 
-def login( email: str, password: str, host: str, port: int | None = None, print_result=True,
+def login( email: str, password: str, host: str, port: int | None = None, print_result=False,
     ) -> CachedAuth:
     """
     Logs in to the server with the provided credentials and saves the authentication state to a file.
