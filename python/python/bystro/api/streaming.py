@@ -1,6 +1,5 @@
 import requests
 import sys
-import subprocess
 from pathlib import Path
 
 from bystro.api.auth import authenticate
