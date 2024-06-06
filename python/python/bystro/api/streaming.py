@@ -187,25 +187,25 @@ def stream_and_decompress_file(
     stream = stream_file(job_id, output=output, key_path=key_path)
 
     if stream is None:
-        # Yield None if the stream is None
         return None
 
-    for chunk in stream:
-        buffer.write(chunk)
-        buffer.seek(0)  # Reset buffer position to the start
-        while True:
-            try:
-                data = decompressor.read(1024)  # Read decompressed data in chunks
-                if not data:
+    def generator():
+        for chunk in stream:
+            buffer.write(chunk)
+            buffer.seek(0)  # Reset buffer position to the start
+            while True:
+                try:
+                    data = decompressor.read(1024)
+                    if not data:
+                        break
+                    yield data
+                except EOFError:
                     break
-                yield data  # Adjust the decoding if needed
-            except EOFError:
-                break
-        # Clear the buffer after reading
-        buffer.seek(0)
-        buffer.truncate()
 
-    # Close the decompressor
-    decompressor.close()
+            # Clear the buffer after reading
+            buffer.seek(0)
+            buffer.truncate()
 
-    return None
+        decompressor.close()
+
+    return generator()
