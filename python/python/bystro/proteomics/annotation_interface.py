@@ -6,9 +6,13 @@ import logging
 import math
 import os
 from pathlib import Path
+import shutil
 import tempfile
 from typing import Any, Callable
 import uuid
+
+# print rss memory usage
+import psutil
 
 from msgspec import Struct
 import numpy as np
@@ -140,7 +144,11 @@ NOT_SUPPORTED_TRACKS = ["refSeq.clinvar"]
 
 DEFAULT_GENE_NAME_COLUMN = "refSeq.name2"
 
+
 def _concatenate_feather_files_memory_mapped(file_list: list[str], output_file: str):
+    # Print memory usage before concatenating
+    process = psutil.Process(os.getpid())
+    logger.info("Memory usage before concatenating: %s", process.memory_info().rss)
     # Open the Feather files using memory mapping
     tables = [feather.read_table(file, memory_map=True) for file in file_list]
 
@@ -151,7 +159,11 @@ def _concatenate_feather_files_memory_mapped(file_list: list[str], output_file: 
     if output_file:
         feather.write_feather(concatenated_table, output_file)
 
+    # Print memory usage after concatenating
+    logger.info("Memory usage after concatenating: %s", process.memory_info().rss)
+
     return concatenated_table
+
 
 def _looks_like_float(val: Any) -> bool:
     """
@@ -615,6 +627,7 @@ def _flatten(xs: Any) -> list[Any]:
         return [xs]
     return sum([_flatten(x) for x in xs], [])
 
+
 def execute_query(
     client: OpenSearch,
     query: dict,
@@ -690,7 +703,6 @@ def execute_query(
         if search_after:
             query["body"]["search_after"] = search_after
 
-        
         resp = client.search(**query)
 
         if not resp["hits"]["hits"]:
@@ -701,7 +713,7 @@ def execute_query(
         # Update search_after to the sort value of the last document retrieved
         search_after = resp["hits"]["hits"][-1]["sort"]
 
-    results_df =  process_query_response(
+    results_df = process_query_response(
         results,
         fields,
         structs_of_arrays=structs_of_arrays,
@@ -715,7 +727,8 @@ def execute_query(
     del results_df
 
     return out_file
- 
+
+
 def _transpose_array_of_structs(array_of_structs: list[dict[str, Any]]) -> dict[str, list[Any]]:
     """
     Transpose an array of structs to a struct of arrays.
@@ -735,8 +748,20 @@ def _transpose_array_of_structs(array_of_structs: list[dict[str, Any]]) -> dict[
 
     return transposed_struct
 
-def execute_query_parallel(slice_id, query, client, tmp_dir, fields,
-structs_of_arrays, melt_samples, explode_field, force_flatten_exploded_field, primary_keys, num_slices):
+
+def execute_query_parallel(
+    slice_id,
+    query,
+    client,
+    tmp_dir,
+    fields,
+    structs_of_arrays,
+    melt_samples,
+    explode_field,
+    force_flatten_exploded_field,
+    primary_keys,
+    num_slices,
+):
     slice_query = copy.deepcopy(query)
     if num_slices > 1:
         # Slice queries require max > 1
@@ -752,8 +777,9 @@ structs_of_arrays, melt_samples, explode_field, force_flatten_exploded_field, pr
         melt_samples=melt_samples,
         explode_field=explode_field,
         force_flatten_exploded_field=force_flatten_exploded_field,
-        primary_keys=primary_keys
+        primary_keys=primary_keys,
     )
+
 
 def process_query_response(
     hits: list[dict[str, Any]],
@@ -937,6 +963,7 @@ def process_query_response(
 
     return df[cols]
 
+
 def get_num_slices(
     client: OpenSearch,
     index_name: str,
@@ -970,22 +997,26 @@ def get_num_slices(
     num_slices_planned = min(num_slices_necessary, OPENSEARCH_QUERY_CONFIG.max_slices)
     return max(num_slices_planned, 1), n_docs
 
-def _get_client(bystro_api_auth: CachedAuth | None = None,
-index_name: str = "",
-cluster_opensearch_config: dict[str, Any] | None = None,
-additional_client_args: dict[str, Any] | None = None) -> OpenSearch:
+
+def _get_client(
+    bystro_api_auth: CachedAuth | None = None,
+    index_name: str = "",
+    cluster_opensearch_config: dict[str, Any] | None = None,
+    additional_client_args: dict[str, Any] | None = None,
+) -> OpenSearch:
     if bystro_api_auth is not None:
         if not index_name:
             raise ValueError("Must provide index_name when bystro_api_auth is provided.")
         # If auth is provided, use the proxied client
         job_id = index_name.split("_")[0]
         return get_proxied_opensearch_client(bystro_api_auth, job_id, additional_client_args)
-    
+
     if cluster_opensearch_config is not None:
         search_client_args = gather_opensearch_args(cluster_opensearch_config)
         return OpenSearch(**search_client_args)
-    
+
     raise ValueError("Must provide either cluster_opensearch_config or bystro_api_auth.")
+
 
 def run_annotation_query(
     query: dict[str, Any],
@@ -1001,6 +1032,7 @@ def run_annotation_query(
     explode_field: str | None = None,
     force_flatten_exploded_field: bool = False,
     primary_keys: dict[str, str] | None = None,
+    max_threads: int = MAX_CONCURRENT_QUERIES,
 ) -> pd.DataFrame:
     """
     Run an annotation query and return a DataFrame of results.
@@ -1110,7 +1142,7 @@ def run_annotation_query(
         query["body"]["size"] = OPENSEARCH_QUERY_CONFIG.max_query_size
         query_results = []
 
-        with ProcessPoolExecutor(max_workers=MAX_CONCURRENT_QUERIES) as executor:
+        with ProcessPoolExecutor(max_workers=max_threads) as executor:
             futures = []
             for slice_id in range(num_slices):
 
@@ -1119,7 +1151,21 @@ def run_annotation_query(
                     # Slice queries require max > 1
                     slice_query["body"]["slice"] = {"id": slice_id, "max": num_slices}
 
-                futures.append(executor.submit(execute_query, client, slice_query, slice_id, tmp_dir, fields, structs_of_arrays, melt_samples, explode_field, force_flatten_exploded_field, primary_keys))
+                futures.append(
+                    executor.submit(
+                        execute_query,
+                        client,
+                        slice_query,
+                        slice_id,
+                        tmp_dir,
+                        fields,
+                        structs_of_arrays,
+                        melt_samples,
+                        explode_field,
+                        force_flatten_exploded_field,
+                        primary_keys,
+                    )
+                )
 
             for future in as_completed(futures):
                 query_results.append(future.result())
@@ -1136,6 +1182,8 @@ def run_annotation_query(
     finally:
         client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore[attr-defined]
         client.close()
+        # clean up tmp_dir
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 def get_annotation_result_from_query(
@@ -1152,6 +1200,7 @@ def get_annotation_result_from_query(
     explode_field: str | None = None,
     force_flatten_exploded_field: bool = True,
     primary_keys: dict[str, str] | None = None,
+    max_threads: int = MAX_CONCURRENT_QUERIES,
 ) -> pd.DataFrame:
     """
     Given a query and index, return a dataframe of variant / sample_id records matching query.
@@ -1221,7 +1270,9 @@ def get_annotation_result_from_query(
         explode_field=explode_field,
         force_flatten_exploded_field=force_flatten_exploded_field,
         primary_keys=primary_keys,
+        max_threads=max_threads,
     )
+
 
 def _build_opensearch_query_from_query_string(
     query_string: str,
