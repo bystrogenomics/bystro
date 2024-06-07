@@ -35,7 +35,7 @@ def test_submit_fn():
 
 def test_handler_fn_happy_path(mocker, tmpdir):
     mocker.patch(
-        "bystro.ancestry.listener.get_models_from_s3",
+        "bystro.ancestry.listener.get_models",
         return_value=AncestryModels(ANCESTRY_MODEL, ANCESTRY_MODEL),
     )
     dosage_path = "some_dosage.feather"
