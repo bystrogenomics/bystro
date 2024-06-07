@@ -1,21 +1,24 @@
 """Query an annotation file and return a list of sample_ids and genes meeting the query criteria."""
 
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import copy
 import logging
 import math
+import os
+from pathlib import Path
+import tempfile
 from typing import Any, Callable
-
-import asyncio
+import uuid
 
 from msgspec import Struct
-import nest_asyncio  # type: ignore
 import numpy as np
-
 import pandas as pd
-from opensearchpy import AsyncOpenSearch
+import pyarrow as pa
+import pyarrow.feather as feather
+from opensearchpy import OpenSearch
 
 from bystro.api.auth import CachedAuth
-from bystro.api.search import get_async_proxied_opensearch_client
+from bystro.api.search import get_proxied_opensearch_client
 from bystro.proteomics.fragpipe_tandem_mass_tag import (
     TandemMassTagDataset,
     FRAGPIPE_SAMPLE_COLUMN,
@@ -26,7 +29,8 @@ from bystro.search.utils.opensearch import gather_opensearch_args
 
 logger = logging.getLogger(__file__)
 
-nest_asyncio.apply()
+
+MAX_CONCURRENT_QUERIES = int(os.getenv("MAX_CONCURRENT_QUERIES", "8"), base=10)
 
 HETEROZYGOTE_DOSAGE = 1
 HOMOZYGOTE_DOSAGE = 2
@@ -136,6 +140,18 @@ NOT_SUPPORTED_TRACKS = ["refSeq.clinvar"]
 
 DEFAULT_GENE_NAME_COLUMN = "refSeq.name2"
 
+def _concatenate_feather_files_memory_mapped(file_list: list[str], output_file: str):
+    # Open the Feather files using memory mapping
+    tables = [feather.read_table(file, memory_map=True) for file in file_list]
+
+    # Concatenate the Arrow Tables
+    concatenated_table = pa.concat_tables(tables)
+
+    # Optionally, write the concatenated table to a new Feather file
+    if output_file:
+        feather.write_feather(concatenated_table, output_file)
+
+    return concatenated_table
 
 def _looks_like_float(val: Any) -> bool:
     """
@@ -599,17 +615,18 @@ def _flatten(xs: Any) -> list[Any]:
         return [xs]
     return sum([_flatten(x) for x in xs], [])
 
-
-async def execute_query(
-    client: AsyncOpenSearch,
+def execute_query(
+    client: OpenSearch,
     query: dict,
+    slice_id: int,
+    tmp_dir: str,
     fields: list[str] | None = None,
     structs_of_arrays: bool = True,
     melt_samples: bool = False,
     explode_field: str | None = None,
     force_flatten_exploded_field: bool = False,
     primary_keys: dict[str, str] | None = None,
-) -> pd.DataFrame:
+) -> str:
     """
     Execute an OpenSearch query and return the results as a DataFrame.
 
@@ -646,6 +663,8 @@ async def execute_query(
     Returns:
         pd.DataFrame: A DataFrame of query results.
     """
+    out_file = str(Path(tmp_dir) / f"{slice_id}.feather")
+
     results: list[dict] = []
     search_after = None  # Initialize search_after for pagination
 
@@ -671,7 +690,8 @@ async def execute_query(
         if search_after:
             query["body"]["search_after"] = search_after
 
-        resp = await client.search(**query)
+        
+        resp = client.search(**query)
 
         if not resp["hits"]["hits"]:
             break  # Exit the loop if no more documents are found
@@ -681,7 +701,7 @@ async def execute_query(
         # Update search_after to the sort value of the last document retrieved
         search_after = resp["hits"]["hits"][-1]["sort"]
 
-    return process_query_response(
+    results_df =  process_query_response(
         results,
         fields,
         structs_of_arrays=structs_of_arrays,
@@ -691,7 +711,11 @@ async def execute_query(
         primary_keys=primary_keys,
     )
 
+    results_df.to_feather(out_file)
+    del results_df
 
+    return out_file
+ 
 def _transpose_array_of_structs(array_of_structs: list[dict[str, Any]]) -> dict[str, list[Any]]:
     """
     Transpose an array of structs to a struct of arrays.
@@ -711,6 +735,25 @@ def _transpose_array_of_structs(array_of_structs: list[dict[str, Any]]) -> dict[
 
     return transposed_struct
 
+def execute_query_parallel(slice_id, query, client, tmp_dir, fields,
+structs_of_arrays, melt_samples, explode_field, force_flatten_exploded_field, primary_keys, num_slices):
+    slice_query = copy.deepcopy(query)
+    if num_slices > 1:
+        # Slice queries require max > 1
+        slice_query["body"]["slice"] = {"id": slice_id, "max": num_slices}
+
+    return execute_query(
+        client=client,
+        slice_id=slice_id,
+        tmp_dir=tmp_dir,
+        query=slice_query,
+        fields=fields,
+        structs_of_arrays=structs_of_arrays,
+        melt_samples=melt_samples,
+        explode_field=explode_field,
+        force_flatten_exploded_field=force_flatten_exploded_field,
+        primary_keys=primary_keys
+    )
 
 def process_query_response(
     hits: list[dict[str, Any]],
@@ -894,9 +937,8 @@ def process_query_response(
 
     return df[cols]
 
-
-async def async_get_num_slices(
-    client: AsyncOpenSearch,
+def get_num_slices(
+    client: OpenSearch,
     index_name: str,
     query: dict[str, Any],
 ) -> tuple[int, int]:
@@ -915,7 +957,7 @@ async def async_get_num_slices(
     get_num_slices_query.pop("sort", None)
     get_num_slices_query.pop("track_total_hits", None)
 
-    response = await client.count(body=get_num_slices_query, index=index_name)
+    response = client.count(body=get_num_slices_query, index=index_name)
 
     n_docs: int = response["count"]
     if n_docs < 1:
@@ -928,10 +970,28 @@ async def async_get_num_slices(
     num_slices_planned = min(num_slices_necessary, OPENSEARCH_QUERY_CONFIG.max_slices)
     return max(num_slices_planned, 1), n_docs
 
+def _get_client(bystro_api_auth: CachedAuth | None = None,
+index_name: str = "",
+cluster_opensearch_config: dict[str, Any] | None = None,
+additional_client_args: dict[str, Any] | None = None) -> OpenSearch:
+    if bystro_api_auth is not None:
+        if not index_name:
+            raise ValueError("Must provide index_name when bystro_api_auth is provided.")
+        # If auth is provided, use the proxied client
+        job_id = index_name.split("_")[0]
+        return get_proxied_opensearch_client(bystro_api_auth, job_id, additional_client_args)
+    
+    if cluster_opensearch_config is not None:
+        search_client_args = gather_opensearch_args(cluster_opensearch_config)
+        return OpenSearch(**search_client_args)
+    
+    raise ValueError("Must provide either cluster_opensearch_config or bystro_api_auth.")
 
-async def async_run_annotation_query(
+def run_annotation_query(
     query: dict[str, Any],
     index_name: str,
+    tmp_dir: str,
+    output_path: str | None = None,
     fields: list[str] | None = None,
     cluster_opensearch_config: dict[str, Any] | None = None,
     bystro_api_auth: CachedAuth | None = None,
@@ -1031,56 +1091,58 @@ async def async_run_annotation_query(
                         primary_key_for_explode_track,
                     )
 
-    if bystro_api_auth is not None:
-        # If auth is provided, use the proxied client
-        job_id = index_name.split("_")[0]
-        client = get_async_proxied_opensearch_client(bystro_api_auth, job_id, additional_client_args)
-    elif cluster_opensearch_config is not None:
-        search_client_args = gather_opensearch_args(cluster_opensearch_config)
-        client = AsyncOpenSearch(**search_client_args)
-    else:
-        raise ValueError("Must provide either cluster_opensearch_config or bystro_api_auth.")
+    client = _get_client(
+        bystro_api_auth=bystro_api_auth,
+        index_name=index_name,
+        cluster_opensearch_config=cluster_opensearch_config,
+        additional_client_args=additional_client_args,
+    )
+    num_slices, _ = get_num_slices(client, index_name, query)
 
-    num_slices, _ = await async_get_num_slices(client, index_name, query)
-
-    point_in_time = await client.create_point_in_time(  # type: ignore[attr-defined]
+    point_in_time = client.create_point_in_time(  # type: ignore[attr-defined]
         index=index_name, params={"keep_alive": OPENSEARCH_QUERY_CONFIG.keep_alive}
     )
+
     try:  # make sure we clean up the PIT index properly no matter what happens in this block
         pit_id = point_in_time["pit_id"]
 
         query["body"]["pit"] = {"id": pit_id}
         query["body"]["size"] = OPENSEARCH_QUERY_CONFIG.max_query_size
         query_results = []
-        for slice_id in range(num_slices):
-            slice_query = copy.deepcopy(query)
-            if num_slices > 1:
-                # Slice queries require max > 1
-                slice_query["body"]["slice"] = {"id": slice_id, "max": num_slices}
 
-            query_result = execute_query(
-                client,
-                query=slice_query,
-                fields=fields,
-                structs_of_arrays=structs_of_arrays,
-                melt_samples=melt_samples,
-                explode_field=explode_field,
-                force_flatten_exploded_field=force_flatten_exploded_field,
-                primary_keys=primary_keys,
-            )
-            query_results.append(query_result)
+        with ProcessPoolExecutor(max_workers=MAX_CONCURRENT_QUERIES) as executor:
+            futures = []
+            for slice_id in range(num_slices):
 
-        res = await asyncio.gather(*query_results)
+                slice_query = copy.deepcopy(query)
+                if num_slices > 1:
+                    # Slice queries require max > 1
+                    slice_query["body"]["slice"] = {"id": slice_id, "max": num_slices}
 
-        return pd.concat(res)
+                futures.append(executor.submit(execute_query, client, slice_query, slice_id, tmp_dir, fields, structs_of_arrays, melt_samples, explode_field, force_flatten_exploded_field, primary_keys))
+
+            for future in as_completed(futures):
+                query_results.append(future.result())
+
+        if output_path is None:
+            output_path = str(Path(tmp_dir) / f"{index_name}_{uuid.uuid4()}.feather")
+
+        # Ensure output path exists
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+
+        _concatenate_feather_files_memory_mapped(query_results, output_path)
+
+        return feather.read_feather(output_path, memory_map=True)
     finally:
-        await client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore[attr-defined]
-        await client.close()
+        client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore[attr-defined]
+        client.close()
 
 
-async def async_get_annotation_result_from_query(
+def get_annotation_result_from_query(
     query_string: str,
     index_name: str,
+    tmp_dir: str | None = None,
+    output_path: str | None = None,
     fields: list[str] | None = None,
     cluster_opensearch_config: dict[str, Any] | None = None,
     bystro_api_auth: CachedAuth | None = None,
@@ -1129,6 +1191,12 @@ async def async_get_annotation_result_from_query(
     Returns:
         pd.DataFrame: DataFrame of variant / sample_id records matching query.
     """
+
+    if tmp_dir is None:
+        tmp_dir = tempfile.mkdtemp()
+
+    # ensure tmp_dir exists
+    Path(tmp_dir).mkdir(parents=True, exist_ok=True)
 
     if cluster_opensearch_config is not None and bystro_api_auth is not None:
         raise ValueError(
@@ -1139,9 +1207,11 @@ async def async_get_annotation_result_from_query(
         query_string, fields=fields, melt_samples=melt_samples
     )
 
-    return await async_run_annotation_query(
+    return run_annotation_query(
         query,
         index_name,
+        tmp_dir=tmp_dir,
+        output_path=output_path,
         fields=fields,
         cluster_opensearch_config=cluster_opensearch_config,
         bystro_api_auth=bystro_api_auth,
@@ -1152,76 +1222,6 @@ async def async_get_annotation_result_from_query(
         force_flatten_exploded_field=force_flatten_exploded_field,
         primary_keys=primary_keys,
     )
-
-
-def get_annotation_result_from_query(
-    query_string: str,
-    index_name: str,
-    fields: list[str] | None = None,
-    cluster_opensearch_config: dict[str, Any] | None = None,
-    bystro_api_auth: CachedAuth | None = None,
-    additional_client_args: dict[str, Any] | None = None,
-    structs_of_arrays: bool = True,
-    melt_samples: bool = True,
-    explode_field: str | None = None,
-    force_flatten_exploded_field: bool = True,
-    primary_keys: dict[str, str] | None = None,
-) -> pd.DataFrame:
-    """
-    Given a query and index, return a dataframe of variant / sample_id records matching query.
-
-    Args:
-        query_string (str): The query string to use for the search.
-        index_name (str): The name of the index to search.
-        fields (list[str] | None): The fields to include in the results, defaults to None.
-        cluster_opensearch_config (dict[str, Any] | None):
-            The configuration for the OpenSearch cluster, defaults to None.
-        bystro_api_auth (CachedAuth | None): The authentication for the Bystro API, defaults to None.
-        additional_client_args (dict[str, Any] | None):
-            Additional arguments for the OpenSearch client, defaults to None.
-        structs_of_arrays (bool): Whether to return structs of arrays, defaults to True.
-        melt_samples (bool):
-            Whether to unpivot `heterozygotes`, `homozygotes`, and `missingGenos` fields.
-            When `True` the resulting DataFrame will have 2 new columns: `samples` and `dosage`,
-            and `heterozygotes`, `homozygotes`, and `missingGenos` will be removed.
-
-            The `dosage` column will have values of 1, 2, or -1, corresponding to whether the sample was
-            found in the `heterozygotes`, `homozygotes`, and `missingGenos` columns, respectively.
-
-            The `samples` column will have the sample ID for each row, and this will always be a
-            scalar value, even if the original `heterozygotes`, `homozygotes`, or `missingGenos` columns
-            had multiple values.
-
-            Defaults to False.
-        explode_field (str | None):
-            A field to explode, converting rows with list values in this column, into
-            multiple rows with 1 value per column, defaults to None.
-        force_flatten_exploded_field (bool):
-            When exploding a field, whether to force flatten array values in cases where the
-            primary key for the track is not present, or the column's value is a list with respect
-            to the primary key. Defaults to True.
-        primary_keys (dict[str, str] | None): The primary keys for tracks, defaults to None.
-
-    Returns:
-        pd.DataFrame: DataFrame of variant / sample_id records matching query.
-    """
-    loop = asyncio.get_event_loop()
-    coroutine = async_get_annotation_result_from_query(
-        query_string,
-        index_name,
-        fields=fields,
-        cluster_opensearch_config=cluster_opensearch_config,
-        bystro_api_auth=bystro_api_auth,
-        additional_client_args=additional_client_args,
-        structs_of_arrays=structs_of_arrays,
-        melt_samples=melt_samples,
-        explode_field=explode_field,
-        force_flatten_exploded_field=force_flatten_exploded_field,
-        primary_keys=primary_keys,
-    )
-
-    return loop.run_until_complete(coroutine)
-
 
 def _build_opensearch_query_from_query_string(
     query_string: str,
