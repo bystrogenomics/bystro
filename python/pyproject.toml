@@ -28,7 +28,7 @@ dependencies = [
     "skops==0.7.post0",
     "tqdm==4.66.3",
     "cloudpickle==3.0.0",
-    "torch==2.3.1",
+    "torch==2.2",
     "psutil==5.9.6",
     "matplotlib==3.7.1",
     "ecos==2.0.13",

@@ -32,8 +32,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Clear pip cache
-        run: pip cache purge
       - name: Upgrade pip
         run: pip install --upgrade pip
       - name: Install Golang
@@ -97,8 +95,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Clear pip cache
-        run: pip cache purge
       - name: Upgrade pip
         run: pip install --upgrade pip
       - name: Install Golang
