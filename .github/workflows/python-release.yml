@@ -77,54 +77,6 @@ jobs:
           ray start --head
           cd python && pytest
 
-  windows:
-    runs-on: ${{ matrix.platform.runner }}
-    strategy:
-      matrix:
-        platform:
-          - runner: windows-latest
-            target: x64
-            local_name: amd64
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          architecture: ${{ matrix.platform.target }}
-      - name: Install Python dependencies
-        run: pip install -r python/requirements-dev.txt
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.platform.target }}
-          args: --release --out dist --find-interpreter --manifest-path python/Cargo.toml
-          sccache: "false"
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-windows-${{ matrix.platform.target }}
-          path: dist
-      - name: Install and wheel and check bystro-api command exists
-        shell: bash
-        run: |
-          set -e
-          python --version
-          ls -la dist
-
-          PYTHON_VERSION=$(python -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
-          ARCHITECTURE=${{ matrix.platform.local_name }}
-
-          echo "PYTHON_VERSION: $PYTHON_VERSION"
-          echo "ARCHITECTURE: $ARCHITECTURE"
-
-          WHEEL_FILE=$(find dist -name "*${PYTHON_VERSION}*${ARCHITECTURE}*.whl" | head -n 1)
-
-          echo "WHEEL_FILE: $WHEEL_FILE"
-
-          pip install $WHEEL_FILE --verbose --force-reinstall
-
-          bystro-api --help
-
   macos:
     runs-on: ${{ matrix.platform.runner }}
     strategy:
