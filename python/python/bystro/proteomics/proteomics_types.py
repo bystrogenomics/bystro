@@ -1,56 +1,44 @@
 """Record classes for proteomics module."""
 import pandas as pd
-import attrs
-from attrs import field
+from msgspec import Struct, DecodeError
+import msgspec.json as mjson
+
+decoder = mjson.Decoder()
 
 
 # The motivation for this class is that we only want to instantiate by creating from a correctly
 # json-serialized pd.DataFrame, ensuring we have a string-like class that can't represent anything
 # but a json-ified df.
 
-
-class DataFrameJson:
+class DataFrameJson(Struct, frozen=True):
     """Represent a DataFrame as a JSON string."""
 
-    __constructor_token = object()
+    json_payload: str
 
-    def __init__(self, json_payload: str, constructor_token: object = None) -> None:
-        if constructor_token != self.__constructor_token:
-            raise ValueError("Can't initialize directly; use DataFrameJson.from_df instead.")
-        self.json_payload = json_payload
+    def __post_init__(self) -> None:
+        try:
+            decoder.decode(self.json_payload)
+        except DecodeError as e:
+            raise ValueError("Invalid JSON payload") from e
 
     @classmethod
     def from_df(cls, dataframe: pd.DataFrame) -> "DataFrameJson":
         """Convert a pd.DataFrame to JsonDataFrame"""
-        return cls(dataframe.to_json(orient="table"), constructor_token=cls.__constructor_token)
+        return cls(dataframe.to_json(orient="table"))
 
     def to_df(self) -> pd.DataFrame:
         """Read out JsonDataFrame to pd.DataFrame"""
         return pd.read_json(self.json_payload, orient="table")
 
 
-def _tsv_validator(_self: object, _attribute: attrs.Attribute, tsv_filename: str) -> None:
-    """Check that tsv_filename ends with ".tsv."""
-    if not isinstance(tsv_filename, str):
-        err_msg = (
-            f"tsv_filename must be of type str, got: {tsv_filename} of type {type(tsv_filename)} instead"
-        )
-        raise TypeError(err_msg)
-    if not tsv_filename.endswith(".tsv"):
-        err_msg = f"tsv_filename must be of extension `.tsv`, got {tsv_filename} instead"
-        raise ValueError(err_msg)
-
-
-@attrs.frozen()
-class ProteomicsSubmission:
+class ProteomicsSubmission(Struct, frozen=True):
     """Represent an incoming submission to the proteomics worker."""
 
-    tsv_filename: str = field(validator=_tsv_validator)
+    tsv_filename: str
 
 
-@attrs.frozen()
-class ProteomicsResponse:
+class ProteomicsResponse(Struct, frozen=True):
     """Represent a proteomics dataframe, converted to json."""
 
-    tsv_filename: str = field(validator=_tsv_validator)
-    dataframe_json: DataFrameJson = field(validator=attrs.validators.instance_of(DataFrameJson))
+    tsv_filename: str
+    dataframe_json: DataFrameJson
