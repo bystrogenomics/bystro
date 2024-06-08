@@ -145,7 +145,7 @@ NOT_SUPPORTED_TRACKS = ["refSeq.clinvar"]
 DEFAULT_GENE_NAME_COLUMN = "refSeq.name2"
 
 
-def _concatenate_feather_files_memory_mapped(file_list: list[str], output_file: str):
+def _concatenate_feather_files_memory_mapped(file_list: list[str], output_file: str) -> pa.Table:
     # Print memory usage before concatenating
     process = psutil.Process(os.getpid())
     logger.info("Memory usage before concatenating: %s", process.memory_info().rss)
@@ -1033,6 +1033,7 @@ def run_annotation_query(
     force_flatten_exploded_field: bool = False,
     primary_keys: dict[str, str] | None = None,
     max_threads: int = MAX_CONCURRENT_QUERIES,
+    as_arrow_table: bool = False,
 ) -> pd.DataFrame:
     """
     Run an annotation query and return a DataFrame of results.
@@ -1176,9 +1177,12 @@ def run_annotation_query(
         # Ensure output path exists
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
-        _concatenate_feather_files_memory_mapped(query_results, output_path)
+        table = _concatenate_feather_files_memory_mapped(query_results, output_path)
 
-        return feather.read_feather(output_path, memory_map=True)
+        if as_arrow_table:
+            return table
+
+        return table.to_pandas()
     finally:
         client.delete_point_in_time(body={"pit_id": pit_id})  # type: ignore[attr-defined]
         client.close()
@@ -1201,6 +1205,7 @@ def get_annotation_result_from_query(
     force_flatten_exploded_field: bool = True,
     primary_keys: dict[str, str] | None = None,
     max_threads: int = MAX_CONCURRENT_QUERIES,
+    as_arrow_table: bool = False,
 ) -> pd.DataFrame:
     """
     Given a query and index, return a dataframe of variant / sample_id records matching query.
@@ -1236,6 +1241,11 @@ def get_annotation_result_from_query(
             primary key for the track is not present, or the column's value is a list with respect
             to the primary key. Defaults to True.
         primary_keys (dict[str, str] | None): The primary keys for tracks, defaults to None.
+        max_threads (int):
+            The maximum number of concurrent queries, defaults to MAX_CONCURRENT_QUERIES.
+        as_arrow_table (bool):
+            Whether to return an Arrow table, otherwise returns a pandas.DataFrame, defaults to False.
+            Returning an Arrow table is preferred for large datasets due to memory constraints.
 
     Returns:
         pd.DataFrame: DataFrame of variant / sample_id records matching query.
@@ -1271,6 +1281,7 @@ def get_annotation_result_from_query(
         force_flatten_exploded_field=force_flatten_exploded_field,
         primary_keys=primary_keys,
         max_threads=max_threads,
+        as_arrow_table=as_arrow_table,
     )
 
 
