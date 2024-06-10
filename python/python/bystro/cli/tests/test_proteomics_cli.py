@@ -1,4 +1,10 @@
+from pathlib import Path
+
 from bystro.cli.proteomics_cli import upload_proteomics_cli
+
+ABUNDANCE_FILE_PATH = str(
+    Path(__file__).parent.parent.parent / "proteomics" / "tests" / "example_abundance_gene_MD.tsv"
+)
 
 
 def test_upload_proteomics_cli(mocker):
@@ -7,7 +13,7 @@ def test_upload_proteomics_cli(mocker):
     )
 
     args = mocker.Mock(
-        protein_abundance_file="./abundance_gene_MD.tsv",
+        protein_abundance_file=ABUNDANCE_FILE_PATH,
         experiment_annotation_file=None,
         annotation_job_id="12345",
     )

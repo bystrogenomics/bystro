@@ -1,94 +1,34 @@
 """
-This provides the base class for covariance estimation. While there are 
-many methods for estimating covariance matrices, once such a matrix has 
-been estimated most of the procedures for evaulating fit, comparing 
-quantities etc are shared between models. This implementation allows for 
-us to implement these methods a single time and for most code being 
-centered on the fit method and a small number of auxiliary methods. This 
-also will provide the basis for factor analysis and probablistic PCA. As 
-a practical design choice, these methods are implemented as separate 
-functions, which are simply converted into object methods by replacing 
-covariance with self.covariance. Documentation is provided in the 
-functional method and omitted from the object methods.
+This module provides a range of functions and methods for advanced statistical
+analysis and manipulation of covariance matrices. It includes tools for matrix
+symmetrization, precision and stable rank calculations, along with predictive
+modeling and entropy calculations using covariance matrices. The core
+functionalities are encapsulated within the BaseCovariance object, enhancing
+ease of use and integration in statistical and machine learning workflows.
 
-Objects
--------
-BaseCovariance
+Classes:
+- BaseCovariance: Encapsulates covariance matrix operations.
+  Methods:
+  - __init__: Initialize with data validation.
+  - get_precision: Retrieve precision matrices.
+  - get_stable_rank: Calculate stable ranks.
+  - predict: Predict missing data values.
+  - conditional_score: Compute conditional scores for subsets.
+  - conditional_score_samples: Score individual samples conditionally.
+  - marginal_score: Calculate marginal scores for subsets.
+  - marginal_score_samples: Score individual samples marginally.
+  - score: General scoring function.
+  - score_samples: Score individual samples.
+  - entropy: Calculate entropy of the distribution.
+  - entropy_subset: Calculate entropy for subsets.
+  - mutual_information: Compute mutual information between sets.
 
-    get_precision()
-        Gets the precision matrix defined as the inverse of the covariance 
-
-    get_stable_rank()
-        Returns the stable rank defined as 
-        ||A||_F^2/||A||^2
-
-    predict(Xobs,idxs)
-        Predicts missing data using observed data.
-
-    --------------------
-    conditional_score(X,idxs,weights=None)
-        mean(log p(X[idx==1]|X[idx==0],covariance))
-
-    conditional_score_samples(X,idxs)
-        log p(X[idx==1]|X[idx==0],covariance)
-    
-    marginal_score(X,idxs,weights=None)
-        mean(log p(X[idx==1]|covariance))
-
-    marginal_score_samples(X,idxs)
-        log p(X[idx==1]|covariance)
-
-    score(X,weights=None):
-        mean log p(X)
-
-    score_samples(X)
-        log p(X)
-
-    --------------------
-    entropy()
-        Computes the entropy of a Gaussian distribution parameterized by 
-        covariance.
-    
-    entropy_subset(idxs)
-        Computes the entropy of a subset of the covariates
-
-    mutual_information(covariance,idxs1,idxs2):
-        This computes the mutual information bewteen the two sets of
-        covariates based on the model.
-
-Methods
--------
-_get_precision(covariance)
-
-_get_stable_rank(covariance)
-
-_predict(covariance,Xobs,idxs)
-
-_get_conditional_parameters(covariance,idxs)
-    Computes the distribution parameters p(X_miss|X_obs)
-
-----------------------------
-
-_conditional_score_samples(covariance,X,idxs,weights=None)
-
-_conditional_score(covariance,X,idxs)
-
-_marginal_score(covariance,X,idxs,weights=None)
-
-_marginal_score_samples(covariance,X,idxs)
-
-_score(covariance,X,weights=None)
-
-_score_samples(covariance,X)
-
-----------------------------
-
-_entropy(covariance)
-
-_entropy_subset(covariance,idxs)
-
-_mutual_information(covariance,idxs1,idxs2):
-
+Standalone Functions:
+- _symmeterize_and_warning: Symmetrize covariance matrices with warnings.
+- ldet_sherman_woodbury_fa: Calculate log determinant using factor analysis.
+- ldet_sherman_woodbury_full: Calculate log determinant of a complex matrix.
+- inv_sherman_woodbury_fa: Invert a matrix with diagonal and low-rank structure.
+- inv_sherman_woodbury_full: Invert a complex matrix structured as A + UBV.
 """
 from typing import Tuple
 
@@ -99,26 +39,48 @@ from datetime import datetime as dt
 import pytz
 
 
-class BaseCovariance:
+def _symmeterize_and_warning(cov: np.ndarray) -> np.ndarray:
     """
-    This object basically contains all the methods asides for fitting
-    a covariance matrix.
-    """
+    Symmetrize the given square covariance matrix and warn if the symmetrization
+    introduces significant changes.
 
-    def __init__(self):
+    Parameters
+    ----------
+    cov : ndarray of shape (n_features, n_features)
+        The covariance matrix to be symmetrized. It must be a square matrix.
+
+    Returns
+    -------
+    cov_new : ndarray of shape (n_features, n_features)
+        The symmetric matrix obtained by averaging the matrix with its transpose.
+
+    Raises
+    ------
+    Warning
+        If the relative mean squared error between the original and symmetrized
+        covariance matrix exceeds 2%, indicating potential issues with the
+        symmetrization process.
+    """
+    cov_new = (cov + cov.T) / 2
+    diff_mse = np.mean((cov_new - cov) ** 2)
+    cov_mse = np.mean(cov**2)
+    if diff_mse / cov_mse > 0.02:
+        print("Warning: original matrix estimate deviated substantially from symmetric")
+    return cov_new
+
+
+class BaseCovariance:
+    def __init__(self) -> None:
         self.creationDate = dt.now(pytz.timezone("US/Pacific"))
         self.covariance: NDArray | None = None
 
-    #################
-    # Miscellaneous #
-    #################
     def get_precision(self) -> NDArray[np.float_]:
         if self.covariance is None:
             raise ValueError("Covariance matrix has not been fit")
 
         return _get_precision(self.covariance)
 
-    def get_stable_rank(self):
+    def get_stable_rank(self) -> np.float_:
         if self.covariance is None:
             raise ValueError("Covariance matrix has not been fit")
 
@@ -130,78 +92,76 @@ class BaseCovariance:
 
         return _predict(self.covariance, Xobs, idxs)
 
-    #####################################
-    # Gaussian Likelihood-based methods #
-    #####################################
-    def conditional_score(self, X: NDArray, idxs: NDArray, weights=None):
+    def conditional_score(
+        self, X: NDArray, idxs: NDArray, weights=None
+    ) -> np.float_:
         if self.covariance is None:
             raise ValueError("Covariance matrix has not been fit")
 
         return _conditional_score(self.covariance, X, idxs, weights=weights)
 
-    def conditional_score_samples(self, X: NDArray, idxs: NDArray):
+    def conditional_score_samples(
+        self, X: NDArray, idxs: NDArray
+    ) -> NDArray[np.float_]:
         if self.covariance is None:
             raise ValueError("Covariance matrix has not been fit")
 
         return _conditional_score_samples(self.covariance, X, idxs)
 
-    def marginal_score(self, X: NDArray, idxs: NDArray, weights=None):
+    def marginal_score(self, X: NDArray, idxs: NDArray, weights=None) -> np.float_:
         if self.covariance is None:
             raise ValueError("Covariance matrix has not been fit")
 
         return _marginal_score(self.covariance, X, idxs, weights=weights)
 
-    def marginal_score_samples(self, X: NDArray, idxs: NDArray):
+    def marginal_score_samples(
+        self, X: NDArray, idxs: NDArray
+    ) -> NDArray[np.float_]:
         if self.covariance is None:
             raise ValueError("Covariance matrix has not been fit")
 
         return _marginal_score_samples(self.covariance, X, idxs)
 
-    def score(self, X: NDArray, weights=None):
+    def score(self, X: NDArray, weights=None) -> np.float_:
         if self.covariance is None:
             raise ValueError("Covariance matrix has not been fit")
 
         return _score(self.covariance, X, weights=weights)
 
-    def score_samples(self, X: NDArray):
+    def score_samples(self, X: NDArray) -> NDArray[np.float_]:
         if self.covariance is None:
             raise ValueError("Covariance matrix has not been fit")
 
         return _score_samples(self.covariance, X)
 
-    #################################
-    # Information-theoretic methods #
-    #################################
-    def entropy(self):
+    def entropy(self) -> np.float_:
         if self.covariance is None:
             raise ValueError("Covariance matrix has not been fit")
 
         return _entropy(self.covariance)
 
-    def entropy_subset(self, idxs: NDArray[np.float_]):
+    def entropy_subset(self, idxs: NDArray[np.float_]) -> np.float_:
         if self.covariance is None:
             raise ValueError("Covariance matrix has not been fit")
 
         return _entropy_subset(self.covariance, idxs)
 
-    def mutual_information(self, idxs1: NDArray[np.float_], idxs2: NDArray[np.float_]):
+    def mutual_information(
+        self, idxs1: NDArray[np.float_], idxs2: NDArray[np.float_]
+    ) -> np.float_:
         if self.covariance is None:
             raise ValueError("Covariance matrix has not been fit")
 
         return _mutual_information(self.covariance, idxs1, idxs2)
 
-
-###########################################
-###########################################
-###########################################
-###                                     ###
-###                                     ###
-###   Methods for covariance matrices   ###
-###                                     ###
-###                                     ###
-###########################################
-###########################################
-###########################################
+    def _test_inputs(self, X: NDArray[np.float_]) -> None:
+        """
+        Just tests to make sure data is numpy array
+        """
+        if not isinstance(X, np.ndarray):
+            raise ValueError("Data is numpy array")
+        if np.sum(np.isnan(X)) > 0:
+            raise ValueError("Data has nans")
 
 
 def _get_precision(covariance: NDArray[np.float_]) -> NDArray[np.float_]:
@@ -242,7 +202,9 @@ def _get_stable_rank(covariance: NDArray[np.float_]) -> np.float_:
 
 
 def _predict(
-    covariance: NDArray[np.float_], Xobs: NDArray[np.float_], idxs: NDArray[np.float_]
+    covariance: NDArray[np.float_],
+    Xobs: NDArray[np.float_],
+    idxs: NDArray[np.float_],
 ) -> NDArray[np.float_]:
     """
     Predicts missing data using observed data. This uses the conditional
@@ -303,7 +265,9 @@ def _conditional_score(
     avg_score : np.float_
         Average log likelihood
     """
-    weights = np.ones(X.shape[0]) if weights is None else weights / np.mean(weights)
+    weights = (
+        np.ones(X.shape[0]) if weights is None else weights / np.mean(weights)
+    )
 
     return np.mean(weights * _conditional_score_samples(covariance, X, idxs))
 
@@ -343,16 +307,21 @@ def _conditional_score_sherman_woodbury(
     avg_score : np.float_
         Average log likelihood
     """
-    weights = np.ones(X.shape[0]) if weights is None else weights / np.mean(weights)
+    weights = (
+        np.ones(X.shape[0]) if weights is None else weights / np.mean(weights)
+    )
 
     return np.mean(
-        weights * _conditional_score_samples_sherman_woodbury(Lambda, W, X, idxs)
+        weights
+        * _conditional_score_samples_sherman_woodbury(Lambda, W, X, idxs)
     )
 
 
 def _conditional_score_samples(
-    covariance: NDArray[np.float_], X: NDArray[np.float_], idxs: NDArray[np.float_]
-) -> np.float_:
+    covariance: NDArray[np.float_],
+    X: NDArray[np.float_],
+    idxs: NDArray[np.float_],
+) -> NDArray[np.float_]:
     """
     Return the conditional log likelihood of each sample, that is
 
@@ -394,7 +363,7 @@ def _conditional_score_samples_sherman_woodbury(
     W: NDArray[np.float_],
     X: NDArray[np.float_],
     idxs: NDArray[np.float_],
-) -> np.float_:
+) -> NDArray[np.float_]:
     """
     Return the conditional log likelihood of each sample, that is
 
@@ -606,8 +575,10 @@ def _marginal_score_sherman_woodbury(
 
 
 def _marginal_score_samples(
-    covariance: NDArray[np.float_], X: NDArray[np.float_], idxs: NDArray[np.float_]
-) -> np.float_:
+    covariance: NDArray[np.float_],
+    X: NDArray[np.float_],
+    idxs: NDArray[np.float_],
+) -> NDArray[np.float_]:
     """
     Returns the marginal log-likelihood of a subset of data
     per window
@@ -639,7 +610,7 @@ def _marginal_score_samples_sherman_woodbury(
     W: NDArray[np.float_],
     X: NDArray[np.float_],
     idxs: NDArray[np.float_],
-) -> np.float_:
+) -> NDArray[np.float_]:
     """
     Returns the marginal log-likelihood of a subset of data
     per window given that Sigma = WWT + Lambda
@@ -747,7 +718,9 @@ def _score_sherman_woodbury(
     return np.mean(weights * _score_samples_sherman_woodbury(Lambda, W, X))
 
 
-def _score_samples(covariance: NDArray[np.float_], X: NDArray[np.float_]) -> np.float_:
+def _score_samples(
+    covariance: NDArray[np.float_], X: NDArray[np.float_]
+) -> NDArray[np.float_]:
     """
     Return the log likelihood of each sample
 
@@ -779,7 +752,7 @@ def _score_samples(covariance: NDArray[np.float_], X: NDArray[np.float_]) -> np.
 
 def _score_samples_sherman_woodbury(
     Lambda: NDArray[np.float_], W: NDArray[np.float_], X: NDArray[np.float_]
-) -> np.float_:
+) -> NDArray[np.float_]:
     """
     Return the log likelihood of each sample
 
@@ -839,7 +812,9 @@ def _entropy(covariance: NDArray[np.float_]) -> np.float_:
     return 0.5 * logdet
 
 
-def _entropy_subset(covariance: NDArray[np.float_], idxs: NDArray[np.float_]) -> np.float_:
+def _entropy_subset(
+    covariance: NDArray[np.float_], idxs: NDArray[np.float_]
+) -> np.float_:
     """
     Computes the entropy of a subset of the Gaussian distribution
     parameterized by covariance.
@@ -865,7 +840,9 @@ def _entropy_subset(covariance: NDArray[np.float_], idxs: NDArray[np.float_]) ->
 
 
 def _mutual_information(
-    covariance: NDArray[np.float_], idxs1: NDArray[np.float_], idxs2: NDArray[np.float_]
+    covariance: NDArray[np.float_],
+    idxs1: NDArray[np.float_],
+    idxs2: NDArray[np.float_],
 ) -> np.float_:
     """
     This computes the mutual information bewteen the two sets of
@@ -889,14 +866,16 @@ def _mutual_information(
     idxs1_sub = idxs1[idxs == 1]
     Hy = _entropy(cov_sub[np.ix_(idxs1_sub == 1, idxs1_sub == 1)])
 
-    _, covariance_conditional = _get_conditional_parameters(cov_sub, 1 - idxs1_sub)
+    _, covariance_conditional = _get_conditional_parameters(
+        cov_sub, 1 - idxs1_sub
+    )
     H_y_given_x = _entropy(covariance_conditional)
     mutual_information = Hy - H_y_given_x
 
     return mutual_information
 
 
-def ldet_sherman_woodbury_fa(Lambda: NDArray, W: NDArray):
+def ldet_sherman_woodbury_fa(Lambda: NDArray, W: NDArray) -> float:
     """
     This converts the log determinant of a matrix Lambda + W^TW where
     Lambda is diagonal. Fa for factor analysis
@@ -923,7 +902,9 @@ def ldet_sherman_woodbury_fa(Lambda: NDArray, W: NDArray):
     return log_determinant
 
 
-def ldet_sherman_woodbury_full(A: NDArray, U: NDArray, B: NDArray, V: NDArray):
+def ldet_sherman_woodbury_full(
+    A: NDArray, U: NDArray, B: NDArray, V: NDArray
+) -> float:
     """
     The value log|A+ UBV|. Useful when A and B are simple to invert and UBV
     is low rank
@@ -956,7 +937,7 @@ def ldet_sherman_woodbury_full(A: NDArray, U: NDArray, B: NDArray, V: NDArray):
     return log_determinant
 
 
-def inv_sherman_woodbury_fa(Lambda: NDArray, W: NDArray):
+def inv_sherman_woodbury_fa(Lambda: NDArray, W: NDArray) -> NDArray[np.float_]:
     """
     This converts the inverse of a matrix Lambda + W^TW where
     Lambda is diagonal. Fa for factor analysis
@@ -987,7 +968,9 @@ def inv_sherman_woodbury_fa(Lambda: NDArray, W: NDArray):
     return Sigma_inv
 
 
-def inv_sherman_woodbury_full(A: NDArray, U: NDArray, B: NDArray, V: NDArray):
+def inv_sherman_woodbury_full(
+    A: NDArray, U: NDArray, B: NDArray, V: NDArray
+) -> NDArray[np.float_]:
     """
     This converts the inverse of a matrix (A + UBV)
 

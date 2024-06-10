@@ -35,6 +35,16 @@ POESingleSNP(BasePOE)
 """
 import numpy as np
 import numpy.linalg as la
+from bystro.covariance.optimal_shrinkage import optimal_shrinkage
+from bystro.covariance._covariance_np import (
+    EmpiricalCovariance,
+    NonLinearShrinkageCovariance,
+)
+from bystro.covariance.covariance_cov_shrinkage import (
+    LinearInverseShrinkage,
+    QuadraticInverseShrinkage,
+)
+from typing import Tuple, Union, Optional
 
 
 class BasePOE:
@@ -43,10 +53,13 @@ class BasePOE:
     implements methods to test inputs for proper dimensionality and a
     method to classify heterozygotes based on their phenotypes
     """
-    def __init__(self):
-        self.parent_effect_ = np.empty(10) # Will be overwritten in fit
 
-    def _test_inputs(self, X, y):
+    def __init__(self) -> None:
+        self.parent_effect_: np.ndarray = np.empty(
+            10
+        )  # Will be overwritten in fit
+
+    def _test_inputs(self, X: np.ndarray, y: np.ndarray) -> None:
         if not isinstance(X, np.ndarray):
             raise ValueError("X is numpy array")
         if not isinstance(y, np.ndarray):
@@ -54,7 +67,9 @@ class BasePOE:
         if X.shape[0] != len(y):
             raise ValueError("X and y have different samples")
 
-    def transform(self, X, return_inner=False):
+    def transform(
+        self, X: np.ndarray, return_inner: bool = False
+    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
         """
         This method predicts whether the heterozygote allele came from
         a maternal/paternal origin. Note that due to a lack of
@@ -63,19 +78,19 @@ class BasePOE:
 
         Parameters
         ----------
-        X : np.array-like,shape=(N,self.p)
+        X : np.array-like, shape=(N, self.p)
             The phenotype data
 
-        return_inner : bool,default=False
+        return_inner : bool, default=False
             Whether to return the inner product classification, a measure
             of confidence in the call
 
         Returns
         -------
-        calls : np.array-like,shape=(N,)
+        calls : np.array-like, shape=(N,)
             A vector of 1s and 0s predicting class
 
-        preds : np.array-like,shape=(N,)
+        preds : np.array-like, shape=(N,)
             The inner product, representing confidence in calls
         """
         X_dm = X - np.mean(X, axis=0)
@@ -89,7 +104,7 @@ class BasePOE:
 class POESingleSNP(BasePOE):
     """
     This is a parent of origin effect estimator inheriting methodology from
-    the commumity detection problem commonly studied in computer science
+    the community detection problem commonly studied in computer science
     and statistics. It functions identically to a sklearn object, where
     model parameters are defined in the __init__ method, a fit method which
     takes in the data as input and fits the model, and a transform method
@@ -97,30 +112,76 @@ class POESingleSNP(BasePOE):
 
     Attributes
     ----------
-    self.Sigma_AA : np.array-like,shape=(p,p)
+    self.Sigma_AA : np.array-like, shape=(p,p)
         The covariance matrix of the homozygous population
 
-    self.parent_effect_: np.array-like,shape=(p,)
+    self.parent_effect_: np.array-like, shape=(p,)
         The difference in effect between the parental or maternal allele
     """
 
-    def __init__(self, compute_pvalue=False, n_permutations=10000):
-        self.compute_pvalue = compute_pvalue
-        self.n_permutations = n_permutations
-
-    def fit(self, X, y):
+    def __init__(
+        self,
+        compute_pvalue: bool = False,
+        n_permutations: int = 10000,
+        cov_regularization: str = "Empirical",
+        svd_loss: Optional[str] = None,
+    ) -> None:
         """
-        This method predicts whether the heterozygote allele came from
-        a maternal/paternal origin. Note that due to a lack of
-        identifiability, we can't state whether class 1 is paternal or
-        maternal
+        Initialize the POESingleSNP estimator.
 
         Parameters
         ----------
-        X : np.array-like,shape=(N,self.p)
+        compute_pvalue : bool, optional, default=False
+            Whether to compute p-values for the test.
+
+        n_permutations : int, optional, default=10000
+            The number of permutations to perform for significance testing.
+
+        cov_regularization : str, optional, default="Empirical"
+            The method of covariance regularization to use. Must be one of:
+            'Empirical', 'NonLinear', 'LinearInverse', 'QuadraticInverse'.
+
+        svd_loss : str or None, optional, default=None
+            The type of SVD loss function to use. Should be a string specifying
+            the loss function, or None if not applicable.
+
+        Raises
+        ------
+        ValueError
+            If `cov_regularization` is not one of the allowable values.
+        """
+        self.compute_pvalue = compute_pvalue
+        self.n_permutations = n_permutations
+        if cov_regularization == "Empirical":
+            self.cov_reg: Union[
+                EmpiricalCovariance,
+                NonLinearShrinkageCovariance,
+                LinearInverseShrinkage,
+                QuadraticInverseShrinkage,
+            ] = EmpiricalCovariance()
+        elif cov_regularization == "NonLinear":
+            self.cov_reg = NonLinearShrinkageCovariance()
+        elif cov_regularization == "LinearInverse":
+            self.cov_reg = LinearInverseShrinkage()
+        elif cov_regularization == "QuadraticInverse":
+            self.cov_reg = QuadraticInverseShrinkage()
+        else:
+            raise ValueError(
+                "Invalid covariance regulator. Must be one of: Empirical, "
+                "NonLinear, LinearInverse, QuadraticInverse"
+            )
+        self.svd_loss = svd_loss
+
+    def fit(self, X: np.ndarray, y: np.ndarray) -> "POESingleSNP":
+        """
+        Fit the POESingleSNP model.
+
+        Parameters
+        ----------
+        X : np.array-like, shape=(N, self.p)
             The phenotype data
 
-        y: np.array-like,shape=(N,)
+        y : np.array-like, shape=(N,)
             The genotype data indicating the number of copies of the
             minority allele
 
@@ -134,10 +195,11 @@ class POESingleSNP(BasePOE):
 
         X_homozygotes = X[y == 0]
         X_heterozygotes = X[y == 1]
-        X_homozygotes = X_homozygotes - np.mean(X_homozygotes,axis=0)
-        X_heterozygotes = X_heterozygotes - np.mean(X_heterozygotes,axis=0)
+        X_homozygotes = X_homozygotes - np.mean(X_homozygotes, axis=0)
+        X_heterozygotes = X_heterozygotes - np.mean(X_heterozygotes, axis=0)
 
-        Sigma_AA = np.cov(X_homozygotes.T)
+        self.cov_reg.fit(X_homozygotes)
+        Sigma_AA = np.array(self.cov_reg.covariance)
         L = la.cholesky(Sigma_AA)
         L_inv = la.inv(L)
 
@@ -146,8 +208,14 @@ class POESingleSNP(BasePOE):
         X_het_whitened = np.dot(X_heterozygotes, L_inv.T)
         Sigma_AB_white = np.cov(X_het_whitened.T)
 
-        U,s,Vt = la.svd(Sigma_AB_white)
-        norm_a = np.maximum(s[0]-1,0)
-        parent_effect_white = Vt[0]*2*np.sqrt(norm_a)
-        self.parent_effect_ = np.dot(parent_effect_white,L.T)
+        U, s, Vt = la.svd(Sigma_AB_white)
+
+        if self.svd_loss:
+            s, _ = optimal_shrinkage(
+                s, self.n_phenotypes / self.n_permutations, self.svd_loss
+            )
+
+        norm_a = np.maximum(s[0] - 1, 0)
+        parent_effect_white = Vt[0] * 2 * np.sqrt(norm_a)
+        self.parent_effect_ = np.dot(parent_effect_white, L.T)
         return self

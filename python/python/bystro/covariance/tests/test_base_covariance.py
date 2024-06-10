@@ -1,6 +1,6 @@
 import numpy as np
 import numpy.linalg as la
-import scipy.stats as st # type: ignore
+import scipy.stats as st  # type: ignore
 from bystro.covariance._base_covariance import (
     BaseCovariance,
     _score_samples,
@@ -20,6 +20,11 @@ from bystro.covariance._base_covariance import (
 
 
 def test_get_stable_rank():
+    """
+    Test the `get_stable_rank` method of the `BaseCovariance` class to ensure
+    it returns the correct rank of the covariance matrix. Tests with identity
+    and modified zero matrices.
+    """
     model = BaseCovariance()
 
     model.covariance = np.eye(10)
@@ -31,6 +36,11 @@ def test_get_stable_rank():
 
 
 def test_predict():
+    """
+    Test the `predict` method of the `BaseCovariance` class to ensure it
+    correctly predicts based on the model's state using a normally distributed
+    dataset.
+    """
     rng = np.random.default_rng(2021)
     X = rng.normal(size=(1000, 10))
     model = BaseCovariance()
@@ -49,6 +59,10 @@ def test_predict():
 
 
 def test_conditional_score_samples():
+    """
+    Test conditional likelihood calculations from samples using the
+    direct method in `BaseCovariance`. Verifies against expected outcomes.
+    """
     rng = np.random.default_rng(2021)
     X = rng.normal(size=(1000, 10))
     model = BaseCovariance()
@@ -71,6 +85,10 @@ def test_conditional_score_samples():
 
 
 def test_conditional_score_samples_sherman_woodbury():
+    """
+    Test the Sherman-Woodbury formula for conditional score calculations from
+    samples. Ensures consistency with the standard method.
+    """
     rng = np.random.default_rng(2021)
     X = rng.normal(size=(1000, 10))
     W = rng.normal(size=(3, 10))
@@ -88,6 +106,10 @@ def test_conditional_score_samples_sherman_woodbury():
 
 
 def test_conditional_score():
+    """
+    Test calculation of conditional scores in the `BaseCovariance` class.
+    Verifies mathematical accuracy for given conditions.
+    """
     rng = np.random.default_rng(2021)
     X = rng.normal(size=(1000, 10))
     model = BaseCovariance()
@@ -125,6 +147,10 @@ def test_conditional_score_sherman_woodbury():
 
 
 def test_marginal_score_samples():
+    """
+    Test marginal score calculations from samples in `BaseCovariance`.
+    Confirms accuracy of scores reflecting marginal probabilities.
+    """
     rng = np.random.default_rng(2021)
     X = rng.normal(size=(150, 10))
     model = BaseCovariance()
@@ -140,6 +166,10 @@ def test_marginal_score_samples():
 
 
 def test_marginal_score_samples_sherman_woodbury():
+    """
+    Verify Sherman-Woodbury for marginal score calculations from samples.
+    Compares results with traditional methods for consistency.
+    """
     rng = np.random.default_rng(2021)
     X = rng.normal(size=(150, 10))
     W = rng.normal(size=(3, 10))
@@ -158,6 +188,10 @@ def test_marginal_score_samples_sherman_woodbury():
 
 
 def test_marginal_score():
+    """
+    Test direct computation of marginal scores using `BaseCovariance`.
+    Validates accuracy of marginal probabilities.
+    """
     rng = np.random.default_rng(2021)
     X = rng.normal(size=(15, 10))
     model = BaseCovariance()
@@ -169,10 +203,14 @@ def test_marginal_score():
     score = model.marginal_score(X[:, idxs == 1], idxs)
     mvn = st.multivariate_normal(mean=np.zeros(8), cov=model.covariance[:8, :8])
     logpdf = mvn.logpdf(X[:, :8])
-    assert np.mean(logpdf) == score
+    assert np.abs(np.mean(logpdf) - score) < 1e-8
 
 
 def test_marginal_score_sherman_woodbury():
+    """
+    Evaluate Sherman-Woodbury for computing marginal scores. Ensures formula
+    provides accurate and efficient results.
+    """
     rng = np.random.default_rng(2021)
     X = rng.normal(size=(150, 10))
     W = rng.normal(size=(3, 10))
@@ -189,6 +227,10 @@ def test_marginal_score_sherman_woodbury():
 
 
 def test_score():
+    """
+    Test overall score computation in `BaseCovariance`. Checks accuracy and
+    robustness of score outputs under various conditions.
+    """
     rng = np.random.default_rng(2021)
     X = rng.normal(size=(1000, 10))
     model = BaseCovariance()
@@ -196,10 +238,14 @@ def test_score():
     score = model.score(X, weights=1.0 * np.ones(1000))
     mvn = st.multivariate_normal(mean=np.zeros(10), cov=model.covariance)
     logpdf = mvn.logpdf(X)
-    assert np.mean(logpdf) == score
+    assert np.abs(np.mean(logpdf) - score) < 1e-8
 
 
 def test_score_sherman_woodbury():
+    """
+    Test Sherman-Woodbury formula for overall score computation. Ensures
+    optimized method maintains accuracy with standard techniques.
+    """
     rng = np.random.default_rng(2021)
     X = rng.normal(size=(1000, 10))
     W = rng.normal(size=(3, 10))
@@ -213,6 +259,10 @@ def test_score_sherman_woodbury():
 
 
 def test_score_samples():
+    """
+    Test computation of scores from samples in `BaseCovariance`. Verifies
+    the method's ability to compute scores accurately from data.
+    """
     rng = np.random.default_rng(2021)
     X = rng.normal(size=(1000, 10))
     model = BaseCovariance()
@@ -224,6 +274,10 @@ def test_score_samples():
 
 
 def test_score_samples_sherman_woodbury():
+    """
+    Assess Sherman-Woodbury optimization in score calculation from samples.
+    Verifies consistent and reliable results compared to basic method.
+    """
     rng = np.random.default_rng(2021)
     X = rng.normal(size=(1000, 10))
     W = rng.normal(size=(3, 10))
@@ -236,6 +290,10 @@ def test_score_samples_sherman_woodbury():
 
 
 def test_entropy():
+    """
+    Test entropy calculation within `BaseCovariance`. Ensures computed
+    entropy is correct for different covariance matrix states.
+    """
     model = BaseCovariance()
     model.covariance = np.eye(10)
     _, logdet = la.slogdet(model.covariance)
@@ -260,6 +318,10 @@ def test_entropy_subset():
 
 
 def test_mutual_information():
+    """
+    Test mutual information calculation between variable sets in the covariance
+    matrix. Confirms accuracy of the mutual information values.
+    """
     rng = np.random.default_rng(2021)
     X = rng.normal(size=(1000, 10))
     model = BaseCovariance()
@@ -279,6 +341,10 @@ def test_mutual_information():
 
 
 def test_inv_sherman_woodbury_fa():
+    """
+    Test Sherman-Woodbury formula for inverse of factor analysis model's
+    covariance matrix. Checks accuracy of inverse calculation.
+    """
     rng = np.random.default_rng(2021)
     p = 20
     Lambda = np.diag(rng.gamma(1, 1, size=p))
@@ -290,6 +356,10 @@ def test_inv_sherman_woodbury_fa():
 
 
 def test_inv_sherman_woodbury_full():
+    """
+    Verify full covariance matrix inversion using Sherman-Woodbury. Ensures
+    correct performance and matches results from traditional methods.
+    """
     rng = np.random.default_rng(2021)
     p = 20
     L = 4
@@ -305,6 +375,10 @@ def test_inv_sherman_woodbury_full():
 
 
 def test_ldet_sherman_woodbury_fa():
+    """
+    Test log-determinant computation using Sherman-Woodbury for factor analysis
+    models. Checks if computed values are correct versus conventional methods.
+    """
     rng = np.random.default_rng(2021)
     p = 20
     Lambda = np.diag(rng.gamma(1, 1, size=p))

@@ -22,29 +22,6 @@ def generate_data_ppca():
     return W, sigma, X_train, S_train
 
 
-def generate_data_spca(L=4, sigmax=1.0, sigmay=0.5, N=10000):
-    rng = np.random.default_rng(2021)
-    p = 30
-    q = 5
-    W_x_base = st.ortho_group.rvs(p)
-    W_y_base = st.ortho_group.rvs(q)
-    Wx = W_x_base[:L]
-    Wy = W_y_base[:L]
-    lamb_x = np.sort(rng.gamma(1, 1, size=L))[::-1] + 1
-    lamb_y = rng.gamma(1, 1, size=L) + 1
-    for ll in range(L):
-        Wx[ll] = Wx[ll] * lamb_x[ll]
-        Wy[ll] = Wy[ll] * lamb_y[ll]
-    S_train = rng.normal(size=(N, L))
-    X_hat = np.dot(S_train, Wx)
-    Y_hat = np.dot(S_train, Wy)
-    X_noise = sigmax * rng.normal(size=(N, p))
-    Y_noise = sigmay * rng.normal(size=(N, q))
-    X_train = X_hat + X_noise
-    Y_train = Y_hat + Y_noise
-    return Wx, Wy, sigmax, sigmay, X_train, Y_train, S_train
-
-
 def generate_data_factorAnalysis():
     rng = np.random.default_rng(2021)
     N = 100000
@@ -77,6 +54,10 @@ def test_ppca():
     s1 = la.norm(cov_emp - cov_est)
     assert s1 <= 10.0
 
-
     model = PPCA(n_components=4, training_options={"n_iterations": 25})
-    model.fit(X,sherman_woodbury=True)
+    model.fit(X, sherman_woodbury=True)
+
+    model = PPCA(
+        n_components=4, training_options={"n_iterations": 25, "use_gpu": False}
+    )
+    model.fit(X)

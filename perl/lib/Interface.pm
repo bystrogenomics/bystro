@@ -207,7 +207,7 @@ sub annotate {
     exit(1);
   }
 
-  say "\nCompleted successfull! Results:\n";
+  say "\nCompleted successfully! Results:\n";
   say JSON::XS->new->pretty(1)->encode($results);
   say "";
 }

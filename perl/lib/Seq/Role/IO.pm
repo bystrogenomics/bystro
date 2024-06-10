@@ -363,9 +363,8 @@ sub safeSystem {
   my $return = system($cmd);
 
   if ( $return > 0 ) {
-    $self->log( $errCode || 'debug',
-      "Failed to execute $cmd. Return: $return, due to: $! ($?)" );
-    return $!;
+    $self->log( $errCode || 'error', "Failed to execute $cmd. Return code: $?" );
+    return $return;
   }
 
   return;

@@ -1,0 +1,9 @@
+connection:
+  request_timeout: 1200
+  nodes:
+    - host: host
+      port: 9200
+      scheme: https
+auth:
+  username: admin
+  password: foo

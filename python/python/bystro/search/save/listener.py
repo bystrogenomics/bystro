@@ -65,7 +65,14 @@ def main():
 
     def handler_fn(publisher: ProgressPublisher, job_data: SaveJobData):
         logger.debug("Processing job: %s", pformat(msgspec.structs.asdict(job_data)))
-        return asyncio.run(go(job_data=job_data, search_conf=search_conf, publisher=publisher))
+        return asyncio.run(
+            go(
+                job_data=job_data,
+                search_conf=search_conf,
+                publisher=publisher,
+                queue_config_path=args.queue_conf,
+            )
+        )
 
     def submit_msg_fn(job_data: SaveJobData):
         return SubmittedJobMessage(submission_id=job_data.submission_id)

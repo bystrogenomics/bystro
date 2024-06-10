@@ -20,13 +20,42 @@ The web app gives full access to all of Bystro's capabilities, provides a conven
 
 ## Installing Bystro
 
-The easiest way is to run from Docker: `docker pull akotlar/bystro:latest && docker run bystro:latest bystro-annotate.pl`
+Bystro consists of 2 main components: the Bystro Python package, which consists of the Bystro ML library, CLI tool, and a collection of easy to use biology tools including global ancestry and the Bystro annotator (Perl).
 
-Please read: [INSTALL.md](INSTALL.md) for instructions on how to download and use Bystro hg19/hg38/etc databases.
+The Bystro Python package also gives the ability to launch workers to process jobs from the Bystro API server, but this is not necessary for most users.
+
+### Installing the Bystro Python libraries and CLI tools
+
+To install the Bystro Python package, run:
+
+```sh
+pip install --pre bystro
+```
+
+The Bystro ancestry CLI `score` tool (`bystro-api ancestry score`) parses VCF files to generate dosage matrices. This requires `bystro-vcf`, a Go program which can be installed with:
+
+```sh
+# Requires Go: install from https://golang.org/doc/install
+go install github.com/bystrogenomics/bystro-vcf@2.2.2
+```
+
+Bystro is compatible with Linux and MacOS. Windows support is experimental. If you are installing on MacOS as a native binary (Arm), you will need to install the following additional dependencies:
+
+```sh
+brew install cmake
+```
+
+Please refer to [INSTALL.md](INSTALL.md) for more details.
+
+### Installing the Bystro Annotator
+
+Please refer to [INSTALL.md](INSTALL.md) for instructions on how to install the Bystro annotator.
+
+### File support
 
 Bystro relies on pluggable (via Bystro's YAML config) pre-processors to normalize variant inputs (**dealing with VCF issues such as padding**), calculate whether a site is a transition or transversion, calculate sample maf, identify hets/homozygotes/missing samples, calculate heterozygosity, homozygosity, missingness, and more.
 
-1. VCF format: [Bystro-Vcf](https://github.com/bystrogenomics/bystro-vcf/tree/2.1.0)
+1. VCF format: [Bystro-Vcf](https://github.com/bystrogenomics/bystro-vcf/tree/2.2.2)
 2. SNP format: [Bystro-SNP](https://github.com/akotlar/bystro-snp)
 3. Create your own to support other formats!
 

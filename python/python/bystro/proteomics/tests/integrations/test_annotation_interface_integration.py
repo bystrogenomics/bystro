@@ -17,11 +17,8 @@ from opensearchpy import OpenSearch
 
 logger = logging.getLogger(__file__)
 
-opensearch_config = get_opensearch_config()
-opensearch_client = OpenSearch(**gather_opensearch_args(opensearch_config))
 
-
-def ensure_annotation_file_present(index_name: str) -> None:
+def ensure_annotation_file_present(index_name: str, opensearch_client: OpenSearch) -> None:
     if not opensearch_client.indices.exists(index_name):
         msg = f"Didn't find {index_name} on server, uploading..."
         logger.debug(msg)
@@ -56,16 +53,21 @@ def index_test_annotation_file(index_name: str) -> None:
 @pytest.mark.integration()
 @flaky(max_runs=2, min_passes=1)
 def test_get_annotation_result_from_query_integration():
+    opensearch_config = get_opensearch_config()
+    opensearch_client = OpenSearch(**gather_opensearch_args(opensearch_config))
+
     index_name = "trio_trim_vep_annotation_for_integration_testing_purposes"
-    ensure_annotation_file_present(index_name)
-    user_query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
-    samples_genes_df = get_annotation_result_from_query(user_query_string, index_name, opensearch_client)
+    ensure_annotation_file_present(index_name, opensearch_client)
+    query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
+    samples_genes_df = get_annotation_result_from_query(
+        query_string, index_name, cluster_opensearch_config=opensearch_config
+    )
     assert samples_genes_df.shape == (1610, 7)
     assert {"1805", "1847", "4805"} == set(samples_genes_df.sample_id.unique())
     assert 689 == len(samples_genes_df.gene_name.unique())
     # it's awkward to test for equality of NaN objects, so fill them
     # and compare the filled sets instead.
-    MISSING_GENO_VALUE = -1
-    expected_dosage_values = {1, 2, MISSING_GENO_VALUE}
-    actual_dosage_values = set(samples_genes_df.dosage.fillna(MISSING_GENO_VALUE).unique())
+
+    expected_dosage_values = {1, 2, -1}
+    actual_dosage_values = set(samples_genes_df.dosage.fillna(-1).unique())
     assert expected_dosage_values == actual_dosage_values

@@ -23,9 +23,16 @@ type ProgressMessage struct {
 	Event        string       `json:"event"`
 }
 
+type StringMessage struct {
+	SubmissionID string `json:"submissionId"`
+	Data         string `json:"data"`
+	Event        string `json:"event"`
+}
+
 type MessageSender interface {
 	SetProgress(progress int)
 	SendMessage()
+	SendStringMessage(message string)
 	Close() error
 }
 
@@ -51,6 +58,26 @@ type DebugMessageSender struct {
 type BeanstalkdConfig struct {
 	Addresses []string `yaml:"addresses"`
 	Tubes     struct {
+		Annotation struct {
+			Submission string `yaml:"submission"`
+			Events     string `yaml:"events"`
+		} `yaml:"annotation"`
+		Ancestry struct {
+			Submission string `yaml:"submission"`
+			Events     string `yaml:"events"`
+		} `yaml:"ancestry"`
+		Proteomics struct {
+			Submission string `yaml:"submission"`
+			Events     string `yaml:"events"`
+		} `yaml:"proteomics"`
+		PRS struct {
+			Submission string `yaml:"submission"`
+			Events     string `yaml:"events"`
+		} `yaml:"prs"`
+		SaveFromQuery struct {
+			Submission string `yaml:"submission"`
+			Events     string `yaml:"events"`
+		} `yaml:"saveFromQuery"`
 		Index struct {
 			Submission string `yaml:"submission"`
 			Events     string `yaml:"events"`
@@ -80,6 +107,7 @@ func (d *DebugMessageSender) Close() error {
 
 func (b *BeanstalkdMessageSender) SendMessage() {
 	messageJson, err := sonic.Marshal(b.Message)
+
 	if err != nil {
 		log.Printf("failed to marshall progress message due to: [%s]\n", err)
 		return
@@ -89,7 +117,26 @@ func (b *BeanstalkdMessageSender) SendMessage() {
 }
 
 func (d *DebugMessageSender) SendMessage() {
-	fmt.Printf("Indexed %d\n", d.Message.Data.Progress)
+	fmt.Printf("Progress: %d\n", d.Message.Data.Progress)
+}
+
+func (b *BeanstalkdMessageSender) SendStringMessage(message string) {
+	messageJson, err := sonic.Marshal(StringMessage{
+		SubmissionID: b.Message.SubmissionID,
+		Data:         message,
+		Event:        PROGRESS_EVENT,
+	})
+
+	if err != nil {
+		log.Printf("failed to marshall progress message due to: [%s]\n", err)
+		return
+	}
+
+	b.eventTube.Put(messageJson, 0, 0, 0)
+}
+
+func (d *DebugMessageSender) SendStringMessage(message string) {
+	fmt.Printf("%s\n", message)
 }
 
 func createBeanstalkdConfig(beanstalkConfigPath string) (BeanstalkdConfig, error) {
@@ -108,7 +155,7 @@ func createBeanstalkdConfig(beanstalkConfigPath string) (BeanstalkdConfig, error
 	return bConfig.Beanstalkd, nil
 }
 
-func CreateMessageSender(beanstalkConfigPath string, jobSubmissionID string, noBean bool) (MessageSender, error) {
+func CreateMessageSender(beanstalkConfigPath string, jobSubmissionID string, tube string) (MessageSender, error) {
 	message := ProgressMessage{
 		SubmissionID: jobSubmissionID,
 		Event:        PROGRESS_EVENT,
@@ -118,7 +165,7 @@ func CreateMessageSender(beanstalkConfigPath string, jobSubmissionID string, noB
 		},
 	}
 
-	if noBean {
+	if beanstalkConfigPath == "" {
 		return &DebugMessageSender{
 			Message: message,
 		}, nil
@@ -134,7 +181,23 @@ func CreateMessageSender(beanstalkConfigPath string, jobSubmissionID string, noB
 		return nil, err
 	}
 
-	eventTube := beanstalk.NewTube(beanstalkConnection, beanstalkdConfig.Tubes.Index.Events)
+	var eventTube *beanstalk.Tube
+	switch tube {
+	case "annotation":
+		eventTube = beanstalk.NewTube(beanstalkConnection, beanstalkdConfig.Tubes.Annotation.Events)
+	case "ancestry":
+		eventTube = beanstalk.NewTube(beanstalkConnection, beanstalkdConfig.Tubes.Ancestry.Events)
+	case "proteomics":
+		eventTube = beanstalk.NewTube(beanstalkConnection, beanstalkdConfig.Tubes.Proteomics.Events)
+	case "prs":
+		eventTube = beanstalk.NewTube(beanstalkConnection, beanstalkdConfig.Tubes.PRS.Events)
+	case "saveFromQuery":
+		eventTube = beanstalk.NewTube(beanstalkConnection, beanstalkdConfig.Tubes.SaveFromQuery.Events)
+	case "index":
+		eventTube = beanstalk.NewTube(beanstalkConnection, beanstalkdConfig.Tubes.Index.Events)
+	default:
+		return nil, fmt.Errorf("unknown event tube: %s", tube)
+	}
 
 	return &BeanstalkdMessageSender{
 		Message:    message,
