@@ -8,6 +8,13 @@ from pyro.distributions import Gamma, Normal  # type: ignore
 
 
 class BasePrsCS:
+    """
+    This implements the base class for PRS-CS methods. Currently, this just
+    sets basic MCMC and parameter values along with defining attributes 
+    to be set during training. Future work will more closely integrate 
+    this with the template objects used throughout bystro.
+    """
+
     def __init__(
         self,
         mcmc_options=None,
@@ -25,26 +32,49 @@ class BasePrsCS:
 
     def _fill_mcmc_options(self, mcmc_options):
         """
-        This fills in default MCMC options of the sampler. Further methods
-        might override these but these are common/basic enough to leave in
-        as an implemented method.
+        This fills in the MCMC parameters
 
         Parameters
         ----------
+        num_chains : int
+            Number of chains to run
+
+        num_warmup : int
+            Number of burnin samples
+
+        num_samples : int
+            Number of MCMC samples to keep
 
         Returns
         -------
-
+        mopts : dict
+            The dictionary of completed options
         """
         default_options = {
             "num_chains": 1,
-            "num_warmup": 10,
-            "num_samples": 50,
+            "num_warmup": 1000,
+            "num_samples": 5000,
         }
         mopts = {**default_options, **mcmc_options}
         return mopts
 
     def _fill_hp_options(self, hp_options):
+        """
+        This fills in the hyperparameters
+
+        Parameters
+        ----------
+        a : float
+            Shape of the gamma distribution
+
+        b : float
+            Scale of the gamma distribution
+
+        Returns
+        -------
+        hopts : dict
+            The dictionary of completed options
+        """
         default_options = {
             "a": 1.0,
             "b": 1.0,
@@ -54,7 +84,29 @@ class BasePrsCS:
 
 
 class PrsCSData(BasePrsCS):
+    """
+    This implements PRS-CS given the original samples as opposed to summary
+    statistics. This allows for easier potential future customization on
+    the predictive loss (for example allowing for more robust alternatives
+    to an L2 loss or classification.
+    """
+
     def fit(self, Z, y):
+        """
+        The fit method. 
+
+        Parameters
+        ----------
+        Z : np.array-like,(n_samples,p)
+            The covariates of interest 
+
+        y : np.array-like,(n_samples,)
+            The disease or outcome 
+
+        Returns
+        -------
+        self
+        """
         hp = self.hp_options
         N, p = Z.shape
 
