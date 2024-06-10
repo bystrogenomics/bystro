@@ -10,7 +10,7 @@ import pyarrow.dataset as ds  # type: ignore
 
 from bystro.ancestry.inference import AncestryModel, AncestryModels, infer_ancestry
 from bystro.ancestry.train import POPS
-from bystro.ancestry.model import get_models_from_s3
+from bystro.ancestry.model import get_models
 
 SAMPLES = [f"sample{i}" for i in range(len(POPS))]
 VARIANTS = ["variant1", "variant2", "variant3"]
@@ -82,9 +82,8 @@ def test_infer_ancestry():
     assert len(samples) == len(ancestry_response.results)
 
 
-@pytest.mark.integration("Requires AWS credentials.")
 def test_infer_ancestry_from_model():
-    ancestry_models = get_models_from_s3("hg38")
+    ancestry_models = get_models("hg38")
 
     # Generate an arrow table that contains genotype dosages for 1000 samples
     variants = list(ancestry_models.gnomad_model.pca_loadings_df.index)

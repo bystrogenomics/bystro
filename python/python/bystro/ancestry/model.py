@@ -1,17 +1,16 @@
 """Provide a worker for the ancestry model."""
 
 import logging
+import os
 from pathlib import Path
+import requests
 
-import boto3  # type: ignore
-from botocore.exceptions import ClientError  # type: ignore
 import pandas as pd
 from skops.io import load as skops_load  # type: ignore
 
 from bystro.ancestry.inference import AncestryModel, AncestryModels
 
 from bystro.utils.timer import Timer
-import os
 
 logging.basicConfig(
     filename="ancestry_model.log",
@@ -31,7 +30,24 @@ ARRAY_RFC_FILE = "arrayset_rfc.skop"
 models_cache: dict[str, AncestryModels] = {}
 
 
-def get_one_model_from_s3(
+def download_file(bucket: str, key: str, filename: str):
+    """
+    Download a file from the given URL to the local path.
+
+    Args:
+        url (str): The URL to download the file from.
+        local_path (str): The local path to save the file.
+    """
+    url = f"https://{bucket}.s3.amazonaws.com/{key}"
+    logger.info("Downloading file from %s to %s", url, filename)
+    response = requests.get(url)
+    response.raise_for_status()  # Raise an error for bad status codes
+
+    with open(filename, "wb") as f:
+        f.write(response.content)
+
+
+def get_one_model(
     pca_local_path: str, rfc_local_path: str, pca_file_key: str, rfc_file_key: str
 ) -> AncestryModel:
     """
@@ -49,8 +65,6 @@ def get_one_model_from_s3(
     Returns:
         AncestryModel: The loaded ancestry model.
     """
-    s3_client = boto3.client("s3")
-
     logger.info(
         "Downloading PCA file %s and RFC file %s to %s and %s",
         pca_file_key,
@@ -61,27 +75,27 @@ def get_one_model_from_s3(
 
     with Timer() as timer:
         try:
-            s3_client.download_file(Bucket=ANCESTRY_BUCKET, Key=pca_file_key, Filename=pca_local_path)
-        except ClientError as e:
-            if e.response["Error"]["Code"] == "NoSuchKey":
-                raise ValueError(f"{pca_file_key} not found. This assembly is not supported.") from e
-            raise  # Re-raise the exception if it's not a "NoSuchKey" error
+            download_file(bucket=ANCESTRY_BUCKET, key=pca_file_key, filename=pca_local_path)
+        except requests.HTTPError as e:
+            raise ValueError(
+                f"{pca_file_key} not found in bucket {ANCESTRY_BUCKET}. "
+                "This assembly is not supported."
+            ) from e
 
         try:
-            s3_client.download_file(Bucket=ANCESTRY_BUCKET, Key=rfc_file_key, Filename=rfc_local_path)
-        except ClientError as e:
-            if e.response["Error"]["Code"] == "NoSuchKey":
-                raise ValueError(
-                    f"{rfc_file_key} ancestry model not found. This assembly is not supported."
-                ) from e
-            raise
+            download_file(bucket=ANCESTRY_BUCKET, key=rfc_file_key, filename=rfc_local_path)
+        except requests.HTTPError as e:
+            raise ValueError(
+                f"{rfc_file_key} not found in bucket {ANCESTRY_BUCKET}. "
+                "This assembly is not supported."
+            ) from e
 
     logger.debug("Downloaded PCA file and RFC file in %f seconds", timer.elapsed_time)
 
     return get_one_model_from_file_system(pca_local_path, rfc_local_path)
 
 
-def get_models_from_s3(assembly: str) -> AncestryModels:
+def get_models(assembly: str) -> AncestryModels:
     """
     Load the ancestry models for the given assembly from S3.
 
@@ -113,13 +127,13 @@ def get_models_from_s3(assembly: str) -> AncestryModels:
         )
         models = AncestryModels(gnomad_model, array_model)
     else:
-        gnomad_model = get_one_model_from_s3(
+        gnomad_model = get_one_model(
             paths["gnomad"]["pca_local_path"],
             paths["gnomad"]["rfc_local_path"],
             paths["gnomad"]["pca_remote_path"],
             paths["gnomad"]["rfc_remote_path"],
         )
-        array_model = get_one_model_from_s3(
+        array_model = get_one_model(
             paths["array"]["pca_local_path"],
             paths["array"]["rfc_local_path"],
             paths["array"]["pca_remote_path"],

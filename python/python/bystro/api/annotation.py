@@ -43,7 +43,7 @@ def _generate_uuid():
     return str(uuid.uuid4())
 
 
-def get_jobs(job_type=None, job_id=None, print_result=True) -> list[JobBasicResponse] | dict:
+def get_jobs(job_type=None, job_id=None, print_result=False) -> list[JobBasicResponse] | dict:
     """
     Fetches the jobs for the given job type, or a single job if a job id is specified.
 
@@ -127,7 +127,7 @@ def create_jobs(
     combine=False,
     names: list[str] | None = None,
     no_index=False,
-    print_result=True,
+    print_result=False,
 ) -> list[dict]:
     """
     Creates 1+ annotation jobs
