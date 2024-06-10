@@ -10,8 +10,8 @@ from pyro.distributions import Gamma, Normal  # type: ignore
 class BasePrsCS:
     """
     This implements the base class for PRS-CS methods. Currently, this just
-    sets basic MCMC and parameter values along with defining attributes 
-    to be set during training. Future work will more closely integrate 
+    sets basic MCMC and parameter values along with defining attributes
+    to be set during training. Future work will more closely integrate
     this with the template objects used throughout bystro.
     """
 
@@ -93,15 +93,15 @@ class PrsCSData(BasePrsCS):
 
     def fit(self, Z, y):
         """
-        The fit method. 
+        The fit method.
 
         Parameters
         ----------
         Z : np.array-like,(n_samples,p)
-            The covariates of interest 
+            The covariates of interest
 
         y : np.array-like,(n_samples,)
-            The disease or outcome 
+            The disease or outcome
 
         Returns
         -------
@@ -112,7 +112,6 @@ class PrsCSData(BasePrsCS):
 
         Z = torch.tensor(Z)
         y = torch.tensor(y)
-
 
         def model(Z, y):
             w = pyro.sample("w", Gamma(0.5, 1.0))
@@ -129,16 +128,13 @@ class PrsCSData(BasePrsCS):
             beta_variance = sigma2 * psi
             beta = pyro.sample("beta", Normal(0, beta_variance).to_event(1))
 
-
             beta = beta.reshape(-1, 1)
 
             with pyro.plate("data", N):
                 prediction_mean = torch.matmul(Z, beta).squeeze()
                 pyro.sample("obs", Normal(prediction_mean, sigma2), obs=y)
 
-
-
-        nuts_kernel = mcmc.NUTS(model, step_size=5e-3,adapt_step_size=False)
+        nuts_kernel = mcmc.NUTS(model, step_size=5e-3, adapt_step_size=False)
         mcmc_run = mcmc.MCMC(nuts_kernel, num_samples=100, warmup_steps=20)
         mcmc_run.run(
             Z,
@@ -146,4 +142,3 @@ class PrsCSData(BasePrsCS):
         )
         self.samples = mcmc_run.get_samples()
         return self
-
