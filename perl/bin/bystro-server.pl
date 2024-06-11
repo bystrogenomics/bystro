@@ -78,7 +78,7 @@ while (1) {
     {
       server          => $conf->{beanstalkd}{addresses}[0],
       default_tube    => $queueConfig->{submission},
-      connect_timeout => 1,
+      connect_timeout => 10,
       encoder         => sub { encode_json( \@_ ) },
       decoder         => sub { @{ decode_json(shift) } },
     }
@@ -88,7 +88,7 @@ while (1) {
     {
       server          => $conf->{beanstalkd}{addresses}[0],
       default_tube    => $queueConfig->{events},
-      connect_timeout => 1,
+      connect_timeout => 10,
       encoder         => sub { encode_json( \@_ ) },
       decoder         => sub { @{ decode_json(shift) } },
     }
