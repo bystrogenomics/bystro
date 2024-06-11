@@ -96,7 +96,7 @@ while (1) {
 
   my $job = $beanstalk->reserve($BEANSTALKD_TIMEOUT);
 
-  if(!$job) {
+  if ( !$job ) {
     next;
   }
   # Parallel ForkManager used only to throttle number of jobs run in parallel
