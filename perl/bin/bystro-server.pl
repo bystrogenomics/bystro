@@ -59,8 +59,6 @@ my %requiredForAll = (
 
 my $requiredForType = { input_files => 'inputFilePath' };
 
-say "Running Annotation queue server";
-
 my $configPathBaseDir  = "config/";
 my $configFilePathHref = {};
 
@@ -71,27 +69,36 @@ if ( !$queueConfig ) {
     . ( join( ', ', @{ keys %{ $conf->{beanstalkd}{tubes} } } ) );
 }
 
-my $beanstalk = Beanstalk::Client->new(
-  {
-    server          => $conf->{beanstalkd}{addresses}[0],
-    default_tube    => $queueConfig->{submission},
-    connect_timeout => 1,
-    encoder         => sub { encode_json( \@_ ) },
-    decoder         => sub { @{ decode_json(shift) } },
-  }
-);
+say "Running Annotation queue server";
 
-my $beanstalkEvents = Beanstalk::Client->new(
-  {
-    server          => $conf->{beanstalkd}{addresses}[0],
-    default_tube    => $queueConfig->{events},
-    connect_timeout => 1,
-    encoder         => sub { encode_json( \@_ ) },
-    decoder         => sub { @{ decode_json(shift) } },
-  }
-);
+my $BEANSTALKD_TIMEOUT = 60;
 
-while ( my $job = $beanstalk->reserve ) {
+while (1) {
+  my $beanstalk = Beanstalk::Client->new(
+    {
+      server          => $conf->{beanstalkd}{addresses}[0],
+      default_tube    => $queueConfig->{submission},
+      connect_timeout => 1,
+      encoder         => sub { encode_json( \@_ ) },
+      decoder         => sub { @{ decode_json(shift) } },
+    }
+  );
+
+  my $beanstalkEvents = Beanstalk::Client->new(
+    {
+      server          => $conf->{beanstalkd}{addresses}[0],
+      default_tube    => $queueConfig->{events},
+      connect_timeout => 1,
+      encoder         => sub { encode_json( \@_ ) },
+      decoder         => sub { @{ decode_json(shift) } },
+    }
+  );
+
+  my $job = $beanstalk->reserve($BEANSTALKD_TIMEOUT);
+
+  if(!$job) {
+    next;
+  }
   # Parallel ForkManager used only to throttle number of jobs run in parallel
   # cannot use run_on_finish with blocking reserves, use try catch instead
   # Also using forks helps clean up leaked memory from LMDB_File
