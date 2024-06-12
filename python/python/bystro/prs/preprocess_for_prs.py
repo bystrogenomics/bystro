@@ -49,7 +49,7 @@ def _load_genetic_maps_from_feather(map_path: str) -> dict[str, pd.DataFrame]:
     """
     try:
         combined_genetic_map = pd.read_feather(map_path)
-        logger.info(f"Successfully loaded combined genetic map from {map_path}")
+        logger.info("Successfully loaded combined genetic map from: %s", map_path)
         genetic_maps = {}
         for chrom_num in combined_genetic_map["chromosome_num"].unique():
             chrom_df = combined_genetic_map[combined_genetic_map["chromosome_num"] == chrom_num].copy()
@@ -57,7 +57,7 @@ def _load_genetic_maps_from_feather(map_path: str) -> dict[str, pd.DataFrame]:
             genetic_maps[key] = chrom_df
         return genetic_maps
     except Exception as e:
-        logger.exception(f"Failed to load genetic map from {map_path}: {e}")
+        logger.exception("Failed to load genetic map from: %s: %s", map_path, e)
         raise e
 
 
