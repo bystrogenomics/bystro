@@ -1,9 +1,7 @@
 """Process dosage matrix, GWAS summary statistics, and LD maps for PRS C+T calculation."""
 
 import bisect
-import glob
 import logging
-import re
 from typing import Optional
 import matplotlib.pyplot as plt  # type: ignore
 from enum import Enum
@@ -53,14 +51,14 @@ def _load_genetic_maps_from_feather(map_path: str) -> dict[str, pd.DataFrame]:
         combined_genetic_map = pd.read_feather(map_path)
         print(f"Successfully loaded combined genetic map from {map_path}")
         genetic_maps = {}
-        for chrom_num in combined_genetic_map['chromosome_num'].unique():
-            chrom_df = combined_genetic_map[combined_genetic_map['chromosome_num'] == chrom_num].copy()
+        for chrom_num in combined_genetic_map["chromosome_num"].unique():
+            chrom_df = combined_genetic_map[combined_genetic_map["chromosome_num"] == chrom_num].copy()
             key = f"GeneticMap{chrom_num}"
             genetic_maps[key] = chrom_df
         return genetic_maps
     except Exception as e:
-        print(f"Failed to load genetic map from {file_path}: {e}")
-        return None
+        print(f"Failed to load genetic map from {map_path}: {e}")
+        raise e
 
 
 def _extract_nomiss_dosage_loci(dosage_matrix_path: str, score_loci: set, chunk_size=1000) -> set:
