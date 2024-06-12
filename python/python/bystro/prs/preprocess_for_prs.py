@@ -37,40 +37,30 @@ def _load_association_scores(AD_SCORE_FILEPATH: str) -> pd.DataFrame:
     return ad_scores[columns_to_include]
 
 
-def _load_genetic_maps_from_feather(map_directory_path: str) -> dict[str, pd.DataFrame]:
+def _load_genetic_maps_from_feather(map_path: str) -> dict[str, pd.DataFrame]:
     """Load genetic maps from Feather files in the specified directory, using logging for messages.
 
     Args:
     ----
-    map_directory_path: The path to the directory containing Feather files.
+    map_path: The path to the Feather files.
 
     Returns:
     -------
     A dictionary where keys are 'GeneticMap{chromosome_number}' and values are the corresponding
     DataFrames loaded from Feather files.
     """
-    file_pattern = f"{map_directory_path}/*.feather"
-    map_file_list = glob.glob(file_pattern)
-    genetic_maps = {}
-    for file in map_file_list:
-        match = re.search(r"chromosome_(\d+)_genetic_map", file)
-        if match:
-            try:
-                chrom_num = match.group(1)
-                genetic_map = pd.read_feather(file)
-                key = f"GeneticMap{chrom_num}"
-                genetic_maps[key] = genetic_map
-                logging.info("Successfully read %s from %s", key, file)
-            except Exception as e:
-                logging.exception("Failed to read from %s", file)
-                raise RuntimeError(f"Failed to process {file} due to an error.") from e
-        else:
-            raise ValueError(
-                "File format must match 'chromosome_1_genetic_map'. "
-                f"Could not determine chromosome number from {file}."
-            )
-
-    return genetic_maps
+    try:
+        combined_genetic_map = pd.read_feather(map_path)
+        print(f"Successfully loaded combined genetic map from {map_path}")
+        genetic_maps = {}
+        for chrom_num in combined_genetic_map['chromosome_num'].unique():
+            chrom_df = combined_genetic_map[combined_genetic_map['chromosome_num'] == chrom_num].copy()
+            key = f"GeneticMap{chrom_num}"
+            genetic_maps[key] = chrom_df
+        return genetic_maps
+    except Exception as e:
+        print(f"Failed to load genetic map from {file_path}: {e}")
+        return None
 
 
 def _extract_nomiss_dosage_loci(dosage_matrix_path: str, score_loci: set, chunk_size=1000) -> set:
@@ -143,7 +133,7 @@ def _preprocess_scores(ad_scores: pd.DataFrame) -> pd.DataFrame:
     return preprocessed_scores.set_index("SNPID")
 
 
-def _preprocess_genetic_maps(map_directory_path: str) -> dict[int, list[int]]:
+def _preprocess_genetic_maps(map_path: str) -> dict[int, list[int]]:
     """
     Loads genetic maps from Feather files located in the specified directory.
     For each chromosome, it extracts the upper bound values as lists and
@@ -151,14 +141,14 @@ def _preprocess_genetic_maps(map_directory_path: str) -> dict[int, list[int]]:
 
     Args:
     ----
-    map_directory_path (str): Path to the directory containing Feather files for the genetic maps.
+    map_path (str): Path to the directory containing Feather files for the genetic maps.
 
     Returns:
     -------
     dict[int, list[int]]: A dictionary where each key is a chromosome number and
     each value is a list of upper bound values extracted from the corresponding genetic map.
     """
-    genetic_maps = _load_genetic_maps_from_feather(map_directory_path)
+    genetic_maps = _load_genetic_maps_from_feather(map_path)
     bin_mappings = {}
     for i in range(1, 23):
         map_key = f"GeneticMap{i}"
@@ -258,9 +248,9 @@ def clean_scores_for_analysis(
     return scores_overlap_adjusted, loci_and_allele_comparison
 
 
-def ld_clump(scores_overlap: pd.DataFrame, map_directory_path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+def ld_clump(scores_overlap: pd.DataFrame, map_path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Bin using genetic map, clump, and adjust dosages and determine if effect allele is alt or ref."""
-    bin_mappings = _preprocess_genetic_maps(map_directory_path)
+    bin_mappings = _preprocess_genetic_maps(map_path)
     scores_overlap = scores_overlap.reset_index()
     allele_comparison_results = scores_overlap.apply(
         compare_alleles, col1="SNPID", col2="ID_effect_as_alt", axis=1
@@ -273,7 +263,7 @@ def ld_clump(scores_overlap: pd.DataFrame, map_directory_path: str) -> tuple[pd.
 
 
 def finalize_scores_after_c_t(
-    gwas_scores_path: str, dosage_matrix_path: str, map_directory_path: str, p_value_threshold: float
+    gwas_scores_path: str, dosage_matrix_path: str, map_path: str, p_value_threshold: float
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Finalize scores for PRS calculation."""
     scores = _load_association_scores(gwas_scores_path)
@@ -282,7 +272,7 @@ def finalize_scores_after_c_t(
     dosage_loci_nomiss = _extract_nomiss_dosage_loci(dosage_matrix_path, thresholded_score_loci)
     overlap_loci = generate_overlap_scores_dosage(thresholded_score_loci, dosage_loci_nomiss)
     scores_overlap = preprocessed_scores[preprocessed_scores.index.isin(overlap_loci)]
-    scores_after_c_t, loci_and_allele_comparison = ld_clump(scores_overlap, map_directory_path)
+    scores_after_c_t, loci_and_allele_comparison = ld_clump(scores_overlap, map_path)
     scores_after_c_t = scores_after_c_t.sort_index()
     return scores_after_c_t, loci_and_allele_comparison
 
@@ -302,13 +292,13 @@ def finalize_dosage_after_c_t(
 def generate_c_and_t_prs_scores(
     gwas_scores_path: str,
     dosage_matrix_path: str,
-    map_directory_path: str,
+    map_path: str,
     p_value_threshold: float = 0.05,
 ) -> dict[str, float]:
     """Calculate PRS."""
     # This part goes through dosage matrix the first time to get overlapping loci
     scores_after_c_t, loci_and_allele_comparison = finalize_scores_after_c_t(
-        gwas_scores_path, dosage_matrix_path, map_directory_path, p_value_threshold
+        gwas_scores_path, dosage_matrix_path, map_path, p_value_threshold
     )
 
     # This part goes through dosage matrix the second time, adjusts dosages,
