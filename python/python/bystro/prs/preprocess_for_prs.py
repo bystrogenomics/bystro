@@ -57,7 +57,7 @@ def _load_genetic_maps_from_feather(map_path: str) -> dict[str, pd.DataFrame]:
             genetic_maps[key] = chrom_df
         return genetic_maps
     except Exception as e:
-        print(f"Failed to load genetic map from {map_path}: {e}")
+        logger.exception(f"Failed to load genetic map from {map_path}: {e}")
         raise e
 
 
