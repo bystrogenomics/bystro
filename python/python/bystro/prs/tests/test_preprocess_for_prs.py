@@ -80,7 +80,8 @@ def mock_dosage_df_clean():
 @pytest.fixture()
 def mock_genetic_maps():
     genetic_map_data = {
-        "GeneticMap1": pd.DataFrame({"upper_bound": [1000, 2000, 3000]}),
+        "GeneticMap1": pd.DataFrame({"upper_bound": [1000, 2000, 3000], "chromosome_num": [1, 1, 1]}),
+        "GeneticMap2": pd.DataFrame({"upper_bound": [1000, 2000, 3000], "chromosome_num": [2, 2, 2]}),
     }
     return genetic_map_data
 
@@ -89,6 +90,7 @@ def mock_genetic_maps():
 def mock_bin_mappings():
     return {
         1: [1000, 2000, 3000],
+        2: [1000, 2000, 3000],
     }
 
 
@@ -127,20 +129,24 @@ def test_extract_nomiss_dosage_loci(tmp_path, mock_dosage_df, mock_scores_loci):
     assert result == expected_result, f"Expected {expected_result}, but got {result}"
 
 
-def test_load_genetic_maps_from_feather(tmp_path):
-    test_dir = tmp_path / "ProcessedGeneticMaps"
-    test_dir.mkdir()
-    test_file = test_dir / "chromosome_1_genetic_map.feather"
-    mock_map = pd.DataFrame({"upper_bound": [1000, 2000, 3000], "chromosome_num": [1, 1, 1]})
-    mock_map.to_feather(test_file)
-    genetic_maps = _load_genetic_maps_from_feather(str(test_dir))
+def test_load_genetic_maps_from_feather(tmp_path, mock_genetic_maps):
+    test_file = tmp_path / "combined_genetic_map.feather"
+
+    combined_mock_map = pd.concat(mock_genetic_maps.values(), ignore_index=True)
+    combined_mock_map.to_feather(test_file)
+    genetic_maps = _load_genetic_maps_from_feather(str(test_file))
 
     assert isinstance(genetic_maps, dict), "The function should return a dictionary."
     assert "GeneticMap1" in genetic_maps, "The dictionary should contain keys in the expected format."
+    assert "GeneticMap2" in genetic_maps, "The dictionary should contain keys in the expected format."
     assert not genetic_maps["GeneticMap1"].empty, "The DataFrame for chr 1 should not be empty."
-    assert len(genetic_maps) == 1, "There should be exactly one genetic map loaded."
+    assert not genetic_maps["GeneticMap2"].empty, "The DataFrame for chr 2 should not be empty."
+    assert len(genetic_maps) == 2, "There should be exactly two genetic maps loaded."
     assert all(
-        column in genetic_maps["GeneticMap1"].columns for column in mock_map.columns
+        column in genetic_maps["GeneticMap1"].columns for column in combined_mock_map.columns
+    ), "The DataFrame should contain the expected columns."
+    assert all(
+        column in genetic_maps["GeneticMap2"].columns for column in combined_mock_map.columns
     ), "The DataFrame should contain the expected columns."
 
 
@@ -270,12 +276,15 @@ def test_generate_c_and_t_prs_scores(
     table = pa.Table.from_pandas(mock_dosage_df)
     test_file = tmp_path / "test_dosage_matrix.feather"
     pa.feather.write_feather(table, test_file)
-    with patch(
-        "bystro.prs.preprocess_for_prs.finalize_scores_after_c_t",
-        side_effect=mock_finalize_scores_after_c_t,
-    ), patch(
-        "bystro.prs.preprocess_for_prs.finalize_dosage_after_c_t",
-        side_effect=mock_finalize_dosage_after_c_t,
+    with (
+        patch(
+            "bystro.prs.preprocess_for_prs.finalize_scores_after_c_t",
+            side_effect=mock_finalize_scores_after_c_t,
+        ),
+        patch(
+            "bystro.prs.preprocess_for_prs.finalize_dosage_after_c_t",
+            side_effect=mock_finalize_dosage_after_c_t,
+        ),
     ):
         gwas_scores_path = "mock_gwas_scores_path"
         dosage_matrix_path = test_file
