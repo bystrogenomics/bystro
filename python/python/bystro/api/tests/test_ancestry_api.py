@@ -115,7 +115,6 @@ def test_ancestry_tsv(tmp_path):
     # Run the conversion for TSV
     ancestry_json_to_format(ancestry_file_path, output_tsv_path, "tsv")
     df1 = pd.read_csv(output_tsv_path, sep="\t")
-    print("df1", df1)
 
     # Run the conversion for Excel
     ancestry_json_to_format(ancestry_file_path, output_csv_path, "csv")
