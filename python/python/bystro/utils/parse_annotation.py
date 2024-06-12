@@ -42,7 +42,7 @@ def parse_tsv_streaming(input_file_path, output_file_path):
 
     for row in reader:
         # For refSeq fields, we annotate one entry per disrupted base in indels
-        # We deduplicate the outpu, so we just need to figure ou the maximum length
+        # We deduplicate the output, so we just need to figure out the maximum length
         exploded_rows = []
         refseq_values = {field: row[field].split("|") for field in refseq_fields}
         max_length = max(len(values) for values in refseq_values.values())
