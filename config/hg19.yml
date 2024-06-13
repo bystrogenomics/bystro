@@ -447,7 +447,6 @@ tracks:
         - CLNVCSO
         - DBVARID
         - ORIGIN
-        - SSR
         - RS
       local_files:
         - clinvar.vcf.gz
