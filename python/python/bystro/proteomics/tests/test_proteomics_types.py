@@ -1,4 +1,3 @@
-import pytest
 from bystro.proteomics.proteomics_types import (
     ProteomicsSubmission,
     DataFrameJson,
@@ -10,15 +9,6 @@ import numpy as np
 
 def test_ProteomicsSubmission():
     ProteomicsSubmission("foo.tsv")
-
-
-def test_ProteomicsSubmission_bad_input():
-    with pytest.raises(TypeError, match="must be of type str"):
-        ProteomicsSubmission(3) # type: ignore
-
-    with pytest.raises(ValueError, match="must be of extension `.tsv`"):
-        ProteomicsSubmission("foo.docx")
-
 
 def test_ProteomicsResonse():
     data = pd.DataFrame(

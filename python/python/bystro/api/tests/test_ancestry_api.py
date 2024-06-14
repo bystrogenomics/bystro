@@ -1,4 +1,7 @@
 from pathlib import Path
+import os
+
+import pandas as pd
 
 from msgspec import json
 import pytest
@@ -14,7 +17,7 @@ from bystro.ancestry.tests.test_inference import (
     ANCESTRY_MODEL,
     _infer_ancestry,
 )
-from bystro.api.ancestry import calculate_ancestry_scores
+from bystro.api.ancestry import calculate_ancestry_scores, ancestry_json_to_format
 
 
 @pytest.mark.integration("Requires bystro-vcf to be installed as well as AWS credentials.")
@@ -95,3 +98,27 @@ def test_job_data_from_beanstalkd():
 
     deserialized_values = json.decode(serialized_expected_value, type=AncestryJobData)
     assert deserialized_values == ancestry_job_data
+
+
+def test_ancestry_tsv(tmp_path):
+    pwd = os.path.dirname(os.path.abspath(__file__))
+    ancestry_file_path = Path(pwd) / "ancestry_input.json"
+    expected_results_path = Path(pwd) / "ancestry_expected_output.tsv"
+
+    expected = pd.read_csv(expected_results_path, sep="\t")
+    print("expected", expected)
+
+    # create tmp file
+    output_tsv_path = tmp_path / "output.tsv"
+    output_csv_path = tmp_path / "output.csv"
+
+    # Run the conversion for TSV
+    ancestry_json_to_format(ancestry_file_path, output_tsv_path, "tsv")
+    df1 = pd.read_csv(output_tsv_path, sep="\t")
+
+    # Run the conversion for Excel
+    ancestry_json_to_format(ancestry_file_path, output_csv_path, "csv")
+    df2 = pd.read_csv(output_csv_path)
+
+    assert expected.equals(df1), "TSV files do not match"
+    assert expected.equals(df2), "CSV files do not match"
