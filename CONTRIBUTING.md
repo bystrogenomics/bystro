@@ -23,7 +23,7 @@ git checkout -b feature/some_feature
 git commit -a -m "Addresses issue #NNN".
 
 # Push to the remote repository, explicitly telling git that the remote repository you want to push to is "origin" (the foobar fork).
-git push --set-upstream origin feature/some_feature
+git push --set-upstream origin feature/999
 ```
 
 Then, visit your fork, and use GitHub to issue the pull request. GitHub will automatically set the bystrogenomics/master as the branch you're PR'ing against.
@@ -74,35 +74,63 @@ git pull upstream refs/pull/999/head
 # Pull Request Etiquette
 1. Keep pull requests small: < 500 maximum added lines of code with rare exceptions, < 200 lines preferred.
 2. 1 commit per pull request: this will make commit history in the main branch easier to follow. 
-- Making significant contributions in a single commit is hard.
-- To solve this, we can leverage the fact that we are operating in a fork of the main repository, and so rewriting our feature branch history has no chance of polluting the main repository's history.
-- Let's say we are in our local clone of our bystro repository fork, on our feature branch feature/999. This feature branch has 7 commits, and we wish to condense that into 1:
 
+
+If you have multiple commits in your feature branch already (the branch you are PR'ing), you can squash those changes:
   ```sh
   # Ensure we're on our local feature/999 branch.
   git checkout feature/999
   
-  # Ensure we have the latest data from our fork.
-  git pull origin feature/999
+  # Bring our local branch up to date with our remote branch
+  # If the branch's remote is "origin" this will be equivalent to executing: git pull origin feature/999
+  git pull
+  ```
   
-  # Keep all code changes, but roll back commit history 7 commits.
-  git reset --soft HEAD~7
-  
-  # Create a new commit, with the cumulative changes of the past 7 commits.
-  # This will overwrite your local feature/999 branch's history, such that the last 7 commit records are replaced with a single commit that has the cumulative changes of those last 7 commits.
+  To squash all commits in the feature branch:
+  ```sh
+  # Squashes all commits in the feature branch
+  # Here we are assuming the bystrogenomics repository is the "upstream" remote
+  # e.g., that you ran `git remote add upstream git@github.com:bystrogenomics/bystro.git`
+  git reset --soft upstream/master
+  ```
+
+  Then, give your squashed commits a message, and push to remote:
+  ```sh
+  # Give your squashed commit a message
   git commit -a -m "Fixes performance regression, addressing issue #100"
-  
-  # Double check that remote origin points to "foobar/bystro.git"
-  git remote --verbose
   
   # Overwrite your fork's remote history to mirror the local history (with the past 7 commits condensed into 1).
   # With --force-with-lease, the push will be rejected if there are new commits on the remote branch that you have not pulled.
-  git push --force-with-lease origin feature/999
+  git push --force-with-lease
   ```
 
- - This will ensure that git history remains clean, while still allowing you to commit frequently during development.
+  If you have already created a branch from feature/999, which was just squashed, you can bring a child branch (feature/1000) up to date by:
+  ```sh
+  # feature/1000 was branched from feature/999 before the squash
+  git checkout feature/1000
 
+  # bring feature/1000 up to date with feature/999
+  git rebase --fork-point feature/999
 
+  # push the changes to feature/1000 to remote
+  git push --force-with-lease
+  ```
 
+  If you now want to squash the commits that are exclusive to feature/1000:
+  ```sh
+  # Checkout the child branch (feature/1000), and bring it up to date with the changes in the parent branch (feature/999)
+  git checkout feature/1000
+  git merge feature/999
 
+  # This command will go place all of the code changes that are exclusive to feature/1000
+  # into an uncommitted state
+  git reset --soft feature/999
 
+  # Commit all of the changes, thereby squashing them
+  git commit -a -m "some commit message for the commits exclusive to feature/1000 that have been squashed"
+
+  # Push to the feature branch
+  git push --force-with-lease
+  ```
+
+This will ensure that git history remains clean, while still allowing you to commit frequently during development.
