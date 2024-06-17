@@ -30,6 +30,6 @@ def calculate_prs_scores(_publisher: ProgressPublisher, prs_job_data: PRSJobData
     basename = prs_job_data.out_basename
     out_path = str(Path(prs_job_data.out_dir) / f"{basename}.prs_scores.tsv")
 
-    result.to_csv(out_path, sep="\t", index=False)
+    result.to_csv(out_path, sep="\t")
 
     return PRSJobResult(result_path=str(out_path), disease=disease, pmid=pmid)
