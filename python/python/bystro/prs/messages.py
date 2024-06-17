@@ -5,7 +5,9 @@ class PRSJobData(BaseMessage, frozen=True, forbid_unknown_fields=True, rename="c
     """Data for PRS jobs received from beanstalkd"""
 
     dosage_matrix_path: str
-    output_dir: str
+    p_value_threshold: float
+    ancestry_result_path: str
+    out_dir: str
     assembly: str
 
 
