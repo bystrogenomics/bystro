@@ -292,7 +292,7 @@ def generate_c_and_t_prs_scores(
     dosage_matrix_path: str,
     map_path: str,
     p_value_threshold: float = 0.05,
-) -> dict[str, float]:
+) -> pd.DataFrame:
     """Calculate PRS."""
     # This part goes through dosage matrix the first time to get overlapping loci
     scores_after_c_t, loci_and_allele_comparison = finalize_scores_after_c_t(
@@ -314,7 +314,7 @@ def generate_c_and_t_prs_scores(
         genos_transpose = finalize_dosage_after_c_t(sample_genotypes, loci_and_allele_comparison)
         prs_scores_chunk = genos_transpose @ beta_values.loc[genos_transpose.columns]
         prs_scores = prs_scores.add(prs_scores_chunk, fill_value=0)
-    return prs_scores.to_dict()
+    return prs_scores
 
 
 def prs_histogram(

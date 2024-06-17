@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from bystro.prs.messages import PRSJobData, PRSJobResult
 from bystro.beanstalkd.worker import ProgressPublisher
 from bystro.prs.model import get_one_model
@@ -11,8 +13,11 @@ def calculate_prs_scores(_publisher: ProgressPublisher, prs_job_data: PRSJobData
     assembly = prs_job_data.assembly
     dosage_matrix_path = prs_job_data.dosage_matrix_path
     p_value_threshold = prs_job_data.p_value_threshold
+    disease = prs_job_data.disease
+    pmid = prs_job_data.pmid
     
-    prs_model = get_one_model(assembly, population="CEU", disease="AD", pmid="PMID35379992")
+    # TODO 2024-06-16 @akotlar: Update this to get multiple populations, one per individual predicted ancestry
+    prs_model = get_one_model(assembly, population="CEU", disease=disease, pmid=pmid)
 
     result = generate_c_and_t_prs_scores(
         gwas_scores_path = prs_model.score_path,
@@ -22,5 +27,9 @@ def calculate_prs_scores(_publisher: ProgressPublisher, prs_job_data: PRSJobData
     )
 
     print("result", result)
+    basename = prs_job_data.out_basename
+    out_path = str(Path(prs_job_data.out_dir) / f"{basename}.prs_scores.tsv")
 
-    return PRSJobResult(prs_scores_path="prs_scores_path")
+    result.to_csv(out_path, sep="\t", index=False)
+
+    return PRSJobResult(result_path=str(out_path))

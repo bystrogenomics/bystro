@@ -293,7 +293,7 @@ def test_generate_c_and_t_prs_scores(
 
         result = generate_c_and_t_prs_scores(
             gwas_scores_path, dosage_matrix_path, map_directory_path, p_value_threshold
-        )
+        ).to_dict()
         expected_result = {"ID00096": -0.013040999999999999, "ID00097": -0.020671}
 
         assert result == expected_result, f"Expected {expected_result}, but got {result}"

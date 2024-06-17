@@ -1,3 +1,4 @@
+from time import strptime
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage, Struct
 
 
@@ -8,7 +9,10 @@ class PRSJobData(BaseMessage, frozen=True, forbid_unknown_fields=True, rename="c
     p_value_threshold: float
     ancestry_result_path: str
     out_dir: str
+    out_basename: str
     assembly: str
+    disease: str
+    pmid: str
 
 
 class PRSJobSubmitMessage(SubmittedJobMessage, frozen=True, kw_only=True, rename="camel"):
@@ -23,7 +27,7 @@ class PRSJobSubmitMessage(SubmittedJobMessage, frozen=True, kw_only=True, rename
 class PRSJobResult(Struct, frozen=True, forbid_unknown_fields=True, rename="camel"):
     """The contents of the PRS result object to be sent back through beanstalkd"""
 
-    prs_scores_path: str
+    result_path: str
 
 
 class PRSJobResultMessage(
@@ -31,7 +35,7 @@ class PRSJobResultMessage(
 ):
     """
     Results to be sent back through beanstalkd after PRS job is completed
-    prs_scores_path: str
+    result_path: str
         The relative path to the PRS scores file, from the PRSJobData.output_dir
     """
 
