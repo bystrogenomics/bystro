@@ -1,12 +1,9 @@
-"""Provide a worker for the ancestry model."""
-
 import logging
 import os
 from pathlib import Path
 import requests
 
 from msgspec import Struct
-import pandas as pd
 
 from bystro.utils.timer import Timer
 
