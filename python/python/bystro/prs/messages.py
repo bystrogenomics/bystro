@@ -28,6 +28,8 @@ class PRSJobResult(Struct, frozen=True, forbid_unknown_fields=True, rename="came
     """The contents of the PRS result object to be sent back through beanstalkd"""
 
     result_path: str
+    disease: str
+    pmid: str
 
 
 class PRSJobResultMessage(
