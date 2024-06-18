@@ -13,7 +13,7 @@ from bystro.ancestry.inference import infer_ancestry
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
 from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, get_progress_reporter, listen
 
-from bystro.ancestry.model import get_models_from_s3
+from bystro.ancestry.model import get_models
 
 logging.basicConfig(
     filename="ancestry_listener.log",
@@ -70,7 +70,7 @@ def handler_fn(publisher: ProgressPublisher, job_data: AncestryJobData) -> Ances
 
     dataset = ds.dataset(job_data.dosage_matrix_path, format="arrow")
 
-    ancestry_models = get_models_from_s3(job_data.assembly)
+    ancestry_models = get_models(job_data.assembly)
 
     return infer_ancestry(ancestry_models, dataset)
 

@@ -1,4 +1,4 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pandas as pd
 import pyarrow as pa  # type: ignore
@@ -23,7 +23,7 @@ AD_SCORE_FILEPATH = "fake_file.txt"
 def mock_scores_df() -> pd.DataFrame:
     return pd.DataFrame(
         {
-            "SNPID": ["1:566875:C:T", "1:728951:A:G"],
+            "SNPID": ["chr1:566875:C:T", "chr1:728951:A:G"],
             "CHR": [1, 1],
             "POS": [566875, 728951],
             "OTHER_ALLELE": ["C", "G"],
@@ -42,12 +42,17 @@ def mock_processed_scores_df() -> pd.DataFrame:
         "OTHER_ALLELE": ["C", "G"],
         "EFFECT_ALLELE": ["T", "A"],
         "P": [0.699009, 0.0030673],
-        "SNPID": ["1:566875:C:T", "1:728951:A:G"],
+        "SNPID": ["chr1:566875:C:T", "chr1:728951:A:G"],
         "BETA": [0.007630, -0.020671],
         "ID_effect_as_alt": ["chr1:566875:C:T", "chr1:728951:G:A"],
         "ID_effect_as_ref": ["chr1:566875:T:C", "chr1:728951:A:G"],
     }
     return pd.DataFrame(mock_gwas_data)
+
+
+@pytest.fixture()
+def mock_scores_loci(mock_processed_scores_df: pd.DataFrame) -> set:
+    return set(mock_processed_scores_df["SNPID"].tolist())
 
 
 @pytest.fixture()
@@ -75,7 +80,8 @@ def mock_dosage_df_clean():
 @pytest.fixture()
 def mock_genetic_maps():
     genetic_map_data = {
-        "GeneticMap1": pd.DataFrame({"upper_bound": [1000, 2000, 3000]}),
+        "GeneticMap1": pd.DataFrame({"upper_bound": [1000, 2000, 3000], "chromosome_num": [1, 1, 1]}),
+        "GeneticMap2": pd.DataFrame({"upper_bound": [1000, 2000, 3000], "chromosome_num": [2, 2, 2]}),
     }
     return genetic_map_data
 
@@ -84,76 +90,72 @@ def mock_genetic_maps():
 def mock_bin_mappings():
     return {
         1: [1000, 2000, 3000],
+        2: [1000, 2000, 3000],
     }
 
 
 @pytest.fixture()
-def mock_final_dosage_scores():
-    genos_transpose_mock = pd.DataFrame(
-        {
-            "chr10:10082621:G:T": [0, 2],
-            "chr10:10528970:A:G": [1, 0],
-        },
-        index=["Sample1", "Sample2"],
-    )
+def mock_finalize_scores_after_c_t():
+    def _mock_finalize_scores_after_c_t(
+        gwas_scores_path, dosage_matrix_path, map_directory_path, p_value_threshold  # noqa: ARG001
+    ):
+        scores_after_c_t = pd.DataFrame(
+            {"BETA": [0.007630, -0.020671], "P": [0.699009, 0.0030673]},
+            index=["chr1:566875:C:T", "chr1:728951:A:G"],
+        )
+        loci_and_allele_comparison = {"chr1:566875:C:T": ("C", "T"), "chr1:728951:A:G": ("G", "A")}
+        return scores_after_c_t, loci_and_allele_comparison
 
-    scores_overlap_adjusted_mock = pd.DataFrame(
-        {
-            "SNPID": ["chr10:10082621:G:T", "chr10:10528970:A:G"],
-            "BETA": [0.1, -0.2],
-        }
-    ).set_index("SNPID")
-
-    expected_results = pd.Series(
-        {
-            "Sample1": (0 * 0.1) + (1 * -0.2),
-            "Sample2": (2 * 0.1) + (0 * -0.2),
-        }
-    )
-    return genos_transpose_mock, scores_overlap_adjusted_mock, expected_results
+    return _mock_finalize_scores_after_c_t
 
 
-def test_extract_nomiss_dosage_loci(mock_dosage_df):
-    filtered_df = mock_dosage_df[mock_dosage_df["ID00096"] != -1]
-    mock_table = pa.Table.from_pandas(filtered_df)
-    with patch("pyarrow.dataset.dataset") as mock_dataset:
-        mock_ds = MagicMock()
-        mock_ds.schema.names = mock_dosage_df.columns.tolist()
-        mock_ds.filter.return_value = mock_ds
-        mock_ds.to_table.return_value = mock_table
-        mock_dataset.return_value = mock_ds
-        result = _extract_nomiss_dosage_loci("mock/path/to/dosage.feather")
+@pytest.fixture()
+def mock_finalize_dosage_after_c_t():
+    def _mock_finalize_dosage_after_c_t(chunk, loci_and_allele_comparison):  # noqa: ARG001
+        return pd.DataFrame(
+            {"ID00096": [1, 1], "ID00097": [0, 1]}, index=["chr1:566875:C:T", "chr1:728951:A:G"]
+        ).transpose()
 
-        assert not result.empty, "The DataFrame should not be empty."
-        assert "locus" in result.columns, "'locus' column should be present in the DataFrame."
-        assert (
-            len(result) == 3
-        ), "The number of rows in the DataFrame should be 3."
-        mock_dataset.assert_called_once_with("mock/path/to/dosage.feather", format="feather")
+    return _mock_finalize_dosage_after_c_t
 
 
-def test_load_genetic_maps_from_feather(tmp_path):
-    test_dir = tmp_path / "ProcessedGeneticMaps"
-    test_dir.mkdir()
-    test_file = test_dir / "chromosome_1_genetic_map.feather"
-    mock_map = pd.DataFrame({"upper_bound": [1000, 2000, 3000], "chromosome_num": [1, 1, 1]})
-    mock_map.to_feather(test_file)
-    genetic_maps = _load_genetic_maps_from_feather(str(test_dir))
+def test_extract_nomiss_dosage_loci(tmp_path, mock_dosage_df, mock_scores_loci):
+    table = pa.Table.from_pandas(mock_dosage_df)
+    test_file = tmp_path / "test_dosage_matrix.feather"
+    pa.feather.write_feather(table, test_file)
+    result = _extract_nomiss_dosage_loci(test_file, mock_scores_loci)
+    expected_result = {"chr1:566875:C:T", "chr1:728951:A:G"}
+
+    assert result == expected_result, f"Expected {expected_result}, but got {result}"
+
+
+def test_load_genetic_maps_from_feather(tmp_path, mock_genetic_maps):
+    test_file = tmp_path / "combined_genetic_map.feather"
+
+    combined_mock_map = pd.concat(mock_genetic_maps.values(), ignore_index=True)
+    combined_mock_map.to_feather(test_file)
+    genetic_maps = _load_genetic_maps_from_feather(str(test_file))
+
     assert isinstance(genetic_maps, dict), "The function should return a dictionary."
     assert "GeneticMap1" in genetic_maps, "The dictionary should contain keys in the expected format."
+    assert "GeneticMap2" in genetic_maps, "The dictionary should contain keys in the expected format."
     assert not genetic_maps["GeneticMap1"].empty, "The DataFrame for chr 1 should not be empty."
-    assert len(genetic_maps) == 1, "There should be exactly one genetic map loaded."
+    assert not genetic_maps["GeneticMap2"].empty, "The DataFrame for chr 2 should not be empty."
+    assert len(genetic_maps) == 2, "There should be exactly two genetic maps loaded."
     assert all(
-        column in genetic_maps["GeneticMap1"].columns for column in mock_map.columns
+        column in genetic_maps["GeneticMap1"].columns for column in combined_mock_map.columns
+    ), "The DataFrame should contain the expected columns."
+    assert all(
+        column in genetic_maps["GeneticMap2"].columns for column in combined_mock_map.columns
     ), "The DataFrame should contain the expected columns."
 
 
 @patch("pyarrow.feather.read_feather")
 def test_load_scores(mock_read_feather, mock_scores_df: pd.DataFrame):
-    # Reset index if your actual function expects 'SNPID' as a column, not an index
     mock_read_feather.return_value = mock_scores_df.reset_index()
     result_df = _load_association_scores("fake_file_path.feather")
     expected_columns = ["CHR", "POS", "OTHER_ALLELE", "EFFECT_ALLELE", "P", "SNPID", "BETA"]
+
     assert not result_df.empty, "The DataFrame should not be empty."
     assert (
         list(result_df.columns) == expected_columns
@@ -164,27 +166,29 @@ def test_load_scores(mock_read_feather, mock_scores_df: pd.DataFrame):
 @patch("bystro.prs.preprocess_for_prs._load_association_scores")
 def test_preprocess_scores(mock_load_association_scores, mock_scores_df: pd.DataFrame):
     mock_load_association_scores.return_value = mock_scores_df
-    processed_scores = _preprocess_scores(AD_SCORE_FILEPATH)
+    processed_scores = _preprocess_scores(mock_scores_df)
 
-    assert "SNPID" in processed_scores.columns
+    assert processed_scores.index.name == "SNPID"
     assert "ID_effect_as_alt" in processed_scores.columns
     assert "ID_effect_as_ref" in processed_scores.columns
 
 
 def test_get_p_value_thresholded_indices(mock_processed_scores_df: pd.DataFrame):
     p_value_threshold = 0.005
-    thresholded_indices = get_p_value_thresholded_indices(mock_processed_scores_df, p_value_threshold)
-    filtered_scores = mock_processed_scores_df.loc[thresholded_indices]
+    thresholded_indices = get_p_value_thresholded_indices(
+        mock_processed_scores_df.set_index("SNPID"), p_value_threshold
+    )
+    filtered_scores = mock_processed_scores_df.set_index("SNPID").loc[list(thresholded_indices)]
+
     assert (
         len(filtered_scores) == 1
     ), "Filtered scores should only contain 1 row for p_value_threshold=0.005."
     assert all(
         filtered_scores["P"] < p_value_threshold
     ), "All rows should have P-values less than the threshold."
-    expected_snps = {"1:728951:A:G"}
-    assert (
-        set(filtered_scores["SNPID"]) == expected_snps
-    ), "Filtered scores should contain expected SNP(s)."
+
+    expected_snps = {"chr1:728951:A:G"}
+    assert set(filtered_scores.index) == expected_snps, "Filtered scores should contain expected SNP(s)."
 
 
 def test_compare_alleles():
@@ -197,6 +201,7 @@ def test_compare_alleles():
         ],
     }
     test_alleles = pd.DataFrame(data)
+
     assert (
         compare_alleles(test_alleles.iloc[0], "pair1", "pair2") == "Direct Match"
     ), "Direct match test failed"
@@ -234,6 +239,7 @@ def test_calculate_abs_effect_weights(mock_processed_scores_df):
     result_df = calculate_abs_effect_weights(mock_processed_scores_df)
     expected_abs_values = [0.007630, 0.020671]  # Expected absolute values
     calculated_abs_values = result_df["abs_effect_weight"].tolist()
+
     assert (
         calculated_abs_values == expected_abs_values
     ), "The calculated and expected values do not match."
@@ -264,14 +270,30 @@ def test_select_max_effect_per_bin():
     ), "The result DataFrame should have one row per (CHR, bin) group."
 
 
-@patch("bystro.prs.preprocess_for_prs.finalize_dosage_scores_after_c_t")
-def test_generate_c_and_t_prs_scores(mock_finalize_dosage_scores_after_c_t, mock_final_dosage_scores):
-    genos_transpose_mock, scores_overlap_adjusted_mock, expected_results = mock_final_dosage_scores
+def test_generate_c_and_t_prs_scores(
+    tmp_path, mock_finalize_scores_after_c_t, mock_finalize_dosage_after_c_t, mock_dosage_df
+):
+    table = pa.Table.from_pandas(mock_dosage_df)
+    test_file = tmp_path / "test_dosage_matrix.feather"
+    pa.feather.write_feather(table, test_file)
+    with (
+        patch(
+            "bystro.prs.preprocess_for_prs.finalize_scores_after_c_t",
+            side_effect=mock_finalize_scores_after_c_t,
+        ),
+        patch(
+            "bystro.prs.preprocess_for_prs.finalize_dosage_after_c_t",
+            side_effect=mock_finalize_dosage_after_c_t,
+        ),
+    ):
+        gwas_scores_path = "mock_gwas_scores_path"
+        dosage_matrix_path = test_file
+        map_directory_path = "mock_map_directory_path"
+        p_value_threshold = 0.05
 
-    def mock_finalize_func(*_, **__):
-        return genos_transpose_mock, scores_overlap_adjusted_mock
+        result = generate_c_and_t_prs_scores(
+            gwas_scores_path, dosage_matrix_path, map_directory_path, p_value_threshold
+        )
+        expected_result = {"ID00096": -0.013040999999999999, "ID00097": -0.020671}
 
-    mock_finalize_dosage_scores_after_c_t.side_effect = mock_finalize_func
-    prs_results = generate_c_and_t_prs_scores("dummy_gwas_path", "dummy_dosage_path", "dummy_map_path")
-    prs_series = pd.Series(prs_results, index=genos_transpose_mock.index)
-    pd.testing.assert_series_equal(prs_series, expected_results, check_dtype=False, check_names=False)
+        assert result == expected_result, f"Expected {expected_result}, but got {result}"

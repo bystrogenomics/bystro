@@ -1,4 +1,4 @@
-black==23.3.0
+black==24.3.0
 flaky==3.7.0
 mypy==1.10.0
 pandas-stubs==2.2.1.240316
@@ -7,6 +7,7 @@ pytest-cov==4.1.0
 pytest-mock==3.11.1
 pytest-asyncio==0.23.7
 pyright==1.1.349
+pyro-ppl==1.9.0
 ruff==0.0.270
 types-tqdm==4.65.0.1
 types-requests==2.31.0.2
@@ -14,4 +15,4 @@ types-psutil==5.9.5
 unipressed==1.2.0
 Cython==3.0.10
 maturin[zig]==1.5.1
-setuptools==65.5.0
+setuptools==65.5.1
