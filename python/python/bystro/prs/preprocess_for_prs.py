@@ -10,6 +10,7 @@ from pyarrow import feather  # type: ignore
 import pyarrow.dataset as ds  # type: ignore
 import pyarrow.compute as pc  # type: ignore
 import pyarrow as pa  # type: ignore
+from bystro.proteomics.annotation_interface import get_annotation_result_from_query, execute_query, async_get_annotation_result_from_query
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,47 @@ def _load_genetic_maps_from_feather(map_path: str) -> dict[str, pd.DataFrame]:
         raise e
 
 
+def convert_loci_to_query_format(score_loci: set) -> str:
+     """
+    Convert a set of loci from the format 'chr10:105612479:G:T' to '(chrom:chr10 pos:105612479 inputRef:G alt:T)'
+    and separate them by '||' in order to issue queries with them.
+    """
+    finalized_loci = []
+    for locus in score_loci:
+        chrom, pos, inputRef, alt = locus.split(':')
+        single_query = f"(chrom:{chrom} pos:{pos} inputRef:{inputRef} alt:{alt})"
+        finalized_loci.append(single_query)
+    allele_frequency_filters = [
+        "(gnomad.genomes.AF_afr:>0)",
+        "(gnomad.genomes.AF_amr:>0)",
+        "(gnomad.genomes.AF_eas:>0)",
+        "(gnomad.genomes.AF_nfe:>0)",
+        "(gnomad.genomes.AF_sas:>0)"
+    ]
+    full_query = allele_frequency_filters + finalized_loci
+    return f'"{" || ".join(full_query)}"'
+
+    
+def _extract_af_and_loci_overlap(score_loci: set, target_dataset_index: str, user: str) -> pd.DataFrame:
+    """
+    Convert loci to query format, perform annotation query, 
+    and return the loci with gnomad allele frequencies.
+    """
+    finalized_loci = convert_loci_to_query_format(score_loci)
+    thresholded_loci_gnomad_afs = get_annotation_result_from_query(
+        query_string=finalized_loci,
+        index_name=target_dataset_index,
+        bystro_api_auth=user,
+        melt_samples = False,
+        fields=['gnomad.genomes.AF_afr',
+        'gnomad.genomes.AF_amr',
+        'gnomad.genomes.AF_eas',
+        'gnomad.genomes.AF_nfe',
+        'gnomad.genomes.AF_sas']
+    )
+    return thresholded_loci_gnomad_afs
+
+        
 def _extract_nomiss_dosage_loci(dosage_matrix_path: str, score_loci: set, chunk_size=1000) -> set:
     """
     Reads a dataset from the provided dosage matrix Feather file path and filters out
@@ -261,14 +303,19 @@ def ld_clump(scores_overlap: pd.DataFrame, map_path: str) -> tuple[pd.DataFrame,
 
 
 def finalize_scores_after_c_t(
-    gwas_scores_path: str, dosage_matrix_path: str, map_path: str, p_value_threshold: float
+    gwas_scores_path: str, dosage_matrix_path: str, map_path: str, p_value_threshold: float,
+    target_dataset_index=None, user=None
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Finalize scores for PRS calculation."""
     scores = _load_association_scores(gwas_scores_path)
     preprocessed_scores = _preprocess_scores(scores)
     thresholded_score_loci = get_p_value_thresholded_indices(preprocessed_scores, p_value_threshold)
-    dosage_loci_nomiss = _extract_nomiss_dosage_loci(dosage_matrix_path, thresholded_score_loci)
-    overlap_loci = generate_overlap_scores_dosage(thresholded_score_loci, dosage_loci_nomiss)
+    if target_dataset_index is not None and user is not None:
+        annotation_loci_nomiss = _extract_af_and_loci_overlap (thresholded_score_loci,target_dataset_index,user)
+        overlap_loci = set(annotation_loci_nomiss['locus'])
+    else:
+        dosage_loci_nomiss = _extract_nomiss_dosage_loci(dosage_matrix_path, thresholded_score_loci)
+        overlap_loci = generate_overlap_scores_dosage(thresholded_score_loci, dosage_loci_nomiss)    
     scores_overlap = preprocessed_scores[preprocessed_scores.index.isin(overlap_loci)]
     scores_after_c_t, loci_and_allele_comparison = ld_clump(scores_overlap, map_path)
     scores_after_c_t = scores_after_c_t.sort_index()
