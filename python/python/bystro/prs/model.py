@@ -20,16 +20,14 @@ PRS_MODEL_DIR = Path(os.getenv("PRS_MODEL_DIR", str(Path(__file__).parent / "dat
 PRS_MODEL_MAP_SUBDIR = "map"
 PRS_MODEL_SUMSTATS_SUBDIR = "sumstats"
 
-models_cache: dict[str, str] = {}
-
-map_template = "%s_genetic_map_%s.feather"
-sumstats_template = "%s_sumstats_%s_%s_compressed.feather"
-
-
 class PrsModel(Struct, frozen=True, forbid_unknown_fields=True, rename="camel"):
     map_path: str
     score_path: str
 
+models_cache: dict[str, PrsModel] = {}
+
+map_template = "%s_genetic_map_%s.feather"
+sumstats_template = "%s_sumstats_%s_%s_compressed.feather"
 
 def download_file(bucket: str, key: str, filename: str):
     """
@@ -66,6 +64,12 @@ def get_one_model(assembly: str, population: str, disease: str, pmid: str) -> Pr
     """
     logger.info("Downloading PRS files for %s %s %s %s", assembly, population, disease, pmid)
 
+    # Check if in cache
+    key = f"{assembly}_{population}_{disease}_{pmid}"
+    if key in models_cache:
+        logger.debug("PRS model found in cache.")
+        return models_cache[key]
+
     map_file = map_template % (assembly, population)
     sumstats_file = sumstats_template % (disease, assembly, pmid)
 
@@ -81,22 +85,30 @@ def get_one_model(assembly: str, population: str, disease: str, pmid: str) -> Pr
 
     remote_sumstats_file = f"{assembly}/{sumstats_file}"
 
-    print("files", map_file, local_map_file, remote_map_file, remote_sumstats_file)
-
     with Timer() as timer:
         try:
-            download_file(bucket=PRS_BUCKET, key=remote_map_file, filename=local_map_file)
-        except requests.HTTPError as e:
-            raise ValueError(f"{map_file} not found in bucket {PRS_BUCKET}.") from e
+            prs_model = get_one_model_from_file_system(str(local_map_file), str(local_sumstats_file))
+            logger.debug("PRS model found on file system.")
+        except ValueError:
+            logger.debug("PRS model not found on file system. Downloading from S3.")
 
-        try:
-            download_file(bucket=PRS_BUCKET, key=remote_sumstats_file, filename=local_sumstats_file)
-        except requests.HTTPError as e:
-            raise ValueError(f"{sumstats_file} not found in bucket {PRS_BUCKET}.") from e
+            try:
+                download_file(bucket=PRS_BUCKET, key=remote_map_file, filename=str(local_map_file))
+            except requests.HTTPError as e:
+                raise ValueError(f"{map_file} not found in bucket {PRS_BUCKET}.") from e
+
+            try:
+                download_file(bucket=PRS_BUCKET, key=remote_sumstats_file, filename=str(local_sumstats_file))
+            except requests.HTTPError as e:
+                raise ValueError(f"{sumstats_file} not found in bucket {PRS_BUCKET}.") from e
+
+            prs_model = get_one_model_from_file_system(str(local_map_file), str(local_sumstats_file))
 
     logger.debug("Downloaded PCA file and RFC file in %f seconds", timer.elapsed_time)
 
-    return get_one_model_from_file_system(local_map_file, local_sumstats_file)
+    models_cache[key] = prs_model
+
+    return prs_model
 
 
 def get_one_model_from_file_system(local_map_file: str, local_sumstats_file: str) -> PrsModel:

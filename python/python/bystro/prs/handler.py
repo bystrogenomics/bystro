@@ -26,7 +26,6 @@ def calculate_prs_scores(_publisher: ProgressPublisher, prs_job_data: PRSJobData
         p_value_threshold = p_value_threshold
     )
 
-    print("result", result)
     basename = prs_job_data.out_basename
     out_path = str(Path(prs_job_data.out_dir) / f"{basename}.prs_scores.tsv")
 
