@@ -3,6 +3,8 @@ from pandas.testing import assert_frame_equal
 import pickle
 from bystro.rare_variant.poirot import extract_residuals, do_poirot_by_snp
 
+pd.options.future.infer_string = True  # type: ignore
+
 
 def test_do_poirot_by_snp():
     with open("python/bystro/rare_variant/tests/poirot_data.pkl", "rb") as f:
@@ -13,9 +15,7 @@ def test_do_poirot_by_snp():
 
     PHENO_ADJ = extract_residuals(PHENO, COVAR)
 
-    results = pd.DataFrame(
-        [do_poirot_by_snp(i, PHENO_ADJ, GENO) for i in range(GENO.shape[1])]
-    )
+    results = pd.DataFrame([do_poirot_by_snp(i, PHENO_ADJ, GENO) for i in range(GENO.shape[1])])
     results["variant"] = GENO.columns
 
     expected_data = {

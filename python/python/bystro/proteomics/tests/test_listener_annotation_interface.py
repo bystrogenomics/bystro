@@ -14,6 +14,7 @@ from bystro.proteomics.listener_annotation_interface import (
 
 from bystro.beanstalkd.worker import ProgressPublisher
 
+pd.options.future.infer_string = True # type: ignore
 
 FAKE_PROTEOMICS_DATA = pd.DataFrame(
     {"sample_id": ["sample1", "sample2"], "gene_name": ["gene1", "gene2"], "abundance": [100, 200]}

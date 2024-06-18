@@ -12,6 +12,7 @@ from bystro.covariance.covariance_cov_shrinkage import (
     lis,
 )
 
+pd.options.future.infer_string = True # type: ignore
 
 def gis_original(Y, k=None): # type: ignore
     N, p = Y.shape

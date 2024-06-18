@@ -16,7 +16,8 @@ def calculate_prs_scores(_publisher: ProgressPublisher, prs_job_data: PRSJobData
     disease = prs_job_data.disease
     pmid = prs_job_data.pmid
     
-    # TODO 2024-06-16 @akotlar: Update this to get multiple populations, one per individual predicted ancestry
+    # TODO 2024-06-16 @akotlar: Update this to get multiple populations,
+    # one per individual predicted ancestry
     prs_model = get_one_model(assembly, population="CEU", disease=disease, pmid=pmid)
 
     result = generate_c_and_t_prs_scores(

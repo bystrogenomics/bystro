@@ -17,6 +17,8 @@ from bystro.proteomics.annotation_interface import (
 
 logger = logging.getLogger(__file__)
 
+pd.options.future.infer_string = True  # type: ignore
+
 PROTEOMICS_TUBE = "proteomics"
 
 
@@ -77,7 +79,7 @@ def make_handler_fn(
         annotation_df = get_annotation_result_from_query(
             query_string=job_data.annotation_query,
             index_name=job_data.index_name,
-            cluster_opensearch_config=search_conf
+            cluster_opensearch_config=search_conf,
         )
 
         joined_df = join_annotation_result_to_fragpipe_dataset(annotation_df, gene_abundance_df)

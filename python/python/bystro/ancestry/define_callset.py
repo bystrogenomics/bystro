@@ -13,10 +13,13 @@ from bystro.ancestry.train_utils import is_autosomal_variant
 
 logger = logging.getLogger(__name__)
 
+pd.options.future.infer_string = True  # type: ignore
+
 ILLUMINA_FILEPATH = DATA_DIR / "Human660W-Quad_v1_H.csv"
 AFFYMETRIX_FILEPATH = DATA_DIR / "Axiom_PMRA.na35.annot.csv"
 
 # TODO: harmonize variant chromosomal coordinates with rsIDs.
+pd.options.future.infer_string = True  # type: ignore
 
 
 def get_watson_crick_complement(base: str) -> str:

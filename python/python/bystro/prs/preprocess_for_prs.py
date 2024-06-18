@@ -17,7 +17,7 @@ from bystro.utils.timer import Timer
 
 logger = logging.getLogger(__name__)
 
-AD_SCORE_FILEPATH = "gwas_summary_stats/AD_sumstats_hg38_PMID35379992.feather"
+pd.options.future.infer_string = True  # type: ignore
 
 
 class StrEnum(str, Enum):
@@ -35,9 +35,19 @@ def _load_association_scores(ad_scores_filepath: str) -> pd.DataFrame:
     """Load in GWAS summary statistics provided by user."""
     # For now, we are supporting one AD dataset PMID:35379992
     ad_scores = feather.read_feather(ad_scores_filepath)
-    print("ad_scores schema", ad_scores.dtypes)
+
     columns_to_include = ["CHR", "POS", "OTHER_ALLELE", "EFFECT_ALLELE", "P", "SNPID", "BETA"]
-    return ad_scores[columns_to_include]
+    return ad_scores[columns_to_include].astype(
+        {
+            "CHR": "int64",
+            "POS": "int64",
+            "OTHER_ALLELE": "string[pyarrow_numpy]",
+            "EFFECT_ALLELE": "string[pyarrow_numpy]",
+            "P": "float32",
+            "SNPID": "string[pyarrow_numpy]",
+            "BETA": "float32",
+        }
+    )
 
 
 def _load_genetic_maps_from_feather(map_path: str) -> dict[str, pd.DataFrame]:
@@ -54,6 +64,9 @@ def _load_genetic_maps_from_feather(map_path: str) -> dict[str, pd.DataFrame]:
     """
     try:
         combined_genetic_map = pd.read_feather(map_path)
+        combined_genetic_map = combined_genetic_map.astype(
+            {"chromosome_num": "int64", "upper_bound": "int64"}
+        )
         logger.info("Successfully loaded combined genetic map from: %s", map_path)
         genetic_maps = {}
         for chrom_num in combined_genetic_map["chromosome_num"].unique():
@@ -64,6 +77,7 @@ def _load_genetic_maps_from_feather(map_path: str) -> dict[str, pd.DataFrame]:
     except Exception as e:
         logger.exception("Failed to load genetic map from: %s: %s", map_path, e)
         raise e
+
 
 def _preprocess_scores(ad_scores: pd.DataFrame) -> pd.DataFrame:
     """Process GWAS summary statistics to use effect scores for PRS."""
@@ -232,7 +246,7 @@ def ld_clump(scores_overlap: pd.DataFrame, map_path: str) -> tuple[pd.DataFrame,
 
 
 def finalize_scores_after_c_t(
-    gwas_scores_path: str, dosage_matrix_path: str, map_path: str, p_value_threshold: float
+    gwas_scores_path: str, map_path: str, p_value_threshold: float
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Finalize scores for PRS calculation."""
     with Timer() as timer:
@@ -267,7 +281,7 @@ def finalize_dosage_after_c_t(
     genos_transpose = genotypes_adjusted_only.T
     return genos_transpose
 
-import json
+
 def generate_c_and_t_prs_scores(
     gwas_scores_path: str,
     dosage_matrix_path: str,
@@ -278,7 +292,7 @@ def generate_c_and_t_prs_scores(
     # This part goes through dosage matrix the first time to get overlapping loci
     with Timer() as timer:
         scores_after_c_t, loci_and_allele_comparison = finalize_scores_after_c_t(
-            gwas_scores_path, dosage_matrix_path, map_path, p_value_threshold
+            gwas_scores_path, map_path, p_value_threshold
         )
     logger.debug("Time to finalize scores after clumping and thresholding: %s", timer.elapsed_time)
 
@@ -288,7 +302,7 @@ def generate_c_and_t_prs_scores(
 
     beta_values = scores_after_c_t["BETA"]
     finalized_loci = scores_after_c_t.index.tolist()
-    print("finalized_loci", json.dumps(finalized_loci, indent=2))
+
     score_loci_filter = pc.field("locus").isin(pa.array(finalized_loci))
 
     dosage_ds = ds.dataset(dosage_matrix_path, format="feather").filter(score_loci_filter)
@@ -301,10 +315,14 @@ def generate_c_and_t_prs_scores(
             with Timer() as timer:
                 sample_genotypes = dosage_ds.to_table(["locus", *sample_group]).to_pandas()
                 sample_genotypes = sample_genotypes.set_index("locus")
-                sample_genotypes = sample_genotypes[(sample_genotypes >= 0).all(axis=1)]
+                sample_genotypes = sample_genotypes[
+                    sample_genotypes.notna() & (sample_genotypes >= 0).all(axis=1)
+                ]
 
             logger.debug(
-                "Time to load dosage matrix chunk of %d samples: %s", len(sample_group), timer.elapsed_time
+                "Time to load dosage matrix chunk of %d samples: %s",
+                len(sample_group),
+                timer.elapsed_time,
             )
 
             with Timer() as timer:
@@ -312,7 +330,9 @@ def generate_c_and_t_prs_scores(
                 prs_scores_chunk = genos_transpose @ beta_values.loc[genos_transpose.columns]
                 prs_scores = prs_scores.add(prs_scores_chunk, fill_value=0)
             logger.debug(
-                "Time to calculate PRS for chunk of %d samples: %s", len(sample_group), timer.elapsed_time
+                "Time to calculate PRS for chunk of %d samples: %s",
+                len(sample_group),
+                timer.elapsed_time,
             )
     logger.debug("Time to calculate PRS for all samples: %s", outer_timer.elapsed_time)
 

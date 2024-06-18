@@ -20,6 +20,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger()
 
+pd.options.future.infer_string = True  # type: ignore
+
 ANCESTRY_BUCKET = os.getenv("ANCESTRY_BUCKET", "bystro-ancestry-public")
 ANCESTRY_MODEL_DIR = os.getenv("ANCESTRY_MODEL_DIR", str(Path(__file__).parent / "data"))
 GNOMAD_PCA_FILE = "gnomadset_pca.csv"

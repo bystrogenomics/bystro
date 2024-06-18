@@ -1,12 +1,13 @@
 """Load and preprocess fragpipe output files."""
 
-
 from collections.abc import Sequence
 from io import StringIO
 from pathlib import Path
 from typing import TypeVar
 
 import pandas as pd
+
+pd.options.future.infer_string = True  # type: ignore
 
 T = TypeVar("T")
 

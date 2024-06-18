@@ -12,6 +12,8 @@ from bystro.ancestry.inference import AncestryModel, AncestryModels, infer_ances
 from bystro.ancestry.train import POPS
 from bystro.ancestry.model import get_models
 
+pd.options.future.infer_string = True # type: ignore
+
 SAMPLES = [f"sample{i}" for i in range(len(POPS))]
 VARIANTS = ["variant1", "variant2", "variant3"]
 PC_COLUMNS = ["pc1", "pc2", "pc3", "pc4"]

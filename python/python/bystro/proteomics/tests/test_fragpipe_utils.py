@@ -5,6 +5,8 @@ import pandas as pd
 
 from bystro.proteomics.fragpipe_utils import check_df_starts_with_cols
 
+pd.options.future.infer_string = True  # type: ignore
+
 
 def test_check_df_starts_with_cols_happy_path():
     """Ensure that check_df_starts_with_cols succeeds if df cols start with given cols."""

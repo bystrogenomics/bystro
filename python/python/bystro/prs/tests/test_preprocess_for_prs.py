@@ -16,6 +16,8 @@ from bystro.prs.preprocess_for_prs import (
     select_max_effect_per_bin,
 )
 
+pd.options.future.infer_string = True  # type: ignore
+
 AD_SCORE_FILEPATH = "fake_file.txt"
 
 

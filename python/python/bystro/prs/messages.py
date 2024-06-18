@@ -1,4 +1,3 @@
-from time import strptime
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage, Struct
 
 
@@ -6,13 +5,13 @@ class PRSJobData(BaseMessage, frozen=True, forbid_unknown_fields=True, rename="c
     """Data for PRS jobs received from beanstalkd"""
 
     dosage_matrix_path: str
-    p_value_threshold: float
     ancestry_result_path: str
     out_dir: str
     out_basename: str
     assembly: str
     disease: str
     pmid: str
+    p_value_threshold: float
 
 
 class PRSJobSubmitMessage(SubmittedJobMessage, frozen=True, kw_only=True, rename="camel"):

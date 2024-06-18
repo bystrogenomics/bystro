@@ -7,6 +7,8 @@ from pathlib import Path
 import pandas as pd
 from bystro.proteomics.fragpipe_utils import check_df_starts_with_cols, prep_annotation_df
 
+pd.options.future.infer_string = True  # type: ignore
+
 PG_MATRIX_COLS = ["Protein.Group", "Protein.Ids", "Protein.Names", "Genes", "First.Protein.Description"]
 
 

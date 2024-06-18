@@ -6,9 +6,12 @@ from bystro.proteomics.proteomics_types import (
 import pandas as pd
 import numpy as np
 
+pd.options.future.infer_string = True  # type: ignore
+
 
 def test_ProteomicsSubmission():
     ProteomicsSubmission("foo.tsv")
+
 
 def test_ProteomicsResonse():
     data = pd.DataFrame(

@@ -26,6 +26,8 @@ from bystro.search.utils.opensearch import gather_opensearch_args
 
 logger = logging.getLogger(__file__)
 
+pd.options.future.infer_string = True  # type: ignore
+
 nest_asyncio.apply()
 
 HETEROZYGOTE_DOSAGE = 1

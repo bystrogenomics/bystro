@@ -20,14 +20,17 @@ PRS_MODEL_DIR = Path(os.getenv("PRS_MODEL_DIR", str(Path(__file__).parent / "dat
 PRS_MODEL_MAP_SUBDIR = "map"
 PRS_MODEL_SUMSTATS_SUBDIR = "sumstats"
 
+
 class PrsModel(Struct, frozen=True, forbid_unknown_fields=True, rename="camel"):
     map_path: str
     score_path: str
+
 
 models_cache: dict[str, PrsModel] = {}
 
 map_template = "%s_genetic_map_%s.feather"
 sumstats_template = "%s_sumstats_%s_%s_compressed.feather"
+
 
 def download_file(bucket: str, key: str, filename: str):
     """
@@ -98,7 +101,9 @@ def get_one_model(assembly: str, population: str, disease: str, pmid: str) -> Pr
                 raise ValueError(f"{map_file} not found in bucket {PRS_BUCKET}.") from e
 
             try:
-                download_file(bucket=PRS_BUCKET, key=remote_sumstats_file, filename=str(local_sumstats_file))
+                download_file(
+                    bucket=PRS_BUCKET, key=remote_sumstats_file, filename=str(local_sumstats_file)
+                )
             except requests.HTTPError as e:
                 raise ValueError(f"{sumstats_file} not found in bucket {PRS_BUCKET}.") from e
 

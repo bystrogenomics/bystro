@@ -14,6 +14,8 @@ from bystro.ancestry.train import (
 )
 
 
+pd.options.future.infer_string = True  # type: ignore
+
 def load_illumina_affy_variants() -> set[str]:
     """Get previously computed intersection of illumina and affymetrix variants."""
     return set(pd.read_csv(INTERMEDIATE_DATA_DIR / "shared_illumina_affy_variants.csv").variant)

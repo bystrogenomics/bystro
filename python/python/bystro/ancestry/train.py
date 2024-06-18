@@ -9,6 +9,7 @@ This script takes a vcf of preprocessed variants (see preprocess_vcfs.sh) and ge
 3.  Classifiers mapping PC space to the 26 HapMap populations as well as 5 continent-level
 superpopulations.
 """
+
 import dataclasses
 import gzip
 import logging
@@ -36,6 +37,7 @@ from bystro.vcf_utils.simulate_random_vcf import HEADER_COLS
 
 logger = logging.getLogger(__name__)
 
+pd.options.future.infer_string = True  # type: ignore
 
 ANCESTRY_DIR = Path(__file__).parent
 DATA_DIR = ANCESTRY_DIR / "data"

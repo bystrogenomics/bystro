@@ -4,6 +4,7 @@ import pandas as pd
 
 from bystro.utils.config import BYSTRO_PROJECT_ROOT
 
+pd.options.future.infer_string = True  # type: ignore
 
 _MAPPING_FILENAME = (
     BYSTRO_PROJECT_ROOT / "python/python/bystro/proteomics" / "uniprot_id_gene_name_mapping.csv"
