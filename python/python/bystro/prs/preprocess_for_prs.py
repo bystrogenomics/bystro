@@ -287,6 +287,7 @@ def generate_c_and_t_prs_scores(
     dosage_matrix_path: str,
     map_path: str,
     p_value_threshold: float = 0.05,
+    sample_chunk_size: int = 200
 ) -> pd.Series:
     """Calculate PRS."""
     # This part goes through dosage matrix the first time to get overlapping loci
@@ -308,7 +309,7 @@ def generate_c_and_t_prs_scores(
     dosage_ds = ds.dataset(dosage_matrix_path, format="feather").filter(score_loci_filter)
 
     samples = [name for name in dosage_ds.schema.names if name != "locus"]
-    sample_groups = [samples[i : i + 1000] for i in range(0, len(samples), 1000)]
+    sample_groups = [samples[i : i + sample_chunk_size] for i in range(0, len(samples), sample_chunk_size)]
 
     with Timer() as outer_timer:
         for sample_group in sample_groups:
