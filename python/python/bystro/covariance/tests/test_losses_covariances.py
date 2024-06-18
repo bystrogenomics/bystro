@@ -103,12 +103,12 @@ def test_kl_divergence_gaussian():
     mu_list = [np.zeros(2), np.ones(2)]
     Sigma_list = [np.eye(2), 2 * np.eye(2)]
     weights = np.array([0.5, 0.5])
-    expected = np.mean(
+    expected = float(np.mean(
         [
             kl_divergence_gaussian(mu, Sigma, mu1, Sigma1)
             for mu, Sigma in zip(mu_list, Sigma_list)
         ]
-    )
+    ))
     assert np.isclose(
         kl_divergence_gaussian(
             np.array(mu_list), np.array(Sigma_list), mu1, Sigma1, weights
@@ -118,14 +118,14 @@ def test_kl_divergence_gaussian():
 
     mu1_list = [np.zeros(2), -np.ones(2)]
     Sigma1_list = [np.eye(2), 3 * np.eye(2)]
-    expected = np.mean(
+    expected = float(np.mean(
         [
             kl_divergence_gaussian(mu0, Sigma0, mu1, Sigma1)
             for mu0, Sigma0, mu1, Sigma1 in zip(
                 mu_list, Sigma_list, mu1_list, Sigma1_list
             )
         ]
-    )
+    ))
     assert np.isclose(
         kl_divergence_gaussian(
             np.array(mu_list),
@@ -151,12 +151,12 @@ def test_symmetric_kl_divergence_gaussian():
     mu_list = [np.zeros(2), np.ones(2)]
     Sigma_list = [np.eye(2), 2 * np.eye(2)]
     weights = np.array([0.5, 0.5])
-    expected = np.mean(
+    expected = float(np.mean(
         [
             symmetric_kl_divergence_gaussian(mu, Sigma0, mu1, Sigma1)
-            for mu, Sigma in zip(mu_list, Sigma_list)
+            for mu, Sigma0 in zip(mu_list, Sigma_list)
         ]
-    )
+    ))
     assert np.isclose(
         symmetric_kl_divergence_gaussian(
             np.array(mu_list), np.array(Sigma_list), mu1, Sigma1, weights
@@ -167,14 +167,14 @@ def test_symmetric_kl_divergence_gaussian():
     # Test with two lists of distributions
     mu1_list = [np.zeros(2), -np.ones(2)]
     Sigma1_list = [np.eye(2), 3 * np.eye(2)]
-    expected = np.mean(
+    expected = float(np.mean(
         [
             symmetric_kl_divergence_gaussian(mu0, Sigma0, mu1, Sigma1)
             for mu0, Sigma0, mu1, Sigma1 in zip(
                 mu_list, Sigma_list, mu1_list, Sigma1_list
             )
         ]
-    )
+    ))
     assert np.isclose(
         symmetric_kl_divergence_gaussian(
             np.array(mu_list),
