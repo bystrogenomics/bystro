@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn.preprocessing import StandardScaler
-from bystro.prs.prscs import PRSCS
+from bystro.prs.prscs_sgld import PRSCS
 from sklearn.linear_model import Ridge
 
 

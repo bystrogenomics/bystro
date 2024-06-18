@@ -3,7 +3,7 @@ import io
 
 import msgspec
 
-from bystro.api.ancestry import calculate_ancestry_scores
+from bystro.api.ancestry import calculate_ancestry_scores, ancestry_json_to_format
 
 
 def add_ancestry_subparser(subparsers):
@@ -69,6 +69,25 @@ def add_ancestry_subparser(subparsers):
 
     ancestry_score_parser.set_defaults(func=_calculate_and_write_ancestry_scores)
 
+    # Add new subparser for JSON to TSV/CSV conversion
+    convert_parser = ancestry_subparser.add_parser(
+        "convert", help="Convert JSON ancestry results to TSV or CSV format"
+    )
+
+    convert_parser.add_argument("--input-json", type=str, required=True, help="The input JSON file")
+    convert_parser.add_argument(
+        "--output", type=str, required=True, help="The output file (TSV or CSV)"
+    )
+    convert_parser.add_argument(
+        "--format",
+        type=str,
+        choices=["tsv", "csv"],
+        default="tsv",
+        help="The output format (default is tsv)",
+    )
+
+    convert_parser.set_defaults(func=_convert_json_to_tsv_or_excel)
+
 
 def _calculate_and_write_ancestry_scores(args: argparse.Namespace):
     """Calculate ancestry scores from a VCF file and write the results to a file.
@@ -100,3 +119,23 @@ def _calculate_and_write_ancestry_scores(args: argparse.Namespace):
 
     else:
         print(f"Ancestry results written to {args.out_dir}")
+
+
+def _convert_json_to_tsv_or_excel(args: argparse.Namespace):
+    """Convert JSON ancestry results to TSV or CSV format
+
+    Args:
+        args (argparse.Namespace): The parsed arguments from the command line.
+         Arguments expected:
+            - input_json: str
+                The input JSON file
+            - output: str
+                The path to the output TSV or CSV file
+            - format: str
+                The output format (TSV or CSV)
+
+    Returns:
+        None
+    """
+    ancestry_json_to_format(args.input_json, args.output, args.format)
+    print(f"\n\nConverted {args.input_json} to {args.format.upper()} format at {args.output}\n")
