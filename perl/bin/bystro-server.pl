@@ -163,10 +163,6 @@ while (1) {
     my $annotate_instance = Seq->new_with_config($inputHref);
 
     ( $err, $outputFileNamesHashRef ) = $annotate_instance->annotate();
-
-    if ($err) {
-      die $err;
-    }
   }
   catch {
     $err = $_;
