@@ -95,7 +95,7 @@ def test_kl_divergence_gaussian():
     Sigma0 = np.eye(2)
     mu1 = np.zeros(2)
     Sigma1 = np.eye(2)
-    expected = 0  # KL divergence should be 0 if the distributions are the same
+    expected = 0.  # KL divergence should be 0 if the distributions are the same
     assert np.isclose(
         kl_divergence_gaussian(mu0, Sigma0, mu1, Sigma1), expected
     ), "KL divergence for identical distributions failed."
@@ -143,7 +143,7 @@ def test_symmetric_kl_divergence_gaussian():
     Sigma0 = np.eye(2)
     mu1 = np.zeros(2)
     Sigma1 = np.eye(2)
-    expected = 0  # Symmetric KL divergence should be 0 if the distributions are the same
+    expected = 0.  # Symmetric KL divergence should be 0 if the distributions are the same
     assert np.isclose(
         symmetric_kl_divergence_gaussian(mu0, Sigma0, mu1, Sigma1), expected
     ), "Symmetric KL divergence for identical distributions failed."
