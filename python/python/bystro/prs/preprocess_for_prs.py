@@ -65,40 +65,6 @@ def _load_genetic_maps_from_feather(map_path: str) -> dict[str, pd.DataFrame]:
         logger.exception("Failed to load genetic map from: %s: %s", map_path, e)
         raise e
 
-
-def _extract_nomiss_dosage_loci(dosage_matrix_path: str, score_loci: set, chunk_size=1000) -> set:
-    """
-    Reads a dataset from the provided dosage matrix Feather file path and filters out
-    rows where any column other than 'locus' contains a missing dosage value (represented by -1)
-    and loci not in the base GWAS summary statistics dataset.
-
-    Args:
-    ----
-    dosage_matrix_path (str): The path to the Feather file containing the target dataset.
-    score_loci (set): A set of loci from a base GWAS summary statistics dataset.
-
-    Returns:
-    -------
-    set: A set containing loci with no missing dosage values across all other columns.
-    """
-    dataset = ds.dataset(dosage_matrix_path, format="feather")
-    score_loci_filter = pc.field("locus").isin(pa.array(list(score_loci)))
-    samples = [name for name in dataset.schema.names if name != "locus"]
-    # Checking for missingness will be removed after imputation to the dosage matrix
-    # TODO: Add imputation preprocess step before PRS, expected 8/2024
-    filters = [pc.field(sample) >= 0 for sample in samples]
-    combined_filter = filters[0]
-    for f in filters[1:]:
-        combined_filter = combined_filter & f
-    total_filter = score_loci_filter & combined_filter
-    table = (
-        dataset.filter(total_filter)
-        .to_table(batch_size=chunk_size, columns=["locus"], batch_readahead=1)
-        .to_pylist()
-    )
-    return set([table[i]["locus"] for i in range(len(table))])
-
-
 def _preprocess_scores(ad_scores: pd.DataFrame) -> pd.DataFrame:
     """Process GWAS summary statistics to use effect scores for PRS."""
     # For now, we are supporting one AD dataset PMID:35379992
@@ -282,15 +248,7 @@ def finalize_scores_after_c_t(
     logger.debug("Time to get p-value thresholded indices: %s", timer.elapsed_time)
 
     with Timer() as timer:
-        dosage_loci_nomiss = _extract_nomiss_dosage_loci(dosage_matrix_path, thresholded_score_loci)
-    logger.debug("Time to extract loci with no missing dosages: %s", timer.elapsed_time)
-
-    with Timer() as timer:
-        overlap_loci = generate_overlap_scores_dosage(thresholded_score_loci, dosage_loci_nomiss)
-    logger.debug("Time to generate overlap scores and dosage: %s", timer.elapsed_time)
-
-    with Timer() as timer:
-        scores_overlap = preprocessed_scores[preprocessed_scores.index.isin(overlap_loci)]
+        scores_overlap = preprocessed_scores[preprocessed_scores.index.isin(thresholded_score_loci)]
         scores_after_c_t, loci_and_allele_comparison = ld_clump(scores_overlap, map_path)
         scores_after_c_t = scores_after_c_t.sort_index()
     logger.debug("Time to clump and adjust dosages: %s", timer.elapsed_time)
@@ -309,7 +267,7 @@ def finalize_dosage_after_c_t(
     genos_transpose = genotypes_adjusted_only.T
     return genos_transpose
 
-
+import json
 def generate_c_and_t_prs_scores(
     gwas_scores_path: str,
     dosage_matrix_path: str,
@@ -329,29 +287,34 @@ def generate_c_and_t_prs_scores(
     prs_scores: pd.Series = pd.Series(dtype=np.float32, name="PRS")
 
     beta_values = scores_after_c_t["BETA"]
-    finalized_loci = scores_after_c_t.index
-    score_loci_filter = pc.field("locus").isin(pa.array(list(finalized_loci)))
+    finalized_loci = scores_after_c_t.index.tolist()
+    print("finalized_loci", json.dumps(finalized_loci, indent=2))
+    score_loci_filter = pc.field("locus").isin(pa.array(finalized_loci))
 
     dosage_ds = ds.dataset(dosage_matrix_path, format="feather").filter(score_loci_filter)
 
     samples = [name for name in dosage_ds.schema.names if name != "locus"]
     sample_groups = [samples[i : i + 1000] for i in range(0, len(samples), 1000)]
 
-    for sample_group in sample_groups:
-        with Timer() as timer:
-            sample_genotypes = dosage_ds.to_table(["locus", *sample_group]).to_pandas()
-            sample_genotypes = sample_genotypes.set_index("locus")
-        logger.debug(
-            "Time to load dosage matrix chunk of %d samples: %s", len(sample_group), timer.elapsed_time
-        )
+    with Timer() as outer_timer:
+        for sample_group in sample_groups:
+            with Timer() as timer:
+                sample_genotypes = dosage_ds.to_table(["locus", *sample_group]).to_pandas()
+                sample_genotypes = sample_genotypes.set_index("locus")
+                sample_genotypes = sample_genotypes[(sample_genotypes >= 0).all(axis=1)]
 
-        with Timer() as timer:
-            genos_transpose = finalize_dosage_after_c_t(sample_genotypes, loci_and_allele_comparison)
-            prs_scores_chunk = genos_transpose @ beta_values.loc[genos_transpose.columns]
-            prs_scores = prs_scores.add(prs_scores_chunk, fill_value=0)
-        logger.debug(
-            "Time to calculate PRS for chunk of %d samples: %s", len(sample_group), timer.elapsed_time
-        )
+            logger.debug(
+                "Time to load dosage matrix chunk of %d samples: %s", len(sample_group), timer.elapsed_time
+            )
+
+            with Timer() as timer:
+                genos_transpose = finalize_dosage_after_c_t(sample_genotypes, loci_and_allele_comparison)
+                prs_scores_chunk = genos_transpose @ beta_values.loc[genos_transpose.columns]
+                prs_scores = prs_scores.add(prs_scores_chunk, fill_value=0)
+            logger.debug(
+                "Time to calculate PRS for chunk of %d samples: %s", len(sample_group), timer.elapsed_time
+            )
+    logger.debug("Time to calculate PRS for all samples: %s", outer_timer.elapsed_time)
 
     return prs_scores
 
