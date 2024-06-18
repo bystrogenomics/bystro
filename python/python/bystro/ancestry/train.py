@@ -526,7 +526,7 @@ def convert_1kgp_vcf_to_dosage(vcf_with_header: pd.DataFrame) -> pd.DataFrame:
     sample_columns_dtypes = {}
     vcf_columns = ["Chromosome", "Position", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"]
     for column in dosage_vcf.columns:
-        if not column in vcf_columns:
+        if column not in vcf_columns:
             sample_columns_dtypes[column] = "uint8"
 
     dosage_vcf = dosage_vcf.set_index("ID", drop=False).astype(sample_columns_dtypes)
