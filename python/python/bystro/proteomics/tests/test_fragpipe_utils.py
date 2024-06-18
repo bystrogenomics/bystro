@@ -23,7 +23,7 @@ def test_check_df_cols_raises():
     expected_cols = ["a", "b", "z"]
     err_msg = re.escape(
         r"expected dataframe to begin with cols: ['a', 'b', 'z'], "
-        r"got cols: Index(['a', 'b', 'c', 'd'], dtype='object') instead."
+        r"got cols: Index(['a', 'b', 'c', 'd'], dtype='string') instead."
     )
     with pytest.raises(ValueError, match=err_msg):
         check_df_starts_with_cols(actual_df, expected_cols)

@@ -16,7 +16,7 @@ def test_do_poirot_by_snp():
     PHENO_ADJ = extract_residuals(PHENO, COVAR)
 
     results = pd.DataFrame([do_poirot_by_snp(i, PHENO_ADJ, GENO) for i in range(GENO.shape[1])])
-    results["variant"] = GENO.columns
+    results["variant"] = GENO.columns.astype("string[pyarrow_numpy]")
 
     expected_data = {
         "pval": [0.672187, 0.397630],

@@ -517,12 +517,19 @@ def _load_1kgp_vcf_to_df() -> pd.DataFrame:
 def convert_1kgp_vcf_to_dosage(vcf_with_header: pd.DataFrame) -> pd.DataFrame:
     """Converts phased genotype vcf to dosage matrix"""
     # TODO Determine whether we should always expect phased genotypes for reference data for training
-    dosage_vcf = vcf_with_header.replace("0|0", 0)
-    dosage_vcf = dosage_vcf.replace("0|1", 1)
-    dosage_vcf = dosage_vcf.replace("1|0", 1)
-    dosage_vcf = dosage_vcf.replace("1|1", 2)
+    dosage_vcf = vcf_with_header.replace("0|0", "0")
+    dosage_vcf = dosage_vcf.replace("0|1", "1")
+    dosage_vcf = dosage_vcf.replace("1|0", "1")
+    dosage_vcf = dosage_vcf.replace("1|1", "2")
     dosage_vcf = dosage_vcf.rename(columns={"#CHROM": "Chromosome", "POS": "Position"}, errors="raise")
-    dosage_vcf = dosage_vcf.set_index("ID", drop=False)
+
+    sample_columns_dtypes = {}
+    vcf_columns = ["Chromosome", "Position", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"]
+    for column in dosage_vcf.columns:
+        if not column in vcf_columns:
+            sample_columns_dtypes[column] = "uint8"
+
+    dosage_vcf = dosage_vcf.set_index("ID", drop=False).astype(sample_columns_dtypes)
     return dosage_vcf
 
 
