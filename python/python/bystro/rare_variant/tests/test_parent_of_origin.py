@@ -103,13 +103,25 @@ def generate_data(beta_m, beta_p, rng, n_individuals=10000, cov=None, maf=0.25):
 
 
 def test_decision_function():
+    np.set_printoptions(suppress=True)
     rng = np.random.default_rng(2021)
     n_p = 10
     beta_m = np.zeros(n_p)
     beta_p = np.zeros(n_p)
     beta_p[:3] = 0.5
     data = generate_data(beta_m, beta_p, rng, maf=0.1, n_individuals=20000)
-    model = POESingleSNP()
+    model = POESingleSNP(
+        compute_pvalue=True, cov_regularization="QuadraticInverse"
+    )
     model.fit(data["phenotypes"], data["genotype"])
     diff = beta_p - beta_m
     assert np.abs(cosine_similarity(diff, model.parent_effect_)) > 0.95
+
+    model = POESingleSNP(
+        compute_pvalue=True,
+        pval_method="permutation",
+        compute_ci=True,
+        cov_regularization="QuadraticInverse",
+    )
+    model.fit(data["phenotypes"], data["genotype"])
+    assert model.p_val < 0.01

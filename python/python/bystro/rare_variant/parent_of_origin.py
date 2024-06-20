@@ -35,6 +35,11 @@ POESingleSNP(BasePOE)
 """
 import numpy as np
 import numpy.linalg as la
+from typing import Tuple, Union, Optional
+from tqdm import trange
+
+from sklearn.utils import resample
+
 from bystro.covariance.optimal_shrinkage import optimal_shrinkage
 from bystro.covariance._covariance_np import (
     EmpiricalCovariance,
@@ -44,7 +49,7 @@ from bystro.covariance.covariance_cov_shrinkage import (
     LinearInverseShrinkage,
     QuadraticInverseShrinkage,
 )
-from typing import Tuple, Union, Optional
+from bystro.random_matrix_theory.rmt4ds_cov_test import two_sample_cov_test
 
 
 class BasePOE:
@@ -122,7 +127,11 @@ class POESingleSNP(BasePOE):
     def __init__(
         self,
         compute_pvalue: bool = False,
-        n_permutations: int = 10000,
+        compute_ci: bool = False,
+        store_samples: bool = False,
+        pval_method: str = "rmt4ds",
+        n_permutations_pval: int = 10000,
+        n_permutations_bootstrap: int = 10000,
         cov_regularization: str = "Empirical",
         svd_loss: Optional[str] = None,
     ) -> None:
@@ -151,7 +160,12 @@ class POESingleSNP(BasePOE):
             If `cov_regularization` is not one of the allowable values.
         """
         self.compute_pvalue = compute_pvalue
-        self.n_permutations = n_permutations
+        self.compute_ci = compute_ci
+        self.n_permutations_pval = n_permutations_pval
+        self.n_permutations_bootstrap = n_permutations_bootstrap
+        self.pval_method = pval_method
+        self.store_samples = store_samples
+
         if cov_regularization == "Empirical":
             self.cov_reg: Union[
                 EmpiricalCovariance,
@@ -172,7 +186,17 @@ class POESingleSNP(BasePOE):
             )
         self.svd_loss = svd_loss
 
-    def fit(self, X: np.ndarray, y: np.ndarray) -> "POESingleSNP":
+        self.p_val = -1.0
+        self.bootstrap_samples_: np.ndarray = np.empty(
+            (10, 10)
+        )  # Will be overwritten in fit
+        self.confidence_interval_: np.ndarray = np.empty(
+            (2, 10)
+        )  # Will be overwritten in fit
+
+    def fit(
+        self, X: np.ndarray, y: np.ndarray, seed: int = 2021
+    ) -> "POESingleSNP":
         """
         Fit the POESingleSNP model.
 
@@ -198,6 +222,11 @@ class POESingleSNP(BasePOE):
         X_homozygotes = X_homozygotes - np.mean(X_homozygotes, axis=0)
         X_heterozygotes = X_heterozygotes - np.mean(X_heterozygotes, axis=0)
 
+        n_hetero = X_heterozygotes.shape[0]
+        n_homo = X_homozygotes.shape[0]
+        n_total = n_hetero + n_homo
+
+        # Compute the point estimate
         self.cov_reg.fit(X_homozygotes)
         Sigma_AA = np.array(self.cov_reg.covariance)
         L = la.cholesky(Sigma_AA)
@@ -212,10 +241,103 @@ class POESingleSNP(BasePOE):
 
         if self.svd_loss:
             s, _ = optimal_shrinkage(
-                s, self.n_phenotypes / self.n_permutations, self.svd_loss
+                s, self.n_phenotypes / n_hetero, self.svd_loss
             )
 
         norm_a = np.maximum(s[0] - 1, 0)
         parent_effect_white = Vt[0] * 2 * np.sqrt(norm_a)
         self.parent_effect_ = np.dot(parent_effect_white, L.T)
+
+        # Compute the p value
+        if self.compute_pvalue:
+            rng = np.random.default_rng(seed)
+            X_total = np.vstack((X_homozygotes, X_heterozygotes))
+
+            if self.pval_method == "permutation":
+                norms_p = np.zeros(self.n_permutations_pval)
+                for i in trange(self.n_permutations_pval):
+                    idx_hetero = np.zeros(n_total)
+                    idx_hetero[
+                        rng.choice(n_total, size=n_hetero, replace=False)
+                    ] = 1
+                    X_homo = X_total[idx_hetero == 0]
+                    X_hetero = X_total[idx_hetero == 1]
+                    X_homo = X_homo - np.mean(X_homo, axis=0)
+                    X_hetero = X_hetero - np.mean(X_hetero, axis=0)
+                    self.cov_reg.fit(X_homo)
+                    Sigma_AA = np.array(self.cov_reg.covariance)
+                    L = la.cholesky(Sigma_AA)
+                    L_inv = la.inv(L)
+                    X_het_whitened = np.dot(X_hetero, L_inv.T)
+                    Sigma_AB_white = np.cov(X_het_whitened.T)
+
+                    U, s, Vt = la.svd(Sigma_AB_white)
+                    if self.svd_loss:
+                        s, _ = optimal_shrinkage(
+                            s,
+                            self.n_phenotypes / n_hetero,
+                            self.svd_loss,
+                        )
+
+                    norm_a = np.maximum(s[0] - 1, 0)
+                    parent_effect_white = Vt[0] * 2 * np.sqrt(norm_a)
+                    parent_effects = np.dot(parent_effect_white, L.T)
+                    norms_p[i] = la.norm(parent_effects)
+
+                self.p_val = float(
+                    np.mean(norms_p > la.norm(self.parent_effect_))
+                )
+            elif self.pval_method == "rmt4ds":
+                result = two_sample_cov_test(X_heterozygotes, X_homozygotes)
+                self.p_val = result["p_value"]
+            else:
+                raise ValueError(
+                    "Unrecognized p value option %s" % self.pval_method
+                )
+
+        # Bootstrap parameter confidence intervals
+        if self.compute_ci:
+            bootstrap_samples_ = np.zeros(
+                (self.n_permutations_bootstrap, self.n_phenotypes)
+            )
+            for i in trange(self.n_permutations_bootstrap):
+                X_homo = resample(X_homozygotes, n_samples=n_homo, replace=True)
+                X_hetero = resample(
+                    X_heterozygotes, n_samples=n_hetero, replace=True
+                )
+                X_homo = X_homo - np.mean(X_homo, axis=0)
+                X_hetero = X_hetero - np.mean(X_hetero, axis=0)
+                self.cov_reg.fit(X_homo)
+                Sigma_AA = np.array(self.cov_reg.covariance)
+                L = la.cholesky(Sigma_AA)
+                L_inv = la.inv(L)
+                X_het_whitened = np.dot(X_hetero, L_inv.T)
+                Sigma_AB_white = np.cov(X_het_whitened.T)
+
+                U, s, Vt = la.svd(Sigma_AB_white)
+                if self.svd_loss:
+                    s, _ = optimal_shrinkage(
+                        s,
+                        self.n_phenotypes / n_hetero,
+                        self.svd_loss,
+                    )
+
+                norm_a = np.maximum(s[0] - 1, 0)
+                parent_effect_white = Vt[0] * 2 * np.sqrt(norm_a)
+                parent_effects = np.dot(parent_effect_white, L.T)
+                if np.dot(parent_effects, self.parent_effect_) > 0:
+                    bootstrap_samples_[i] = parent_effects
+                else:
+                    bootstrap_samples_[i] = -1 * parent_effects
+
+            if self.store_samples:
+                self.bootstrap_samples_ = bootstrap_samples_
+
+            lb = np.quantile(bootstrap_samples_, 0.025, axis=0)
+            ub = np.quantile(bootstrap_samples_, 0.975, axis=0)
+            confidence_interval_ = np.zeros((2, self.n_phenotypes))
+            confidence_interval_[0] = lb
+            confidence_interval_[1] = ub
+
+            self.confidence_interval_ = confidence_interval_
         return self
