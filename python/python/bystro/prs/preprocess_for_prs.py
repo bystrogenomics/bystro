@@ -353,7 +353,13 @@ def generate_c_and_t_prs_scores(
                 overlap_loci = generate_overlap_scores_dosage(thresholded_score_loci, dosage_loci_nomiss)
                 scores_overlap = preprocessed_scores[preprocessed_scores.index.isin(overlap_loci)]
 
-                map_path = get_map_file(assembly, population)
+                # TODO 2024-06-22 @ctrevino: We do not currently have all 26 1000G population maps
+                # this block needs to be removed once we do
+                try:
+                    map_path = get_map_file(assembly, population)
+                except ValueError as e:
+                    logger.exception("Failed to get map file for %s: %s, defaulting to CEU", population, e)
+                    map_path = get_map_file(assembly, "CEU")
 
                 scores_after_c_t, loci_and_allele_comparison = ld_clump(scores_overlap, str(map_path))
                 scores_after_c_t = scores_after_c_t.sort_index()
