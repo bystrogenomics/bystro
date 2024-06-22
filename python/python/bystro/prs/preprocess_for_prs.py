@@ -309,7 +309,12 @@ def generate_c_and_t_prs_scores(
         scores = _load_association_scores(str(gwas_scores_path))
     logger.debug("Time to load association scores: %s", timer.elapsed_time)
 
-    score_loci_filter = pc.field("locus").isin(pa.array(scores))
+    with Timer() as timer:
+        preprocessed_scores = _preprocess_scores(scores)
+        thresholded_score_loci = get_p_value_thresholded_indices(preprocessed_scores, p_value_threshold)
+    logger.debug("Time to preprocess scores: %s", timer.elapsed_time)
+
+    score_loci_filter = pc.field("locus").isin(pa.array(thresholded_score_loci))
 
     dosage_ds = ds.dataset(dosage_matrix_path, format="feather").filter(score_loci_filter)
 
@@ -328,11 +333,6 @@ def generate_c_and_t_prs_scores(
         for i in range(0, len(samples), sample_chunk_size):
             sample_groups.append((population, samples[i : i + sample_chunk_size]))
 
-    with Timer() as timer:
-        preprocessed_scores = _preprocess_scores(scores)
-        thresholded_score_loci = get_p_value_thresholded_indices(preprocessed_scores, p_value_threshold)
-    logger.debug("Time to preprocess scores: %s", timer.elapsed_time)
-
     # Accumulate the results
     prs_scores: pd.Series = pd.Series(dtype=np.float32, name="PRS")
     with Timer() as outer_timer:
@@ -342,13 +342,11 @@ def generate_c_and_t_prs_scores(
             with Timer() as timer:
                 sample_genotypes = dosage_ds.to_table(["locus", *sample_group]).to_pandas()
                 sample_genotypes = sample_genotypes.set_index("locus")
-                sample_genotypes = sample_genotypes[
-                    sample_genotypes.notna() & (sample_genotypes >= 0).all(axis=1)
-                ]
+
+                mask = sample_genotypes.notna().all(axis=1) & (sample_genotypes >= 0).all(axis=1)
+                sample_genotypes = sample_genotypes[mask]
 
                 dosage_loci_nomiss = sample_genotypes.index.tolist()
-
-                logger.info("dosage_loci_nomiss: %s", dosage_loci_nomiss)
 
                 overlap_loci = generate_overlap_scores_dosage(thresholded_score_loci, dosage_loci_nomiss)
                 scores_overlap = preprocessed_scores[preprocessed_scores.index.isin(overlap_loci)]
@@ -358,11 +356,14 @@ def generate_c_and_t_prs_scores(
                 try:
                     map_path = get_map_file(assembly, population)
                 except ValueError as e:
-                    logger.exception("Failed to get map file for %s: %s, defaulting to CEU", population, e)
+                    logger.exception(
+                        "Failed to get map file for %s: %s, defaulting to CEU", population, e
+                    )
                     map_path = get_map_file(assembly, "CEU")
 
                 scores_after_c_t, loci_and_allele_comparison = ld_clump(scores_overlap, str(map_path))
                 scores_after_c_t = scores_after_c_t.sort_index()
+
                 beta_values = scores_after_c_t["BETA"]
 
                 with Timer() as timer:
