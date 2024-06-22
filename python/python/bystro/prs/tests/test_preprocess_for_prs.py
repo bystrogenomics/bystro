@@ -48,8 +48,8 @@ def mock_processed_scores_df() -> pd.DataFrame:
         "P": [0.699009, 0.0030673],
         "SNPID": ["chr1:566875:C:T", "chr1:728951:A:G"],
         "BETA": [0.007630, -0.020671],
-        "ID_effect_as_alt": ["chr1:566875:C:T", "chr1:728951:G:A"],
-        "ID_effect_as_ref": ["chr1:566875:T:C", "chr1:728951:A:G"],
+        "ID_effect_as_alt": ["chr8:132782505:C:T", "chr3:183978846:G:A"],
+        "ID_effect_as_ref": ["chr2:4000400:T:C", "chr21:24791946:C:T"],
     }
     return pd.DataFrame(mock_gwas_data)
 
@@ -63,7 +63,12 @@ def mock_scores_loci(mock_processed_scores_df: pd.DataFrame) -> set:
 def mock_dosage_df():
     return pd.DataFrame(
         {
-            "locus": ["chr1:566875:C:T", "chr1:728951:A:G", "chr1:917492:C:T", "chr2:917492:A:T"],
+            "locus": [
+                "chr8:132782505:C:T",
+                "chr3:183978846:G:A",
+                "chr2:4000400:T:C",
+                "chr21:24791946:C:T",
+            ],
             "ID00096": [1, 1, 2, -1],
             "ID00097": [0, 1, 1, 0],
         }
@@ -74,7 +79,7 @@ def mock_dosage_df():
 def mock_dosage_df_clean():
     return pd.DataFrame(
         {
-            "locus": ["chr1:566875:C:T", "chr1:728951:A:G", "chr1:917492:C:T"],
+            "locus": ["chr8:132782505:C:T", "chr3:183978846:G:A", "chr2:4000400:T:C"],
             "ID00096": [1, 1, 2],
             "ID00097": [0, 1, 1],
         }
@@ -102,7 +107,7 @@ def mock_bin_mappings():
 def mock_finalize_dosage_after_c_t():
     def _mock_finalize_dosage_after_c_t(chunk, loci_and_allele_comparison):  # noqa: ARG001
         return pd.DataFrame(
-            {"ID00096": [1, 1], "ID00097": [0, 1]}, index=["chr1:566875:C:T", "chr1:728951:A:G"]
+            {"ID00096": [1, 1], "ID00097": [0, 1]}, index=["chr8:132782505:C:T", "chr3:183978846:G:A"]
         ).transpose()
 
     return _mock_finalize_dosage_after_c_t
@@ -260,13 +265,12 @@ def test_generate_c_and_t_prs_scores(tmp_path, mock_finalize_dosage_after_c_t, m
         dosage_matrix_path = test_file
         p_value_threshold = 0.05
 
-        print("PopulationVector.__slots__", PopulationVector.__slots__)
-
         population_vectors = {}
         for population in PopulationVector.__slots__:
-            population_vectors[population] = {"lowerBound": 0.0, "upperBound": 1.0}
+            population_vectors[population] = {"lowerBound": 0.0, "upperBound": 0.0}
+        population_vectors["ACB"] = {"lowerBound": 0.9, "upperBound": 0.9}
+        population_vectors["CEU"] = {"lowerBound": 0.1, "upperBound": 0.1}
 
-        print("population_vectors", population_vectors)
         ancestry_json = {
             "results": [
                 {
@@ -275,7 +279,7 @@ def test_generate_c_and_t_prs_scores(tmp_path, mock_finalize_dosage_after_c_t, m
                     "populations": population_vectors,
                     "superpops": {
                         "AFR": {"lowerBound": 0.9, "upperBound": 0.9},
-                        "AMR": {"lowerBound": 0.0, "upperBound": 0.0},
+                        "AMR": {"lowerBound": 0.1, "upperBound": 0.1},
                         "EAS": {"lowerBound": 0.0, "upperBound": 0.0},
                         "EUR": {"lowerBound": 0.0, "upperBound": 0.0},
                         "SAS": {"lowerBound": 0.0, "upperBound": 0.0},
@@ -288,7 +292,7 @@ def test_generate_c_and_t_prs_scores(tmp_path, mock_finalize_dosage_after_c_t, m
                     "populations": population_vectors,
                     "superpops": {
                         "AFR": {"lowerBound": 0.9, "upperBound": 0.9},
-                        "AMR": {"lowerBound": 0.0, "upperBound": 0.0},
+                        "AMR": {"lowerBound": 0.1, "upperBound": 0.1},
                         "EAS": {"lowerBound": 0.0, "upperBound": 0.0},
                         "EUR": {"lowerBound": 0.0, "upperBound": 0.0},
                         "SAS": {"lowerBound": 0.0, "upperBound": 0.0},
@@ -309,6 +313,6 @@ def test_generate_c_and_t_prs_scores(tmp_path, mock_finalize_dosage_after_c_t, m
             dosage_matrix_path=dosage_matrix_path,
             p_value_threshold=p_value_threshold,
         ).to_dict()
-        expected_result = {"ID00096": -0.013040999999999999, "ID00097": -0.020671}
+        expected_result = {"ID00096": 0.09220000356435776, "ID00097": -0.028599999845027924}
 
         assert result == expected_result, f"Expected {expected_result}, but got {result}"
