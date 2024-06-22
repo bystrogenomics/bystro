@@ -13,6 +13,8 @@ import pyarrow as pa  # type: ignore
 
 import numpy as np
 
+from bystro.ancestry.ancestry_types import AncestryResults, PopulationVector
+from bystro.prs.model import get_sumstats_file, get_map_file
 from bystro.utils.timer import Timer
 
 logger = logging.getLogger(__name__)
@@ -246,13 +248,9 @@ def ld_clump(scores_overlap: pd.DataFrame, map_path: str) -> tuple[pd.DataFrame,
 
 
 def finalize_scores_after_c_t(
-    gwas_scores_path: str, map_path: str, p_value_threshold: float
+    scores: pd.DataFrame, map_path: str, p_value_threshold: float
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Finalize scores for PRS calculation."""
-    with Timer() as timer:
-        scores = _load_association_scores(gwas_scores_path)
-    logger.debug("Time to load association scores: %s", timer.elapsed_time)
-
     with Timer() as timer:
         preprocessed_scores = _preprocess_scores(scores)
     logger.debug("Time to preprocess scores: %s", timer.elapsed_time)
@@ -282,39 +280,65 @@ def finalize_dosage_after_c_t(
     return genos_transpose
 
 
+def _ancestry_results_to_dicts(
+    ancestry: AncestryResults,
+) -> tuple[dict[str, str], dict[str, PopulationVector]]:
+    """Convert AncestryResults to a dictionary of top hit probabilities."""
+    top_hits = {}
+    populations: dict[str, PopulationVector] = {}
+    for result in ancestry.results:
+        top_hits[result.sample_id] = result.top_hit.populations[0]
+        populations[result.sample_id] = result.populations
+
+    return top_hits, populations
+
+
 def generate_c_and_t_prs_scores(
-    gwas_scores_path: str,
+    assembly: str,
+    disease: str,
+    pmid: str,
+    ancestry: AncestryResults,
     dosage_matrix_path: str,
-    map_path: str,
     p_value_threshold: float = 0.05,
     sample_chunk_size: int = 200,
 ) -> pd.Series:
     """Calculate PRS."""
     # This part goes through dosage matrix the first time to get overlapping loci
     with Timer() as timer:
-        scores_after_c_t, loci_and_allele_comparison = finalize_scores_after_c_t(
-            gwas_scores_path, map_path, p_value_threshold
-        )
-    logger.debug("Time to finalize scores after clumping and thresholding: %s", timer.elapsed_time)
+        gwas_scores_path = get_sumstats_file(disease, assembly, pmid)
+        scores = _load_association_scores(str(gwas_scores_path))
+    logger.debug("Time to load association scores: %s", timer.elapsed_time)
 
-    # This part goes through dosage matrix the second time, adjusts dosages,
-    # transposes genotypes, and calculates PRS
-    prs_scores: pd.Series = pd.Series(dtype=np.float32, name="PRS")
-
-    beta_values = scores_after_c_t["BETA"]
-    finalized_loci = scores_after_c_t.index.tolist()
-
-    score_loci_filter = pc.field("locus").isin(pa.array(finalized_loci))
+    score_loci_filter = pc.field("locus").isin(pa.array(scores))
 
     dosage_ds = ds.dataset(dosage_matrix_path, format="feather").filter(score_loci_filter)
 
-    samples = [name for name in dosage_ds.schema.names if name != "locus"]
-    sample_groups = [
-        samples[i : i + sample_chunk_size] for i in range(0, len(samples), sample_chunk_size)
-    ]
+    # For now we will ld prune based on a single population, the top_hit
+    # To vectorize ld pruning, we will gather chunks based on the top hit
 
+    top_hits, _populations = _ancestry_results_to_dicts(ancestry)
+    sample_groups = []
+    population_wise_samples: dict[str, list[str]] = {}
+    for sample, population in top_hits.items():
+        if population not in population_wise_samples:
+            population_wise_samples[population] = []
+        population_wise_samples[population].append(sample)
+
+    for population, samples in population_wise_samples.items():
+        for i in range(0, len(samples), sample_chunk_size):
+            sample_groups.append((population, samples[i : i + sample_chunk_size]))
+
+    with Timer() as timer:
+        preprocessed_scores = _preprocess_scores(scores)
+        thresholded_score_loci = get_p_value_thresholded_indices(preprocessed_scores, p_value_threshold)
+    logger.debug("Time to preprocess scores: %s", timer.elapsed_time)
+
+    # Accumulate the results
+    prs_scores: pd.Series = pd.Series(dtype=np.float32, name="PRS")
     with Timer() as outer_timer:
-        for sample_group in sample_groups:
+        for sample_pop_group in sample_groups:
+            population, sample_group = sample_pop_group
+
             with Timer() as timer:
                 sample_genotypes = dosage_ds.to_table(["locus", *sample_group]).to_pandas()
                 sample_genotypes = sample_genotypes.set_index("locus")
@@ -322,21 +346,36 @@ def generate_c_and_t_prs_scores(
                     sample_genotypes.notna() & (sample_genotypes >= 0).all(axis=1)
                 ]
 
+                dosage_loci_nomiss = sample_genotypes.index.tolist()
+
+                logger.info("dosage_loci_nomiss: %s", dosage_loci_nomiss)
+
+                overlap_loci = generate_overlap_scores_dosage(thresholded_score_loci, dosage_loci_nomiss)
+                scores_overlap = preprocessed_scores[preprocessed_scores.index.isin(overlap_loci)]
+
+                map_path = get_map_file(assembly, population)
+
+                scores_after_c_t, loci_and_allele_comparison = ld_clump(scores_overlap, str(map_path))
+                scores_after_c_t = scores_after_c_t.sort_index()
+                beta_values = scores_after_c_t["BETA"]
+
+                with Timer() as timer:
+                    genos_transpose = finalize_dosage_after_c_t(
+                        sample_genotypes, loci_and_allele_comparison
+                    )
+                    prs_scores_chunk = genos_transpose @ beta_values.loc[genos_transpose.columns]
+                    prs_scores = prs_scores.add(prs_scores_chunk, fill_value=0)
+                logger.debug(
+                    "Time to calculate PRS for chunk of %d samples: %s",
+                    len(sample_group),
+                    timer.elapsed_time,
+                )
             logger.debug(
                 "Time to load dosage matrix chunk of %d samples: %s",
                 len(sample_group),
                 timer.elapsed_time,
             )
 
-            with Timer() as timer:
-                genos_transpose = finalize_dosage_after_c_t(sample_genotypes, loci_and_allele_comparison)
-                prs_scores_chunk = genos_transpose @ beta_values.loc[genos_transpose.columns]
-                prs_scores = prs_scores.add(prs_scores_chunk, fill_value=0)
-            logger.debug(
-                "Time to calculate PRS for chunk of %d samples: %s",
-                len(sample_group),
-                timer.elapsed_time,
-            )
     logger.debug("Time to calculate PRS for all samples: %s", outer_timer.elapsed_time)
 
     return prs_scores
@@ -360,7 +399,3 @@ def prs_histogram(
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.show()
-
-
-def _load_covariates(COVARIATE_FILEPATH: str) -> pd.DataFrame:
-    return pd.read_csv(COVARIATE_FILEPATH, delimiter="\t")

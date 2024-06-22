@@ -1,9 +1,12 @@
 from pathlib import Path
 
-from bystro.prs.messages import PRSJobData, PRSJobResult
+from msgspec import json
+
 from bystro.beanstalkd.worker import ProgressPublisher
-from bystro.prs.model import get_one_model
+from bystro.ancestry.ancestry_types import AncestryResults
+from bystro.prs.messages import PRSJobData, PRSJobResult
 from bystro.prs.preprocess_for_prs import generate_c_and_t_prs_scores
+
 
 def calculate_prs_scores(_publisher: ProgressPublisher, prs_job_data: PRSJobData) -> PRSJobResult:
     """
@@ -15,16 +18,19 @@ def calculate_prs_scores(_publisher: ProgressPublisher, prs_job_data: PRSJobData
     p_value_threshold = prs_job_data.p_value_threshold
     disease = prs_job_data.disease
     pmid = prs_job_data.pmid
-    
-    # TODO 2024-06-16 @akotlar: Update this to get multiple populations,
-    # one per individual predicted ancestry
-    prs_model = get_one_model(assembly, population="CEU", disease=disease, pmid=pmid)
+
+    ancestry: AncestryResults
+    with open(prs_job_data.ancestry_result_path, "rb") as f:
+        data = f.read()
+        ancestry = json.decode(data, type=AncestryResults)
 
     result = generate_c_and_t_prs_scores(
-        gwas_scores_path = prs_model.score_path,
-        dosage_matrix_path = dosage_matrix_path,
-        map_path = prs_model.map_path,
-        p_value_threshold = p_value_threshold
+        assembly=assembly,
+        disease=disease,
+        pmid=pmid,
+        ancestry=ancestry,
+        dosage_matrix_path=dosage_matrix_path,
+        p_value_threshold=p_value_threshold,
     )
 
     basename = prs_job_data.out_basename

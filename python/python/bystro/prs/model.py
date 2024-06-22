@@ -27,6 +27,8 @@ class PrsModel(Struct, frozen=True, forbid_unknown_fields=True, rename="camel"):
 
 
 models_cache: dict[str, PrsModel] = {}
+map_cache = {}
+sumstats_cache = {}
 
 map_template = "%s_genetic_map_%s.feather"
 sumstats_template = "%s_sumstats_%s_%s_compressed.feather"
@@ -49,89 +51,95 @@ def download_file(bucket: str, key: str, filename: str):
         f.write(response.content)
 
 
-def get_one_model(assembly: str, population: str, disease: str, pmid: str) -> PrsModel:
+def get_sumstats_file(disease: str, assembly: str, pmid: str) -> Path:
     """
-    Load an ancestry model from S3.
+    Get the path to the sumstats file for a given disease, assembly, and PubMed ID.
+
+    Args:
+        disease (str): The disease to use.
+        assembly (str): The assembly to use.
+        pmid (str): The PubMed ID of the study.
+
+    Returns:
+
+    """
+    sumstats_cache_key = f"{disease}_{assembly}_{pmid}"
+
+    if sumstats_cache_key in sumstats_cache:
+        logger.debug("Sumstats for %s found in cache.", sumstats_cache_key)
+    else:
+        sumstats_file = sumstats_template % (disease, assembly, pmid)
+        local_sumstats_file = PRS_MODEL_DIR / assembly / PRS_MODEL_SUMSTATS_SUBDIR / sumstats_file
+        local_sumstats_dir = local_sumstats_file.parent
+        local_sumstats_dir.mkdir(parents=True, exist_ok=True)
+
+        remote_sumstats_file = f"{assembly}/{sumstats_file}"
+
+        if not local_file_exists(str(local_sumstats_file)):
+            with Timer() as timer:
+                try:
+                    download_file(
+                        bucket=PRS_BUCKET, key=remote_sumstats_file, filename=str(local_sumstats_file)
+                    )
+                except requests.HTTPError as e:
+                    raise ValueError(f"{sumstats_file} not found in bucket {PRS_BUCKET}.") from e
+
+            logger.debug("Downloaded sumstats file in %f seconds", timer.elapsed_time)
+
+        sumstats_cache[sumstats_cache_key] = local_sumstats_file
+
+    return sumstats_cache[sumstats_cache_key]
+
+
+def get_map_file(assembly: str, population: str) -> Path:
+    """
+    Get the path to the genetic map file for a given assembly and population.
 
     Args:
         assembly (str): The assembly to use.
         population (str): The population to use.
-        disease (str): The disease to use.
-        pmid (str): The PubMed ID of the study.
-
-    Raises:
-        ValueError: If the map or sumstats file is not found.
 
     Returns:
-        PrsModel: The loaded PRS model.
+
     """
-    logger.info("Downloading PRS files for %s %s %s %s", assembly, population, disease, pmid)
+    map_cache_key = f"{assembly}_{population}"
 
-    # Check if in cache
-    key = f"{assembly}_{population}_{disease}_{pmid}"
-    if key in models_cache:
-        logger.debug("PRS model found in cache.")
-        return models_cache[key]
+    if map_cache_key in map_cache:
+        logger.debug("Genetic map for %s found in cache.", map_cache_key)
+    else:
+        map_file = map_template % (assembly, population)
+        local_map_file = PRS_MODEL_DIR / assembly / PRS_MODEL_MAP_SUBDIR / map_file
+        local_map_dir = local_map_file.parent
+        local_map_dir.mkdir(parents=True, exist_ok=True)
 
-    map_file = map_template % (assembly, population)
-    sumstats_file = sumstats_template % (disease, assembly, pmid)
+        remote_map_file = f"{assembly}/{map_file}"
 
-    local_map_file = PRS_MODEL_DIR / assembly / PRS_MODEL_MAP_SUBDIR / map_file
-    local_map_dir = local_map_file.parent
-    local_map_dir.mkdir(parents=True, exist_ok=True)
+        if not local_file_exists(str(local_map_file)):
+            with Timer() as timer:
+                try:
+                    download_file(bucket=PRS_BUCKET, key=remote_map_file, filename=str(local_map_file))
+                except requests.HTTPError as e:
+                    raise ValueError(f"{map_file} not found in bucket {PRS_BUCKET}.") from e
 
-    remote_map_file = f"{assembly}/{map_file}"
+            logger.debug("Downloaded genetic map file in %f seconds", timer.elapsed_time)
 
-    local_sumstats_file = PRS_MODEL_DIR / assembly / PRS_MODEL_SUMSTATS_SUBDIR / sumstats_file
-    local_sumstats_dir = local_sumstats_file.parent
-    local_sumstats_dir.mkdir(parents=True, exist_ok=True)
+        map_cache[map_cache_key] = local_map_file
 
-    remote_sumstats_file = f"{assembly}/{sumstats_file}"
-
-    with Timer() as timer:
-        try:
-            prs_model = get_one_model_from_file_system(str(local_map_file), str(local_sumstats_file))
-            logger.debug("PRS model found on file system.")
-        except ValueError:
-            logger.debug("PRS model not found on file system. Downloading from S3.")
-
-            try:
-                download_file(bucket=PRS_BUCKET, key=remote_map_file, filename=str(local_map_file))
-            except requests.HTTPError as e:
-                raise ValueError(f"{map_file} not found in bucket {PRS_BUCKET}.") from e
-
-            try:
-                download_file(
-                    bucket=PRS_BUCKET, key=remote_sumstats_file, filename=str(local_sumstats_file)
-                )
-            except requests.HTTPError as e:
-                raise ValueError(f"{sumstats_file} not found in bucket {PRS_BUCKET}.") from e
-
-            prs_model = get_one_model_from_file_system(str(local_map_file), str(local_sumstats_file))
-
-    logger.debug("Downloaded PCA file and RFC file in %f seconds", timer.elapsed_time)
-
-    models_cache[key] = prs_model
-
-    return prs_model
+    return map_cache[map_cache_key]
 
 
-def get_one_model_from_file_system(local_map_file: str, local_sumstats_file: str) -> PrsModel:
+def local_file_exists(file_path: str) -> bool:
     """
-    Load a PRS model from the local file system.
+    Check whether a file exists in the local filesystem.
 
     Args:
-        local_map_file (str): The local path to the genetic map file.
-        local_sumstats_file (str): The local path to the sumstats file.
+        file_path (str): The local path
 
     Returns:
-        PrsModel: The loaded PRS model.
+        bool: True if the file exists, False otherwise.
     """
 
-    if not os.path.exists(local_map_file):
-        raise ValueError(f"Genetic map file {local_map_file} not found.")
+    if not os.path.exists(file_path):
+        return False
 
-    if not os.path.exists(local_sumstats_file):
-        raise ValueError(f"Sumstats file {local_sumstats_file} not found.")
-
-    return PrsModel(map_path=local_map_file, score_path=local_sumstats_file)
+    return True
