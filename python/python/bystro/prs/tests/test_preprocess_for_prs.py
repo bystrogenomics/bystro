@@ -1,8 +1,11 @@
 from unittest.mock import patch
+import json
 
+from msgspec import json as mjson
 import pandas as pd
 import pyarrow as pa  # type: ignore
 import pytest
+from bystro.ancestry.ancestry_types import PopulationVector, AncestryResults
 from bystro.prs.preprocess_for_prs import (
     _load_association_scores,
     _load_genetic_maps_from_feather,
@@ -93,21 +96,6 @@ def mock_bin_mappings():
         1: [1000, 2000, 3000],
         2: [1000, 2000, 3000],
     }
-
-
-@pytest.fixture()
-def mock_finalize_scores_after_c_t():
-    def _mock_finalize_scores_after_c_t(
-        gwas_scores_path, map_directory_path, p_value_threshold  # noqa: ARG001
-    ):
-        scores_after_c_t = pd.DataFrame(
-            {"BETA": [0.007630, -0.020671], "P": [0.699009, 0.0030673]},
-            index=["chr1:566875:C:T", "chr1:728951:A:G"],
-        )
-        loci_and_allele_comparison = {"chr1:566875:C:T": ("C", "T"), "chr1:728951:A:G": ("G", "A")}
-        return scores_after_c_t, loci_and_allele_comparison
-
-    return _mock_finalize_scores_after_c_t
 
 
 @pytest.fixture()
@@ -261,29 +249,65 @@ def test_select_max_effect_per_bin():
     ), "The result DataFrame should have one row per (CHR, bin) group."
 
 
-def test_generate_c_and_t_prs_scores(
-    tmp_path, mock_finalize_scores_after_c_t, mock_finalize_dosage_after_c_t, mock_dosage_df
-):
+def test_generate_c_and_t_prs_scores(tmp_path, mock_finalize_dosage_after_c_t, mock_dosage_df):
     table = pa.Table.from_pandas(mock_dosage_df)
     test_file = tmp_path / "test_dosage_matrix.feather"
     pa.feather.write_feather(table, test_file)
-    with (
-        patch(
-            "bystro.prs.preprocess_for_prs.finalize_scores_after_c_t",
-            side_effect=mock_finalize_scores_after_c_t,
-        ),
-        patch(
-            "bystro.prs.preprocess_for_prs.finalize_dosage_after_c_t",
-            side_effect=mock_finalize_dosage_after_c_t,
-        ),
+    with patch(
+        "bystro.prs.preprocess_for_prs.finalize_dosage_after_c_t",
+        side_effect=mock_finalize_dosage_after_c_t,
     ):
-        gwas_scores_path = "mock_gwas_scores_path"
         dosage_matrix_path = test_file
-        map_directory_path = "mock_map_directory_path"
         p_value_threshold = 0.05
 
+        print("PopulationVector.__slots__", PopulationVector.__slots__)
+
+        population_vectors = {}
+        for population in PopulationVector.__slots__:
+            population_vectors[population] = {"lowerBound": 0.0, "upperBound": 1.0}
+
+        print("population_vectors", population_vectors)
+        ancestry_json = {
+            "results": [
+                {
+                    "sampleId": "ID00096",
+                    "topHit": {"probability": 0.9, "populations": ["ACB"]},
+                    "populations": population_vectors,
+                    "superpops": {
+                        "AFR": {"lowerBound": 0.9, "upperBound": 0.9},
+                        "AMR": {"lowerBound": 0.0, "upperBound": 0.0},
+                        "EAS": {"lowerBound": 0.0, "upperBound": 0.0},
+                        "EUR": {"lowerBound": 0.0, "upperBound": 0.0},
+                        "SAS": {"lowerBound": 0.0, "upperBound": 0.0},
+                    },
+                    "nSnps": 100,
+                },
+                {
+                    "sampleId": "ID00097",
+                    "topHit": {"probability": 0.9, "populations": ["ACB"]},
+                    "populations": population_vectors,
+                    "superpops": {
+                        "AFR": {"lowerBound": 0.9, "upperBound": 0.9},
+                        "AMR": {"lowerBound": 0.0, "upperBound": 0.0},
+                        "EAS": {"lowerBound": 0.0, "upperBound": 0.0},
+                        "EUR": {"lowerBound": 0.0, "upperBound": 0.0},
+                        "SAS": {"lowerBound": 0.0, "upperBound": 0.0},
+                    },
+                    "nSnps": 100,
+                },
+            ],
+            "pcs": {"PC1": [0.1, 0.2], "PC2": [0.3, 0.4]},
+        }
+        ancestry_json_str = json.dumps(ancestry_json)
+        ancestry_results = mjson.decode(ancestry_json_str, type=AncestryResults)
+
         result = generate_c_and_t_prs_scores(
-            gwas_scores_path, dosage_matrix_path, map_directory_path, p_value_threshold
+            assembly="hg19",
+            disease="AD",
+            pmid="PMID35379992",
+            ancestry=ancestry_results,
+            dosage_matrix_path=dosage_matrix_path,
+            p_value_threshold=p_value_threshold,
         ).to_dict()
         expected_result = {"ID00096": -0.013040999999999999, "ID00097": -0.020671}
 

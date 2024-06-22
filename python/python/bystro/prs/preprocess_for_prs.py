@@ -247,27 +247,6 @@ def ld_clump(scores_overlap: pd.DataFrame, map_path: str) -> tuple[pd.DataFrame,
     return clean_scores_for_analysis(max_effect_per_bin, "ID_effect_as_ref")
 
 
-def finalize_scores_after_c_t(
-    scores: pd.DataFrame, map_path: str, p_value_threshold: float
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Finalize scores for PRS calculation."""
-    with Timer() as timer:
-        preprocessed_scores = _preprocess_scores(scores)
-    logger.debug("Time to preprocess scores: %s", timer.elapsed_time)
-
-    with Timer() as timer:
-        thresholded_score_loci = get_p_value_thresholded_indices(preprocessed_scores, p_value_threshold)
-    logger.debug("Time to get p-value thresholded indices: %s", timer.elapsed_time)
-
-    with Timer() as timer:
-        scores_overlap = preprocessed_scores[preprocessed_scores.index.isin(thresholded_score_loci)]
-        scores_after_c_t, loci_and_allele_comparison = ld_clump(scores_overlap, map_path)
-        scores_after_c_t = scores_after_c_t.sort_index()
-    logger.debug("Time to clump and adjust dosages: %s", timer.elapsed_time)
-
-    return scores_after_c_t, loci_and_allele_comparison
-
-
 def finalize_dosage_after_c_t(
     dosage_overlap: pd.DataFrame, loci_and_allele_comparison: pd.DataFrame
 ) -> pd.DataFrame:
