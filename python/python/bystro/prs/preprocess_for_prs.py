@@ -384,11 +384,10 @@ def generate_c_and_t_prs_scores(
                 index_name=index_name,
                 user=user,
                 cluster_opensearch_config=cluster_opensearch_config,
-            )
+            ).set_index("locus")
             logger.debug(
                 "Memory usage after fetching gnomad allele frequencies: %s", process.memory_info().rss / 1e6
             )
-            print("thresholded_loci_gnomad_afs", thresholded_loci_gnomad_afs)
         logger.debug("Time to query for gnomad allele frequencies: %s", query_timer.elapsed_time)
 
     # Accumulate the results
