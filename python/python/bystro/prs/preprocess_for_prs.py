@@ -1,10 +1,13 @@
 """Process dosage matrix, GWAS summary statistics, and LD maps for PRS C+T calculation."""
 
 import bisect
-import logging
-from typing import Optional
-import matplotlib.pyplot as plt  # type: ignore
 from enum import Enum
+import logging
+from typing import Any, Optional
+import os
+import psutil
+
+import matplotlib.pyplot as plt  # type: ignore
 import pandas as pd
 from pyarrow import feather  # type: ignore
 import pyarrow.dataset as ds  # type: ignore
@@ -13,6 +16,8 @@ import pyarrow as pa  # type: ignore
 
 import numpy as np
 
+from bystro.api.auth import CachedAuth
+from bystro.proteomics.annotation_interface import get_annotation_result_from_query
 from bystro.ancestry.ancestry_types import AncestryResults, PopulationVector
 from bystro.prs.model import get_sumstats_file, get_map_file
 from bystro.utils.timer import Timer
@@ -79,6 +84,48 @@ def _load_genetic_maps_from_feather(map_path: str) -> dict[str, pd.DataFrame]:
     except Exception as e:
         logger.exception("Failed to load genetic map from: %s: %s", map_path, e)
         raise e
+
+
+def convert_loci_to_query_format(score_loci: set) -> str:
+    """
+    Convert a set of loci from the format 'chr10:105612479:G:T' to '(chrom:chr10 pos:105612479 inputRef:G alt:T)'
+    and separate them by '||' in order to issue queries with them.
+    """
+    finalized_loci = []
+    for locus in score_loci:
+        chrom, pos, inputRef, alt = locus.split(":")
+        single_query = f"(chrom:{chrom} pos:{pos} inputRef:{inputRef} alt:{alt})"
+        finalized_loci.append(single_query)
+    return "(" + " || ".join(finalized_loci) + ")" + " && _exists_:gnomad.genomes"
+
+
+def _extract_af_and_loci_overlap(
+    score_loci: set,
+    index_name: str,
+    user: CachedAuth | None = None,
+    cluster_opensearch_config: dict[str, Any] | None = None,
+) -> pd.DataFrame:
+    """
+    Convert loci to query format, perform annotation query,
+    and return the loci with gnomad allele frequencies.
+    """
+    query = convert_loci_to_query_format(score_loci)
+
+    thresholded_loci_gnomad_afs = get_annotation_result_from_query(
+        query_string=query,
+        index_name=index_name,
+        bystro_api_auth=user,
+        cluster_opensearch_config=cluster_opensearch_config,
+        melt_samples=False,
+        fields=[
+            "gnomad.genomes.AF_afr",
+            "gnomad.genomes.AF_amr",
+            "gnomad.genomes.AF_eas",
+            "gnomad.genomes.AF_nfe",
+            "gnomad.genomes.AF_sas",
+        ],
+    )
+    return thresholded_loci_gnomad_afs
 
 
 def _preprocess_scores(ad_scores: pd.DataFrame) -> pd.DataFrame:
@@ -280,8 +327,16 @@ def generate_c_and_t_prs_scores(
     dosage_matrix_path: str,
     p_value_threshold: float = 0.05,
     sample_chunk_size: int = 200,
+    index_name: str | None = None,
+    user: CachedAuth | None = None,
+    cluster_opensearch_config: dict[str, Any] | None = None,
 ) -> pd.Series:
     """Calculate PRS."""
+    if index_name is not None and cluster_opensearch_config is None and user is None:
+        raise ValueError(
+            "If index_name is provided, either user or cluster_opensearch_config must be provided."
+        )
+
     # This part goes through dosage matrix the first time to get overlapping loci
     with Timer() as timer:
         gwas_scores_path = get_sumstats_file(disease, assembly, pmid)
@@ -311,6 +366,26 @@ def generate_c_and_t_prs_scores(
     for population, samples in population_wise_samples.items():
         for i in range(0, len(samples), sample_chunk_size):
             sample_groups.append((population, samples[i : i + sample_chunk_size]))
+
+    thresholded_loci_gnomad_afs: pd.DataFrame | None = None
+    if index_name is not None:
+        with Timer() as query_timer:
+            process = psutil.Process(os.getpid())
+            logger.debug(
+                "Memory usage before fetching gnomad allele frequencies: %s",
+                process.memory_info().rss / 1e6,
+            )
+            thresholded_loci_gnomad_afs = _extract_af_and_loci_overlap(
+                score_loci=thresholded_score_loci,
+                index_name=index_name,
+                user=user,
+                cluster_opensearch_config=cluster_opensearch_config,
+            )
+            logger.debug(
+                "Memory usage after fetching gnomad allele frequencies: %s", process.memory_info().rss / 1e6
+            )
+            print("thresholded_loci_gnomad_afs", thresholded_loci_gnomad_afs)
+        logger.debug("Time to query for gnomad allele frequencies: %s", query_timer.elapsed_time)
 
     # Accumulate the results
     prs_scores: pd.Series = pd.Series(dtype=np.float32, name="PRS")

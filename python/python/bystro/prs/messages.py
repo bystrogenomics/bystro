@@ -34,6 +34,8 @@ class PRSJobData(BaseMessage, frozen=True, forbid_unknown_fields=True, rename="c
 
         When both ancestry_result_path and population_path are provided,
         the populations in this file will be used for allele frequency weighting in the PRS calculation.
+    index_name: str | None
+        The index of the dataset in the OpenSearch cluster, if available
     """
 
     dosage_matrix_path: str
@@ -45,6 +47,7 @@ class PRSJobData(BaseMessage, frozen=True, forbid_unknown_fields=True, rename="c
     p_value_threshold: float
     ancestry_result_path: str
     populations_path: str | None = None
+    index_name: str | None = None
 
 
 class PRSJobSubmitMessage(SubmittedJobMessage, frozen=True, kw_only=True, rename="camel"):

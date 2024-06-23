@@ -22,4 +22,4 @@ apps:
   - name: BystroPRSServer
     script: python/python/bystro/prs/listener.py
     interpreter: "python"
-    args: --queue_conf config/beanstalk.yml
+    args: --queue_conf config/beanstalk.yml --search_conf config/opensearch.yml

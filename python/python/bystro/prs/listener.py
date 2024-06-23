@@ -10,7 +10,7 @@ from bystro.beanstalkd.worker import (
 )
 from bystro.beanstalkd.messages import SubmittedJobMessage
 from bystro.prs.messages import PRSJobData, PRSJobResult, PRSJobResultMessage
-from bystro.prs.handler import calculate_prs_scores
+from bystro.prs.handler import make_calculate_prs_scores
 
 TUBE = "prs"
 
@@ -36,10 +36,24 @@ def main():
         required=True,
     )
 
+    parser.add_argument(
+        "--search_conf",
+        type=str,
+        help="Path to the opensearch config yaml file (e.g. elasticsearch.yml)",
+        required=True,
+    )
+    args = parser.parse_args()
+
+    
     args = parser.parse_args()
 
     with open(args.queue_conf, "r", encoding="utf-8") as queue_config_file:
         queue_conf = YAML(typ="safe").load(queue_config_file)
+
+    with open(args.search_conf, "r", encoding="utf-8") as search_config_file:
+        search_conf = YAML(typ="safe").load(search_config_file)
+
+    calculate_prs_scores = make_calculate_prs_scores(search_conf)
 
     listen(
         job_data_type=PRSJobData,
