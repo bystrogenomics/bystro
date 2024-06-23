@@ -104,7 +104,8 @@ def _load_genetic_maps_from_feather(map_path: str) -> dict[str, pd.DataFrame]:
 
 def _convert_loci_to_query_format(score_loci: set) -> str:
     """
-    Convert a set of loci from the format 'chr10:105612479:G:T' to '(chrom:chr10 pos:105612479 inputRef:G alt:T)'
+    Convert a set of loci from the format 'chr10:105612479:G:T' to
+    '(chrom:chr10 pos:105612479 inputRef:G alt:T)'
     and separate them by '||' in order to issue queries with them.
     """
     if not score_loci:
@@ -116,7 +117,7 @@ def _convert_loci_to_query_format(score_loci: set) -> str:
         single_query = f"(chrom:{chrom} pos:{pos} inputRef:{inputRef} alt:{alt})"
         finalized_loci.append(single_query)
 
-    return "(_exists_:gnomad.genomes) && " + "(" + " || ".join(finalized_loci) + ")"
+    return f"(_exists_:gnomad.genomes) && ({' || '.join(finalized_loci)})"
 
 
 def _extract_af_and_loci_overlap(
@@ -152,8 +153,8 @@ def _calculate_allele_frequency_total_variation(
     # Renormalize gnomad allele frequencies
     gnomad_afs = gnomad_afs.div(gnomad_afs.sum(axis=1), axis=0)
 
-    sample_superprop_probs = {}
-    for sample in superpop_probabilities.keys():
+    sample_superprop_probs: dict[str, dict[str, float]] = {}
+    for sample in superpop_probabilities:
         sample_superprop_probs[sample] = {}
         for superpop in ANCESTRY_SUPERPOPS:
             one_sample = superpop_probabilities[sample]
@@ -162,7 +163,7 @@ def _calculate_allele_frequency_total_variation(
                 prob_range.lower_bound + prob_range.upper_bound
             ) / 2
 
-    sample_superprop_probs_df = pd.DataFrame(sample_superprop_probs)
+    sample_superprop_probs_df = pd.DataFrame(sample_superprop_probs, dtype=np.float32)
     # Normalize, just in case
     sample_superprop_probs_df = sample_superprop_probs_df.div(
         sample_superprop_probs_df.sum(axis=0), axis=1
