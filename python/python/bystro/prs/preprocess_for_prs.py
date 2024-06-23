@@ -86,17 +86,21 @@ def _load_genetic_maps_from_feather(map_path: str) -> dict[str, pd.DataFrame]:
         raise e
 
 
-def convert_loci_to_query_format(score_loci: set) -> str:
+def _convert_loci_to_query_format(score_loci: set) -> str:
     """
     Convert a set of loci from the format 'chr10:105612479:G:T' to '(chrom:chr10 pos:105612479 inputRef:G alt:T)'
     and separate them by '||' in order to issue queries with them.
     """
+    if not score_loci:
+        raise ValueError("No loci provided for conversion to query format.")
+
     finalized_loci = []
     for locus in score_loci:
         chrom, pos, inputRef, alt = locus.split(":")
         single_query = f"(chrom:{chrom} pos:{pos} inputRef:{inputRef} alt:{alt})"
         finalized_loci.append(single_query)
-    return "(" + " || ".join(finalized_loci) + ")" + " && _exists_:gnomad.genomes"
+
+    return "(_exists_:gnomad.genomes) && " + "(" + " || ".join(finalized_loci) + ")"
 
 
 def _extract_af_and_loci_overlap(
@@ -109,7 +113,7 @@ def _extract_af_and_loci_overlap(
     Convert loci to query format, perform annotation query,
     and return the loci with gnomad allele frequencies.
     """
-    query = convert_loci_to_query_format(score_loci)
+    query = _convert_loci_to_query_format(score_loci)
 
     thresholded_loci_gnomad_afs = get_annotation_result_from_query(
         query_string=query,
