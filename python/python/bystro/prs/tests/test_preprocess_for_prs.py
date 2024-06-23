@@ -266,7 +266,7 @@ def test_generate_c_and_t_prs_scores(tmp_path, mock_finalize_dosage_after_c_t, m
         p_value_threshold = 0.05
 
         population_vectors = {}
-        for population in PopulationVector.__slots__:
+        for population in PopulationVector.__slots__:  # type: ignore
             population_vectors[population] = {"lowerBound": 0.0, "upperBound": 0.0}
         population_vectors["ACB"] = {"lowerBound": 0.9, "upperBound": 0.9}
         population_vectors["CEU"] = {"lowerBound": 0.1, "upperBound": 0.1}
