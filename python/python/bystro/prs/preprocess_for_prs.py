@@ -18,13 +18,29 @@ import numpy as np
 
 from bystro.api.auth import CachedAuth
 from bystro.proteomics.annotation_interface import get_annotation_result_from_query
-from bystro.ancestry.ancestry_types import AncestryResults, PopulationVector
+from bystro.ancestry.ancestry_types import AncestryResults, PopulationVector, SuperpopVector
 from bystro.prs.model import get_sumstats_file, get_map_file
 from bystro.utils.timer import Timer
 
 logger = logging.getLogger(__name__)
 
 pd.options.future.infer_string = True  # type: ignore
+
+ANCESTRY_SUPERPOPS = ["AFR", "AMR", "EAS", "EUR", "SAS"]
+GNOMAD_AF_SUPERPOPS = [
+    "gnomad.genomes.AF_afr",
+    "gnomad.genomes.AF_amr",
+    "gnomad.genomes.AF_eas",
+    "gnomad.genomes.AF_nfe",
+    "gnomad.genomes.AF_sas",
+]
+GNOMAD_AF_SUPERPOPS_MAP = {
+    "gnomad.genomes.AF_afr": "AFR",
+    "gnomad.genomes.AF_amr": "AMR",
+    "gnomad.genomes.AF_eas": "EAS",
+    "gnomad.genomes.AF_nfe": "EUR",
+    "gnomad.genomes.AF_sas": "SAS",
+}
 
 
 class StrEnum(str, Enum):
@@ -115,21 +131,44 @@ def _extract_af_and_loci_overlap(
     """
     query = _convert_loci_to_query_format(score_loci)
 
-    thresholded_loci_gnomad_afs = get_annotation_result_from_query(
-        query_string=query,
-        index_name=index_name,
-        bystro_api_auth=user,
-        cluster_opensearch_config=cluster_opensearch_config,
-        melt_samples=False,
-        fields=[
-            "gnomad.genomes.AF_afr",
-            "gnomad.genomes.AF_amr",
-            "gnomad.genomes.AF_eas",
-            "gnomad.genomes.AF_nfe",
-            "gnomad.genomes.AF_sas",
-        ],
+    return (
+        get_annotation_result_from_query(
+            query_string=query,
+            index_name=index_name,
+            bystro_api_auth=user,
+            cluster_opensearch_config=cluster_opensearch_config,
+            melt_samples=False,
+            fields=GNOMAD_AF_SUPERPOPS,
+        )
+        .set_index("locus")
+        .fillna(0)
+        .rename(columns=GNOMAD_AF_SUPERPOPS_MAP)[ANCESTRY_SUPERPOPS]
     )
-    return thresholded_loci_gnomad_afs
+
+
+def _calculate_allele_frequency_total_variation(
+    gnomad_afs: pd.DataFrame, superpop_probabilities: dict[str, SuperpopVector]
+):
+    # Renormalize gnomad allele frequencies
+    gnomad_afs = gnomad_afs.div(gnomad_afs.sum(axis=1), axis=0)
+
+    sample_superprop_probs = {}
+    for sample in superpop_probabilities.keys():
+        sample_superprop_probs[sample] = {}
+        for superpop in ANCESTRY_SUPERPOPS:
+            one_sample = superpop_probabilities[sample]
+            prob_range = getattr(one_sample, superpop)
+            sample_superprop_probs[sample][superpop] = (
+                prob_range.lower_bound + prob_range.upper_bound
+            ) / 2
+
+    sample_superprop_probs_df = pd.DataFrame(sample_superprop_probs)
+    # Normalize, just in case
+    sample_superprop_probs_df = sample_superprop_probs_df.div(
+        sample_superprop_probs_df.sum(axis=0), axis=1
+    )
+
+    return 2 * (gnomad_afs @ sample_superprop_probs_df.loc[gnomad_afs.columns.tolist()])
 
 
 def _preprocess_scores(ad_scores: pd.DataFrame) -> pd.DataFrame:
@@ -312,15 +351,17 @@ def finalize_dosage_after_c_t(
 
 def _ancestry_results_to_dicts(
     ancestry: AncestryResults,
-) -> tuple[dict[str, str], dict[str, PopulationVector]]:
+) -> tuple[dict[str, str], dict[str, PopulationVector], dict[str, SuperpopVector]]:
     """Convert AncestryResults to a dictionary of top hit probabilities."""
     top_hits = {}
     populations: dict[str, PopulationVector] = {}
+    superpops: dict[str, SuperpopVector] = {}
     for result in ancestry.results:
         top_hits[result.sample_id] = result.top_hit.populations[0]
         populations[result.sample_id] = result.populations
+        superpops[result.sample_id] = result.superpops
 
-    return top_hits, populations
+    return top_hits, populations, superpops
 
 
 def generate_c_and_t_prs_scores(
@@ -359,7 +400,7 @@ def generate_c_and_t_prs_scores(
     # For now we will ld prune based on a single population, the top_hit
     # To vectorize ld pruning, we will gather chunks based on the top hit
 
-    top_hits, _populations = _ancestry_results_to_dicts(ancestry)
+    top_hits, _, superpop_probabilities = _ancestry_results_to_dicts(ancestry)
     sample_groups = []
     population_wise_samples: dict[str, list[str]] = {}
     for sample, population in top_hits.items():
@@ -371,7 +412,7 @@ def generate_c_and_t_prs_scores(
         for i in range(0, len(samples), sample_chunk_size):
             sample_groups.append((population, samples[i : i + sample_chunk_size]))
 
-    thresholded_loci_gnomad_afs: pd.DataFrame | None = None
+    ancestry_weighted_af_total_variation: pd.DataFrame | None
     if index_name is not None:
         with Timer() as query_timer:
             process = psutil.Process(os.getpid())
@@ -384,9 +425,25 @@ def generate_c_and_t_prs_scores(
                 index_name=index_name,
                 user=user,
                 cluster_opensearch_config=cluster_opensearch_config,
-            ).set_index("locus")
+            )
+
+            thresholded_loci_gnomad_afs = thresholded_loci_gnomad_afs.rename(
+                columns=GNOMAD_AF_SUPERPOPS_MAP
+            )
+
+            logger.debug("thresholded_loci_gnomad_afs: %s", thresholded_loci_gnomad_afs)
+
+            ancestry_weighted_af_total_variation = _calculate_allele_frequency_total_variation(
+                thresholded_loci_gnomad_afs, superpop_probabilities
+            )
+
             logger.debug(
-                "Memory usage after fetching gnomad allele frequencies: %s", process.memory_info().rss / 1e6
+                "ancestry_weighted_af_total_variation: %s", ancestry_weighted_af_total_variation
+            )
+
+            logger.debug(
+                "Memory usage after fetching gnomad allele frequencies: %s",
+                process.memory_info().rss / 1e6,
             )
         logger.debug("Time to query for gnomad allele frequencies: %s", query_timer.elapsed_time)
 
@@ -427,6 +484,14 @@ def generate_c_and_t_prs_scores(
                     genos_transpose = finalize_dosage_after_c_t(
                         sample_genotypes, loci_and_allele_comparison
                     )
+
+                    if ancestry_weighted_af_total_variation is not None:
+                        weights_filtered = ancestry_weighted_af_total_variation.loc[
+                            genos_transpose.columns
+                        ].fillna(0)
+                        genos_transpose = genos_transpose - weights_filtered[genos_transpose.index].T
+                        genos_transpose[genos_transpose < 0] = 0
+
                     prs_scores_chunk = genos_transpose @ beta_values.loc[genos_transpose.columns]
                     prs_scores = prs_scores.add(prs_scores_chunk, fill_value=0)
                 logger.debug(

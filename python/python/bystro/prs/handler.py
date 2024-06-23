@@ -24,8 +24,6 @@ def make_calculate_prs_scores(
         pmid = prs_job_data.pmid
         index_name = prs_job_data.index_name
 
-        print("index_name", index_name)
-
         ancestry: AncestryResults
         with open(prs_job_data.ancestry_result_path, "rb") as f:
             data = f.read()
