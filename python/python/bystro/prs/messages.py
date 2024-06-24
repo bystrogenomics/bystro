@@ -14,8 +14,9 @@ class PRSJobData(BaseMessage, frozen=True, forbid_unknown_fields=True, rename="c
         The basename of the output file
     assembly: str
         The assembly to use for the PRS calculation
-    disease: str
-        The disease to use for the PRS calculation
+    trait: str
+        The trait, disease, or outcome to use for the PRS calculation
+        (e.g Alzheimer's Disease, ADHD, Schizophrenia)
     pmid: str
         The ID of the study (PubMed ID typically)
     p_value_threshold: float
@@ -42,7 +43,7 @@ class PRSJobData(BaseMessage, frozen=True, forbid_unknown_fields=True, rename="c
     out_dir: str
     out_basename: str
     assembly: str
-    disease: str
+    trait: str
     pmid: str
     p_value_threshold: float
     ancestry_result_path: str
@@ -63,7 +64,7 @@ class PRSJobResult(Struct, frozen=True, forbid_unknown_fields=True, rename="came
     """The contents of the PRS result object to be sent back through beanstalkd"""
 
     result_path: str
-    disease: str
+    trait: str
     pmid: str
 
 

@@ -307,7 +307,7 @@ def test_generate_c_and_t_prs_scores(tmp_path, mock_finalize_dosage_after_c_t, m
 
         result = generate_c_and_t_prs_scores(
             assembly="hg19",
-            disease="AD",
+            trait="AD",
             pmid="PMID35379992",
             ancestry=ancestry_results,
             dosage_matrix_path=dosage_matrix_path,

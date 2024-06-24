@@ -20,7 +20,7 @@ def make_calculate_prs_scores(
         assembly = prs_job_data.assembly
         dosage_matrix_path = prs_job_data.dosage_matrix_path
         p_value_threshold = prs_job_data.p_value_threshold
-        disease = prs_job_data.disease
+        trait = prs_job_data.trait
         pmid = prs_job_data.pmid
         index_name = prs_job_data.index_name
 
@@ -31,7 +31,7 @@ def make_calculate_prs_scores(
 
         result = generate_c_and_t_prs_scores(
             assembly=assembly,
-            disease=disease,
+            trait=trait,
             pmid=pmid,
             ancestry=ancestry,
             cluster_opensearch_config=cluster_opensearch_config,
@@ -45,6 +45,6 @@ def make_calculate_prs_scores(
 
         result.to_csv(out_path, sep="\t")
 
-        return PRSJobResult(result_path=str(out_path), disease=disease, pmid=pmid)
+        return PRSJobResult(result_path=str(out_path), trait=trait, pmid=pmid)
 
     return calculate_prs_scores

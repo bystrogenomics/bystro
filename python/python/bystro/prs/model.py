@@ -51,24 +51,24 @@ def download_file(bucket: str, key: str, filename: str):
         f.write(response.content)
 
 
-def get_sumstats_file(disease: str, assembly: str, pmid: str) -> Path:
+def get_sumstats_file(trait: str, assembly: str, pmid: str) -> Path:
     """
-    Get the path to the sumstats file for a given disease, assembly, and PubMed ID.
+    Get the path to the sumstats file for a given trait/disease/outcome, assembly, and PubMed ID.
 
     Args:
-        disease (str): The disease to use.
+        trait (str): The trait to use.
         assembly (str): The assembly to use.
         pmid (str): The PubMed ID of the study.
 
     Returns:
 
     """
-    sumstats_cache_key = f"{disease}_{assembly}_{pmid}"
+    sumstats_cache_key = f"{trait}_{assembly}_{pmid}"
 
     if sumstats_cache_key in sumstats_cache:
         logger.debug("Sumstats for %s found in cache.", sumstats_cache_key)
     else:
-        sumstats_file = sumstats_template % (disease, assembly, pmid)
+        sumstats_file = sumstats_template % (trait, assembly, pmid)
         local_sumstats_file = PRS_MODEL_DIR / assembly / PRS_MODEL_SUMSTATS_SUBDIR / sumstats_file
         local_sumstats_dir = local_sumstats_file.parent
         local_sumstats_dir.mkdir(parents=True, exist_ok=True)

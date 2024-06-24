@@ -403,7 +403,7 @@ def _ancestry_results_to_dicts(
 
 def generate_c_and_t_prs_scores(
     assembly: str,
-    disease: str,
+    trait: str,
     pmid: str,
     ancestry: AncestryResults,
     dosage_matrix_path: str,
@@ -421,7 +421,7 @@ def generate_c_and_t_prs_scores(
 
     # This part goes through dosage matrix the first time to get overlapping loci
     with Timer() as timer:
-        gwas_scores_path = get_sumstats_file(disease, assembly, pmid)
+        gwas_scores_path = get_sumstats_file(trait, assembly, pmid)
         scores = _load_association_scores(str(gwas_scores_path))
     logger.debug("Time to load association scores: %s", timer.elapsed_time)
 
