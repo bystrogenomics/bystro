@@ -26,20 +26,37 @@ logger = logging.getLogger(__name__)
 
 pd.options.future.infer_string = True  # type: ignore
 
+HG19_ASSEMBLY = "hg19"
+HG38_ASSEMBLY = "hg38"
+
 ANCESTRY_SUPERPOPS = ["AFR", "AMR", "EAS", "EUR", "SAS"]
-GNOMAD_AF_SUPERPOPS = [
+HG19_GNOMAD_AF_SUPERPOPS = [
     "gnomad.genomes.AF_afr",
     "gnomad.genomes.AF_amr",
     "gnomad.genomes.AF_eas",
     "gnomad.genomes.AF_nfe",
     "gnomad.genomes.AF_sas",
 ]
-GNOMAD_AF_SUPERPOPS_MAP = {
+HG19_GNOMAD_AF_SUPERPOPS_MAP = {
     "gnomad.genomes.AF_afr": "AFR",
     "gnomad.genomes.AF_amr": "AMR",
     "gnomad.genomes.AF_eas": "EAS",
     "gnomad.genomes.AF_nfe": "EUR",
     "gnomad.genomes.AF_sas": "SAS",
+}
+HG38_GNOMAD_AF_SUPERPOPS = [
+    "gnomad.genomes.AF_joint_afr",
+    "gnomad.genomes.AF_joint_amr",
+    "gnomad.genomes.AF_joint_eas",
+    "gnomad.genomes.AF_joint_nfe",
+    "gnomad.genomes.AF_joint_sas",
+]
+HG38_GNOMAD_AF_SUPERPOPS_MAP = {
+    "gnomad.genomes.AF_joint_afr": "AFR",
+    "gnomad.genomes.AF_joint_amr": "AMR",
+    "gnomad.genomes.AF_joint_eas": "EAS",
+    "gnomad.genomes.AF_joint_nfe": "EUR",
+    "gnomad.genomes.AF_joint_sas": "SAS",
 }
 
 
@@ -123,6 +140,7 @@ def _convert_loci_to_query_format(score_loci: set) -> str:
 def _extract_af_and_loci_overlap(
     score_loci: set,
     index_name: str,
+    assembly: str,
     user: CachedAuth | None = None,
     cluster_opensearch_config: dict[str, Any] | None = None,
 ) -> pd.DataFrame:
@@ -132,6 +150,15 @@ def _extract_af_and_loci_overlap(
     """
     query = _convert_loci_to_query_format(score_loci)
 
+    if assembly == HG19_ASSEMBLY:
+        gnomad_af_fields = HG19_GNOMAD_AF_SUPERPOPS
+        gnomad_af_fields_map = HG19_GNOMAD_AF_SUPERPOPS_MAP
+    elif assembly == HG38_ASSEMBLY:
+        gnomad_af_fields = HG38_GNOMAD_AF_SUPERPOPS
+        gnomad_af_fields_map = HG38_GNOMAD_AF_SUPERPOPS_MAP
+    else:
+        raise ValueError(f"Assembly {assembly} is not supported.")
+
     return (
         get_annotation_result_from_query(
             query_string=query,
@@ -139,11 +166,11 @@ def _extract_af_and_loci_overlap(
             bystro_api_auth=user,
             cluster_opensearch_config=cluster_opensearch_config,
             melt_samples=False,
-            fields=GNOMAD_AF_SUPERPOPS,
+            fields=gnomad_af_fields,
         )
         .set_index("locus")
         .fillna(0)
-        .rename(columns=GNOMAD_AF_SUPERPOPS_MAP)[ANCESTRY_SUPERPOPS]
+        .rename(columns=gnomad_af_fields_map)[ANCESTRY_SUPERPOPS]
     )
 
 
@@ -424,12 +451,9 @@ def generate_c_and_t_prs_scores(
             thresholded_loci_gnomad_afs = _extract_af_and_loci_overlap(
                 score_loci=thresholded_score_loci,
                 index_name=index_name,
+                assembly=assembly,
                 user=user,
                 cluster_opensearch_config=cluster_opensearch_config,
-            )
-
-            thresholded_loci_gnomad_afs = thresholded_loci_gnomad_afs.rename(
-                columns=GNOMAD_AF_SUPERPOPS_MAP
             )
 
             logger.debug("thresholded_loci_gnomad_afs: %s", thresholded_loci_gnomad_afs)
