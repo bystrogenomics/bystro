@@ -35,14 +35,12 @@ HG19_GNOMAD_AF_SUPERPOPS = [
     "gnomad.genomes.AF_amr",
     "gnomad.genomes.AF_eas",
     "gnomad.genomes.AF_nfe",
-    "gnomad.genomes.AF_sas",
 ]
 HG19_GNOMAD_AF_SUPERPOPS_MAP = {
     "gnomad.genomes.AF_afr": "AFR",
     "gnomad.genomes.AF_amr": "AMR",
     "gnomad.genomes.AF_eas": "EAS",
     "gnomad.genomes.AF_nfe": "EUR",
-    "gnomad.genomes.AF_sas": "SAS",
 }
 HG38_GNOMAD_AF_SUPERPOPS = [
     "gnomad.genomes.AF_joint_afr",
@@ -137,6 +135,12 @@ def _convert_loci_to_query_format(score_loci: set) -> str:
     return f"(_exists_:gnomad.genomes) && ({' || '.join(finalized_loci)})"
 
 
+def _add_sas_column_if_missing(df):
+    if "SAS" not in df.columns:
+        df["SAS"] = 0
+    return df
+
+
 def _extract_af_and_loci_overlap(
     score_loci: set,
     index_name: str,
@@ -159,7 +163,7 @@ def _extract_af_and_loci_overlap(
     else:
         raise ValueError(f"Assembly {assembly} is not supported.")
 
-    return (
+    res = (
         get_annotation_result_from_query(
             query_string=query,
             index_name=index_name,
@@ -170,8 +174,13 @@ def _extract_af_and_loci_overlap(
         )
         .set_index("locus")
         .fillna(0)
-        .rename(columns=gnomad_af_fields_map)[ANCESTRY_SUPERPOPS]
+        .rename(columns=gnomad_af_fields_map)
     )
+
+    if assembly == HG19_ASSEMBLY:
+        return _add_sas_column_if_missing(res)[ANCESTRY_SUPERPOPS]
+
+    return res[ANCESTRY_SUPERPOPS]
 
 
 def _calculate_allele_frequency_total_variation(
