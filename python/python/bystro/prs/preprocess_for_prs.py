@@ -413,7 +413,7 @@ def generate_c_and_t_prs_scores(
         for i in range(0, len(samples), sample_chunk_size):
             sample_groups.append((population, samples[i : i + sample_chunk_size]))
 
-    ancestry_weighted_af_total_variation: pd.DataFrame | None
+    ancestry_weighted_af_total_variation: pd.DataFrame | None = None
     if index_name is not None:
         with Timer() as query_timer:
             process = psutil.Process(os.getpid())
