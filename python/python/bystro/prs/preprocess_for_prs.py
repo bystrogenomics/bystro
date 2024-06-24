@@ -1,19 +1,61 @@
 """Process dosage matrix, GWAS summary statistics, and LD maps for PRS C+T calculation."""
 
 import bisect
-import logging
-from typing import Optional
-import matplotlib.pyplot as plt  # type: ignore
 from enum import Enum
+import logging
+from typing import Any, Optional
+import os
+import psutil
+
+import matplotlib.pyplot as plt  # type: ignore
 import pandas as pd
 from pyarrow import feather  # type: ignore
 import pyarrow.dataset as ds  # type: ignore
 import pyarrow.compute as pc  # type: ignore
 import pyarrow as pa  # type: ignore
 
+import numpy as np
+
+from bystro.api.auth import CachedAuth
+from bystro.proteomics.annotation_interface import get_annotation_result_from_query
+from bystro.ancestry.ancestry_types import AncestryResults, PopulationVector, SuperpopVector
+from bystro.prs.model import get_sumstats_file, get_map_file
+from bystro.utils.timer import Timer
+
 logger = logging.getLogger(__name__)
 
-AD_SCORE_FILEPATH = "gwas_summary_stats/AD_sumstats_hg38_PMID35379992.feather"
+pd.options.future.infer_string = True  # type: ignore
+
+HG19_ASSEMBLY = "hg19"
+HG38_ASSEMBLY = "hg38"
+
+ANCESTRY_SUPERPOPS = ["AFR", "AMR", "EAS", "EUR", "SAS"]
+HG19_GNOMAD_AF_SUPERPOPS = [
+    "gnomad.genomes.AF_afr",
+    "gnomad.genomes.AF_amr",
+    "gnomad.genomes.AF_eas",
+    "gnomad.genomes.AF_nfe",
+]
+HG19_GNOMAD_AF_SUPERPOPS_MAP = {
+    "gnomad.genomes.AF_afr": "AFR",
+    "gnomad.genomes.AF_amr": "AMR",
+    "gnomad.genomes.AF_eas": "EAS",
+    "gnomad.genomes.AF_nfe": "EUR",
+}
+HG38_GNOMAD_AF_SUPERPOPS = [
+    "gnomad.genomes.AF_joint_afr",
+    "gnomad.genomes.AF_joint_amr",
+    "gnomad.genomes.AF_joint_eas",
+    "gnomad.genomes.AF_joint_nfe",
+    "gnomad.genomes.AF_joint_sas",
+]
+HG38_GNOMAD_AF_SUPERPOPS_MAP = {
+    "gnomad.genomes.AF_joint_afr": "AFR",
+    "gnomad.genomes.AF_joint_amr": "AMR",
+    "gnomad.genomes.AF_joint_eas": "EAS",
+    "gnomad.genomes.AF_joint_nfe": "EUR",
+    "gnomad.genomes.AF_joint_sas": "SAS",
+}
 
 
 class StrEnum(str, Enum):
@@ -27,12 +69,23 @@ class GwasStatsLocusKind(StrEnum):
     NO_MATCH = "Alleles Do Not Match"
 
 
-def _load_association_scores(AD_SCORE_FILEPATH: str) -> pd.DataFrame:
+def _load_association_scores(ad_scores_filepath: str) -> pd.DataFrame:
     """Load in GWAS summary statistics provided by user."""
     # For now, we are supporting one AD dataset PMID:35379992
-    ad_scores = feather.read_feather(AD_SCORE_FILEPATH)
+    ad_scores = feather.read_feather(ad_scores_filepath)
+
     columns_to_include = ["CHR", "POS", "OTHER_ALLELE", "EFFECT_ALLELE", "P", "SNPID", "BETA"]
-    return ad_scores[columns_to_include]
+    return ad_scores[columns_to_include].astype(
+        {
+            "CHR": "int64",
+            "POS": "int64",
+            "OTHER_ALLELE": "string[pyarrow_numpy]",
+            "EFFECT_ALLELE": "string[pyarrow_numpy]",
+            "P": "float32",
+            "SNPID": "string[pyarrow_numpy]",
+            "BETA": "float32",
+        }
+    )
 
 
 def _load_genetic_maps_from_feather(map_path: str) -> dict[str, pd.DataFrame]:
@@ -49,6 +102,9 @@ def _load_genetic_maps_from_feather(map_path: str) -> dict[str, pd.DataFrame]:
     """
     try:
         combined_genetic_map = pd.read_feather(map_path)
+        combined_genetic_map = combined_genetic_map.astype(
+            {"chromosome_num": "int64", "upper_bound": "int64"}
+        )
         logger.info("Successfully loaded combined genetic map from: %s", map_path)
         genetic_maps = {}
         for chrom_num in combined_genetic_map["chromosome_num"].unique():
@@ -61,37 +117,95 @@ def _load_genetic_maps_from_feather(map_path: str) -> dict[str, pd.DataFrame]:
         raise e
 
 
-def _extract_nomiss_dosage_loci(dosage_matrix_path: str, score_loci: set, chunk_size=1000) -> set:
+def _convert_loci_to_query_format(score_loci: set) -> str:
     """
-    Reads a dataset from the provided dosage matrix Feather file path and filters out
-    rows where any column other than 'locus' contains a missing dosage value (represented by -1)
-    and loci not in the base GWAS summary statistics dataset.
-
-    Args:
-    ----
-    dosage_matrix_path (str): The path to the Feather file containing the target dataset.
-    score_loci (set): A set of loci from a base GWAS summary statistics dataset.
-
-    Returns:
-    -------
-    set: A set containing loci with no missing dosage values across all other columns.
+    Convert a set of loci from the format 'chr10:105612479:G:T' to
+    '(chrom:chr10 pos:105612479 inputRef:G alt:T)'
+    and separate them by '||' in order to issue queries with them.
     """
-    dataset = ds.dataset(dosage_matrix_path, format="feather")
-    score_loci_filter = pc.field("locus").isin(pa.array(list(score_loci)))
-    samples = [name for name in dataset.schema.names if name != "locus"]
-    # Checking for missingness will be removed after imputation to the dosage matrix
-    # TODO: Add imputation preprocess step before PRS, expected 8/2024
-    filters = [pc.field(sample) >= 0 for sample in samples]
-    combined_filter = filters[0]
-    for f in filters[1:]:
-        combined_filter = combined_filter & f
-    total_filter = score_loci_filter & combined_filter
-    table = (
-        dataset.filter(total_filter)
-        .to_table(batch_size=chunk_size, columns=["locus"], batch_readahead=1)
-        .to_pylist()
+    if not score_loci:
+        raise ValueError("No loci provided for conversion to query format.")
+
+    finalized_loci = []
+    for locus in score_loci:
+        chrom, pos, inputRef, alt = locus.split(":")
+        single_query = f"(chrom:{chrom} pos:{pos} inputRef:{inputRef} alt:{alt})"
+        finalized_loci.append(single_query)
+
+    return f"(_exists_:gnomad.genomes) && ({' || '.join(finalized_loci)})"
+
+
+def _add_sas_column_if_missing(df):
+    if "SAS" not in df.columns:
+        df["SAS"] = 0
+    return df
+
+
+def _extract_af_and_loci_overlap(
+    score_loci: set,
+    index_name: str,
+    assembly: str,
+    user: CachedAuth | None = None,
+    cluster_opensearch_config: dict[str, Any] | None = None,
+) -> pd.DataFrame:
+    """
+    Convert loci to query format, perform annotation query,
+    and return the loci with gnomad allele frequencies.
+    """
+    query = _convert_loci_to_query_format(score_loci)
+
+    if assembly == HG19_ASSEMBLY:
+        gnomad_af_fields = HG19_GNOMAD_AF_SUPERPOPS
+        gnomad_af_fields_map = HG19_GNOMAD_AF_SUPERPOPS_MAP
+    elif assembly == HG38_ASSEMBLY:
+        gnomad_af_fields = HG38_GNOMAD_AF_SUPERPOPS
+        gnomad_af_fields_map = HG38_GNOMAD_AF_SUPERPOPS_MAP
+    else:
+        raise ValueError(f"Assembly {assembly} is not supported.")
+
+    res = (
+        get_annotation_result_from_query(
+            query_string=query,
+            index_name=index_name,
+            bystro_api_auth=user,
+            cluster_opensearch_config=cluster_opensearch_config,
+            melt_samples=False,
+            fields=gnomad_af_fields,
+        )
+        .set_index("locus")
+        .fillna(0)
+        .rename(columns=gnomad_af_fields_map)
     )
-    return set([table[i]["locus"] for i in range(len(table))])
+
+    if assembly == HG19_ASSEMBLY:
+        return _add_sas_column_if_missing(res)[ANCESTRY_SUPERPOPS]
+
+    return res[ANCESTRY_SUPERPOPS]
+
+
+def _calculate_allele_frequency_total_variation(
+    gnomad_afs: pd.DataFrame, superpop_probabilities: dict[str, SuperpopVector]
+):
+    # Renormalize gnomad allele frequencies
+    gnomad_afs = gnomad_afs.div(gnomad_afs.sum(axis=1), axis=0)
+
+    sample_superprop_probs: dict[str, dict[str, float]] = {}
+    for sample in superpop_probabilities:
+        sample_superprop_probs[sample] = {}
+        for superpop in ANCESTRY_SUPERPOPS:
+            one_sample = superpop_probabilities[sample]
+            prob_range = getattr(one_sample, superpop)
+            sample_superprop_probs[sample][superpop] = (
+                prob_range.lower_bound + prob_range.upper_bound
+            ) / 2
+
+    sample_superprop_probs_df = pd.DataFrame(sample_superprop_probs, dtype=np.float32)
+    # Normalize, just in case
+    sample_superprop_probs_df = sample_superprop_probs_df.div(
+        sample_superprop_probs_df.sum(axis=0), axis=1
+    )
+
+    return 2 * (gnomad_afs @ sample_superprop_probs_df.loc[gnomad_afs.columns.tolist()])
 
 
 def _preprocess_scores(ad_scores: pd.DataFrame) -> pd.DataFrame:
@@ -260,21 +374,6 @@ def ld_clump(scores_overlap: pd.DataFrame, map_path: str) -> tuple[pd.DataFrame,
     return clean_scores_for_analysis(max_effect_per_bin, "ID_effect_as_ref")
 
 
-def finalize_scores_after_c_t(
-    gwas_scores_path: str, dosage_matrix_path: str, map_path: str, p_value_threshold: float
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Finalize scores for PRS calculation."""
-    scores = _load_association_scores(gwas_scores_path)
-    preprocessed_scores = _preprocess_scores(scores)
-    thresholded_score_loci = get_p_value_thresholded_indices(preprocessed_scores, p_value_threshold)
-    dosage_loci_nomiss = _extract_nomiss_dosage_loci(dosage_matrix_path, thresholded_score_loci)
-    overlap_loci = generate_overlap_scores_dosage(thresholded_score_loci, dosage_loci_nomiss)
-    scores_overlap = preprocessed_scores[preprocessed_scores.index.isin(overlap_loci)]
-    scores_after_c_t, loci_and_allele_comparison = ld_clump(scores_overlap, map_path)
-    scores_after_c_t = scores_after_c_t.sort_index()
-    return scores_after_c_t, loci_and_allele_comparison
-
-
 def finalize_dosage_after_c_t(
     dosage_overlap: pd.DataFrame, loci_and_allele_comparison: pd.DataFrame
 ) -> pd.DataFrame:
@@ -287,34 +386,161 @@ def finalize_dosage_after_c_t(
     return genos_transpose
 
 
-def generate_c_and_t_prs_scores(
-    gwas_scores_path: str,
-    dosage_matrix_path: str,
-    map_path: str,
-    p_value_threshold: float = 0.05,
-) -> dict[str, float]:
-    """Calculate PRS."""
-    # This part goes through dosage matrix the first time to get overlapping loci
-    scores_after_c_t, loci_and_allele_comparison = finalize_scores_after_c_t(
-        gwas_scores_path, dosage_matrix_path, map_path, p_value_threshold
-    )
+def _ancestry_results_to_dicts(
+    ancestry: AncestryResults,
+) -> tuple[dict[str, str], dict[str, PopulationVector], dict[str, SuperpopVector]]:
+    """Convert AncestryResults to a dictionary of top hit probabilities."""
+    top_hits = {}
+    populations: dict[str, PopulationVector] = {}
+    superpops: dict[str, SuperpopVector] = {}
+    for result in ancestry.results:
+        top_hits[result.sample_id] = result.top_hit.populations[0]
+        populations[result.sample_id] = result.populations
+        superpops[result.sample_id] = result.superpops
 
-    # This part goes through dosage matrix the second time, adjusts dosages,
-    # transposes genotypes, and calculates PRS
-    prs_scores: pd.Series = pd.Series(dtype=float)
-    beta_values = scores_after_c_t["BETA"]
-    finalized_loci = scores_after_c_t.index
-    score_loci_filter = pc.field("locus").isin(pa.array(list(finalized_loci)))
+    return top_hits, populations, superpops
+
+
+def generate_c_and_t_prs_scores(
+    assembly: str,
+    trait: str,
+    pmid: str,
+    ancestry: AncestryResults,
+    dosage_matrix_path: str,
+    p_value_threshold: float = 0.05,
+    sample_chunk_size: int = 200,
+    index_name: str | None = None,
+    user: CachedAuth | None = None,
+    cluster_opensearch_config: dict[str, Any] | None = None,
+) -> pd.Series:
+    """Calculate PRS."""
+    if index_name is not None and cluster_opensearch_config is None and user is None:
+        raise ValueError(
+            "If index_name is provided, either user or cluster_opensearch_config must be provided."
+        )
+
+    # This part goes through dosage matrix the first time to get overlapping loci
+    with Timer() as timer:
+        gwas_scores_path = get_sumstats_file(trait, assembly, pmid)
+        scores = _load_association_scores(str(gwas_scores_path))
+    logger.debug("Time to load association scores: %s", timer.elapsed_time)
+
+    with Timer() as timer:
+        preprocessed_scores = _preprocess_scores(scores)
+        thresholded_score_loci = get_p_value_thresholded_indices(preprocessed_scores, p_value_threshold)
+    logger.debug("Time to preprocess scores: %s", timer.elapsed_time)
+
+    score_loci_filter = pc.field("locus").isin(pa.array(thresholded_score_loci))
+
     dosage_ds = ds.dataset(dosage_matrix_path, format="feather").filter(score_loci_filter)
-    samples = [name for name in dosage_ds.schema.names if name != "locus"]
-    sample_groups = [samples[i : i + 1000] for i in range(0, len(samples), 1000)]
-    for sample_group in sample_groups:
-        sample_genotypes = dosage_ds.to_table(["locus", *sample_group]).to_pandas()
-        sample_genotypes = sample_genotypes.set_index("locus")
-        genos_transpose = finalize_dosage_after_c_t(sample_genotypes, loci_and_allele_comparison)
-        prs_scores_chunk = genos_transpose @ beta_values.loc[genos_transpose.columns]
-        prs_scores = prs_scores.add(prs_scores_chunk, fill_value=0)
-    return prs_scores.to_dict()
+
+    # For now we will ld prune based on a single population, the top_hit
+    # To vectorize ld pruning, we will gather chunks based on the top hit
+
+    top_hits, _, superpop_probabilities = _ancestry_results_to_dicts(ancestry)
+    sample_groups = []
+    population_wise_samples: dict[str, list[str]] = {}
+    for sample, population in top_hits.items():
+        if population not in population_wise_samples:
+            population_wise_samples[population] = []
+        population_wise_samples[population].append(sample)
+
+    for population, samples in population_wise_samples.items():
+        for i in range(0, len(samples), sample_chunk_size):
+            sample_groups.append((population, samples[i : i + sample_chunk_size]))
+
+    ancestry_weighted_af_total_variation: pd.DataFrame | None = None
+    if index_name is not None:
+        with Timer() as query_timer:
+            process = psutil.Process(os.getpid())
+            logger.debug(
+                "Memory usage before fetching gnomad allele frequencies: %s",
+                process.memory_info().rss / 1e6,
+            )
+            thresholded_loci_gnomad_afs = _extract_af_and_loci_overlap(
+                score_loci=thresholded_score_loci,
+                index_name=index_name,
+                assembly=assembly,
+                user=user,
+                cluster_opensearch_config=cluster_opensearch_config,
+            )
+
+            logger.debug("thresholded_loci_gnomad_afs: %s", thresholded_loci_gnomad_afs)
+
+            ancestry_weighted_af_total_variation = _calculate_allele_frequency_total_variation(
+                thresholded_loci_gnomad_afs, superpop_probabilities
+            )
+
+            logger.debug(
+                "ancestry_weighted_af_total_variation: %s", ancestry_weighted_af_total_variation
+            )
+
+            logger.debug(
+                "Memory usage after fetching gnomad allele frequencies: %s",
+                process.memory_info().rss / 1e6,
+            )
+        logger.debug("Time to query for gnomad allele frequencies: %s", query_timer.elapsed_time)
+
+    # Accumulate the results
+    prs_scores: pd.Series = pd.Series(dtype=np.float32, name="PRS")
+    with Timer() as outer_timer:
+        for sample_pop_group in sample_groups:
+            population, sample_group = sample_pop_group
+
+            with Timer() as timer:
+                sample_genotypes = dosage_ds.to_table(["locus", *sample_group]).to_pandas()
+                sample_genotypes = sample_genotypes.set_index("locus")
+
+                mask = sample_genotypes.notna().all(axis=1) & (sample_genotypes >= 0).all(axis=1)
+                sample_genotypes = sample_genotypes[mask]
+
+                dosage_loci_nomiss = sample_genotypes.index.tolist()
+
+                overlap_loci = generate_overlap_scores_dosage(thresholded_score_loci, dosage_loci_nomiss)
+                scores_overlap = preprocessed_scores[preprocessed_scores.index.isin(overlap_loci)]
+
+                # TODO 2024-06-22 @ctrevino: We do not currently have all 26 1000G population maps
+                # this block needs to be removed once we do
+                try:
+                    map_path = get_map_file(assembly, population)
+                except ValueError as e:
+                    logger.exception(
+                        "Failed to get map file for %s: %s, defaulting to CEU", population, e
+                    )
+                    map_path = get_map_file(assembly, "CEU")
+
+                scores_after_c_t, loci_and_allele_comparison = ld_clump(scores_overlap, str(map_path))
+                scores_after_c_t = scores_after_c_t.sort_index()
+
+                beta_values = scores_after_c_t["BETA"]
+
+                with Timer() as timer:
+                    genos_transpose = finalize_dosage_after_c_t(
+                        sample_genotypes, loci_and_allele_comparison
+                    )
+
+                    if ancestry_weighted_af_total_variation is not None:
+                        weights_filtered = ancestry_weighted_af_total_variation.loc[
+                            genos_transpose.columns
+                        ].fillna(0)
+                        genos_transpose = genos_transpose - weights_filtered[genos_transpose.index].T
+
+                    prs_scores_chunk = genos_transpose @ beta_values.loc[genos_transpose.columns]
+                    prs_scores = prs_scores.add(prs_scores_chunk, fill_value=0)
+                logger.debug(
+                    "Time to calculate PRS for chunk of %d samples: %s",
+                    len(sample_group),
+                    timer.elapsed_time,
+                )
+            logger.debug(
+                "Time to load dosage matrix chunk of %d samples: %s",
+                len(sample_group),
+                timer.elapsed_time,
+            )
+
+    logger.debug("Time to calculate PRS for all samples: %s", outer_timer.elapsed_time)
+
+    return prs_scores
 
 
 def prs_histogram(
@@ -335,7 +561,3 @@ def prs_histogram(
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.show()
-
-
-def _load_covariates(COVARIATE_FILEPATH: str) -> pd.DataFrame:
-    return pd.read_csv(COVARIATE_FILEPATH, delimiter="\t")

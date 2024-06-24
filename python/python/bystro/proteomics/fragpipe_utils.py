@@ -2,6 +2,8 @@
 
 import pandas as pd
 
+pd.options.future.infer_string = True  # type: ignore
+
 ANNOTATION_COLS = ["plex", "channel", "sample", "sample_name", "condition", "replicate"]
 
 

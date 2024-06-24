@@ -1,9 +1,11 @@
 """Tests for proteomics module."""
+
 import pytest
 from bystro.proteomics.proteomics import load_fragpipe_dataset
 import io
 import pandas as pd
 
+pd.options.future.infer_string = True  # type: ignore
 # file contents adapted from Supplementary_Data_Phosphoproteome_DIA,
 # Supplementary_Data_Proteome_DIA folders of
 # wingolab-bystro-matrixData-opensearch repo

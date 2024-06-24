@@ -11,6 +11,8 @@ from bystro.beanstalkd.worker import ProgressPublisher
 import pandas as pd
 from unittest.mock import patch
 
+pd.options.future.infer_string = True  # type: ignore
+
 FAKE_FRAGPIPE_DF = pd.DataFrame(
     {
         "ACADVL": {"Sample1": 0.1, "Sample2": 0.2},

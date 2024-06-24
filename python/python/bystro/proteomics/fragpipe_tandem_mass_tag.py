@@ -7,6 +7,8 @@ import pandas as pd
 
 from bystro.proteomics.fragpipe_utils import check_df_starts_with_cols, prep_annotation_df
 
+pd.options.future.infer_string = True  # type: ignore
+
 FRAGPIPE_ABUNDANCE_COLS = ["Index", "NumberPSM", "ProteinID", "MaxPepProb", "ReferenceIntensity"]
 FRAGPIPE_GENE_NAME_COLUMN_ORIGINAL = "Index"
 FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED = "gene_name"

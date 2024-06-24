@@ -5,6 +5,8 @@ from io import StringIO
 
 import pandas as pd
 
+pd.options.future.infer_string = True  # type: ignore
+
 HEADER_COLS = ["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"]
 
 
@@ -24,7 +26,7 @@ def generate_simulated_vcf(num_samples: int, num_vars: int) -> str:
     header = HEADER_COLS + sample_ids
     vcf_data = []
     simulated_indices = []
-    vcf_data.append("#"+"\t".join(header))
+    vcf_data.append("#" + "\t".join(header))
     for variant in range(num_vars):
         # Use index simulator to generate random chrom,pos,ref,alt
         random_chr, random_pos, random_ref, random_alt = generate_random_vcf_index()
@@ -36,15 +38,15 @@ def generate_simulated_vcf(num_samples: int, num_vars: int) -> str:
         format_ = "GT"
         samples = []
         record = [
-            str(random_chr), 
-            str(random_pos), 
-            variant_id, 
-            random_ref, 
-            random_alt, 
-            str(qual), 
-            filter_, 
-            info, 
-            format_
+            str(random_chr),
+            str(random_pos),
+            variant_id,
+            random_ref,
+            random_alt,
+            str(qual),
+            filter_,
+            info,
+            format_,
         ]
         for _ in range(num_samples):
             genotype = random.choice(["0|0", "0|1", "1|0", "1|1"])
@@ -67,9 +69,9 @@ def add_comment_lines_to_sim_vcf(vcf_str: str) -> str:
     comment_lines = [f"# Comment line {i}" for i in range(1, num_comment_lines + 1)]
     sim_vcf_with_comments = "\n".join(comment_lines) + "\n" + "\n".join(vcf_str)
     return sim_vcf_with_comments
-    
-            
-def write_out_sim_vcf(sim_vcf_name: str,sim_vcf_with_comments: str):
+
+
+def write_out_sim_vcf(sim_vcf_name: str, sim_vcf_with_comments: str):
     """Save the simulated VCF as a TSV file"""
     with open(sim_vcf_name, "w") as file:
         file.write(sim_vcf_with_comments)

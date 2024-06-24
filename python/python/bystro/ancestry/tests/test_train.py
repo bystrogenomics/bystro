@@ -1,4 +1,5 @@
 """Tests for ancestry model training code."""
+
 import re
 
 import numpy as np
@@ -18,6 +19,8 @@ from bystro.ancestry.train import (
     apply_pca_transform,
 )
 from bystro.vcf_utils.simulate_random_vcf import generate_simulated_vcf, convert_sim_vcf_to_df
+
+pd.options.future.infer_string = True  # type: ignore
 
 
 def test__parse_vcf_from_file_stream():

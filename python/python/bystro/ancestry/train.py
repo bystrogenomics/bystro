@@ -9,6 +9,7 @@ This script takes a vcf of preprocessed variants (see preprocess_vcfs.sh) and ge
 3.  Classifiers mapping PC space to the 26 HapMap populations as well as 5 continent-level
 superpopulations.
 """
+
 import dataclasses
 import gzip
 import logging
@@ -36,6 +37,7 @@ from bystro.vcf_utils.simulate_random_vcf import HEADER_COLS
 
 logger = logging.getLogger(__name__)
 
+pd.options.future.infer_string = True  # type: ignore
 
 ANCESTRY_DIR = Path(__file__).parent
 DATA_DIR = ANCESTRY_DIR / "data"
@@ -515,12 +517,19 @@ def _load_1kgp_vcf_to_df() -> pd.DataFrame:
 def convert_1kgp_vcf_to_dosage(vcf_with_header: pd.DataFrame) -> pd.DataFrame:
     """Converts phased genotype vcf to dosage matrix"""
     # TODO Determine whether we should always expect phased genotypes for reference data for training
-    dosage_vcf = vcf_with_header.replace("0|0", 0)
-    dosage_vcf = dosage_vcf.replace("0|1", 1)
-    dosage_vcf = dosage_vcf.replace("1|0", 1)
-    dosage_vcf = dosage_vcf.replace("1|1", 2)
+    dosage_vcf = vcf_with_header.replace("0|0", "0")
+    dosage_vcf = dosage_vcf.replace("0|1", "1")
+    dosage_vcf = dosage_vcf.replace("1|0", "1")
+    dosage_vcf = dosage_vcf.replace("1|1", "2")
     dosage_vcf = dosage_vcf.rename(columns={"#CHROM": "Chromosome", "POS": "Position"}, errors="raise")
-    dosage_vcf = dosage_vcf.set_index("ID", drop=False)
+
+    sample_columns_dtypes = {}
+    vcf_columns = ["Chromosome", "Position", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"]
+    for column in dosage_vcf.columns:
+        if column not in vcf_columns:
+            sample_columns_dtypes[column] = "uint8"
+
+    dosage_vcf = dosage_vcf.set_index("ID", drop=False).astype(sample_columns_dtypes)
     return dosage_vcf
 
 
