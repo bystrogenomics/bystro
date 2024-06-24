@@ -14,6 +14,7 @@ from bystro.proteomics.listener_annotation_interface import (
 
 from bystro.beanstalkd.worker import ProgressPublisher
 
+pd.options.future.infer_string = True  # type: ignore
 
 FAKE_PROTEOMICS_DATA = pd.DataFrame(
     {"sample_id": ["sample1", "sample2"], "gene_name": ["gene1", "gene2"], "abundance": [100, 200]}
@@ -39,31 +40,29 @@ def test_submit_fn():
 def test_handler_fn_happy_path(tmpdir, mocker):
     mocker.patch(
         "bystro.proteomics.listener_annotation_interface.ds.dataset",
-        return_value=mocker.Mock(to_table=mocker.Mock(to_pandas=mocker.Mock(return_value=FAKE_PROTEOMICS_DATA)))
+        return_value=mocker.Mock(
+            to_table=mocker.Mock(to_pandas=mocker.Mock(return_value=FAKE_PROTEOMICS_DATA))
+        ),
     )
     mocker.patch(
-        "bystro.proteomics.listener_annotation_interface.pd.read_csv",
-        return_value=FAKE_PROTEOMICS_DATA
+        "bystro.proteomics.listener_annotation_interface.pd.read_csv", return_value=FAKE_PROTEOMICS_DATA
     )
     mocker.patch(
         "bystro.proteomics.listener_annotation_interface.get_annotation_result_from_query",
-        return_value=pd.DataFrame()
-        )
+        return_value=pd.DataFrame(),
+    )
     mocker.patch(
         "bystro.proteomics.listener_annotation_interface.join_annotation_result_to_fragpipe_dataset",
-        return_value=pd.DataFrame()
+        return_value=pd.DataFrame(),
     )
-    mocker.patch(
-        "bystro.proteomics.annotation_interface.AsyncOpenSearch",
-        return_value=mocker.Mock()
-    )
+    mocker.patch("bystro.proteomics.annotation_interface.AsyncOpenSearch", return_value=mocker.Mock())
 
     job_data = ProteomicsJobData(
         data_path=str(tmpdir / "some_data.feather"),
         out_dir=str(tmpdir),
         annotation_query=FAKE_ANNOTATION_QUERY,
         index_name=FAKE_INDEX_NAME,
-        submission_id="test_submission"
+        submission_id="test_submission",
     )
 
     publisher = mocker.Mock(spec=ProgressPublisher)

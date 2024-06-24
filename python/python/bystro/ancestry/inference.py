@@ -31,6 +31,8 @@ from bystro.utils.timer import Timer
 logger = logging.getLogger(__name__)
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
+pd.options.future.infer_string = True  # type: ignore
+
 ANCESTRY_SCORE_SAMPLE_CHUNK_SIZE = int(os.getenv("ANCESTRY_SCORE_SAMPLE_CHUNK_SIZE", 200))
 
 

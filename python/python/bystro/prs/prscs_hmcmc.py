@@ -101,7 +101,7 @@ class PrsCSData(BasePrsCS):
             The covariates of interest
 
         y : np.array-like,(n_samples,)
-            The disease or outcome
+            The trait, disease, or outcome
 
         Returns
         -------

@@ -38,11 +38,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
+
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm  # type: ignore
 from statsmodels.multivariate.manova import MANOVA  # type: ignore
 from typing import List, Dict
+
+pd.options.future.infer_string = True  # type: ignore
 
 
 def group_center(data: pd.Series, group: pd.Series) -> pd.Series:
@@ -83,10 +86,7 @@ def center_pheno(dat: pd.DataFrame, by: str) -> pd.DataFrame:
     npheno = len([col for col in dat.columns if col.startswith("X")])
 
     if by == "mean":
-        centered_vals = [
-            group_center(dat[f"X{x+1}"], dat["off_geno_grp"])
-            for x in range(npheno)
-        ]
+        centered_vals = [group_center(dat[f"X{x+1}"], dat["off_geno_grp"]) for x in range(npheno)]
         centered_data = pd.DataFrame(
             np.array(centered_vals).T,
             columns=[f"pheno{x+1}" for x in range(npheno)],
@@ -95,8 +95,7 @@ def center_pheno(dat: pd.DataFrame, by: str) -> pd.DataFrame:
 
     elif by == "median":
         centered_vals = [
-            dat.groupby("off_geno_grp")[f"X{x+1}"].transform("median")
-            for x in range(npheno)
+            dat.groupby("off_geno_grp")[f"X{x+1}"].transform("median") for x in range(npheno)
         ]
         dat[[f"pheno{x+1}" for x in range(npheno)]] = np.array(centered_vals).T
 
@@ -122,9 +121,7 @@ def center_pheno(dat: pd.DataFrame, by: str) -> pd.DataFrame:
     return dat
 
 
-def extract_residuals(
-    phen_df: pd.DataFrame, covar_df: pd.DataFrame
-) -> pd.DataFrame:
+def extract_residuals(phen_df: pd.DataFrame, covar_df: pd.DataFrame) -> pd.DataFrame:
     """
     Adjust for effects of covariates by extracting residuals.
 
@@ -155,9 +152,7 @@ def extract_residuals(
     return resid_df
 
 
-def do_r_omnibus_test(
-    dat: pd.DataFrame, varnames: List[str], groupname: str
-) -> Dict[str, float]:
+def do_r_omnibus_test(dat: pd.DataFrame, varnames: List[str], groupname: str) -> Dict[str, float]:
     """
     Perform R-Omnibus test for equality of phenotypic covariance matrices.
 
@@ -193,29 +188,19 @@ def do_r_omnibus_test(
     x_M_2 = X[1] - M[1]
 
     Z = [
-        [
-            np.outer(x_M_1[j], x_M_1[j])[np.triu_indices(npheno)]
-            for j in range(ngrp1)
-        ],
-        [
-            np.outer(x_M_2[j], x_M_2[j])[np.triu_indices(npheno)]
-            for j in range(ngrp2)
-        ],
+        [np.outer(x_M_1[j], x_M_1[j])[np.triu_indices(npheno)] for j in range(ngrp1)],
+        [np.outer(x_M_2[j], x_M_2[j])[np.triu_indices(npheno)] for j in range(ngrp2)],
     ]
 
     W = []
     for group_Z in Z:
         group_W = []
         for z in group_Z:
-            w = np.divide(
-                z, np.sqrt(np.abs(z)), out=np.zeros_like(z), where=z != 0
-            )
+            w = np.divide(z, np.sqrt(np.abs(z)), out=np.zeros_like(z), where=z != 0)
             group_W.append(w)
         W.append(group_W)
 
-    W_df = pd.DataFrame(
-        {"grp": [grplevels[0]] * ngrp1 + [grplevels[1]] * ngrp2}
-    )
+    W_df = pd.DataFrame({"grp": [grplevels[0]] * ngrp1 + [grplevels[1]] * ngrp2})
     W_df["grp"] = pd.Categorical(W_df["grp"])
 
     ntest = (npheno**2 + npheno) // 2
@@ -227,9 +212,7 @@ def do_r_omnibus_test(
     new_columns = ["grp"] + [f"test_{i}" for i in range(1, ntest + 1)]
     W_df.columns = pd.Index(new_columns)
 
-    manova_model = MANOVA.from_formula(
-        " + ".join(W_df.columns[1:]) + " ~ grp", data=W_df
-    )
+    manova_model = MANOVA.from_formula(" + ".join(W_df.columns[1:]) + " ~ grp", data=W_df)
     result = manova_model.mv_test()
 
     pval = result.results["grp"]["stat"]["Pr > F"][0]
@@ -238,9 +221,7 @@ def do_r_omnibus_test(
     return {"pval": pval, "stat": stat}
 
 
-def do_poirot_by_snp(
-    i: int, phenodat: pd.DataFrame, genodat: pd.DataFrame
-) -> Dict[str, float]:
+def do_poirot_by_snp(i: int, phenodat: pd.DataFrame, genodat: pd.DataFrame) -> Dict[str, float]:
     """
     Perform POIROT test for one variant.
 
@@ -260,12 +241,8 @@ def do_poirot_by_snp(
     """
     dat = phenodat.copy()
     dat["geno"] = genodat.iloc[:, i]
-    dat["geno_grp"] = np.where(
-        dat["geno"].isin([0, 2]), "Homozygote", "Heterozygote"
-    )
-    dat["geno_grp"] = pd.Categorical(
-        dat["geno_grp"], categories=["Homozygote", "Heterozygote"]
-    )
+    dat["geno_grp"] = np.where(dat["geno"].isin([0, 2]), "Homozygote", "Heterozygote")
+    dat["geno_grp"] = pd.Categorical(dat["geno_grp"], categories=["Homozygote", "Heterozygote"])
     npheno = phenodat.shape[1]
 
     medians = phenodat.groupby(dat["geno"]).median().to_numpy()
@@ -276,7 +253,5 @@ def do_poirot_by_snp(
     )
     dat = pd.concat([dat, centered_data], axis=1)
 
-    result = do_r_omnibus_test(
-        dat, [f"pheno{x+1}_cent" for x in range(npheno)], "geno_grp"
-    )
+    result = do_r_omnibus_test(dat, [f"pheno{x+1}_cent" for x in range(npheno)], "geno_grp")
     return result

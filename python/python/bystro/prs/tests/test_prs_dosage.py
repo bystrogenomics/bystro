@@ -9,6 +9,8 @@ import pandas as pd
 
 import pytest
 
+pd.options.future.infer_string = True  # type: ignore
+
 np.random.seed(0)  # noqa: NPY002
 random.seed(0)
 
@@ -60,9 +62,12 @@ def _create_feather_file_with_multiple_batches(tmp_path, batches=5):
 
     # write an IPC/feather file
     weights = {}
-    with pa.OSFile(file_path, "wb") as sink, pa.RecordBatchFileWriter(
-        sink, table.schema, options=pa.ipc.IpcWriteOptions(compression="zstd")
-    ) as writer:
+    with (
+        pa.OSFile(file_path, "wb") as sink,
+        pa.RecordBatchFileWriter(
+            sink, table.schema, options=pa.ipc.IpcWriteOptions(compression="zstd")
+        ) as writer,
+    ):
         for i in range(batches):
             # generates a random set of 10 loci, taking chromosomes from chr1-22,
             # positions from 1-100000000, and alleles from ACGT

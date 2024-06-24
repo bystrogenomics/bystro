@@ -1,12 +1,14 @@
 from unittest.mock import patch
+import json
 
+from msgspec import json as mjson
 import pandas as pd
 import pyarrow as pa  # type: ignore
 import pytest
+from bystro.ancestry.ancestry_types import PopulationVector, AncestryResults
 from bystro.prs.preprocess_for_prs import (
     _load_association_scores,
     _load_genetic_maps_from_feather,
-    _extract_nomiss_dosage_loci,
     _preprocess_scores,
     calculate_abs_effect_weights,
     compare_alleles,
@@ -16,6 +18,8 @@ from bystro.prs.preprocess_for_prs import (
     select_max_effect_per_bin,
 )
 
+pd.options.future.infer_string = True  # type: ignore
+
 AD_SCORE_FILEPATH = "fake_file.txt"
 
 
@@ -23,7 +27,7 @@ AD_SCORE_FILEPATH = "fake_file.txt"
 def mock_scores_df() -> pd.DataFrame:
     return pd.DataFrame(
         {
-            "SNPID": ["chr1:566875:C:T", "chr1:728951:A:G"],
+            "SNPID": ["chr8:132782505:T:C", "chr3:183978846:A:G"],
             "CHR": [1, 1],
             "POS": [566875, 728951],
             "OTHER_ALLELE": ["C", "G"],
@@ -42,10 +46,10 @@ def mock_processed_scores_df() -> pd.DataFrame:
         "OTHER_ALLELE": ["C", "G"],
         "EFFECT_ALLELE": ["T", "A"],
         "P": [0.699009, 0.0030673],
-        "SNPID": ["chr1:566875:C:T", "chr1:728951:A:G"],
+        "SNPID": ["chr8:132782505:T:C", "chr3:183978846:A:G"],
         "BETA": [0.007630, -0.020671],
-        "ID_effect_as_alt": ["chr1:566875:C:T", "chr1:728951:G:A"],
-        "ID_effect_as_ref": ["chr1:566875:T:C", "chr1:728951:A:G"],
+        "ID_effect_as_alt": ["chr8:132782505:C:T", "chr3:183978846:G:A"],
+        "ID_effect_as_ref": ["chr8:132782505:T:C", "chr3:183978846:A:G"],
     }
     return pd.DataFrame(mock_gwas_data)
 
@@ -59,7 +63,12 @@ def mock_scores_loci(mock_processed_scores_df: pd.DataFrame) -> set:
 def mock_dosage_df():
     return pd.DataFrame(
         {
-            "locus": ["chr1:566875:C:T", "chr1:728951:A:G", "chr1:917492:C:T", "chr2:917492:A:T"],
+            "locus": [
+                "chr8:132782505:C:T",
+                "chr3:183978846:G:A",
+                "chr2:4000400:T:C",
+                "chr21:24791946:C:T",
+            ],
             "ID00096": [1, 1, 2, -1],
             "ID00097": [0, 1, 1, 0],
         }
@@ -70,7 +79,7 @@ def mock_dosage_df():
 def mock_dosage_df_clean():
     return pd.DataFrame(
         {
-            "locus": ["chr1:566875:C:T", "chr1:728951:A:G", "chr1:917492:C:T"],
+            "locus": ["chr8:132782505:C:T", "chr3:183978846:G:A", "chr2:4000400:T:C"],
             "ID00096": [1, 1, 2],
             "ID00097": [0, 1, 1],
         }
@@ -95,38 +104,13 @@ def mock_bin_mappings():
 
 
 @pytest.fixture()
-def mock_finalize_scores_after_c_t():
-    def _mock_finalize_scores_after_c_t(
-        gwas_scores_path, dosage_matrix_path, map_directory_path, p_value_threshold  # noqa: ARG001
-    ):
-        scores_after_c_t = pd.DataFrame(
-            {"BETA": [0.007630, -0.020671], "P": [0.699009, 0.0030673]},
-            index=["chr1:566875:C:T", "chr1:728951:A:G"],
-        )
-        loci_and_allele_comparison = {"chr1:566875:C:T": ("C", "T"), "chr1:728951:A:G": ("G", "A")}
-        return scores_after_c_t, loci_and_allele_comparison
-
-    return _mock_finalize_scores_after_c_t
-
-
-@pytest.fixture()
 def mock_finalize_dosage_after_c_t():
     def _mock_finalize_dosage_after_c_t(chunk, loci_and_allele_comparison):  # noqa: ARG001
         return pd.DataFrame(
-            {"ID00096": [1, 1], "ID00097": [0, 1]}, index=["chr1:566875:C:T", "chr1:728951:A:G"]
+            {"ID00096": [1, 1], "ID00097": [0, 1]}, index=["chr8:132782505:C:T", "chr3:183978846:G:A"]
         ).transpose()
 
     return _mock_finalize_dosage_after_c_t
-
-
-def test_extract_nomiss_dosage_loci(tmp_path, mock_dosage_df, mock_scores_loci):
-    table = pa.Table.from_pandas(mock_dosage_df)
-    test_file = tmp_path / "test_dosage_matrix.feather"
-    pa.feather.write_feather(table, test_file)
-    result = _extract_nomiss_dosage_loci(test_file, mock_scores_loci)
-    expected_result = {"chr1:566875:C:T", "chr1:728951:A:G"}
-
-    assert result == expected_result, f"Expected {expected_result}, but got {result}"
 
 
 def test_load_genetic_maps_from_feather(tmp_path, mock_genetic_maps):
@@ -187,7 +171,7 @@ def test_get_p_value_thresholded_indices(mock_processed_scores_df: pd.DataFrame)
         filtered_scores["P"] < p_value_threshold
     ), "All rows should have P-values less than the threshold."
 
-    expected_snps = {"chr1:728951:A:G"}
+    expected_snps = {"chr3:183978846:A:G"}
     assert set(filtered_scores.index) == expected_snps, "Filtered scores should contain expected SNP(s)."
 
 
@@ -270,30 +254,65 @@ def test_select_max_effect_per_bin():
     ), "The result DataFrame should have one row per (CHR, bin) group."
 
 
-def test_generate_c_and_t_prs_scores(
-    tmp_path, mock_finalize_scores_after_c_t, mock_finalize_dosage_after_c_t, mock_dosage_df
-):
+def test_generate_c_and_t_prs_scores(tmp_path, mock_finalize_dosage_after_c_t, mock_dosage_df):
     table = pa.Table.from_pandas(mock_dosage_df)
     test_file = tmp_path / "test_dosage_matrix.feather"
     pa.feather.write_feather(table, test_file)
-    with (
-        patch(
-            "bystro.prs.preprocess_for_prs.finalize_scores_after_c_t",
-            side_effect=mock_finalize_scores_after_c_t,
-        ),
-        patch(
-            "bystro.prs.preprocess_for_prs.finalize_dosage_after_c_t",
-            side_effect=mock_finalize_dosage_after_c_t,
-        ),
+    with patch(
+        "bystro.prs.preprocess_for_prs.finalize_dosage_after_c_t",
+        side_effect=mock_finalize_dosage_after_c_t,
     ):
-        gwas_scores_path = "mock_gwas_scores_path"
         dosage_matrix_path = test_file
-        map_directory_path = "mock_map_directory_path"
         p_value_threshold = 0.05
 
+        population_vectors = {}
+        for population in PopulationVector.__slots__:  # type: ignore
+            population_vectors[population] = {"lowerBound": 0.0, "upperBound": 0.0}
+        population_vectors["ACB"] = {"lowerBound": 0.9, "upperBound": 0.9}
+        population_vectors["CEU"] = {"lowerBound": 0.1, "upperBound": 0.1}
+
+        ancestry_json = {
+            "results": [
+                {
+                    "sampleId": "ID00096",
+                    "topHit": {"probability": 0.9, "populations": ["ACB"]},
+                    "populations": population_vectors,
+                    "superpops": {
+                        "AFR": {"lowerBound": 0.9, "upperBound": 0.9},
+                        "AMR": {"lowerBound": 0.1, "upperBound": 0.1},
+                        "EAS": {"lowerBound": 0.0, "upperBound": 0.0},
+                        "EUR": {"lowerBound": 0.0, "upperBound": 0.0},
+                        "SAS": {"lowerBound": 0.0, "upperBound": 0.0},
+                    },
+                    "nSnps": 100,
+                },
+                {
+                    "sampleId": "ID00097",
+                    "topHit": {"probability": 0.9, "populations": ["ACB"]},
+                    "populations": population_vectors,
+                    "superpops": {
+                        "AFR": {"lowerBound": 0.9, "upperBound": 0.9},
+                        "AMR": {"lowerBound": 0.1, "upperBound": 0.1},
+                        "EAS": {"lowerBound": 0.0, "upperBound": 0.0},
+                        "EUR": {"lowerBound": 0.0, "upperBound": 0.0},
+                        "SAS": {"lowerBound": 0.0, "upperBound": 0.0},
+                    },
+                    "nSnps": 100,
+                },
+            ],
+            "pcs": {"PC1": [0.1, 0.2], "PC2": [0.3, 0.4]},
+        }
+        ancestry_json_str = json.dumps(ancestry_json)
+        ancestry_results = mjson.decode(ancestry_json_str, type=AncestryResults)
+
         result = generate_c_and_t_prs_scores(
-            gwas_scores_path, dosage_matrix_path, map_directory_path, p_value_threshold
-        )
-        expected_result = {"ID00096": -0.013040999999999999, "ID00097": -0.020671}
+            assembly="hg19",
+            trait="AD",
+            pmid="PMID35379992",
+            ancestry=ancestry_results,
+            dosage_matrix_path=dosage_matrix_path,
+            p_value_threshold=p_value_threshold,
+        ).to_dict()
+        expected_result = {"ID00096": 0.09220000356435776, "ID00097": -0.028599999845027924}
 
         assert result == expected_result, f"Expected {expected_result}, but got {result}"

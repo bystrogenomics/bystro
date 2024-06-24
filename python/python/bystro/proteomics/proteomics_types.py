@@ -1,7 +1,10 @@
 """Record classes for proteomics module."""
+
 import pandas as pd
 from msgspec import Struct, DecodeError
 import msgspec.json as mjson
+
+pd.options.future.infer_string = True  # type: ignore
 
 decoder = mjson.Decoder()
 
@@ -9,6 +12,7 @@ decoder = mjson.Decoder()
 # The motivation for this class is that we only want to instantiate by creating from a correctly
 # json-serialized pd.DataFrame, ensuring we have a string-like class that can't represent anything
 # but a json-ified df.
+
 
 class DataFrameJson(Struct, frozen=True):
     """Represent a DataFrame as a JSON string."""

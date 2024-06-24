@@ -5,6 +5,7 @@ from pandas.testing import assert_frame_equal
 
 from bystro.proteomics.fragpipe_data_independent_analysis import load_data_independent_analysis_dataset
 
+pd.options.future.infer_string = True  # type: ignore
 
 raw_annotation_df = pd.DataFrame(
     {

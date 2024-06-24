@@ -1,4 +1,5 @@
 """Test define_callset.py."""
+
 import pandas as pd
 import pytest
 
@@ -8,6 +9,7 @@ from bystro.ancestry.define_callset import (
     liftover_38_from_37,
 )
 
+pd.options.future.infer_string = True  # type: ignore
 
 @pytest.mark.parametrize(
     ("test_input", "expected"),
@@ -18,10 +20,10 @@ from bystro.ancestry.define_callset import (
         ("chr1:900000000:G:A", None),
     ],
 )
-
 @pytest.mark.skip(reason="UCSC liftover service may be down.")
 def test_liftover_38_from_37(test_input: str, expected: str | None):
     assert expected == liftover_38_from_37(test_input)
+
 
 @pytest.mark.skip(reason="UCSC liftover service may be down.")
 def test__process_affymetrix_df():
@@ -46,6 +48,7 @@ def test__process_affymetrix_df():
     )
 
     assert (expected_output == _get_variants_from_affymetrix_df(affymetrix_df)).all()
+
 
 @pytest.mark.skip(reason="UCSC liftover service may be down.")
 def test__process_illumina_df():

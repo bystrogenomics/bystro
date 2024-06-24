@@ -6,6 +6,8 @@ from bystro.proteomics.fragpipe_tandem_mass_tag import (
 )
 from pandas.testing import assert_frame_equal
 
+pd.options.future.infer_string = True  # type: ignore
+
 raw_abundance_df = pd.DataFrame(
     {
         "Index": {0: "A1BG", 1: "A1CF", 2: "A2M"},
