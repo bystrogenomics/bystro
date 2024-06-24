@@ -27,7 +27,7 @@ AD_SCORE_FILEPATH = "fake_file.txt"
 def mock_scores_df() -> pd.DataFrame:
     return pd.DataFrame(
         {
-            "SNPID": ["chr1:566875:C:T", "chr1:728951:A:G"],
+            "SNPID": ["chr8:132782505:T:C", "chr3:183978846:A:G"],
             "CHR": [1, 1],
             "POS": [566875, 728951],
             "OTHER_ALLELE": ["C", "G"],
@@ -46,10 +46,10 @@ def mock_processed_scores_df() -> pd.DataFrame:
         "OTHER_ALLELE": ["C", "G"],
         "EFFECT_ALLELE": ["T", "A"],
         "P": [0.699009, 0.0030673],
-        "SNPID": ["chr1:566875:C:T", "chr1:728951:A:G"],
+        "SNPID": ["chr8:132782505:T:C", "chr3:183978846:A:G"],
         "BETA": [0.007630, -0.020671],
         "ID_effect_as_alt": ["chr8:132782505:C:T", "chr3:183978846:G:A"],
-        "ID_effect_as_ref": ["chr2:4000400:T:C", "chr21:24791946:C:T"],
+        "ID_effect_as_ref": ["chr8:132782505:T:C", "chr3:183978846:A:G"],
     }
     return pd.DataFrame(mock_gwas_data)
 
@@ -171,7 +171,7 @@ def test_get_p_value_thresholded_indices(mock_processed_scores_df: pd.DataFrame)
         filtered_scores["P"] < p_value_threshold
     ), "All rows should have P-values less than the threshold."
 
-    expected_snps = {"chr1:728951:A:G"}
+    expected_snps = {"chr3:183978846:A:G"}
     assert set(filtered_scores.index) == expected_snps, "Filtered scores should contain expected SNP(s)."
 
 
