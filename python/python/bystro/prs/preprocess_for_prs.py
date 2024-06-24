@@ -491,7 +491,6 @@ def generate_c_and_t_prs_scores(
                             genos_transpose.columns
                         ].fillna(0)
                         genos_transpose = genos_transpose - weights_filtered[genos_transpose.index].T
-                        genos_transpose[genos_transpose < 0] = 0
 
                     prs_scores_chunk = genos_transpose @ beta_values.loc[genos_transpose.columns]
                     prs_scores = prs_scores.add(prs_scores_chunk, fill_value=0)
