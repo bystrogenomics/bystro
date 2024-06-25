@@ -5,6 +5,7 @@ from enum import Enum
 import logging
 from typing import Any, Optional
 import os
+from bystro.beanstalkd.worker import ProgressReporter
 import psutil
 
 import matplotlib.pyplot as plt  # type: ignore
@@ -412,6 +413,7 @@ def generate_c_and_t_prs_scores(
     index_name: str | None = None,
     user: CachedAuth | None = None,
     cluster_opensearch_config: dict[str, Any] | None = None,
+    reporter: ProgressReporter | None = None,
 ) -> pd.Series:
     """Calculate PRS."""
     if index_name is not None and cluster_opensearch_config is None and user is None:
@@ -425,10 +427,16 @@ def generate_c_and_t_prs_scores(
         scores = _load_association_scores(str(gwas_scores_path))
     logger.debug("Time to load association scores: %s", timer.elapsed_time)
 
+    if reporter is not None:
+        reporter.message.remote("Loaded association scores")
+
     with Timer() as timer:
         preprocessed_scores = _preprocess_scores(scores)
         thresholded_score_loci = get_p_value_thresholded_indices(preprocessed_scores, p_value_threshold)
     logger.debug("Time to preprocess scores: %s", timer.elapsed_time)
+
+    if reporter is not None:
+        reporter.message.remote("Preprocessed scores")
 
     score_loci_filter = pc.field("locus").isin(pa.array(thresholded_score_loci))
 
@@ -445,9 +453,12 @@ def generate_c_and_t_prs_scores(
             population_wise_samples[population] = []
         population_wise_samples[population].append(sample)
 
+    total_number_of_samples = 0
     for population, samples in population_wise_samples.items():
         for i in range(0, len(samples), sample_chunk_size):
-            sample_groups.append((population, samples[i : i + sample_chunk_size]))
+            sample_group = samples[i : i + sample_chunk_size]
+            sample_groups.append((population, sample_group))
+            total_number_of_samples += len(sample_group)
 
     ancestry_weighted_af_total_variation: pd.DataFrame | None = None
     if index_name is not None:
@@ -481,9 +492,14 @@ def generate_c_and_t_prs_scores(
             )
         logger.debug("Time to query for gnomad allele frequencies: %s", query_timer.elapsed_time)
 
+    if reporter is not None:
+        reporter.message.remote("Fetched allele frequencies")
+
     # Accumulate the results
     prs_scores: pd.Series = pd.Series(dtype=np.float32, name="PRS")
     with Timer() as outer_timer:
+        samples_processed = 0
+
         for sample_pop_group in sample_groups:
             population, sample_group = sample_pop_group
 
@@ -538,6 +554,14 @@ def generate_c_and_t_prs_scores(
                 timer.elapsed_time,
             )
 
+            if reporter is not None:
+                samples_processed += len(sample_group)
+                reporter.increment_and_write_progress_message.remote(
+                    len(sample_group),
+                    "Processed",
+                    f"samples ({(samples_processed/total_number_of_samples) * 100}%)",
+                    True,
+                )
     logger.debug("Time to calculate PRS for all samples: %s", outer_timer.elapsed_time)
 
     return prs_scores
