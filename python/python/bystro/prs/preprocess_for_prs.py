@@ -428,7 +428,7 @@ def generate_c_and_t_prs_scores(
     logger.debug("Time to load association scores: %s", timer.elapsed_time)
 
     if reporter is not None:
-        reporter.message.remote("Loaded association scores")
+        reporter.message.remote("Loaded association scores") # type: ignore
 
     with Timer() as timer:
         preprocessed_scores = _preprocess_scores(scores)
@@ -436,7 +436,7 @@ def generate_c_and_t_prs_scores(
     logger.debug("Time to preprocess scores: %s", timer.elapsed_time)
 
     if reporter is not None:
-        reporter.message.remote("Preprocessed scores")
+        reporter.message.remote("Preprocessed scores") # type: ignore
 
     score_loci_filter = pc.field("locus").isin(pa.array(thresholded_score_loci))
 
@@ -492,7 +492,7 @@ def generate_c_and_t_prs_scores(
         logger.debug("Time to query for gnomad allele frequencies: %s", query_timer.elapsed_time)
 
     if reporter is not None:
-        reporter.message.remote("Fetched allele frequencies")
+        reporter.message.remote("Fetched allele frequencies") # type: ignore
 
     # Accumulate the results
     prs_scores: pd.Series = pd.Series(dtype=np.float32, name="PRS")
@@ -571,7 +571,7 @@ def generate_c_and_t_prs_scores(
 
             if reporter is not None:
                 samples_processed += len(sample_group)
-                reporter.increment_and_write_progress_message.remote(
+                reporter.increment_and_write_progress_message.remote( # type: ignore
                     len(sample_group),
                     "Processed",
                     f"samples ({int((samples_processed/total_number_of_samples) * 10_000)/100}%)",
