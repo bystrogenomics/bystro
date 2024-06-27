@@ -27,6 +27,7 @@ from bystro.beanstalkd.messages import (
 BEANSTALK_ERR_TIMEOUT = "TIMED_OUT"
 SOCKET_TIMEOUT_TIME = 10
 JOB_TIMEOUT_TIME = 5
+HEARTBEAT_INTERVAL = 30 # seconds
 
 T = TypeVar("T", bound=BaseMessage)
 T2 = TypeVar("T2", bound=BaseMessage)
@@ -180,7 +181,7 @@ def listen(
                     except Exception as e:
                         print(f"Ping error while waiting for handler: {e}", file=sys.stderr)
                     finally:
-                        time.sleep(1)  # Adjust the sleep interval as needed
+                        time.sleep(HEARTBEAT_INTERVAL)
 
                 handler_thread.join()  # Ensure the handler thread has completed
 
