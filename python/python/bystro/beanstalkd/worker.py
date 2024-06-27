@@ -1,8 +1,10 @@
 """TODO: Add description here"""
 
 import abc
+import queue
 import sys
 import time
+import threading
 import traceback
 from collections.abc import Callable
 from textwrap import dedent
@@ -66,6 +68,14 @@ def default_failed_msg_fn(
     return FailedJobMessage(submission_id=job_data.submission_id, reason=str(err))
 
 
+def handle_job(publisher, job_data, handler_fn, result_queue):
+    try:
+        result = handler_fn(publisher, job_data)
+        result_queue.put(result)
+    except Exception as e:
+        result_queue.put(e)
+
+
 def listen(
     job_data_type: type[T],
     handler_fn: Callable[[ProgressPublisher, T], Any],
@@ -83,8 +93,8 @@ def listen(
     hosts, ports = queue_conf.split_host_port()
 
     tube_conf = queue_conf.tubes[tube]
-    clients = tuple(
-        BeanstalkClient(host, port, socket_timeout=SOCKET_TIMEOUT_TIME)
+    client_confs = tuple(
+        {"host":host, "port":port, "socket_timeout":SOCKET_TIMEOUT_TIME}
         for (host, port) in zip(hosts, ports)
     )
 
@@ -98,8 +108,9 @@ def listen(
         client: BeanstalkClient | None = None
         try:
             offset = i % len(hosts)
-            client = clients[offset]
+            client_conf = client_confs[offset]
 
+            client = BeanstalkClient(*client_conf)
             client.watch(tube_conf["submission"])
             client.use(tube_conf["events"])
 
@@ -151,13 +162,39 @@ def listen(
                 )
 
                 client.put_job(json.encode(submit_msg_fn(job_data)))
-                res = handler_fn(publisher, job_data)
+
+                result_queue: queue.Queue = queue.Queue()
+                handler_thread = threading.Thread(
+                    target=handle_job, args=(publisher, job_data, handler_fn, result_queue)
+                )
+                handler_thread.start()
+
+                while handler_thread.is_alive():
+                    # Ping the server periodically while waiting for the handler to finish
+                    try:
+                        with client._sock_ctx() as socket:  # noqa: SLF001
+                            client._send_message(f"touch {job_id}", socket)  # noqa: SLF001
+                            body = client._receive_word(socket, b"TOUCHED", b"NOT_FOUND")  # noqa: SLF001
+                            if body == b"NOT_FOUND":
+                                print(f"Job {job_id} not found", file=sys.stderr)
+                    except Exception as e:
+                        print(f"Ping error while waiting for handler: {e}", file=sys.stderr)
+                    finally:
+                        time.sleep(1)  # Adjust the sleep interval as needed
+
+                handler_thread.join()  # Ensure the handler thread has completed
+
+                res = result_queue.get()
+                if isinstance(res, Exception):
+                    raise res
+
                 client.put_job(json.encode(completed_msg_fn(job_data, res)))
                 client.delete_job(job.job_id)
             except Exception as err:
                 traceback.print_exc()
 
                 failed_msg = failed_msg_fn(job_data, job_id, err)
+
                 client.put_job(json.encode(failed_msg))
                 client.delete_job(job.job_id)
 
@@ -181,6 +218,7 @@ def listen(
                 continue
 
             client.release_job(job.job_id)
+
             time.sleep(1)
             continue
 
