@@ -3,7 +3,7 @@ from typing import Any, Callable
 
 from msgspec import json
 
-from bystro.beanstalkd.worker import ProgressPublisher
+from bystro.beanstalkd.worker import ProgressPublisher, get_progress_reporter
 from bystro.ancestry.ancestry_types import AncestryResults
 from bystro.prs.messages import PRSJobData, PRSJobResult
 from bystro.prs.preprocess_for_prs import generate_c_and_t_prs_scores
@@ -12,7 +12,7 @@ from bystro.prs.preprocess_for_prs import generate_c_and_t_prs_scores
 def make_calculate_prs_scores(
     cluster_opensearch_config: dict[str, Any]
 ) -> Callable[[ProgressPublisher, PRSJobData], PRSJobResult]:
-    def calculate_prs_scores(_publisher: ProgressPublisher, prs_job_data: PRSJobData) -> PRSJobResult:
+    def calculate_prs_scores(publisher: ProgressPublisher, prs_job_data: PRSJobData) -> PRSJobResult:
         """
         Calculate PRS scores for a single submission
         """
@@ -29,6 +29,8 @@ def make_calculate_prs_scores(
             data = f.read()
             ancestry = json.decode(data, type=AncestryResults)
 
+        reporter = get_progress_reporter(publisher, update_interval=100)
+
         result = generate_c_and_t_prs_scores(
             assembly=assembly,
             trait=trait,
@@ -38,6 +40,7 @@ def make_calculate_prs_scores(
             index_name=index_name,
             dosage_matrix_path=dosage_matrix_path,
             p_value_threshold=p_value_threshold,
+            reporter=reporter
         )
 
         basename = prs_job_data.out_basename

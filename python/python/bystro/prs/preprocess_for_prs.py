@@ -5,6 +5,7 @@ from enum import Enum
 import logging
 from typing import Any, Optional
 import os
+from bystro.beanstalkd.worker import ProgressReporter
 import psutil
 
 import matplotlib.pyplot as plt  # type: ignore
@@ -412,6 +413,7 @@ def generate_c_and_t_prs_scores(
     index_name: str | None = None,
     user: CachedAuth | None = None,
     cluster_opensearch_config: dict[str, Any] | None = None,
+    reporter: ProgressReporter | None = None,
 ) -> pd.Series:
     """Calculate PRS."""
     if index_name is not None and cluster_opensearch_config is None and user is None:
@@ -425,10 +427,16 @@ def generate_c_and_t_prs_scores(
         scores = _load_association_scores(str(gwas_scores_path))
     logger.debug("Time to load association scores: %s", timer.elapsed_time)
 
+    if reporter is not None:
+        reporter.message.remote("Loaded association scores") # type: ignore
+
     with Timer() as timer:
         preprocessed_scores = _preprocess_scores(scores)
         thresholded_score_loci = get_p_value_thresholded_indices(preprocessed_scores, p_value_threshold)
     logger.debug("Time to preprocess scores: %s", timer.elapsed_time)
+
+    if reporter is not None:
+        reporter.message.remote("Preprocessed scores") # type: ignore
 
     score_loci_filter = pc.field("locus").isin(pa.array(thresholded_score_loci))
 
@@ -445,17 +453,19 @@ def generate_c_and_t_prs_scores(
             population_wise_samples[population] = []
         population_wise_samples[population].append(sample)
 
+    total_number_of_samples = 0
     for population, samples in population_wise_samples.items():
         for i in range(0, len(samples), sample_chunk_size):
-            sample_groups.append((population, samples[i : i + sample_chunk_size]))
+            sample_group = samples[i : i + sample_chunk_size]
+            sample_groups.append((population, sample_group))
+            total_number_of_samples += len(sample_group)
 
     ancestry_weighted_af_total_variation: pd.DataFrame | None = None
     if index_name is not None:
         with Timer() as query_timer:
-            process = psutil.Process(os.getpid())
             logger.debug(
                 "Memory usage before fetching gnomad allele frequencies: %s",
-                process.memory_info().rss / 1e6,
+                psutil.Process(os.getpid()).memory_info().rss / 1024**2,
             )
             thresholded_loci_gnomad_afs = _extract_af_and_loci_overlap(
                 score_loci=thresholded_score_loci,
@@ -477,13 +487,18 @@ def generate_c_and_t_prs_scores(
 
             logger.debug(
                 "Memory usage after fetching gnomad allele frequencies: %s",
-                process.memory_info().rss / 1e6,
+                psutil.Process(os.getpid()).memory_info().rss / 1024**2,
             )
         logger.debug("Time to query for gnomad allele frequencies: %s", query_timer.elapsed_time)
+
+    if reporter is not None:
+        reporter.message.remote("Fetched allele frequencies") # type: ignore
 
     # Accumulate the results
     prs_scores: pd.Series = pd.Series(dtype=np.float32, name="PRS")
     with Timer() as outer_timer:
+        samples_processed = 0
+
         for sample_pop_group in sample_groups:
             population, sample_group = sample_pop_group
 
@@ -498,7 +513,20 @@ def generate_c_and_t_prs_scores(
 
                 overlap_loci = generate_overlap_scores_dosage(thresholded_score_loci, dosage_loci_nomiss)
                 scores_overlap = preprocessed_scores[preprocessed_scores.index.isin(overlap_loci)]
+            logger.debug(
+                "Time to load dosage matrix chunk of %d samples (total samples: %d): %s",
+                len(sample_group),
+                samples_processed + len(sample_group),
+                timer.elapsed_time,
+            )
+            logger.debug(
+                "Memory usage after loading dosage matrix of %d samples (total samples: %d): %s",
+                len(sample_group),
+                samples_processed + len(sample_group),
+                psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+            )
 
+            with Timer() as load_timer:
                 # TODO 2024-06-22 @ctrevino: We do not currently have all 26 1000G population maps
                 # this block needs to be removed once we do
                 try:
@@ -508,36 +536,47 @@ def generate_c_and_t_prs_scores(
                         "Failed to get map file for %s: %s, defaulting to CEU", population, e
                     )
                     map_path = get_map_file(assembly, "CEU")
+            logger.debug("Time to load genetic map: %s", load_timer.elapsed_time)
 
+            with Timer() as c_t_timer:
                 scores_after_c_t, loci_and_allele_comparison = ld_clump(scores_overlap, str(map_path))
                 scores_after_c_t = scores_after_c_t.sort_index()
 
                 beta_values = scores_after_c_t["BETA"]
+            logger.debug("Time to clump: %s", c_t_timer.elapsed_time)
 
-                with Timer() as timer:
-                    genos_transpose = finalize_dosage_after_c_t(
-                        sample_genotypes, loci_and_allele_comparison
-                    )
+            with Timer() as final_timer:
+                genos_transpose = finalize_dosage_after_c_t(sample_genotypes, loci_and_allele_comparison)
 
-                    if ancestry_weighted_af_total_variation is not None:
-                        weights_filtered = ancestry_weighted_af_total_variation.loc[
-                            genos_transpose.columns
-                        ].fillna(0)
-                        genos_transpose = genos_transpose - weights_filtered[genos_transpose.index].T
+                if ancestry_weighted_af_total_variation is not None:
+                    weights_filtered = ancestry_weighted_af_total_variation.loc[
+                        genos_transpose.columns
+                    ].fillna(0)
+                    genos_transpose = genos_transpose - weights_filtered[genos_transpose.index].T
 
-                    prs_scores_chunk = genos_transpose @ beta_values.loc[genos_transpose.columns]
-                    prs_scores = prs_scores.add(prs_scores_chunk, fill_value=0)
-                logger.debug(
-                    "Time to calculate PRS for chunk of %d samples: %s",
-                    len(sample_group),
-                    timer.elapsed_time,
-                )
+                prs_scores_chunk = genos_transpose @ beta_values.loc[genos_transpose.columns]
+                prs_scores = prs_scores.add(prs_scores_chunk, fill_value=0)
             logger.debug(
-                "Time to load dosage matrix chunk of %d samples: %s",
+                "Time to calculate PRS for chunk of %d samples (%d total samples): %s",
                 len(sample_group),
-                timer.elapsed_time,
+                samples_processed + len(sample_group),
+                final_timer.elapsed_time,
+            )
+            logger.debug(
+                "Memory usage after calculating PRS for %d samples (%d total samples): %s",
+                len(sample_group),
+                samples_processed + len(sample_group),
+                psutil.Process(os.getpid()).memory_info().rss / 1024**2,
             )
 
+            if reporter is not None:
+                samples_processed += len(sample_group)
+                reporter.increment_and_write_progress_message.remote( # type: ignore
+                    len(sample_group),
+                    "Processed",
+                    f"samples ({int((samples_processed/total_number_of_samples) * 10_000)/100}%)",
+                    True,
+                )
     logger.debug("Time to calculate PRS for all samples: %s", outer_timer.elapsed_time)
 
     return prs_scores
