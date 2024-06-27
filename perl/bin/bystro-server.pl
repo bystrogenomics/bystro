@@ -18,7 +18,7 @@ use Log::Any::Adapter;
 use File::Basename;
 use Getopt::Long;
 
-use DDP;
+use DDP output => *STDOUT;
 
 use Beanstalk::Client;
 
@@ -73,26 +73,39 @@ say "Running Annotation queue server";
 
 my $BEANSTALKD_TIMEOUT = 60;
 
-while (1) {
-  my $beanstalk = Beanstalk::Client->new(
-    {
-      server          => $conf->{beanstalkd}{addresses}[0],
-      default_tube    => $queueConfig->{submission},
-      connect_timeout => 10,
-      encoder         => sub { encode_json( \@_ ) },
-      decoder         => sub { @{ decode_json(shift) } },
-    }
-  );
+sub _get_consumer_client {
+  my $server_address = shift;
+  my $tube           = shift;
 
-  my $beanstalkEvents = Beanstalk::Client->new(
+  return Beanstalk::Client->new(
     {
-      server          => $conf->{beanstalkd}{addresses}[0],
-      default_tube    => $queueConfig->{events},
+      server          => $server_address,
+      default_tube    => $tube,
       connect_timeout => 10,
       encoder         => sub { encode_json( \@_ ) },
       decoder         => sub { @{ decode_json(shift) } },
     }
   );
+}
+
+sub _get_producer_client {
+  my $server_address = shift;
+  my $tube           = shift;
+
+  return Beanstalk::Client->new(
+    {
+      server          => $server_address,
+      default_tube    => $tube,
+      connect_timeout => 10,
+      encoder         => sub { encode_json( \@_ ) },
+      decoder         => sub { @{ decode_json(shift) } },
+    }
+  );
+}
+
+while (1) {
+  my $beanstalk = _get_consumer_client( $conf->{beanstalkd}{addresses}[0],
+    $queueConfig->{submission} );
 
   my $job = $beanstalk->reserve($BEANSTALKD_TIMEOUT);
 
@@ -126,6 +139,9 @@ while (1) {
       die $err;
     }
 
+    my $beanstalkEvents =
+      _get_producer_client( $conf->{beanstalkd}{addresses}[0], $queueConfig->{events} );
+
     $beanstalkEvents->put(
       {
         priority => 0,
@@ -140,27 +156,21 @@ while (1) {
     );
 
     if ($debug) {
-      say STDERR "job " . $job->id . " starting with inputHref:";
+      say "job " . $job->id . " starting with inputHref:";
       p $inputHref;
     }
 
     my $annotate_instance = Seq->new_with_config($inputHref);
 
     ( $err, $outputFileNamesHashRef ) = $annotate_instance->annotate();
-
-    if ( defined $debug ) {
-      p $err;
-    }
   }
   catch {
     $err = $_;
   };
 
-  if ( defined $debug ) {
-    p $err;
-  }
-
   if ($err) {
+    say STDERR $err;
+
     $err =~ s/\sat\s\w+\/\w+.*\sline\s\d+.*//;
 
     say "job " . $job->id . " failed";
@@ -172,13 +182,31 @@ while (1) {
       submissionId => $jobDataHref->{submissionId},
     };
 
+    my $beanstalkEvents =
+      _get_producer_client( $conf->{beanstalkd}{addresses}[0], $queueConfig->{events} );
+
     $beanstalkEvents->put( { priority => 0, data => encode_json($data) } );
+
+    if ( $beanstalkEvents->error ) {
+      say STDERR "Beanstalkd last error: " . $beanstalkEvents->error;
+    }
+
+    my $socket = $job->client->connect( $conf->{beanstalkd}{addresses}[0], 10 );
+
+    if ( $job->client->error ) {
+      say STDERR "Failed to connect to queue server with error " . $job->client->error;
+    }
+    elsif ( !$socket ) {
+      say STDERR "Failed to connect to queue server for an unknown reason";
+    }
 
     $job->delete();
 
-    if ( $beanstalkEvents->error && defined $debug ) {
-      say STDERR "Beanstalkd last error:";
-      p $beanstalkEvents->error;
+    if ( $job->client->error ) {
+      say STDERR "Failed to delete job with id "
+        . $job->id
+        . " with error "
+        . $job->client->error;
     }
 
     next;
@@ -192,19 +220,37 @@ while (1) {
   };
 
   if ( defined $debug ) {
-    say STDERR "putting completiong event";
+    say "putting completion event";
     p $data;
   }
+
+  my $beanstalkEvents =
+    _get_producer_client( $conf->{beanstalkd}{addresses}[0], $queueConfig->{events} );
 
   # Signal completion before completion actually occurs via delete
   # To be conservative; since after delete message is lost
   $beanstalkEvents->put( { priority => 0, data => encode_json($data) } );
 
+  if ( $beanstalkEvents->error ) {
+    say STDERR "Beanstalkd last error: " . $beanstalkEvents->error;
+  }
+
+  my $socket = $job->client->connect( $conf->{beanstalkd}{addresses}[0], 10 );
+
+  if ( $job->client->error ) {
+    say STDERR "Failed to connect to queue server with error " . $job->client->error;
+  }
+  elsif ( !$socket ) {
+    say STDERR "Failed to connect to queue server for an unknown reason";
+  }
+
   $job->delete();
 
-  if ( $beanstalkEvents->error && defined $debug ) {
-    say "Beanstalkd last error:";
-    p $beanstalkEvents->error;
+  if ( $job->client->error ) {
+    say STDERR "Failed to delete job with id "
+      . $job->id
+      . " with error "
+      . $job->client->error;
   }
 
   say "completed job with queue id " . $job->id;
