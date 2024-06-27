@@ -111,7 +111,7 @@ def listen(
             offset = i % len(hosts)
             client_conf = client_confs[offset]
 
-            client = BeanstalkClient(*client_conf)
+            client = BeanstalkClient(**client_conf)
             client.watch(tube_conf["submission"])
             client.use(tube_conf["events"])
 
