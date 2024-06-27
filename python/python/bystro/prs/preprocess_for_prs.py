@@ -344,11 +344,16 @@ def select_max_effect_per_bin(scores_overlap_abs_val: pd.DataFrame) -> pd.DataFr
     ]
 
 
+def select_min_pval_per_bin(scores_overlap_abs_val: pd.DataFrame) -> pd.DataFrame:
+    """Select the row with the smallest p-value for each bin."""
+    return scores_overlap_abs_val.loc[scores_overlap_abs_val.groupby(["CHR", "bin"])["P"].idxmin()]
+
+
 def clean_scores_for_analysis(
-    max_effect_per_bin: pd.DataFrame, column_to_drop: str
+    min_pval_per_bin: pd.DataFrame, column_to_drop: str
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Drop extra columns and prepare df with final set of loci for dosage matrix filtering."""
-    scores_overlap_adjusted = max_effect_per_bin.drop(columns=["bin", "abs_effect_weight"])
+    scores_overlap_adjusted = min_pval_per_bin.drop(columns=["bin"])
     scores_overlap_adjusted = scores_overlap_adjusted.set_index("SNPID")
     format_col_index = scores_overlap_adjusted.columns.get_loc(column_to_drop)
     # If there is more than 1 column found, our "columns_to_keep" function will not work
@@ -370,9 +375,8 @@ def ld_clump(scores_overlap: pd.DataFrame, map_path: str) -> tuple[pd.DataFrame,
     )
     scores_overlap.insert(0, "allele_comparison", allele_comparison_results)
     scores_overlap_w_bins = assign_bins(scores_overlap, bin_mappings)
-    scores_overlap_abs_val = calculate_abs_effect_weights(scores_overlap_w_bins)
-    max_effect_per_bin = select_max_effect_per_bin(scores_overlap_abs_val)
-    return clean_scores_for_analysis(max_effect_per_bin, "ID_effect_as_ref")
+    min_pval_per_bin = select_min_pval_per_bin(scores_overlap_w_bins)
+    return clean_scores_for_analysis(min_pval_per_bin, "ID_effect_as_ref")
 
 
 def finalize_dosage_after_c_t(
@@ -428,7 +432,7 @@ def generate_c_and_t_prs_scores(
     logger.debug("Time to load association scores: %s", timer.elapsed_time)
 
     if reporter is not None:
-        reporter.message.remote("Loaded association scores") # type: ignore
+        reporter.message.remote("Loaded association scores")  # type: ignore
 
     with Timer() as timer:
         preprocessed_scores = _preprocess_scores(scores)
@@ -436,7 +440,7 @@ def generate_c_and_t_prs_scores(
     logger.debug("Time to preprocess scores: %s", timer.elapsed_time)
 
     if reporter is not None:
-        reporter.message.remote("Preprocessed scores") # type: ignore
+        reporter.message.remote("Preprocessed scores")  # type: ignore
 
     score_loci_filter = pc.field("locus").isin(pa.array(thresholded_score_loci))
 
@@ -492,7 +496,7 @@ def generate_c_and_t_prs_scores(
         logger.debug("Time to query for gnomad allele frequencies: %s", query_timer.elapsed_time)
 
     if reporter is not None:
-        reporter.message.remote("Fetched allele frequencies") # type: ignore
+        reporter.message.remote("Fetched allele frequencies")  # type: ignore
 
     # Accumulate the results
     prs_scores: pd.Series = pd.Series(dtype=np.float32, name="PRS")
@@ -571,7 +575,7 @@ def generate_c_and_t_prs_scores(
 
             if reporter is not None:
                 samples_processed += len(sample_group)
-                reporter.increment_and_write_progress_message.remote( # type: ignore
+                reporter.increment_and_write_progress_message.remote(  # type: ignore
                     len(sample_group),
                     "Processed",
                     f"samples ({int((samples_processed/total_number_of_samples) * 10_000)/100}%)",
