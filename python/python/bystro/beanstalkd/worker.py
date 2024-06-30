@@ -2,12 +2,10 @@
 
 import abc
 import logging
-import queue
 import os
 import signal
 import sys
 import time
-import threading
 import traceback
 from collections.abc import Callable
 from textwrap import dedent
@@ -26,6 +24,8 @@ from bystro.beanstalkd.messages import (
     ProgressMessage,
     ProgressStringMessage,
 )
+
+ray.init(ignore_reinit_error=True)
 
 BEANSTALK_ERR_TIMEOUT = "TIMED_OUT"
 SOCKET_TIMEOUT_TIME = 10
@@ -76,12 +76,13 @@ def default_failed_msg_fn(
     return FailedJobMessage(submission_id=job_data.submission_id, reason=str(err))
 
 
-def handle_job(publisher, job_data, handler_fn, result_queue):
+@ray.remote
+def handle_job(publisher, job_data, handler_fn):
     try:
         result = handler_fn(publisher, job_data)
-        result_queue.put(result)
+        return result
     except Exception as e:
-        result_queue.put(e)
+        return e
 
 
 def signal_handler(sig, _frame):
@@ -193,21 +194,21 @@ def listen(
 
                 client.put_job(json.encode(submit_msg_fn(job_data)))
 
-                result_queue: queue.Queue = queue.Queue()
-                handler_thread = threading.Thread(
-                    target=handle_job, args=(publisher, job_data, handler_fn, result_queue)
-                )
-                handler_thread.start()
+                handle_job_future = handle_job.remote(publisher, job_data, handler_fn)
 
                 # Ensure job is kept alive indefinitely, until completion
                 # Some jobs are potentially weeks long
-                while handler_thread.is_alive():
+                while True:
+                    # Check if the handle_job task is complete
+                    ready, still_waiting = ray.wait([handle_job_future], timeout=HEARTBEAT_INTERVAL)
                     _touch(client, job_id)
-                    time.sleep(HEARTBEAT_INTERVAL)
+                    if len(still_waiting) == 0:
+                        if ready[0] != handle_job_future:
+                            logger.error("Unexpected ray.wait result: %s", ready)
+                        break
 
-                handler_thread.join()
+                res = ray.get(handle_job_future)
 
-                res = result_queue.get()
                 if isinstance(res, Exception):
                     raise res
 
@@ -287,14 +288,10 @@ class BeanstalkdProgressReporter(ProgressReporter):
         self._client.use(self._publisher.queue)
 
     def _get_client(self) -> BeanstalkClient:
-        if self._client is None or time.time() - self._last_update_time >= HEARTBEAT_INTERVAL:
-            print(
-                "Closing beanstalkd after: %d seconds", time.time() - self._last_update_time
-            )
             # Will automatically be re-opened upon next use
-            self._client.close()
+        self._client.close()
 
-            self._last_update_time = time.time()
+        self._last_update_time = time.time()
 
         return self._client
 
@@ -326,6 +323,7 @@ class BeanstalkdProgressReporter(ProgressReporter):
             client.put_job(json.encode(progress_message))
 
             self._last_updated = self._message.data.progress
+            self._last_update_time = time.time()
 
     def clear_progress(self):
         """Clear the progress counter"""
@@ -338,6 +336,7 @@ class BeanstalkdProgressReporter(ProgressReporter):
 
         client = self._get_client()
         client.put_job(json.encode(progress_message))
+        self._last_update_time = time.time()
 
     def get_counter(self) -> int:
         """Get the current value of the counter"""
