@@ -1,6 +1,5 @@
 """TODO: Add description here"""
-
-import abc
+from concurrent.futures import ThreadPoolExecutor
 import logging
 import os
 import signal
@@ -11,21 +10,21 @@ from collections.abc import Callable
 from textwrap import dedent
 from typing import Any, TypeVar
 
-import ray
-from msgspec import DecodeError, Struct, ValidationError, json
+
+from msgspec import DecodeError, ValidationError, json
 from pystalk import BeanstalkClient, BeanstalkError  # type: ignore
-from pystalk.client import Job  # type: ignore
 
 from bystro.beanstalkd.messages import (
     BeanstalkJobID,
     BaseMessage,
     FailedJobMessage,
     InvalidJobMessage,
-    ProgressMessage,
-    ProgressStringMessage,
+    ProgressPublisher,
+    QueueConf,
+    ProgressMessage
 )
 
-ray.init(ignore_reinit_error=True)
+executor = ThreadPoolExecutor(max_workers=1)
 
 BEANSTALK_ERR_TIMEOUT = "TIMED_OUT"
 SOCKET_TIMEOUT_TIME = 10
@@ -40,32 +39,21 @@ T3 = TypeVar("T3", bound=BaseMessage)
 
 logger = logging.getLogger(__name__)
 
+# Signal handler function
+def sigterm_handler(_signum, _frame):
+    print("SIGTERM received. Cleaning up...")
+    executor.shutdown(wait=False)
+    exit(0)
 
-class ProgressPublisher(Struct):
-    """Beanstalkd Message Published Config"""
-
-    host: str
-    port: int
-    queue: str
-    message: ProgressMessage
+# Set up the signal handler in the main thread
+signal.signal(signal.SIGTERM, sigterm_handler)
 
 
-class QueueConf(Struct):
-    """Queue Configuration"""
-
-    addresses: list[str]
-    tubes: dict
-
-    def split_host_port(self):
-        """Split host and port"""
-        hosts = []
-        ports = []
-        for host in self.addresses:
-            host, port = host.split(":")
-            hosts.append(host)
-            ports.append(port)
-        return hosts, ports
-
+def handle_job(handler_fn, publisher, job_data):
+    try:
+        return handler_fn(publisher, job_data)
+    except Exception as e:
+        return e
 
 def default_failed_msg_fn(
     job_data: T | None, job_id: BeanstalkJobID, err: Exception
@@ -76,19 +64,12 @@ def default_failed_msg_fn(
     return FailedJobMessage(submission_id=job_data.submission_id, reason=str(err))
 
 
-@ray.remote
-def handle_job(publisher, job_data, handler_fn):
+def worker(publisher, job_data, handler_fn, result_queue):
     try:
-        result = handler_fn(publisher, job_data)
-        return result
+        handler_fn(publisher, job_data)
+        result_queue.put(None)  # Indicate success
     except Exception as e:
-        return e
-
-
-def signal_handler(sig, _frame):
-    print("Received signal:", sig)
-    # Handle the signal (e.g., clean up resources, shut down gracefully)
-    sys.exit(0)
+        result_queue.put(e)  # Indicate failure
 
 
 def _touch(client: BeanstalkClient, job_id: str | int):
@@ -115,28 +96,20 @@ def listen(
         [T | None, BeanstalkJobID, Exception], FailedJobMessage | InvalidJobMessage
     ] = default_failed_msg_fn,  # noqa: E501
 ):
-    """Listen on a Beanstalkd channel, waiting for work.
-    When work is available call the work handler
-    """
     hosts, ports = queue_conf.split_host_port()
-
     tube_conf = queue_conf.tubes[tube]
     client_confs = tuple(
         {"host": host, "port": port, "socket_timeout": SOCKET_TIMEOUT_TIME}
         for (host, port) in zip(hosts, ports)
     )
 
-    signal.signal(signal.SIGTERM, signal_handler)
-    signal.signal(signal.SIGINT, signal_handler)
-
     i = 0
     while True:
         i += 1
-
-        job: Job | None = None
-        job_id: BeanstalkJobID | None = None
-        job_data: T | None = None
-        client: BeanstalkClient | None = None
+        job = None
+        job_id = None
+        job_data = None
+        client = None
         try:
             offset = i % len(hosts)
             client_conf = client_confs[offset]
@@ -182,7 +155,6 @@ def listen(
                 client.delete_job(job_id)
 
             try:
-                # Typeguard
                 assert job_data is not None
 
                 publisher = ProgressPublisher(
@@ -194,20 +166,19 @@ def listen(
 
                 client.put_job(json.encode(submit_msg_fn(job_data)))
 
-                handle_job_future = handle_job.remote(publisher, job_data, handler_fn)
+                # Submit the job to the ThreadPoolExecutor
+                future = executor.submit(handle_job, handler_fn, publisher, job_data)
 
                 # Ensure job is kept alive indefinitely, until completion
                 # Some jobs are potentially weeks long
                 while True:
                     # Check if the handle_job task is complete
-                    ready, still_waiting = ray.wait([handle_job_future], timeout=HEARTBEAT_INTERVAL)
-                    _touch(client, job_id)
-                    if len(still_waiting) == 0:
-                        if ready[0] != handle_job_future:
-                            logger.error("Unexpected ray.wait result: %s", ready)
+                    if future.done():
                         break
+                    _touch(client, job_id)
+                    time.sleep(HEARTBEAT_INTERVAL)
 
-                res = ray.get(handle_job_future)
+                res = future.result()
 
                 if isinstance(res, Exception):
                     raise res
@@ -226,7 +197,6 @@ def listen(
 
         except BeanstalkError as err:
             if err.message == BEANSTALK_ERR_TIMEOUT:
-                # This is completely expected, will happen every 5s
                 continue
 
             traceback.print_exc()
@@ -242,142 +212,6 @@ def listen(
                 continue
 
             client.release_job(job.job_id)
-
             time.sleep(1)
             continue
 
-
-class ProgressReporter(abc.ABC):
-    @abc.abstractmethod
-    def increment(self, count: int, force: bool = False):
-        """Increment the counter by processed variant count and report to the beanstalk queue"""
-
-    @abc.abstractmethod
-    def message(self, msg: str):
-        """Send a message to the beanstalk queue"""
-
-    @abc.abstractmethod
-    def increment_and_write_progress_message(
-        self, count: int, msg_prefix: str, msg_suffix: str = "", force: bool = False
-    ):
-        """Increment the counter by processed variant count
-        and report to the beanstalk queue as a string message"""
-
-    @abc.abstractmethod
-    def clear_progress(self):
-        """Clear the progress counter"""
-
-    @abc.abstractmethod
-    def get_counter(self) -> int:
-        """Get the current value of the counter"""
-
-
-@ray.remote(num_cpus=0)
-class BeanstalkdProgressReporter(ProgressReporter):
-    """A Ray class to report progress to a beanstalk queue"""
-
-    def __init__(self, publisher: ProgressPublisher, update_interval: int = 100_000):
-        self._message = publisher.message
-        self._update_interval = update_interval
-        self._publisher = publisher
-
-        self._last_updated = 0
-        self._last_update_time = time.time()
-
-        self._client = BeanstalkClient(self._publisher.host, self._publisher.port, socket_timeout=10)
-        self._client.use(self._publisher.queue)
-
-    def _get_client(self) -> BeanstalkClient:
-            # Will automatically be re-opened upon next use
-        self._client.close()
-
-        self._last_update_time = time.time()
-
-        return self._client
-
-    def increment(self, count: int, force: bool = False):
-        """Increment the counter by processed variant count and report to the beanstalk queue"""
-        self._message.data.progress += count
-
-        if force or self._message.data.progress - self._last_updated >= self._update_interval:
-            client = self._get_client()
-            client.put_job(json.encode(self._message))
-
-            self._last_updated = self._message.data.progress
-            self._last_update_time = time.time()
-
-    def increment_and_write_progress_message(
-        self, count: int, msg_prefix: str, msg_suffix: str = "", force: bool = False
-    ):
-        """Increment the counter by processed variant count
-        and report to the beanstalk queue as a string message
-        """
-        self._message.data.progress += count
-
-        if force or self._message.data.progress - self._last_updated >= self._update_interval:
-            message = f"{msg_prefix} {self._message.data.progress} {msg_suffix}"
-            progress_message = ProgressStringMessage(
-                submission_id=self._message.submission_id, data=message
-            )
-            client = self._get_client()
-            client.put_job(json.encode(progress_message))
-
-            self._last_updated = self._message.data.progress
-            self._last_update_time = time.time()
-
-    def clear_progress(self):
-        """Clear the progress counter"""
-        self._message.data.progress = 0
-        self._last_updated = 0
-
-    def message(self, msg: str):
-        """Send a message to the beanstalk queue"""
-        progress_message = ProgressStringMessage(submission_id=self._message.submission_id, data=msg)
-
-        client = self._get_client()
-        client.put_job(json.encode(progress_message))
-        self._last_update_time = time.time()
-
-    def get_counter(self) -> int:
-        """Get the current value of the counter"""
-        return self._message.data.progress
-
-
-@ray.remote(num_cpus=0)
-class DebugProgressReporter(ProgressReporter):
-    """A Ray class to report progress to stdout"""
-
-    def __init__(self):
-        self._value = 0
-
-    def increment(self, count: int, _force: bool = False):
-        self._value += count
-        print(f"Processed {self._value} records")
-
-    def increment_and_write_progress_message(
-        self, count: int, msg_prefix: str, msg_suffix: str = "", _force: bool = False
-    ):
-        self._value += count
-        print(f"{msg_prefix} {self._value} {msg_suffix}")
-
-    def clear_progress(self):
-        """Clear the progress counter"""
-        self._value = 0
-
-    def message(self, msg: str):
-        """Send a message to the beanstalk queue"""
-        print(msg)
-
-    def get_counter(self):
-        return self._value
-
-
-def get_progress_reporter(
-    publisher: ProgressPublisher | None = None, update_interval: int = 100_000
-) -> ProgressReporter:
-    if publisher:
-        return BeanstalkdProgressReporter.remote(  # type: ignore
-            publisher, update_interval=update_interval
-        )
-
-    return DebugProgressReporter.remote()  # type: ignore

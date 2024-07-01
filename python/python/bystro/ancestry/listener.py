@@ -10,8 +10,13 @@ from ruamel.yaml import YAML
 
 from bystro.ancestry.ancestry_types import AncestryResults, AncestryJobCompleteMessage, AncestryJobData
 from bystro.ancestry.inference import infer_ancestry
-from bystro.beanstalkd.messages import SubmittedJobMessage
-from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, get_progress_reporter, listen
+from bystro.beanstalkd.messages import (
+    SubmittedJobMessage,
+    ProgressPublisher,
+    QueueConf,
+    get_progress_reporter,
+)
+from bystro.beanstalkd.worker import listen
 
 from bystro.ancestry.model import get_models
 
@@ -24,6 +29,7 @@ logging.basicConfig(
 logger = logging.getLogger()
 
 ANCESTRY_TUBE = "ancestry"
+
 
 def _load_queue_conf(queue_conf_path: str) -> QueueConf:
     with Path(queue_conf_path).open(encoding="utf-8") as queue_config_file:
