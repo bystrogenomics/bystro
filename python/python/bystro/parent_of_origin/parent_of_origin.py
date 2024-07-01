@@ -38,6 +38,8 @@ import numpy.linalg as la
 from typing import Tuple, Union, Optional
 from tqdm import trange
 
+from numba import jit # type: ignore
+
 from sklearn.utils import resample
 
 from bystro.covariance.optimal_shrinkage import optimal_shrinkage
@@ -355,3 +357,123 @@ class POESingleSNP(BasePOE):
 
             self.confidence_interval_ = confidence_interval_
         return self
+
+
+class POEMultipleSNP(BasePOE):
+    """ """
+
+    def __init__(
+        self,
+        pval_method: str = "rmt4ds",
+        cov_regularization: str = "Empirical",
+        svd_loss: Optional[str] = None,
+    ) -> None:
+        """
+        Raises
+        ------
+        ValueError
+            If `cov_regularization` is not one of the allowable values.
+        """
+        self.pval_method = pval_method
+
+        self.cov_regularization = cov_regularization
+
+        self.svd_loss = svd_loss
+
+        self.p_vals: np.ndarray = np.empty(10)
+        self.parent_effects_: np.ndarray = np.empty(
+            (2, 10)
+        )  # Will be overwritten in fit
+
+    def fit(
+        self, X: np.ndarray, Y: np.ndarray, seed: int = 2021
+    ) -> "POEMultipleSNP":
+        """
+        Fit the POESingleSNP model.
+
+        Parameters
+        ----------
+        X : np.array-like, shape=(N, self.n_phenotypes)
+            The phenotype data
+
+        Y : np.array-like, shape=(N,self.n_genotypes)
+            The genotype data indicating the number of copies of the
+            minority allele
+
+        Returns
+        -------
+        self : POESingleSNP
+            The instance of the method
+        """
+        self._test_inputs(X, Y)
+        self.n_phenotypes = X.shape[1]
+        self.n_genotypes = Y.shape[1]
+
+        model_single_snp = POESingleSNP(
+            compute_pvalue=True,
+            pval_method=self.pval_method,
+            cov_regularization=self.cov_regularization,
+            svd_loss=self.svd_loss,
+        )
+
+        self.p_vals = -1 * np.ones(self.n_genotypes)
+        self.parent_effects_ = np.zeros((self.n_genotypes, self.n_phenotypes))
+
+        @jit
+        def subfunction(y):
+            model_single_snp.fit(X, y,seed=seed)
+            pval = model_single_snp.p_val
+            parent_effect = model_single_snp.parent_effect_
+            return pval, parent_effect
+
+        for i in trange(self.n_genotypes):
+            pval, parent_effect = subfunction(Y[:, i])
+            self.p_vals[i] = pval
+            self.parent_effects_[i] = parent_effect
+
+        return self
+
+    def transform(
+        self, X: np.ndarray, return_inner: bool = False
+    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+        """
+        This method predicts whether the heterozygote allele came from
+        a maternal/paternal origin. Note that due to a lack of
+        identifiability, we can't state whether class 1 is paternal or
+        maternal
+
+        Parameters
+        ----------
+        X : np.array-like, shape=(N, self.phenotypes)
+            The phenotype data
+
+        return_inner : bool, default=False
+            Whether to return the inner product classification, a measure
+            of confidence in the call
+
+        Returns
+        -------
+        calls : np.array-like, shape=(N,self.n_genotypes)
+            A vector of 1s and 0s predicting class
+
+        preds : np.array-like, shape=(N,self.n_genotypes)
+            The inner product, representing confidence in calls
+        """
+        N = X.shape[0]
+        calls = np.zeros((N, self.n_genotypes))
+        preds = np.zeros((N, self.n_genotypes))
+        X_dm = X - np.mean(X, axis=0)
+        for i in range(self.n_genotypes):
+            preds[:, i] = np.dot(X_dm, self.parent_effects_[i])
+            calls[:, i] = 1.0 * (preds[:, i] > 0)
+        if return_inner is False:
+            return calls
+        return calls, preds
+
+    def _test_inputs(self, X: np.ndarray, Y: np.ndarray) -> None:
+        if not isinstance(X, np.ndarray):
+            raise ValueError("X is numpy array")
+        if not isinstance(Y, np.ndarray):
+            raise ValueError("y is numpy array")
+        if X.shape[0] != Y.shape[0]:
+            raise ValueError("X and Y have different sample sizes")
