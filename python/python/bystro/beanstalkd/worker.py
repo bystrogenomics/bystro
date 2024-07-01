@@ -32,7 +32,7 @@ SOCKET_TIMEOUT_TIME = 10
 JOB_TIMEOUT_TIME = 5
 
 # seconds; default AWS load balancer TTL is 60 seconds
-HEARTBEAT_INTERVAL = int(os.getenv("BEANSTALKD_HEARTBEAT_INTERVAL", "50"))
+HEARTBEAT_INTERVAL = int(os.getenv("BEANSTALKD_HEARTBEAT_INTERVAL", "30"))
 
 T = TypeVar("T", bound=BaseMessage)
 T2 = TypeVar("T2", bound=BaseMessage)
