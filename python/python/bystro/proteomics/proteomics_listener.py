@@ -1,10 +1,18 @@
 """Listener for proteomics worker."""
+
 import argparse
 import logging
 from pathlib import Path
 
-from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
-from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, get_progress_reporter, listen
+from bystro.beanstalkd.messages import (
+    BaseMessage,
+    CompletedJobMessage,
+    SubmittedJobMessage,
+    QueueConf,
+    get_progress_reporter,
+    ProgressPublisher,
+)
+from bystro.beanstalkd.worker import listen
 from bystro.proteomics.proteomics import load_fragpipe_dataset
 from bystro.proteomics.proteomics_types import (
     ProteomicsResponse,

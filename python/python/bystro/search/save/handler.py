@@ -21,7 +21,7 @@ from numpy.typing import NDArray
 import numpy as np
 import ray
 
-from bystro.beanstalkd.worker import ProgressPublisher, ProgressReporter, get_progress_reporter
+from bystro.beanstalkd.messages import get_progress_reporter, ProgressPublisher, ProgressReporter
 from bystro.search.utils.annotation import AnnotationOutputs, Statistics
 from bystro.search.utils.messages import SaveJobData
 from bystro.search.utils.opensearch import gather_opensearch_args
@@ -53,8 +53,6 @@ MINIMUM_RECORDS_TO_ENABLE_REPORTING = 100_000
 # These are the fields that are required to define a locus
 # They are used to filter the dosage matrix
 FIELDS_TO_QUERY = ["chrom", "pos", "inputRef", "alt"]
-
-ray.init(ignore_reinit_error=True, address="auto")
 
 _GO_HANDLER_BINARY_PATH = "dosage-filter"
 

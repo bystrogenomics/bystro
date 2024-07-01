@@ -1,10 +1,11 @@
 """Classes for common shapes of data in ancestry."""
 from msgspec import Struct
+from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage
 
 LOWER_UNIT_BOUND = 0.0
 UPPER_UNIT_BOUND = 1.0
 
-class ProbabilityInterval(Struct, rename="camel"):
+class ProbabilityInterval(Struct, frozen=True, rename="camel"):
     """Represent an interval of probabilities."""
 
     lower_bound: float
@@ -37,7 +38,7 @@ class ProbabilityInterval(Struct, rename="camel"):
 # responsibility to give us scientifically sensible results.
 
 
-class PopulationVector(Struct, kw_only=True):
+class PopulationVector(Struct, frozen=True, kw_only=True):
     """A vector of probability intervals over populations.
 
     Represents model estimates of an individual's similarity to
@@ -73,7 +74,7 @@ class PopulationVector(Struct, kw_only=True):
     YRI: ProbabilityInterval
 
 
-class SuperpopVector(Struct, kw_only=True):
+class SuperpopVector(Struct, frozen=True, kw_only=True):
     """A vector of probability intervals for superpopulations.
 
     Represents model estimates of an individual's similarity to
@@ -89,7 +90,7 @@ class SuperpopVector(Struct, kw_only=True):
     SAS: ProbabilityInterval
 
 
-class AncestryTopHit(Struct):
+class AncestryTopHit(Struct, frozen=True, rename="camel"):
     """
     The top hit for a sample, with the max value (a probability) and the population(s) corresponding
     """
@@ -127,7 +128,7 @@ class AncestryScoresOneSample(Struct, frozen=True, rename="camel"):
         if self.n_snps < 0:
             raise TypeError("n_snps must be non-negative")
 
-class AncestryResults(Struct, frozen=True):
+class AncestryResults(Struct, frozen=True, rename="camel"):
     """An outgoing response from the ancestry worker.
 
     Represents ancestry model output for an entire study as a list of
@@ -137,3 +138,30 @@ class AncestryResults(Struct, frozen=True):
 
     results: list[AncestryScoresOneSample]
     pcs: dict[str, list[float]]
+
+
+class AncestryJobData(BaseMessage, frozen=True, rename="camel"):
+    """
+    The expected JSON message for the Ancestry job.
+
+    Parameters
+    ----------
+    submission_id: str
+        The unique identifier for the job.
+    dosage_matrix_path: str
+        The path to the dosage matrix file.
+    out_dir: str
+        The directory to write the results to.
+    assembly: str
+        The genome assembly used for the dosage matrix.
+    """
+
+    dosage_matrix_path: str
+    out_dir: str
+    assembly: str
+
+
+class AncestryJobCompleteMessage(CompletedJobMessage, frozen=True, kw_only=True, rename="camel"):
+    """The returned JSON message expected by the API server"""
+
+    result_path: str
