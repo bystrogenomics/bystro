@@ -7,7 +7,7 @@ various aspects of the generated data.
 """
 import numpy as np
 import numpy.linalg as la
-from bystro.rare_variant.parent_of_origin import POESingleSNP
+from bystro.parent_of_origin.parent_of_origin import POESingleSNP
 
 
 def cosine_similarity(vec1, vec2):
