@@ -1,13 +1,13 @@
 import pandas as pd
 from pandas.testing import assert_frame_equal
 import pickle
-from bystro.rare_variant.poirot import extract_residuals, do_poirot_by_snp
+from bystro.parent_of_origin.poirot import extract_residuals, do_poirot_by_snp
 
 pd.options.future.infer_string = True  # type: ignore
 
 
 def test_do_poirot_by_snp():
-    with open("python/bystro/rare_variant/tests/poirot_data.pkl", "rb") as f:
+    with open("python/bystro/parent_of_origin/tests/poirot_data.pkl", "rb") as f:
         loaded_data_dict = pickle.load(f)
     PHENO = loaded_data_dict["phenotypes"]
     GENO = loaded_data_dict["variants"]

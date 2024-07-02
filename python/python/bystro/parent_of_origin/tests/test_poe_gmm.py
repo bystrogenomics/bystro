@@ -1,5 +1,5 @@
 import numpy as np
-from bystro.rare_variant.poe_gmm import POEGMM
+from bystro.parent_of_origin.poe_gmm import POEGMM
 
 
 def generate_data(beta_m, beta_p, rng, n_individuals=10000, cov=None, maf=0.25):
