@@ -36,6 +36,7 @@ POESingleSNP(BasePOE)
 import numpy as np
 import numpy.linalg as la
 from typing import Tuple, Union, Optional
+from numpy.typing import NDArray
 from tqdm import trange
 
 from numba import jit # type: ignore
@@ -50,6 +51,7 @@ from bystro.covariance._covariance_np import (
 from bystro.covariance.covariance_cov_shrinkage import (
     LinearInverseShrinkage,
     QuadraticInverseShrinkage,
+    qis,
 )
 from bystro.random_matrix_theory.rmt4ds_cov_test import two_sample_cov_test
 from bystro.covariance.hypothesis_classical import (
@@ -420,14 +422,99 @@ class POEMultipleSNP(BasePOE):
         self.parent_effects_ = np.zeros((self.n_genotypes, self.n_phenotypes))
 
         @jit
-        def subfunction(y):
-            model_single_snp.fit(X, y,seed=seed)
-            pval = model_single_snp.p_val
-            parent_effect = model_single_snp.parent_effect_
+        def subfunction(X: NDArray[np.float64],y: NDArray[np.float64]):
+            X_homozygotes = X[y == 0]
+            X_heterozygotes = X[y == 1]
+            X_homozygotes = X_homozygotes# - np.mean(X_homozygotes, axis=0)
+            X_heterozygotes = X_heterozygotes# - np.mean(X_heterozygotes, axis=0)
+
+            n_hetero = X_heterozygotes.shape[0]
+            n_homo = X_homozygotes.shape[0]
+            n_total = n_hetero + n_homo
+
+            Sigma_AA = np.cov(X_homozygotes.T)
+            L = la.cholesky(Sigma_AA)
+            L_inv = la.inv(L)
+
+            X_het_whitened = np.dot(X_heterozygotes, L_inv.T)
+            Sigma_AB_white = np.cov(X_het_whitened.T)
+
+            U, s, Vt = la.svd(Sigma_AB_white)
+
+            norm_a = np.maximum(s[0] - 1, 0)
+            parent_effect_white = Vt[0] * 2 * np.sqrt(norm_a)
+            parent_effect = np.dot(parent_effect_white, L.T)
+
+            X1 = X_heterozygotes
+            X2 = X_homozygotes
+            n1, p1 = X1.shape
+            n2, p2 = X2.shape
+            N1 = n1 - 1
+            N2 = n2 - 1
+            X1 = X1# - np.mean(X1, axis=0)
+            X2 = X2# - np.mean(X2, axis=0)
+
+            N = N1 + N2
+            c1 = N1 / N
+            c2 = N2 / N
+            yN1 = p1 / N1
+            yN2 = p2 / N2
+            S1 = X1.T @ X1 / N1
+            S2 = X2.T @ X2 / N2
+
+            def d2(y1,y2):
+                return (
+                    (y1 + y2 - y1 * y2)
+                    / (y1 * y2)
+                    * np.log((y1 + y2) / (y1 + y2 - y1 * y2))
+                    + y1 * (1 - y2) / (y2 * (y1 + y2)) * np.log(1 - y2)
+                    + y2 * (1 - y1) / (y1 * (y1 + y2)) * np.log(1 - y1)
+                )
+            
+            def mu2(y1,y2):
+                return 0.5 * np.log((y1 + y2 - y1 * y2) / (y1 + y2)) - (
+                        y1 * np.log(1 - y2) + y2 * np.log(1 - y1)
+                    ) / (y1 + y2)
+            
+            def sigma2_2(y1,y2):
+                return -(2 * y1**2 * np.log(1 - y2) + 2 * y2**2 * np.log(1 - y1)) / (
+        y1 + y2
+    ) ** 2 - 2 * np.log((y1 + y2) / (y1 + y2 - y1 * y2))
+
+            log_V1_ = np.log(la.det(S1 @ la.solve(S2, np.eye(p1)))) * (N1 / 2) - np.log(
+                la.det(c1 * S1 @ la.solve(S2, np.eye(p2)) + c2 * np.eye(p2))
+            ) * (N / 2)
+            z_value = (-2 / N * log_V1_ - p1 * d2(yN1, yN2) - mu2(yN1, yN2)) / np.sqrt(
+                sigma2_2(yN1, yN2)
+            )
+
+            def erf(x):
+                # Constants used in the approximation formula
+                a1 =  0.254829592
+                a2 = -0.284496736
+                a3 =  1.421413741
+                a4 = -1.453152027
+                a5 =  1.061405429
+                p  =  0.3275911
+
+                # Save the sign of x
+                sign = np.sign(x)
+                x = np.abs(x)
+
+                # A&S formula 7.1.26
+                t = 1.0 / (1.0 + p * x)
+                y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * np.exp(-x * x)
+
+                return sign * y
+
+            def norm_sf(z_value):
+                return 0.5 * (1 - erf(z_value / np.sqrt(2)))
+
+            pval= norm_sf(z_value)
             return pval, parent_effect
 
         for i in trange(self.n_genotypes):
-            pval, parent_effect = subfunction(Y[:, i])
+            pval, parent_effect = subfunction(X,Y[:, i])
             self.p_vals[i] = pval
             self.parent_effects_[i] = parent_effect
 
@@ -477,3 +564,5 @@ class POEMultipleSNP(BasePOE):
             raise ValueError("y is numpy array")
         if X.shape[0] != Y.shape[0]:
             raise ValueError("X and Y have different sample sizes")
+
+
