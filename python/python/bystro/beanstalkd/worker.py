@@ -1,4 +1,5 @@
 """TODO: Add description here"""
+
 from concurrent.futures import ThreadPoolExecutor
 import logging
 import os
@@ -21,7 +22,7 @@ from bystro.beanstalkd.messages import (
     InvalidJobMessage,
     ProgressPublisher,
     QueueConf,
-    ProgressMessage
+    ProgressMessage,
 )
 
 executor = ThreadPoolExecutor(max_workers=1)
@@ -39,11 +40,13 @@ T3 = TypeVar("T3", bound=BaseMessage)
 
 logger = logging.getLogger(__name__)
 
+
 # Signal handler function
 def sigterm_handler(_signum, _frame):
     print("SIGTERM received. Cleaning up...")
     executor.shutdown(wait=False)
     exit(0)
+
 
 # Set up the signal handler in the main thread
 signal.signal(signal.SIGTERM, sigterm_handler)
@@ -55,6 +58,7 @@ def handle_job(handler_fn, publisher, job_data):
     except Exception as e:
         return e
 
+
 def default_failed_msg_fn(
     job_data: T | None, job_id: BeanstalkJobID, err: Exception
 ) -> FailedJobMessage | InvalidJobMessage:  # noqa: E501
@@ -62,14 +66,6 @@ def default_failed_msg_fn(
     if job_data is None:
         return InvalidJobMessage(queue_id=job_id, reason=str(err))
     return FailedJobMessage(submission_id=job_data.submission_id, reason=str(err))
-
-
-def worker(publisher, job_data, handler_fn, result_queue):
-    try:
-        handler_fn(publisher, job_data)
-        result_queue.put(None)  # Indicate success
-    except Exception as e:
-        result_queue.put(e)  # Indicate failure
 
 
 def _touch(client: BeanstalkClient, job_id: str | int):
@@ -214,4 +210,3 @@ def listen(
             client.release_job(job.job_id)
             time.sleep(1)
             continue
-
