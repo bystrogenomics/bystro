@@ -550,9 +550,9 @@ def generate_c_and_t_prs_scores(
                 genos_transpose = finalize_dosage_after_c_t(sample_genotypes, loci_and_allele_comparison)
 
                 if ancestry_weighted_af_total_variation is not None:
-                    weights_filtered = ancestry_weighted_af_total_variation.loc[
-                        genos_transpose.columns
-                    ].fillna(0)
+                    weights_filtered = ancestry_weighted_af_total_variation.reindex(
+                        genos_transpose.columns, axis=0, fill_value=0
+                    )
                     genos_transpose = genos_transpose - weights_filtered[genos_transpose.index].T
 
                 prs_scores_chunk = genos_transpose @ beta_values.loc[genos_transpose.columns]

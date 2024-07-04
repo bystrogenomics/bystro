@@ -1,5 +1,6 @@
 import abc
 from enum import Enum
+import os
 import time
 from typing import get_type_hints
 
@@ -9,6 +10,10 @@ import ray
 
 SubmissionID = str | int
 BeanstalkJobID = int
+
+# seconds; default AWS load balancer TTL is 60 seconds
+# set the interval 2 seconds beforehand to make room for timing / network delays
+QUEUE_HEARTBEAT_INTERVAL = max(1, float(os.getenv("BYSTRO_BEANSTALKD_HEARTBEAT_INTERVAL", "20")) - 2)
 
 
 class Event(str, Enum):
@@ -140,7 +145,15 @@ class BeanstalkdProgressReporter(ProgressReporter):
 
     def _get_client(self) -> BeanstalkClient:
         # Will automatically be re-opened upon next use
-        self._client.close()
+        # Ensure we do not re-establish the connection more than every HEARTBEAT_INTERVAL seconds
+        if time.time() - self._last_update_time >= QUEUE_HEARTBEAT_INTERVAL:
+            print(
+                (
+                    "Set BeanstalkdProgressReporter client to closed."
+                    " Will be automatically re-opened on next use"
+                )
+            )
+            self._client.close()
 
         self._last_update_time = time.time()
 

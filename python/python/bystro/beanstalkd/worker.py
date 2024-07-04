@@ -2,7 +2,6 @@
 
 from concurrent.futures import ThreadPoolExecutor
 import logging
-import os
 import signal
 import sys
 import time
@@ -23,16 +22,14 @@ from bystro.beanstalkd.messages import (
     ProgressPublisher,
     QueueConf,
     ProgressMessage,
+    QUEUE_HEARTBEAT_INTERVAL,
 )
 
 executor = ThreadPoolExecutor(max_workers=1)
 
 BEANSTALK_ERR_TIMEOUT = "TIMED_OUT"
-SOCKET_TIMEOUT_TIME = 10
-JOB_TIMEOUT_TIME = 5
-
-# seconds; default AWS load balancer TTL is 60 seconds
-HEARTBEAT_INTERVAL = int(os.getenv("BEANSTALKD_HEARTBEAT_INTERVAL", "30"))
+SOCKET_TIMEOUT_TIME = 30
+JOB_TIMEOUT_TIME = 20
 
 T = TypeVar("T", bound=BaseMessage)
 T2 = TypeVar("T2", bound=BaseMessage)
@@ -167,12 +164,19 @@ def listen(
 
                 # Ensure job is kept alive indefinitely, until completion
                 # Some jobs are potentially weeks long
+                last_touch_time = time.time()
                 while True:
                     # Check if the handle_job task is complete
                     if future.done():
+                        _touch(client, job_id)
+                        last_touch_time = time.time()
                         break
-                    _touch(client, job_id)
-                    time.sleep(HEARTBEAT_INTERVAL)
+
+                    if time.time() - last_touch_time >= QUEUE_HEARTBEAT_INTERVAL:
+                        _touch(client, job_id)
+                        last_touch_time = time.time()
+
+                    time.sleep(1)
 
                 res = future.result()
 
