@@ -6,7 +6,7 @@ from numpy.typing import NDArray
 import pytest
 import ray
 
-from bystro.beanstalkd.worker import get_progress_reporter
+from bystro.beanstalkd.messages import get_progress_reporter
 from bystro.search.save.handler import (
     AsyncQueryProcessor,
     sort_loci_and_doc_ids,

@@ -5,7 +5,7 @@ from enum import Enum
 import logging
 from typing import Any, Optional
 import os
-from bystro.beanstalkd.worker import ProgressReporter
+from bystro.beanstalkd.messages import ProgressReporter
 import psutil
 
 import matplotlib.pyplot as plt  # type: ignore
@@ -80,10 +80,10 @@ def _load_association_scores(ad_scores_filepath: str) -> pd.DataFrame:
         {
             "CHR": "int64",
             "POS": "int64",
-            "OTHER_ALLELE": "string[pyarrow_numpy]",
-            "EFFECT_ALLELE": "string[pyarrow_numpy]",
+            "OTHER_ALLELE": "string[pyarrow]",
+            "EFFECT_ALLELE": "string[pyarrow]",
             "P": "float32",
-            "SNPID": "string[pyarrow_numpy]",
+            "SNPID": "string[pyarrow]",
             "BETA": "float32",
         }
     )
@@ -428,7 +428,7 @@ def generate_c_and_t_prs_scores(
     logger.debug("Time to load association scores: %s", timer.elapsed_time)
 
     if reporter is not None:
-        reporter.message.remote("Loaded association scores") # type: ignore
+        reporter.message.remote("Loaded association scores")  # type: ignore
 
     with Timer() as timer:
         preprocessed_scores = _preprocess_scores(scores)
@@ -436,7 +436,7 @@ def generate_c_and_t_prs_scores(
     logger.debug("Time to preprocess scores: %s", timer.elapsed_time)
 
     if reporter is not None:
-        reporter.message.remote("Preprocessed scores") # type: ignore
+        reporter.message.remote("Preprocessed scores")  # type: ignore
 
     score_loci_filter = pc.field("locus").isin(pa.array(thresholded_score_loci))
 
@@ -492,7 +492,7 @@ def generate_c_and_t_prs_scores(
         logger.debug("Time to query for gnomad allele frequencies: %s", query_timer.elapsed_time)
 
     if reporter is not None:
-        reporter.message.remote("Fetched allele frequencies") # type: ignore
+        reporter.message.remote("Fetched allele frequencies")  # type: ignore
 
     # Accumulate the results
     prs_scores: pd.Series = pd.Series(dtype=np.float32, name="PRS")
@@ -504,7 +504,8 @@ def generate_c_and_t_prs_scores(
 
             with Timer() as timer:
                 sample_genotypes = dosage_ds.to_table(["locus", *sample_group]).to_pandas()
-                sample_genotypes = sample_genotypes.set_index("locus")
+                sample_genotypes.index = pd.Index(sample_genotypes["locus"], dtype="string[pyarrow]")
+                sample_genotypes = sample_genotypes.drop(columns=["locus"])
 
                 mask = sample_genotypes.notna().all(axis=1) & (sample_genotypes >= 0).all(axis=1)
                 sample_genotypes = sample_genotypes[mask]
@@ -549,9 +550,9 @@ def generate_c_and_t_prs_scores(
                 genos_transpose = finalize_dosage_after_c_t(sample_genotypes, loci_and_allele_comparison)
 
                 if ancestry_weighted_af_total_variation is not None:
-                    weights_filtered = ancestry_weighted_af_total_variation.loc[
-                        genos_transpose.columns
-                    ].fillna(0)
+                    weights_filtered = ancestry_weighted_af_total_variation.reindex(
+                        genos_transpose.columns, axis=0, fill_value=0
+                    )
                     genos_transpose = genos_transpose - weights_filtered[genos_transpose.index].T
 
                 prs_scores_chunk = genos_transpose @ beta_values.loc[genos_transpose.columns]
@@ -571,7 +572,7 @@ def generate_c_and_t_prs_scores(
 
             if reporter is not None:
                 samples_processed += len(sample_group)
-                reporter.increment_and_write_progress_message.remote( # type: ignore
+                reporter.increment_and_write_progress_message.remote(  # type: ignore
                     len(sample_group),
                     "Processed",
                     f"samples ({int((samples_processed/total_number_of_samples) * 10_000)/100}%)",
