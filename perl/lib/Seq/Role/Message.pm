@@ -21,6 +21,11 @@ use Beanstalk::Client;
 use Cpanel::JSON::XS;
 use DDP return_value => 'dump';
 use Carp qw/croak/;
+use Time::HiRes qw(time);
+use Try::Tiny;
+
+my $PUBLISHER_ACTION_TIMEOUT = 30;
+my $PUBLISHER_CONNECT_TIMEOUT = 10;
 
 $Seq::Role::Message::LOG = Log::Fast->new(
   {
@@ -57,6 +62,7 @@ state $debug   = 0;
 state $verbose = 1000;
 state $publisher;
 state $messageBase;
+state $lastPublisherInteractionTime;
 
 # whether log level or verbosity is at the debug level
 # shoud only be accessed after setLogLevel and/or setVerbosity executed if program doesn't want default
@@ -84,6 +90,7 @@ sub initialize {
   $debug       = 0;
   $verbose     = 10000;
   $publisher   = undef;
+  $lastPublisherInteractionTime = undef;
   $messageBase = undef;
 }
 
@@ -145,9 +152,11 @@ sub setPublisher {
     {
       server          => $publisherConfig->{server},
       default_tube    => $publisherConfig->{queue},
-      connect_timeout => 1,
+      connect_timeout => $PUBLISHER_CONNECT_TIMEOUT,
     }
   );
+
+  $lastPublisherInteractionTime = time();
 
   $messageBase = $publisherConfig->{messageBase};
 }
@@ -160,14 +169,33 @@ sub publishMessage {
   # because predicates don't trigger builders, need to check hasPublisherAddress
   return unless $publisher;
 
+  if (time() - $lastPublisherInteractionTime >= $PUBLISHER_ACTION_TIMEOUT) {
+    try {
+      $publisher->disconnect();
+      $publisher->connect();
+    }
+    catch {
+      warn "Failed to connect to publisher: $_";
+      return;  # Exit the function if connection fails
+    };
+  }
+
   $messageBase->{data} = $_[1];
 
-  $publisher->put(
-    {
-      priority => 0,
-      data     => encode_json($messageBase),
-    }
-  );
+  try {
+    $publisher->put(
+      {
+        priority => 0,
+        data     => encode_json($messageBase),
+      }
+    );
+  }
+  catch {
+    warn "Failed to publish message: $_";
+    return;
+  };
+
+  $lastPublisherInteractionTime = time();
 
   return;
 }
@@ -179,14 +207,33 @@ sub publishProgress {
   # because predicates don't trigger builders, need to check hasPublisherAddress
   return unless $publisher;
 
+  if (time() - $lastPublisherInteractionTime >= $PUBLISHER_ACTION_TIMEOUT) {
+    try {
+      $publisher->disconnect();
+      $publisher->connect();
+    }
+    catch {
+      warn "Failed to connect to publisher: $_";
+      return;  # Exit the function if connection fails
+    };
+  }
+
   $messageBase->{data} = { progress => $_[1], skipped => $_[2] };
 
-  $publisher->put(
-    {
-      priority => 0,
-      data     => encode_json($messageBase),
-    }
-  );
+  try {
+    $publisher->put(
+      {
+        priority => 0,
+        data     => encode_json($messageBase),
+      }
+    );
+  }
+  catch {
+    warn "Failed to publish progress: $_";
+    return;
+  };
+
+  $lastPublisherInteractionTime = time();
 }
 
 sub log {

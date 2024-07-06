@@ -13,7 +13,8 @@ BeanstalkJobID = int
 
 # seconds; default AWS load balancer TTL is 60 seconds
 # set the interval 2 seconds beforehand to make room for timing / network delays
-QUEUE_HEARTBEAT_INTERVAL = max(1, float(os.getenv("BYSTRO_BEANSTALKD_HEARTBEAT_INTERVAL", "20")) - 2)
+QUEUE_HEARTBEAT_INTERVAL = max(1, float(os.getenv("BYSTRO_BEANSTALKD_HEARTBEAT_INTERVAL", "30")))
+QUEUE_PRODUCER_TIMEOUT = max(1, float(os.getenv("BYSTRO_BEANSTALKD_PRODUCER_TIMEOUT", "10")))
 
 
 class Event(str, Enum):
@@ -140,7 +141,7 @@ class BeanstalkdProgressReporter(ProgressReporter):
         self._last_updated = 0
         self._last_update_time = time.time()
 
-        self._client = BeanstalkClient(self._publisher.host, self._publisher.port, socket_timeout=10)
+        self._client = BeanstalkClient(self._publisher.host, self._publisher.port, socket_timeout=QUEUE_HEARTBEAT_INTERVAL)
         self._client.use(self._publisher.queue)
 
     def _get_client(self) -> BeanstalkClient:

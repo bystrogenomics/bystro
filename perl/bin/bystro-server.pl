@@ -71,7 +71,13 @@ if ( !$queueConfig ) {
 
 say "Running Annotation queue server";
 
-my $BEANSTALKD_TIMEOUT = 60;
+my $BEANSTALKD_RESERVE_TIMEOUT = 10;
+# Needs to be larger than RESERVE_TIMEOUT
+# Used for both producer and consumer clients
+# We give move time for the producer to connect
+# Than in Message.pm, because these messages indiciate job success/failure,
+# And therefore is more important than progress updates
+my $BEANSTALKD_CONNECT_TIMEOUT = 30;
 
 sub _get_consumer_client {
   my $server_address = shift;
@@ -81,7 +87,7 @@ sub _get_consumer_client {
     {
       server          => $server_address,
       default_tube    => $tube,
-      connect_timeout => 10,
+      connect_timeout => $BEANSTALKD_CONNECT_TIMEOUT,
       encoder         => sub { encode_json( \@_ ) },
       decoder         => sub { @{ decode_json(shift) } },
     }
@@ -96,7 +102,7 @@ sub _get_producer_client {
     {
       server          => $server_address,
       default_tube    => $tube,
-      connect_timeout => 10,
+      connect_timeout => $BEANSTALKD_CONNECT_TIMEOUT,
       encoder         => sub { encode_json( \@_ ) },
       decoder         => sub { @{ decode_json(shift) } },
     }
@@ -107,7 +113,7 @@ while (1) {
   my $beanstalk = _get_consumer_client( $conf->{beanstalkd}{addresses}[0],
     $queueConfig->{submission} );
 
-  my $job = $beanstalk->reserve($BEANSTALKD_TIMEOUT);
+  my $job = $beanstalk->reserve($BEANSTALKD_RESERVE_TIMEOUT);
 
   if ( !$job ) {
     next;
@@ -191,7 +197,7 @@ while (1) {
       say STDERR "Beanstalkd last error: " . $beanstalkEvents->error;
     }
 
-    my $socket = $job->client->connect( $conf->{beanstalkd}{addresses}[0], 10 );
+    my $socket = $job->client->connect( $conf->{beanstalkd}{addresses}[0], $BEANSTALKD_CONNECT_TIMEOUT );
 
     if ( $job->client->error ) {
       say STDERR "Failed to connect to queue server with error " . $job->client->error;
@@ -235,7 +241,7 @@ while (1) {
     say STDERR "Beanstalkd last error: " . $beanstalkEvents->error;
   }
 
-  my $socket = $job->client->connect( $conf->{beanstalkd}{addresses}[0], 10 );
+  my $socket = $job->client->connect( $conf->{beanstalkd}{addresses}[0], $BEANSTALKD_CONNECT_TIMEOUT );
 
   if ( $job->client->error ) {
     say STDERR "Failed to connect to queue server with error " . $job->client->error;

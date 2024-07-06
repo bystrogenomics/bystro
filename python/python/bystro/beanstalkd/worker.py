@@ -2,6 +2,7 @@
 
 from concurrent.futures import ThreadPoolExecutor
 import logging
+import os
 import signal
 import sys
 import time
@@ -22,14 +23,16 @@ from bystro.beanstalkd.messages import (
     ProgressPublisher,
     QueueConf,
     ProgressMessage,
-    QUEUE_HEARTBEAT_INTERVAL,
+    QUEUE_HEARTBEAT_INTERVAL
 )
 
 executor = ThreadPoolExecutor(max_workers=1)
 
 BEANSTALK_ERR_TIMEOUT = "TIMED_OUT"
-SOCKET_TIMEOUT_TIME = 30
-JOB_TIMEOUT_TIME = 20
+QUEUE_RESERVE_JOB_TIMEOUT_TIME = int(os.getenv("BYSTRO_BEANSTALKD_RESERVE_JOB_TIMEOUT", "10"))
+
+# Must be larger than JOB_TIMEOUT_TIME
+QUEUE_CONSUMER_SOCKET_TIMEOUT = int(os.getenv("BYSTRO_BEANSTALKD_CONSUMER_SOCKET_TIMEOUT", "30"))
 
 T = TypeVar("T", bound=BaseMessage)
 T2 = TypeVar("T2", bound=BaseMessage)
@@ -92,7 +95,7 @@ def listen(
     hosts, ports = queue_conf.split_host_port()
     tube_conf = queue_conf.tubes[tube]
     client_confs = tuple(
-        {"host": host, "port": port, "socket_timeout": SOCKET_TIMEOUT_TIME}
+        {"host": host, "port": port, "socket_timeout": QUEUE_CONSUMER_SOCKET_TIMEOUT}
         for (host, port) in zip(hosts, ports)
     )
 
@@ -111,7 +114,7 @@ def listen(
             client.watch(tube_conf["submission"])
             client.use(tube_conf["events"])
 
-            job = client.reserve_job(JOB_TIMEOUT_TIME)
+            job = client.reserve_job(QUEUE_RESERVE_JOB_TIMEOUT_TIME)
             job_id = int(job.job_id)  # type: ignore
 
             try:
