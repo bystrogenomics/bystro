@@ -50,6 +50,10 @@ from bystro.covariance.covariance_cov_shrinkage import (
     QuadraticInverseShrinkage,
 )
 from bystro.random_matrix_theory.rmt4ds_cov_test import two_sample_cov_test
+from bystro.covariance.hypothesis_classical import (
+    srivastavayanagihara_two_sample_test,
+    srivastava_two_sample_test,
+)
 
 
 class BasePOE:
@@ -289,6 +293,16 @@ class POESingleSNP(BasePOE):
                 )
             elif self.pval_method == "rmt4ds":
                 result = two_sample_cov_test(X_heterozygotes, X_homozygotes)
+                self.p_val = result["p_value"]
+            elif self.pval_method == "srivastavayanagihara":
+                result = srivastavayanagihara_two_sample_test(
+                    [X_heterozygotes, X_homozygotes]
+                )
+                self.p_val = result["p_value"]
+            elif self.pval_method == "srivastava":
+                result = srivastava_two_sample_test(
+                    [X_heterozygotes, X_homozygotes]
+                )
                 self.p_val = result["p_value"]
             else:
                 raise ValueError(

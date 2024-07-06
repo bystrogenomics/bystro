@@ -8,10 +8,15 @@ import msgspec
 import pyarrow.dataset as ds  # type: ignore
 from ruamel.yaml import YAML
 
-from bystro.ancestry.ancestry_types import AncestryResults
+from bystro.ancestry.ancestry_types import AncestryResults, AncestryJobCompleteMessage, AncestryJobData
 from bystro.ancestry.inference import infer_ancestry
-from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
-from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, get_progress_reporter, listen
+from bystro.beanstalkd.messages import (
+    SubmittedJobMessage,
+    ProgressPublisher,
+    QueueConf,
+    get_progress_reporter,
+)
+from bystro.beanstalkd.worker import listen
 
 from bystro.ancestry.model import get_models
 
@@ -24,32 +29,6 @@ logging.basicConfig(
 logger = logging.getLogger()
 
 ANCESTRY_TUBE = "ancestry"
-
-class AncestryJobData(BaseMessage, frozen=True, rename="camel"):
-    """
-    The expected JSON message for the Ancestry job.
-
-    Parameters
-    ----------
-    submission_id: str
-        The unique identifier for the job.
-    dosage_matrix_path: str
-        The path to the dosage matrix file.
-    out_dir: str
-        The directory to write the results to.
-    assembly: str
-        The genome assembly used for the dosage matrix.
-    """
-
-    dosage_matrix_path: str
-    out_dir: str
-    assembly: str
-
-
-class AncestryJobCompleteMessage(CompletedJobMessage, frozen=True, kw_only=True, rename="camel"):
-    """The returned JSON message expected by the API server"""
-
-    result_path: str
 
 
 def _load_queue_conf(queue_conf_path: str) -> QueueConf:
