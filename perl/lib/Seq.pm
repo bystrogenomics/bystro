@@ -367,7 +367,7 @@ sub annotateFile {
   }
 
   # Force flush
-  my ($totalAnnotated, $totalSkipped) = $progressFunc->( 0, 0, undef, undef, 1 );
+  my ( $totalAnnotated, $totalSkipped ) = $progressFunc->( 0, 0, undef, undef, 1 );
 
   MCE::Loop::finish();
 
@@ -609,11 +609,11 @@ sub makeLogProgressAndPrint {
     ##    $_[0],          $_[1]           , $_[2],     $_[3].           , $_[4]
     if ( $_[2] ) {
       $$abortErrRef = $_[2];
-      return ($totalAnnotated, $totalSkipped);
+      return ( $totalAnnotated, $totalSkipped );
     }
 
-    $totalAnnotated +=  $_[0];
-    $totalSkipped  += $_[1];
+    $totalAnnotated += $_[0];
+    $totalSkipped   += $_[1];
 
     if ($publish) {
       $thresholdAnn     += $_[0];
@@ -635,7 +635,7 @@ sub makeLogProgressAndPrint {
       print $outFh $_[3];
     }
 
-    return ($totalAnnotated, $totalSkipped);
+    return ( $totalAnnotated, $totalSkipped );
   }
 }
 
