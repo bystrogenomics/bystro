@@ -48,6 +48,8 @@ class SaveJobData(BaseMessage, frozen=True, forbid_unknown_fields=True, kw_only=
 
 class SaveJobResults(Struct, frozen=True, rename="camel"):
     output_file_names: AnnotationOutputs
+    total_annotated: int
+    total_skipped: int
 
 
 class SaveJobCompleteMessage(CompletedJobMessage, frozen=True, kw_only=True, rename="camel"):

@@ -176,7 +176,9 @@ def test_save_job_results_camel_decamel():
             dosage_matrix_out_path="dosage_matrix_out_path",
             header="header",
             archived=None,
-        )
+        ),
+        total_annotated=100,
+        total_skipped=10,
     )
 
     serialized_values = json.encode(job_results)
@@ -194,7 +196,9 @@ def test_save_job_results_camel_decamel():
             "dosageMatrixOutPath": "dosage_matrix_out_path",
             "header": "header",
             "archived": None,
-        }
+        },
+        "totalAnnotated": 100,
+        "totalSkipped": 10,
     }
     serialized_expected_value = json.encode(expected_value)
 
@@ -214,7 +218,9 @@ def test_save_job_complete_message_camel_decamel():
             dosage_matrix_out_path="dosage_matrix_out_path",
             header="header",
             archived=None,
-        )
+        ),
+        total_annotated=100,
+        total_skipped=10,
     )
     completed_msg = SaveJobCompleteMessage(
         submission_id="submit1",
@@ -239,7 +245,9 @@ def test_save_job_complete_message_camel_decamel():
                 "dosageMatrixOutPath": "dosage_matrix_out_path",
                 "header": "header",
                 "archived": None,
-            }
+            },
+            "totalAnnotated": 100,
+            "totalSkipped": 10,
         }
     }
     serialized_expected_value = json.encode(expected_value)

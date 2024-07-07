@@ -23,7 +23,7 @@ import ray
 
 from bystro.beanstalkd.messages import get_progress_reporter, ProgressPublisher, ProgressReporter
 from bystro.search.utils.annotation import AnnotationOutputs, Statistics
-from bystro.search.utils.messages import SaveJobData
+from bystro.search.utils.messages import SaveJobData, SaveJobResults
 from bystro.search.utils.opensearch import gather_opensearch_args
 from bystro.utils.compress import get_compress_from_pipe_cmd, get_decompress_to_pipe_cmd
 from bystro.utils.timer import Timer
@@ -512,7 +512,7 @@ def filter_annotation_and_dosage_matrix(
     loci_sorted: NDArray,
     n_hits: int,
     queue_config_path: str,
-) -> AnnotationOutputs:
+) -> SaveJobResults:
     output_dir = os.path.dirname(job_data.output_base_path)
     basename = os.path.basename(job_data.output_base_path)
 
@@ -578,12 +578,16 @@ def filter_annotation_and_dosage_matrix(
 
     reporter.increment.remote(n_results, True)  # type: ignore
 
-    return outputs
+    return SaveJobResults(
+        output_file_names=outputs,
+        total_annotated=n_results,
+        total_skipped=n_hits - n_results,
+    )
 
 
 async def go(  # pylint:disable=invalid-name
     job_data: SaveJobData, search_conf: dict, publisher: ProgressPublisher, queue_config_path: str
-) -> AnnotationOutputs:
+) -> SaveJobResults:
     """Main function for running the query and writing the output"""
     search_client_args = gather_opensearch_args(search_conf)
     client = OpenSearch(**search_client_args)
