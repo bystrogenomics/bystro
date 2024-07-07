@@ -141,10 +141,17 @@ class BeanstalkdProgressReporter(ProgressReporter):
         self._last_updated = 0
         self._last_update_time = time.time()
 
-        self._client = BeanstalkClient(self._publisher.host, self._publisher.port, socket_timeout=QUEUE_HEARTBEAT_INTERVAL)
-        self._client.use(self._publisher.queue)
+        self._client: BeanstalkClient | None = None
 
     def _get_client(self) -> BeanstalkClient:
+        if self._client is None:
+            self._client = BeanstalkClient(
+                self._publisher.host, self._publisher.port, socket_timeout=QUEUE_PRODUCER_TIMEOUT
+            )
+            self._client.use(self._publisher.queue)
+            self._last_update_time = time.time()
+            return self._client
+
         # Will automatically be re-opened upon next use
         # Ensure we do not re-establish the connection more than every HEARTBEAT_INTERVAL seconds
         if time.time() - self._last_update_time >= QUEUE_HEARTBEAT_INTERVAL:
@@ -165,11 +172,13 @@ class BeanstalkdProgressReporter(ProgressReporter):
         self._message.data.progress += count
 
         if force or self._message.data.progress - self._last_updated >= self._update_interval:
-            client = self._get_client()
-            client.put_job(json.encode(self._message))
-
-            self._last_updated = self._message.data.progress
-            self._last_update_time = time.time()
+            try:
+                client = self._get_client()
+                client.put_job(json.encode(self._message))
+                self._last_updated = self._message.data.progress
+                self._last_update_time = time.time()
+            except Exception as e:
+                print(f"Failed to put job to beanstalkd: {e}")
 
     def increment_and_write_progress_message(
         self, count: int, msg_prefix: str, msg_suffix: str = "", force: bool = False
@@ -184,11 +193,14 @@ class BeanstalkdProgressReporter(ProgressReporter):
             progress_message = ProgressStringMessage(
                 submission_id=self._message.submission_id, data=message
             )
-            client = self._get_client()
-            client.put_job(json.encode(progress_message))
+            try:
+                client = self._get_client()
+                client.put_job(json.encode(progress_message))
 
-            self._last_updated = self._message.data.progress
-            self._last_update_time = time.time()
+                self._last_updated = self._message.data.progress
+                self._last_update_time = time.time()
+            except Exception as e:
+                print(f"Failed to put job to beanstalkd: {e}")
 
     def clear_progress(self):
         """Clear the progress counter"""
@@ -199,9 +211,12 @@ class BeanstalkdProgressReporter(ProgressReporter):
         """Send a message to the beanstalk queue"""
         progress_message = ProgressStringMessage(submission_id=self._message.submission_id, data=msg)
 
-        client = self._get_client()
-        client.put_job(json.encode(progress_message))
-        self._last_update_time = time.time()
+        try:
+            client = self._get_client()
+            client.put_job(json.encode(progress_message))
+            self._last_update_time = time.time()
+        except Exception as e:
+            print(f"Failed to put job to beanstalkd: {e}")
 
     def get_counter(self) -> int:
         """Get the current value of the counter"""
