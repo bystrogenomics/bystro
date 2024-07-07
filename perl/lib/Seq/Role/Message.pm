@@ -20,11 +20,11 @@ use namespace::autoclean;
 use Beanstalk::Client;
 use Cpanel::JSON::XS;
 use DDP return_value => 'dump';
-use Carp qw/croak/;
+use Carp        qw/croak/;
 use Time::HiRes qw(time);
 use Try::Tiny;
 
-my $PUBLISHER_ACTION_TIMEOUT = 30;
+my $PUBLISHER_ACTION_TIMEOUT  = 30;
 my $PUBLISHER_CONNECT_TIMEOUT = 10;
 
 $Seq::Role::Message::LOG = Log::Fast->new(
@@ -87,11 +87,11 @@ has hasPublisher => (
 );
 
 sub initialize {
-  $debug       = 0;
-  $verbose     = 10000;
-  $publisher   = undef;
+  $debug                        = 0;
+  $verbose                      = 10000;
+  $publisher                    = undef;
   $lastPublisherInteractionTime = undef;
-  $messageBase = undef;
+  $messageBase                  = undef;
 }
 
 sub setLogPath {
@@ -169,14 +169,14 @@ sub publishMessage {
   # because predicates don't trigger builders, need to check hasPublisherAddress
   return unless $publisher;
 
-  if (time() - $lastPublisherInteractionTime >= $PUBLISHER_ACTION_TIMEOUT) {
+  if ( time() - $lastPublisherInteractionTime >= $PUBLISHER_ACTION_TIMEOUT ) {
     try {
       $publisher->disconnect();
       $publisher->connect();
     }
     catch {
       warn "Failed to connect to publisher: $_";
-      return;  # Exit the function if connection fails
+      return; # Exit the function if connection fails
     };
   }
 
@@ -207,14 +207,14 @@ sub publishProgress {
   # because predicates don't trigger builders, need to check hasPublisherAddress
   return unless $publisher;
 
-  if (time() - $lastPublisherInteractionTime >= $PUBLISHER_ACTION_TIMEOUT) {
+  if ( time() - $lastPublisherInteractionTime >= $PUBLISHER_ACTION_TIMEOUT ) {
     try {
       $publisher->disconnect();
       $publisher->connect();
     }
     catch {
       warn "Failed to connect to publisher: $_";
-      return;  # Exit the function if connection fails
+      return; # Exit the function if connection fails
     };
   }
 
