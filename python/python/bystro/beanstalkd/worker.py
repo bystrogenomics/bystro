@@ -29,7 +29,7 @@ from bystro.beanstalkd.messages import (
 executor = ThreadPoolExecutor(max_workers=1)
 
 BEANSTALK_ERR_TIMEOUT = "TIMED_OUT"
-QUEUE_RESERVE_JOB_TIMEOUT_TIME = int(os.getenv("BYSTRO_BEANSTALKD_RESERVE_JOB_TIMEOUT", "10"))
+QUEUE_RESERVE_JOB_TIMEOUT_TIME = int(os.getenv("BYSTRO_BEANSTALKD_RESERVE_JOB_TIMEOUT", "20"))
 
 # Must be larger than JOB_TIMEOUT_TIME
 QUEUE_CONSUMER_SOCKET_TIMEOUT = int(os.getenv("BYSTRO_BEANSTALKD_CONSUMER_SOCKET_TIMEOUT", "30"))
@@ -205,13 +205,13 @@ def listen(
             traceback.print_exc()
 
             if client is None:
-                print("Couldn't connect to Beanstalkd server, sleeping for 10s", file=sys.stderr)
-                time.sleep(10)
+                print("Couldn't connect to Beanstalkd server, sleeping for 5s", file=sys.stderr)
+                time.sleep(5)
                 continue
 
             if job is None:
-                print("Couldn't reserve job, sleeping for 10s", file=sys.stderr)
-                time.sleep(10)
+                print("Couldn't reserve job, sleeping for 1s", file=sys.stderr)
+                time.sleep(1)
                 continue
 
             client.release_job(job.job_id)
