@@ -66,13 +66,15 @@ def test_index_job_data_camel_decamel():
 def test_index_job_results_camel_decamel():
     job_results = IndexJobResults(
         index_config_path="index_config_path",
-        field_names=["field1", "field2"]
+        field_names=["field1", "field2"],
+        total_indexed=100,
     )
 
     serialized_values = json.encode(job_results)
     expected_value = {
         "indexConfigPath": "index_config_path",
-        "fieldNames": ["field1", "field2"]
+        "fieldNames": ["field1", "field2"],
+        "totalIndexed": 100,
     }
     serialized_expected_value = json.encode(expected_value)
 
@@ -84,7 +86,8 @@ def test_index_job_results_camel_decamel():
 def test_index_job_complete_message_camel_decamel():
     job_results = IndexJobResults(
         index_config_path="index_config_path",
-        field_names=["field1", "field2"]
+        field_names=["field1", "field2"],
+        total_indexed=100,
     )
     completed_msg = IndexJobCompleteMessage(
         submission_id="foo",
@@ -97,7 +100,8 @@ def test_index_job_complete_message_camel_decamel():
         "event": "completed",
         "results": {
             "indexConfigPath": "index_config_path",
-            "fieldNames": ["field1", "field2"]
+            "fieldNames": ["field1", "field2"],
+            "totalIndexed": 100,
         }
     }
     serialized_expected_value = json.encode(expected_value)
