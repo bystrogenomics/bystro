@@ -367,7 +367,7 @@ sub annotateFile {
   }
 
   # Force flush
-  $progressFunc->( 0, 0, undef, undef, 1 );
+  my ($totalAnnotated, $totalSkipped) = $progressFunc->( 0, 0, undef, undef, 1 );
 
   MCE::Loop::finish();
 
@@ -586,7 +586,7 @@ sub annotateFile {
     return ( $humanErr, undef );
   }
 
-  return ( $err, $self->outputFilesInfo );
+  return ( $err, $self->outputFilesInfo, $totalAnnotated, $totalSkipped );
 }
 
 sub makeLogProgressAndPrint {
@@ -603,22 +603,23 @@ sub makeLogProgressAndPrint {
   if ( !$throttleThreshold ) {
     $throttleThreshold = 1e4;
   }
+
   return sub {
     #<Int>$annotatedCount, <Int>$skipCount, <Str>$err, <Str>$outputLines, <Bool> $forcePublish = @_;
     ##    $_[0],          $_[1]           , $_[2],     $_[3].           , $_[4]
     if ( $_[2] ) {
       $$abortErrRef = $_[2];
-      return;
+      return ($totalAnnotated, $totalSkipped);
     }
+
+    $totalAnnotated +=  $_[0];
+    $totalSkipped  += $_[1];
 
     if ($publish) {
       $thresholdAnn     += $_[0];
       $thresholdSkipped += $_[1];
 
       if ( $_[4] || $thresholdAnn + $thresholdSkipped >= $throttleThreshold ) {
-        $totalAnnotated += $thresholdAnn;
-        $totalSkipped   += $thresholdSkipped;
-
         $self->publishProgress( $totalAnnotated, $totalSkipped );
 
         $thresholdAnn     = 0;
@@ -633,6 +634,8 @@ sub makeLogProgressAndPrint {
 
       print $outFh $_[3];
     }
+
+    return ($totalAnnotated, $totalSkipped);
   }
 }
 

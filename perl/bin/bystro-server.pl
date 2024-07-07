@@ -125,7 +125,7 @@ while (1) {
   # prevents anything within the try from executing
 
   my $jobDataHref;
-  my ( $err, $outputFileNamesHashRef );
+  my ( $err, $outputFileNamesHashRef, $totalAnnotated, $totalSkipped );
 
   try {
     $jobDataHref = decode_json( $job->data );
@@ -168,7 +168,8 @@ while (1) {
 
     my $annotate_instance = Seq->new_with_config($inputHref);
 
-    ( $err, $outputFileNamesHashRef ) = $annotate_instance->annotate();
+    ( $err, $outputFileNamesHashRef, $totalAnnotated, $totalSkipped ) =
+      $annotate_instance->annotate();
   }
   catch {
     $err = $_;
@@ -197,7 +198,8 @@ while (1) {
       say STDERR "Beanstalkd last error: " . $beanstalkEvents->error;
     }
 
-    my $socket = $job->client->connect( $conf->{beanstalkd}{addresses}[0], $BEANSTALKD_CONNECT_TIMEOUT );
+    my $socket = $job->client->connect( $conf->{beanstalkd}{addresses}[0],
+      $BEANSTALKD_CONNECT_TIMEOUT );
 
     if ( $job->client->error ) {
       say STDERR "Failed to connect to queue server with error " . $job->client->error;
@@ -222,7 +224,11 @@ while (1) {
     event        => $COMPLETED,
     queueId      => $job->id,
     submissionId => $jobDataHref->{submissionId},
-    results      => { outputFileNames => $outputFileNamesHashRef, }
+    results      => {
+      outputFileNames => $outputFileNamesHashRef,
+      totalAnnotated  => $totalAnnotated,
+      totalSkipped    => $totalSkipped
+    }
   };
 
   if ( defined $debug ) {
@@ -241,7 +247,8 @@ while (1) {
     say STDERR "Beanstalkd last error: " . $beanstalkEvents->error;
   }
 
-  my $socket = $job->client->connect( $conf->{beanstalkd}{addresses}[0], $BEANSTALKD_CONNECT_TIMEOUT );
+  my $socket = $job->client->connect( $conf->{beanstalkd}{addresses}[0],
+    $BEANSTALKD_CONNECT_TIMEOUT );
 
   if ( $job->client->error ) {
     say STDERR "Failed to connect to queue server with error " . $job->client->error;

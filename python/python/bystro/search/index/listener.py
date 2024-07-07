@@ -15,14 +15,23 @@ from bystro.beanstalkd.worker import ProgressPublisher, QueueConf, listen
 from bystro.search.utils.annotation import get_config_file_path
 from bystro.search.utils.messages import IndexJobCompleteMessage, IndexJobData, IndexJobResults
 
-from msgspec import json
+from msgspec import json, Struct
 
 TUBE = "index"
 
 _INDEXER_BINARY = "opensearch"
 
 
-def run_binary_with_args(binary_path: str, args: list[str]) -> list[str]:
+class IndexerReturnData(Struct, frozen=True, forbid_unknown_fields=True, rename="camel"):
+    """
+    The return data from the indexer binary.
+    """
+
+    header: list[str]
+    total_indexed: int
+
+
+def run_binary_with_args(binary_path: str, args: list[str]) -> IndexerReturnData:
     """
     Run a binary with the specified arguments and return the output as a list of strings.
 
@@ -48,9 +57,9 @@ def run_binary_with_args(binary_path: str, args: list[str]) -> list[str]:
     if process.returncode != 0 or stderr:
         raise RuntimeError(f"Binary execution failed: {stderr}")
 
-    header_fields = stdout
+    return_data = stdout
 
-    return json.decode(header_fields, type=list[str])
+    return json.decode(return_data, type=IndexerReturnData)
 
 
 def run_handler_with_config(
@@ -61,7 +70,7 @@ def run_handler_with_config(
     no_queue: bool = False,
     submission_id: SubmissionID | None = None,
     queue_config: str | None = None,
-) -> list[str]:
+) -> IndexerReturnData:
     """
     Run the handler with the specified configuration.
 
@@ -77,7 +86,7 @@ def run_handler_with_config(
             The path to the queue configuration file. Required when no_queue is not False (optional).
 
     Returns:
-        list[str]: The header fields.
+        IndexerReturnData: The header fields.
 
     Raises:
         ValueError: If submission_id and queue_config are not specified when no_queue is not False.
@@ -108,9 +117,7 @@ def run_handler_with_config(
         args.append("--job-submission-id")
         args.append(str(submission_id))
 
-    header_fields = run_binary_with_args(_INDEXER_BINARY, args)
-
-    return header_fields
+    return run_binary_with_args(_INDEXER_BINARY, args)
 
 
 def main():
@@ -143,13 +150,13 @@ def main():
     with open(args.queue_conf, "r", encoding="utf-8") as queue_config_file:
         queue_conf_deserialized = YAML(typ="safe").load(queue_config_file)
 
-    def handler_fn(_: ProgressPublisher, beanstalkd_job_data: IndexJobData) -> list[str]:
+    def handler_fn(_: ProgressPublisher, beanstalkd_job_data: IndexJobData) -> IndexerReturnData:
         inputs = beanstalkd_job_data.input_file_names
 
         annotation_path = os.path.join(beanstalkd_job_data.input_dir, inputs.annotation)
         m_path = get_config_file_path(conf_dir, beanstalkd_job_data.assembly, ".mapping.y*ml")
 
-        header_fields = run_handler_with_config(
+        return run_handler_with_config(
             index_name=beanstalkd_job_data.index_name,
             submission_id=beanstalkd_job_data.submission_id,
             mapping_config=m_path,
@@ -158,12 +165,10 @@ def main():
             annotation_path=annotation_path,
         )
 
-        return header_fields
-
     def submit_msg_fn(job_data: IndexJobData):
         return SubmittedJobMessage(job_data.submission_id)
 
-    def completed_msg_fn(job_data: IndexJobData, field_names: list[str]):
+    def completed_msg_fn(job_data: IndexJobData, return_data: IndexerReturnData):
         mapping_config_path = get_config_file_path(conf_dir, job_data.assembly, ".mapping.y*ml")
 
         # Write mapping config path to the job data out_dir directory
@@ -174,7 +179,11 @@ def main():
 
         return IndexJobCompleteMessage(
             submission_id=job_data.submission_id,
-            results=IndexJobResults(map_config_basename, field_names),
+            results=IndexJobResults(
+                index_config_path=map_config_basename,
+                field_names=return_data.header,
+                total_indexed=return_data.total_indexed,
+            ),
         )  # noqa: E501
 
     listen(
