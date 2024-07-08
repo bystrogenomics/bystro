@@ -19,7 +19,6 @@ from bystro.beanstalkd.worker import (
 )
 from bystro.beanstalkd.messages import SubmittedJobMessage
 from bystro.search.save.handler import go
-from bystro.search.utils.annotation import AnnotationOutputs
 from bystro.search.utils.messages import SaveJobCompleteMessage, SaveJobData, SaveJobResults
 
 logging.basicConfig(
@@ -77,9 +76,9 @@ def main():
     def submit_msg_fn(job_data: SaveJobData):
         return SubmittedJobMessage(submission_id=job_data.submission_id)
 
-    def completed_msg_fn(job_data: SaveJobData, results: AnnotationOutputs) -> SaveJobCompleteMessage:
+    def completed_msg_fn(job_data: SaveJobData, results: SaveJobResults) -> SaveJobCompleteMessage:
         return SaveJobCompleteMessage(
-            submission_id=job_data.submission_id, results=SaveJobResults(results)
+            submission_id=job_data.submission_id, results=results
         )
 
     listen(
