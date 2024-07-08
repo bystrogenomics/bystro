@@ -200,14 +200,15 @@ sub annotate {
   }
 
   my $annotator = Seq->new_with_config($args);
-  my ( $err, $results ) = $annotator->annotate();
+  my ( $err, $results, $totalProgress, $totalSkipped ) = $annotator->annotate();
 
   if ($err) {
     say STDERR "\nError: $err\n";
     exit(1);
   }
 
-  say "\nCompleted successfully! Results:\n";
+  say
+    "\nCompleted successfully! Total Annotated: $totalProgress. Total Skipped: $totalSkipped. Results:\n";
   say JSON::XS->new->pretty(1)->encode($results);
   say "";
 }

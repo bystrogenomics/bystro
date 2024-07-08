@@ -71,7 +71,13 @@ if ( !$queueConfig ) {
 
 say "Running Annotation queue server";
 
-my $BEANSTALKD_TIMEOUT = 60;
+my $BEANSTALKD_RESERVE_TIMEOUT = 10;
+# Needs to be larger than RESERVE_TIMEOUT
+# Used for both producer and consumer clients
+# We give move time for the producer to connect
+# Than in Message.pm, because these messages indiciate job success/failure,
+# And therefore is more important than progress updates
+my $BEANSTALKD_CONNECT_TIMEOUT = 30;
 
 sub _get_consumer_client {
   my $server_address = shift;
@@ -81,7 +87,7 @@ sub _get_consumer_client {
     {
       server          => $server_address,
       default_tube    => $tube,
-      connect_timeout => 10,
+      connect_timeout => $BEANSTALKD_CONNECT_TIMEOUT,
       encoder         => sub { encode_json( \@_ ) },
       decoder         => sub { @{ decode_json(shift) } },
     }
@@ -96,7 +102,7 @@ sub _get_producer_client {
     {
       server          => $server_address,
       default_tube    => $tube,
-      connect_timeout => 10,
+      connect_timeout => $BEANSTALKD_CONNECT_TIMEOUT,
       encoder         => sub { encode_json( \@_ ) },
       decoder         => sub { @{ decode_json(shift) } },
     }
@@ -107,7 +113,7 @@ while (1) {
   my $beanstalk = _get_consumer_client( $conf->{beanstalkd}{addresses}[0],
     $queueConfig->{submission} );
 
-  my $job = $beanstalk->reserve($BEANSTALKD_TIMEOUT);
+  my $job = $beanstalk->reserve($BEANSTALKD_RESERVE_TIMEOUT);
 
   if ( !$job ) {
     next;
@@ -119,7 +125,7 @@ while (1) {
   # prevents anything within the try from executing
 
   my $jobDataHref;
-  my ( $err, $outputFileNamesHashRef );
+  my ( $err, $outputFileNamesHashRef, $totalAnnotated, $totalSkipped );
 
   try {
     $jobDataHref = decode_json( $job->data );
@@ -155,6 +161,10 @@ while (1) {
       }
     );
 
+    if ( $beanstalkEvents->error ) {
+      say STDERR "Failed to send started message: " . $beanstalkEvents->error;
+    }
+
     if ($debug) {
       say "job " . $job->id . " starting with inputHref:";
       p $inputHref;
@@ -162,7 +172,8 @@ while (1) {
 
     my $annotate_instance = Seq->new_with_config($inputHref);
 
-    ( $err, $outputFileNamesHashRef ) = $annotate_instance->annotate();
+    ( $err, $outputFileNamesHashRef, $totalAnnotated, $totalSkipped ) =
+      $annotate_instance->annotate();
   }
   catch {
     $err = $_;
@@ -187,11 +198,17 @@ while (1) {
 
     $beanstalkEvents->put( { priority => 0, data => encode_json($data) } );
 
+    # The API server relies on failure or completion messages to know when a job is done
+    # If we did not successfully send a failure mesage, we must attempt to release the job
+    # for reprocessing; else the API server will never know the job failed and the job will be lost
+    my $jobShouldBeReleased = 0;
     if ( $beanstalkEvents->error ) {
-      say STDERR "Beanstalkd last error: " . $beanstalkEvents->error;
+      $jobShouldBeReleased = 1;
+      say STDERR "Failed to send $FAILED message due to: " . $beanstalkEvents->error;
     }
 
-    my $socket = $job->client->connect( $conf->{beanstalkd}{addresses}[0], 10 );
+    my $socket = $job->client->connect( $conf->{beanstalkd}{addresses}[0],
+      $BEANSTALKD_CONNECT_TIMEOUT );
 
     if ( $job->client->error ) {
       say STDERR "Failed to connect to queue server with error " . $job->client->error;
@@ -200,10 +217,19 @@ while (1) {
       say STDERR "Failed to connect to queue server for an unknown reason";
     }
 
-    $job->delete();
+    if ($jobShouldBeReleased) {
+      say STDERR "Releasing job "
+        . $job->id
+        . " because we failed to send $FAILED message";
+      $job->release();
+    }
+    else {
+      say "Deleting job with id " . $job->id;
+      $job->delete();
+    }
 
     if ( $job->client->error ) {
-      say STDERR "Failed to delete job with id "
+      say STDERR "Failed to release or delete job with id "
         . $job->id
         . " with error "
         . $job->client->error;
@@ -216,11 +242,15 @@ while (1) {
     event        => $COMPLETED,
     queueId      => $job->id,
     submissionId => $jobDataHref->{submissionId},
-    results      => { outputFileNames => $outputFileNamesHashRef, }
+    results      => {
+      outputFileNames => $outputFileNamesHashRef,
+      totalAnnotated  => $totalAnnotated,
+      totalSkipped    => $totalSkipped
+    }
   };
 
   if ( defined $debug ) {
-    say "putting completion event";
+    say "Finished job with id " . $job->id . " with data:";
     p $data;
   }
 
@@ -231,11 +261,17 @@ while (1) {
   # To be conservative; since after delete message is lost
   $beanstalkEvents->put( { priority => 0, data => encode_json($data) } );
 
+  # If we did not successfully send a completion mesage, we must attempt to release the job
+  # for reprocessing; else the API server will never know the job completed and the job will be lost
+  my $jobShouldBeReleased = 0;
   if ( $beanstalkEvents->error ) {
-    say STDERR "Beanstalkd last error: " . $beanstalkEvents->error;
+    say STDERR "Releasing job because we failed to put the completion message: "
+      . $beanstalkEvents->error;
+    $jobShouldBeReleased = 1;
   }
 
-  my $socket = $job->client->connect( $conf->{beanstalkd}{addresses}[0], 10 );
+  my $socket = $job->client->connect( $conf->{beanstalkd}{addresses}[0],
+    $BEANSTALKD_CONNECT_TIMEOUT );
 
   if ( $job->client->error ) {
     say STDERR "Failed to connect to queue server with error " . $job->client->error;
@@ -244,16 +280,23 @@ while (1) {
     say STDERR "Failed to connect to queue server for an unknown reason";
   }
 
-  $job->delete();
-
-  if ( $job->client->error ) {
-    say STDERR "Failed to delete job with id "
+  if ($jobShouldBeReleased) {
+    say STDERR "Releasing job "
       . $job->id
-      . " with error "
-      . $job->client->error;
+      . " because we failed to send $COMPLETED message";
+    $job->release();
+  }
+  else {
+    say "Deleting job with id " . $job->id;
+    $job->delete();
   }
 
-  say "completed job with queue id " . $job->id;
+  if ( $job->client->error ) {
+    say STDERR "Failed to delete or release job with id "
+      . $job->id
+      . " due to error "
+      . $job->client->error;
+  }
 }
 
 sub coerceInputs {

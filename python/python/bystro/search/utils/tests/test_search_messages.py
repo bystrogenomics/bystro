@@ -66,13 +66,15 @@ def test_index_job_data_camel_decamel():
 def test_index_job_results_camel_decamel():
     job_results = IndexJobResults(
         index_config_path="index_config_path",
-        field_names=["field1", "field2"]
+        field_names=["field1", "field2"],
+        total_indexed=100,
     )
 
     serialized_values = json.encode(job_results)
     expected_value = {
         "indexConfigPath": "index_config_path",
-        "fieldNames": ["field1", "field2"]
+        "fieldNames": ["field1", "field2"],
+        "totalIndexed": 100,
     }
     serialized_expected_value = json.encode(expected_value)
 
@@ -84,7 +86,8 @@ def test_index_job_results_camel_decamel():
 def test_index_job_complete_message_camel_decamel():
     job_results = IndexJobResults(
         index_config_path="index_config_path",
-        field_names=["field1", "field2"]
+        field_names=["field1", "field2"],
+        total_indexed=100,
     )
     completed_msg = IndexJobCompleteMessage(
         submission_id="foo",
@@ -97,7 +100,8 @@ def test_index_job_complete_message_camel_decamel():
         "event": "completed",
         "results": {
             "indexConfigPath": "index_config_path",
-            "fieldNames": ["field1", "field2"]
+            "fieldNames": ["field1", "field2"],
+            "totalIndexed": 100,
         }
     }
     serialized_expected_value = json.encode(expected_value)
@@ -172,7 +176,9 @@ def test_save_job_results_camel_decamel():
             dosage_matrix_out_path="dosage_matrix_out_path",
             header="header",
             archived=None,
-        )
+        ),
+        total_annotated=100,
+        total_skipped=10,
     )
 
     serialized_values = json.encode(job_results)
@@ -190,7 +196,9 @@ def test_save_job_results_camel_decamel():
             "dosageMatrixOutPath": "dosage_matrix_out_path",
             "header": "header",
             "archived": None,
-        }
+        },
+        "totalAnnotated": 100,
+        "totalSkipped": 10,
     }
     serialized_expected_value = json.encode(expected_value)
 
@@ -210,7 +218,9 @@ def test_save_job_complete_message_camel_decamel():
             dosage_matrix_out_path="dosage_matrix_out_path",
             header="header",
             archived=None,
-        )
+        ),
+        total_annotated=100,
+        total_skipped=10,
     )
     completed_msg = SaveJobCompleteMessage(
         submission_id="submit1",
@@ -235,7 +245,9 @@ def test_save_job_complete_message_camel_decamel():
                 "dosageMatrixOutPath": "dosage_matrix_out_path",
                 "header": "header",
                 "archived": None,
-            }
+            },
+            "totalAnnotated": 100,
+            "totalSkipped": 10,
         }
     }
     serialized_expected_value = json.encode(expected_value)

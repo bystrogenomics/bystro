@@ -31,6 +31,7 @@ type StringMessage struct {
 
 type MessageSender interface {
 	SetProgress(progress int)
+	GetProgress() int
 	SendMessage()
 	SendStringMessage(message string)
 	Close() error
@@ -93,8 +94,16 @@ func (b *BeanstalkdMessageSender) SetProgress(progress int) {
 	b.Message.Data.Progress = progress
 }
 
+func (b *BeanstalkdMessageSender) GetProgress() int {
+	return b.Message.Data.Progress
+}
+
 func (d *DebugMessageSender) SetProgress(progress int) {
 	d.Message.Data.Progress = progress
+}
+
+func (d *DebugMessageSender) GetProgress() int {
+	return d.Message.Data.Progress
 }
 
 func (b *BeanstalkdMessageSender) Close() error {

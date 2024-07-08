@@ -197,10 +197,16 @@ func main() {
 		log.Fatalf("Error completing index request due to: [%s]\n", err)
 	}
 
-	marshalledHeaderFields, err := sonic.Marshal(headerFields)
+	// Return JSON of header fields and progressSender.Data.Progress and progressSender.Data.Skipped
+	returnMsgJson, err := sonic.Marshal(
+		map[string]interface{}{
+			"header":       headerFields,
+			"totalIndexed": progressSender.GetProgress(),
+		},
+	)
 	if err != nil {
-		log.Fatalf("Marshaling failed of header fields: [%s]\n", err)
+		// Handle error
+		log.Fatalf("Error marshaling JSON: %v", err)
 	}
-
-	fmt.Print(string(marshalledHeaderFields))
+	fmt.Print(string(returnMsgJson))
 }
