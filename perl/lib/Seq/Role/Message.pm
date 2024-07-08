@@ -24,9 +24,9 @@ use Carp        qw/croak/;
 use Time::HiRes qw(time);
 use Try::Tiny;
 
-my $PUBLISHER_ACTION_TIMEOUT        = 30;
-my $PUBLISHER_CONNECT_TIMEOUT       = 10;
-my $MAX_PUT_MESSAGE_TIMEOUT         = 5;
+my $PUBLISHER_ACTION_TIMEOUT  = 30;
+my $PUBLISHER_CONNECT_TIMEOUT = 10;
+my $MAX_PUT_MESSAGE_TIMEOUT   = 5;
 # How many consecutive failures to connect to the publisher before we stop trying
 my $MAX_PUBLISHER_FAILURES_IN_A_ROW = 5;
 
