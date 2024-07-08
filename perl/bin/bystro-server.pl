@@ -27,11 +27,10 @@ use YAML::XS qw/LoadFile/;
 use Seq;
 use Path::Tiny qw/path/;
 
-my ( $verbose, $queueConfigPath, $maxThreads, $debug );
+my ( $verbose, $queueConfigPath, $maxThreads );
 
 GetOptions(
   'v|verbose=i'     => \$verbose,
-  'd|debug'         => \$debug,
   'q|queueConfig=s' => \$queueConfigPath,
   'maxThreads=i'    => \$maxThreads,
 );
@@ -79,13 +78,13 @@ my $BEANSTALKD_RESERVE_TIMEOUT = 10;
 # And therefore is more important than progress updates
 my $BEANSTALKD_CONNECT_TIMEOUT = 30;
 
-sub _get_consumer_client {
-  my $server_address = shift;
+sub _getConsumerClient {
+  my $address = shift;
   my $tube           = shift;
 
   return Beanstalk::Client->new(
     {
-      server          => $server_address,
+      server          => $address,
       default_tube    => $tube,
       connect_timeout => $BEANSTALKD_CONNECT_TIMEOUT,
       encoder         => sub { encode_json( \@_ ) },
@@ -94,13 +93,13 @@ sub _get_consumer_client {
   );
 }
 
-sub _get_producer_client {
-  my $server_address = shift;
+sub _getProducerClient {
+  my $address = shift;
   my $tube           = shift;
 
   return Beanstalk::Client->new(
     {
-      server          => $server_address,
+      server          => $address,
       default_tube    => $tube,
       connect_timeout => $BEANSTALKD_CONNECT_TIMEOUT,
       encoder         => sub { encode_json( \@_ ) },
@@ -109,169 +108,10 @@ sub _get_producer_client {
   );
 }
 
-while (1) {
-  my $beanstalk = _get_consumer_client( $conf->{beanstalkd}{addresses}[0],
-    $queueConfig->{submission} );
-
-  my $job = $beanstalk->reserve($BEANSTALKD_RESERVE_TIMEOUT);
-
-  if ( !$job ) {
-    next;
-  }
-  # Parallel ForkManager used only to throttle number of jobs run in parallel
-  # cannot use run_on_finish with blocking reserves, use try catch instead
-  # Also using forks helps clean up leaked memory from LMDB_File
-  # Unfortunately, parallel fork manager doesn't play nicely with try tiny
-  # prevents anything within the try from executing
-
-  my $jobDataHref;
-  my ( $err, $outputFileNamesHashRef, $totalAnnotated, $totalSkipped );
-
-  try {
-    $jobDataHref = decode_json( $job->data );
-
-    if ( defined $debug ) {
-      say "Reserved job with id " . $job->id . " which contains:";
-      p $jobDataHref;
-
-      my $stats = $job->stats();
-      say "stats are";
-      p $stats;
-    }
-
-    ( $err, my $inputHref ) = coerceInputs( $jobDataHref, $job->id );
-
-    if ($err) {
-      die $err;
-    }
-
-    my $beanstalkEvents =
-      _get_producer_client( $conf->{beanstalkd}{addresses}[0], $queueConfig->{events} );
-
-    $beanstalkEvents->put(
-      {
-        priority => 0,
-        data     => encode_json(
-          {
-            event        => $STARTED,
-            submissionId => $jobDataHref->{submissionId},
-            queueId      => $job->id,
-          }
-        )
-      }
-    );
-
-    if ( $beanstalkEvents->error ) {
-      say STDERR "Failed to send started message: " . $beanstalkEvents->error;
-    }
-
-    if ($debug) {
-      say "job " . $job->id . " starting with inputHref:";
-      p $inputHref;
-    }
-
-    my $annotate_instance = Seq->new_with_config($inputHref);
-
-    ( $err, $outputFileNamesHashRef, $totalAnnotated, $totalSkipped ) =
-      $annotate_instance->annotate();
-  }
-  catch {
-    $err = $_;
-  };
-
-  if ($err) {
-    say STDERR $err;
-
-    $err =~ s/\sat\s\w+\/\w+.*\sline\s\d+.*//;
-
-    say "job " . $job->id . " failed";
-
-    my $data = {
-      event        => $FAILED,
-      reason       => $err,
-      queueId      => $job->id,
-      submissionId => $jobDataHref->{submissionId},
-    };
-
-    my $beanstalkEvents =
-      _get_producer_client( $conf->{beanstalkd}{addresses}[0], $queueConfig->{events} );
-
-    $beanstalkEvents->put( { priority => 0, data => encode_json($data) } );
-
-    # The API server relies on failure or completion messages to know when a job is done
-    # If we did not successfully send a failure mesage, we must attempt to release the job
-    # for reprocessing; else the API server will never know the job failed and the job will be lost
-    my $jobShouldBeReleased = 0;
-    if ( $beanstalkEvents->error ) {
-      $jobShouldBeReleased = 1;
-      say STDERR "Failed to send $FAILED message due to: " . $beanstalkEvents->error;
-    }
-
-    my $socket = $job->client->connect( $conf->{beanstalkd}{addresses}[0],
-      $BEANSTALKD_CONNECT_TIMEOUT );
-
-    if ( $job->client->error ) {
-      say STDERR "Failed to connect to queue server with error " . $job->client->error;
-    }
-    elsif ( !$socket ) {
-      say STDERR "Failed to connect to queue server for an unknown reason";
-    }
-
-    if ($jobShouldBeReleased) {
-      say STDERR "Releasing job "
-        . $job->id
-        . " because we failed to send $FAILED message";
-      $job->release();
-    }
-    else {
-      say "Deleting job with id " . $job->id;
-      $job->delete();
-    }
-
-    if ( $job->client->error ) {
-      say STDERR "Failed to release or delete job with id "
-        . $job->id
-        . " with error "
-        . $job->client->error;
-    }
-
-    next;
-  }
-
-  my $data = {
-    event        => $COMPLETED,
-    queueId      => $job->id,
-    submissionId => $jobDataHref->{submissionId},
-    results      => {
-      outputFileNames => $outputFileNamesHashRef,
-      totalAnnotated  => $totalAnnotated,
-      totalSkipped    => $totalSkipped
-    }
-  };
-
-  if ( defined $debug ) {
-    say "Finished job with id " . $job->id . " with data:";
-    p $data;
-  }
-
-  my $beanstalkEvents =
-    _get_producer_client( $conf->{beanstalkd}{addresses}[0], $queueConfig->{events} );
-
-  # Signal completion before completion actually occurs via delete
-  # To be conservative; since after delete message is lost
-  $beanstalkEvents->put( { priority => 0, data => encode_json($data) } );
-
-  # If we did not successfully send a completion mesage, we must attempt to release the job
-  # for reprocessing; else the API server will never know the job completed and the job will be lost
-  my $jobShouldBeReleased = 0;
-  if ( $beanstalkEvents->error ) {
-    say STDERR "Releasing job because we failed to put the completion message: "
-      . $beanstalkEvents->error;
-    $jobShouldBeReleased = 1;
-  }
-
-  my $socket = $job->client->connect( $conf->{beanstalkd}{addresses}[0],
-    $BEANSTALKD_CONNECT_TIMEOUT );
+sub connectJob {
+  my $job = shift;
+  my $address = shift;
+  my $socket = $job->client->connect( $address, $BEANSTALKD_CONNECT_TIMEOUT );
 
   if ( $job->client->error ) {
     say STDERR "Failed to connect to queue server with error " . $job->client->error;
@@ -279,24 +119,162 @@ while (1) {
   elsif ( !$socket ) {
     say STDERR "Failed to connect to queue server for an unknown reason";
   }
+}
 
-  if ($jobShouldBeReleased) {
-    say STDERR "Releasing job "
-      . $job->id
-      . " because we failed to send $COMPLETED message";
-    $job->release();
-  }
-  else {
-    say "Deleting job with id " . $job->id;
-    $job->delete();
-  }
+# Function to execute Beanstalkd command with timeout
+sub executeWithTimeout {
+    my ($timeout, $cmdRef, @args) = @_;
+    eval {
+        local $SIG{ALRM} = sub { die "TIMED_OUT_CLIENT_SIDE" };
+        alarm($timeout);
+        $cmdRef->(@args);
+        alarm(0);
+    };
+    return $@ if $@;
+    return;
+}
 
-  if ( $job->client->error ) {
-    say STDERR "Failed to delete or release job with id "
-      . $job->id
-      . " due to error "
-      . $job->client->error;
-  }
+sub putWithTimeout {
+    my ($publisher, $timeout, @args) = @_;
+    return executeWithTimeout($timeout, sub { $publisher->put(@args) });
+}
+
+sub reserveWithTimeout {
+    my ($consumer, $timeout) = @_;
+    my $result;
+    # We need to double the timeout because the reserve command will block until a job is available
+    # And we only want to error if the beanstalkd server timeout isn't respected
+    my $err = executeWithTimeout($timeout * 2, sub { $result = $consumer->reserve($timeout) });
+    return ($result, $err);
+}
+
+sub deleteWithTimeout {
+    my ($job, $timeout) = @_;
+    return executeWithTimeout($timeout, sub { $job->delete() });
+}
+
+sub releaseWithTimeout {
+    my ($job, $timeout) = @_;
+    return executeWithTimeout($timeout, sub { $job->release() });
+}
+
+
+sub handleJobFailure {
+    my ($job, $address, $err, $jobDataHref) = @_;
+    say STDERR $err;
+    $err =~ s/\sat\s\w+\/\w+.*\sline\s\d+.*//;
+    say "job " . $job->id . " failed";
+
+    my $data = { event => $FAILED, reason => $err, queueId => $job->id, submissionId => $jobDataHref->{submissionId} };
+    my $beanstalkEvents = _getProducerClient($conf->{beanstalkd}{addresses}[0], $queueConfig->{events});
+    my $error = putWithTimeout($beanstalkEvents, $BEANSTALKD_RESERVE_TIMEOUT, { priority => 0, data => encode_json($data) });
+
+    if ($error) {
+        say STDERR "Failed to send $FAILED message due to: $error";
+    }
+
+    my $jobShouldBeReleased = $error ? 1 : 0;
+    connectJob($job, $address);
+    $error = releaseOrDeleteJob($job, $jobShouldBeReleased, $BEANSTALKD_RESERVE_TIMEOUT);
+
+    if ($error) {
+        say STDERR "Failed to release or delete job with id " . $job->id . " with error $error";
+    }
+}
+
+sub handleJobCompletion {
+    my ($job, $address, $jobDataHref, $outputFileNamesHashRef, $totalAnnotated, $totalSkipped) = @_;
+    my $data = { event => $COMPLETED, queueId => $job->id, submissionId => $jobDataHref->{submissionId}, results => { outputFileNames => $outputFileNamesHashRef, totalAnnotated => $totalAnnotated, totalSkipped => $totalSkipped } };
+
+    say "Finished job with id " . $job->id . " with data:";
+    p $data;
+
+    my $beanstalkEvents = _getProducerClient($conf->{beanstalkd}{addresses}[0], $queueConfig->{events});
+    my $error = putWithTimeout($beanstalkEvents, $BEANSTALKD_RESERVE_TIMEOUT, { priority => 0, data => encode_json($data) });
+
+    if ($error) {
+        say STDERR "Releasing job because we failed to put the completion message: $error";
+    }
+
+    my $jobShouldBeReleased = $error ? 1 : 0;
+    connectJob($job, $address);
+    $error = releaseOrDeleteJob($job, $jobShouldBeReleased, $BEANSTALKD_CONNECT_TIMEOUT);
+
+    if ($error) {
+        say STDERR "Failed to release or delete job with id " . $job->id . " with error $error";
+    }
+}
+
+sub releaseOrDeleteJob {
+    my ($job, $shouldRelease, $timeout) = @_;
+
+    if ($shouldRelease) {
+        return releaseWithTimeout($job, $timeout);
+    } else {
+        return deleteWithTimeout($job, $timeout);
+    }
+}
+
+# Main worker loop
+my $lastAddressIndex = 0;
+while (1) {
+    # round robin between beanstalkd servers, taking $conf->{beanstalkd}{addresses} in turn
+    # looping back to the first server after the last one
+    my $address = $conf->{beanstalkd}{addresses}[$lastAddressIndex];
+    $lastAddressIndex = ($lastAddressIndex + 1) % scalar(@{ $conf->{beanstalkd}{addresses} });
+
+    my $beanstalk = _getConsumerClient($address, $queueConfig->{submission});
+
+    my ($job, $err) = reserveWithTimeout($beanstalk, $BEANSTALKD_RESERVE_TIMEOUT);
+
+    if($err) {
+        say STDERR "Failed to reserve job: $err";
+        next;
+    }
+
+    if (!$job) {
+        say "No job available";
+        next;
+    }
+
+    my $jobDataHref;
+    my ($outputFileNamesHashRef, $totalAnnotated, $totalSkipped);
+
+    try {
+        $jobDataHref = decode_json($job->data);
+        say "Reserved job with id " . $job->id . " which contains:";
+        p $jobDataHref;
+
+        ($err, my $inputHref) = coerceInputs($jobDataHref, $job->id);
+        if ($err) {
+            die $err;
+        }
+
+        my $beanstalkEvents = _getProducerClient($address, $queueConfig->{events});
+        $err = putWithTimeout($beanstalkEvents, $BEANSTALKD_RESERVE_TIMEOUT, { priority => 0, data => encode_json({ event => $STARTED, submissionId => $jobDataHref->{submissionId}, queueId => $job->id }) });
+
+        # This error is less critical, because progress messages
+        # will set the API server state to "started"
+        if ($err) {
+            say STDERR "Failed to send started message: $err";
+        }
+
+        say "job " . $job->id . " starting with inputHref:";
+        p $inputHref;
+
+        my $annotateInstance = Seq->new_with_config($inputHref);
+        ($err, $outputFileNamesHashRef, $totalAnnotated, $totalSkipped) = $annotateInstance->annotate();
+    }
+    catch {
+        $err = $_;
+    };
+
+    if ($err) {
+        handleJobFailure($job, $address, $err, $jobDataHref);
+        next;
+    }
+
+    handleJobCompletion($job, $address, $jobDataHref, $outputFileNamesHashRef, $totalAnnotated, $totalSkipped);
 }
 
 sub coerceInputs {
