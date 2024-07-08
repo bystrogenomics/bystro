@@ -24,8 +24,11 @@ use Carp        qw/croak/;
 use Time::HiRes qw(time);
 use Try::Tiny;
 
-my $PUBLISHER_ACTION_TIMEOUT  = 30;
-my $PUBLISHER_CONNECT_TIMEOUT = 10;
+my $PUBLISHER_ACTION_TIMEOUT        = 30;
+my $PUBLISHER_CONNECT_TIMEOUT       = 10;
+my $MAX_PUT_MESSAGE_TIMEOUT         = 5;
+# How many consecutive failures to connect to the publisher before we stop trying
+my $MAX_PUBLISHER_FAILURES_IN_A_ROW = 3;
 
 $Seq::Role::Message::LOG = Log::Fast->new(
   {
@@ -63,6 +66,7 @@ state $verbose = 1000;
 state $publisher;
 state $messageBase;
 state $lastPublisherInteractionTime;
+state $publisherConsecutiveConnectionFailures = 0;
 
 # whether log level or verbosity is at the debug level
 # shoud only be accessed after setLogLevel and/or setVerbosity executed if program doesn't want default
@@ -87,11 +91,31 @@ has hasPublisher => (
 );
 
 sub initialize {
-  $debug                        = 0;
-  $verbose                      = 10000;
-  $publisher                    = undef;
-  $lastPublisherInteractionTime = undef;
-  $messageBase                  = undef;
+  $debug                                  = 0;
+  $verbose                                = 10000;
+  $publisher                              = undef;
+  $lastPublisherInteractionTime           = 0;
+  $publisherConsecutiveConnectionFailures = 0;
+  $messageBase                            = undef;
+}
+
+sub putMessageWithTimeout {
+  my ( $publisher, $timeout, @args ) = @_;
+
+  eval {
+    local $SIG{ALRM} = sub { die "TIMED_OUT_CLIENT_SIDE" };
+    alarm($timeout);
+
+    $publisher->put(@args); # Execute the passed function with arguments
+
+    alarm(0);               # Disable the alarm
+  };
+
+  if ($@) {
+    return $@;
+  }
+
+  return;
 }
 
 sub setLogPath {
@@ -156,9 +180,18 @@ sub setPublisher {
     }
   );
 
-  $lastPublisherInteractionTime = time();
+  $lastPublisherInteractionTime           = time();
+  $publisherConsecutiveConnectionFailures = 0;
 
   $messageBase = $publisherConfig->{messageBase};
+}
+
+sub _incrementPublishFailuresAndWarn {
+  $publisherConsecutiveConnectionFailures++;
+  if ( $publisherConsecutiveConnectionFailures >= $MAX_PUBLISHER_FAILURES_IN_A_ROW ) {
+    say STDERR
+      "Exceeded maximum number of progress publisher reconnection attempts. Disabling progress publisher until job completion.";
+  }
 }
 
 # note, accessing hash directly because traits don't work with Maybe types
@@ -166,72 +199,89 @@ sub publishMessage {
   # my ( $self, $msg ) = @_;
   # to save on perf, $_[0] == $self, $_[1] == $msg;
 
-  # because predicates don't trigger builders, need to check hasPublisherAddress
   return unless $publisher;
 
-  if ( time() - $lastPublisherInteractionTime >= $PUBLISHER_ACTION_TIMEOUT ) {
-    try {
-      $publisher->disconnect();
-      $publisher->connect();
+  if ( $publisherConsecutiveConnectionFailures >= $MAX_PUBLISHER_FAILURES_IN_A_ROW ) {
+    return;
+  }
+
+  my $timeSinceLastInteraction = time() - $lastPublisherInteractionTime;
+  if ( $timeSinceLastInteraction >= $PUBLISHER_ACTION_TIMEOUT ) {
+    say
+      "Attempting to reconnect progress publisher because time since last interaction is $timeSinceLastInteraction seconds.";
+
+    $publisher->disconnect();
+    $publisher->connect();
+
+    # Ensure that we space apart reconnection attempts
+    $lastPublisherInteractionTime = time();
+
+    if ( $publisher->error ) {
+      say STDERR "Failed to connect to progress publisher server: " . $publisher->error;
+
+      _incrementPublishFailuresAndWarn();
+      return;
     }
-    catch {
-      warn "Failed to connect to publisher: $_";
-      return; # Exit the function if connection fails
-    };
+
+    $publisherConsecutiveConnectionFailures = 0;
   }
 
   $messageBase->{data} = $_[1];
 
-  try {
-    $publisher->put(
-      {
-        priority => 0,
-        data     => encode_json($messageBase),
-      }
-    );
-  }
-  catch {
-    warn "Failed to publish message: $_";
+  my $error = putMessageWithTimeout( $publisher, $MAX_PUT_MESSAGE_TIMEOUT,
+    { priority => 0, data => encode_json($messageBase) } );
+
+  if ( $error || $publisher->error ) {
+    my $err = $publisher->error ? $publisher->error : $error;
+    say STDERR "Failed to publish message: " . $err;
+
     return;
-  };
+  }
 
   $lastPublisherInteractionTime = time();
-
-  return;
 }
 
 sub publishProgress {
   # my ( $self, $annotatedCount, $skippedCount ) = @_;
   #     $_[0],  $_[1],           $_[2]
 
-  # because predicates don't trigger builders, need to check hasPublisherAddress
   return unless $publisher;
 
-  if ( time() - $lastPublisherInteractionTime >= $PUBLISHER_ACTION_TIMEOUT ) {
-    try {
-      $publisher->disconnect();
-      $publisher->connect();
+  if ( $publisherConsecutiveConnectionFailures >= $MAX_PUBLISHER_FAILURES_IN_A_ROW ) {
+    return;
+  }
+
+  my $timeSinceLastInteraction = time() - $lastPublisherInteractionTime;
+  if ( $timeSinceLastInteraction >= $PUBLISHER_ACTION_TIMEOUT ) {
+    say
+      "Attempting to reconnect progress publisher because time since last interaction is $timeSinceLastInteraction seconds.";
+
+    $publisher->disconnect();
+    $publisher->connect();
+
+    # Ensure that we space apart reconnection attempts
+    $lastPublisherInteractionTime = time();
+
+    if ( $publisher->error ) {
+      say STDERR "Failed to connect to progress publisher server: " . $publisher->error;
+
+      _incrementPublishFailuresAndWarn();
+      return;
     }
-    catch {
-      warn "Failed to connect to publisher: $_";
-      return; # Exit the function if connection fails
-    };
+
+    $publisherConsecutiveConnectionFailures = 0;
   }
 
   $messageBase->{data} = { progress => $_[1], skipped => $_[2] };
 
-  try {
-    $publisher->put(
-      {
-        priority => 0,
-        data     => encode_json($messageBase),
-      }
-    );
-  }
-  catch {
-    warn "Failed to publish progress: $_";
+  my $error = putMessageWithTimeout( $publisher, $MAX_PUT_MESSAGE_TIMEOUT,
+    { priority => 0, data => encode_json($messageBase) } );
+  if ( $error || $publisher->error ) {
+    my $err = $publisher->error ? $publisher->error : $error;
+    say STDERR "Failed to publish progress: " . $err;
+
     return;
-  };
+  }
 
   $lastPublisherInteractionTime = time();
 }
@@ -252,15 +302,13 @@ sub log {
   elsif ( $_[1] eq 'debug' ) {
     $Seq::Role::Message::LOG->DEBUG("[$_[1]] $_[2]");
 
-    # do not publish debug messages by default
-    # if($debug) {
-    #   $_[0]->publishMessage( "Debug: $_[2]" );
-    # }
+    # we may publish too many debug messages. to enable:
+    # $_[0]->publishMessage( "Debug: $_[2]" );
   }
   elsif ( $_[1] eq 'warn' ) {
     $Seq::Role::Message::LOG->WARN("[$_[1]] $_[2]");
 
-    # we may publish too many warnings this way
+    # we may publish too many warnings. to enable:
     # $_[0]->publishMessage( "Warning: $_[2]" );
   }
   elsif ( $_[1] eq 'error' ) {

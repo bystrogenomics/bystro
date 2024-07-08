@@ -161,6 +161,10 @@ while (1) {
       }
     );
 
+    if ( $beanstalkEvents->error ) {
+      say STDERR "Failed to send started message: " . $beanstalkEvents->error;
+    }
+
     if ($debug) {
       say "job " . $job->id . " starting with inputHref:";
       p $inputHref;
@@ -194,8 +198,13 @@ while (1) {
 
     $beanstalkEvents->put( { priority => 0, data => encode_json($data) } );
 
+    # The API server relies on failure or completion messages to know when a job is done
+    # If we did not successfully send a failure mesage, we must attempt to release the job
+    # for reprocessing; else the API server will never know the job failed and the job will be lost
+    my $jobShouldBeReleased = 0;
     if ( $beanstalkEvents->error ) {
-      say STDERR "Beanstalkd last error: " . $beanstalkEvents->error;
+      $jobShouldBeReleased = 1;
+      say STDERR "Failed to send $FAILED message due to: " . $beanstalkEvents->error;
     }
 
     my $socket = $job->client->connect( $conf->{beanstalkd}{addresses}[0],
@@ -208,10 +217,19 @@ while (1) {
       say STDERR "Failed to connect to queue server for an unknown reason";
     }
 
-    $job->delete();
+    if ($jobShouldBeReleased) {
+      say STDERR "Releasing job "
+        . $job->id
+        . " because we failed to send $FAILED message";
+      $job->release();
+    }
+    else {
+      say "Deleting job with id " . $job->id;
+      $job->delete();
+    }
 
     if ( $job->client->error ) {
-      say STDERR "Failed to delete job with id "
+      say STDERR "Failed to release or delete job with id "
         . $job->id
         . " with error "
         . $job->client->error;
@@ -232,7 +250,7 @@ while (1) {
   };
 
   if ( defined $debug ) {
-    say "putting completion event";
+    say "Finished job with id " . $job->id . " with data:";
     p $data;
   }
 
@@ -243,8 +261,13 @@ while (1) {
   # To be conservative; since after delete message is lost
   $beanstalkEvents->put( { priority => 0, data => encode_json($data) } );
 
+  # If we did not successfully send a completion mesage, we must attempt to release the job
+  # for reprocessing; else the API server will never know the job completed and the job will be lost
+  my $jobShouldBeReleased = 0;
   if ( $beanstalkEvents->error ) {
-    say STDERR "Beanstalkd last error: " . $beanstalkEvents->error;
+    say STDERR "Releasing job because we failed to put the completion message: "
+      . $beanstalkEvents->error;
+    $jobShouldBeReleased = 1;
   }
 
   my $socket = $job->client->connect( $conf->{beanstalkd}{addresses}[0],
@@ -257,16 +280,23 @@ while (1) {
     say STDERR "Failed to connect to queue server for an unknown reason";
   }
 
-  $job->delete();
-
-  if ( $job->client->error ) {
-    say STDERR "Failed to delete job with id "
+  if ($jobShouldBeReleased) {
+    say STDERR "Releasing job "
       . $job->id
-      . " with error "
-      . $job->client->error;
+      . " because we failed to send $COMPLETED message";
+    $job->release();
+  }
+  else {
+    say "Deleting job with id " . $job->id;
+    $job->delete();
   }
 
-  say "completed job with queue id " . $job->id;
+  if ( $job->client->error ) {
+    say STDERR "Failed to delete or release job with id "
+      . $job->id
+      . " due to error "
+      . $job->client->error;
+  }
 }
 
 sub coerceInputs {
