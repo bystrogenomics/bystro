@@ -238,9 +238,8 @@ sub releaseOrDeleteJob {
   if ($shouldRelease) {
     return releaseWithTimeout( $job, $timeout );
   }
-  else {
-    return deleteWithTimeout( $job, $timeout );
-  }
+
+  return deleteWithTimeout( $job, $timeout );
 }
 
 sub runAnnotation {
