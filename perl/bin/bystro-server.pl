@@ -9,11 +9,14 @@
 use 5.10.0;
 use Cpanel::JSON::XS;
 
+use MCE::Shared;
 use strict;
 use warnings;
 
 use Try::Tiny;
+use Time::HiRes qw(time);
 
+use MCE::Hobo;
 use Log::Any::Adapter;
 use File::Basename;
 use Getopt::Long;
@@ -77,6 +80,7 @@ my $BEANSTALKD_RESERVE_TIMEOUT = 10;
 # Than in Message.pm, because these messages indiciate job success/failure,
 # And therefore is more important than progress updates
 my $BEANSTALKD_CONNECT_TIMEOUT = 30;
+my $BEANSTALKD_JOB_HEARTBEAT   = 30;
 
 sub _getConsumerClient {
   my $address = shift;
@@ -145,7 +149,7 @@ sub reserveWithTimeout {
     # We need to double the timeout because the reserve command will block until a job is available
     # And we only want to error if the beanstalkd server timeout isn't respected
     my $err = executeWithTimeout($timeout * 2, sub { $result = $consumer->reserve($timeout) });
-    return ($result, $err);
+    return ($err, $result);
 }
 
 sub deleteWithTimeout {
@@ -163,7 +167,7 @@ sub handleJobFailure {
     my ($job, $address, $err, $jobDataHref) = @_;
     say STDERR $err;
     $err =~ s/\sat\s\w+\/\w+.*\sline\s\d+.*//;
-    say "job " . $job->id . " failed";
+    say "job " . $job->id . " failed due to $err";
 
     my $data = { event => $FAILED, reason => $err, queueId => $job->id, submissionId => $jobDataHref->{submissionId} };
     my $beanstalkEvents = _getProducerClient($conf->{beanstalkd}{addresses}[0], $queueConfig->{events});
@@ -215,6 +219,20 @@ sub releaseOrDeleteJob {
     }
 }
 
+sub runAnnotation {
+    my ($jobDataHref) = @_;
+
+    my $annotateInstance = Seq->new_with_config($jobDataHref);
+    my ($err, $outputFileNamesHashRef, $totalAnnotated, $totalSkipped) = $annotateInstance->annotate();
+
+    return {
+        output => $outputFileNamesHashRef,
+        annotated         => $totalAnnotated,
+        skipped           => $totalSkipped,
+        err => $err
+    };
+}
+
 # Main worker loop
 my $lastAddressIndex = 0;
 while (1) {
@@ -225,10 +243,10 @@ while (1) {
 
     my $beanstalk = _getConsumerClient($address, $queueConfig->{submission});
 
-    my ($job, $err) = reserveWithTimeout($beanstalk, $BEANSTALKD_RESERVE_TIMEOUT);
+    my ($reserveErr, $job) = reserveWithTimeout($beanstalk, $BEANSTALKD_RESERVE_TIMEOUT);
 
-    if($err) {
-        say STDERR "Failed to reserve job: $err";
+    if($reserveErr) {
+        say STDERR "Failed to reserve job: $reserveErr";
         next;
     }
 
@@ -239,31 +257,82 @@ while (1) {
 
     my $jobDataHref;
     my ($outputFileNamesHashRef, $totalAnnotated, $totalSkipped);
-
+    my $err;
     try {
         $jobDataHref = decode_json($job->data);
         say "Reserved job with id " . $job->id . " which contains:";
         p $jobDataHref;
 
-        ($err, my $inputHref) = coerceInputs($jobDataHref, $job->id);
-        if ($err) {
-            die $err;
+        my ($coerceErr, $inputHref) = coerceInputs($jobDataHref, $job->id);
+        if ($coerceErr) {
+            die $coerceErr;
         }
 
         my $beanstalkEvents = _getProducerClient($address, $queueConfig->{events});
-        $err = putWithTimeout($beanstalkEvents, $BEANSTALKD_RESERVE_TIMEOUT, { priority => 0, data => encode_json({ event => $STARTED, submissionId => $jobDataHref->{submissionId}, queueId => $job->id }) });
+        my $putErr = putWithTimeout($beanstalkEvents, $BEANSTALKD_RESERVE_TIMEOUT, { priority => 0, data => encode_json({ event => $STARTED, submissionId => $jobDataHref->{submissionId}, queueId => $job->id }) });
 
         # This error is less critical, because progress messages
         # will set the API server state to "started"
-        if ($err) {
+        if ($putErr) {
             say STDERR "Failed to send started message: $err";
         }
 
-        say "job " . $job->id . " starting with inputHref:";
-        p $inputHref;
+        my $result = MCE::Shared->hash( );
+        my $done = MCE::Shared->scalar( );
 
-        my $annotateInstance = Seq->new_with_config($inputHref);
-        ($err, $outputFileNamesHashRef, $totalAnnotated, $totalSkipped) = $annotateInstance->annotate();
+        my $heartbeatClient = MCE::Hobo->create(sub {
+          my $lastTouchTime = time();
+          my $isDone = $done->get();
+
+          # We cannot wrap this in a try/catch, maybe because we're already nested in a try/catch
+          # TODO 2024-07-09 @akotlar: investigate what happens if this loop dies
+          while(!$isDone) {
+            if(time() - $lastTouchTime >= $BEANSTALKD_JOB_HEARTBEAT) {
+              $lastTouchTime = time();
+              $job->touch();
+
+              if($job->client->error) {
+                say STDERR "Failed to touch job with id " . $job->id . " with error " . $job->client->error;
+              } else {
+                say "Touched job   with id " . $job->id;
+
+                my $res =  $job->stats();
+                say "Stats for job with id " . $job->id . ":";
+                p $res;
+
+                if ($job->client->error) {
+                  say STDERR "Failed to get job stats with error " . $job->client->error;
+                }
+              }
+            }
+
+            sleep(1);
+
+            $isDone = $done->get();
+          }
+
+          return;
+        });
+
+        # We must run the annotation in the main thread, because internally it runs MCE, and
+        # it turns out that MCE does not enjoy running from within itself (there may be workarounds that we do not understand)
+        my $res = runAnnotation($inputHref);
+        $done->set(1);
+
+        $heartbeatClient->join();
+
+        if(!$res) {
+            die "Failed to get result from annotation job";
+        }
+        if($res->{err}) {
+            die $res->{err};
+        }
+        if(!$res->{output}) {
+            die "Failed to get output from annotation job";
+        }
+        $outputFileNamesHashRef = $res->{output};
+        $totalAnnotated = $res->{annotated};
+        $totalSkipped = $res->{skipped};
     }
     catch {
         $err = $_;
