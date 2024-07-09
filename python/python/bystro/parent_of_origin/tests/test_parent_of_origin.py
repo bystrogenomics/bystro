@@ -7,7 +7,10 @@ various aspects of the generated data.
 """
 import numpy as np
 import numpy.linalg as la
-from bystro.parent_of_origin.parent_of_origin import POESingleSNP, POEMultipleSNP
+from bystro.parent_of_origin.parent_of_origin import (
+    POESingleSNP,
+    POEMultipleSNP,
+)
 
 
 def cosine_similarity(vec1, vec2):
@@ -101,10 +104,18 @@ def generate_data(beta_m, beta_p, rng, n_individuals=10000, cov=None, maf=0.25):
 
     return results
 
-def generate_multivariate_data(beta_m, beta_p, rng, n_individuals=10000, cov=None, maf=0.25,
-                                n_genotypes=100):
+
+def generate_multivariate_data(
+    beta_m,
+    beta_p,
+    rng,
+    n_individuals=10000,
+    cov=None,
+    maf=0.25,
+    n_genotypes=100,
+):
     """
-    Generate synthetic genotype and phenotype data for a genetic study. We are just going 
+    Generate synthetic genotype and phenotype data for a genetic study. We are just going
     to use one relevant and the remainder are irrelevant
 
     Parameters:
@@ -184,17 +195,16 @@ def generate_multivariate_data(beta_m, beta_p, rng, n_individuals=10000, cov=Non
     # Store the phenotype data in the results dictionary
     results["phenotypes"] = phenotypes
 
-    has_mother_total = rng.binomial(1, p=maf, size=(n_individuals,n_genotypes))
-    has_father_total = rng.binomial(1, p=maf, size=(n_individuals,n_genotypes))
-    has_mother_total[:,0] = has_mother
-    has_father_total[:,0] = has_father
+    has_mother_total = rng.binomial(1, p=maf, size=(n_individuals, n_genotypes))
+    has_father_total = rng.binomial(1, p=maf, size=(n_individuals, n_genotypes))
+    has_mother_total[:, 0] = has_mother
+    has_father_total[:, 0] = has_father
     genotype_total = has_mother_total + has_father_total
-    results['genotypes'] = genotype_total
+    results["genotypes"] = genotype_total
 
     return results
 
 
-'''
 def test_decision_function():
     np.set_printoptions(suppress=True)
     rng = np.random.default_rng(2021)
@@ -218,7 +228,7 @@ def test_decision_function():
     )
     model.fit(data["phenotypes"], data["genotype"])
     assert model.p_val < 0.01
-'''
+
 
 def test_multi_fit():
     np.set_printoptions(suppress=True)
@@ -227,10 +237,8 @@ def test_multi_fit():
     beta_m = np.zeros(n_p)
     beta_p = np.zeros(n_p)
     beta_p[:3] = 0.5
-    data = generate_multivariate_data(beta_m, beta_p, rng, maf=0.03, n_individuals=500000,n_genotypes=1000)
+    data = generate_multivariate_data(
+        beta_m, beta_p, rng, maf=0.03, n_individuals=500000, n_genotypes=1000
+    )
     model = POEMultipleSNP()
     model.fit(data["phenotypes"], data["genotypes"])
-    print(model.p_vals)
-    print(model.parent_effects_[0])
-    print(model.parent_effects_[3])
-    assert 1==2

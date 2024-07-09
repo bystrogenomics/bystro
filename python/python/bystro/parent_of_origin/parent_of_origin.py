@@ -39,7 +39,7 @@ from typing import Tuple, Union, Optional
 from numpy.typing import NDArray
 from tqdm import trange
 
-from numba import jit # type: ignore
+from numba import jit  # type: ignore
 
 from sklearn.utils import resample
 
@@ -51,7 +51,6 @@ from bystro.covariance._covariance_np import (
 from bystro.covariance.covariance_cov_shrinkage import (
     LinearInverseShrinkage,
     QuadraticInverseShrinkage,
-    qis,
 )
 from bystro.random_matrix_theory.rmt4ds_cov_test import two_sample_cov_test
 from bystro.covariance.hypothesis_classical import (
@@ -387,9 +386,7 @@ class POEMultipleSNP(BasePOE):
             (2, 10)
         )  # Will be overwritten in fit
 
-    def fit(
-        self, X: np.ndarray, Y: np.ndarray, seed: int = 2021
-    ) -> "POEMultipleSNP":
+    def fit(self, X: np.ndarray, Y: np.ndarray) -> "POEMultipleSNP":
         """
         Fit the POESingleSNP model.
 
@@ -411,26 +408,15 @@ class POEMultipleSNP(BasePOE):
         self.n_phenotypes = X.shape[1]
         self.n_genotypes = Y.shape[1]
 
-        model_single_snp = POESingleSNP(
-            compute_pvalue=True,
-            pval_method=self.pval_method,
-            cov_regularization=self.cov_regularization,
-            svd_loss=self.svd_loss,
-        )
-
         self.p_vals = -1 * np.ones(self.n_genotypes)
         self.parent_effects_ = np.zeros((self.n_genotypes, self.n_phenotypes))
 
         @jit
-        def subfunction(X: NDArray[np.float64],y: NDArray[np.float64]):
+        def subfunction(X: NDArray[np.float64], y: NDArray[np.float64]):
             X_homozygotes = X[y == 0]
             X_heterozygotes = X[y == 1]
-            X_homozygotes = X_homozygotes# - np.mean(X_homozygotes, axis=0)
-            X_heterozygotes = X_heterozygotes# - np.mean(X_heterozygotes, axis=0)
-
-            n_hetero = X_heterozygotes.shape[0]
-            n_homo = X_homozygotes.shape[0]
-            n_total = n_hetero + n_homo
+            X_homozygotes = X_homozygotes
+            X_heterozygotes = X_heterozygotes
 
             Sigma_AA = np.cov(X_homozygotes.T)
             L = la.cholesky(Sigma_AA)
@@ -451,8 +437,8 @@ class POEMultipleSNP(BasePOE):
             n2, p2 = X2.shape
             N1 = n1 - 1
             N2 = n2 - 1
-            X1 = X1# - np.mean(X1, axis=0)
-            X2 = X2# - np.mean(X2, axis=0)
+            X1 = X1  # - np.mean(X1, axis=0)
+            X2 = X2  # - np.mean(X2, axis=0)
 
             N = N1 + N2
             c1 = N1 / N
@@ -462,7 +448,7 @@ class POEMultipleSNP(BasePOE):
             S1 = X1.T @ X1 / N1
             S2 = X2.T @ X2 / N2
 
-            def d2(y1,y2):
+            def d2(y1, y2):
                 return (
                     (y1 + y2 - y1 * y2)
                     / (y1 * y2)
@@ -470,32 +456,36 @@ class POEMultipleSNP(BasePOE):
                     + y1 * (1 - y2) / (y2 * (y1 + y2)) * np.log(1 - y2)
                     + y2 * (1 - y1) / (y1 * (y1 + y2)) * np.log(1 - y1)
                 )
-            
-            def mu2(y1,y2):
-                return 0.5 * np.log((y1 + y2 - y1 * y2) / (y1 + y2)) - (
-                        y1 * np.log(1 - y2) + y2 * np.log(1 - y1)
-                    ) / (y1 + y2)
-            
-            def sigma2_2(y1,y2):
-                return -(2 * y1**2 * np.log(1 - y2) + 2 * y2**2 * np.log(1 - y1)) / (
-        y1 + y2
-    ) ** 2 - 2 * np.log((y1 + y2) / (y1 + y2 - y1 * y2))
 
-            log_V1_ = np.log(la.det(S1 @ la.solve(S2, np.eye(p1)))) * (N1 / 2) - np.log(
+            def mu2(y1, y2):
+                return 0.5 * np.log((y1 + y2 - y1 * y2) / (y1 + y2)) - (
+                    y1 * np.log(1 - y2) + y2 * np.log(1 - y1)
+                ) / (y1 + y2)
+
+            def sigma2_2(y1, y2):
+                return -(
+                    2 * y1**2 * np.log(1 - y2) + 2 * y2**2 * np.log(1 - y1)
+                ) / (y1 + y2) ** 2 - 2 * np.log((y1 + y2) / (y1 + y2 - y1 * y2))
+
+            log_V1_ = np.log(la.det(S1 @ la.solve(S2, np.eye(p1)))) * (
+                N1 / 2
+            ) - np.log(
                 la.det(c1 * S1 @ la.solve(S2, np.eye(p2)) + c2 * np.eye(p2))
-            ) * (N / 2)
-            z_value = (-2 / N * log_V1_ - p1 * d2(yN1, yN2) - mu2(yN1, yN2)) / np.sqrt(
-                sigma2_2(yN1, yN2)
+            ) * (
+                N / 2
             )
+            z_value = (
+                -2 / N * log_V1_ - p1 * d2(yN1, yN2) - mu2(yN1, yN2)
+            ) / np.sqrt(sigma2_2(yN1, yN2))
 
             def erf(x):
                 # Constants used in the approximation formula
-                a1 =  0.254829592
+                a1 = 0.254829592
                 a2 = -0.284496736
-                a3 =  1.421413741
+                a3 = 1.421413741
                 a4 = -1.453152027
-                a5 =  1.061405429
-                p  =  0.3275911
+                a5 = 1.061405429
+                p = 0.3275911
 
                 # Save the sign of x
                 sign = np.sign(x)
@@ -503,18 +493,20 @@ class POEMultipleSNP(BasePOE):
 
                 # A&S formula 7.1.26
                 t = 1.0 / (1.0 + p * x)
-                y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * np.exp(-x * x)
+                y = 1.0 - (
+                    ((((a5 * t + a4) * t) + a3) * t + a2) * t + a1
+                ) * t * np.exp(-x * x)
 
                 return sign * y
 
             def norm_sf(z_value):
                 return 0.5 * (1 - erf(z_value / np.sqrt(2)))
 
-            pval= norm_sf(z_value)
+            pval = norm_sf(z_value)
             return pval, parent_effect
 
         for i in trange(self.n_genotypes):
-            pval, parent_effect = subfunction(X,Y[:, i])
+            pval, parent_effect = subfunction(X, Y[:, i])
             self.p_vals[i] = pval
             self.parent_effects_[i] = parent_effect
 
@@ -564,5 +556,3 @@ class POEMultipleSNP(BasePOE):
             raise ValueError("y is numpy array")
         if X.shape[0] != Y.shape[0]:
             raise ValueError("X and Y have different sample sizes")
-
-
