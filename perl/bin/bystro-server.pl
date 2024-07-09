@@ -7,28 +7,25 @@
 # Requires: Snpfile::AnnotatorBase
 
 use 5.10.0;
-use Cpanel::JSON::XS;
 
-use MCE::Shared;
 use strict;
 use warnings;
 
-use Try::Tiny;
-use Time::HiRes qw(time);
-
-use MCE::Hobo;
-use Log::Any::Adapter;
-use File::Basename;
-use Getopt::Long;
+use Beanstalk::Client;
+use Cpanel::JSON::XS;
 
 use DDP output => *STDOUT;
-
-use Beanstalk::Client;
-
-use YAML::XS qw/LoadFile/;
+use File::Basename;
+use Getopt::Long;
+use Log::Any::Adapter;
+use MCE::Shared;
+use MCE::Hobo;
+use Path::Tiny qw/path/;
+use Try::Tiny;
+use Time::HiRes qw(time);
+use YAML::XS    qw/LoadFile/;
 
 use Seq;
-use Path::Tiny qw/path/;
 
 my ( $verbose, $queueConfigPath, $maxThreads );
 
