@@ -162,9 +162,9 @@ sub releaseWithTimeout {
 
 sub handleJobFailure {
   my ( $job, $address, $err, $jobDataHref ) = @_;
-  say STDERR $err;
+  say STDERR "job " . $job->id . " failed due to $err";
+
   $err =~ s/\sat\s\w+\/\w+.*\sline\s\d+.*//;
-  say "job " . $job->id . " failed due to $err";
 
   my $data = {
     event        => $FAILED,
