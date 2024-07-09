@@ -385,11 +385,13 @@ while (1) {
 
   if ($err) {
     handleJobFailure( $job, $address, $err, $jobDataHref );
-    next;
+  }
+  else {
+    handleJobCompletion( $job, $address, $jobDataHref, $outputFileNamesHashRef,
+      $totalAnnotated, $totalSkipped );
   }
 
-  handleJobCompletion( $job, $address, $jobDataHref, $outputFileNamesHashRef,
-    $totalAnnotated, $totalSkipped );
+  sleep(1);
 }
 
 sub coerceInputs {
