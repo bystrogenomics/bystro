@@ -4,7 +4,7 @@
 # Description:
 # Date Created:   Wed Dec 24
 # By:             Alex Kotlar
-# Requires: Snpfile::AnnotatorBase
+# Requires: Seq
 
 use 5.10.0;
 
@@ -14,7 +14,7 @@ use warnings;
 use Beanstalk::Client;
 use Cpanel::JSON::XS;
 
-use DDP output => *STDOUT;
+use DDP { output => 'stdout', deparse => 1 };
 use File::Basename;
 use Getopt::Long;
 use Log::Any::Adapter;
@@ -77,7 +77,7 @@ my $BEANSTALKD_RESERVE_TIMEOUT = 20;
 # Than in Message.pm, because these messages indiciate job success/failure,
 # And therefore is more important than progress updates
 my $BEANSTALKD_CONNECT_TIMEOUT = 30;
-my $BEANSTALKD_JOB_HEARTBEAT   = 30;
+my $BEANSTALKD_JOB_HEARTBEAT   = 5;
 
 sub _getConsumerClient {
   my $address = shift;
@@ -109,22 +109,6 @@ sub _getProducerClient {
   );
 }
 
-sub connectJob {
-  my $job     = shift;
-  my $address = shift;
-  my $socket  = $job->client->connect( $address, $BEANSTALKD_CONNECT_TIMEOUT );
-
-  if ( $job->client->error ) {
-    say STDERR "Failed to connect to queue server with error " . $job->client->error;
-    return $job->client->error;
-  }
-  elsif ( !$socket ) {
-    say STDERR "Failed to connect to queue server for an unknown reason";
-    return "UNKNOWN_CONNECT_ERROR";
-  }
-  return
-}
-
 # Function to execute Beanstalkd command with timeout
 sub executeWithTimeout {
   my ( $timeout, $cmdRef, @args ) = @_;
@@ -141,8 +125,8 @@ sub executeWithTimeout {
 sub putWithTimeout {
   my ( $publisher, $timeout, @args ) = @_;
 
-  my $start = time();
-  my $err = executeWithTimeout( $timeout, sub { $publisher->put(@args) } );
+  my $start     = time();
+  my $err       = executeWithTimeout( $timeout, sub { $publisher->put(@args) } );
   my $timeTaken = time() - $start;
 
   if ($err) {
@@ -150,8 +134,9 @@ sub putWithTimeout {
     return $err;
   }
 
-  if( $publisher->error ) {
-    say STDERR "Failed to put message after $timeTaken seconds due to:" . $publisher->error;
+  if ( $publisher->error ) {
+    say STDERR "Failed to put message after $timeTaken seconds due to:"
+      . $publisher->error;
     return $publisher->error;
   }
 
@@ -175,8 +160,9 @@ sub reserveWithTimeout {
     say STDERR "Failed to reserve job after $timeTaken seconds due to: $err";
     return ( $err, undef );
   }
-  if( $consumer->error ) {
-    say STDERR "Failed to reserve job after $timeTaken seconds due to: " . $consumer->error;
+  if ( $consumer->error ) {
+    say STDERR "Failed to reserve job after $timeTaken seconds due to: "
+      . $consumer->error;
     return ( $consumer->error, undef );
   }
 
@@ -187,17 +173,22 @@ sub reserveWithTimeout {
 sub deleteWithTimeout {
   my ( $job, $timeout ) = @_;
 
-  my $start = time();
-  my $err = executeWithTimeout( $timeout, sub { $job->delete() } );
+  my $start     = time();
+  my $err       = executeWithTimeout( $timeout, sub { $job->delete() } );
   my $timeTaken = time() - $start;
 
-  if($err) {
-    say STDERR "Failed to delete job with id ". $job->id . " in $timeTaken seconds due to: $err";
+  if ($err) {
+    say STDERR "Failed to delete job with id "
+      . $job->id
+      . " in $timeTaken seconds due to: $err";
     return $err;
   }
 
-  if( $job->client->error ) {
-    say STDERR "Failed to delete job  ". $job->id . " in $timeTaken seconds due to: " . $job->client->error;
+  if ( $job->client->error ) {
+    say STDERR "Failed to delete job  "
+      . $job->id
+      . " in $timeTaken seconds due to: "
+      . $job->client->error;
     return $job->client->error;
   }
 
@@ -208,16 +199,16 @@ sub deleteWithTimeout {
 
 sub releaseWithTimeout {
   my ( $job, $timeout ) = @_;
-  my $start = time();
-  my $err = executeWithTimeout( $timeout, sub { $job->release() } );
+  my $start     = time();
+  my $err       = executeWithTimeout( $timeout, sub { $job->release() } );
   my $timeTaken = time() - $start;
 
-  if($err) {
+  if ($err) {
     say STDERR "Failed to release job after $timeTaken due to: $err";
     return $err;
   }
 
-  if( $job->client->error ) {
+  if ( $job->client->error ) {
     say STDERR "Failed to release job after $timeTaken due to: $err";
     return $job->client->error;
   }
@@ -231,16 +222,16 @@ sub statsWithTimeout {
   my ( $job, $timeout ) = @_;
   my $result;
 
-  my $start = time();
-  my $err = executeWithTimeout( $timeout, sub { $result = $job->stats() } );
+  my $start     = time();
+  my $err       = executeWithTimeout( $timeout, sub { $result = $job->stats() } );
   my $timeTaken = time() - $start;
-  
-  if($err) {
+
+  if ($err) {
     say STDERR "Failed to get job stats after $timeTaken due to: $err";
     return ( $err, undef );
   }
 
-  if( $job->client->error ) {
+  if ( $job->client->error ) {
     say STDERR "Failed to get job stats after $timeTaken due to: " . $job->client->error;
     return ( $job->client->error, undef );
   }
@@ -249,15 +240,16 @@ sub statsWithTimeout {
 }
 
 sub touchWithTimeout {
-  my ( $job, $timeout ) = @_;
+  my ( $job, $timeout, $address ) = @_;
+
   my $err = executeWithTimeout( $timeout, sub { $job->touch() } );
 
-  if($err) {
+  if ($err) {
     say STDERR "Failed to touch job with error: $err";
     return $err;
   }
 
-  if( $job->client->error ) {
+  if ( $job->client->error ) {
     say STDERR "Failed to touch job with error: " . $job->client->error;
     return $job->client->error;
   }
@@ -289,16 +281,13 @@ sub handleJobFailure {
   }
 
   my $jobShouldBeReleased = $error ? 1 : 0;
-  
-  my $connectError = connectJob( $job, $address );
-  if($connectError) {
-    say STDERR "Failed to connect to job with id " . $job->id . " with error $connectError";
+
+  my $terminalError =
+    releaseOrDeleteJob( $job, $jobShouldBeReleased, $BEANSTALKD_RESERVE_TIMEOUT );
+
+  if ($terminalError) {
+    say STDERR "Failed to fail job with id " . $job->id . " with error $terminalError";
   }
-
-  # We will still try to release the job, even if we failed to connect to it, in case the connect error was transient
-  # The error, if any will be logged
-
-  releaseOrDeleteJob( $job, $jobShouldBeReleased, $BEANSTALKD_RESERVE_TIMEOUT );
 }
 
 sub handleJobCompletion {
@@ -330,16 +319,12 @@ sub handleJobCompletion {
   }
 
   my $jobShouldBeReleased = $error ? 1 : 0;
-  my $connectError = connectJob( $job, $address );
-  if($connectError) {
-    say STDERR "Failed to connect to job with id " . $job->id . " with error $connectError";
-  }
 
   # We will still try to release/delete the job, even if we failed to connect to it, in case the connect error was transient
   my $terminalError =
     releaseOrDeleteJob( $job, $jobShouldBeReleased, $BEANSTALKD_CONNECT_TIMEOUT );
 
-  if (!$terminalError) {
+  if ( !$terminalError ) {
     say "Job with id " . $job->id . " completed successfully";
   }
 }
@@ -400,7 +385,7 @@ while (1) {
     $jobDataHref = decode_json( $job->data );
     say "Reserved job with id " . $job->id . " which contains:";
     p $jobDataHref;
-    
+
     my ( $coerceErr, $inputHref ) = coerceInputs( $jobDataHref, $job->id );
     if ($coerceErr) {
       die $coerceErr;
@@ -441,21 +426,20 @@ while (1) {
         while ( !$isDone ) {
           if ( time() - $lastTouchTime >= $BEANSTALKD_JOB_HEARTBEAT ) {
             $lastTouchTime = time();
-            my $touchErr = touchWithTimeout( $job, $BEANSTALKD_RESERVE_TIMEOUT);
+            my $touchErr = touchWithTimeout( $job, $BEANSTALKD_RESERVE_TIMEOUT, $address );
 
-            if ( $touchErr ) {
-              say STDERR "Failed to touch job with id "
-                . $job->id
-                . " with error $touchErr";
+            if ($touchErr) {
+              say STDERR "Failed to touch job with id " . $job->id . " with error $touchErr";
             }
             else {
               say "Touched job   with id " . $job->id;
 
-              my ($statsErr, $res) = statsWithTimeout($job, $BEANSTALKD_RESERVE_TIMEOUT);
+              my ( $statsErr, $res ) = statsWithTimeout( $job, $BEANSTALKD_RESERVE_TIMEOUT );
 
-              if ( $statsErr ) {
-                say STDERR "Failed to get job stats with error $statsErr" ;
-              } else {
+              if ($statsErr) {
+                say STDERR "Failed to get job stats with error $statsErr";
+              }
+              else {
                 p $res;
               }
             }
