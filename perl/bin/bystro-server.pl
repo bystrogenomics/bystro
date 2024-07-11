@@ -586,7 +586,7 @@ sub main {
                 say STDERR "Failed to touch job with id " . $job->id . " with error $touchErr";
               }
               else {
-                say "Touched job   with id " . $job->id;
+                say "Touched job with id " . $job->id;
 
                 my ( $statsErr, $res ) = statsWithTimeout( $job, $BEANSTALKD_RESERVE_TIMEOUT );
 
