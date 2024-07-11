@@ -17,13 +17,12 @@ use Beanstalk::Client;
 use Cpanel::JSON::XS;
 
 use DDP;
-use IPC::Open3;
 use Symbol 'gensym';
 use File::Basename;
 use FindBin;
 use File::Spec;
 use Getopt::Long;
-use JSON::XS;
+
 use Log::Any::Adapter;
 use MCE::Shared;
 use MCE::Hobo;
