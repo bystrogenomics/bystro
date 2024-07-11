@@ -140,11 +140,6 @@ has maxThreads => (
   documentation => 'Number of CPU threads to use (optional)',
 );
 
-subtype HashRefJson => as 'HashRef';
-coerce HashRefJson => from 'Str' => via { decode_json $_ };
-subtype ArrayRefJson => as 'ArrayRef';
-coerce ArrayRefJson => from 'Str' => via { from_json $_ };
-
 has publisher => (
   is            => 'ro',
   isa           => 'Str',
