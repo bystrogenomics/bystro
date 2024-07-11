@@ -452,8 +452,6 @@ sub getConfigFilePath {
   # Combine the parts
   my $fullPath = File::Spec->catfile( $confDir, $assembly . ".y*ml" );
 
-  print "Full path: $fullPath\n";
-
   my @maybePath = glob($fullPath);
   if ( scalar @maybePath ) {
     if ( scalar @maybePath > 1 ) {
