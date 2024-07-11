@@ -1,6 +1,6 @@
 
 #!/usr/bin/env perl
-# Name:           snpfile_annotate_mongo_redis_queue.pl
+# Name:           bystro-server.pl
 # Description:
 # Date Created:   Wed Dec 24
 # By:             Alex Kotlar
@@ -11,11 +11,14 @@ use 5.10.0;
 use strict;
 use warnings;
 
+use Exporter 'import';
+
 use Beanstalk::Client;
 use Cpanel::JSON::XS;
 
 use DDP { output => 'stdout', deparse => 1 };
 use File::Basename;
+use File::Spec;
 use Getopt::Long;
 use Log::Any::Adapter;
 use MCE::Shared;
@@ -27,28 +30,16 @@ use YAML::XS    qw/LoadFile/;
 
 use Seq;
 
-my ( $verbose, $queueConfigPath, $maxThreads );
+our @EXPORT_OK =
+  qw(runAnnotation _getConsumerClient _getProducerClient putWithTimeout reserveWithTimeout deleteWithTimeout releaseWithTimeout statsWithTimeout touchWithTimeout handleJobFailure handleJobCompletion releaseOrDeleteJob);
 
-GetOptions(
-  'v|verbose=i'     => \$verbose,
-  'q|queueConfig=s' => \$queueConfigPath,
-  'maxThreads=i'    => \$maxThreads,
-);
-
-if ( !($queueConfigPath) ) {
-  # Generate a help strings that shows the arguments
-  say "\nUsage: perl $0 -q <queueConfigPath> --maxThreads <maxThreads>\n";
-  exit 1;
-}
-
-my $type = 'annotation';
+my $DEFAULT_TUBE = 'annotation';
+my $DEFAULT_CONF_DIR = "config/";
 
 my $PROGRESS  = "progress";
 my $FAILED    = "failed";
 my $STARTED   = "started";
 my $COMPLETED = "completed";
-
-my $conf = LoadFile($queueConfigPath);
 
 # The properties that we accept from the worker caller
 my %requiredForAll = (
@@ -58,26 +49,14 @@ my %requiredForAll = (
 
 my $requiredForType = { input_files => 'inputFilePath' };
 
-my $configPathBaseDir  = "config/";
-my $configFilePathHref = {};
-
-my $queueConfig = $conf->{beanstalkd}{tubes}{$type};
-
-if ( !$queueConfig ) {
-  die "Queue config format not recognized. Options are "
-    . ( join( ', ', @{ keys %{ $conf->{beanstalkd}{tubes} } } ) );
-}
-
-say "Running Annotation queue server";
-
 my $BEANSTALKD_RESERVE_TIMEOUT = 20;
+my $BEANSTALKD_JOB_HEARTBEAT   = 20;
 # Needs to be larger than RESERVE_TIMEOUT
 # Used for both producer and consumer clients
 # We give move time for the producer to connect
 # Than in Message.pm, because these messages indiciate job success/failure,
 # And therefore is more important than progress updates
 my $BEANSTALKD_CONNECT_TIMEOUT = 30;
-my $BEANSTALKD_JOB_HEARTBEAT   = 5;
 
 sub _getConsumerClient {
   my $address = shift;
@@ -227,12 +206,17 @@ sub statsWithTimeout {
   my $timeTaken = time() - $start;
 
   if ($err) {
-    say STDERR "Failed to get job stats after $timeTaken due to: $err";
+    say STDERR "Failed to get stats for job with id "
+      . $job->id
+      . " after $timeTaken due to: $err";
     return ( $err, undef );
   }
 
   if ( $job->client->error ) {
-    say STDERR "Failed to get job stats after $timeTaken due to: " . $job->client->error;
+    say STDERR "Failed to get job stats for job with id "
+      . $job->id
+      . " after $timeTaken due to: "
+      . $job->client->error;
     return ( $job->client->error, undef );
   }
 
@@ -245,12 +229,15 @@ sub touchWithTimeout {
   my $err = executeWithTimeout( $timeout, sub { $job->touch() } );
 
   if ($err) {
-    say STDERR "Failed to touch job with error: $err";
+    say STDERR "Failed to touch job with id " . $job->id . " with error: $err";
     return $err;
   }
 
   if ( $job->client->error ) {
-    say STDERR "Failed to touch job with error: " . $job->client->error;
+    say STDERR "Failed to touch job with id "
+      . $job->id
+      . " with error: "
+      . $job->client->error;
     return $job->client->error;
   }
 
@@ -258,7 +245,7 @@ sub touchWithTimeout {
 }
 
 sub handleJobFailure {
-  my ( $job, $address, $err, $jobDataHref ) = @_;
+  my ( $job, $address, $queueConfig, $err, $jobDataHref ) = @_;
   say STDERR "job " . $job->id . " failed due to $err";
 
   $err =~ s/\sat\s\w+\/\w+.*\sline\s\d+.*//;
@@ -271,7 +258,7 @@ sub handleJobFailure {
   };
 
   my $beanstalkEvents =
-    _getProducerClient( $conf->{beanstalkd}{addresses}[0], $queueConfig->{events} );
+    _getProducerClient( $address, $queueConfig->{events} );
 
   my $error = putWithTimeout( $beanstalkEvents, $BEANSTALKD_RESERVE_TIMEOUT,
     { priority => 0, data => encode_json($data) } );
@@ -291,7 +278,7 @@ sub handleJobFailure {
 }
 
 sub handleJobCompletion {
-  my ( $job, $address, $jobDataHref, $outputFileNamesHashRef, $totalAnnotated,
+  my ( $job, $address, $queueConfig, $jobDataHref, $outputFileNamesHashRef, $totalAnnotated,
     $totalSkipped )
     = @_;
   my $data = {
@@ -309,13 +296,15 @@ sub handleJobCompletion {
   p $data;
 
   my $beanstalkEvents =
-    _getProducerClient( $conf->{beanstalkd}{addresses}[0], $queueConfig->{events} );
+    _getProducerClient( $address, $queueConfig->{events} );
 
   my $error = putWithTimeout( $beanstalkEvents, $BEANSTALKD_RESERVE_TIMEOUT,
     { priority => 0, data => encode_json($data) } );
 
   if ($error) {
-    say STDERR "Releasing job because we failed to put the completion message: $error";
+    say STDERR "Releasing job with id "
+      . $job->id
+      . " because we failed to put the completion message due to: $error";
   }
 
   my $jobShouldBeReleased = $error ? 1 : 0;
@@ -354,144 +343,14 @@ sub runAnnotation {
   };
 }
 
-# Main worker loop
-my $lastAddressIndex = 0;
-while (1) {
-  # round robin between beanstalkd servers, taking $conf->{beanstalkd}{addresses} in turn
-  # looping back to the first server after the last one
-  my $address = $conf->{beanstalkd}{addresses}[$lastAddressIndex];
-  $lastAddressIndex =
-    ( $lastAddressIndex + 1 ) % scalar( @{ $conf->{beanstalkd}{addresses} } );
-
-  my $beanstalk = _getConsumerClient( $address, $queueConfig->{submission} );
-
-  my ( $reserveErr, $job ) =
-    reserveWithTimeout( $beanstalk, $BEANSTALKD_RESERVE_TIMEOUT );
-
-  # Logged in reserveWithTimeout
-  if ($reserveErr) {
-    next;
-  }
-
-  if ( !$job ) {
-    say STDERR "No job found, despite no error being thrown. This should not happen.";
-    next;
-  }
-
-  my $jobDataHref;
-  my ( $outputFileNamesHashRef, $totalAnnotated, $totalSkipped );
-  my $err;
-  try {
-    $jobDataHref = decode_json( $job->data );
-    say "Reserved job with id " . $job->id . " which contains:";
-    p $jobDataHref;
-
-    my ( $coerceErr, $inputHref ) = coerceInputs( $jobDataHref, $job->id );
-    if ($coerceErr) {
-      die $coerceErr;
-    }
-
-    my $beanstalkEvents = _getProducerClient( $address, $queueConfig->{events} );
-    my $putErr          = putWithTimeout(
-      $beanstalkEvents,
-      $BEANSTALKD_RESERVE_TIMEOUT,
-      {
-        priority => 0,
-        data     => encode_json(
-          {
-            event        => $STARTED,
-            submissionId => $jobDataHref->{submissionId},
-            queueId      => $job->id
-          }
-        )
-      }
-    );
-
-    # This error is less critical, because progress messages
-    # will set the API server state to "started"
-    if ($putErr) {
-      say STDERR "Failed to send started message: $err";
-    }
-
-    my $result = MCE::Shared->hash();
-    my $done   = MCE::Shared->scalar();
-
-    my $heartbeatClient = MCE::Hobo->create(
-      sub {
-        my $lastTouchTime = time();
-        my $isDone        = $done->get();
-
-        # We cannot wrap this in a try/catch, maybe because we're already nested in a try/catch
-        # TODO 2024-07-09 @akotlar: investigate what happens if this loop dies
-        while ( !$isDone ) {
-          if ( time() - $lastTouchTime >= $BEANSTALKD_JOB_HEARTBEAT ) {
-            $lastTouchTime = time();
-            my $touchErr = touchWithTimeout( $job, $BEANSTALKD_RESERVE_TIMEOUT, $address );
-
-            if ($touchErr) {
-              say STDERR "Failed to touch job with id " . $job->id . " with error $touchErr";
-            }
-            else {
-              say "Touched job   with id " . $job->id;
-
-              my ( $statsErr, $res ) = statsWithTimeout( $job, $BEANSTALKD_RESERVE_TIMEOUT );
-
-              if ($statsErr) {
-                say STDERR "Failed to get job stats with error $statsErr";
-              }
-              else {
-                p $res;
-              }
-            }
-          }
-
-          sleep(1);
-
-          $isDone = $done->get();
-        }
-
-        return;
-      }
-    );
-
-    # We must run the annotation in the main thread, because internally it runs MCE, and
-    # it turns out that MCE does not enjoy running from within itself (there may be workarounds that we do not understand)
-    my $res = runAnnotation($inputHref);
-    $done->set(1);
-
-    $heartbeatClient->join();
-
-    if ( !$res ) {
-      die "Failed to get result from annotation job";
-    }
-    if ( $res->{err} ) {
-      die $res->{err};
-    }
-    if ( !$res->{output} ) {
-      die "Failed to get output from annotation job";
-    }
-    $outputFileNamesHashRef = $res->{output};
-    $totalAnnotated         = $res->{annotated};
-    $totalSkipped           = $res->{skipped};
-  }
-  catch {
-    $err = $_;
-  };
-
-  if ($err) {
-    handleJobFailure( $job, $address, $err, $jobDataHref );
-  }
-  else {
-    handleJobCompletion( $job, $address, $jobDataHref, $outputFileNamesHashRef,
-      $totalAnnotated, $totalSkipped );
-  }
-
-  sleep(1);
-}
-
 sub coerceInputs {
   my $jobDetailsHref = shift;
   my $queueId        = shift;
+  my $address        = shift;
+  my $queueConfig    = shift;
+  my $verbose        = shift;
+  my $maxThreads     = shift;
+  my $confDir = shift;
 
   my %args;
   my $err;
@@ -515,7 +374,7 @@ sub coerceInputs {
     $jobSpecificArgs{$key} = $jobDetailsHref->{ $requiredForType->{$key} };
   }
 
-  my $configFilePath = getConfigFilePath( $jobSpecificArgs{assembly} );
+  my $configFilePath = getConfigFilePath( $jobSpecificArgs{assembly}, $confDir );
 
   if ( !$configFilePath ) {
     $err = "Assembly $jobSpecificArgs{assembly} doesn't have corresponding config file";
@@ -525,7 +384,7 @@ sub coerceInputs {
   my %commmonArgs = (
     config    => $configFilePath,
     publisher => {
-      server      => $conf->{beanstalkd}{addresses}[0],
+      server      => $address,
       queue       => $queueConfig->{events},
       messageBase => {
         event        => $PROGRESS,
@@ -551,21 +410,202 @@ sub coerceInputs {
 
 sub getConfigFilePath {
   my $assembly = shift;
+  my $confDir = shift;
 
-  if ( exists $configFilePathHref->{$assembly} ) {
-    return $configFilePathHref->{$assembly};
-  }
-  else {
-    my @maybePath = glob( $configPathBaseDir . $assembly . ".y*ml" );
-    if ( scalar @maybePath ) {
-      if ( scalar @maybePath > 1 ) {
-        #should log
-        say "\n\nMore than 1 config path found, choosing first";
-      }
+  # Combine the parts
+  my $fullPath = File::Spec->catfile($confDir, $assembly . ".y*ml");
 
-      return $maybePath[0];
+  print "Full path: $fullPath\n";
+
+  my @maybePath = glob( $fullPath );
+  if ( scalar @maybePath ) {
+    if ( scalar @maybePath > 1 ) {
+      #should log
+      say "\n\nMore than 1 config path found, choosing first";
     }
 
-    die "\n\nNo config path found for the assembly $assembly. Exiting\n\n";
+    return $maybePath[0];
+  }
+
+  die "\n\nNo config path found for the assembly $assembly. Exiting\n\n";
+}
+
+# Main worker loop
+sub main {
+  my ( $verbose, $confDir, $maxThreads, $queueConfigPath, $tube );
+
+  GetOptions(
+    'v|verbose=i'     => \$verbose,
+    'c|conf_dir=s'    => \$confDir,
+    'q|queue_conf=s' => \$queueConfigPath,
+    't|threads=i'    => \$maxThreads,
+    'qt|tube'    => \$tube,
+  );
+
+  if ( !($queueConfigPath) ) {
+    # Generate a help strings that shows the arguments
+    say "\nUsage: perl $0 -q <queueConfigPath> --threads <maxThreads> --tube annotation\n";
+    exit 1;
+  }
+
+  if(!$confDir) {
+    $confDir = $DEFAULT_CONF_DIR;
+  }
+
+  if(!$tube) {
+    $tube = $DEFAULT_TUBE;
+  }
+
+  say "CONF DIR IS $confDir";
+  say "TUBE IS $tube";
+
+  my $conf               = LoadFile($queueConfigPath);
+  my $configFilePathHref = {};
+
+  my $queueConfig = $conf->{beanstalkd}{tubes}{$tube};
+
+  if ( !$queueConfig ) {
+    die "Queue config format not recognized. Options are "
+      . ( join( ', ', @{ keys %{ $conf->{beanstalkd}{tubes} } } ) );
+  }
+
+  say "Running Annotation queue server";
+
+  my $lastAddressIndex = 0;
+  while (1) {
+    # round robin between beanstalkd servers, taking $conf->{beanstalkd}{addresses} in turn
+    # looping back to the first server after the last one
+    my $address = $conf->{beanstalkd}{addresses}[$lastAddressIndex];
+    $lastAddressIndex =
+      ( $lastAddressIndex + 1 ) % scalar( @{ $conf->{beanstalkd}{addresses} } );
+
+    my $beanstalk = _getConsumerClient( $address, $queueConfig->{submission} );
+
+    my ( $reserveErr, $job ) =
+      reserveWithTimeout( $beanstalk, $BEANSTALKD_RESERVE_TIMEOUT );
+
+    # Errors logged in reserveWithTimeout
+    if ($reserveErr) {
+      next;
+    }
+
+    if ( !$job ) {
+      say STDERR "No job found, despite no error being thrown. This should not happen.";
+      next;
+    }
+
+    my $jobDataHref;
+    my ( $outputFileNamesHashRef, $totalAnnotated, $totalSkipped );
+    my $err;
+    try {
+      $jobDataHref = decode_json( $job->data );
+      say "Reserved job with id " . $job->id . " which contains:";
+      p $jobDataHref;
+
+      my ( $coerceErr, $inputHref ) = coerceInputs( $jobDataHref, $job->id, $address, $queueConfig, $verbose, $maxThreads, $confDir );
+      if ($coerceErr) {
+        die $coerceErr;
+      }
+
+      my $beanstalkEvents = _getProducerClient( $address, $queueConfig->{events} );
+      my $putErr          = putWithTimeout(
+        $beanstalkEvents,
+        $BEANSTALKD_RESERVE_TIMEOUT,
+        {
+          priority => 0,
+          data     => encode_json(
+            {
+              event        => $STARTED,
+              submissionId => $jobDataHref->{submissionId},
+              queueId      => $job->id
+            }
+          )
+        }
+      );
+
+      # This error is less critical, because progress messages
+      # will set the API server state to "started"
+      if ($putErr) {
+        say STDERR "Failed to send started message: $err";
+      }
+
+      my $result = MCE::Shared->hash();
+      my $done   = MCE::Shared->scalar();
+
+      my $heartbeatClient = MCE::Hobo->create(
+        sub {
+          my $lastTouchTime = time();
+          my $isDone        = $done->get();
+
+          # We cannot wrap this in a try/catch, maybe because we're already nested in a try/catch
+          # TODO 2024-07-09 @akotlar: investigate what happens if this loop dies
+          while ( !$isDone ) {
+            if ( time() - $lastTouchTime >= $BEANSTALKD_JOB_HEARTBEAT ) {
+              $lastTouchTime = time();
+              my $touchErr = touchWithTimeout( $job, $BEANSTALKD_RESERVE_TIMEOUT, $address );
+
+              if ($touchErr) {
+                say STDERR "Failed to touch job with id " . $job->id . " with error $touchErr";
+              }
+              else {
+                say "Touched job   with id " . $job->id;
+
+                my ( $statsErr, $res ) = statsWithTimeout( $job, $BEANSTALKD_RESERVE_TIMEOUT );
+
+                if ($statsErr) {
+                  say STDERR "Failed to get job stats with error $statsErr";
+                }
+                else {
+                  p $res;
+                }
+              }
+            }
+
+            sleep(1);
+
+            $isDone = $done->get();
+          }
+
+          return;
+        }
+      );
+
+      # We must run the annotation in the main thread, because internally it runs MCE, and
+      # it turns out that MCE does not enjoy running from within itself (there may be workarounds that we do not understand)
+      my $res = runAnnotation($inputHref);
+      $done->set(1);
+
+      $heartbeatClient->join();
+
+      if ( !$res ) {
+        die "Failed to get result from annotation job\n"; #newline supresses line number
+      }
+      if ( $res->{err} ) {
+        die $res->{err} . "\n";
+      }
+      if ( !$res->{output} ) {
+        die "Failed to get output from annotation job\n";
+      }
+      $outputFileNamesHashRef = $res->{output};
+      $totalAnnotated         = $res->{annotated};
+      $totalSkipped           = $res->{skipped};
+    }
+    catch {
+      $err = $_;
+    };
+
+    if ($err) {
+      handleJobFailure( $job, $address, $queueConfig, $err, $jobDataHref );
+    }
+    else {
+      handleJobCompletion( $job, $address, $queueConfig, $jobDataHref, $outputFileNamesHashRef,
+        $totalAnnotated, $totalSkipped );
+    }
+
+    sleep(1);
   }
 }
+
+main() if not caller;
+
+1; # Return true value to indicate module is loaded successfully

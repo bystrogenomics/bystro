@@ -22,16 +22,15 @@ from bystro.beanstalkd.messages import (
     InvalidJobMessage,
     ProgressPublisher,
     QueueConf,
-    ProgressMessage,
-    QUEUE_HEARTBEAT_INTERVAL
+    ProgressMessage
 )
 
 executor = ThreadPoolExecutor(max_workers=1)
 
 BEANSTALK_ERR_TIMEOUT = "TIMED_OUT"
 QUEUE_RESERVE_JOB_TIMEOUT_TIME = int(os.getenv("BYSTRO_BEANSTALKD_RESERVE_JOB_TIMEOUT", "20"))
-
-# Must be larger than JOB_TIMEOUT_TIME
+QUEUE_JOB_HEARTBEAT_INTERVAL = int(os.getenv("BYSTRO_BEANSTALKD_JOB_HEARTBEAT_INTERVAL", "20"))
+# Must be larger than QUEUE_RESERVE_JOB_TIMEOUT_TIME and QUEUE_JOB_HEARTBEAT_INTERVAL
 QUEUE_CONSUMER_SOCKET_TIMEOUT = int(os.getenv("BYSTRO_BEANSTALKD_CONSUMER_SOCKET_TIMEOUT", "30"))
 
 T = TypeVar("T", bound=BaseMessage)
@@ -175,7 +174,7 @@ def listen(
                         last_touch_time = time.time()
                         break
 
-                    if time.time() - last_touch_time >= QUEUE_HEARTBEAT_INTERVAL:
+                    if time.time() - last_touch_time >= QUEUE_JOB_HEARTBEAT_INTERVAL:
                         _touch(client, job_id)
                         last_touch_time = time.time()
 

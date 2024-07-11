@@ -24,8 +24,8 @@ use Carp        qw/croak/;
 use Time::HiRes qw(time);
 use Try::Tiny;
 
-my $PUBLISHER_ACTION_TIMEOUT  = 30;
-my $PUBLISHER_CONNECT_TIMEOUT = 10;
+my $PUBLISHER_ACTION_TIMEOUT  = 20;
+my $PUBLISHER_CONNECT_TIMEOUT = 30;
 my $MAX_PUT_MESSAGE_TIMEOUT   = 5;
 # How many consecutive failures to connect to the publisher before we stop trying
 my $MAX_PUBLISHER_FAILURES_IN_A_ROW = 5;
@@ -190,7 +190,7 @@ sub _incrementPublishFailuresAndWarn {
   $publisherConsecutiveConnectionFailures++;
   if ( $publisherConsecutiveConnectionFailures >= $MAX_PUBLISHER_FAILURES_IN_A_ROW ) {
     say STDERR
-      "Exceeded maximum number of progress publisher reconnection attempts. Disabling progress publisher until job completion.";
+      "Exceeded maximum number of publisher reconnection attempts. Disabling publisher until job completion.";
   }
 }
 
@@ -208,7 +208,7 @@ sub publishMessage {
   my $timeSinceLastInteraction = time() - $lastPublisherInteractionTime;
   if ( $timeSinceLastInteraction >= $PUBLISHER_ACTION_TIMEOUT ) {
     say
-      "Attempting to reconnect progress publisher because time since last interaction is $timeSinceLastInteraction seconds.";
+      "Attempting to reconnect to publisher in publishMessage because time since last interaction is $timeSinceLastInteraction seconds.";
 
     $publisher->disconnect();
     $publisher->connect();
@@ -217,11 +217,13 @@ sub publishMessage {
     $lastPublisherInteractionTime = time();
 
     if ( $publisher->error ) {
-      say STDERR "Failed to connect to progress publisher server: " . $publisher->error;
+      say STDERR "Failed to connect to publisher in publishMessage: " . $publisher->error;
 
       _incrementPublishFailuresAndWarn();
       return;
     }
+
+    say "Successfully reconnected to publisher in publishMessage";
 
     $publisherConsecutiveConnectionFailures = 0;
   }
@@ -254,7 +256,7 @@ sub publishProgress {
   my $timeSinceLastInteraction = time() - $lastPublisherInteractionTime;
   if ( $timeSinceLastInteraction >= $PUBLISHER_ACTION_TIMEOUT ) {
     say
-      "Attempting to reconnect progress publisher because time since last interaction is $timeSinceLastInteraction seconds.";
+      "Attempting to reconnect publisher in publishProgress because time since last interaction is $timeSinceLastInteraction seconds.";
 
     $publisher->disconnect();
     $publisher->connect();
@@ -263,11 +265,13 @@ sub publishProgress {
     $lastPublisherInteractionTime = time();
 
     if ( $publisher->error ) {
-      say STDERR "Failed to connect to progress publisher server: " . $publisher->error;
+      say STDERR "Failed to connect to publisher in publishProgress: " . $publisher->error;
 
       _incrementPublishFailuresAndWarn();
       return;
     }
+
+    say "Successfully reconnected to publisher in publishProgress";
 
     $publisherConsecutiveConnectionFailures = 0;
   }
