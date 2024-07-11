@@ -200,14 +200,7 @@ sub coerceFeatureType {
 
   my $type = $_[0]->getFeatureType( $_[1] );
 
-  # say "$type";
-  # Don't mutate the input if no type is stated for the feature
-  # if( !defined $type ) {
-  #   return $_[2];
-  # }
-
   #### All values sent to coerceFeatureType at least get an undefined check ####
-
   # modifying the value here actually modifies the value in the array
   # http://stackoverflow.com/questions/2059817/why-is-perl-foreach-variable-assignment-modifying-the-values-in-the-array
   # https://ideone.com/gjWQeS

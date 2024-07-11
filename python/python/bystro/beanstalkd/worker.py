@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 # Signal handler function
 def sigterm_handler(_signum, _frame):
-    print("SIGTERM received. Cleaning up...")
+    print("SIGTERM received. Cleaning up...", file=sys.stderr)
     executor.shutdown(wait=False)
     exit(0)
 

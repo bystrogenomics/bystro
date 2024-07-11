@@ -145,7 +145,6 @@ sub setVerbosity {
   my ( $self, $verboseLevel ) = @_;
 
   if ( $verboseLevel != 0 && $verboseLevel != 1 && $verboseLevel != 2 ) {
-    # Should log this
     say STDERR "Verbose level must be 0, 1, or 2, setting to 10000 (no verbose output)";
     $verbose = 10000;
     return;
@@ -207,7 +206,7 @@ sub publishMessage {
 
   my $timeSinceLastInteraction = time() - $lastPublisherInteractionTime;
   if ( $timeSinceLastInteraction >= $PUBLISHER_ACTION_TIMEOUT ) {
-    say
+    say STDERR
       "Attempting to reconnect to publisher in publishMessage because time since last interaction is $timeSinceLastInteraction seconds.";
 
     $publisher->disconnect();
@@ -223,7 +222,7 @@ sub publishMessage {
       return;
     }
 
-    say "Successfully reconnected to publisher in publishMessage";
+    say STDERR "Successfully reconnected to publisher in publishMessage";
 
     $publisherConsecutiveConnectionFailures = 0;
   }
@@ -255,7 +254,7 @@ sub publishProgress {
 
   my $timeSinceLastInteraction = time() - $lastPublisherInteractionTime;
   if ( $timeSinceLastInteraction >= $PUBLISHER_ACTION_TIMEOUT ) {
-    say
+    say STDERR
       "Attempting to reconnect publisher in publishProgress because time since last interaction is $timeSinceLastInteraction seconds.";
 
     $publisher->disconnect();
@@ -271,7 +270,7 @@ sub publishProgress {
       return;
     }
 
-    say "Successfully reconnected to publisher in publishProgress";
+    say STDERR "Successfully reconnected to publisher in publishProgress";
 
     $publisherConsecutiveConnectionFailures = 0;
   }
@@ -331,8 +330,6 @@ sub log {
     return;
   }
 
-  # So if verbosity is set to 1, only err, warn, and fatal messages
-  # will be printed to sdout
   if ( $verbose <= $mapSeverity{ $_[1] } ) {
     say STDERR "[$_[1]] $_[2]";
   }

@@ -16,19 +16,22 @@ use Exporter 'import';
 use Beanstalk::Client;
 use Cpanel::JSON::XS;
 
-use DDP { output => 'stdout', deparse => 1 };
+use DDP;
+use IPC::Open3;
+use Symbol 'gensym';
 use File::Basename;
+use FindBin;
 use File::Spec;
 use Getopt::Long;
+use JSON::XS;
 use Log::Any::Adapter;
 use MCE::Shared;
 use MCE::Hobo;
 use Path::Tiny qw/path/;
+use File::Temp qw/tempfile/;
 use Try::Tiny;
 use Time::HiRes qw(time);
 use YAML::XS    qw/LoadFile/;
-
-use Seq;
 
 our @EXPORT_OK =
   qw(runAnnotation _getConsumerClient _getProducerClient putWithTimeout reserveWithTimeout deleteWithTimeout releaseWithTimeout statsWithTimeout touchWithTimeout handleJobFailure handleJobCompletion releaseOrDeleteJob);
@@ -40,6 +43,15 @@ my $PROGRESS  = "progress";
 my $FAILED    = "failed";
 my $STARTED   = "started";
 my $COMPLETED = "completed";
+
+# Find the path to bystro-annotate.pl in the same directory as the current script
+my $ANNOTATE_SCRIPT = File::Spec->catfile( $FindBin::Bin, 'bystro-annotate.pl' );
+
+# Ensure the script exists
+if ( !-e $ANNOTATE_SCRIPT ) {
+  die
+    "Could not find bystro-annotate.pl in the same directory as the current script\n";
+}
 
 # The properties that we accept from the worker caller
 my %requiredForAll = (
@@ -119,7 +131,7 @@ sub putWithTimeout {
     return $publisher->error;
   }
 
-  say "Put message in $timeTaken seconds";
+  say STDERR "Put message in $timeTaken seconds";
 
   return;
 }
@@ -145,7 +157,7 @@ sub reserveWithTimeout {
     return ( $consumer->error, undef );
   }
 
-  say "Reserved job with id " . $result->id . " in $timeTaken seconds";
+  say STDERR "Reserved job with id " . $result->id . " in $timeTaken seconds";
   return ( undef, $result );
 }
 
@@ -176,7 +188,7 @@ sub deleteWithTimeout {
     return $job->client->error;
   }
 
-  say "Deleted job with id " . $job->id . " in $timeTaken seconds";
+  say STDERR "Deleted job with id " . $job->id . " in $timeTaken seconds";
 
   return;
 }
@@ -325,7 +337,7 @@ sub handleJobCompletion {
     }
   };
 
-  say "Finished job with id " . $job->id . " with data:";
+  say STDERR "Finished job with id " . $job->id . " with data:";
   p $data;
 
   my $beanstalkEvents = _getProducerClient( $address, $queueConfig->{events} );
@@ -346,7 +358,7 @@ sub handleJobCompletion {
     releaseOrDeleteJob( $job, $jobShouldBeReleased, $BEANSTALKD_CONNECT_TIMEOUT );
 
   if ( !$terminalError ) {
-    say "Job with id " . $job->id . " completed successfully";
+    say STDERR "Job with id " . $job->id . " completed successfully";
   }
 }
 
@@ -368,15 +380,46 @@ sub releaseOrDeleteJob {
 sub runAnnotation {
   my ($jobDataHref) = @_;
 
-  my $annotateInstance = Seq->new_with_config($jobDataHref);
-  my ( $err, $outputFileNamesHashRef, $totalAnnotated, $totalSkipped ) =
-    $annotateInstance->annotate();
+  # Convert the Perl hash reference to a JSON string
+  my $jsonConfig = encode_json($jobDataHref);
+
+  # Create a temporary file to hold the JSON configuration
+  my ( $fh, $jsonConfigFile ) = tempfile();
+  print $fh $jsonConfig;
+  close $fh;
+
+  # Create a temporary file to hold the JSON configuration
+  # my $json_config_file = "temp_config.json";
+  # path($json_config_file)->spew_utf8($jsonConfig);
+  # say "WROTE TO: $json_config_file";
+  # Call the bystro-annotate.pl script with the JSON config argument and capture stdout
+  my ( $resultSummaryFh, $resultSummaryPath ) = tempfile();
+
+  say STDERR
+    "Wrote json_config for annotation to: $jsonConfigFile and set result_summary_path to: $resultSummaryPath";
+
+  `perl $ANNOTATE_SCRIPT --json_config $jsonConfigFile --result_summary_path $resultSummaryPath`;
+  my $exit_status = $? >> 8;
+
+  if ( $exit_status != 0 ) {
+    return {
+      output    => undef,
+      annotated => undef,
+      skipped   => undef,
+      err       => "Failed to run annotation job with exit status $exit_status"
+    };
+  }
+
+  my $output = path($resultSummaryPath)->slurp_utf8();
+  say STDERR "RESULT IS $output";
+
+  my $result = decode_json($output);
 
   return {
-    output    => $outputFileNamesHashRef,
-    annotated => $totalAnnotated,
-    skipped   => $totalSkipped,
-    err       => $err
+    output    => $result->{results},
+    annotated => $result->{totalProgress},
+    skipped   => $result->{totalSkipped},
+    err       => $result->{error}
   };
 }
 
@@ -456,7 +499,7 @@ sub getConfigFilePath {
   if ( scalar @maybePath ) {
     if ( scalar @maybePath > 1 ) {
       #should log
-      say "\n\nMore than 1 config path found, choosing first";
+      say STDERR "\n\nMore than 1 config path found, choosing first";
     }
 
     return $maybePath[0];
@@ -479,7 +522,7 @@ sub main {
 
   if ( !($queueConfigPath) ) {
     # Generate a help strings that shows the arguments
-    say
+    say STDERR
       "\nUsage: perl $0 -q <queueConfigPath> --threads <maxThreads> --tube annotation\n";
     exit 1;
   }
@@ -492,8 +535,8 @@ sub main {
     $tube = $DEFAULT_TUBE;
   }
 
-  say "CONF DIR IS $confDir";
-  say "TUBE IS $tube";
+  say STDERR "CONF DIR IS $confDir";
+  say STDERR "TUBE IS $tube";
 
   my $conf               = LoadFile($queueConfigPath);
   my $configFilePathHref = {};
@@ -505,7 +548,7 @@ sub main {
       . ( join( ', ', @{ keys %{ $conf->{beanstalkd}{tubes} } } ) );
   }
 
-  say "Running Annotation queue server";
+  say STDERR "Running Annotation queue server";
 
   my $lastAddressIndex = 0;
   while (1) {
@@ -535,7 +578,7 @@ sub main {
     my $err;
     try {
       $jobDataHref = decode_json( $job->data );
-      say "Reserved job with id " . $job->id . " which contains:";
+      say STDERR "Reserved job with id " . $job->id . " which contains:";
       p $jobDataHref;
 
       my ( $coerceErr, $inputHref ) =
@@ -586,7 +629,7 @@ sub main {
                 say STDERR "Failed to touch job with id " . $job->id . " with error $touchErr";
               }
               else {
-                say "Touched job with id " . $job->id;
+                say STDERR "Touched job with id " . $job->id;
 
                 my ( $statsErr, $res ) = statsWithTimeout( $job, $BEANSTALKD_RESERVE_TIMEOUT );
 
