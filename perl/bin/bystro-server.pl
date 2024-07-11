@@ -33,7 +33,7 @@ use Seq;
 our @EXPORT_OK =
   qw(runAnnotation _getConsumerClient _getProducerClient putWithTimeout reserveWithTimeout deleteWithTimeout releaseWithTimeout statsWithTimeout touchWithTimeout handleJobFailure handleJobCompletion releaseOrDeleteJob);
 
-my $DEFAULT_TUBE = 'annotation';
+my $DEFAULT_TUBE     = 'annotation';
 my $DEFAULT_CONF_DIR = "config/";
 
 my $PROGRESS  = "progress";
@@ -152,6 +152,11 @@ sub reserveWithTimeout {
 sub deleteWithTimeout {
   my ( $job, $timeout ) = @_;
 
+  if ( !$job ) {
+    say STDERR "Cannot delete job that is not defined";
+    return "Job is not defined";
+  }
+
   my $start     = time();
   my $err       = executeWithTimeout( $timeout, sub { $job->delete() } );
   my $timeTaken = time() - $start;
@@ -178,6 +183,12 @@ sub deleteWithTimeout {
 
 sub releaseWithTimeout {
   my ( $job, $timeout ) = @_;
+
+  if ( !$job ) {
+    say STDERR "Cannot release job that is not defined";
+    return "Job is not defined";
+  }
+
   my $start     = time();
   my $err       = executeWithTimeout( $timeout, sub { $job->release() } );
   my $timeTaken = time() - $start;
@@ -199,6 +210,12 @@ sub releaseWithTimeout {
 
 sub statsWithTimeout {
   my ( $job, $timeout ) = @_;
+
+  if ( !$job ) {
+    say STDERR "Cannot get stats for job that is not defined";
+    return ( "Job is not defined", undef );
+  }
+
   my $result;
 
   my $start     = time();
@@ -226,6 +243,11 @@ sub statsWithTimeout {
 sub touchWithTimeout {
   my ( $job, $timeout, $address ) = @_;
 
+  if ( !$job ) {
+    say STDERR "Cannot touch job that is not defined";
+    return "Job is not defined";
+  }
+
   my $err = executeWithTimeout( $timeout, sub { $job->touch() } );
 
   if ($err) {
@@ -246,6 +268,12 @@ sub touchWithTimeout {
 
 sub handleJobFailure {
   my ( $job, $address, $queueConfig, $err, $jobDataHref ) = @_;
+
+  if ( !$job ) {
+    say STDERR "Cannot handle job failure without a job";
+    return;
+  }
+
   say STDERR "job " . $job->id . " failed due to $err";
 
   $err =~ s/\sat\s\w+\/\w+.*\sline\s\d+.*//;
@@ -257,8 +285,7 @@ sub handleJobFailure {
     submissionId => $jobDataHref->{submissionId}
   };
 
-  my $beanstalkEvents =
-    _getProducerClient( $address, $queueConfig->{events} );
+  my $beanstalkEvents = _getProducerClient( $address, $queueConfig->{events} );
 
   my $error = putWithTimeout( $beanstalkEvents, $BEANSTALKD_RESERVE_TIMEOUT,
     { priority => 0, data => encode_json($data) } );
@@ -278,9 +305,15 @@ sub handleJobFailure {
 }
 
 sub handleJobCompletion {
-  my ( $job, $address, $queueConfig, $jobDataHref, $outputFileNamesHashRef, $totalAnnotated,
-    $totalSkipped )
+  my ( $job, $address, $queueConfig, $jobDataHref, $outputFileNamesHashRef,
+    $totalAnnotated, $totalSkipped )
     = @_;
+
+  if ( !$job ) {
+    say STDERR "Cannot handle job completion without a job";
+    return;
+  }
+
   my $data = {
     event        => $COMPLETED,
     queueId      => $job->id,
@@ -295,8 +328,7 @@ sub handleJobCompletion {
   say "Finished job with id " . $job->id . " with data:";
   p $data;
 
-  my $beanstalkEvents =
-    _getProducerClient( $address, $queueConfig->{events} );
+  my $beanstalkEvents = _getProducerClient( $address, $queueConfig->{events} );
 
   my $error = putWithTimeout( $beanstalkEvents, $BEANSTALKD_RESERVE_TIMEOUT,
     { priority => 0, data => encode_json($data) } );
@@ -320,6 +352,11 @@ sub handleJobCompletion {
 
 sub releaseOrDeleteJob {
   my ( $job, $shouldRelease, $timeout ) = @_;
+
+  if ( !$job ) {
+    say STDERR "Cannot release/delete job that is not defined";
+    return "Job is not defined";
+  }
 
   if ($shouldRelease) {
     return releaseWithTimeout( $job, $timeout );
@@ -350,7 +387,7 @@ sub coerceInputs {
   my $queueConfig    = shift;
   my $verbose        = shift;
   my $maxThreads     = shift;
-  my $confDir = shift;
+  my $confDir        = shift;
 
   my %args;
   my $err;
@@ -410,14 +447,14 @@ sub coerceInputs {
 
 sub getConfigFilePath {
   my $assembly = shift;
-  my $confDir = shift;
+  my $confDir  = shift;
 
   # Combine the parts
-  my $fullPath = File::Spec->catfile($confDir, $assembly . ".y*ml");
+  my $fullPath = File::Spec->catfile( $confDir, $assembly . ".y*ml" );
 
   print "Full path: $fullPath\n";
 
-  my @maybePath = glob( $fullPath );
+  my @maybePath = glob($fullPath);
   if ( scalar @maybePath ) {
     if ( scalar @maybePath > 1 ) {
       #should log
@@ -435,24 +472,25 @@ sub main {
   my ( $verbose, $confDir, $maxThreads, $queueConfigPath, $tube );
 
   GetOptions(
-    'v|verbose=i'     => \$verbose,
-    'c|conf_dir=s'    => \$confDir,
+    'v|verbose=i'    => \$verbose,
+    'c|conf_dir=s'   => \$confDir,
     'q|queue_conf=s' => \$queueConfigPath,
     't|threads=i'    => \$maxThreads,
-    'qt|tube'    => \$tube,
+    'qt|tube'        => \$tube,
   );
 
   if ( !($queueConfigPath) ) {
     # Generate a help strings that shows the arguments
-    say "\nUsage: perl $0 -q <queueConfigPath> --threads <maxThreads> --tube annotation\n";
+    say
+      "\nUsage: perl $0 -q <queueConfigPath> --threads <maxThreads> --tube annotation\n";
     exit 1;
   }
 
-  if(!$confDir) {
+  if ( !$confDir ) {
     $confDir = $DEFAULT_CONF_DIR;
   }
 
-  if(!$tube) {
+  if ( !$tube ) {
     $tube = $DEFAULT_TUBE;
   }
 
@@ -502,7 +540,9 @@ sub main {
       say "Reserved job with id " . $job->id . " which contains:";
       p $jobDataHref;
 
-      my ( $coerceErr, $inputHref ) = coerceInputs( $jobDataHref, $job->id, $address, $queueConfig, $verbose, $maxThreads, $confDir );
+      my ( $coerceErr, $inputHref ) =
+        coerceInputs( $jobDataHref, $job->id, $address, $queueConfig, $verbose,
+        $maxThreads, $confDir );
       if ($coerceErr) {
         die $coerceErr;
       }
@@ -598,8 +638,8 @@ sub main {
       handleJobFailure( $job, $address, $queueConfig, $err, $jobDataHref );
     }
     else {
-      handleJobCompletion( $job, $address, $queueConfig, $jobDataHref, $outputFileNamesHashRef,
-        $totalAnnotated, $totalSkipped );
+      handleJobCompletion( $job, $address, $queueConfig, $jobDataHref,
+        $outputFileNamesHashRef, $totalAnnotated, $totalSkipped );
     }
 
     sleep(1);
