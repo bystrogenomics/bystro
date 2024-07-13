@@ -11,8 +11,10 @@ import tempfile
 import json
 import shutil
 import yaml
-
+import psutil
+import sys
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
+import signal
 
 from msgspec import Struct
 from bystro.beanstalkd.worker import listen, ProgressPublisher, QueueConf
@@ -53,16 +55,22 @@ def _run_annotation(json_config_file: str, result_summary_path: str) -> Annotati
         if not os.path.exists(script):
             raise FileNotFoundError(f"Could not find the bystro-annotate script at {script}")
 
-    command = (
-        f"perl {script} --json_config {json_config_file} --result_summary_path {result_summary_path}"
-    )
-    process = subprocess.Popen(
-        command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, text=True
-    )
-    _stdout, stderr = process.communicate()
+    command = [
+        "perl",
+        script,
+        "--json_config",
+        json_config_file,
+        "--result_summary_path",
+        result_summary_path,
+    ]
 
-    if process.returncode != 0:
-        raise RuntimeError(f"Annotation script execution failed: {stderr}")
+    returncode = os.system(" ".join(command))
+
+    # process = subprocess.Popen(command)
+    # process.wait()
+    print("returncdoe in _run_annotation", returncode)
+    if returncode != 0:
+        raise RuntimeError(f"Annotation script execution failed: {returncode}")
 
     with open(result_summary_path, "r", encoding="utf-8") as file:
         result = json.load(file)
@@ -155,14 +163,25 @@ def main():
     with open(queue_conf_path, "r", encoding="utf-8") as file:
         queue_conf = yaml.safe_load(file)
 
-    listen(
-        job_data_type=AnnotationJobData,
-        handler_fn=lambda publisher, job_data: handler_fn(publisher, job_data, conf_dir),
-        submit_msg_fn=submit_msg_fn,
-        completed_msg_fn=completed_msg_fn,
-        queue_conf=QueueConf(**queue_conf["beanstalkd"]),
-        tube=TUBE,
-    )
+    try:
+        print("os.getpid() in listener", os.getpid())
+        listen(
+            job_data_type=AnnotationJobData,
+            handler_fn=lambda publisher, job_data: handler_fn(publisher, job_data, conf_dir),
+            submit_msg_fn=submit_msg_fn,
+            completed_msg_fn=completed_msg_fn,
+            queue_conf=QueueConf(**queue_conf["beanstalkd"]),
+            tube=TUBE,
+        )
+    except Exception as e:
+        print("GOT EXCEPTION", e)
+
+        # parent = psutil.Process(os.getpid())
+        # for child in parent.children(recursive=True):  # or parent.children() for recursive=False
+        #     print("child", child)
+        #     child.kill()
+        # parent.kill()
+        # os.kill(os.getpid(), signal.SIGINT)
 
 
 if __name__ == "__main__":

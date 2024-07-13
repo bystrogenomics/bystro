@@ -7,7 +7,7 @@ package Seq;
 our $VERSION = '0.001';
 # ABSTRACT: Annotate a snp file
 
-# TODO: make temp_dir handling more transparent
+use Fcntl qw(:flock);
 use Mouse 2;
 use Types::Path::Tiny qw/AbsFile/;
 
@@ -23,6 +23,7 @@ use JSON::XS;
 use Seq::DBManager;
 use Path::Tiny;
 use Scalar::Util qw/looks_like_number/;
+use Try::Tiny;
 
 extends 'Seq::Base';
 
@@ -116,6 +117,11 @@ sub annotateFile {
   my $self = shift;
   my $type = shift;
 
+  my $lockFh;
+  my $lockPath = $self->outDir->child('bystro_annotation.lock')->stringify;
+  open $lockFh, ">", $lockPath or die $!; 
+  flock $lockFh, LOCK_EX|LOCK_NB or die "Another instance is running: $!";
+
   my ( $err, $inFhs, $outFh, $statsFh, $headerFh, $preOutArgs ) =
     $self->_getFileHandles($type);
 
@@ -123,6 +129,10 @@ sub annotateFile {
     $self->_errorWithCleanup($err);
     return ( $err, undef );
   }
+
+  # Create a file "bystro_annotation_lock" in the destination directory
+  # and get an exclusive lock
+  # If that fails, we know that another process is running, and we should exit
 
   ########################## Write the header ##################################
   my $header;
@@ -583,6 +593,14 @@ sub annotateFile {
     $self->_errorWithCleanup($humanErr);
     return ( $humanErr, undef );
   }
+
+  # remove the lock file and delete
+  try {
+    close($lockFh);
+    unlink($lockPath);
+  } catch {
+    $self->log('warn', "Failed to close and delete lock file: $_");
+  };
 
   return ( $err, $self->outputFilesInfo, $totalAnnotated, $totalSkipped );
 }
