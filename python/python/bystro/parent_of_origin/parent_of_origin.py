@@ -35,13 +35,13 @@ POESingleSNP(BasePOE)
 """
 import numpy as np
 import numpy.linalg as la
-from typing import Tuple, Union, Optional
+from typing import Tuple, Union, Optional, List, Dict
 from numpy.typing import NDArray
 from tqdm import trange
 
 from numba import jit  # type: ignore
 
-from sklearn.utils import resample
+from sklearn.utils import resample # type: ignore
 
 from bystro.covariance.optimal_shrinkage import optimal_shrinkage
 from bystro.covariance._covariance_np import (
@@ -150,8 +150,20 @@ class POESingleSNP(BasePOE):
         compute_pvalue : bool, optional, default=False
             Whether to compute p-values for the test.
 
-        n_permutations : int, optional, default=10000
-            The number of permutations to perform for significance testing.
+        compute_ci : bool, optional, default=False
+            Whether to compute confidence intervals.
+
+        store_samples : bool, optional, default=False
+            Whether to store bootstrap samples.
+
+        pval_method : str, optional, default="rmt4ds"
+            The method for p-value computation.
+
+        n_permutations_pval : int, optional, default=10000
+            The number of permutations for p-value calculation.
+
+        n_permutations_bootstrap : int, optional, default=10000
+            The number of permutations for bootstrap confidence intervals.
 
         cov_regularization : str, optional, default="Empirical"
             The method of covariance regularization to use. Must be one of:
@@ -209,17 +221,20 @@ class POESingleSNP(BasePOE):
 
         Parameters
         ----------
-        X : np.array-like, shape=(N, self.p)
-            The phenotype data
+        X : np.array-like, shape=(N, p)
+            The phenotype data.
 
         y : np.array-like, shape=(N,)
             The genotype data indicating the number of copies of the
-            minority allele
+            minority allele.
+
+        seed : int, optional, default=2021
+            Seed for the random number generator.
 
         Returns
         -------
         self : POESingleSNP
-            The instance of the method
+            The instance of the method.
         """
         self._test_inputs(X, y)
         self.n_phenotypes = X.shape[1]
@@ -509,6 +524,148 @@ class POEMultipleSNP(BasePOE):
             pval, parent_effect = subfunction(X, Y[:, i])
             self.p_vals[i] = pval
             self.parent_effects_[i] = parent_effect
+
+        return self
+
+    def transform(
+        self, X: np.ndarray, return_inner: bool = False
+    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+        """
+        This method predicts whether the heterozygote allele came from
+        a maternal/paternal origin. Note that due to a lack of
+        identifiability, we can't state whether class 1 is paternal or
+        maternal
+
+        Parameters
+        ----------
+        X : np.array-like, shape=(N, self.phenotypes)
+            The phenotype data
+
+        return_inner : bool, default=False
+            Whether to return the inner product classification, a measure
+            of confidence in the call
+
+        Returns
+        -------
+        calls : np.array-like, shape=(N,self.n_genotypes)
+            A vector of 1s and 0s predicting class
+
+        preds : np.array-like, shape=(N,self.n_genotypes)
+            The inner product, representing confidence in calls
+        """
+        N = X.shape[0]
+        calls = np.zeros((N, self.n_genotypes))
+        preds = np.zeros((N, self.n_genotypes))
+        X_dm = X - np.mean(X, axis=0)
+        for i in range(self.n_genotypes):
+            preds[:, i] = np.dot(X_dm, self.parent_effects_[i])
+            calls[:, i] = 1.0 * (preds[:, i] > 0)
+        if return_inner is False:
+            return calls
+        return calls, preds
+
+    def _test_inputs(self, X: np.ndarray, Y: np.ndarray) -> None:
+        if not isinstance(X, np.ndarray):
+            raise ValueError("X is numpy array")
+        if not isinstance(Y, np.ndarray):
+            raise ValueError("y is numpy array")
+        if X.shape[0] != Y.shape[0]:
+            raise ValueError("X and Y have different sample sizes")
+
+
+class POEMultipleSNP2(BasePOE):
+    """ """
+
+    def __init__(
+        self,
+        pval_method: str = "rmt4ds",
+        cov_regularization: str = "Empirical",
+        svd_loss: Optional[str] = None,
+        n_repeats: int = 1000,
+    ) -> None:
+        """
+        Raises
+        ------
+        ValueError
+            If `cov_regularization` is not one of the allowable values.
+        """
+        self.pval_method = pval_method
+        self.cov_regularization = cov_regularization
+        self.svd_loss = svd_loss
+        self.n_repeats = n_repeats
+        self.p_vals: np.ndarray = np.array([])  # Initialize with an empty array
+        self.parent_effects_: np.ndarray = np.array(
+            []
+        )  # Initialize with an empty array
+
+    def fit(
+        self, X: np.ndarray, Y: np.ndarray, seed: int = 2021
+    ) -> "POEMultipleSNP2":
+        """
+        Fit the POEMultipleSNP2 model.
+
+        Parameters
+        ----------
+        X : np.array-like, shape=(N, self.n_phenotypes)
+            The phenotype data
+
+        Y : np.array-like, shape=(N, self.n_genotypes)
+            The genotype data indicating the number of copies of the
+            minority allele
+
+        seed : int, optional, default=2021
+            Seed for the random number generator.
+
+        Returns
+        -------
+        self : POEMultipleSNP2
+            The instance of the method
+        """
+        self._test_inputs(X, Y)
+        self.n_phenotypes = X.shape[1]
+        self.n_genotypes = Y.shape[1]
+
+        self.p_vals = -1 * np.ones(self.n_genotypes)
+        self.parent_effects_ = np.zeros((self.n_genotypes, self.n_phenotypes))
+
+        MAF = np.mean(Y > 0, axis=0)
+        MAF_thresholds = [0.005, 0.01, 0.05]
+
+        permutation_results: Dict[float, List[List[float]]] = {
+            threshold: [] for threshold in MAF_thresholds
+        }
+
+        rng = np.random.default_rng(seed)
+        for threshold in MAF_thresholds:
+            for _ in range(self.n_repeats):
+                permuted_Y = rng.permutation(Y)
+                norm_values = []
+                for i in range(self.n_genotypes):
+                    model = POESingleSNP(compute_pvalue=False, compute_ci=False)
+                    model.fit(X, permuted_Y[:, i], seed=seed)
+                    norm_values.append(
+                        float(np.linalg.norm(model.parent_effect_))
+                    )
+                permutation_results[threshold].append(norm_values)
+
+        for i in range(self.n_genotypes):
+            model = POESingleSNP(compute_pvalue=False, compute_ci=False)
+            model.fit(X, Y[:, i], seed=seed)
+            self.parent_effects_[i] = model.parent_effect_
+
+            current_maf = MAF[i]
+            appropriate_threshold = max(
+                [t for t in MAF_thresholds if t <= current_maf],
+                default=min(MAF_thresholds),
+            )
+            permutation_vector = np.array(
+                permutation_results[appropriate_threshold]
+            ).flatten()
+            observed_norm = np.linalg.norm(model.parent_effect_)
+
+            # Calculate the p-value using the empirical CDF
+            p_value = (permutation_vector >= observed_norm).mean()
+            self.p_vals[i] = p_value
 
         return self
 
