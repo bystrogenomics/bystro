@@ -6,15 +6,11 @@
 import argparse
 import os
 import glob
-import subprocess
 import tempfile
 import json
 import shutil
 import yaml
-import psutil
-import sys
 from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage, SubmittedJobMessage
-import signal
 
 from msgspec import Struct
 from bystro.beanstalkd.worker import listen, ProgressPublisher, QueueConf
@@ -160,25 +156,14 @@ def main():
     with open(queue_conf_path, "r", encoding="utf-8") as file:
         queue_conf = yaml.safe_load(file)
 
-    try:
-        listen(
-            job_data_type=AnnotationJobData,
-            handler_fn=lambda publisher, job_data: handler_fn(publisher, job_data, conf_dir),
-            submit_msg_fn=submit_msg_fn,
-            completed_msg_fn=completed_msg_fn,
-            queue_conf=QueueConf(**queue_conf["beanstalkd"]),
-            tube=TUBE,
-        )
-    except Exception as e:
-        print("GOT EXCEPTION", e)
-
-        # parent = psutil.Process(os.getpid())
-        # for child in parent.children(recursive=True):  # or parent.children() for recursive=False
-        #     print("child", child)
-        #     child.kill()
-        # parent.kill()
-        # os.kill(os.getpid(), signal.SIGINT)
-
+    listen(
+        job_data_type=AnnotationJobData,
+        handler_fn=lambda publisher, job_data: handler_fn(publisher, job_data, conf_dir),
+        submit_msg_fn=submit_msg_fn,
+        completed_msg_fn=completed_msg_fn,
+        queue_conf=QueueConf(**queue_conf["beanstalkd"]),
+        tube=TUBE,
+    )
 
 if __name__ == "__main__":
     main()

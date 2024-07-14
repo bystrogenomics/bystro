@@ -3,9 +3,8 @@
 from concurrent import futures
 from concurrent.futures import ProcessPoolExecutor
 
-import multiprocessing
-import queue
 import logging
+import multiprocessing
 import os
 import signal
 import sys
@@ -14,11 +13,11 @@ import traceback
 from collections.abc import Callable
 from textwrap import dedent
 from typing import Any, TypeVar
-import psutil
-import cloudpickle
 
+import cloudpickle
 from msgspec import DecodeError, ValidationError, json
-from pystalk import BeanstalkClient, BeanstalkError  # type: ignore
+from pystalk import BeanstalkClient  # type: ignore
+import psutil
 
 from bystro.beanstalkd.messages import (
     BeanstalkJobID,
@@ -31,10 +30,10 @@ from bystro.beanstalkd.messages import (
 )
 
 BEANSTALK_ERR_TIMEOUT = "TIMED_OUT"
-QUEUE_RESERVE_JOB_TIMEOUT_TIME = int(os.getenv("BYSTRO_BEANSTALKD_RESERVE_JOB_TIMEOUT", "5"))
-QUEUE_JOB_HEARTBEAT_INTERVAL = int(os.getenv("BYSTRO_BEANSTALKD_JOB_HEARTBEAT_INTERVAL", "5"))
+QUEUE_RESERVE_JOB_TIMEOUT_TIME = int(os.getenv("BYSTRO_BEANSTALKD_RESERVE_JOB_TIMEOUT", "20"))
+QUEUE_JOB_HEARTBEAT_INTERVAL = int(os.getenv("BYSTRO_BEANSTALKD_JOB_HEARTBEAT_INTERVAL", "20"))
 # Must be larger than QUEUE_RESERVE_JOB_TIMEOUT_TIME and QUEUE_JOB_HEARTBEAT_INTERVAL
-QUEUE_CONSUMER_SOCKET_TIMEOUT = int(os.getenv("BYSTRO_BEANSTALKD_CONSUMER_SOCKET_TIMEOUT", "10"))
+QUEUE_CONSUMER_SOCKET_TIMEOUT = int(os.getenv("BYSTRO_BEANSTALKD_CONSUMER_SOCKET_TIMEOUT", "30"))
 
 T = TypeVar("T", bound=BaseMessage)
 T2 = TypeVar("T2", bound=BaseMessage)
@@ -104,11 +103,6 @@ def handle_job(handler_fn, publisher, job_data):
         return e
 
 
-def handler_fnBaz(publisher, job_data):
-    print("GOT JOB DATA", job_data)
-    return job_data
-
-
 def default_failed_msg_fn(
     job_data: T | None, job_id: BeanstalkJobID, err: Exception
 ) -> FailedJobMessage | InvalidJobMessage:  # noqa: E501
@@ -116,24 +110,6 @@ def default_failed_msg_fn(
     if job_data is None:
         return InvalidJobMessage(queue_id=job_id, reason=str(err))
     return FailedJobMessage(submission_id=job_data.submission_id, reason=str(err))
-
-
-def _shutdown():
-    executor.shutdown(wait=False)
-
-    logger.error("Shutdown called")
-    parent = psutil.Process(os.getpid())
-    for child in parent.children(recursive=True):  # or parent.children() for recursive=False
-        logger.error(f"Killing child PID: {child}")
-        try:
-            child.kill()
-        except Exception:
-            logger.error(f"Failed to kill child PID: {child}")
-    try:
-        parent.kill()
-    except Exception:
-        logger.error(f"Failed to kill parent PID: {parent}")
-    sys.exit(0)
 
 
 def _touch(client: BeanstalkClient, job_id: BeanstalkJobID):
