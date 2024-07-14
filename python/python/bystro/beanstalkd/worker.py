@@ -2,6 +2,9 @@
 
 from concurrent import futures
 from concurrent.futures import ProcessPoolExecutor
+
+import multiprocessing
+import queue
 import logging
 import os
 import signal
@@ -40,10 +43,14 @@ T3 = TypeVar("T3", bound=BaseMessage)
 logger = logging.getLogger(__name__)
 
 class FunctionWrapper:
-    def __init__(self, fn):
+    def __init__(self, fn, queue):
         self.fn_ser = cloudpickle.dumps(fn)
+        self.queue = queue
 
     def __call__(self, *args, **kwargs):
+        worker_pid = os.getpid()
+        self.queue.put(worker_pid)
+
         fn = cloudpickle.loads(self.fn_ser)
         return fn(*args, **kwargs)
 
@@ -60,25 +67,30 @@ class NotFoundError(Exception):
 
 
 # Signal handler function
-def sigterm_handler(_signum, _frame):
-    print("SIGINT received. Cleaning up...")
-    # executor.shutdown(wait=False)
+def kill_child_processes(parent_pid = os.getpid(), kill_parent=False):
+    parent = psutil.Process(parent_pid)
 
-    parent = psutil.Process(os.getpid())
-    print("parent", parent)
-    print("children", parent.children(recursive=True))
     for child in parent.children(recursive=True):  # or parent.children() for recursive=False
-        print("child", child)
-        child.kill()
-    parent.kill()
+        try:
+            logger.info("Killing child process %s", child)
+            child.kill()
+        except Exception as e:
+            logger.error("Failed to kill child %s due to: %s", child, e)
+
+    if kill_parent:
+        try:
+            logger.info("Killing parent process %s", parent)
+            parent.kill()
+        except Exception as e:
+            logger.error("Failed to kill parent %s due to: %s", parent, e)
+
+def sigterm_handler(_signum, _frame):
+    kill_child_processes()
     sys.exit(0)
 
-
 # Set up the signal handler in the main thread
-# signal.signal(signal.SIGTERM, sigterm_handler)
+signal.signal(signal.SIGTERM, sigterm_handler)
 signal.signal(signal.SIGINT, sigterm_handler)
-# signal.signal(signal.SIGQUIT, sigterm_handler)
-
 
 def handle_job(handler_fn, publisher, job_data):
     try:
@@ -122,8 +134,6 @@ def _touch(client: BeanstalkClient, job_id: BeanstalkJobID, future: Any):
         client._send_message(f"touch {job_id}", socket)  # noqa: SLF001
         return client._receive_word(socket, b"TOUCHED")  # noqa: SLF001
 
-
-print("os.getpid() in worker global", os.getpid())
 
 class WrapHandlerFn:
     def __init__(self, handler_fn: Callable[[ProgressPublisher, T], Any], publisher: ProgressPublisher):
@@ -206,62 +216,71 @@ def listen(
                 )
 
                 client.put_job(json.encode(submit_msg_fn(job_data)))
-                with ProcessPoolExecutor(max_workers=1) as executor:
-                    future = executor.submit(FunctionWrapper(handler_fn), publisher, job_data)
 
-                    # Ensure job is kept alive indefinitely, until completion
-                    # Some jobs are potentially weeks long
-                    last_touch_time = time.time()
+                with multiprocessing.Manager() as manager:
+                    pid_queue = manager.Queue()
+                    with ProcessPoolExecutor(max_workers=1) as executor:
+                        future = executor.submit(FunctionWrapper(handler_fn, pid_queue), publisher, job_data)
+                        
+                        future_pid = pid_queue.get()
+                        logger.info("Started worker for function %s. Parent PID: %s, Worker pid: %s", handler_fn,  os.getpid(), future_pid)
 
-                    failed_touch = False
-                    while True:
+                        # Ensure job is kept alive indefinitely, until completion
+                        # Some jobs are potentially weeks long
+                        last_touch_time = time.time()
+
                         failed_touch = False
-                        # Check if the handle_job task is complete
-                        try:
-                            if future.done():
-                                _touch(client, job_id, future)
-                                last_touch_time = time.time()
+
+                        while True:
+                            failed_touch = False
+                            # Check if the handle_job task is complete
+                            try:
+                                if future.done():
+                                    _touch(client, job_id, future)
+                                    last_touch_time = time.time()
+                                    break
+
+                                if time.time() - last_touch_time >= QUEUE_JOB_HEARTBEAT_INTERVAL:
+                                    _touch(client, job_id, future)
+                                    last_touch_time = time.time()
+                            except TimeoutError:
+                                logger.warning("Job %s  _touch timed out", job_id)
+                            except Exception as err:
+                                # The only expected error is NOT_FOUND which means the job is no longer bound
+                                # to the worker.
+                                # This means we must terminate processing of this job, since other
+                                # workers may to pick it up for processing
+                                # Any other exception is even more odd, and suggest a fatal error
+                                # related to beanstalkd communication, which again could potentially
+                                # lead to duplicate job processing
+                                logger.error(
+                                    "Job %s _touch failed with %s, shutting down job processing", job_id, err
+                                )
+                                failed_touch = True
                                 break
 
-                            if time.time() - last_touch_time >= QUEUE_JOB_HEARTBEAT_INTERVAL:
-                                _touch(client, job_id, future)
-                                last_touch_time = time.time()
-                        except TimeoutError:
-                            logger.warning("Job %s  _touch timed out", job_id)
-                        except Exception as err:
-                            # The only expected error is NOT_FOUND which means the job is no longer bound
-                            # to the worker.
-                            # This means we must terminate processing of this job, since other
-                            # workers may to pick it up for processing
-                            # Any other exception is even more odd, and suggest a fatal error
-                            # related to beanstalkd communication, which again could potentially
-                            # lead to duplicate job processing
-                            logger.error(
-                                "Job %s _touch failed with %s, shutting down job processing", job_id, err
-                            )
-                            failed_touch = True
-                            break
+                        if failed_touch:
+                            executor.shutdown(wait=False, cancel_futures=True)
 
-                    if failed_touch:
-                        future.cancel()
-                        executor.shutdown(wait=True, cancel_futures=True)
-                        failed_touch = True
+                            try:
+                                kill_child_processes(future_pid, True)
+                            except Exception as e:
+                                logger.error("Failed to kill job worker PID: %s due to: %s", future_pid, e)
 
-                        try:
-                            client.release_job(job.job_id)
-                        except Exception as err:
-                            logger.error("Failed to release job with id %s due to: %s", job.job_id, err)
+                            try:
+                                client.release_job(job.job_id)
+                            except Exception as err:
+                                logger.error("Failed to release job with id %s due to: %s", job.job_id, err)
 
-                        continue
+                            continue
 
-                    res = future.result()
-                    print("res", res)
+                        res = future.result()
 
-                    if isinstance(res, Exception):
-                        raise res
+                        if isinstance(res, Exception):
+                            raise res
 
-                    client.put_job(json.encode(completed_msg_fn(job_data, res)))
-                    client.delete_job(job.job_id)
+                        client.put_job(json.encode(completed_msg_fn(job_data, res)))
+                        client.delete_job(job.job_id)
             except Exception as err:
                 traceback.print_exc()
 

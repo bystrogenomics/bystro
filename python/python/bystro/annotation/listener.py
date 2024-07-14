@@ -164,7 +164,6 @@ def main():
         queue_conf = yaml.safe_load(file)
 
     try:
-        print("os.getpid() in listener", os.getpid())
         listen(
             job_data_type=AnnotationJobData,
             handler_fn=lambda publisher, job_data: handler_fn(publisher, job_data, conf_dir),
