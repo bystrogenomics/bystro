@@ -124,7 +124,7 @@ sub annotateFile {
   my $lockPath = $self->outDir->child($ANNOTATION_LOCK_FILE_NAME)->stringify;
   my $outDir = $self->outDir->stringify;
   open $lockFh, ">", $lockPath or die $!;
-  flock $lockFh, LOCK_EX | LOCK_NB or die "Multiple Bystro annotator instances are competing to process a dataset whose output directory is $outDir. If you are running the Bystro Annotator from the Bystro UI, this is likely because of a network interruption that resulted in double submission. You may retry the job at any time. Error: $!";
+  flock $lockFh, LOCK_EX | LOCK_NB or die "Multiple Bystro annotator instances are competing to process  $outDir. If you are running the Bystro Annotator from the Bystro UI, this is likely because of a network interruption that resulted in double submission. Please retry this job. Error: $!";
 
   # Check if $ANNOTATION_COMPLTE_FILE_NAME exists in the outDir, and if it does, exit
   my $annotationCompletePath =
