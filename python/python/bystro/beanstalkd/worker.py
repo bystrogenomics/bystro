@@ -14,7 +14,7 @@ from collections.abc import Callable
 from textwrap import dedent
 from typing import Any, TypeVar
 
-import cloudpickle
+import cloudpickle # type: ignore
 from msgspec import DecodeError, ValidationError, json
 from pystalk import BeanstalkClient  # type: ignore
 import psutil
