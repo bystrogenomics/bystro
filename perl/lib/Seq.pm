@@ -132,7 +132,7 @@ sub annotateFile {
     my $annotationOutputDir = $self->outDir->stringify;
     $self->_errorWithCleanup('Annotation already completed');
     return (
-      "Skipping annotation. We found the annotation status file `$ANNOTATION_COMPLTE_FILE_NAME` in the target ouput directory `$annotationOutputDir`, which suggests that this directory already contains a completed annotation. If you think this is an error and you do wish to annotate and output to this directory, delete `$annotationCompletePath`.",
+      "Skipping annotation. We found the annotation status file `$ANNOTATION_COMPLTE_FILE_NAME` in the target ouput directory `$annotationOutputDir`, which suggests that this directory already contains a completed annotation. This is most likely caused by one of two reasons: 1) You are trying to re-run an annotation and are outputting to an existing output directory, or 2) There are network connectivity issues, such as with a load balancing server, and this annotation was accidentally double-submitted. If you think this is an error and you do wish to annotate and output to this directory, delete `$annotationCompletePath`.",
       undef
     );
   }
