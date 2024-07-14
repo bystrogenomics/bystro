@@ -14,7 +14,7 @@ from collections.abc import Callable
 from textwrap import dedent
 from typing import Any, TypeVar
 
-import cloudpickle # type: ignore
+import cloudpickle  # type: ignore
 from msgspec import DecodeError, ValidationError, json
 from pystalk import BeanstalkClient  # type: ignore
 import psutil
@@ -53,18 +53,6 @@ class FunctionWrapper:
 
         fn = cloudpickle.loads(self.fn_ser)
         return fn(*args, **kwargs)
-
-
-class NotFoundError(Exception):
-    """
-    A NOT_FOUND Beanstalkd error arises
-    when a job is no longer bound to the worker
-
-    In these cases, there is no safe way to continue processing the job
-    """
-
-    def __init__(self, job_id: BeanstalkJobID):
-        super().__init__(f"Job {job_id} is no longer bound to this worker")
 
 
 # Signal handler function
@@ -217,9 +205,7 @@ def listen(
             with multiprocessing.Manager() as manager:
                 pid_queue = manager.Queue()
                 with ProcessPoolExecutor(max_workers=1) as executor:
-                    future = executor.submit(
-                        FunctionWrapper(handler_fn, pid_queue), publisher, job_data
-                    )
+                    future = executor.submit(FunctionWrapper(handler_fn, pid_queue), publisher, job_data)
 
                     future_pid = pid_queue.get()
                     logger.info(
@@ -271,16 +257,12 @@ def listen(
                         try:
                             kill_child_processes(future_pid, True)
                         except Exception as e:
-                            logger.error(
-                                "Failed to kill job worker PID: %s due to: %s", future_pid, e
-                            )
+                            logger.error("Failed to kill job worker PID: %s due to: %s", future_pid, e)
 
                         try:
                             client.release_job(job.job_id)
                         except Exception as err:
-                            logger.error(
-                                "Failed to release job with id %s due to: %s", job.job_id, err
-                            )
+                            logger.error("Failed to release job with id %s due to: %s", job.job_id, err)
 
                         continue
 
