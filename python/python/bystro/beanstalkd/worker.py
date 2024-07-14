@@ -136,7 +136,7 @@ def _shutdown():
     sys.exit(0)
 
 
-def _touch(client: BeanstalkClient, job_id: BeanstalkJobID, future: Any):
+def _touch(client: BeanstalkClient, job_id: BeanstalkJobID):
     # Ping the server periodically while waiting for the handler to finish
     with client._sock_ctx() as socket:  # noqa: SLF001
         client._send_message(f"touch {job_id}", socket)  # noqa: SLF001
@@ -260,15 +260,16 @@ def listen(
                     failed_touch = False
                     while True:
                         failed_touch = False
+                        time.sleep(1)
                         # Check if the handle_job task is complete
                         try:
                             if future.done():
-                                _touch(client, job_id, future)
+                                _touch(client, job_id)
                                 last_touch_time = time.time()
                                 break
 
                             if time.time() - last_touch_time >= QUEUE_JOB_HEARTBEAT_INTERVAL:
-                                _touch(client, job_id, future)
+                                _touch(client, job_id)
                                 last_touch_time = time.time()
                         except TimeoutError:
                             logger.warning("Job %s  _touch timed out", job_id)

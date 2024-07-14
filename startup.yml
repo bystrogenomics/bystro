@@ -5,4 +5,4 @@ apps:
     args: --conf_dir config --queue_conf config/beanstalk.yml
     log_date_format: "YYYY-MM-DD HH:mm:ss Z"
     exec_mode: "fork"
-    instances: 1
+    instances: 2
