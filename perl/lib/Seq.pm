@@ -27,6 +27,9 @@ use Try::Tiny;
 
 extends 'Seq::Base';
 
+our $ANNOTATION_COMPLTE_FILE_NAME = 'bystro_annotation.complete';
+our $ANNOTATION_LOCK_FILE_NAME    = 'bystro_annotation.lock';
+
 # We  add a few of our own annotation attributes
 # These will be re-used in the body of the annotation processor below
 # Users may configure these
@@ -118,9 +121,21 @@ sub annotateFile {
   my $type = shift;
 
   my $lockFh;
-  my $lockPath = $self->outDir->child('bystro_annotation.lock')->stringify;
-  open $lockFh, ">", $lockPath or die $!; 
-  flock $lockFh, LOCK_EX|LOCK_NB or die "Another instance is running: $!";
+  my $lockPath = $self->outDir->child($ANNOTATION_LOCK_FILE_NAME)->stringify;
+  open $lockFh, ">", $lockPath or die $!;
+  flock $lockFh, LOCK_EX | LOCK_NB or die "Another instance is running: $!";
+
+  # Check if $ANNOTATION_COMPLTE_FILE_NAME exists in the outDir, and if it does, exit
+  my $annotationCompletePath =
+    $self->outDir->child($ANNOTATION_COMPLTE_FILE_NAME)->stringify;
+  if ( -e $annotationCompletePath ) {
+    my $annotationOutputDir = $self->outDir->stringify;
+    $self->_errorWithCleanup('Annotation already completed');
+    return (
+      "Skipping annotation. We found the annotation status file `$ANNOTATION_COMPLTE_FILE_NAME` in the target ouput directory `$annotationOutputDir`, which suggests that this directory already contains a completed annotation. If you think this is an error and you do wish to annotate and output to this directory, delete `$annotationCompletePath`.",
+      undef
+    );
+  }
 
   my ( $err, $inFhs, $outFh, $statsFh, $headerFh, $preOutArgs ) =
     $self->_getFileHandles($type);
@@ -594,13 +609,17 @@ sub annotateFile {
     return ( $humanErr, undef );
   }
 
-  # remove the lock file and delete
-  try {
-    close($lockFh);
-    unlink($lockPath);
-  } catch {
-    $self->log('warn', "Failed to close and delete lock file: $_");
-  };
+  my $completionPath = $self->outDir->child($ANNOTATION_COMPLTE_FILE_NAME)->stringify;
+
+  $err = $self->safeSystem("touch $completionPath");
+
+  if ($err) {
+    my $humanErr = "Failed to create completion file";
+    $self->_errorWithCleanup($humanErr);
+    return ( $humanErr, undef );
+  }
+
+  $self->log( 'info', "Created completion file" );
 
   return ( $err, $self->outputFilesInfo, $totalAnnotated, $totalSkipped );
 }

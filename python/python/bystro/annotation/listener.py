@@ -66,9 +66,6 @@ def _run_annotation(json_config_file: str, result_summary_path: str) -> Annotati
 
     returncode = os.system(" ".join(command))
 
-    # process = subprocess.Popen(command)
-    # process.wait()
-    print("returncdoe in _run_annotation", returncode)
     if returncode != 0:
         raise RuntimeError(f"Annotation script execution failed: {returncode}")
 
