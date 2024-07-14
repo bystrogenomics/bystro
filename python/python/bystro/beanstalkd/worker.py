@@ -107,16 +107,6 @@ def _touch(client: BeanstalkClient, job_id: BeanstalkJobID):
         return client._receive_word(socket, b"TOUCHED")  # noqa: SLF001
 
 
-class WrapHandlerFn:
-    def __init__(self, handler_fn: Callable[[ProgressPublisher, T], Any], publisher: ProgressPublisher):
-        self.handler_fn = cloudpickle.dumps(handler_fn)
-        self.publisher = publisher
-
-    def __call__(self, job_data: T) -> Any:
-        handler_fn = cloudpickle.loads(self.handler_fn)
-        return handler_fn(self.publisher, job_data)
-
-
 def listen(
     job_data_type: type[T],
     handler_fn: Callable[[ProgressPublisher, T], Any],
