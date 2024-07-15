@@ -622,14 +622,16 @@ sub annotateFile {
     return ( $humanErr, undef );
   }
 
-  $self->log( 'info', "Created completion file" );
+  # Post moving files to output directory, we don't want to regenerate log file in the tmp dir
+  # so just log to STDERR
+  say STDERR "Created completion file";
 
   try {
     close($lockFh);
     unlink($lockPath);
   }
   catch {
-    $self->log( 'warn', "Failed to close and delete lock file: $_" );
+    say STDERR "Failed to close and delete lock file: $_";
   };
 
   return ( $err, $self->outputFilesInfo, $totalAnnotated, $totalSkipped );
