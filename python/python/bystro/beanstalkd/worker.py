@@ -16,7 +16,7 @@ from typing import Any, TypeVar
 
 import cloudpickle  # type: ignore
 from msgspec import DecodeError, ValidationError, json
-from pystalk import BeanstalkClient  # type: ignore
+from pystalk import BeanstalkClient, BeanstalkError  # type: ignore
 import psutil
 
 from bystro.beanstalkd.messages import (
@@ -39,7 +39,10 @@ T = TypeVar("T", bound=BaseMessage)
 T2 = TypeVar("T2", bound=BaseMessage)
 T3 = TypeVar("T3", bound=BaseMessage)
 
-logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+)
+logger = logging.getLogger()
 
 
 class FunctionWrapper:
@@ -148,13 +151,18 @@ def listen(
         try:
             job = client.reserve_job(QUEUE_RESERVE_JOB_TIMEOUT_TIME)
             job_id = int(job.job_id)  # type: ignore
+            logger.info("Reserved job with id: %s", job_id)
         except Exception as err:
-            logger.warning("Failed to reserve job: %s", err)
+            if isinstance(err, BeanstalkError) and err.message == BEANSTALK_ERR_TIMEOUT:
+                logger.info("No jobs available")
+            else:
+                logger.error("Failed to reserve job: %s", err)
             time.sleep(1)
             continue
 
         try:
             job_data = json.decode(job.job_data, type=job_data_type)
+            logger.info("Decoded data for job with id: %s: %s", job_id, job_data)
         except Exception as err:
             msg = Exception("Unknown error, check admin logs")
 
