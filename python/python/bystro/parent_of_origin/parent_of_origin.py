@@ -36,7 +36,10 @@ POESingleSNP(BasePOE)
 import numpy as np
 import numpy.linalg as la
 from typing import Tuple, Union, Optional
+from numpy.typing import NDArray
 from tqdm import trange
+
+from numba import jit  # type: ignore
 
 from sklearn.utils import resample
 
@@ -355,3 +358,201 @@ class POESingleSNP(BasePOE):
 
             self.confidence_interval_ = confidence_interval_
         return self
+
+
+class POEMultipleSNP(BasePOE):
+    """ """
+
+    def __init__(
+        self,
+        pval_method: str = "rmt4ds",
+        cov_regularization: str = "Empirical",
+        svd_loss: Optional[str] = None,
+    ) -> None:
+        """
+        Raises
+        ------
+        ValueError
+            If `cov_regularization` is not one of the allowable values.
+        """
+        self.pval_method = pval_method
+
+        self.cov_regularization = cov_regularization
+
+        self.svd_loss = svd_loss
+
+        self.p_vals: np.ndarray = np.empty(10)
+        self.parent_effects_: np.ndarray = np.empty(
+            (2, 10)
+        )  # Will be overwritten in fit
+
+    def fit(self, X: np.ndarray, Y: np.ndarray) -> "POEMultipleSNP":
+        """
+        Fit the POESingleSNP model.
+
+        Parameters
+        ----------
+        X : np.array-like, shape=(N, self.n_phenotypes)
+            The phenotype data
+
+        Y : np.array-like, shape=(N,self.n_genotypes)
+            The genotype data indicating the number of copies of the
+            minority allele
+
+        Returns
+        -------
+        self : POESingleSNP
+            The instance of the method
+        """
+        self._test_inputs(X, Y)
+        self.n_phenotypes = X.shape[1]
+        self.n_genotypes = Y.shape[1]
+
+        self.p_vals = -1 * np.ones(self.n_genotypes)
+        self.parent_effects_ = np.zeros((self.n_genotypes, self.n_phenotypes))
+
+        @jit
+        def subfunction(X: NDArray[np.float64], y: NDArray[np.float64]):
+            X_homozygotes = X[y == 0]
+            X_heterozygotes = X[y == 1]
+            X_homozygotes = X_homozygotes
+            X_heterozygotes = X_heterozygotes
+
+            Sigma_AA = np.cov(X_homozygotes.T)
+            L = la.cholesky(Sigma_AA)
+            L_inv = la.inv(L)
+
+            X_het_whitened = np.dot(X_heterozygotes, L_inv.T)
+            Sigma_AB_white = np.cov(X_het_whitened.T)
+
+            U, s, Vt = la.svd(Sigma_AB_white)
+
+            norm_a = np.maximum(s[0] - 1, 0)
+            parent_effect_white = Vt[0] * 2 * np.sqrt(norm_a)
+            parent_effect = np.dot(parent_effect_white, L.T)
+
+            X1 = X_heterozygotes
+            X2 = X_homozygotes
+            n1, p1 = X1.shape
+            n2, p2 = X2.shape
+            N1 = n1 - 1
+            N2 = n2 - 1
+            X1 = X1  # - np.mean(X1, axis=0)
+            X2 = X2  # - np.mean(X2, axis=0)
+
+            N = N1 + N2
+            c1 = N1 / N
+            c2 = N2 / N
+            yN1 = p1 / N1
+            yN2 = p2 / N2
+            S1 = X1.T @ X1 / N1
+            S2 = X2.T @ X2 / N2
+
+            def d2(y1, y2):
+                return (
+                    (y1 + y2 - y1 * y2)
+                    / (y1 * y2)
+                    * np.log((y1 + y2) / (y1 + y2 - y1 * y2))
+                    + y1 * (1 - y2) / (y2 * (y1 + y2)) * np.log(1 - y2)
+                    + y2 * (1 - y1) / (y1 * (y1 + y2)) * np.log(1 - y1)
+                )
+
+            def mu2(y1, y2):
+                return 0.5 * np.log((y1 + y2 - y1 * y2) / (y1 + y2)) - (
+                    y1 * np.log(1 - y2) + y2 * np.log(1 - y1)
+                ) / (y1 + y2)
+
+            def sigma2_2(y1, y2):
+                return -(
+                    2 * y1**2 * np.log(1 - y2) + 2 * y2**2 * np.log(1 - y1)
+                ) / (y1 + y2) ** 2 - 2 * np.log((y1 + y2) / (y1 + y2 - y1 * y2))
+
+            log_V1_ = np.log(la.det(S1 @ la.solve(S2, np.eye(p1)))) * (
+                N1 / 2
+            ) - np.log(
+                la.det(c1 * S1 @ la.solve(S2, np.eye(p2)) + c2 * np.eye(p2))
+            ) * (
+                N / 2
+            )
+            z_value = (
+                -2 / N * log_V1_ - p1 * d2(yN1, yN2) - mu2(yN1, yN2)
+            ) / np.sqrt(sigma2_2(yN1, yN2))
+
+            def erf(x):
+                # Constants used in the approximation formula
+                a1 = 0.254829592
+                a2 = -0.284496736
+                a3 = 1.421413741
+                a4 = -1.453152027
+                a5 = 1.061405429
+                p = 0.3275911
+
+                # Save the sign of x
+                sign = np.sign(x)
+                x = np.abs(x)
+
+                # A&S formula 7.1.26
+                t = 1.0 / (1.0 + p * x)
+                y = 1.0 - (
+                    ((((a5 * t + a4) * t) + a3) * t + a2) * t + a1
+                ) * t * np.exp(-x * x)
+
+                return sign * y
+
+            def norm_sf(z_value):
+                return 0.5 * (1 - erf(z_value / np.sqrt(2)))
+
+            pval = norm_sf(z_value)
+            return pval, parent_effect
+
+        for i in trange(self.n_genotypes):
+            pval, parent_effect = subfunction(X, Y[:, i])
+            self.p_vals[i] = pval
+            self.parent_effects_[i] = parent_effect
+
+        return self
+
+    def transform(
+        self, X: np.ndarray, return_inner: bool = False
+    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+        """
+        This method predicts whether the heterozygote allele came from
+        a maternal/paternal origin. Note that due to a lack of
+        identifiability, we can't state whether class 1 is paternal or
+        maternal
+
+        Parameters
+        ----------
+        X : np.array-like, shape=(N, self.phenotypes)
+            The phenotype data
+
+        return_inner : bool, default=False
+            Whether to return the inner product classification, a measure
+            of confidence in the call
+
+        Returns
+        -------
+        calls : np.array-like, shape=(N,self.n_genotypes)
+            A vector of 1s and 0s predicting class
+
+        preds : np.array-like, shape=(N,self.n_genotypes)
+            The inner product, representing confidence in calls
+        """
+        N = X.shape[0]
+        calls = np.zeros((N, self.n_genotypes))
+        preds = np.zeros((N, self.n_genotypes))
+        X_dm = X - np.mean(X, axis=0)
+        for i in range(self.n_genotypes):
+            preds[:, i] = np.dot(X_dm, self.parent_effects_[i])
+            calls[:, i] = 1.0 * (preds[:, i] > 0)
+        if return_inner is False:
+            return calls
+        return calls, preds
+
+    def _test_inputs(self, X: np.ndarray, Y: np.ndarray) -> None:
+        if not isinstance(X, np.ndarray):
+            raise ValueError("X is numpy array")
+        if not isinstance(Y, np.ndarray):
+            raise ValueError("y is numpy array")
+        if X.shape[0] != Y.shape[0]:
+            raise ValueError("X and Y have different sample sizes")
