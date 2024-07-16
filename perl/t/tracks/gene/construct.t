@@ -2,9 +2,9 @@
 use Test::More;
 
 use Seq::Tracks::Gene::Build;
-use Seq::DBManager
+use Seq::DBManager;
 
-  Seq::DBManager::initialize( { databaseDir => 'bar' } );
+Seq::DBManager::initialize( { databaseDir => 'bar' } );
 
 my $gene = Seq::Tracks::Gene::Build->new(
   {
