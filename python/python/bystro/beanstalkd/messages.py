@@ -13,8 +13,8 @@ BeanstalkJobID = int
 
 # seconds; default AWS load balancer TTL is 60 seconds
 # set the interval 2 seconds beforehand to make room for timing / network delays
-QUEUE_HEARTBEAT_INTERVAL = max(1, float(os.getenv("BYSTRO_BEANSTALKD_HEARTBEAT_INTERVAL", "30")))
-QUEUE_PRODUCER_TIMEOUT = max(1, float(os.getenv("BYSTRO_BEANSTALKD_PRODUCER_TIMEOUT", "10")))
+QUEUE_HEARTBEAT_INTERVAL = max(1, float(os.getenv("BYSTRO_BEANSTALKD_HEARTBEAT_INTERVAL", "20")))
+QUEUE_PRODUCER_TIMEOUT = max(1, float(os.getenv("BYSTRO_BEANSTALKD_PRODUCER_TIMEOUT", "30")))
 
 
 class Event(str, Enum):

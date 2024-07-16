@@ -266,17 +266,6 @@ sub _buildTranscript {
 
       $txSequence .= $refBase;
     }
-
-    # The above replaces this from _build_transcript_db;
-    # note that we still respect half-closed exonEnds range
-    # for ( my $i = 0; $i < @exon_starts; $i++ ) { #half closed
-    #   my $exon;
-    #   for ( my $abs_pos = $exon_starts[$i]; $abs_pos < $exon_ends[$i]; $abs_pos++ ) {
-    #     $exon .= $self->get_base( $abs_pos, 1 );
-    #   }
-    #   # say join ("\t", $exon_starts[$i], $exon_ends[$i], $exon);
-    #   $seq .= $exon;
-    # }
   }
 
   if ( $self->strand eq "-" ) {
@@ -617,20 +606,20 @@ sub _buildTranscriptErrors {
 
   if ( $codingSeq ne $codingSeq2 ) {
     if ( $self->debug ) {
-      say "condingSeq ne codingSeq2";
-      say "coding seq is: ";
+      say STDERR "condingSeq ne codingSeq2";
+      say STDERR "coding seq is: ";
       p $codingSeq;
-      say "coding seq length: ";
+      say STDERR "coding seq length: ";
       my $length = length($codingSeq);
       p $length;
-      say "coding seq 2 is: ";
+      say STDERR "coding seq 2 is: ";
       p $codingSeq2;
-      say "coding seq 2 length: ";
+      say STDERR "coding seq 2 length: ";
       $length = length($codingSeq2);
       p $length;
-      say "name of transcript:";
+      say STDERR "name of transcript:";
       p $self->name;
-      say "strand is";
+      say STDERR "strand is";
       p $self->strand;
 
       my $numSpliceStuff = 0;
@@ -643,9 +632,9 @@ sub _buildTranscriptErrors {
         }
       }
 
-      say "difference in length: " . ( length($codingSeq) - length($codingSeq2) );
-      say "number of splice things: $numSpliceStuff";
-      say "can be explained by splice things?: "
+      say STDERR "difference in length: " . ( length($codingSeq) - length($codingSeq2) );
+      say STDERR "number of splice things: $numSpliceStuff";
+      say STDERR "can be explained by splice things?: "
         . ( length($codingSeq) - length($codingSeq2) ) eq $numSpliceStuff ? "Yes" : "No";
     }
 
