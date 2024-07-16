@@ -35,7 +35,7 @@ POESingleSNP(BasePOE)
 """
 import numpy as np
 import numpy.linalg as la
-from typing import Tuple, Union, Optional
+from typing import Tuple, Union, Optional, Dict
 from numpy.typing import NDArray
 from tqdm import trange
 
@@ -634,7 +634,7 @@ class POEMultipleSNP2(BasePOE):
         self.parent_effects_ = np.zeros((self.n_genotypes, self.n_phenotypes))
 
         maf_thresholds = [0.05, 0.01, 0.001]
-        maf_perms = {}
+        maf_perms: Dict[float, np.ndarray] = {}
 
         rng = np.random.default_rng(seed)
         for maf in maf_thresholds:
@@ -674,7 +674,7 @@ class POEMultipleSNP2(BasePOE):
                 parent_effect_white = Vt[0] * 2 * np.sqrt(norm_a)
                 parent_effect = np.dot(parent_effect_white, L.T)
                 perms.append(np.linalg.norm(parent_effect))
-            maf_perms[maf] = perms
+            maf_perms[maf] = np.array(perms)
 
         for i in range(self.n_genotypes):
             current_maf = maf_vals[i]
@@ -694,7 +694,7 @@ class POEMultipleSNP2(BasePOE):
             self.parent_effects_[i] = model.parent_effect_
             norm_effect = np.linalg.norm(model.parent_effect_)
 
-            p_value = (np.array(relevant_perms) >= norm_effect).mean()
+            p_value = (relevant_perms >= norm_effect).mean()
             self.p_vals[i] = p_value
 
         return self
