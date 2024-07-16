@@ -255,6 +255,5 @@ def test_multi2_fit():
     data = generate_multivariate_data(
         beta_m, beta_p, rng, maf=0.03, n_individuals=50000, n_genotypes=1000
     )
-    maf_vals = 0.3 * np.ones(1000)
     model = POEMultipleSNP2()
-    model.fit(data["phenotypes"], data["genotypes"], maf_vals, seed=2021)
+    model.fit(data["phenotypes"], data["genotypes"], seed=2021)

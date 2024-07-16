@@ -591,6 +591,24 @@ class POEMultipleSNP2(BasePOE):
         """
         self.pval_method = pval_method
         self.cov_regularization = cov_regularization
+        if cov_regularization == "Empirical":
+            self.cov_reg: Union[
+                EmpiricalCovariance,
+                NonLinearShrinkageCovariance,
+                LinearInverseShrinkage,
+                QuadraticInverseShrinkage,
+            ] = EmpiricalCovariance()
+        elif cov_regularization == "NonLinear":
+            self.cov_reg = NonLinearShrinkageCovariance()
+        elif cov_regularization == "LinearInverse":
+            self.cov_reg = LinearInverseShrinkage()
+        elif cov_regularization == "QuadraticInverse":
+            self.cov_reg = QuadraticInverseShrinkage()
+        else:
+            raise ValueError(
+                "Invalid covariance regulator. Must be one of: Empirical, "
+                "NonLinear, LinearInverse, QuadraticInverse"
+            )
         self.svd_loss = svd_loss
         self.n_repeats = n_repeats
         self.p_vals: np.ndarray = np.array([])
@@ -600,7 +618,6 @@ class POEMultipleSNP2(BasePOE):
         self,
         X: np.ndarray,
         Y: np.ndarray,
-        maf_vals: np.ndarray,
         seed: int = 2021,
     ) -> "POEMultipleSNP2":
         """
@@ -614,9 +631,6 @@ class POEMultipleSNP2(BasePOE):
         Y : np.array-like, shape=(N, self.n_genotypes)
             The genotype data indicating the number of copies of the
             minority allele
-
-        maf_vals : np.array-like, shape=(self.n_genotypes,)
-            The Minor Allele Frequencies (MAF) of each genotype
 
         seed : int, optional, default=2021
             Seed for the random number generator.
@@ -633,6 +647,7 @@ class POEMultipleSNP2(BasePOE):
         self.p_vals = -1 * np.ones(self.n_genotypes)
         self.parent_effects_ = np.zeros((self.n_genotypes, self.n_phenotypes))
 
+        maf_vals = np.mean(Y > 0, axis=0)
         maf_thresholds = [0.05, 0.01, 0.001]
         maf_perms: Dict[float, np.ndarray] = {}
 
@@ -654,7 +669,7 @@ class POEMultipleSNP2(BasePOE):
 
                 X_homo = X_homo - np.mean(X_homo, axis=0)
                 X_het = X_het - np.mean(X_het, axis=0)
-                cov_reg = EmpiricalCovariance()
+                cov_reg = self.cov_reg
                 cov_reg.fit(X_homo)
                 Sigma_AA = np.array(cov_reg.covariance)
                 L = la.cholesky(Sigma_AA)
