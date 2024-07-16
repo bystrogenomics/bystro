@@ -35,13 +35,13 @@ POESingleSNP(BasePOE)
 """
 import numpy as np
 import numpy.linalg as la
-from typing import Tuple, Union, Optional, List, Dict
+from typing import Tuple, Union, Optional
 from numpy.typing import NDArray
 from tqdm import trange
 
 from numba import jit  # type: ignore
 
-from sklearn.utils import resample # type: ignore
+from sklearn.utils import resample  # type: ignore
 
 from bystro.covariance.optimal_shrinkage import optimal_shrinkage
 from bystro.covariance._covariance_np import (
@@ -593,13 +593,15 @@ class POEMultipleSNP2(BasePOE):
         self.cov_regularization = cov_regularization
         self.svd_loss = svd_loss
         self.n_repeats = n_repeats
-        self.p_vals: np.ndarray = np.array([])  # Initialize with an empty array
-        self.parent_effects_: np.ndarray = np.array(
-            []
-        )  # Initialize with an empty array
+        self.p_vals: np.ndarray = np.array([])
+        self.parent_effects_: np.ndarray = np.array([])
 
     def fit(
-        self, X: np.ndarray, Y: np.ndarray, seed: int = 2021
+        self,
+        X: np.ndarray,
+        Y: np.ndarray,
+        maf_vals: np.ndarray,
+        seed: int = 2021,
     ) -> "POEMultipleSNP2":
         """
         Fit the POEMultipleSNP2 model.
@@ -612,6 +614,9 @@ class POEMultipleSNP2(BasePOE):
         Y : np.array-like, shape=(N, self.n_genotypes)
             The genotype data indicating the number of copies of the
             minority allele
+
+        maf_vals : np.array-like, shape=(self.n_genotypes,)
+            The Minor Allele Frequencies (MAF) of each genotype
 
         seed : int, optional, default=2021
             Seed for the random number generator.
@@ -628,43 +633,68 @@ class POEMultipleSNP2(BasePOE):
         self.p_vals = -1 * np.ones(self.n_genotypes)
         self.parent_effects_ = np.zeros((self.n_genotypes, self.n_phenotypes))
 
-        MAF = np.mean(Y > 0, axis=0)
-        MAF_thresholds = [0.005, 0.01, 0.05]
-
-        permutation_results: Dict[float, List[List[float]]] = {
-            threshold: [] for threshold in MAF_thresholds
-        }
+        maf_thresholds = [0.05, 0.01, 0.001]
+        maf_perms = {}
 
         rng = np.random.default_rng(seed)
-        for threshold in MAF_thresholds:
+        for maf in maf_thresholds:
+            perms = []
             for _ in range(self.n_repeats):
-                permuted_Y = rng.permutation(Y)
-                norm_values = []
-                for i in range(self.n_genotypes):
-                    model = POESingleSNP(compute_pvalue=False, compute_ci=False)
-                    model.fit(X, permuted_Y[:, i], seed=seed)
-                    norm_values.append(
-                        float(np.linalg.norm(model.parent_effect_))
+                n_total = X.shape[0]
+                homo_prob = (1 - maf) ** 2
+                homo_count = int(homo_prob * n_total)
+                het_count = n_total - homo_count
+
+                perm_indices = rng.permutation(n_total)
+                homo_indices = perm_indices[:homo_count]
+                het_indices = perm_indices[homo_count : homo_count + het_count]
+
+                X_homo = X[homo_indices]
+                X_het = X[het_indices]
+
+                X_homo = X_homo - np.mean(X_homo, axis=0)
+                X_het = X_het - np.mean(X_het, axis=0)
+                cov_reg = EmpiricalCovariance()
+                cov_reg.fit(X_homo)
+                Sigma_AA = np.array(cov_reg.covariance)
+                L = la.cholesky(Sigma_AA)
+                L_inv = la.inv(L)
+
+                X_het_whitened = np.dot(X_het, L_inv.T)
+                Sigma_AB_white = np.cov(X_het_whitened.T)
+
+                U, s, Vt = la.svd(Sigma_AB_white)
+
+                if self.svd_loss:
+                    s, _ = optimal_shrinkage(
+                        s, self.n_phenotypes / X_het.shape[0], self.svd_loss
                     )
-                permutation_results[threshold].append(norm_values)
+
+                norm_a = np.maximum(s[0] - 1, 0)
+                parent_effect_white = Vt[0] * 2 * np.sqrt(norm_a)
+                parent_effect = np.dot(parent_effect_white, L.T)
+                perms.append(np.linalg.norm(parent_effect))
+            maf_perms[maf] = perms
 
         for i in range(self.n_genotypes):
-            model = POESingleSNP(compute_pvalue=False, compute_ci=False)
+            current_maf = maf_vals[i]
+            appropriate_threshold = max(
+                [t for t in maf_thresholds if t <= current_maf],
+                default=min(maf_thresholds),
+            )
+            relevant_perms = maf_perms[appropriate_threshold]
+
+            model = POESingleSNP(
+                compute_pvalue=False,
+                compute_ci=False,
+                cov_regularization=self.cov_regularization,
+                svd_loss=self.svd_loss,
+            )
             model.fit(X, Y[:, i], seed=seed)
             self.parent_effects_[i] = model.parent_effect_
+            norm_effect = np.linalg.norm(model.parent_effect_)
 
-            current_maf = MAF[i]
-            appropriate_threshold = max(
-                [t for t in MAF_thresholds if t <= current_maf],
-                default=min(MAF_thresholds),
-            )
-            permutation_vector = np.array(
-                permutation_results[appropriate_threshold]
-            ).flatten()
-            observed_norm = np.linalg.norm(model.parent_effect_)
-
-            # Calculate the p-value using the empirical CDF
-            p_value = (permutation_vector >= observed_norm).mean()
+            p_value = (np.array(relevant_perms) >= norm_effect).mean()
             self.p_vals[i] = p_value
 
         return self
