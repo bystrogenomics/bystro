@@ -7,12 +7,14 @@ from typing import Any, Callable
 
 import asyncio
 
+from bystro.proteomics.somascan import SomascanDataset, ADAT_GENE_NAME_COLUMN
 from msgspec import Struct
 import nest_asyncio  # type: ignore
 import numpy as np
 
 import pandas as pd
 from opensearchpy import AsyncOpenSearch
+import somadata  # type: ignore
 
 from bystro.api.auth import CachedAuth
 from bystro.api.search import get_async_proxied_opensearch_client
@@ -1315,13 +1317,13 @@ def explode_rows_with_list(df, column):
     return pd.DataFrame(rows)
 
 
-def join_annotation_result_to_fragpipe_dataset(
+def join_annotation_result_to_proteomic_dataset(
     query_result_df: pd.DataFrame,
-    tmt_dataset: TandemMassTagDataset,
+    proteomic_dataset: pd.DataFrame | TandemMassTagDataset | SomascanDataset | somadata.Adat,
     get_tracking_id_from_genomic_sample_id: Callable[[str], str] = (lambda x: x),
     get_tracking_id_from_proteomic_sample_id: Callable[[str], str] = (lambda x: x),
-    genetic_join_column: str = DEFAULT_GENE_NAME_COLUMN,
-    fragpipe_join_column: str = FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED,
+    genetic_join_column: str | None = None,
+    proteomic_join_column: str | None = None,
 ) -> pd.DataFrame:
     """
     Join annotation result to FragPipe dataset.
@@ -1329,21 +1331,54 @@ def join_annotation_result_to_fragpipe_dataset(
     Args:
         query_result_df (pd.DataFrame):
             DataFrame containing result from get_annotation_result_from_query.
-        tmt_dataset (TandemMassTagDataset): The TandemMassTagDataset instance.
+        proteomic_dataset (pd.DataFrame | TandemMassTagDataset | SomascanDataset | somadata.Adat):
+            A dataframe representing the proteomic dataset, or else
+            a TandemMassTagDataset, SomascanDataset, or somadata.Adat.
         get_tracking_id_from_genomic_sample_id (Callable[[str], str]):
             Callable mapping genomic sample IDs to tracking IDs, defaults to identity function.
         get_tracking_id_from_proteomic_sample_id (Callable[[str], str]):
             Callable mapping proteomic sample IDs to tracking IDs, defaults to identity function.
         genetic_join_column (str, optional):
-            The column to join on in the genetic dataset, defaults to "refSeq.name2".
-        fragpipe_join_column (str, optional)
-            The column to join on in the FragPipe dataset, defaults to "gene_name".
+            The column to join on in the genetic dataset.
+            Must be provided if proteomic_dataset is a DataFrame, otherwise defaults to "refSeq.name2".
+        proteomic_join_column (str, optional)
+            The column to join on in the FragPipe dataset.
+            Must be provided if proteomic_dataset is a DataFrame,
+            otherwise defaults to "gene_name" for TandemMassTagDataset, and
+            "Target" for SomascanDataset and somadata.Adat.
 
     Returns:
         pd.DataFrame: The joined DataFrame.
     """
     query_result_df = query_result_df.copy()
-    proteomics_df = tmt_dataset.get_melted_abundance_df()
+
+    if isinstance(proteomic_dataset, TandemMassTagDataset):
+        proteomics_df = proteomic_dataset.get_melted_abundance_df()
+
+        if proteomic_join_column is None:
+            proteomic_join_column = FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED
+        if genetic_join_column is None:
+            genetic_join_column = DEFAULT_GENE_NAME_COLUMN
+
+    elif isinstance(proteomic_dataset, (SomascanDataset, somadata.Adat)):
+        if isinstance(proteomic_dataset, SomascanDataset):
+            proteomics_df = proteomic_dataset.adat.columns.to_frame(index=False)
+        else:
+            proteomics_df = proteomic_dataset.columns.to_frame(index=False)
+
+        if proteomic_join_column is None:
+            proteomic_join_column = ADAT_GENE_NAME_COLUMN
+        if genetic_join_column is None:
+            genetic_join_column = DEFAULT_GENE_NAME_COLUMN
+    elif isinstance(proteomic_dataset, pd.DataFrame):
+        proteomics_df = proteomic_dataset
+
+        if proteomic_join_column is None:
+            raise ValueError(
+                "proteomic_join_column must be provided if proteomic_dataset is a DataFrame"
+            )
+        if genetic_join_column is None:
+            raise ValueError("genetic_join_column must be provided if proteomic_dataset is a DataFrame")
 
     query_result_df[SAMPLE_GENERATED_COLUMN] = query_result_df[SAMPLE_GENERATED_COLUMN].apply(
         get_tracking_id_from_genomic_sample_id
@@ -1356,7 +1391,7 @@ def join_annotation_result_to_fragpipe_dataset(
     joined_df = query_result_df.merge(
         proteomics_df,
         left_on=[SAMPLE_GENERATED_COLUMN, genetic_join_column],
-        right_on=[FRAGPIPE_SAMPLE_COLUMN, fragpipe_join_column],
-    ).drop(columns=[fragpipe_join_column])
+        right_on=[FRAGPIPE_SAMPLE_COLUMN, proteomic_join_column],
+    ).drop(columns=[proteomic_join_column])
 
     return joined_df

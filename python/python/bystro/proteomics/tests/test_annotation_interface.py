@@ -7,7 +7,7 @@ import pytest
 
 from bystro.proteomics.annotation_interface import (
     process_query_response,
-    join_annotation_result_to_fragpipe_dataset,
+    join_annotation_result_to_proteomic_dataset,
     async_get_annotation_result_from_query,
     SAMPLE_GENERATED_COLUMN,
     ALWAYS_INCLUDED_FIELDS,
@@ -311,7 +311,7 @@ def test_process_response():
 
 
 @pytest.mark.asyncio
-async def test_join_annotation_result_to_fragpipe_dataset(mocker):
+async def test_join_annotation_result_to_proteomic_dataset(mocker):
     mocker.patch(
         "bystro.proteomics.annotation_interface.AsyncOpenSearch",
         return_value=MockAsyncOpenSearch(TEST_RESPONSES_WITH_SAMPLES),
@@ -348,8 +348,8 @@ async def test_join_annotation_result_to_fragpipe_dataset(mocker):
     replacements = {sample_id: sample_name for sample_id, sample_name in zip(sample_ids, sample_names)}
     query_result_df["sample"] = query_result_df["sample"].replace(replacements)
 
-    joined_df = join_annotation_result_to_fragpipe_dataset(
-        query_result_df, tmt_dataset, fragpipe_join_column=FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED
+    joined_df = join_annotation_result_to_proteomic_dataset(
+        query_result_df, tmt_dataset, proteomic_join_column=FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED
     )
 
     assert (90, 17) == joined_df.shape

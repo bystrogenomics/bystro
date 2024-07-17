@@ -4,9 +4,11 @@ import somadata  # type: ignore
 
 from msgspec import Struct
 
+ADAT_GENE_NAME_COLUMN = "Target"
+ADA_PROTEIN_NAME_COLUMN = "UniProt"
 
 class SomascanDataset(Struct):
-    """Represent a Fragpipe Tandem Mass Tag dataset."""
+    """Represent a SomaScan Aptamer dataset."""
 
     adat: somadata.Adat
     annotations: somadata.Annotations | None = None
