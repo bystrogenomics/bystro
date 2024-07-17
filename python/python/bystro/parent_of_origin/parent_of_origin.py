@@ -581,7 +581,7 @@ class POEMultipleSNP2(BasePOE):
         pval_method: str = "rmt4ds",
         cov_regularization: str = "Empirical",
         svd_loss: Optional[str] = None,
-        n_repeats: int = 1000,
+        n_repeats: int = 4000,
     ) -> None:
         """
         Raises
