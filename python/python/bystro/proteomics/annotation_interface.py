@@ -7,12 +7,14 @@ from typing import Any, Callable
 
 import asyncio
 
+from bystro.proteomics.somascan import SomascanDataset, ADAT_GENE_NAME_COLUMN, ADAT_SAMPLE_ID_COLUMN
 from msgspec import Struct
 import nest_asyncio  # type: ignore
 import numpy as np
 
 import pandas as pd
 from opensearchpy import AsyncOpenSearch
+import somadata  # type: ignore
 
 from bystro.api.auth import CachedAuth
 from bystro.api.search import get_async_proxied_opensearch_client
@@ -1315,13 +1317,14 @@ def explode_rows_with_list(df, column):
     return pd.DataFrame(rows)
 
 
-def join_annotation_result_to_fragpipe_dataset(
+def join_annotation_result_to_proteomic_dataset(
     query_result_df: pd.DataFrame,
-    tmt_dataset: TandemMassTagDataset,
+    proteomic_dataset: pd.DataFrame | TandemMassTagDataset | SomascanDataset | somadata.Adat,
     get_tracking_id_from_genomic_sample_id: Callable[[str], str] = (lambda x: x),
     get_tracking_id_from_proteomic_sample_id: Callable[[str], str] = (lambda x: x),
-    genetic_join_column: str = DEFAULT_GENE_NAME_COLUMN,
-    fragpipe_join_column: str = FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED,
+    genetic_join_column: str | None = None,
+    proteomic_join_column: str | None = None,
+    proteomic_sample_id_column: str | None = None,
 ) -> pd.DataFrame:
     """
     Join annotation result to FragPipe dataset.
@@ -1329,34 +1332,86 @@ def join_annotation_result_to_fragpipe_dataset(
     Args:
         query_result_df (pd.DataFrame):
             DataFrame containing result from get_annotation_result_from_query.
-        tmt_dataset (TandemMassTagDataset): The TandemMassTagDataset instance.
+        proteomic_dataset (pd.DataFrame | TandemMassTagDataset | SomascanDataset | somadata.Adat):
+            A dataframe representing the proteomic dataset, or else
+            a TandemMassTagDataset, SomascanDataset, or somadata.Adat.
         get_tracking_id_from_genomic_sample_id (Callable[[str], str]):
             Callable mapping genomic sample IDs to tracking IDs, defaults to identity function.
         get_tracking_id_from_proteomic_sample_id (Callable[[str], str]):
             Callable mapping proteomic sample IDs to tracking IDs, defaults to identity function.
         genetic_join_column (str, optional):
-            The column to join on in the genetic dataset, defaults to "refSeq.name2".
-        fragpipe_join_column (str, optional)
-            The column to join on in the FragPipe dataset, defaults to "gene_name".
+            The column to join on in the genetic dataset.
+            Must be provided if proteomic_dataset is a DataFrame, otherwise defaults to "refSeq.name2".
+        proteomic_join_column (str, optional)
+            The column to join on in the FragPipe dataset.
+            Must be provided if proteomic_dataset is a DataFrame,
+            otherwise defaults to "gene_name" for TandemMassTagDataset, and
+            "Target" for SomascanDataset and somadata.Adat.
+        proteomic_sample_id_column (str, optional):
+            The column name for the sample ID in the proteomic dataset.
+            Must be provided if proteomic_dataset is a DataFrame,
+            otherwise defaults to 'sample' for TandemMassTagDataset,
+            and 'SampleId' for SomascanDataset and somadata.Adat.
 
     Returns:
         pd.DataFrame: The joined DataFrame.
     """
     query_result_df = query_result_df.copy()
-    proteomics_df = tmt_dataset.get_melted_abundance_df()
+
+    if isinstance(proteomic_dataset, TandemMassTagDataset):
+        proteomics_df = proteomic_dataset.get_melted_abundance_df()
+
+        if proteomic_join_column is None:
+            proteomic_join_column = FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED
+        if genetic_join_column is None:
+            genetic_join_column = DEFAULT_GENE_NAME_COLUMN
+        if proteomic_sample_id_column is None:
+            proteomic_sample_id_column = FRAGPIPE_SAMPLE_COLUMN
+    elif isinstance(proteomic_dataset, (SomascanDataset, somadata.Adat)):
+        if isinstance(proteomic_dataset, somadata.Adat):
+            proteomic_dataset = SomascanDataset(proteomic_dataset)
+
+        proteomics_df = proteomic_dataset.to_melted_frame()
+
+        if proteomic_join_column is None:
+            proteomic_join_column = ADAT_GENE_NAME_COLUMN
+        if genetic_join_column is None:
+            genetic_join_column = DEFAULT_GENE_NAME_COLUMN
+        if proteomic_sample_id_column is None:
+            proteomic_sample_id_column = ADAT_SAMPLE_ID_COLUMN
+    elif isinstance(proteomic_dataset, pd.DataFrame):
+        proteomics_df = proteomic_dataset
+
+        if proteomic_join_column is None:
+            raise ValueError(
+                "proteomic_join_column must be provided if proteomic_dataset is a DataFrame"
+            )
+        if genetic_join_column is None:
+            raise ValueError("genetic_join_column must be provided if proteomic_dataset is a DataFrame")
+        if proteomic_sample_id_column is None:
+            raise ValueError(
+                "proteomic_sample_id_column must be provided if proteomic_dataset is a DataFrame"
+            )
 
     query_result_df[SAMPLE_GENERATED_COLUMN] = query_result_df[SAMPLE_GENERATED_COLUMN].apply(
         get_tracking_id_from_genomic_sample_id
     )
 
-    proteomics_df[FRAGPIPE_SAMPLE_COLUMN] = proteomics_df[FRAGPIPE_SAMPLE_COLUMN].apply(
+    proteomics_df[proteomic_sample_id_column] = proteomics_df[proteomic_sample_id_column].apply(
         get_tracking_id_from_proteomic_sample_id
     )
+
+    columns_to_drop = []
+    if proteomic_sample_id_column != SAMPLE_GENERATED_COLUMN:
+        columns_to_drop.append(proteomic_sample_id_column)
+
+    if proteomic_join_column != genetic_join_column:
+        columns_to_drop.append(proteomic_join_column)
 
     joined_df = query_result_df.merge(
         proteomics_df,
         left_on=[SAMPLE_GENERATED_COLUMN, genetic_join_column],
-        right_on=[FRAGPIPE_SAMPLE_COLUMN, fragpipe_join_column],
-    ).drop(columns=[fragpipe_join_column])
+        right_on=[proteomic_sample_id_column, proteomic_join_column],
+    ).drop(columns=columns_to_drop)
 
     return joined_df

@@ -10,6 +10,7 @@ import numpy.linalg as la
 from bystro.parent_of_origin.parent_of_origin import (
     POESingleSNP,
     POEMultipleSNP,
+    POEMultipleSNP2,
 )
 
 
@@ -242,3 +243,19 @@ def test_multi_fit():
     )
     model = POEMultipleSNP()
     model.fit(data["phenotypes"], data["genotypes"])
+
+
+def test_multi2_fit():
+    np.set_printoptions(suppress=True)
+    rng = np.random.default_rng(2021)
+    n_p = 40
+    beta_m = np.zeros(n_p)
+    beta_p = np.zeros(n_p)
+    beta_p[:3] = 0.5
+    data = generate_multivariate_data(
+        beta_m, beta_p, rng, maf=0.03, n_individuals=50000, n_genotypes=1000
+    )
+    model = POEMultipleSNP2(n_repeats=10)
+    model.fit(data["phenotypes"], data["genotypes"], seed=2021)
+    assert model is not None, "Model fitting failed"
+    assert isinstance(model, POEMultipleSNP2), "Model type is incorrect"

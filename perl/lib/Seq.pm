@@ -7,7 +7,7 @@ package Seq;
 our $VERSION = '0.001';
 # ABSTRACT: Annotate a snp file
 
-# TODO: make temp_dir handling more transparent
+use Fcntl qw(:flock);
 use Mouse 2;
 use Types::Path::Tiny qw/AbsFile/;
 
@@ -23,8 +23,12 @@ use JSON::XS;
 use Seq::DBManager;
 use Path::Tiny;
 use Scalar::Util qw/looks_like_number/;
+use Try::Tiny;
 
 extends 'Seq::Base';
+
+our $ANNOTATION_COMPLTE_FILE_NAME = 'bystro_annotation.complete';
+our $ANNOTATION_LOCK_FILE_NAME    = 'bystro_annotation.lock';
 
 # We  add a few of our own annotation attributes
 # These will be re-used in the body of the annotation processor below
@@ -116,6 +120,26 @@ sub annotateFile {
   my $self = shift;
   my $type = shift;
 
+  my $lockFh;
+  my $lockPath = $self->outDir->child($ANNOTATION_LOCK_FILE_NAME)->stringify;
+  my $outDir   = $self->outDir->stringify;
+  open $lockFh, ">", $lockPath or die $!;
+  flock $lockFh, LOCK_EX | LOCK_NB
+    or die
+    "Multiple Bystro annotator instances are competing to process  $outDir. If you are running the Bystro Annotator from the Bystro UI, this is likely because of a network interruption that resulted in double submission. Please retry this job. Error: $!";
+
+  # Check if $ANNOTATION_COMPLTE_FILE_NAME exists in the outDir, and if it does, exit
+  my $annotationCompletePath =
+    $self->outDir->child($ANNOTATION_COMPLTE_FILE_NAME)->stringify;
+  if ( -e $annotationCompletePath ) {
+    my $annotationOutputDir = $self->outDir->stringify;
+    $self->_errorWithCleanup('Annotation already completed');
+    return (
+      "Skipping annotation. We found the annotation status file `$ANNOTATION_COMPLTE_FILE_NAME` in the target ouput directory `$annotationOutputDir`, which suggests that this directory already contains a completed annotation. This is most likely caused by one of two reasons: 1) You are trying to re-run an annotation and are outputting to an existing output directory, or 2) There are network connectivity issues, such as with a load balancing server, and this annotation was accidentally double-submitted. If you think this is an error: 1) if running Bystro Annotator from the command line: delete `$annotationCompletePath` (or all files in the directory) and try annotating again. 2) If running from Bystro UI, re-submit the annotation.",
+      undef
+    );
+  }
+
   my ( $err, $inFhs, $outFh, $statsFh, $headerFh, $preOutArgs ) =
     $self->_getFileHandles($type);
 
@@ -123,6 +147,10 @@ sub annotateFile {
     $self->_errorWithCleanup($err);
     return ( $err, undef );
   }
+
+  # Create a file "bystro_annotation_lock" in the destination directory
+  # and get an exclusive lock
+  # If that fails, we know that another process is running, and we should exit
 
   ########################## Write the header ##################################
   my $header;
@@ -376,8 +404,6 @@ sub annotateFile {
   # to copy the data from a scalar, and don't want to use a hash for this alone
   # So, using a scalar ref to abortErr in the gather function.
   if ($abortErr) {
-    say "Aborted job due to $abortErr";
-
     # Database & tx need to be closed
     $db->cleanUp();
 
@@ -585,6 +611,28 @@ sub annotateFile {
     $self->_errorWithCleanup($humanErr);
     return ( $humanErr, undef );
   }
+
+  my $completionPath = $self->outDir->child($ANNOTATION_COMPLTE_FILE_NAME)->stringify;
+
+  $err = $self->safeSystem("touch $completionPath");
+
+  if ($err) {
+    my $humanErr = "Failed to create completion file";
+    $self->_errorWithCleanup($humanErr);
+    return ( $humanErr, undef );
+  }
+
+  # Post moving files to output directory, we don't want to regenerate log file in the tmp dir
+  # so just log to STDERR
+  say STDERR "Created completion file";
+
+  try {
+    close($lockFh);
+    unlink($lockPath);
+  }
+  catch {
+    say STDERR "Failed to close and delete lock file: $_";
+  };
 
   return ( $err, $self->outputFilesInfo, $totalAnnotated, $totalSkipped );
 }
