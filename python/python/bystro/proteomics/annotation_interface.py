@@ -1316,6 +1316,7 @@ def explode_rows_with_list(df, column):
             rows.append(row)
     return pd.DataFrame(rows)
 
+
 def join_annotation_result_to_proteomic_dataset(
     query_result_df: pd.DataFrame,
     proteomic_dataset: pd.DataFrame | TandemMassTagDataset | SomascanDataset | somadata.Adat,
@@ -1400,10 +1401,17 @@ def join_annotation_result_to_proteomic_dataset(
         get_tracking_id_from_proteomic_sample_id
     )
 
+    columns_to_drop = []
+    if proteomic_sample_id_column != SAMPLE_GENERATED_COLUMN:
+        columns_to_drop.append(proteomic_sample_id_column)
+
+    if proteomic_join_column != genetic_join_column:
+        columns_to_drop.append(proteomic_join_column)
+
     joined_df = query_result_df.merge(
         proteomics_df,
         left_on=[SAMPLE_GENERATED_COLUMN, genetic_join_column],
         right_on=[proteomic_sample_id_column, proteomic_join_column],
-    ).drop(columns=[proteomic_sample_id_column, proteomic_join_column])
+    ).drop(columns=columns_to_drop)
 
     return joined_df
