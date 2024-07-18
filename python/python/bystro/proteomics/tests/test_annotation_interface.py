@@ -372,7 +372,7 @@ async def test_join_annotation_result_to_fragpipe_dataset(mocker):
         query_result_df, tmt_dataset, proteomic_join_column=FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED
     )
 
-    assert (90, 17) == joined_df.shape
+    assert (90, 16) == joined_df.shape
 
     retained_fragpipe_columns = []
     for name in FRAGPIPE_RENAMED_COLUMNS:
