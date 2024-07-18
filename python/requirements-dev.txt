@@ -15,5 +15,5 @@ types-psutil==5.9.5
 unipressed==1.2.0
 Cython==3.0.10
 maturin[zig]==1.5.1
-setuptools==65.5.1
+setuptools==70.0.0
 types-PyYAML==6.0.12
