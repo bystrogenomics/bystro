@@ -257,3 +257,5 @@ def test_multi2_fit():
     )
     model = POEMultipleSNP2(n_repeats=10)
     model.fit(data["phenotypes"], data["genotypes"], seed=2021)
+    assert model is not None, "Model fitting failed"
+    assert isinstance(model, POEMultipleSNP2), "Model type is incorrect"
