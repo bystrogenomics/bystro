@@ -2,23 +2,33 @@ import numpy as np
 from scipy.linalg import eigh  # type: ignore
 from scipy.stats import norm, chi2  # type: ignore
 from scipy.sparse.linalg import eigs  # type: ignore
-from statsmodels.stats.multitest import multipletests
+from statsmodels.stats.multitest import multipletests  # type: ignore
+from typing import Optional, List, Union
 
-rng = np.random.default_rng()
 
-
-def two_way_sampling(X: np.ndarray, Y: np.ndarray, n: int) -> dict:
+def two_way_sampling(
+    X: np.ndarray, Y: np.ndarray, n: int, seed: int = 2021
+) -> dict:
     """
     Perform two-way sampling on matrices X and Y.
 
-    Parameters:
-    X (np.ndarray): First matrix.
-    Y (np.ndarray): Second matrix.
-    n (int): Sample size.
+    Parameters
+    ----------
+    X : np.ndarray
+        First matrix.
+    Y : np.ndarray
+        Second matrix.
+    n : int
+        Sample size.
+    seed : int, optional
+        Random seed, by default 2021.
 
-    Returns:
-    dict: Sampled matrices Xs, Ys, Zs.
+    Returns
+    -------
+    sampled_matrices : dict
+        Dictionary containing sampled matrices Xs, Ys, Zs.
     """
+    rng = np.random.default_rng(seed)
     n1, n2 = X.shape[0], Y.shape[0]
     if n > min(max(n1, n2) / 2, n1, n2):
         raise ValueError("Invalid sample sizes!")
@@ -47,26 +57,34 @@ def cov_eigs(X: np.ndarray) -> np.ndarray:
     """
     Find eigenvalues of the sample covariance matrix.
 
-    Parameters:
-    X (np.ndarray): Input matrix.
+    Parameters
+    ----------
+    X : np.ndarray
+        Input matrix.
 
-    Returns:
-    np.ndarray: Eigenvalues of the sample covariance matrix.
+    Returns
+    -------
+    eigvals : np.ndarray
+        Eigenvalues of the sample covariance matrix.
     """
     n, p = X.shape
     X1 = X - np.mean(X, axis=0)
-    return eigh(np.dot(X1.T, X1) / np.sqrt(n * p), eigvals_only=True)
+    return eigh(np.dot(X1, X1.T) / np.sqrt(n * p), eigvals_only=True)
 
 
-def k(x: float) -> float:
+def k_func(x: float) -> float:
     """
     Kernel function K.
 
-    Parameters:
-    x (float): Input value.
+    Parameters
+    ----------
+    x : float
+        Input value.
 
-    Returns:
-    float: Output of the kernel function.
+    Returns
+    -------
+    k_value : float
+        Output of the kernel function.
     """
     if abs(x) >= 1.05:
         return 0
@@ -75,20 +93,26 @@ def k(x: float) -> float:
     return np.exp(1 / 0.05**2 - 1 / (0.05**2 - (abs(x) - 1) ** 2))
 
 
-def t(lambda_: np.ndarray, gamma: float, eta0: float) -> float:
+def t_func(lambda_: np.ndarray, gamma: float, eta0: float) -> float:
     """
     Compute T value.
 
-    Parameters:
-    lambda_ (np.ndarray): Array of eigenvalues.
-    gamma (float): Gamma value.
-    eta0 (float): Eta value.
+    Parameters
+    ----------
+    lambda_ : np.ndarray
+        Array of eigenvalues.
+    gamma : float
+        Gamma value.
+    eta0 : float
+        Eta value.
 
-    Returns:
-    float: T value.
+    Returns
+    -------
+    t_value : float
+        T value.
     """
     return sum(
-        (lambda_i - gamma) / eta0 * k((lambda_i - gamma) / eta0)
+        (lambda_i - gamma) / eta0 * k_func((lambda_i - gamma) / eta0)
         for lambda_i in lambda_
     )
 
@@ -102,23 +126,32 @@ def check_efficient(
     """
     Check if the splitting is efficient.
 
-    Parameters:
-    gamma (float): Gamma value.
-    lambda1 (np.ndarray): First array of eigenvalues.
-    lambda2 (np.ndarray): Second array of eigenvalues.
-    epsilon (float): Tolerance value.
+    Parameters
+    ----------
+    gamma : float
+        Gamma value.
+    lambda1 : np.ndarray
+        First array of eigenvalues.
+    lambda2 : np.ndarray
+        Second array of eigenvalues.
+    epsilon : float, optional
+        Tolerance value, by default 0.05.
 
-    Returns:
-    bool: True if efficient, False otherwise.
+    Returns
+    -------
+    is_efficient : bool
+        True if efficient, False otherwise.
     """
     range1 = abs(lambda1[0] - lambda1[-1])
     range2 = abs(lambda2[0] - lambda2[-1])
-    return not (
+    if (
         max(abs(gamma - lambda1[0]), abs(gamma - lambda1[-1]))
         > range1 - epsilon
         or max(abs(gamma - lambda2[0]), abs(gamma - lambda2[-1]))
         > range2 - epsilon
-    )
+    ):
+        return False
+    return True
 
 
 def two_sample_test_(
@@ -128,26 +161,40 @@ def two_sample_test_(
     const: float = 0.5,
     alpha: float = 0.05,
     epsilon: float = 0.05,
-    thres: float = None,
+    thres: Optional[float] = None,
     mode: str = "test",
-) -> dict:
+    seed: int = 2021,
+) -> Union[dict, float]:
     """
     Perform a two-sample test.
 
-    Parameters:
-    X (np.ndarray): First matrix.
-    Y (np.ndarray): Second matrix.
-    n (int): Sample size.
-    const (float): Constant value.
-    alpha (float): Significance level.
-    epsilon (float): Tolerance value.
-    thres (float): Threshold value.
-    mode (str): Mode of the test.
+    Parameters
+    ----------
+    X : np.ndarray
+        First matrix.
+    Y : np.ndarray
+        Second matrix.
+    n : int
+        Sample size.
+    const : float, optional
+        Constant value, by default 0.5.
+    alpha : float, optional
+        Significance level, by default 0.05.
+    epsilon : float, optional
+        Tolerance value, by default 0.05.
+    thres : Optional[float], optional
+        Threshold value, by default None.
+    mode : str, optional
+        Mode of the test, by default "test".
+    seed : int, optional
+        Random seed, by default 2021.
 
-    Returns:
-    dict: Result of the two-sample test.
+    Returns
+    -------
+    test_result : dict
+        Result of the two-sample test.
     """
-    sample_list = two_way_sampling(X, Y, n)
+    sample_list = two_way_sampling(X, Y, n, seed=seed)
     Xs, Ys, Zs = sample_list["Xs"], sample_list["Ys"], sample_list["Zs"]
 
     eig_xs = cov_eigs(Xs)
@@ -157,11 +204,10 @@ def two_sample_test_(
     if not check_efficient(gamma, eig_xs, eig_ys, epsilon):
         return {"efficient": False, "c": 1}
 
-    gamma = np.median(eig_zs)
-    eta0 = np.std(eig_zs) * const
+    eta0 = np.std(eig_zs, ddof=1) * const
 
-    Tx = t(eig_xs, gamma, eta0)
-    Ty = t(eig_ys, gamma, eta0)
+    Tx = t_func(eig_xs, gamma, eta0)
+    Ty = t_func(eig_ys, gamma, eta0)
 
     if mode != "test":
         return abs(Tx - Ty)
@@ -169,48 +215,70 @@ def two_sample_test_(
     if thres is None:
         thres = 2.6
 
-    threshold = thres / norm.ppf(1 - 0.05 / 2) * norm.ppf(1 - alpha / 2)
-    result = (Tx - Ty) / (thres / norm.ppf(1 - 0.05 / 2))
+    if abs(Tx - Ty) > (
+        thres / norm.ppf(1 - 0.05 / 2) * norm.ppf(1 - alpha / 2)
+    ):
+        return {
+            "efficient": True,
+            "c": 1,
+            "statistic": (Tx - Ty) / (thres / norm.ppf(1 - 0.05 / 2)),
+        }
     return {
         "efficient": True,
-        "c": int(abs(Tx - Ty) > threshold),
-        "statistic": result,
+        "c": 0,
+        "statistic": (Tx - Ty) / (thres / norm.ppf(1 - 0.05 / 2)),
     }
 
 
 def two_sample_test(
     X: np.ndarray,
     Y: np.ndarray,
-    n: int = None,
+    n: Optional[int] = None,
     k: int = 100,
-    const: float = None,
+    const: Optional[float] = None,
     alpha: float = 0.05,
     epsilon: float = 0.05,
-    thres: float = None,
+    thres: Optional[float] = None,
     calib: bool = False,
+    seed: int = 2021,
 ) -> dict:
     """
     Perform a two-sample test multiple times.
 
-    Parameters:
-    X (np.ndarray): First matrix.
-    Y (np.ndarray): Second matrix.
-    n (int): Sample size.
-    k (int): Number of iterations.
-    const (float): Constant value.
-    alpha (float): Significance level.
-    epsilon (float): Tolerance value.
-    thres (float): Threshold value.
-    calib (bool): Calibration flag.
+    Parameters
+    ----------
+    X : np.ndarray
+        First matrix.
+    Y : np.ndarray
+        Second matrix.
+    n : Optional[int], optional
+        Sample size, by default None.
+    k : int, optional
+        Number of iterations, by default 100.
+    const : Optional[float], optional
+        Constant value, by default None.
+    alpha : float, optional
+        Significance level, by default 0.05.
+    epsilon : float, optional
+        Tolerance value, by default 0.05.
+    thres : Optional[float], optional
+        Threshold value, by default None.
+    calib : bool, optional
+        Calibration flag, by default False.
+    seed : int, optional
+        Random seed, by default 2021.
 
-    Returns:
-    dict: Result of the two-sample test.
+    Returns
+    -------
+    test_result : dict
+        Result of the two-sample test.
     """
+    rng = np.random.default_rng(seed)
     reject, df, statistic = 0, 0, 0
 
     if n is None:
         n1, n2 = X.shape[0], Y.shape[0]
-        n = min(max(n1, n2) / 2, n1, n2) - 5
+        n = int(min(max(n1, n2) / 2, n1, n2)) - 5
 
     if thres is None:
         thres = (
@@ -224,27 +292,45 @@ def two_sample_test(
                 alpha=alpha,
                 const=0.5,
                 iterations=100,
+                seed=seed,
             )
         )
 
     if const is None:
-        const = c_tuning(X, Y, n, alpha=alpha, epsilon=epsilon, thres=thres)[
-            "c"
-        ]
+        const = c_tuning(
+            X, Y, n, alpha=alpha, epsilon=epsilon, thres=thres, seed=seed
+        )["c"]
 
     for _ in range(k):
         result = two_sample_test_(
-            X, Y, n, alpha=alpha, const=const, epsilon=epsilon, thres=thres
+            X,
+            Y,
+            n,
+            alpha=alpha,
+            const=const,
+            epsilon=epsilon,
+            thres=thres,
+            seed=rng.integers(int(1e6)),
         )
-        if result["efficient"]:
+        if isinstance(result, dict) and result["efficient"]:
             df += 1
             statistic += result["statistic"] ** 2
-        if result["c"] == 1:
-            reject += 1
+            if result["c"] == 1:
+                reject += 1
 
-    threshold = rng.binomial(k, alpha)
+    if df < 10:
+        pvalue = 0
+        statistic = 10000
+    else:
+        pvalue = 1 - chi2.cdf(statistic, df)
 
-    return {"decision": int(reject > threshold), "df": df, "reject": reject}
+    return {
+        "decision": int(reject > rng.binomial(k, alpha)),
+        "statistic": statistic,
+        "pvalue": pvalue,
+        "df": df,
+        "reject": reject,
+    }
 
 
 def calibration(
@@ -256,60 +342,95 @@ def calibration(
     const: float = 0.5,
     iterations: int = 100,
     K: int = 100,
+    seed: int = 2021,
 ) -> float:
     """
     Perform calibration to find threshold.
 
-    Parameters:
-    n1 (int): Size of the first sample.
-    n2 (int): Size of the second sample.
-    p (int): Number of columns.
-    n (int): Sample size.
-    alpha (float): Significance level.
-    const (float): Constant value.
-    iterations (int): Number of iterations.
-    K (int): Number of sub-iterations.
+    Parameters
+    ----------
+    n1 : int
+        Size of the first sample.
+    n2 : int
+        Size of the second sample.
+    p : int
+        Number of columns.
+    n : int
+        Sample size.
+    alpha : float, optional
+        Significance level, by default 0.05.
+    const : float, optional
+        Constant value, by default 0.5.
+    iterations : int, optional
+        Number of iterations, by default 100.
+    K : int, optional
+        Number of sub-iterations, by default 100.
+    seed : int, optional
+        Random seed, by default 2021.
 
-    Returns:
-    float: Threshold value.
+    Returns
+    -------
+    threshold : float
+        Threshold value.
     """
-    values = []
+    rng = np.random.default_rng(seed)
+    values: List[float] = []
     for _ in range(iterations):
         X = rng.normal(0, 1, (n1, p))
         Y = rng.normal(0, 1, (n2, p))
         for _ in range(K):
-            values.append(
-                two_sample_test_(
-                    X, Y, n, alpha=alpha, const=const, mode="calib"
-                )
+            value = two_sample_test_(
+                X,
+                Y,
+                n,
+                alpha=alpha,
+                const=const,
+                mode="calib",
+                seed=rng.integers(int(1e6)),
             )
-    return np.quantile(values, 1 - alpha)
+            if isinstance(value, float):
+                values.append(value)
+    return float(np.quantile(values, 1 - alpha))
 
 
 def c_tuning(
     X: np.ndarray,
     Y: np.ndarray,
     n: int,
-    thres: float = None,
+    thres: Optional[float] = None,
     alpha: float = 0.05,
     epsilon: float = 0.05,
     K: int = 500,
+    seed: int = 2021,
 ) -> dict:
     """
     Tune the constant C.
 
-    Parameters:
-    X (np.ndarray): First matrix.
-    Y (np.ndarray): Second matrix.
-    n (int): Sample size.
-    thres (float): Threshold value.
-    alpha (float): Significance level.
-    epsilon (float): Tolerance value.
-    K (int): Number of iterations.
+    Parameters
+    ----------
+    X : np.ndarray
+        First matrix.
+    Y : np.ndarray
+        Second matrix.
+    n : int
+        Sample size.
+    thres : Optional[float], optional
+        Threshold value, by default None.
+    alpha : float, optional
+        Significance level, by default 0.05.
+    epsilon : float, optional
+        Tolerance value, by default 0.05.
+    K : int, optional
+        Number of iterations, by default 500.
+    seed : int, optional
+        Random seed, by default 2021.
 
-    Returns:
-    dict: Tuned constant C and rates.
+    Returns
+    -------
+    tuning_result : dict
+        Tuned constant C and rates.
     """
+    rng = np.random.default_rng(seed)
     Cs = np.arange(1, 31) / 10
     rates = []
 
@@ -321,9 +442,16 @@ def c_tuning(
         rej = 0
         for _ in range(K):
             result = two_sample_test_(
-                X, Y, n, alpha=alpha, const=c, epsilon=epsilon, thres=thres
+                X,
+                Y,
+                n,
+                alpha=alpha,
+                const=c,
+                epsilon=epsilon,
+                thres=thres,
+                seed=rng.integers(int(1e6)),
             )
-            if result["efficient"]:
+            if isinstance(result, dict) and result["efficient"]:
                 all_ += 1
                 rej += result["c"]
         rates.append(rej / all_ if all_ > 50 else 1)
@@ -332,15 +460,19 @@ def c_tuning(
     return {"c": Cs[stable], "rates": rates}
 
 
-def find_stable(xs: list) -> int:
+def find_stable(xs: List[float]) -> int:
     """
     Find the stable point in a list of rates.
 
-    Parameters:
-    xs (list): List of rates.
+    Parameters
+    ----------
+    xs : list
+        List of rates.
 
-    Returns:
-    int: Index of the stable point.
+    Returns
+    -------
+    stable_index : int
+        Index of the stable point.
     """
     roll_average = np.convolve(xs, np.ones(3) / 3, mode="valid")
     vars_ = [np.var(roll_average[:i]) for i in range(2, len(roll_average))]
@@ -350,20 +482,24 @@ def find_stable(xs: list) -> int:
     return i + 2
 
 
-def movevar(xs: list) -> list:
+def movevar(xs: List[float]) -> List[float]:
     """
     Compute the moving variance of a list.
 
-    Parameters:
-    xs (list): List of values.
+    Parameters
+    ----------
+    xs : list
+        List of values.
 
-    Returns:
-    list: List of variances.
+    Returns
+    -------
+    variances : list
+        List of variances.
     """
     n = len(xs)
     vars_ = []
     for i in range(2, n + 1):
-        vars_.append(np.var(xs[:i]))
+        vars_.append(float(np.var(xs[:i])))
     return vars_
 
 
@@ -371,12 +507,17 @@ def clx2013(X: np.ndarray, Y: np.ndarray) -> dict:
     """
     Perform the CLX2013 test.
 
-    Parameters:
-    X (np.ndarray): First matrix.
-    Y (np.ndarray): Second matrix.
+    Parameters
+    ----------
+    X : np.ndarray
+        First matrix.
+    Y : np.ndarray
+        Second matrix.
 
-    Returns:
-    dict: Test statistic and p-value.
+    Returns
+    -------
+    test_result : dict
+        Test statistic and p-value.
     """
     n1, p = X.shape
     n2 = Y.shape[0]
@@ -409,12 +550,17 @@ def sy2010(X: np.ndarray, Y: np.ndarray) -> dict:
     """
     Perform the SY2010 test.
 
-    Parameters:
-    X (np.ndarray): First matrix.
-    Y (np.ndarray): Second matrix.
+    Parameters
+    ----------
+    X : np.ndarray
+        First matrix.
+    Y : np.ndarray
+        Second matrix.
 
-    Returns:
-    dict: Test statistic and p-value.
+    Returns
+    -------
+    test_result : dict
+        Test statistic and p-value.
     """
     n1 = X.shape[0] - 1
     n2 = Y.shape[0] - 1
@@ -498,59 +644,68 @@ def sy2010(X: np.ndarray, Y: np.ndarray) -> dict:
 
 
 def hc2018(
-    X: np.ndarray, Y: np.ndarray, N: int = None, alpha: float = 0.05
+    X: np.ndarray, Y: np.ndarray, N: Optional[int] = None, alpha: float = 0.05
 ) -> dict:
     """
     Perform the HC2018 test.
 
-    Parameters:
-    X (np.ndarray): First matrix.
-    Y (np.ndarray): Second matrix.
-    N (int): Parameter for the test.
-    alpha (float): Significance level.
+    Parameters
+    ----------
+    X : np.ndarray
+        First matrix.
+    Y : np.ndarray
+        Second matrix.
+    N : Optional[int], optional
+        Parameter for the test, by default None.
+    alpha : float, optional
+        Significance level, by default 0.05.
 
-    Returns:
-    dict: Test result.
+    Returns
+    -------
+    test_result : dict
+        Test result.
     """
     if N is None:
         N = int(np.floor(X.shape[1] ** 0.7))
 
-    def double_sum(X1: np.ndarray, X2: np.ndarray) -> np.ndarray:
-        return np.sum(X1, axis=0) * np.sum(X2, axis=0) - np.sum(X1 * X2, axis=0)
+    def double_sum(X1, X2):
+        result = np.sum(X1, axis=0) * np.sum(X2, axis=0) - np.sum(
+            X1 * X2, axis=0
+        )
+        return result
 
-    def triple_sum(
-        X1: np.ndarray, X2: np.ndarray, X3: np.ndarray
-    ) -> np.ndarray:
-        return (
+    def triple_sum(X1, X2, X3):
+        result = (
             double_sum(X1, X2) * np.sum(X3, axis=0)
             - double_sum(X1 * X3, X2)
             - double_sum(X1, X2 * X3)
         )
+        return result
 
-    def quad_sum(
-        X1: np.ndarray, X2: np.ndarray, X3: np.ndarray, X4: np.ndarray
-    ) -> np.ndarray:
-        return (
+    def quad_sum(X1, X2, X3, X4):
+        result = (
             triple_sum(X1, X2, X3) * np.sum(X4, axis=0)
             - triple_sum(X1 * X4, X2, X3)
             - triple_sum(X1, X2 * X4, X3)
             - triple_sum(X1, X2, X3 * X4)
         )
+        return result
 
-    def di(X: np.ndarray, q: int) -> float:
+    def di(X, q):
         n, p = X.shape
         X1 = X[:, : p - q]
         X2 = X[:, q:]
         D_1 = np.sum(double_sum(X1 * X2, X1 * X2))
         D_2 = np.sum(triple_sum(X1, X2, X1 * X2))
         D_3 = np.sum(quad_sum(X1, X2, X1, X2))
-        return (
+        result = (
             1 / (n * (n - 1)) * D_1
             - 2 / (n * (n - 1) * (n - 1)) * D_2
             + 1 / (n * (n - 1) * (n - 2) * (n - 3)) * D_3
         )
+        return result
 
-    def dc(X1: np.ndarray, X2: np.ndarray, q: int) -> float:
+    def dc(X1, X2, q):
         n1, p = X1.shape
         n2 = X2.shape[0]
         X11 = X1[:, : p - q]
@@ -561,27 +716,30 @@ def hc2018(
         Dc_2 = np.sum(double_sum(X11, X12) * np.sum(X21 * X22, axis=0))
         Dc_3 = np.sum(np.sum(X11 * X12, axis=0) * double_sum(X21, X22))
         Dc_4 = np.sum(double_sum(X11, X12) * double_sum(X21, X22))
-        return (
+        result = (
             Dc_1 / (n1 * n2)
             - Dc_2 / (n1 * (n1 - 1) * n2)
             - Dc_3 / (n1 * n2 * (n2 - 1))
             + Dc_4 / (n1 * (n1 - 1) * n2 * (n2 - 1))
         )
+        return result
 
-    def sq(X1: np.ndarray, X2: np.ndarray, q: int) -> float:
-        return di(X1, q) + di(X2, q) - 2 * dc(X1, X2, q)
+    def sq(X1, X2, q):
+        result = di(X1, q) + di(X2, q) - 2 * dc(X1, X2, q)
+        return result
 
-    def ri(X: np.ndarray, q: int) -> float:
+    def ri(X, q):
         n, p = X.shape
 
         X = X - np.mean(X, axis=0)
 
         X1 = X[:, : p - q]
+
         X2 = X[:, q:]
 
         Y = X1 * X2
 
-        Y -= np.mean(Y, axis=0) / (n - 1)
+        Y = Y - np.sum(Y, axis=0) / (n - 1)
 
         YYt2 = np.dot(Y, Y.T) ** 2
 
@@ -589,44 +747,38 @@ def hc2018(
 
         return result
 
-    def rc(X1: np.ndarray, X2: np.ndarray, q: int) -> float:
+    def rc(X1, X2, q):
         n1, p = X1.shape
         X1 = X1 - np.mean(X1, axis=0)
-
         X11 = X1[:, : p - q]
-
         X12 = X1[:, q:]
-
         Y1 = X11 * X12
-
-        Y1 -= np.mean(Y1, axis=0) / (n1 - 1)
+        Y1 = Y1 - np.sum(Y1, axis=0) / (n1 - 1)
 
         n2 = X2.shape[0]
         X2 = X2 - np.mean(X2, axis=0)
-
         X21 = X2[:, : p - q]
-
         X22 = X2[:, q:]
-
         Y2 = X21 * X22
-
-        Y2 -= np.mean(Y2, axis=0) / (n2 - 1)
-
+        Y2 = Y2 - np.sum(Y2, axis=0) / (n2 - 1)
         result = np.sum((np.dot(Y1, Y2.T)) ** 2) / (n1 * n2)
 
         return result
 
-    def v2(X1: np.ndarray, X2: np.ndarray, q: int) -> float:
-        n1, n2 = X1.shape[0], X2.shape[0]
-        return (
+    def v2(X1, X2, q):
+        n1 = X1.shape[0]
+        n2 = X2.shape[0]
+        result = (
             ri(X1, q) * 2 / (n1 * (n1 - 1))
             + ri(X2, q) * 2 / (n2 * (n2 - 1))
             + rc(X1, X2, q) * 4 / (n1 * n2)
         )
+        return result
 
-    def one_super(X1: np.ndarray, X2: np.ndarray, q: int) -> float:
+    def one_super(X1, X2, q):
         chi = sq(X1, X2, q) ** 2 / v2(X1, X2, q)
-        return chi2.sf(chi, 1)
+        result = chi2.sf(chi, 1)
+        return result
 
     pvalues = [one_super(X, Y, i) for i in range(N + 1)]
     test = adaptive_sts(pvalues, alpha=alpha, lambda_=0.5, silent=True)
@@ -634,30 +786,41 @@ def hc2018(
     return {"reject": np.sum(test["rejected"]), "pvalues": pvalues, "N": N}
 
 
-def storey_pi0_est(pValues: list, lambda_: float = 0.5) -> dict:
+def storey_pi0_est(pValues: List[float], lambda_: float = 0.5) -> dict:
     """
     Estimate the proportion of true null hypotheses.
 
-    Parameters:
-    pValues (list): List of p-values.
-    lambda_ (float): Lambda parameter.
+    Parameters
+    ----------
+    pValues : list
+        List of p-values.
+    lambda_ : float, optional
+        Lambda parameter, by default 0.5.
 
-    Returns:
-    dict: Estimated pi0.
+    Returns
+    -------
+    pi0_estimate : dict
+        Estimated pi0.
     """
     pi0 = np.mean(np.array(pValues) > lambda_) / (1 - lambda_)
-    pi0 = min(pi0, 1.0)
+    pi0 = np.min((float(pi0), 1.0))
     return {"pi0": pi0}
 
 
-def print_rejected(rejected: list, pValues: list, adjPValues: list) -> None:
+def print_rejected(
+    rejected: List[bool], pValues: List[float], adjPValues: List[float]
+) -> None:
     """
     Print the rejected hypotheses.
 
-    Parameters:
-    rejected (list): List of rejected hypotheses.
-    pValues (list): List of p-values.
-    adjPValues (list): List of adjusted p-values.
+    Parameters
+    ----------
+    rejected : list
+        List of rejected hypotheses.
+    pValues : list
+        List of p-values.
+    adjPValues : list
+        List of adjusted p-values.
     """
     for i in range(len(pValues)):
         if rejected[i]:
@@ -667,26 +830,36 @@ def print_rejected(rejected: list, pValues: list, adjPValues: list) -> None:
 
 
 def adaptive_sts(
-    pValues: list, alpha: float, lambda_: float = 0.5, silent: bool = False
+    pValues: List[float],
+    alpha: float,
+    lambda_: float = 0.5,
+    silent: bool = False,
 ) -> dict:
     """
     Perform the adaptive step-up procedure.
 
-    Parameters:
-    pValues (list): List of p-values.
-    alpha (float): Significance level.
-    lambda_ (float): Lambda parameter.
-    silent (bool): Silent flag.
+    Parameters
+    ----------
+    pValues : list
+        List of p-values.
+    alpha : float
+        Significance level.
+    lambda_ : float, optional
+        Lambda parameter, by default 0.5.
+    silent : bool, optional
+        Silent flag, by default False.
 
-    Returns:
-    dict: Result of the adaptive step-up procedure.
+    Returns
+    -------
+    sts_result : dict
+        Result of the adaptive step-up procedure.
     """
     m = len(pValues)
     _, adjP, _, _ = multipletests(pValues, alpha=alpha, method="fdr_bh")
 
     pi0 = storey_pi0_est(pValues, lambda_)["pi0"]
     criticalValues = [(i * alpha) / (m * pi0) for i in range(1, m + 1)]
-    adjPValues = adjP * min(pi0, 1)
+    adjPValues = adjP * min(pi0, 1.0)
     rejected = adjPValues <= alpha
 
     if not silent:
