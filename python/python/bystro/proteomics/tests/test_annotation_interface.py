@@ -6,8 +6,9 @@ import msgspec
 import pytest
 
 from bystro.proteomics.annotation_interface import (
+    DOSAGE_GENERATED_COLUMN,
     process_query_response,
-    join_annotation_result_to_fragpipe_dataset,
+    join_annotation_result_to_proteomic_dataset,
     async_get_annotation_result_from_query,
     SAMPLE_GENERATED_COLUMN,
     ALWAYS_INCLUDED_FIELDS,
@@ -20,8 +21,10 @@ from bystro.proteomics.fragpipe_tandem_mass_tag import (
     FRAGPIPE_RENAMED_COLUMNS,
     FRAGPIPE_SAMPLE_COLUMN,
     FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED,
-    FRAGPIPE_SAMPLE_INTENSITY_COLUMN
+    FRAGPIPE_SAMPLE_INTENSITY_COLUMN,
 )
+
+from bystro.proteomics.somascan import SomascanDataset, ADAT_SAMPLE_ID_COLUMN
 
 TEST_LEGACY_RESPONSE_PATH = Path(__file__).parent / "test_legacy_response.dat"
 
@@ -167,8 +170,8 @@ async def test_get_annotation_results_from_query_with_samples(mocker):
     assert (397, 12) == samples_and_genes_df.shape
 
     assert list(samples_and_genes_df.columns) == ALWAYS_INCLUDED_FIELDS + [LINK_GENERATED_COLUMN] + [
-        "sample",
-        "dosage",
+        SAMPLE_GENERATED_COLUMN,
+        DOSAGE_GENERATED_COLUMN,
     ] + ["gnomad.exomes.AF", "refSeq.name2"]
 
 
@@ -273,8 +276,8 @@ def test_process_response():
     melted = process_query_response(copy.deepcopy(all_hits), melt_samples=True)
     assert (397, 12) == melted.shape
     assert list(melted.columns) == ALWAYS_INCLUDED_FIELDS + [LINK_GENERATED_COLUMN] + [
-        "sample",
-        "dosage",
+        SAMPLE_GENERATED_COLUMN,
+        DOSAGE_GENERATED_COLUMN,
     ] + ["gnomad.exomes.AF", "refSeq.name2"]
 
     assert {"1805", "1847", "4805"} == set(melted[SAMPLE_GENERATED_COLUMN].unique())
@@ -293,21 +296,36 @@ def test_process_response():
                 heterozygotes = [heterozygotes]
 
             for sample in heterozygotes:
-                assert 1 == melted_rows[melted_rows["sample"] == str(sample)]["dosage"].to_numpy()[0]
+                assert (
+                    1
+                    == melted_rows[melted_rows[SAMPLE_GENERATED_COLUMN] == str(sample)][
+                        DOSAGE_GENERATED_COLUMN
+                    ].to_numpy()[0]
+                )
 
         if homozygotes is not None:
             if not isinstance(homozygotes, list):
                 homozygotes = [homozygotes]
 
             for sample in homozygotes:
-                assert 2 == melted_rows[melted_rows["sample"] == str(sample)]["dosage"].to_numpy()[0]
+                assert (
+                    2
+                    == melted_rows[melted_rows[SAMPLE_GENERATED_COLUMN] == str(sample)][
+                        DOSAGE_GENERATED_COLUMN
+                    ].to_numpy()[0]
+                )
 
         if missing is not None:
             if not isinstance(missing, list):
                 missing = [missing]
 
             for sample in missing:
-                assert -1 == melted_rows[melted_rows["sample"] == str(sample)]["dosage"].to_numpy()[0]
+                assert (
+                    -1
+                    == melted_rows[melted_rows[SAMPLE_GENERATED_COLUMN] == str(sample)][
+                        DOSAGE_GENERATED_COLUMN
+                    ].to_numpy()[0]
+                )
 
 
 @pytest.mark.asyncio
@@ -336,7 +354,7 @@ async def test_join_annotation_result_to_fragpipe_dataset(mocker):
 
     assert (582, 12) == query_result_df.shape
 
-    sample_ids = query_result_df["sample"].unique()
+    sample_ids = query_result_df[SAMPLE_GENERATED_COLUMN].unique()
 
     abundance_file = str(Path(__file__).parent / "example_abundance_gene_MD.tsv")
     experiment_file = str(Path(__file__).parent / "example_experiment_annotation_file.tsv")
@@ -346,10 +364,12 @@ async def test_join_annotation_result_to_fragpipe_dataset(mocker):
 
     # replace the sample ids with the sample names
     replacements = {sample_id: sample_name for sample_id, sample_name in zip(sample_ids, sample_names)}
-    query_result_df["sample"] = query_result_df["sample"].replace(replacements)
+    query_result_df[SAMPLE_GENERATED_COLUMN] = query_result_df[SAMPLE_GENERATED_COLUMN].replace(
+        replacements
+    )
 
-    joined_df = join_annotation_result_to_fragpipe_dataset(
-        query_result_df, tmt_dataset, fragpipe_join_column=FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED
+    joined_df = join_annotation_result_to_proteomic_dataset(
+        query_result_df, tmt_dataset, proteomic_join_column=FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED
     )
 
     assert (90, 17) == joined_df.shape
@@ -362,3 +382,47 @@ async def test_join_annotation_result_to_fragpipe_dataset(mocker):
 
     retained_fragpipe_columns.append(FRAGPIPE_SAMPLE_INTENSITY_COLUMN)
     assert list(joined_df.columns) == list(query_result_df.columns) + retained_fragpipe_columns
+
+
+@pytest.mark.asyncio
+async def test_join_annotation_result_to_somascan_dataset(mocker):
+    mocker.patch(
+        "bystro.proteomics.annotation_interface.AsyncOpenSearch",
+        return_value=MockAsyncOpenSearch(TEST_RESPONSES_WITH_SAMPLES),
+    )
+
+    query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
+    index_name = "foo"
+
+    query_result_df = await async_get_annotation_result_from_query(
+        query_string,
+        index_name,
+        cluster_opensearch_config={
+            "connection": {
+                "nodes": ["http://localhost:9200"],
+                "request_timeout": 1200,
+                "use_ssl": False,
+                "verify_certs": False,
+            },
+        },
+        explode_field="refSeq.name2",
+    )
+
+    assert (582, 12) == query_result_df.shape
+
+    sample_ids = query_result_df[SAMPLE_GENERATED_COLUMN].unique()
+
+    adat_file = str(Path(__file__).parent / "example_data_v4.1_plasma.adat")
+    somascan_dataset = SomascanDataset.from_paths(adat_file)
+
+    sample_names = list(somascan_dataset.adat.index.to_frame()[ADAT_SAMPLE_ID_COLUMN].values)[
+        0 : sample_ids.shape[0]
+    ]
+    replacements = {sample_id: sample_name for sample_id, sample_name in zip(sample_ids, sample_names)}
+    query_result_df[SAMPLE_GENERATED_COLUMN] = query_result_df[SAMPLE_GENERATED_COLUMN].replace(
+        replacements
+    )
+
+    joined_df_soma = join_annotation_result_to_proteomic_dataset(query_result_df, somascan_dataset)
+
+    assert (131, 71) == joined_df_soma.shape
