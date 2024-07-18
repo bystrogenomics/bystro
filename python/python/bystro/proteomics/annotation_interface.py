@@ -7,7 +7,7 @@ from typing import Any, Callable
 
 import asyncio
 
-from bystro.proteomics.somascan import SomascanDataset, ADAT_GENE_NAME_COLUMN
+from bystro.proteomics.somascan import SomascanDataset, ADAT_GENE_NAME_COLUMN, ADAT_SAMPLE_ID_COLUMN
 from msgspec import Struct
 import nest_asyncio  # type: ignore
 import numpy as np
@@ -1316,7 +1316,6 @@ def explode_rows_with_list(df, column):
             rows.append(row)
     return pd.DataFrame(rows)
 
-
 def join_annotation_result_to_proteomic_dataset(
     query_result_df: pd.DataFrame,
     proteomic_dataset: pd.DataFrame | TandemMassTagDataset | SomascanDataset | somadata.Adat,
@@ -1324,6 +1323,7 @@ def join_annotation_result_to_proteomic_dataset(
     get_tracking_id_from_proteomic_sample_id: Callable[[str], str] = (lambda x: x),
     genetic_join_column: str | None = None,
     proteomic_join_column: str | None = None,
+    proteomic_sample_id_column: str | None = None,
 ) -> pd.DataFrame:
     """
     Join annotation result to FragPipe dataset.
@@ -1346,6 +1346,11 @@ def join_annotation_result_to_proteomic_dataset(
             Must be provided if proteomic_dataset is a DataFrame,
             otherwise defaults to "gene_name" for TandemMassTagDataset, and
             "Target" for SomascanDataset and somadata.Adat.
+        proteomic_sample_id_column (str, optional):
+            The column name for the sample ID in the proteomic dataset.
+            Must be provided if proteomic_dataset is a DataFrame,
+            otherwise defaults to 'sample' for TandemMassTagDataset,
+            and 'SampleId' for SomascanDataset and somadata.Adat.
 
     Returns:
         pd.DataFrame: The joined DataFrame.
@@ -1359,17 +1364,20 @@ def join_annotation_result_to_proteomic_dataset(
             proteomic_join_column = FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED
         if genetic_join_column is None:
             genetic_join_column = DEFAULT_GENE_NAME_COLUMN
-
+        if proteomic_sample_id_column is None:
+            proteomic_sample_id_column = FRAGPIPE_SAMPLE_COLUMN
     elif isinstance(proteomic_dataset, (SomascanDataset, somadata.Adat)):
-        if isinstance(proteomic_dataset, SomascanDataset):
-            proteomics_df = proteomic_dataset.adat.columns.to_frame(index=False)
-        else:
-            proteomics_df = proteomic_dataset.columns.to_frame(index=False)
+        if isinstance(proteomic_dataset, somadata.Adat):
+            proteomic_dataset = SomascanDataset(proteomic_dataset)
+
+        proteomics_df = proteomic_dataset.to_melted_frame()
 
         if proteomic_join_column is None:
             proteomic_join_column = ADAT_GENE_NAME_COLUMN
         if genetic_join_column is None:
             genetic_join_column = DEFAULT_GENE_NAME_COLUMN
+        if proteomic_sample_id_column is None:
+            proteomic_sample_id_column = ADAT_SAMPLE_ID_COLUMN
     elif isinstance(proteomic_dataset, pd.DataFrame):
         proteomics_df = proteomic_dataset
 
@@ -1379,19 +1387,23 @@ def join_annotation_result_to_proteomic_dataset(
             )
         if genetic_join_column is None:
             raise ValueError("genetic_join_column must be provided if proteomic_dataset is a DataFrame")
+        if proteomic_sample_id_column is None:
+            raise ValueError(
+                "proteomic_sample_id_column must be provided if proteomic_dataset is a DataFrame"
+            )
 
     query_result_df[SAMPLE_GENERATED_COLUMN] = query_result_df[SAMPLE_GENERATED_COLUMN].apply(
         get_tracking_id_from_genomic_sample_id
     )
 
-    proteomics_df[FRAGPIPE_SAMPLE_COLUMN] = proteomics_df[FRAGPIPE_SAMPLE_COLUMN].apply(
+    proteomics_df[proteomic_sample_id_column] = proteomics_df[proteomic_sample_id_column].apply(
         get_tracking_id_from_proteomic_sample_id
     )
 
     joined_df = query_result_df.merge(
         proteomics_df,
         left_on=[SAMPLE_GENERATED_COLUMN, genetic_join_column],
-        right_on=[FRAGPIPE_SAMPLE_COLUMN, proteomic_join_column],
-    ).drop(columns=[proteomic_join_column])
+        right_on=[proteomic_sample_id_column, proteomic_join_column],
+    ).drop(columns=[proteomic_sample_id_column, proteomic_join_column])
 
     return joined_df

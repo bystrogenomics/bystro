@@ -5,7 +5,9 @@ import somadata  # type: ignore
 from msgspec import Struct
 
 ADAT_GENE_NAME_COLUMN = "Target"
-ADA_PROTEIN_NAME_COLUMN = "UniProt"
+ADAT_PROTEIN_NAME_COLUMN = "UniProt"
+ADAT_SAMPLE_ID_COLUMN = "SampleId"
+ADAT_RFU_COLUMN = "RFU"
 
 class SomascanDataset(Struct):
     """Represent a SomaScan Aptamer dataset."""
@@ -42,3 +44,8 @@ class SomascanDataset(Struct):
                     f", not {type(self.annotations)}"
                 )
             )
+
+    def to_melted_frame(self):
+        return self.adat.stack( # noqa: PD013
+            level=list(range(self.adat.columns.nlevels)), future_stack=True
+        ).reset_index(name=ADAT_RFU_COLUMN)
