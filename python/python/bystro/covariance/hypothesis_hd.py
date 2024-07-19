@@ -3,7 +3,13 @@ from scipy.linalg import eigh  # type: ignore
 from scipy.stats import norm, chi2  # type: ignore
 from scipy.sparse.linalg import eigs  # type: ignore
 from statsmodels.stats.multitest import multipletests  # type: ignore
+import logging
 from typing import Optional, List, Union
+
+logging.basicConfig(
+    level=logging.WARNING, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 
 def two_way_sampling(
@@ -209,6 +215,7 @@ def two_sample_test_(
         return abs(Tx - Ty)
 
     if thres is None:
+        logger.warning("Threshold thres not specified, setting %f", 2.6)
         thres = 2.6
 
     if abs(Tx - Ty) > (
@@ -269,6 +276,18 @@ def two_sample_test(
     test_result : dict
         Result of the two-sample test.
     """
+
+    if const is not None and (
+        not isinstance(const, float) or not (0.1 <= const <= 10)
+    ):
+        raise ValueError("const must be a float between 0.1 and 10.")
+    if not isinstance(alpha, float) or not (0 < alpha < 1):
+        raise ValueError("alpha must be a float between 0 and 1.")
+    if not isinstance(epsilon, float) or not (0 < epsilon < 1):
+        raise ValueError("epsilon must be a float between 0 and 1.")
+    if thres is not None and (not isinstance(thres, float) or thres <= 0):
+        raise ValueError("thres must be a float greater than 0.")
+
     rng = np.random.default_rng(seed)
     reject, df, statistic = 0, 0, 0
 
@@ -277,10 +296,11 @@ def two_sample_test(
         n = int(min(max(n1, n2) / 2, n1, n2)) - 5
 
     if thres is None:
-        thres = (
-            2.6
-            if not calib
-            else calibration(
+        if not calib:
+            logger.warning("Threshold thres not specified, setting %f", 2.6)
+            thres = 2.6
+        else:
+            thres = calibration(
                 n1=X.shape[0],
                 n2=Y.shape[0],
                 p=X.shape[1],
@@ -290,7 +310,6 @@ def two_sample_test(
                 iterations=100,
                 seed=seed,
             )
-        )
 
     if const is None:
         const = c_tuning(
@@ -431,6 +450,7 @@ def c_tuning(
     rates = []
 
     if thres is None:
+        logger.warning("Threshold thres not specified, setting %f", 2.6)
         thres = 2.6
 
     for c in Cs:
