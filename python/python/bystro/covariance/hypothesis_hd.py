@@ -117,11 +117,36 @@ def t_func(lambda_: np.ndarray, gamma: float, eta0: float) -> float:
     )
 
 
+def check_efficient(
+    gamma: float,
+    lambda1: np.ndarray,
+    lambda2: np.ndarray,
+    epsilon: float = 0.05,
+) -> bool:
+    """
+    Check if the splitting is efficient.
+    Parameters
+    ----------
+    gamma : float
+        Gamma value.
+    lambda1 : np.ndarray
+        First array of eigenvalues.
+    lambda2 : np.ndarray
+        Second array of eigenvalues.
+    epsilon : float, optional
+        Tolerance value, by default 0.05.
+    Returns
+    -------
+    is_efficient : bool
+        True if efficient, False otherwise.
+    """
     range1 = abs(lambda1[0] - lambda1[-1])
     range2 = abs(lambda2[0] - lambda2[-1])
     return not (
-        max(abs(gamma - lambda1[0]), abs(gamma - lambda1[-1])) > range1 - epsilon
-        or max(abs(gamma - lambda2[0]), abs(gamma - lambda2[-1])) > range2 - epsilon
+        max(abs(gamma - lambda1[0]), abs(gamma - lambda1[-1]))
+        > range1 - epsilon
+        or max(abs(gamma - lambda2[0]), abs(gamma - lambda2[-1]))
+        > range2 - epsilon
     )
 
 
