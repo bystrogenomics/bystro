@@ -9,7 +9,7 @@ from bystro.covariance.hypothesis_hd import (
 
 
 def test_sy2010():
-    with open("hypothesis_hd_data.pkl", "rb") as f:
+    with open("python/bystro/covariance/tests/hypothesis_hd_data.pkl", "rb") as f:
         data = pickle.load(f)
     X = data["X"]
     Y = data["Y"]
@@ -26,7 +26,7 @@ def test_sy2010():
 
 
 def test_clx2013():
-    with open("hypothesis_hd_data.pkl", "rb") as f:
+    with open("python/bystro/covariance/tests/hypothesis_hd_data.pkl", "rb") as f:
         data = pickle.load(f)
     X = data["X"]
     Y = data["Y"]
@@ -43,7 +43,7 @@ def test_clx2013():
 
 
 def test_hc2018():
-    with open("hypothesis_hd_data.pkl", "rb") as f:
+    with open("python/bystro/covariance/tests/hypothesis_hd_data.pkl", "rb") as f:
         data = pickle.load(f)
     X = data["X"]
     Y = data["Y"]
@@ -111,7 +111,7 @@ def test_hc2018():
 
 
 def test_two_sample_test():
-    with open("hypothesis_hd_data.pkl", "rb") as f:
+    with open("python/bystro/covariance/tests/hypothesis_hd_data.pkl", "rb") as f:
         data = pickle.load(f)
     X = data["X"]
     Y = data["Y"]
