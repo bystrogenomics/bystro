@@ -52,7 +52,7 @@ def test_handler_fn_happy_path(tmpdir, mocker):
         return_value=pd.DataFrame(),
     )
     mocker.patch(
-        "bystro.proteomics.listener_annotation_interface.join_annotation_result_to_fragpipe_dataset",
+        "bystro.proteomics.listener_annotation_interface.join_annotation_result_to_proteomic_dataset",
         return_value=pd.DataFrame(),
     )
     mocker.patch("bystro.proteomics.annotation_interface.AsyncOpenSearch", return_value=mocker.Mock())

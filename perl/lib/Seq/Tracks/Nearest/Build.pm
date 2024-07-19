@@ -515,11 +515,6 @@ sub _writeNearestData {
     if ( defined $previousLongestEnd ) {
       # Here we can assume that both $start and $longestPreviousEnd are both 0-based, closed
       # and so the first intergenic base is + 1 of the longestPreviousTxEnd and - 1 of the current start
-      #say previousLongestEnd == 1
-      #say $start == 11
-      #end..2..3..4..5..Midpoint..7..8..9..10..start
-      #(11 - 1 ) / 2 == 5; 5 + end = 5 + 1 == 6 == midpoint
-      # unnecessary extra precedence parenthesis, makes me feel safer :|
       $midPoint = $previousLongestEnd + ( ( $start - $previousLongestEnd ) / 2 );
     }
 
@@ -699,10 +694,6 @@ sub _getTxNumber {
     $uniqCombos{$hash} = $txNumber;
 
     $txNumber++;
-
-    # my $len = scalar keys %uniqCombos;
-    # my $size = total_size(\%uniqCombos);
-    # say "we now have $size bytes for $len unique numbers";
 
     return $uniqCombos{$hash};
   }
