@@ -122,19 +122,27 @@ def stream_file(
 
         if write_stdout:
             if hasattr(sys.stdout, "buffer"):
-                for chunk in response.iter_content(chunk_size=chunk_size):
-                    sys.stdout.buffer.write(chunk)
-                sys.stdout.buffer.flush()
+                with tqdm(total=total_size, unit="B", unit_scale=True) as progress_bar:
+                    for chunk in response.iter_content(chunk_size=chunk_size):
+                        if chunk:
+                            progress_bar.update(len(chunk))
+                            sys.stdout.buffer.write(chunk)
+                    sys.stdout.buffer.flush()
             else:
-                for chunk in response.iter_content(chunk_size=chunk_size):
-                    sys.stdout.write(chunk)
-                sys.stdout.flush()
+                with tqdm(total=total_size, unit="B", unit_scale=True) as progress_bar:
+                    for chunk in response.iter_content(chunk_size=chunk_size):
+                        if chunk:
+                            progress_bar.update(len(chunk))
+                            sys.stdout.write(chunk)
+                    sys.stdout.flush()
 
             return None
 
         def generator():
-            for chunk in response.iter_content(chunk_size=chunk_size):
-                yield chunk
+            with tqdm(total=total_size, unit="B", unit_scale=True) as progress_bar:
+                for chunk in response.iter_content(chunk_size=chunk_size):
+                    progress_bar.update(len(chunk))
+                    yield chunk
 
         return generator()
 
