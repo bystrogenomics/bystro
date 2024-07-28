@@ -177,6 +177,7 @@ def stream_file_cli(args: argparse.Namespace) -> None:
         output=args.output,
         key_path=args.key_path,
         out_dir=args.out_dir,
+        write_stdout=not args.out_dir
     )
 
 
@@ -328,10 +329,7 @@ def main():
 
     args = parser.parse_args()
     if hasattr(args, "func"):
-        try:
-            args.func(args)
-        except Exception as e:
-            print(f"\nSomething went wrong:\t{e}\n")
+        args.func(args)
 
     else:
         parser.print_help()

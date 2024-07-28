@@ -4,7 +4,7 @@ import requests
 import sys
 from pathlib import Path
 from typing import Generator
-
+from tqdm import tqdm
 from bystro.api.auth import authenticate
 
 GET_STREAM_ENDPOINT = "/api/jobs/{job_id}/streamFile"
@@ -17,7 +17,7 @@ def stream_file(
     key_path: str | None = None,
     out_dir: str | None = None,
     write_stdout: bool = False,
-    chunk_size: int | None = None,
+    chunk_size: int | None = 1024 * 1024 * 10,
 ) -> None | Generator[bytes, None, None]:
     """
     Fetch the file from the /api/jobs/:id/streamFile endpoint.
@@ -37,7 +37,7 @@ def stream_file(
     write_stdout : bool, optional
         If True, write the file to write_stdout. If False, write the file to the specified directory.
     chunk_size : int, optional
-        The size of the chunks to read from the response, by default None, which result
+        The size of the chunks to read from the response, by default 10MB
 
     Returns
     -------
@@ -101,39 +101,54 @@ def stream_file(
         content_disposition = response.headers.get("Content-Disposition")
         if not content_disposition:
             raise RuntimeError("No Content-Disposition header found in the response.")
-        
+
         filename = content_disposition.split("filename=")[-1].strip("\"'")
+
+        total_size = int(response.headers.get("Content-Length", 0))
 
         if out_dir:
             out_dir_path = Path(out_dir)
             out_dir_path.mkdir(parents=True, exist_ok=True)
             out_file = out_dir_path / filename
-            with open(out_file, "wb") as f:
+            with (
+                tqdm(total=total_size, unit="B", unit_scale=True) as progress_bar,
+                open(out_file, "wb") as f,
+            ):
                 for chunk in response.iter_content(chunk_size=chunk_size):
-                    f.write(chunk)
+                    if chunk:
+                        f.write(chunk)
+                        progress_bar.update(len(chunk))
             return None
 
         if write_stdout:
             if hasattr(sys.stdout, "buffer"):
-                for chunk in response.iter_content(chunk_size=chunk_size):
-                    sys.stdout.buffer.write(chunk)
-                sys.stdout.buffer.flush()
+                with tqdm(total=total_size, unit="B", unit_scale=True) as progress_bar:
+                    for chunk in response.iter_content(chunk_size=chunk_size):
+                        if chunk:
+                            progress_bar.update(len(chunk))
+                            sys.stdout.buffer.write(chunk)
+                    sys.stdout.buffer.flush()
             else:
-                for chunk in response.iter_content(chunk_size=chunk_size):
-                    sys.stdout.write(chunk)
-                sys.stdout.flush()
+                with tqdm(total=total_size, unit="B", unit_scale=True) as progress_bar:
+                    for chunk in response.iter_content(chunk_size=chunk_size):
+                        if chunk:
+                            progress_bar.update(len(chunk))
+                            sys.stdout.write(chunk)
+                    sys.stdout.flush()
 
             return None
 
         def generator():
-            for chunk in response.iter_content(chunk_size=chunk_size):
-                yield chunk
+            with tqdm(total=total_size, unit="B", unit_scale=True) as progress_bar:
+                for chunk in response.iter_content(chunk_size=chunk_size):
+                    progress_bar.update(len(chunk))
+                    yield chunk
 
         return generator()
-    
+
     if response.status_code == 400:
         raise RuntimeError(f"Bad Request: {response.text}")
-    
+
     if response.status_code == 404:
         raise RuntimeError("File not found.")
 
