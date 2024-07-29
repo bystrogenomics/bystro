@@ -4,7 +4,7 @@ from scipy.stats import norm, chi2  # type: ignore
 from scipy.sparse.linalg import eigs  # type: ignore
 from statsmodels.stats.multitest import multipletests  # type: ignore
 import logging
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Dict, Any
 
 logging.basicConfig(
     level=logging.WARNING, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -519,6 +519,15 @@ def movevar(xs: List[float]) -> List[float]:
     return vars_
 
 
+#########################
+#########################
+##                     ##
+##    Other methods    ##
+##                     ##
+#########################
+#########################
+
+
 def clx2013(X: np.ndarray, Y: np.ndarray) -> dict:
     """
     Perform the CLX2013 test.
@@ -891,3 +900,171 @@ def adaptive_sts(
         "pi0": pi0,
         "errorControl": {"type": "FDR", "alpha": alpha},
     }
+
+
+######################
+######################
+##                  ##
+##      HDTest      ##
+##                  ##
+######################
+######################
+
+
+def hd2017(
+    X: np.ndarray,
+    Y: np.ndarray,
+    J: int = 2500,
+    seed: int = 2021,
+    dname: str = "X and Y",
+) -> Dict[str, Any]:
+    """
+    Perform the Two-Sample HD test for the equality of two covariance matrices from
+    'Chang, J., Zhou, W., Zhou, W.-X., and Wang, L. (2016). Comparing large covariance matrices
+    under weak conditions on the dependence structure and its application to gene clustering.'
+
+    Parameters
+    ----------
+    X : np.ndarray
+        The n1 x p data matrix for sample 1.
+    Y : np.ndarray
+        The n2 x p data matrix for sample 2.
+    J : int, optional
+        The number of permutations, by default 2500.
+    seed : int, optional
+        The random seed for reproducibility, by default 2021.
+    dname : str, optional
+        The name of the data, by default "X and Y".
+
+    Returns
+    -------
+    hd_res : dict
+        A dictionary containing the test statistics, p-value,
+        alternative hypothesis, method, and data names.
+    """
+    X = np.asarray(X)
+    Y = np.asarray(Y)
+
+    n1, p = X.shape
+    n2 = Y.shape[0]
+
+    if Y.shape[1] != p:
+        raise ValueError("Different dimensions of X and Y.")
+
+    scalev = np.tile(np.concatenate([np.ones(n1) / n1, np.ones(n2) / n2]), J)
+
+    Sx = np.cov(X, rowvar=False) * (n1 - 1) / n1
+    Sy = np.cov(Y, rowvar=False) * (n2 - 1) / n2
+
+    xa = X - np.mean(X, axis=0)
+    ya = Y - np.mean(Y, axis=0)
+
+    vx = ((xa**2).T @ (xa**2)) / n1 - 2 / n1 * ((xa.T @ xa) * Sx) + Sx**2
+    vy = ((ya**2).T @ (ya**2)) / n2 - 2 / n2 * ((ya.T @ ya) * Sy) + Sy**2
+
+    with np.errstate(invalid="ignore"):
+        deno = np.sqrt(vx / n1 + vy / n2)
+    numo = np.abs(Sx - Sy)
+    Tnm = np.max(numo / deno)
+
+    xat = xa.T / n1
+    yat = ya.T / n2
+    ts = np.zeros(J)
+
+    rng = np.random.default_rng(seed)
+    for j in range(J):
+        g = rng.standard_normal(n1 + n2)
+        scalev = np.concatenate([np.ones(n1) / n1, np.ones(n2) / n2])
+        g *= scalev
+        atmp = np.sum(g[:n1])
+        btmp = np.sum(g[n1:])
+
+        ts1 = ((xa * g[:n1][:, np.newaxis]) - (xat.T * atmp)).T @ xa
+        ts2 = ((ya * g[n1:][:, np.newaxis]) - (yat.T * btmp)).T @ ya
+
+        ts[j] = np.max(np.abs(ts1 - ts2) / deno)
+
+    hd_res = {
+        "statistics": Tnm,
+        "p.value": np.mean(ts >= Tnm),
+        "alternative": "two.sided",
+        "method": "Two-Sample HD test",
+        "data.name": dname,
+    }
+
+    return hd_res
+
+
+def schott2007(
+    X: np.ndarray, Y: np.ndarray, dname: str = "X and Y"
+) -> Dict[str, Any]:
+    """
+    Perform the Two-Sample Scott test for the equality of two covariance matrices from
+    'Schott, J. R. (2007). A test for the equality of covariance matrices
+    when the dimension is large relative to the sample size.'
+
+    Parameters
+    ----------
+    X : np.ndarray
+        The n1 x p data matrix for sample 1.
+    Y : np.ndarray
+        The n2 x p data matrix for sample 2.
+    dname : str, optional
+        The name of the data, by default "X and Y".
+
+    Returns
+    -------
+    sc_res : dict
+        A dictionary containing the test statistics, p-value,
+        alternative hypothesis, method, and data names.
+    """
+    X = np.asarray(X)
+    Y = np.asarray(Y)
+
+    p = X.shape[1]
+    n1 = X.shape[0]
+    n2 = Y.shape[0]
+
+    if Y.shape[1] != p:
+        raise ValueError("Different dimensions of X and Y.")
+
+    Sx = np.cov(X, rowvar=False) * (n1 - 1) / n1
+    Sy = np.cov(Y, rowvar=False) * (n2 - 1) / n2
+
+    Sxx = Sx * n1 / (n1 - 1)
+    Syy = Sy * n2 / (n2 - 1)
+
+    SsS = (Sxx * n1 + Syy * n2) / (n1 + n2)
+
+    eta1 = ((n1 - 1) + 2) * ((n1 - 1) - 1)
+    eta2 = ((n2 - 1) + 2) * ((n2 - 1) - 1)
+    d1 = (1 - (n1 - 1 - 2) / eta1) * np.sum(np.diag(Sxx @ Sxx))
+    d2 = (1 - (n2 - 1 - 2) / eta2) * np.sum(np.diag(Syy @ Syy))
+    d3 = 2 * np.sum(np.diag(Sxx @ Syy))
+    d4 = (n1 - 1) / eta1 * np.sum(np.diag(Sxx)) ** 2
+    d5 = (n2 - 1) / eta2 * np.sum(np.diag(Syy)) ** 2
+    th = (
+        4
+        * (((n1 + n2 - 2) / ((n1 - 1) * (n2 - 1))) ** 2)
+        * (
+            (n1 + n2 - 2) ** 2
+            / ((n1 + n2) * (n1 + n2 - 2 - 1))
+            * (
+                np.sum(np.diag(SsS @ SsS))
+                - (np.sum(np.diag(SsS))) ** 2 / (n1 + n2 - 2)
+            )
+        )
+        ** 2
+    )
+    Sc = (d1 + d2 - d3 - d4 - d5) / np.sqrt(th)
+
+    sc_p = (1 - norm.cdf(np.abs(Sc))) * 2
+    sc_res = {
+        "statistics": np.abs(Sc),
+        "p.value": sc_p,
+        "alternative": "two.sided",
+        "method": "Two-Sample Scott test",
+        "data.name": dname,
+    }
+
+    return sc_res
