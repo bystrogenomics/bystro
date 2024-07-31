@@ -42,6 +42,7 @@ from tqdm import trange
 from numba import jit  # type: ignore
 
 from sklearn.utils import resample  # type: ignore
+from scipy.stats import norm  # type: ignore
 
 from bystro.covariance.optimal_shrinkage import optimal_shrinkage
 from bystro.covariance._covariance_np import (
@@ -327,24 +328,24 @@ class POESingleSNP(BasePOE):
                     "Unrecognized p value option %s" % self.pval_method
                 )
 
+        n_p_b = self.n_permutations_bootstrap
         # Bootstrap parameter confidence intervals
         if self.compute_ci:
+            ci_eigenvector = np.zeros((self.n_phenotypes, 2))
+
             bootstrap_samples_ = np.zeros(
                 (self.n_permutations_bootstrap, self.n_phenotypes)
             )
-            for i in trange(self.n_permutations_bootstrap):
-                X_homo = resample(X_homozygotes, n_samples=n_homo, replace=True)
-                X_hetero = resample(
-                    X_heterozygotes, n_samples=n_hetero, replace=True
+
+            for i in trange(n_p_b):
+                X_het_resampled = resample(
+                    X_het_whitened, n_samples=n_hetero, replace=True
                 )
-                X_homo = X_homo - np.mean(X_homo, axis=0)
-                X_hetero = X_hetero - np.mean(X_hetero, axis=0)
-                self.cov_reg.fit(X_homo)
-                Sigma_AA = np.array(self.cov_reg.covariance)
-                L = la.cholesky(Sigma_AA)
-                L_inv = la.inv(L)
-                X_het_whitened = np.dot(X_hetero, L_inv.T)
-                Sigma_AB_white = np.cov(X_het_whitened.T)
+
+                X_het_resampled = X_het_resampled - np.mean(
+                    X_het_resampled, axis=0
+                )
+                Sigma_AB_white = np.cov(X_het_resampled.T)
 
                 U, s, Vt = la.svd(Sigma_AB_white)
                 if self.svd_loss:
@@ -362,16 +363,67 @@ class POESingleSNP(BasePOE):
                 else:
                     bootstrap_samples_[i] = -1 * parent_effects
 
-            if self.store_samples:
-                self.bootstrap_samples_ = bootstrap_samples_
+            # Formulas for the BCA algorithm come from 14.3 in the book
+            # "An introduction to the Bootstrap" By Efron and Tibshirani.
+            # The specific formula is 
+            # a = [sum_{i=1}^n(\hat{\theta}-\hat{\theta}_i)^3]/
+            #     6[\sum_{i=1}^n(\hat{\theta}-\hat{\theta}_i)^2]^{3/2}
+            # z_0 = \Phi^{-1}(#{\theta^{b}<\hat{\theta})/B)
+            # lb = \Phi(z_0 + (z_0+z^{alpha})/(1-a(z_0+z^{alpha})))
+            # ub = \Phi(z_0 + (z_0+z^{1-alpha})/(1-a(z_0+z^{1-alpha})))
+            alpha = 0.05
+            alpha1 = alpha / 2
+            alpha2 = 1 - alpha / 2
+            ci_eigenvector = np.zeros((self.n_phenotypes, 2))
+            for j in range(self.n_phenotypes):
+                bootstrap_vector_component = bootstrap_samples_[:, j]
+                z0_vector_component = norm.ppf(
+                    np.mean(bootstrap_vector_component < self.parent_effect_[j])
+                )
+                j_values_vector_component = np.array(
+                    [
+                        np.delete(bootstrap_vector_component, i).mean()
+                        for i in range(n_p_b)
+                    ]
+                )
+                jackknife_mean_vector_component = (
+                    j_values_vector_component.mean()
+                )
+                a_vector_component = np.sum(
+                    (
+                        jackknife_mean_vector_component
+                        - j_values_vector_component
+                    )
+                    ** 3
+                ) / (
+                    6.0
+                    * np.sum(
+                        (
+                            jackknife_mean_vector_component
+                            - j_values_vector_component
+                        )
+                        ** 2
+                    )
+                    ** 1.5
+                )
+                ci_eigenvector[j] = np.percentile(
+                    bootstrap_vector_component,
+                    [
+                        100
+                        * norm.cdf(
+                            2 * z0_vector_component
+                            + norm.ppf(alpha1 + a_vector_component)
+                        ),
+                        100
+                        * norm.cdf(
+                            2 * z0_vector_component
+                            + norm.ppf(alpha2 - a_vector_component)
+                        ),
+                    ],
+                )
 
-            lb = np.quantile(bootstrap_samples_, 0.025, axis=0)
-            ub = np.quantile(bootstrap_samples_, 0.975, axis=0)
-            confidence_interval_ = np.zeros((2, self.n_phenotypes))
-            confidence_interval_[0] = lb
-            confidence_interval_[1] = ub
+            self.confidence_interval_ = ci_eigenvector
 
-            self.confidence_interval_ = confidence_interval_
         return self
 
 
