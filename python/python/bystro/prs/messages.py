@@ -37,6 +37,12 @@ class PRSJobData(BaseMessage, frozen=True, forbid_unknown_fields=True, rename="c
         the populations in this file will be used for allele frequency weighting in the PRS calculation.
     index_name: str | None
         The index of the dataset in the OpenSearch cluster, if available
+    covariates_path: str | None
+        The path to the covariates file, which is expected to be a tab-separated file with the first column
+        being the sample id, and the subsequent columns being the covariates.
+
+        Bystro understands the following reserved covariates:
+            1. "phenotype" - The sample phenotype. Expected to be 0 or 1.
     """
 
     dosage_matrix_path: str
@@ -47,8 +53,11 @@ class PRSJobData(BaseMessage, frozen=True, forbid_unknown_fields=True, rename="c
     pmid: str
     p_value_threshold: float
     ancestry_result_path: str
+    disease_prevalence: float
+    binary_trait: bool
     populations_path: str | None = None
     index_name: str | None = None
+    covariates_path: str | None = None
 
 
 class PRSJobSubmitMessage(SubmittedJobMessage, frozen=True, kw_only=True, rename="camel"):
