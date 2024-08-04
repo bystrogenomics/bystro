@@ -54,7 +54,7 @@ class PRSJobData(BaseMessage, frozen=True, forbid_unknown_fields=True, rename="c
     p_value_threshold: float
     ancestry_result_path: str
     disease_prevalence: float
-    binary_trait: bool
+    continuous_trait: bool
     populations_path: str | None = None
     index_name: str | None = None
     covariates_path: str | None = None

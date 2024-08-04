@@ -503,7 +503,7 @@ def generate_c_and_t_prs_scores(
     ancestry: AncestryResults,
     dosage_matrix_path: str,
     disease_prevalence: float,
-    binary_trait: bool,
+    continuous_trait: bool,
     experiment_mapping: ExperimentMapping | None = None,
     min_abs_beta: float = 0.01,
     max_abs_beta: float = 3.0,
@@ -531,8 +531,10 @@ def generate_c_and_t_prs_scores(
         The path to the dosage matrix file.
     experiment_mapping: ExperimentMapping, optional
         The experiment mapping for the study.
-    disease_prevalence: float, optional
+    disease_prevalence: float
         The prevalence of the disease.
+    continuous_trait: bool
+        Whether the trait is continuous.
     p_value_threshold: float, optional
         The p-value threshold for selecting loci. Default is 0.05,
         meaning loci with p-values less than or equal to 0.05 will be selected.
@@ -587,12 +589,14 @@ def generate_c_and_t_prs_scores(
 
     print("scores_overlap header: ", list(scores_overlap.columns))
 
-    if binary_trait:
-        beta = get_allelic_effect(scores_overlap, disease_prevalence)
-    else:
-        beta = scores_overlap[BETA_COLUMN]
+    if not continuous_trait:
+        # mask sites with beta values outside of the range and drop these
+        scores_overlap = scores_overlap[
+            (scores_overlap[BETA_COLUMN].abs() >= min_abs_beta)
+            & (scores_overlap[BETA_COLUMN].abs() <= max_abs_beta)
+        ]
+        scores_overlap[BETA_COLUMN] = get_allelic_effect(scores_overlap, disease_prevalence)
 
-    print("beta", beta)
     # For now we will ld prune based on a single population, the top_hit
     # To vectorize ld pruning, we will gather chunks based on the top hit
 

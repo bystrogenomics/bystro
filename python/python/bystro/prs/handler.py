@@ -23,6 +23,8 @@ def make_calculate_prs_scores(
         trait = prs_job_data.trait
         pmid = prs_job_data.pmid
         index_name = prs_job_data.index_name
+        continuous_trait = prs_job_data.continuous_trait
+        disease_prevalence = prs_job_data.disease_prevalence
 
         ancestry: AncestryResults
         with open(prs_job_data.ancestry_result_path, "rb") as f:
@@ -36,6 +38,8 @@ def make_calculate_prs_scores(
             trait=trait,
             pmid=pmid,
             ancestry=ancestry,
+            continuous_trait=continuous_trait,
+            disease_prevalence=disease_prevalence,
             cluster_opensearch_config=cluster_opensearch_config,
             index_name=index_name,
             dosage_matrix_path=dosage_matrix_path,
