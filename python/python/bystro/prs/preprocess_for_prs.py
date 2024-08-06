@@ -556,7 +556,8 @@ def prune_by_window(df: pd.DataFrame, window_size: int):
     return final_pruned_df.drop(columns=["Chromosome", "Position", "Ref", "Alt"])
 
 
-cutler_snp_set = set(
+# for debug testing against big_daly
+_cutler_snp_set = set(
     [
         "rs11121129",
         "rs61839660",
@@ -1618,6 +1619,7 @@ def generate_c_and_t_prs_scores(
     user: CachedAuth | None = None,
     cluster_opensearch_config: dict[str, Any] | None = None,
     reporter: ProgressReporter | None = None,
+    debug: bool = True,
 ) -> pd.DataFrame:
     """
     Calculate PRS scores using the C+T method.
@@ -1679,12 +1681,15 @@ def generate_c_and_t_prs_scores(
         preprocessed_scores = _preprocess_scores(scores)
 
         if distance_based_cluster:
-            # keep only those snps that are in the cutler_snp_set, based on the VARIANT_ID_COLUMN
-            preprocessed_scores = preprocessed_scores[preprocessed_scores[VARIANT_ID_COLUMN].isin(cutler_snp_set)]
-            # preprocessed_scores = prune_by_window(preprocessed_scores, ld_window_bp)
+            # if debugging against Dave Cutler's PRS calculator, uncomment to keep only those snps that
+            # are in the cutler_snp_set, based on the VARIANT_ID_COLUMN
+            # preprocessed_scores = preprocessed_scores[preprocessed_scores[VARIANT_ID_COLUMN].isin(_cutler_snp_set)] # noqa
+            preprocessed_scores = prune_by_window(preprocessed_scores, ld_window_bp)
         else:
             if training_populations is None:
-                raise ValueError("If distance_based_cluster is False, training_populations must be provided")
+                raise ValueError(
+                    "If distance_based_cluster is False, training_populations must be provided"
+                )
 
             if len(training_populations) > 1:
                 raise ValueError(
@@ -1701,7 +1706,9 @@ def generate_c_and_t_prs_scores(
             try:
                 sumstat_ld_map_path = get_map_file(assembly, sumstat_population)
             except ValueError as e:
-                raise ValueError(f"{sumstat_population} is likely not supported. Failed to get map file: {e}")
+                raise ValueError(
+                    f"{sumstat_population} is likely not supported. Failed to get map file: {e}"
+                )
 
             if index_name is not None and cluster_opensearch_config is None and user is None:
                 raise ValueError(
@@ -1740,10 +1747,8 @@ def generate_c_and_t_prs_scores(
     if not continuous_trait:
         preprocessed_scores[BETA_COLUMN] = get_allelic_effect(preprocessed_scores, disease_prevalence)
 
-    preprocessed_scores.to_csv("preprocessed_scores_step3.csv")
     # For now we will ld prune based on a single population, the top_hit
     # To vectorize ld pruning, we will gather chunks based on the top hit
-
     top_hits, _, superpop_probabilities = _ancestry_results_to_dicts(ancestry)
     sample_groups = []
     population_wise_samples: dict[str, list[str]] = {}
@@ -1818,25 +1823,25 @@ def generate_c_and_t_prs_scores(
     logger.debug("Va %s", Va)
     logger.debug("Ve: %s", Ve)
 
-    ### Debug code to remove
-    population_allele_frequencies.to_csv("population_allele.tsv", sep="\t")
-    ancestry_weighted_afs.to_csv("ancestry_weighted_afs.tsv", sep="\t")
-    mean_q.to_csv("mean_q.tsv", sep="\t")
-    preprocessed_scores.to_csv("preprocessed_scores_step4.csv")
-    Va.to_csv("Va.tsv", sep="\t")
+    if debug:
+        preprocessed_scores.to_csv("preprocessed_scores.csv")
+        population_allele_frequencies.to_csv("population_allele.tsv", sep="\t")
+        ancestry_weighted_afs.to_csv("ancestry_weighted_afs.tsv", sep="\t")
+        mean_q.to_csv("mean_q.tsv", sep="\t")
+        preprocessed_scores.to_csv("preprocessed_scores_step4.csv")
+        Va.to_csv("Va.tsv", sep="\t")
 
-    print("Ve", Ve)
-    print("or_prev", or_prev)
-    print("scores_overlap[BETA_COLUMN]", preprocessed_scores[BETA_COLUMN].shape)
-    print("nan scores_overlap[BETA_COLUMN]", preprocessed_scores[BETA_COLUMN].isna().sum())
-    print("mean_q", mean_q)
-    print("nan mean_q", mean_q.isna().sum())
-    print("scores_overlap[BETA_COLUMN]", preprocessed_scores[BETA_COLUMN])
-    print(
-        "scores_overlap[BETA_COLUMN]*scores_overlap[BETA_COLUMN]",
-        preprocessed_scores[BETA_COLUMN] * preprocessed_scores[BETA_COLUMN],
-    )
-    ### end Debug code to remove
+        print("Ve", Ve)
+        print("or_prev", or_prev)
+        print("scores_overlap[BETA_COLUMN]", preprocessed_scores[BETA_COLUMN].shape)
+        print("nan scores_overlap[BETA_COLUMN]", preprocessed_scores[BETA_COLUMN].isna().sum())
+        print("mean_q", mean_q)
+        print("nan mean_q", mean_q.isna().sum())
+        print("scores_overlap[BETA_COLUMN]", preprocessed_scores[BETA_COLUMN])
+        print(
+            "scores_overlap[BETA_COLUMN]*scores_overlap[BETA_COLUMN]",
+            preprocessed_scores[BETA_COLUMN] * preprocessed_scores[BETA_COLUMN],
+        )
 
     if reporter is not None:
         reporter.message.remote("Fetched allele frequencies")  # type: ignore
@@ -1864,11 +1869,8 @@ def generate_c_and_t_prs_scores(
                 )
                 sample_genotypes = sample_genotypes.set_index(SNPID_COLUMN)
 
-                # TODO @akotlar: 2024-08-06 better imputation strategy
-                # Imputation of missing values
-                # For now, set missing values to 0, so that they do not affect the PRS calculation
-                sample_genotypes = sample_genotypes.fillna(0)  # pre 2024-07 missingness
-                sample_genotypes[sample_genotypes < 0] = 0  # post 2024-07 missingness
+                # TODO @akotlar: 2024-08-06 impute genotypes
+                sample_genotypes = sample_genotypes.replace(-1, np.nan)
 
             logger.debug(
                 "Time to load dosage matrix chunk of %d samples (total samples: %d): %s",
@@ -1893,14 +1895,21 @@ def generate_c_and_t_prs_scores(
             with Timer() as final_timer:
                 adjusted_genotypes = (
                     sample_genotypes
-                    - 2 * ancestry_weighted_afs.loc[sample_genotypes.index, sample_genotypes.columns]
+                    - 2.0 * ancestry_weighted_afs.loc[sample_genotypes.index, sample_genotypes.columns]
                 )
                 beta_values = preprocessed_scores.loc[adjusted_genotypes.index][BETA_COLUMN]
 
                 # prs_score for individual samples
                 # beta_values is a vector of beta values for each locus n * 1
                 # adjusted_genotypes is a matrix of genotypes for each sample n * m
-                prs_scores_chunk = adjusted_genotypes.T @ beta_values
+                # Multiply genotype DataFrame by SNP values DataFrame
+                prs_scores_chunk = adjusted_genotypes.multiply(beta_values, axis=0)
+
+                # Replace NaN with 0
+                prs_scores_chunk = prs_scores_chunk.fillna(0)
+
+                # Sum the results across the SNPs for each sample
+                prs_scores_chunk = prs_scores_chunk.sum(axis=0)
 
                 sample_prevalence = 1.0 - norm.cdf(threshold, prs_scores_chunk, Ve)
 
@@ -1911,33 +1920,32 @@ def generate_c_and_t_prs_scores(
                     prs_scores[sample] = prs_scores_chunk.loc[sample]
                     corrected_odds_ratios[sample] = real_or[index]
 
-                # debug code to remove
-                sample_genotypes.to_csv(f"sample_genotypes_{samples_processed}.tsv", sep="\t")
-                adjusted_genotypes.to_csv(f"adjusted_genotypes{samples_processed}.tsv", sep="\t")
-                beta_values.to_csv(f"beta_values_{samples_processed}.tsv", sep="\t")
-                prs_scores_chunk.to_csv(f"prs_scores_chunk_{samples_processed}.tsv", sep="\t")
-                print("ancestry_weighted_afs", ancestry_weighted_afs)
-                print("adjusted_genotypes", adjusted_genotypes)
-                print(
-                    "For chunk",
-                    samples_processed,
-                    "sample_prevalence",
-                    sample_prevalence,
-                    "threshold",
-                    threshold,
-                    "prs_scores_chunk",
-                    prs_scores_chunk,
-                    "Ve",
-                    Ve,
-                )
-                preprocessed_scores.loc[adjusted_genotypes.index].to_csv(
-                    f"preprocessed_scores_{samples_processed}.tsv", sep="\t"
-                )
-                print("prs_scores_chunk", prs_scores_chunk)
-                print("sample_prevalence", sample_prevalence)
-                print("real_or", real_or)
-                print("corrected_odds_ratios", corrected_odds_ratios)
-                # end debug code to remove
+                if debug:
+                    sample_genotypes.to_csv(f"sample_genotypes_{samples_processed}.tsv", sep="\t")
+                    adjusted_genotypes.to_csv(f"adjusted_genotypes{samples_processed}.tsv", sep="\t")
+                    beta_values.to_csv(f"beta_values_{samples_processed}.tsv", sep="\t")
+                    prs_scores_chunk.to_csv(f"prs_scores_chunk_{samples_processed}.tsv", sep="\t")
+                    print("ancestry_weighted_afs", ancestry_weighted_afs)
+                    print("adjusted_genotypes", adjusted_genotypes)
+                    print(
+                        "For chunk",
+                        samples_processed,
+                        "sample_prevalence",
+                        sample_prevalence,
+                        "threshold",
+                        threshold,
+                        "prs_scores_chunk",
+                        prs_scores_chunk,
+                        "Ve",
+                        Ve,
+                    )
+                    preprocessed_scores.loc[adjusted_genotypes.index].to_csv(
+                        f"preprocessed_scores_{samples_processed}.tsv", sep="\t"
+                    )
+                    print("prs_scores_chunk", prs_scores_chunk)
+                    print("sample_prevalence", sample_prevalence)
+                    print("real_or", real_or)
+                    print("corrected_odds_ratios", corrected_odds_ratios)
 
             logger.debug(
                 "Time to calculate PRS for chunk of %d samples (%d total samples): %s",
@@ -1964,10 +1972,6 @@ def generate_c_and_t_prs_scores(
 
     # create dataframe with PRS scores and corrected odds ratios
     results = pd.DataFrame({"PRS": prs_scores, "Corrected OR": corrected_odds_ratios})
-
-    # debug code to remove
-    print("results", results)
-    # debug code to remove
 
     return results
 
