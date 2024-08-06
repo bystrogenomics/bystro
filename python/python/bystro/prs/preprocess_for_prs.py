@@ -465,6 +465,7 @@ def ld_clump(scores_overlap: pd.DataFrame, map_path: str) -> tuple[pd.DataFrame,
     min_pval_per_bin = select_min_pval_per_bin(scores_overlap_w_bins)
     return clean_scores_for_analysis(min_pval_per_bin, ID_REF_COMPUTED_COLUMN)
 
+
 def _ancestry_results_to_dicts(
     ancestry: AncestryResults,
 ) -> tuple[dict[str, str], dict[str, PopulationVector], dict[str, SuperpopVector]]:
@@ -518,8 +519,7 @@ def generate_c_and_t_prs_scores(
     dosage_matrix_path: str,
     disease_prevalence: float,
     continuous_trait: bool,
-    index_name: str | None = None,
-    population_allele_frequencies: pd.DataFrame | None = None,
+    index_name: str,
     experiment_mapping: ExperimentMapping | None = None,
     min_abs_beta: float = 0.01,
     max_abs_beta: float = 3.0,
@@ -602,28 +602,31 @@ def generate_c_and_t_prs_scores(
 
     with Timer() as timer:
         preprocessed_scores = _preprocess_scores(scores)
-        preprocessed_scores.to_csv("preprocessed_scores_big_daly.csv")
 
         # prune preprocessed_scores to only include loci with p-values below the threshold
+        # and filter down to sites with beta values within range
         preprocessed_scores = preprocessed_scores[preprocessed_scores[P_COLUMN] <= p_value_threshold]
+        preprocessed_scores = preprocessed_scores[
+            (preprocessed_scores[BETA_COLUMN].abs() >= min_abs_beta)
+            & (preprocessed_scores[BETA_COLUMN].abs() <= max_abs_beta)
+        ]
+
         preprocessed_scores.to_csv("preprocessed_scores_pruned_big_daly.csv")
 
-    scores_after_c_t, _loci_and_allele_comparison = ld_clump(
-        preprocessed_scores, str(sumstat_ld_map_path)
-    )
-    _loci_and_allele_comparison.to_csv('loci_and_allele_comparison_big_daly.csv')
-    print("preprocessed_scores", preprocessed_scores)
-    print("scores_after_c_t", scores_after_c_t)
-    print("loci_and_allele_comparison", _loci_and_allele_comparison)
-    preprocessed_scores = preprocessed_scores.loc[scores_after_c_t.index]
-    preprocessed_scores.to_csv("preprocessed_scores_after_c_t_big_daly.csv")
+        scores_after_c_t, _loci_and_allele_comparison = ld_clump(
+            preprocessed_scores, str(sumstat_ld_map_path)
+        )
+        # TODO: check for non-direct match and warn
+        preprocessed_scores = preprocessed_scores.loc[scores_after_c_t.index]
     logger.debug("Time to preprocess scores: %s", timer.elapsed_time)
 
     if reporter is not None:
         reporter.message.remote("Preprocessed scores")  # type: ignore
 
-    preprocessed_scores_loci = list(preprocessed_scores.index)
-    score_loci_filter = pc.field(GENOTYPE_DOSAGE_LOCUS_COLUMN).isin(pa.array(preprocessed_scores_loci))
+    preprocessed_scores_loci = set(preprocessed_scores.index)
+    score_loci_filter = pc.field(GENOTYPE_DOSAGE_LOCUS_COLUMN).isin(
+        pa.array(list(preprocessed_scores_loci))
+    )
 
     dosage_ds = ds.dataset(dosage_matrix_path, format="feather").filter(score_loci_filter)
 
@@ -636,16 +639,12 @@ def generate_c_and_t_prs_scores(
     assert set(dosage_loci).issubset(preprocessed_scores_loci)
 
     preprocessed_scores = preprocessed_scores.loc[dosage_loci]
+
     threshold = norm.ppf(1.0 - disease_prevalence)
     if not continuous_trait:
-        # mask sites with beta values outside of the range and drop these
-        # scores_overlap = scores_overlap[
-        #     (scores_overlap[BETA_COLUMN].abs() >= min_abs_beta)
-        #     & (scores_overlap[BETA_COLUMN].abs() <= max_abs_beta)
-        # ]
         preprocessed_scores[BETA_COLUMN] = get_allelic_effect(preprocessed_scores, disease_prevalence)
 
-    preprocessed_scores.to_csv("preprocessed_scores_step3_big_daly.csv")
+    preprocessed_scores.to_csv("preprocessed_scores_step3.csv")
     # For now we will ld prune based on a single population, the top_hit
     # To vectorize ld pruning, we will gather chunks based on the top hit
 
@@ -665,58 +664,49 @@ def generate_c_and_t_prs_scores(
             total_number_of_samples += len(sample_group)
 
     mean_q: pd.Series | float = 0.0
-    if population_allele_frequencies is None:
-        if index_name is None:
-            raise ValueError("index_name is required if population_allele_frequencies is None")
 
-        with Timer() as query_timer:
-            logger.debug(
-                "Memory usage before fetching gnomad allele frequencies: %s",
-                psutil.Process(os.getpid()).memory_info().rss / 1024**2,
-            )
-            population_allele_frequencies = _extract_af_and_loci_overlap(
-                score_loci=set(dosage_loci),
-                rsids=set(preprocessed_scores[VARIANT_ID_COLUMN]),
-                index_name=index_name,
-                assembly=assembly,
-                user=user,
-                cluster_opensearch_config=cluster_opensearch_config,
-            )
+    with Timer() as query_timer:
+        logger.debug(
+            "Memory usage before fetching gnomad allele frequencies: %s",
+            psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+        )
+        population_allele_frequencies = _extract_af_and_loci_overlap(
+            score_loci=set(dosage_loci),
+            rsids=set(preprocessed_scores[VARIANT_ID_COLUMN]),
+            index_name=index_name,
+            assembly=assembly,
+            user=user,
+            cluster_opensearch_config=cluster_opensearch_config,
+        )
 
-            logger.debug("population_allele_frequencies: %s", population_allele_frequencies)
+        logger.debug("population_allele_frequencies: %s", population_allele_frequencies)
 
-            logger.debug(
-                "Memory usage after fetching gnomad allele frequencies: %s",
-                psutil.Process(os.getpid()).memory_info().rss / 1024**2,
-            )
+        logger.debug(
+            "Memory usage after fetching gnomad allele frequencies: %s",
+            psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+        )
 
     ancestry_weighted_afs = _calculate_ancestry_weighted_af(
         population_allele_frequencies, superpop_probabilities
     )
 
-    population_allele_frequencies.to_csv("population_allele_frequencies_big_daly.tsv", sep="\t")
-
-    ancestry_weighted_afs.to_csv("ancestry_weighted_afs_big_daly.tsv", sep="\t")
-
-    # TODO: @akotlar 2024-08-04 - divide weighted AFs by N?
     mean_q = ancestry_weighted_afs.fillna(0).mean(axis=1)
-
-    mean_q.to_csv("mean_q_big_daly.tsv", sep="\t")
 
     logger.debug("mean_q: %s", mean_q)
     logger.debug("Time to query for gnomad allele frequencies: %s", query_timer.elapsed_time)
 
     # get all ancestry_weighted_afs loci that are not missing
+    dosage_loci_nonmissing_afs = list(
+        set(dosage_loci).intersection(set(population_allele_frequencies.index))
+    )
 
-    dosage_loci_nonmissing_afs = list(set(dosage_loci).intersection(population_allele_frequencies.index))
-    print("dosage_loci_nonmissing_afs", dosage_loci_nonmissing_afs)
     if len(dosage_loci_nonmissing_afs) == 0:
         raise ValueError(
             "No loci match between base and target dataset; cannot proceed with PRS calculation."
         )
 
     preprocessed_scores = preprocessed_scores.loc[dosage_loci_nonmissing_afs]
-    preprocessed_scores.to_csv("preprocessed_scores_step4.csv")
+
     if preprocessed_scores.empty:
         raise ValueError(
             "No loci match between base and target dataset; cannot proceed with PRS calculation."
@@ -724,6 +714,20 @@ def generate_c_and_t_prs_scores(
 
     or_prev = (1.0 - disease_prevalence) / disease_prevalence
 
+    Va = preprocessed_scores[BETA_COLUMN] * preprocessed_scores[BETA_COLUMN] * 2 * mean_q * (1 - mean_q)
+    Va = Va.fillna(0)
+
+    Ve = np.sqrt(1.0 - Va.sum())
+
+    logger.debug("Va %s", Va)
+    logger.debug("Ve: %s", Ve)
+
+    ### Debug code to remove
+    population_allele_frequencies.to_csv("population_allele.tsv", sep="\t")
+    ancestry_weighted_afs.to_csv("ancestry_weighted_afs.tsv", sep="\t")
+    mean_q.to_csv("mean_q.tsv", sep="\t")
+    preprocessed_scores.to_csv("preprocessed_scores_step4.csv")
+    Va.to_csv("Va_big_daly.tsv", sep="\t")
     print("or_prev", or_prev)
     print("scores_overlap[BETA_COLUMN]", preprocessed_scores[BETA_COLUMN].shape)
     print("nan scores_overlap[BETA_COLUMN]", preprocessed_scores[BETA_COLUMN].isna().sum())
@@ -734,13 +738,7 @@ def generate_c_and_t_prs_scores(
         "scores_overlap[BETA_COLUMN]*scores_overlap[BETA_COLUMN]",
         preprocessed_scores[BETA_COLUMN] * preprocessed_scores[BETA_COLUMN],
     )
-    Va = preprocessed_scores[BETA_COLUMN] * preprocessed_scores[BETA_COLUMN] * 2 * mean_q * (1 - mean_q)
-    Va = Va.fillna(0)
-
-    Ve = np.sqrt(1.0 - Va.sum())
-    print("Ve", Ve)
-    print("Va", Va)
-    Va.to_csv("Va_big_daly.tsv", sep="\t")
+    ### end Debug code to remove
 
     if reporter is not None:
         reporter.message.remote("Fetched allele frequencies")  # type: ignore
@@ -749,12 +747,12 @@ def generate_c_and_t_prs_scores(
     prs_scores: dict[str, float] = {}
     corrected_odds_ratios: dict[str, float] = {}
 
+    dosage_chunk_index: pd.Index = pd.Index(list(dosage_loci_nonmissing_afs), dtype="string[pyarrow]")
+
     score_loci_filter = pc.field(GENOTYPE_DOSAGE_LOCUS_COLUMN).isin(
         pa.array(list(dosage_loci_nonmissing_afs))
     )
     dosage_ds = ds.dataset(dosage_matrix_path, format="feather").filter(score_loci_filter)
-
-    dosage_chunk_index: pd.Index = pd.Index(list(dosage_loci_nonmissing_afs), dtype="string[pyarrow]")
     with Timer() as outer_timer:
         samples_processed = 0
 
@@ -763,9 +761,10 @@ def generate_c_and_t_prs_scores(
 
             with Timer() as timer:
                 sample_genotypes = dosage_ds.to_table([*sample_group]).to_pandas()
-                print("sample_genotypes got", sample_genotypes)
                 sample_genotypes.index = dosage_chunk_index
-                print("set index", sample_genotypes)
+                print(f"sample_genotypes for chunk {samples_processed}", sample_genotypes)
+
+                # TODO @akotlar: 2024-08-06 better imputation strategy
                 # Imputation of missing values
                 # For now, set missing values to 0, so that they do not affect the PRS calculation
                 sample_genotypes = sample_genotypes.fillna(0)  # pre 2024-07 missingness
@@ -784,83 +783,41 @@ def generate_c_and_t_prs_scores(
                 psutil.Process(os.getpid()).memory_info().rss / 1024**2,
             )
 
-            # check if any preprocessed_scores index is missing from sample_genotypes
-            print("checking for missing loci")
             missing_loci = set(preprocessed_scores.index) - set(sample_genotypes.index)
-            if missing_loci:
-                logger.warning(
-                    "Missing loci in dosage matrix chunk for population %s: %s", population, missing_loci
-                )
 
+            if missing_loci:
                 raise ValueError(
                     f"Missing loci in dosage matrix chunk for population {population}: {missing_loci}"
                 )
 
-            # with Timer() as c_t_timer:
-                
-
-                # print("scores_after_c_t", scores_after_c_t)
-                # print("scores_after_c_t columns", list(scores_after_c_t.columns))
-
-                # check if any loci are missing from scores_after_c_t
-                # missing_loci = set(preprocessed_scores.index) - set(scores_after_c_t.index)
-                # missing_loci2 = set(scores_after_c_t.index) - set(preprocessed_scores.index)
-                # missing_loci3 = set(scores_after_c_t.index) - set(sample_genotypes.index)
-                # missing_loci4 = set(sample_genotypes.index) - set(scores_after_c_t.index)
-
-                # print("missing_loci", missing_loci)
-                # print("missing_loci2", missing_loci2)
-                # print("missing_loci3", missing_loci3)
-                # print("missing_loci4", missing_loci4)
-
-            # logger.debug("Time to clump: %s", c_t_timer.elapsed_time)
-
             with Timer() as final_timer:
-                print("about to finalize_dosage_after_c_t")
-
-                print("after finalize_dosage_after_c_t")
-
-                print("ancestry_weighted_afs index", ancestry_weighted_afs.index)
-                # print("genos_transpose index", genos_transpose.index)
-                # print("genos_transpose.columns", genos_transpose.columns)
-                # print("list(genos_transpose.columns)", list(genos_transpose.columns))
-                # print(
-                #     "ancestry_weighted_afs[genos_transpose.columns].T",
-                #     ancestry_weighted_afs.loc[list(genos_transpose.columns)].T,
-                # )
-                # print(
-                #     "ancestry_weighted_afs[genos_transpose.columns].T",
-                #     ancestry_weighted_afs.loc[genos_transpose.columns].T,
-                # )
-                # print(
-                #     "ancestry_weighted_afs.loc[genos_transpose.columns, genos_transpose.index]",
-                #     ancestry_weighted_afs.loc[genos_transpose.columns, genos_transpose.index],
-                # )
                 genos_transpose = (
                     sample_genotypes.T
                     - 2 * ancestry_weighted_afs.loc[sample_genotypes.index, sample_genotypes.columns].T
                 )
-                print("after genos_transpose", genos_transpose)
-                print("scores_after_c_t[BETA_COLUMN]", scores_after_c_t[BETA_COLUMN])
-                print("scores_after_c_t", scores_after_c_t)
-                beta_values = scores_after_c_t.loc[list(genos_transpose.columns)][BETA_COLUMN]
-                print("beta_values", beta_values)
-                prs_scores_chunk = genos_transpose @ beta_values
-                print("prs_scores_chunk", prs_scores_chunk)
-                sample_prevalence = 1.0 - norm.cdf(threshold, prs_scores_chunk, Ve)
-                print("sample_prevalence", sample_prevalence)
-                real_or = or_prev * sample_prevalence / (1.0 - sample_prevalence)
-                print("real_or", real_or)
 
-                # make real_or a dataframe and write to tsv
+                beta_values = scores_after_c_t.loc[list(genos_transpose.columns)][BETA_COLUMN]
+                prs_scores_chunk = genos_transpose @ beta_values
+
+                sample_prevalence = 1.0 - norm.cdf(threshold, prs_scores_chunk, Ve)
+                real_or = or_prev * sample_prevalence / (1.0 - sample_prevalence)
 
                 # add each prs score to the prs_scores dict
                 for index, sample in enumerate(genos_transpose.index):
                     prs_scores[sample] = prs_scores_chunk.loc[sample]
                     corrected_odds_ratios[sample] = real_or[index]
+
+                # debug code to remove
+                genos_transpose.to_csv(f"genos_transpose_{samples_processed}.tsv", sep="\t")
+                scores_after_c_t.loc[list(genos_transpose.columns)].to_csv(
+                    f"scores_after_c_t_{samples_processed}.tsv", sep="\t"
+                )
+                print("prs_scores_chunk", prs_scores_chunk)
+                print("sample_prevalence", sample_prevalence)
+                print("real_or", real_or)
                 print("corrected_odds_ratios", corrected_odds_ratios)
-                # prs_scores = prs_scores.add(prs_scores_chunk, fill_value=0)
-                # corrected_odds_ratios = corrected_odds_ratios.add(real_or, fill_value=0)
+                # end debug code to remove
+
             logger.debug(
                 "Time to calculate PRS for chunk of %d samples (%d total samples): %s",
                 len(sample_group),
@@ -886,7 +843,11 @@ def generate_c_and_t_prs_scores(
 
     # create dataframe with PRS scores and corrected odds ratios
     results = pd.DataFrame({"PRS": prs_scores, "Corrected OR": corrected_odds_ratios})
+
+    # debug code to remove
     print("results", results)
+    # debug code to remove
+
     return results
 
 

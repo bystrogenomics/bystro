@@ -28,8 +28,8 @@ class PRSJobData(BaseMessage, frozen=True, forbid_unknown_fields=True, rename="c
 
         The ancestry file will be used to calculate best-fit populations,
         which are used for allele frequency weighting in the PRS calculation.
-    index_name: str | None
-        The index of the dataset in the OpenSearch cluster, if available
+    index_name: str
+        The index of the dataset in the OpenSearch cluster
     covariates_path: str | None
         The path to the covariates file, which is expected to be a tab-separated file with the first column
         being the sample id, and the subsequent columns being the covariates.
@@ -49,7 +49,7 @@ class PRSJobData(BaseMessage, frozen=True, forbid_unknown_fields=True, rename="c
     ancestry_result_path: str
     disease_prevalence: float
     continuous_trait: bool
-    index_name: str | None = None
+    index_name: str
     covariates_path: str | None = None
 
 
