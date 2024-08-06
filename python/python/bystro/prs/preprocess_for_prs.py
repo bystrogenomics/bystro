@@ -512,7 +512,7 @@ def get_allelic_effect(df: pd.DataFrame, prevalence: float) -> pd.Series:
 
 def prune_by_window(df: pd.DataFrame, window_size: int):
     # Split the SNPID column into separate chromosome and position columns
-    df[["Chromosome", "Position", "Ref", "Alt"]] = df["SNPID"].str.split(":", expand=True)
+    df[["Chromosome", "Position", "Ref", "Alt"]] = df[SNPID_COLUMN].str.split(":", expand=True)
 
     # Convert the Position column to integers
     df["Position"] = df["Position"].astype(int)
@@ -539,7 +539,7 @@ def prune_by_window(df: pd.DataFrame, window_size: int):
                 df.at[idx, "Bin"] = bin_counter
 
         # Within each bin, keep the SNP with the lowest p-value
-        pruned_df = df.loc[df.groupby("Bin")["P"].idxmin()].reset_index(drop=True)
+        pruned_df = df.loc[df.groupby("Bin")[P_COLUMN].idxmin()].reset_index(drop=True)
 
         # Drop the intermediate columns if not needed
         pruned_df = pruned_df.drop(columns=["Bin"])
