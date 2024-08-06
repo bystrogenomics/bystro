@@ -1602,12 +1602,14 @@ def generate_c_and_t_prs_scores(
     assembly: str,
     trait: str,
     pmid: str,
-    training_populations: list[str],
     ancestry: AncestryResults,
     dosage_matrix_path: str,
     disease_prevalence: float,
     continuous_trait: bool,
     index_name: str,
+    training_populations: list[str] | None = None,
+    distance_based_cluster: bool = True,
+    ld_window_bp: int = 20_000,
     experiment_mapping: ExperimentMapping | None = None,
     min_abs_beta: float = 0.01,
     max_abs_beta: float = 3.0,
@@ -1656,29 +1658,6 @@ def generate_c_and_t_prs_scores(
     reporter: ProgressReporter, optional
         The progress reporter.
     """
-    if len(training_populations) > 1:
-        raise ValueError(
-            (
-                "PRS training data from only one superpopulation "
-                f"or population is currently supported: found {training_populations}."
-            )
-        )
-
-    sumstat_population = training_populations[0]
-
-    if sumstat_population in SUPERPOP_TO_POP_MAP:
-        sumstat_population = SUPERPOP_TO_POP_MAP[sumstat_population]
-
-    try:
-        sumstat_ld_map_path = get_map_file(assembly, sumstat_population)
-    except ValueError as e:
-        raise ValueError(f"{sumstat_population} is likely not supported. Failed to get map file: {e}")
-
-    if index_name is not None and cluster_opensearch_config is None and user is None:
-        raise ValueError(
-            "If index_name is provided, either user or cluster_opensearch_config must be provided."
-        )
-
     # This part goes through dosage matrix the first time to get overlapping loci
     with Timer() as timer:
         gwas_scores_path = get_sumstats_file(trait, assembly, pmid)
@@ -1696,20 +1675,45 @@ def generate_c_and_t_prs_scores(
             (scores[BETA_COLUMN].abs() >= min_abs_beta) & (scores[BETA_COLUMN].abs() <= max_abs_beta)
         ]
 
-        # keep only those snps that are in the cutler_snp_set, based on the VARIANT_ID_COLUMN
-        scores = scores[scores[VARIANT_ID_COLUMN].isin(cutler_snp_set)]
-
-        # scores = prune_by_window(scores, 20_000)
-        # print("pruned scores", scores)
-
+        # TODO: check for non-direct match and warn
         preprocessed_scores = _preprocess_scores(scores)
-        preprocessed_scores.to_csv("preprocessed_scores_pruned_cutler_set.csv")
 
-        # scores_after_c_t, _loci_and_allele_comparison = ld_clump(
-        #     preprocessed_scores, str(sumstat_ld_map_path)
-        # )
-        # # TODO: check for non-direct match and warn
-        # preprocessed_scores = preprocessed_scores.loc[scores_after_c_t.index]
+        if distance_based_cluster:
+            # keep only those snps that are in the cutler_snp_set, based on the VARIANT_ID_COLUMN
+            preprocessed_scores = preprocessed_scores[preprocessed_scores[VARIANT_ID_COLUMN].isin(cutler_snp_set)]
+            # preprocessed_scores = prune_by_window(preprocessed_scores, ld_window_bp)
+        else:
+            if training_populations is None:
+                raise ValueError("If distance_based_cluster is False, training_populations must be provided")
+
+            if len(training_populations) > 1:
+                raise ValueError(
+                    (
+                        "PRS training data from only one superpopulation "
+                        f"or population is currently supported: found {training_populations}."
+                    )
+                )
+            sumstat_population = training_populations[0]
+
+            if sumstat_population in SUPERPOP_TO_POP_MAP:
+                sumstat_population = SUPERPOP_TO_POP_MAP[sumstat_population]
+
+            try:
+                sumstat_ld_map_path = get_map_file(assembly, sumstat_population)
+            except ValueError as e:
+                raise ValueError(f"{sumstat_population} is likely not supported. Failed to get map file: {e}")
+
+            if index_name is not None and cluster_opensearch_config is None and user is None:
+                raise ValueError(
+                    "If index_name is provided, either user or cluster_opensearch_config must be provided."
+                )
+
+            scores_after_c_t, _loci_and_allele_comparison = ld_clump(
+                preprocessed_scores, str(sumstat_ld_map_path)
+            )
+
+            preprocessed_scores = preprocessed_scores.loc[scores_after_c_t.index]
+
     logger.debug("Time to preprocess scores: %s", timer.elapsed_time)
 
     if reporter is not None:
