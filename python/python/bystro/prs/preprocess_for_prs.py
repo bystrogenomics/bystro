@@ -1676,15 +1676,14 @@ def generate_c_and_t_prs_scores(
         scores = scores[
             (scores[BETA_COLUMN].abs() >= min_abs_beta) & (scores[BETA_COLUMN].abs() <= max_abs_beta)
         ]
-
-        # TODO: check for non-direct match and warn
-        preprocessed_scores = _preprocess_scores(scores)
-
         if distance_based_cluster:
             # if debugging against Dave Cutler's PRS calculator, uncomment to keep only those snps that
             # are in the cutler_snp_set, based on the VARIANT_ID_COLUMN
             # preprocessed_scores = preprocessed_scores[preprocessed_scores[VARIANT_ID_COLUMN].isin(_cutler_snp_set)] # noqa
-            preprocessed_scores = prune_by_window(preprocessed_scores, ld_window_bp)
+            scores = prune_by_window(scores, ld_window_bp)
+
+            # TODO: check for non-direct match and warn
+            preprocessed_scores = _preprocess_scores(scores)
         else:
             if training_populations is None:
                 raise ValueError(
@@ -1714,6 +1713,9 @@ def generate_c_and_t_prs_scores(
                 raise ValueError(
                     "If index_name is provided, either user or cluster_opensearch_config must be provided."
                 )
+
+            # TODO: check for non-direct match and warn
+            preprocessed_scores = _preprocess_scores(scores)
 
             scores_after_c_t, _loci_and_allele_comparison = ld_clump(
                 preprocessed_scores, str(sumstat_ld_map_path)
