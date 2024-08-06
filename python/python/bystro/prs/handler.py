@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Any, Callable
 
+from bystro.utils.covariates import ExperimentMappings
 from msgspec import json
 
 from bystro.beanstalkd.messages import ProgressPublisher, get_progress_reporter
@@ -26,6 +27,7 @@ def make_calculate_prs_scores(
         disease_prevalence = prs_job_data.disease_prevalence
         training_populations = prs_job_data.training_populations
 
+
         ancestry: AncestryResults
         with open(prs_job_data.ancestry_result_path, "rb") as f:
             data = f.read()
@@ -33,6 +35,12 @@ def make_calculate_prs_scores(
 
         reporter = get_progress_reporter(publisher, update_interval=100)
 
+        covariates_path = prs_job_data.covariates_path
+
+        if covariates_path:
+            covariates = ExperimentMappings.from_path(covariates_path)
+
+        print("covariates", covariates)
         results = generate_c_and_t_prs_scores(
             assembly=assembly,
             trait=trait,
@@ -42,6 +50,7 @@ def make_calculate_prs_scores(
             disease_prevalence=disease_prevalence,
             training_populations=training_populations,
             cluster_opensearch_config=cluster_opensearch_config,
+            experiment_mapping=covariates,
             index_name=index_name,
             dosage_matrix_path=dosage_matrix_path,
             p_value_threshold=p_value_threshold,

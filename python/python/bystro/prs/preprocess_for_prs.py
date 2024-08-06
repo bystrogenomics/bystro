@@ -35,7 +35,7 @@ from pyarrow import feather  # type: ignore
 from scipy.stats import norm
 
 from bystro.api.auth import CachedAuth
-from bystro.utils.covariates import ExperimentMapping
+from bystro.utils.covariates import Covariates, ExperimentMapping, ExperimentMappings
 from bystro.proteomics.annotation_interface import get_annotation_result_from_query
 from bystro.ancestry.ancestry_types import AncestryResults, PopulationVector, SuperpopVector
 from bystro.prs.model import get_sumstats_file, get_map_file
@@ -1599,6 +1599,18 @@ _cutler_snp_set = set(
 )
 
 
+def _experiment_mapping_to_dict(experiment_mapping: ExperimentMappings) -> dict[str, Covariates]:
+    """
+    Create dictionary, keyed on sample_id and containing a dictionary of all covariates belonging to this sample
+    """
+
+    sample_covariates: dict[str, Covariates] = {}
+    for mapping in experiment_mapping.user_experiment_mappings:
+        sample_covariates[mapping.sample_id] = mapping.covariates
+
+    return sample_covariates
+
+
 def generate_c_and_t_prs_scores(
     assembly: str,
     trait: str,
@@ -1611,7 +1623,7 @@ def generate_c_and_t_prs_scores(
     training_populations: list[str] | None = None,
     distance_based_cluster: bool = False,
     ld_window_bp: int = 100_000,
-    experiment_mapping: ExperimentMapping | None = None,
+    experiment_mapping: ExperimentMappings | None = None,
     min_abs_beta: float = 0.01,
     max_abs_beta: float = 3.0,
     p_value_threshold: float = 0.05,
@@ -1669,6 +1681,9 @@ def generate_c_and_t_prs_scores(
     if reporter is not None:
         reporter.message.remote("Loaded association scores")  # type: ignore
 
+    if experiment_mapping is not None:
+        covariates_dict = _experiment_mapping_to_dict(experiment_mapping)
+    print("covariates_dict", covariates_dict)
     with Timer() as timer:
         # prune preprocessed_scores to only include loci with p-values below the threshold
         # and filter down to sites with beta values within range
@@ -1851,6 +1866,8 @@ def generate_c_and_t_prs_scores(
     # Accumulate the results
     prs_scores: dict[str, float] = {}
     corrected_odds_ratios: dict[str, float] = {}
+    sex: dict[str, str] = {}
+    affectation: dict[str, str] = {}
 
     score_loci_filter = pc.field(GENOTYPE_DOSAGE_LOCUS_COLUMN).isin(
         pa.array(list(dosage_loci_nonmissing_afs))
@@ -1922,9 +1939,22 @@ def generate_c_and_t_prs_scores(
                     prs_scores[sample] = prs_scores_chunk.loc[sample]
                     corrected_odds_ratios[sample] = real_or[index]
 
+                    if covariates_dict is not None:
+                        sample_covariates = covariates_dict[sample]
+
+                        if sample_covariates.sex is None:
+                            sex[sample] = "Unknown"
+                        else:
+                            sex[sample] = sample_covariates.sex
+
+                        if sample_covariates.phenotype is None:
+                            affectation[sample] = "Unknown"
+                        else:
+                            affectation[sample] = sample_covariates.phenotype
+
                 if debug:
                     sample_genotypes.to_csv(f"sample_genotypes_{samples_processed}.tsv", sep="\t")
-                    adjusted_genotypes.to_csv(f"adjusted_genotypes{samples_processed}.tsv", sep="\t")
+                    adjusted_genotypes.to_csv(f"adjusted_genodtypes{samples_processed}.tsv", sep="\t")
                     beta_values.to_csv(f"beta_values_{samples_processed}.tsv", sep="\t")
                     prs_scores_chunk.to_csv(f"prs_scores_chunk_{samples_processed}.tsv", sep="\t")
                     print("ancestry_weighted_afs", ancestry_weighted_afs)
@@ -1973,7 +2003,14 @@ def generate_c_and_t_prs_scores(
     logger.debug("Time to calculate PRS for all samples: %s", outer_timer.elapsed_time)
 
     # create dataframe with PRS scores and corrected odds ratios
-    results = pd.DataFrame({"PRS": prs_scores, "Corrected OR": corrected_odds_ratios})
+    results = pd.DataFrame(
+        {
+            "PRS": prs_scores,
+            "Corrected OR": corrected_odds_ratios,
+            "Sex": sex,
+            "Affectation": affectation,
+        }
+    )
 
     return results
 
