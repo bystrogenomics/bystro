@@ -21,6 +21,7 @@ import logging
 from typing import Any, Optional
 import os
 from bystro.beanstalkd.messages import ProgressReporter
+from pandas._libs import missing
 import psutil
 
 import matplotlib.pyplot as plt  # type: ignore
@@ -57,24 +58,40 @@ HG38_ASSEMBLY = "hg38"
 GENOTYPE_DOSAGE_LOCUS_COLUMN = "locus"
 CEU_POP = "CEU"
 
-AFR_SUPERPOP = "AFR"
-AMR_SUPERPOP = "AMR"
-EAS_SUPERPOP = "EAS"
-EUR_SUPERPOP = "EUR"
-SAS_SUPERPOP = "SAS"
-ANCESTRY_SUPERPOPS = [AFR_SUPERPOP, AMR_SUPERPOP, EAS_SUPERPOP, EUR_SUPERPOP, SAS_SUPERPOP]
+AFR = "AFR"
+AMR = "AMR"
+EAS = "EAS"
+EUR = "EUR"
+SAS = "SAS"
+ANCESTRY_SUPERPOPS = [AFR, AMR, EAS, EUR, SAS]
 
+# For now, we will use LD maps from the subpopulations to approximate the ld maps for superpopulations
+# for the purposes of calculating the liabilty scale effect Beta for the PRS calculation
+SUPERPOP_TO_POP_MAP = {
+    AFR: "YRI",
+    AMR: "MXL",
+    EAS: "JPT",
+    EUR: "CEU",
+    SAS: "GIH",
+}
+
+# hg19 lacks SAS superpopulation, so we will use the mean AF across all populations
+# as a proxy for SAS
+# this overall AF will be likely larger than the true SAS AF,
+# and will therefore lead to likely conservative PRS scores
 HG19_GNOMAD_AF_SUPERPOPS = [
+    "gnomad.genomes.AF",
     "gnomad.genomes.AF_afr",
     "gnomad.genomes.AF_amr",
     "gnomad.genomes.AF_eas",
     "gnomad.genomes.AF_nfe",
 ]
 HG19_GNOMAD_AF_SUPERPOPS_MAP = {
-    "gnomad.genomes.AF_afr": AFR_SUPERPOP,
-    "gnomad.genomes.AF_amr": AMR_SUPERPOP,
-    "gnomad.genomes.AF_eas": EAS_SUPERPOP,
-    "gnomad.genomes.AF_nfe": EUR_SUPERPOP,
+    "gnomad.genomes.AF": SAS,
+    "gnomad.genomes.AF_afr": AFR,
+    "gnomad.genomes.AF_amr": AMR,
+    "gnomad.genomes.AF_eas": EAS,
+    "gnomad.genomes.AF_nfe": EUR,
 }
 HG38_GNOMAD_AF_SUPERPOPS = [
     "gnomad.genomes.AF_joint_afr",
@@ -84,11 +101,11 @@ HG38_GNOMAD_AF_SUPERPOPS = [
     "gnomad.genomes.AF_joint_sas",
 ]
 HG38_GNOMAD_AF_SUPERPOPS_MAP = {
-    "gnomad.genomes.AF_joint_afr": AFR_SUPERPOP,
-    "gnomad.genomes.AF_joint_amr": AMR_SUPERPOP,
-    "gnomad.genomes.AF_joint_eas": EAS_SUPERPOP,
-    "gnomad.genomes.AF_joint_nfe": EUR_SUPERPOP,
-    "gnomad.genomes.AF_joint_sas": SAS_SUPERPOP,
+    "gnomad.genomes.AF_joint_afr": AFR,
+    "gnomad.genomes.AF_joint_amr": AMR,
+    "gnomad.genomes.AF_joint_eas": EAS,
+    "gnomad.genomes.AF_joint_nfe": EUR,
+    "gnomad.genomes.AF_joint_sas": SAS,
 }
 
 ######### SUMSTAT COLUMNS #########
@@ -96,6 +113,7 @@ HG38_GNOMAD_AF_SUPERPOPS_MAP = {
 CHROM_COLUMN = "CHR"
 POS_COLUMN = "POS"
 SNPID_COLUMN = "SNPID"
+VARIANT_ID_COLUMN = "VARIANT_ID"
 OTHER_ALLELE_COLUMN = "OTHER_ALLELE"
 EFFECT_ALLELE_COLUMN = "EFFECT_ALLELE"
 P_COLUMN = "P"
@@ -109,9 +127,10 @@ HARMONIZED_SUMSTAT_COLUMNS = [
     OTHER_ALLELE_COLUMN,
     EFFECT_ALLELE_COLUMN,
     P_COLUMN,
-    SNPID_COLUMN,
     BETA_COLUMN,
     EFFECT_FREQUENCY_COLUMN,
+    SNPID_COLUMN,
+    VARIANT_ID_COLUMN,
 ]
 HARMONIZED_SUMSTAT_COLUMN_TYPES = {
     CHROM_COLUMN: "string[pyarrow]",
@@ -201,16 +220,29 @@ def _convert_loci_to_query_format(score_loci: set) -> str:
     return f"(_exists_:gnomad.genomes) && ({' || '.join(finalized_loci)})"
 
 
-def _add_sas_column_if_missing(df):
-    if SAS_SUPERPOP not in df.columns:
-        df[SAS_SUPERPOP] = 0
-    return df
+def _convert_rsid_to_query_format(rsids: set) -> str:
+    """
+    Convert a set of rsids from the format 'rs123' to
+    '(gnomad.genomes.id:rs123)'
+    and separate them by '||' in order to issue queries with them.
+    """
+    if not rsids:
+        raise ValueError("No rsids provided for conversion to query format.")
+
+    query = []
+
+    for rsid in rsids:
+        single_query = f"(gnomad.genomes.id:{rsid})"
+        query.append(single_query)
+
+    return " || ".join(query)
 
 
 def _extract_af_and_loci_overlap(
     score_loci: set,
     index_name: str,
     assembly: str,
+    rsids: set | None = None,
     user: CachedAuth | None = None,
     cluster_opensearch_config: dict[str, Any] | None = None,
 ) -> pd.DataFrame:
@@ -218,7 +250,15 @@ def _extract_af_and_loci_overlap(
     Convert loci to query format, perform annotation query,
     and return the loci with gnomad allele frequencies.
     """
-    query = _convert_loci_to_query_format(score_loci)
+    if rsids is not None:
+        # check that there are no missing values in the set; by checking for None or np.nan
+        if (None in rsids) or (np.nan in rsids):
+            logger.warning("There are missing values in the set of rsids, defaulting to score_loci.")
+            query = _convert_loci_to_query_format(score_loci)
+        else:
+            query = _convert_rsid_to_query_format(rsids)
+    else:
+        query = _convert_loci_to_query_format(score_loci)
 
     if assembly == HG19_ASSEMBLY:
         gnomad_af_fields = HG19_GNOMAD_AF_SUPERPOPS
@@ -239,22 +279,15 @@ def _extract_af_and_loci_overlap(
             fields=gnomad_af_fields,
         )
         .set_index(GENOTYPE_DOSAGE_LOCUS_COLUMN)
-        .fillna(0)
         .rename(columns=gnomad_af_fields_map)
     )
-
-    if assembly == HG19_ASSEMBLY:
-        return _add_sas_column_if_missing(res)[ANCESTRY_SUPERPOPS]
 
     return res[ANCESTRY_SUPERPOPS]
 
 
-def _calculate_allele_frequency_total_variation(
+def _calculate_ancestry_weighted_af(
     gnomad_afs: pd.DataFrame, superpop_probabilities: dict[str, SuperpopVector]
-):
-    # Renormalize gnomad allele frequencies
-    gnomad_afs = gnomad_afs.div(gnomad_afs.sum(axis=1), axis=0)
-
+) -> pd.DataFrame:
     sample_superprop_probs: dict[str, dict[str, float]] = {}
     for sample in superpop_probabilities:
         sample_superprop_probs[sample] = {}
@@ -266,12 +299,15 @@ def _calculate_allele_frequency_total_variation(
             ) / 2
 
     sample_superprop_probs_df = pd.DataFrame(sample_superprop_probs, dtype=np.float32)
+
+    sample_superprop_probs_df.to_csv("sample_superprop_probs_df_big_daly.tsv", sep="\t")
     # Normalize, just in case
     sample_superprop_probs_df = sample_superprop_probs_df.div(
         sample_superprop_probs_df.sum(axis=0), axis=1
     )
+    sample_superprop_probs_df.to_csv("sample_superprop_probs_df_normalized_big_daly.tsv", sep="\t")
 
-    return 2 * (gnomad_afs @ sample_superprop_probs_df.loc[gnomad_afs.columns.tolist()])
+    return gnomad_afs @ sample_superprop_probs_df.loc[gnomad_afs.columns.tolist()]
 
 
 def _preprocess_scores(scores: pd.DataFrame) -> pd.DataFrame:
@@ -332,24 +368,6 @@ def _preprocess_genetic_maps(map_path: str) -> dict[int, list[int]]:
             upper_bounds = genetic_map[UPPER_BOUND_GENETIC_MAP_COLUMN].tolist()
             bin_mappings[i] = upper_bounds
     return bin_mappings
-
-
-def get_p_value_thresholded_indices(df, p_value_threshold: float) -> set:
-    """Return indices of rows with P-values less than or equal to the specified threshold."""
-    if not (0 <= p_value_threshold <= 1):
-        raise ValueError("p_value_threshold must be between 0 and 1")
-    return set(df.index[df[P_COLUMN] <= p_value_threshold])
-
-
-def generate_overlap_scores_dosage(thresholded_score_loci: set, filtered_dosage_loci: set) -> set:
-    """Compare and restrict to overlapping loci between dosage matrix and thresholded scores."""
-
-    overlap_loci = thresholded_score_loci.intersection(filtered_dosage_loci)
-    if len(overlap_loci) == 0:
-        raise ValueError(
-            "No loci match between base and target dataset; cannot proceed with PRS calculation."
-        )
-    return overlap_loci
 
 
 def compare_alleles(row: pd.Series, col1: str, col2: str) -> GwasStatsLocusKind:
@@ -447,19 +465,6 @@ def ld_clump(scores_overlap: pd.DataFrame, map_path: str) -> tuple[pd.DataFrame,
     min_pval_per_bin = select_min_pval_per_bin(scores_overlap_w_bins)
     return clean_scores_for_analysis(min_pval_per_bin, ID_REF_COMPUTED_COLUMN)
 
-
-def finalize_dosage_after_c_t(
-    dosage_overlap: pd.DataFrame, loci_and_allele_comparison: pd.DataFrame
-) -> pd.DataFrame:
-    """Finalize dosage matrix for PRS calculation."""
-    merged_allele_comparison_genos = loci_and_allele_comparison.join(dosage_overlap, how="inner")
-    merged_allele_comparison_genos = merged_allele_comparison_genos.sort_index()
-    genos_adjusted = merged_allele_comparison_genos.apply(adjust_dosages, axis=1)
-    genotypes_adjusted_only = genos_adjusted.iloc[:, 1:]
-    genos_transpose = genotypes_adjusted_only.T
-    return genos_transpose
-
-
 def _ancestry_results_to_dicts(
     ancestry: AncestryResults,
 ) -> tuple[dict[str, str], dict[str, PopulationVector], dict[str, SuperpopVector]]:
@@ -480,18 +485,26 @@ def get_allelic_effect(df: pd.DataFrame, prevalence: float) -> pd.Series:
         raise ValueError("Prevalence must be between 0 and 1")
 
     threshold = norm.ppf(1.0 - prevalence)
-
+    print("threshold", threshold)
+    print('df["EFFECT_ALLELE_FREQUENCY"]', df["EFFECT_ALLELE_FREQUENCY"])
     pene_effect = prevalence / (
         df["EFFECT_ALLELE_FREQUENCY"] + (1 - df["EFFECT_ALLELE_FREQUENCY"]) / np.exp(df["BETA"])
     )
     pene_ref = (prevalence - pene_effect * df["EFFECT_ALLELE_FREQUENCY"]) / (
-        1 - pene_effect * df["EFFECT_ALLELE_FREQUENCY"]
+        1 - df["EFFECT_ALLELE_FREQUENCY"]
     )
+
+    print("pene_effect", pene_effect)
+    print("pene_ref", pene_ref)
 
     alpha_effect = threshold - norm.ppf(1.0 - pene_effect)
     alpha_ref = threshold - norm.ppf(1.0 - pene_ref)
 
+    print("alpha_effect", alpha_effect)
+    print("alpha_ref", alpha_ref)
+
     beta = alpha_effect - alpha_ref
+    print("beta", beta)
 
     return beta
 
@@ -500,20 +513,22 @@ def generate_c_and_t_prs_scores(
     assembly: str,
     trait: str,
     pmid: str,
+    training_populations: list[str],
     ancestry: AncestryResults,
     dosage_matrix_path: str,
     disease_prevalence: float,
     continuous_trait: bool,
+    index_name: str | None = None,
+    population_allele_frequencies: pd.DataFrame | None = None,
     experiment_mapping: ExperimentMapping | None = None,
     min_abs_beta: float = 0.01,
     max_abs_beta: float = 3.0,
     p_value_threshold: float = 0.05,
     sample_chunk_size: int = 200,
-    index_name: str | None = None,
     user: CachedAuth | None = None,
     cluster_opensearch_config: dict[str, Any] | None = None,
     reporter: ProgressReporter | None = None,
-) -> pd.Series:
+) -> pd.DataFrame:
     """
     Calculate PRS scores using the C+T method.
 
@@ -525,6 +540,8 @@ def generate_c_and_t_prs_scores(
         The trait name.
     pmid: str
         The PubMed ID of the GWAS study.
+    training_populations: list[str]
+        The populations or superpopulations from which the training data was derived.
     ancestry: AncestryResults
         The ancestry results for the study.
     dosage_matrix_path: str
@@ -544,13 +561,31 @@ def generate_c_and_t_prs_scores(
         The maximum absolute beta value used in calculating the odds ratio
     sample_chunk_size: int, optional
         The number of samples to process in each chunk.
-    index_name: str, optional
+    index_name: str
         The index name of the dataset in the OpenSearch cluster.
     cluster_opensearch_config: dict, optional
         The OpenSearch cluster configuration
     reporter: ProgressReporter, optional
         The progress reporter.
     """
+    if len(training_populations) > 1:
+        raise ValueError(
+            (
+                "PRS training data from only one superpopulation "
+                f"or population is currently supported: found {training_populations}."
+            )
+        )
+
+    sumstat_population = training_populations[0]
+
+    if sumstat_population in SUPERPOP_TO_POP_MAP:
+        sumstat_population = SUPERPOP_TO_POP_MAP[sumstat_population]
+
+    try:
+        sumstat_ld_map_path = get_map_file(assembly, sumstat_population)
+    except ValueError as e:
+        raise ValueError(f"{sumstat_population} is likely not supported. Failed to get map file: {e}")
+
     if index_name is not None and cluster_opensearch_config is None and user is None:
         raise ValueError(
             "If index_name is provided, either user or cluster_opensearch_config must be provided."
@@ -567,13 +602,28 @@ def generate_c_and_t_prs_scores(
 
     with Timer() as timer:
         preprocessed_scores = _preprocess_scores(scores)
-        thresholded_score_loci = get_p_value_thresholded_indices(preprocessed_scores, p_value_threshold)
+        preprocessed_scores.to_csv("preprocessed_scores_big_daly.csv")
+
+        # prune preprocessed_scores to only include loci with p-values below the threshold
+        preprocessed_scores = preprocessed_scores[preprocessed_scores[P_COLUMN] <= p_value_threshold]
+        preprocessed_scores.to_csv("preprocessed_scores_pruned_big_daly.csv")
+
+    scores_after_c_t, _loci_and_allele_comparison = ld_clump(
+        preprocessed_scores, str(sumstat_ld_map_path)
+    )
+    _loci_and_allele_comparison.to_csv('loci_and_allele_comparison_big_daly.csv')
+    print("preprocessed_scores", preprocessed_scores)
+    print("scores_after_c_t", scores_after_c_t)
+    print("loci_and_allele_comparison", _loci_and_allele_comparison)
+    preprocessed_scores = preprocessed_scores.loc[scores_after_c_t.index]
+    preprocessed_scores.to_csv("preprocessed_scores_after_c_t_big_daly.csv")
     logger.debug("Time to preprocess scores: %s", timer.elapsed_time)
 
     if reporter is not None:
         reporter.message.remote("Preprocessed scores")  # type: ignore
 
-    score_loci_filter = pc.field(GENOTYPE_DOSAGE_LOCUS_COLUMN).isin(pa.array(thresholded_score_loci))
+    preprocessed_scores_loci = list(preprocessed_scores.index)
+    score_loci_filter = pc.field(GENOTYPE_DOSAGE_LOCUS_COLUMN).isin(pa.array(preprocessed_scores_loci))
 
     dosage_ds = ds.dataset(dosage_matrix_path, format="feather").filter(score_loci_filter)
 
@@ -582,21 +632,20 @@ def generate_c_and_t_prs_scores(
         .to_pandas()[GENOTYPE_DOSAGE_LOCUS_COLUMN]
         .to_numpy()
     )
-    dosage_chunk_index: pd.Index = pd.Index(dosage_loci, dtype="string[pyarrow]")
 
-    overlap_loci = generate_overlap_scores_dosage(thresholded_score_loci, dosage_loci)
-    scores_overlap = preprocessed_scores[preprocessed_scores.index.isin(overlap_loci)]
+    assert set(dosage_loci).issubset(preprocessed_scores_loci)
 
-    print("scores_overlap header: ", list(scores_overlap.columns))
-
+    preprocessed_scores = preprocessed_scores.loc[dosage_loci]
+    threshold = norm.ppf(1.0 - disease_prevalence)
     if not continuous_trait:
         # mask sites with beta values outside of the range and drop these
-        scores_overlap = scores_overlap[
-            (scores_overlap[BETA_COLUMN].abs() >= min_abs_beta)
-            & (scores_overlap[BETA_COLUMN].abs() <= max_abs_beta)
-        ]
-        scores_overlap[BETA_COLUMN] = get_allelic_effect(scores_overlap, disease_prevalence)
+        # scores_overlap = scores_overlap[
+        #     (scores_overlap[BETA_COLUMN].abs() >= min_abs_beta)
+        #     & (scores_overlap[BETA_COLUMN].abs() <= max_abs_beta)
+        # ]
+        preprocessed_scores[BETA_COLUMN] = get_allelic_effect(preprocessed_scores, disease_prevalence)
 
+    preprocessed_scores.to_csv("preprocessed_scores_step3_big_daly.csv")
     # For now we will ld prune based on a single population, the top_hit
     # To vectorize ld pruning, we will gather chunks based on the top hit
 
@@ -615,42 +664,97 @@ def generate_c_and_t_prs_scores(
             sample_groups.append((population, sample_group))
             total_number_of_samples += len(sample_group)
 
-    ancestry_weighted_af_total_variation: pd.DataFrame | None = None
-    if index_name is not None:
+    mean_q: pd.Series | float = 0.0
+    if population_allele_frequencies is None:
+        if index_name is None:
+            raise ValueError("index_name is required if population_allele_frequencies is None")
+
         with Timer() as query_timer:
             logger.debug(
                 "Memory usage before fetching gnomad allele frequencies: %s",
                 psutil.Process(os.getpid()).memory_info().rss / 1024**2,
             )
-            thresholded_loci_gnomad_afs = _extract_af_and_loci_overlap(
-                score_loci=thresholded_score_loci,
+            population_allele_frequencies = _extract_af_and_loci_overlap(
+                score_loci=set(dosage_loci),
+                rsids=set(preprocessed_scores[VARIANT_ID_COLUMN]),
                 index_name=index_name,
                 assembly=assembly,
                 user=user,
                 cluster_opensearch_config=cluster_opensearch_config,
             )
 
-            logger.debug("thresholded_loci_gnomad_afs: %s", thresholded_loci_gnomad_afs)
-
-            ancestry_weighted_af_total_variation = _calculate_allele_frequency_total_variation(
-                thresholded_loci_gnomad_afs, superpop_probabilities
-            )
-
-            logger.debug(
-                "ancestry_weighted_af_total_variation: %s", ancestry_weighted_af_total_variation
-            )
+            logger.debug("population_allele_frequencies: %s", population_allele_frequencies)
 
             logger.debug(
                 "Memory usage after fetching gnomad allele frequencies: %s",
                 psutil.Process(os.getpid()).memory_info().rss / 1024**2,
             )
-        logger.debug("Time to query for gnomad allele frequencies: %s", query_timer.elapsed_time)
+
+    ancestry_weighted_afs = _calculate_ancestry_weighted_af(
+        population_allele_frequencies, superpop_probabilities
+    )
+
+    population_allele_frequencies.to_csv("population_allele_frequencies_big_daly.tsv", sep="\t")
+
+    ancestry_weighted_afs.to_csv("ancestry_weighted_afs_big_daly.tsv", sep="\t")
+
+    # TODO: @akotlar 2024-08-04 - divide weighted AFs by N?
+    mean_q = ancestry_weighted_afs.fillna(0).mean(axis=1)
+
+    mean_q.to_csv("mean_q_big_daly.tsv", sep="\t")
+
+    logger.debug("mean_q: %s", mean_q)
+    logger.debug("Time to query for gnomad allele frequencies: %s", query_timer.elapsed_time)
+
+    # get all ancestry_weighted_afs loci that are not missing
+
+    dosage_loci_nonmissing_afs = list(set(dosage_loci).intersection(population_allele_frequencies.index))
+    print("dosage_loci_nonmissing_afs", dosage_loci_nonmissing_afs)
+    if len(dosage_loci_nonmissing_afs) == 0:
+        raise ValueError(
+            "No loci match between base and target dataset; cannot proceed with PRS calculation."
+        )
+
+    preprocessed_scores = preprocessed_scores.loc[dosage_loci_nonmissing_afs]
+    preprocessed_scores.to_csv("preprocessed_scores_step4.csv")
+    if preprocessed_scores.empty:
+        raise ValueError(
+            "No loci match between base and target dataset; cannot proceed with PRS calculation."
+        )
+
+    or_prev = (1.0 - disease_prevalence) / disease_prevalence
+
+    print("or_prev", or_prev)
+    print("scores_overlap[BETA_COLUMN]", preprocessed_scores[BETA_COLUMN].shape)
+    print("nan scores_overlap[BETA_COLUMN]", preprocessed_scores[BETA_COLUMN].isna().sum())
+    print("mean_q", mean_q)
+    print("nan mean_q", mean_q.isna().sum())
+    print("scores_overlap[BETA_COLUMN]", preprocessed_scores[BETA_COLUMN])
+    print(
+        "scores_overlap[BETA_COLUMN]*scores_overlap[BETA_COLUMN]",
+        preprocessed_scores[BETA_COLUMN] * preprocessed_scores[BETA_COLUMN],
+    )
+    Va = preprocessed_scores[BETA_COLUMN] * preprocessed_scores[BETA_COLUMN] * 2 * mean_q * (1 - mean_q)
+    Va = Va.fillna(0)
+
+    Ve = np.sqrt(1.0 - Va.sum())
+    print("Ve", Ve)
+    print("Va", Va)
+    Va.to_csv("Va_big_daly.tsv", sep="\t")
 
     if reporter is not None:
         reporter.message.remote("Fetched allele frequencies")  # type: ignore
 
     # Accumulate the results
-    prs_scores: pd.Series = pd.Series(dtype=np.float32, name="PRS")
+    prs_scores: dict[str, float] = {}
+    corrected_odds_ratios: dict[str, float] = {}
+
+    score_loci_filter = pc.field(GENOTYPE_DOSAGE_LOCUS_COLUMN).isin(
+        pa.array(list(dosage_loci_nonmissing_afs))
+    )
+    dosage_ds = ds.dataset(dosage_matrix_path, format="feather").filter(score_loci_filter)
+
+    dosage_chunk_index: pd.Index = pd.Index(list(dosage_loci_nonmissing_afs), dtype="string[pyarrow]")
     with Timer() as outer_timer:
         samples_processed = 0
 
@@ -659,8 +763,9 @@ def generate_c_and_t_prs_scores(
 
             with Timer() as timer:
                 sample_genotypes = dosage_ds.to_table([*sample_group]).to_pandas()
+                print("sample_genotypes got", sample_genotypes)
                 sample_genotypes.index = dosage_chunk_index
-
+                print("set index", sample_genotypes)
                 # Imputation of missing values
                 # For now, set missing values to 0, so that they do not affect the PRS calculation
                 sample_genotypes = sample_genotypes.fillna(0)  # pre 2024-07 missingness
@@ -679,41 +784,83 @@ def generate_c_and_t_prs_scores(
                 psutil.Process(os.getpid()).memory_info().rss / 1024**2,
             )
 
-            with Timer() as load_timer:
-                # TODO 2024-06-22 @ctrevino: We do not currently have all 26 1000G population maps
-                # this block needs to be removed once we do
-                try:
-                    map_path = get_map_file(assembly, population)
-                except ValueError as e:
-                    logger.exception(
-                        "Failed to get map file for %s: %s, defaulting to CEU", population, e
-                    )
-                    map_path = get_map_file(assembly, CEU_POP)
-            logger.debug("Time to load genetic map: %s", load_timer.elapsed_time)
+            # check if any preprocessed_scores index is missing from sample_genotypes
+            print("checking for missing loci")
+            missing_loci = set(preprocessed_scores.index) - set(sample_genotypes.index)
+            if missing_loci:
+                logger.warning(
+                    "Missing loci in dosage matrix chunk for population %s: %s", population, missing_loci
+                )
 
-            with Timer() as c_t_timer:
-                scores_after_c_t, loci_and_allele_comparison = ld_clump(scores_overlap, str(map_path))
-                scores_after_c_t = scores_after_c_t.sort_index()
+                raise ValueError(
+                    f"Missing loci in dosage matrix chunk for population {population}: {missing_loci}"
+                )
 
-                print("scores_after_c_t", scores_after_c_t)
-                print("scores_after_c_t columns", list(scores_after_c_t.columns))
+            # with Timer() as c_t_timer:
+                
 
-                # The Beta is the unadjusted odds ratio from the GWAS for each surviving SNP
-                beta_values = scores_after_c_t[BETA_COLUMN]
+                # print("scores_after_c_t", scores_after_c_t)
+                # print("scores_after_c_t columns", list(scores_after_c_t.columns))
 
-            logger.debug("Time to clump: %s", c_t_timer.elapsed_time)
+                # check if any loci are missing from scores_after_c_t
+                # missing_loci = set(preprocessed_scores.index) - set(scores_after_c_t.index)
+                # missing_loci2 = set(scores_after_c_t.index) - set(preprocessed_scores.index)
+                # missing_loci3 = set(scores_after_c_t.index) - set(sample_genotypes.index)
+                # missing_loci4 = set(sample_genotypes.index) - set(scores_after_c_t.index)
+
+                # print("missing_loci", missing_loci)
+                # print("missing_loci2", missing_loci2)
+                # print("missing_loci3", missing_loci3)
+                # print("missing_loci4", missing_loci4)
+
+            # logger.debug("Time to clump: %s", c_t_timer.elapsed_time)
 
             with Timer() as final_timer:
-                genos_transpose = finalize_dosage_after_c_t(sample_genotypes, loci_and_allele_comparison)
+                print("about to finalize_dosage_after_c_t")
 
-                if ancestry_weighted_af_total_variation is not None:
-                    weights_filtered = ancestry_weighted_af_total_variation.reindex(
-                        genos_transpose.columns, axis=0, fill_value=0
-                    )
-                    genos_transpose = genos_transpose - weights_filtered[genos_transpose.index].T
+                print("after finalize_dosage_after_c_t")
 
-                prs_scores_chunk = genos_transpose @ beta_values.loc[genos_transpose.columns]
-                prs_scores = prs_scores.add(prs_scores_chunk, fill_value=0)
+                print("ancestry_weighted_afs index", ancestry_weighted_afs.index)
+                # print("genos_transpose index", genos_transpose.index)
+                # print("genos_transpose.columns", genos_transpose.columns)
+                # print("list(genos_transpose.columns)", list(genos_transpose.columns))
+                # print(
+                #     "ancestry_weighted_afs[genos_transpose.columns].T",
+                #     ancestry_weighted_afs.loc[list(genos_transpose.columns)].T,
+                # )
+                # print(
+                #     "ancestry_weighted_afs[genos_transpose.columns].T",
+                #     ancestry_weighted_afs.loc[genos_transpose.columns].T,
+                # )
+                # print(
+                #     "ancestry_weighted_afs.loc[genos_transpose.columns, genos_transpose.index]",
+                #     ancestry_weighted_afs.loc[genos_transpose.columns, genos_transpose.index],
+                # )
+                genos_transpose = (
+                    sample_genotypes.T
+                    - 2 * ancestry_weighted_afs.loc[sample_genotypes.index, sample_genotypes.columns].T
+                )
+                print("after genos_transpose", genos_transpose)
+                print("scores_after_c_t[BETA_COLUMN]", scores_after_c_t[BETA_COLUMN])
+                print("scores_after_c_t", scores_after_c_t)
+                beta_values = scores_after_c_t.loc[list(genos_transpose.columns)][BETA_COLUMN]
+                print("beta_values", beta_values)
+                prs_scores_chunk = genos_transpose @ beta_values
+                print("prs_scores_chunk", prs_scores_chunk)
+                sample_prevalence = 1.0 - norm.cdf(threshold, prs_scores_chunk, Ve)
+                print("sample_prevalence", sample_prevalence)
+                real_or = or_prev * sample_prevalence / (1.0 - sample_prevalence)
+                print("real_or", real_or)
+
+                # make real_or a dataframe and write to tsv
+
+                # add each prs score to the prs_scores dict
+                for index, sample in enumerate(genos_transpose.index):
+                    prs_scores[sample] = prs_scores_chunk.loc[sample]
+                    corrected_odds_ratios[sample] = real_or[index]
+                print("corrected_odds_ratios", corrected_odds_ratios)
+                # prs_scores = prs_scores.add(prs_scores_chunk, fill_value=0)
+                # corrected_odds_ratios = corrected_odds_ratios.add(real_or, fill_value=0)
             logger.debug(
                 "Time to calculate PRS for chunk of %d samples (%d total samples): %s",
                 len(sample_group),
@@ -737,7 +884,10 @@ def generate_c_and_t_prs_scores(
                 )
     logger.debug("Time to calculate PRS for all samples: %s", outer_timer.elapsed_time)
 
-    return prs_scores
+    # create dataframe with PRS scores and corrected odds ratios
+    results = pd.DataFrame({"PRS": prs_scores, "Corrected OR": corrected_odds_ratios})
+    print("results", results)
+    return results
 
 
 def prs_histogram(

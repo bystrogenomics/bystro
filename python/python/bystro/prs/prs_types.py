@@ -11,6 +11,7 @@ class PRSJobData(Struct, frozen=True, rename="camel"):
     covariates_path: str | None = None
     map_path: str
     p_value_threshold: float = 0.05
+    training_populations: list[str]
 
 
 class PRSJobResult(Struct, frozen=True):

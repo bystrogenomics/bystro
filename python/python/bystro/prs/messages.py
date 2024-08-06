@@ -19,22 +19,15 @@ class PRSJobData(BaseMessage, frozen=True, forbid_unknown_fields=True, rename="c
         (e.g Alzheimer's Disease, ADHD, Schizophrenia)
     pmid: str
         The ID of the study (PubMed ID typically)
+    training_populations: list[str]
+        The populations or superpopulations from which the training data was derived
     p_value_threshold: float
         The p-value threshold to use for the PRS calculation
     ancestry_result_path: str, optional
-        The path to the ancestry result file. Must be provided if populations_path is not provided.
+        The path to the ancestry result file.
 
-        When populations_path is not provided, the inferred ancestry
-        from the ancestry_result_path will be used to calculate best-fit populations,
+        The ancestry file will be used to calculate best-fit populations,
         which are used for allele frequency weighting in the PRS calculation.
-    populations_path: str, optional
-        The path to the populations file, which is expected to be 2 tab-separated file with 2 columns,
-        the first being the sample name, and the 2nd being the population.
-
-        Must be provided if ancestry_result_path is not provided.
-
-        When both ancestry_result_path and population_path are provided,
-        the populations in this file will be used for allele frequency weighting in the PRS calculation.
     index_name: str | None
         The index of the dataset in the OpenSearch cluster, if available
     covariates_path: str | None
@@ -51,11 +44,11 @@ class PRSJobData(BaseMessage, frozen=True, forbid_unknown_fields=True, rename="c
     assembly: str
     trait: str
     pmid: str
+    training_populations: list[str]
     p_value_threshold: float
     ancestry_result_path: str
     disease_prevalence: float
     continuous_trait: bool
-    populations_path: str | None = None
     index_name: str | None = None
     covariates_path: str | None = None
 
