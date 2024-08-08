@@ -37,10 +37,10 @@ def make_calculate_prs_scores(
 
         covariates_path = prs_job_data.covariates_path
 
+        covariates_data: ExperimentMappings | None = None
         if covariates_path:
-            covariates = ExperimentMappings.from_path(covariates_path)
+            covariates_data = ExperimentMappings.from_path(covariates_path)
 
-        print("covariates", covariates)
         results = generate_c_and_t_prs_scores(
             assembly=assembly,
             trait=trait,
@@ -50,7 +50,7 @@ def make_calculate_prs_scores(
             disease_prevalence=disease_prevalence,
             training_populations=training_populations,
             cluster_opensearch_config=cluster_opensearch_config,
-            experiment_mapping=covariates,
+            experiment_mapping=covariates_data,
             index_name=index_name,
             dosage_matrix_path=dosage_matrix_path,
             p_value_threshold=p_value_threshold,

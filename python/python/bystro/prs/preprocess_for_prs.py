@@ -1681,9 +1681,10 @@ def generate_c_and_t_prs_scores(
     if reporter is not None:
         reporter.message.remote("Loaded association scores")  # type: ignore
 
+    covariates_dict: dict[str, Covariates] | None = None
     if experiment_mapping is not None:
         covariates_dict = _experiment_mapping_to_dict(experiment_mapping)
-    print("covariates_dict", covariates_dict)
+
     with Timer() as timer:
         # prune preprocessed_scores to only include loci with p-values below the threshold
         # and filter down to sites with beta values within range
@@ -1940,17 +1941,21 @@ def generate_c_and_t_prs_scores(
                     corrected_odds_ratios[sample] = real_or[index]
 
                     if covariates_dict is not None:
-                        sample_covariates = covariates_dict[sample]
+                        sample_covariates = covariates_dict.get(sample)
 
-                        if sample_covariates.sex is None:
+                        if sample_covariates is None:
                             sex[sample] = "Unknown"
-                        else:
-                            sex[sample] = sample_covariates.sex
-
-                        if sample_covariates.phenotype is None:
                             affectation[sample] = "Unknown"
                         else:
-                            affectation[sample] = sample_covariates.phenotype
+                            if sample_covariates.sex is None:
+                                sex[sample] = "Unknown"
+                            else:
+                                sex[sample] = sample_covariates.sex
+
+                            if sample_covariates.phenotype is None:
+                                affectation[sample] = "Unknown"
+                            else:
+                                affectation[sample] = sample_covariates.phenotype
 
                 if debug:
                     sample_genotypes.to_csv(f"sample_genotypes_{samples_processed}.tsv", sep="\t")
