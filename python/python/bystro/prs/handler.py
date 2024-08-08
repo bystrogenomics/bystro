@@ -58,7 +58,7 @@ def make_calculate_prs_scores(
         )
 
         basename = prs_job_data.out_basename
-        out_path = str(Path(prs_job_data.out_dir) / f"{basename}.prs.tsv")
+        out_path = str(Path(prs_job_data.out_dir) / f"{basename}.{trait}.{pmid}.prs.tsv")
 
         results.to_csv(out_path, sep="\t")
 
