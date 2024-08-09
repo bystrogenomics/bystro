@@ -33,6 +33,7 @@ POESingleSNP(BasePOE)
     A caller for the POE of a single SNP. No sparsity assumptions are 
     implemented in this model.
 """
+
 import numpy as np
 import numpy.linalg as la
 from typing import Tuple, Union, Optional, Dict
@@ -365,7 +366,7 @@ class POESingleSNP(BasePOE):
 
             # Formulas for the BCA algorithm come from 14.3 in the book
             # "An introduction to the Bootstrap" By Efron and Tibshirani.
-            # The specific formula is 
+            # The specific formula is
             # a = [sum_{i=1}^n(\hat{\theta}-\hat{\theta}_i)^3]/
             #     6[\sum_{i=1}^n(\hat{\theta}-\hat{\theta}_i)^2]^{3/2}
             # z_0 = \Phi^{-1}(#{\theta^{b}<\hat{\theta})/B)
