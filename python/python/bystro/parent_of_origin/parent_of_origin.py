@@ -36,7 +36,7 @@ POESingleSNP(BasePOE)
 
 import numpy as np
 import numpy.linalg as la
-from typing import Tuple, Union, Optional, Dict
+from typing import Tuple, Union, Optional
 from numpy.typing import NDArray
 from tqdm import trange
 
@@ -131,6 +131,15 @@ class POESingleSNP(BasePOE):
 
     self.parent_effect_: np.array-like, shape=(p,)
         The difference in effect between the parental or maternal allele
+
+    self.p_val : float
+        The computed p-value (if compute_pvalue is True when fitting)
+
+    self.bootstrap_samples_ : np.ndarray
+        The stored bootstrap samples (if store_samples is True when fitting)
+
+    self.confidence_interval_ : np.ndarray
+        The computed confidence intervals for the parent effect (if compute_ci is True when fitting)
     """
 
     def __init__(
@@ -627,7 +636,19 @@ class POEMultipleSNP(BasePOE):
 
 
 class POEMultipleSNP2(BasePOE):
-    """ """
+    """
+    This class performs parent of origin effect estimation for multiple SNPs simultaneously.
+    It applies the POESingleSNP model to each SNP in the set,
+    calculating parent effects and p-values for each SNP.
+
+    Attributes
+    ----------
+    self.p_vals : np.ndarray
+        The computed p-values for each SNP.
+
+    self.parent_effects_ : np.ndarray
+        The computed parent effects for each SNP.
+    """
 
     def __init__(
         self,
@@ -700,70 +721,16 @@ class POEMultipleSNP2(BasePOE):
         self.p_vals = -1 * np.ones(self.n_genotypes)
         self.parent_effects_ = np.zeros((self.n_genotypes, self.n_phenotypes))
 
-        maf_vals = np.mean(Y > 0, axis=0)
-        maf_thresholds = [0.05, 0.01, 0.001]
-        maf_perms: Dict[float, np.ndarray] = {}
-
-        rng = np.random.default_rng(seed)
-        for maf in maf_thresholds:
-            perms = []
-            for _ in range(self.n_repeats):
-                n_total = X.shape[0]
-                homo_prob = (1 - maf) ** 2
-                homo_count = int(homo_prob * n_total)
-                het_count = n_total - homo_count
-
-                perm_indices = rng.permutation(n_total)
-                homo_indices = perm_indices[:homo_count]
-                het_indices = perm_indices[homo_count : homo_count + het_count]
-
-                X_homo = X[homo_indices]
-                X_het = X[het_indices]
-
-                X_homo = X_homo - np.mean(X_homo, axis=0)
-                X_het = X_het - np.mean(X_het, axis=0)
-                cov_reg = self.cov_reg
-                cov_reg.fit(X_homo)
-                Sigma_AA = np.array(cov_reg.covariance)
-                L = la.cholesky(Sigma_AA)
-                L_inv = la.inv(L)
-
-                X_het_whitened = np.dot(X_het, L_inv.T)
-                Sigma_AB_white = np.cov(X_het_whitened.T)
-
-                U, s, Vt = la.svd(Sigma_AB_white)
-
-                if self.svd_loss:
-                    s, _ = optimal_shrinkage(
-                        s, self.n_phenotypes / X_het.shape[0], self.svd_loss
-                    )
-
-                norm_a = np.maximum(s[0] - 1, 0)
-                parent_effect_white = Vt[0] * 2 * np.sqrt(norm_a)
-                parent_effect = np.dot(parent_effect_white, L.T)
-                perms.append(np.linalg.norm(parent_effect))
-            maf_perms[maf] = np.array(perms)
-
-        for i in range(self.n_genotypes):
-            current_maf = maf_vals[i]
-            appropriate_threshold = max(
-                [t for t in maf_thresholds if t <= current_maf],
-                default=min(maf_thresholds),
-            )
-            relevant_perms = maf_perms[appropriate_threshold]
-
+        for i in trange(self.n_genotypes):
             model = POESingleSNP(
-                compute_pvalue=False,
+                compute_pvalue=True,
                 compute_ci=False,
                 cov_regularization=self.cov_regularization,
                 svd_loss=self.svd_loss,
             )
             model.fit(X, Y[:, i], seed=seed)
             self.parent_effects_[i] = model.parent_effect_
-            norm_effect = np.linalg.norm(model.parent_effect_)
-
-            p_value = (relevant_perms >= norm_effect).mean()
-            self.p_vals[i] = p_value
+            self.p_vals[i] = model.p_val
 
         return self
 
