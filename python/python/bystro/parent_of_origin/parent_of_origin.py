@@ -270,6 +270,8 @@ class POESingleSNP(BasePOE):
         X_het_whitened = np.dot(X_heterozygotes, L_inv.T)
         Sigma_AB_white = np.cov(X_het_whitened.T)
 
+        X_het_whitened_original = X_het_whitened.copy()
+
         U, s, Vt = la.svd(Sigma_AB_white)
 
         if self.svd_loss:
@@ -349,7 +351,7 @@ class POESingleSNP(BasePOE):
 
             for i in trange(n_p_b):
                 X_het_resampled = resample(
-                    X_het_whitened, n_samples=n_hetero, replace=True
+                    X_het_whitened_original, n_samples=n_hetero, replace=True
                 )
 
                 X_het_resampled = X_het_resampled - np.mean(
