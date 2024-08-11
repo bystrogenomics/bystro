@@ -51,6 +51,12 @@ class PRSJobData(BaseMessage, frozen=True, forbid_unknown_fields=True, rename="c
     continuous_trait: bool
     index_name: str
     covariates_path: str | None = None
+    ld_window_bp: int = 1e6
+    distance_based_cluster: bool = False
+    min_abs_beta: float = 0.01
+    max_abs_beta: float = 3.0
+
+
 
 
 class PRSJobSubmitMessage(SubmittedJobMessage, frozen=True, kw_only=True, rename="camel"):

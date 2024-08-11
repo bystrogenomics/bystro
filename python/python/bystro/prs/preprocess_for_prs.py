@@ -447,7 +447,6 @@ def clean_scores_for_analysis(
         scores_overlap_adjusted.columns[format_col_index + 1 :]
     )
 
-    print("columns_to_keep", columns_to_keep)
     loci_and_allele_comparison = scores_overlap_adjusted[columns_to_keep]
     return scores_overlap_adjusted, loci_and_allele_comparison
 
@@ -1622,7 +1621,7 @@ def generate_c_and_t_prs_scores(
     index_name: str,
     training_populations: list[str] | None = None,
     distance_based_cluster: bool = False,
-    ld_window_bp: int = 100_000,
+    ld_window_bp: int = 1e6,
     experiment_mapping: ExperimentMappings | None = None,
     min_abs_beta: float = 0.01,
     max_abs_beta: float = 3.0,

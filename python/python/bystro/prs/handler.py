@@ -7,7 +7,7 @@ from msgspec import json
 from bystro.beanstalkd.messages import ProgressPublisher, get_progress_reporter
 from bystro.ancestry.ancestry_types import AncestryResults
 from bystro.prs.messages import PRSJobData, PRSJobResult
-from bystro.prs.preprocess_for_prs import generate_c_and_t_prs_scores
+from bystro.prs.preprocess_for_prs import generate_c_and_t_prs_scores, ld_clump
 
 def make_calculate_prs_scores(
     cluster_opensearch_config: dict[str, Any]
@@ -26,6 +26,10 @@ def make_calculate_prs_scores(
         continuous_trait = prs_job_data.continuous_trait
         disease_prevalence = prs_job_data.disease_prevalence
         training_populations = prs_job_data.training_populations
+        distance_based_cluster = prs_job_data.distance_based_cluster
+        ld_window_bp = prs_job_data.ld_window_bp
+        min_abs_beta = prs_job_data.min_abs_beta
+        max_abs_beta = prs_job_data.max_abs_beta
 
 
         ancestry: AncestryResults
@@ -54,7 +58,11 @@ def make_calculate_prs_scores(
             index_name=index_name,
             dosage_matrix_path=dosage_matrix_path,
             p_value_threshold=p_value_threshold,
-            reporter=reporter
+            distance_based_cluster=distance_based_cluster,
+            ld_window_bp=ld_window_bp,
+            min_abs_beta=min_abs_beta,
+            max_abs_beta=max_abs_beta,
+            reporter=reporter,
         )
 
         basename = prs_job_data.out_basename
