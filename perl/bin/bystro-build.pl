@@ -157,15 +157,15 @@ index of the genome and associated annotations in the MongoDB instance.
 
 config: A YAML genome assembly configuration file that specifies the various
 tracks and data associated with the assembly. This is the same file that is
-used by the Seq Package to annotate VCF and SNP files.
+used by the Bystro Package to annotate VCF and SNP files.
 
 =item B<-t>, B<--type>
 
-type: Build all tracks in the configuration file with `type: <this_type>``.
+type: Build all tracks in the configuration file with `type: <this_type>`.
 
 =item B<-n>, B<--name>
 
-name: Build the track specified in the configuration file with `name: <this_name>``.
+name: Build the track specified in the configuration file with `name: <this_name>`.
 
 =item B<--chr>
 
@@ -215,6 +215,6 @@ Bystro Team
 
 =head1 SEE ALSO
 
-Seq Package
+Bystro Package
 
 =cut
