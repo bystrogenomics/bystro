@@ -23,6 +23,7 @@ my (
 );
 
 $debug = 0;
+
 # usage
 GetOptions(
   'c|config=s'                                => \$yaml_config,
@@ -40,38 +41,37 @@ GetOptions(
   'log_dir=s'                                 => \$logDir,
   'threads=i'                                 => \$maxThreads,
   'meta_only'                                 => \$metaOnly,
-);
+) or pod2usage(2);
 
 if ($help) {
-  Pod::Usage::pod2usage(1);
+  pod2usage(1);
   exit;
 }
 
-my %options = (
-  'c|config=s'                                => \$yaml_config,
-  't|type|wantedType=s'                       => \$wantedType,
-  'n|name|wantedName=s'                       => \$wantedName,
-  'v|verbose=i'                               => \$verbose,
-  'h|help'                                    => \$help,
-  'd|debug=i'                                 => \$debug,
-  'o|overwrite'                               => \$overwrite,
-  'chr|wantedChr=s'                           => \$wantedChr,
-  'delete'                                    => \$delete,
-  'build_region_track_only'                   => \$regionTrackOnly,
-  'skipCompletionCheck|skip_completion_check' => \$skipCompletionCheck,
-  'dry_run_insertions|dry|dryRun'             => \$dryRunInsertions,
-  'log_dir=s'                                 => \$logDir,
-  'maxThreads=i'                              => \$maxThreads,
-  'meta_only'                                 => \$metaOnly,
-);
-
 unless ($yaml_config) {
-  Pod::Usage::pod2usage();
+  pod2usage("Error: --config is required");
 }
 
 if ($debug) {
   say STDERR "Running with the following parameters:";
-  p %options;
+  my $options = {
+    config                  => $yaml_config,
+    wantedChr               => $wantedChr,
+    wantedType              => $wantedType,
+    wantedName              => $wantedName,
+    overwrite               => $overwrite || 0,
+    debug                   => $debug     || 0,
+    delete                  => !!$delete,
+    build_region_track_only => !!$regionTrackOnly,
+    skipCompletionCheck     => !!$skipCompletionCheck,
+    dryRunInsertions        => !!$dryRunInsertions,
+    logDir                  => $logDir,
+    maxThreads              => $maxThreads,
+    metaOnly                => !!$metaOnly,
+    verbose                 => $verbose,
+  };
+
+  p $options;
 }
 
 # read config file to determine genome name for log and check validity
@@ -117,57 +117,109 @@ my $builder_options_href = {
 if ( defined $maxThreads ) {
   $builder_options_href->{maxThreads} = $maxThreads;
 }
-# my $log_file = path(".")->child($log_name)->absolute->stringify;
-# Log::Any::Adapter->set( 'File', $log_file );
 
 my $builder = Seq::Build->new_with_config($builder_options_href);
-
-#say "done: " . $wantedType || $wantedName . $wantedChr ? ' for $wantedChr' : '';
 
 __END__
 
 =head1 NAME
 
-build_genome_assembly - builds a binary genome assembly
+build_genome_assembly - Builds a binary genome assembly
 
 =head1 SYNOPSIS
 
-build_genome_assembly
-  --config <file>
-  --type <'genome', 'conserv', 'transcript_db', 'snp_db', 'gene_db'>
-  [ --wanted_chr ]
+build_genome_assembly [options]
+
+ Options:
+   -c, --config                   YAML configuration file
+   -t, --type, --wantedType       Type of build (e.g., genome, conserv, transcript_db, gene_db, snp_db)
+   -n, --name, --wantedName       Name of the build
+   -v, --verbose                  Verbosity level
+   -h, --help                     Display this help message
+   -d, --debug                    Debug level (default: 0)
+   -o, --overwrite                Overwrite existing files
+   --chr, --wantedChr             Chromosome to build (if applicable)
+   --delete                       Delete mode
+   --build_region_track_only      Build region track only
+   --skipCompletionCheck          Skip completion check
+   --dry_run_insertions, --dry    Perform a dry run of insertions
+   --log_dir                      Directory for log files
+   --threads                      Number of threads to use
+   --meta_only                    Meta only mode
 
 =head1 DESCRIPTION
 
-C<build_genome_assembly.pl> takes a yaml configuration file and reads raw genomic
+C<build_genome_assembly.pl> takes a YAML configuration file and reads raw genomic
 data that has been previously downloaded into the 'raw' folder to create the binary
-index of the genome and assocated annotations in the mongodb instance.
+index of the genome and associated annotations in the MongoDB instance.
 
 =head1 OPTIONS
 
 =over 8
 
-=item B<-t>, B<--type>
-
-Type: A general command to start building; genome, conserv, transcript_db, gene_db
-or snp_db.
-
 =item B<-c>, B<--config>
 
 Config: A YAML genome assembly configuration file that specifies the various
 tracks and data associated with the assembly. This is the same file that is
-used by the Seq Package to annotate snpfiles.
+used by the Seq Package to annotate VCF and SNP files.
 
-=item B<-w>, B<--wanted_chr>
+=item B<-t>, B<--type>, B<--wantedType>
 
-Wanted_chr: chromosome to build, if building gene or snp; will build all if not
-specified.
+Type: Build all tracks in the configuration file with `type: <this_type>``.
+
+=item B<-n>, B<--name>, B<--wantedName>
+
+Name: Build the track specified in the configuration file with `name: <this_name>``.
+
+=item B<--chr>, B<--wantedChr>
+
+Wanted_chr: Chromosome to build, if building gene or SNP; will build all if not specified.
+
+=item B<-v>, B<--verbose>
+
+Verbose: Verbosity level (default: 0).
+
+=item B<-d>, B<--debug>
+
+Debug: Debug level (default: 0).
+
+=item B<-o>, B<--overwrite>
+
+Overwrite: Overwrite existing files.
+
+=item B<--delete>
+
+Delete: Delete mode.
+
+=item B<--build_region_track_only>
+
+Build_region_track_only: Build region track only.
+
+=item B<--skipCompletionCheck>
+
+SkipCompletionCheck: Skip completion check.
+
+=item B<--dry_run_insertions>, B<--dry>, B<--dryRun>
+
+Dry_run_insertions: Perform a dry run of insertions.
+
+=item B<--log_dir>
+
+Log_dir: Directory for log files.
+
+=item B<--threads>
+
+Threads: Number of threads to use.
+
+=item B<--meta_only>
+
+Meta_only: Meta only mode.
 
 =back
 
 =head1 AUTHOR
 
-Thomas Wingo
+Bystro Team
 
 =head1 SEE ALSO
 
