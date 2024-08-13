@@ -50,5 +50,4 @@ def test_ppca():
     model = PPCADropout(
         2, mu=100.0, gamma=10.0, delta=5.0, training_options=training_options
     )
-    model.fit(X, logits,task='regression')
-
+    model.fit(X, logits, task="regression")

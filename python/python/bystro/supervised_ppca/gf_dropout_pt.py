@@ -156,15 +156,7 @@ class PPCADropout(PPCA):
             supervision_loss = nn.MSELoss()
 
             # Now initializing the predictive coefficients
-            #sigma = softplus(sigmal_)
-            #P_x, Cov = _get_projection_matrix(W_, sigma, device)
-            #mean_z = torch.matmul(X_, torch.transpose(P_x, 0, 1))
-            #eps = torch.rand_like(mean_z)
-            #C1_2 = torch.linalg.cholesky(Cov)
-            #z_samples = mean_z + torch.matmul(eps, C1_2)
-            beta_init = np.ones(
-                self.n_supervised
-            )  
+            beta_init = np.ones(self.n_supervised)
             beta_l = torch.tensor(
                 beta_init.astype(np.float32).T,
                 device=device,
