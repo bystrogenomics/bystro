@@ -33,15 +33,17 @@ POESingleSNP(BasePOE)
     A caller for the POE of a single SNP. No sparsity assumptions are 
     implemented in this model.
 """
+
 import numpy as np
 import numpy.linalg as la
-from typing import Tuple, Union, Optional, Dict
+from typing import Tuple, Union, Optional
 from numpy.typing import NDArray
 from tqdm import trange
 
 from numba import jit  # type: ignore
 
 from sklearn.utils import resample  # type: ignore
+from scipy.stats import norm  # type: ignore
 
 from bystro.covariance.optimal_shrinkage import optimal_shrinkage
 from bystro.covariance._covariance_np import (
@@ -129,6 +131,15 @@ class POESingleSNP(BasePOE):
 
     self.parent_effect_: np.array-like, shape=(p,)
         The difference in effect between the parental or maternal allele
+
+    self.p_val : float
+        The computed p-value (if compute_pvalue is True when fitting)
+
+    self.bootstrap_samples_ : np.ndarray
+        The stored bootstrap samples (if store_samples is True when fitting)
+
+    self.confidence_interval_ : np.ndarray
+        The computed confidence intervals for the parent effect (if compute_ci is True when fitting)
     """
 
     def __init__(
@@ -259,6 +270,8 @@ class POESingleSNP(BasePOE):
         X_het_whitened = np.dot(X_heterozygotes, L_inv.T)
         Sigma_AB_white = np.cov(X_het_whitened.T)
 
+        X_het_whitened_original = X_het_whitened.copy()
+
         U, s, Vt = la.svd(Sigma_AB_white)
 
         if self.svd_loss:
@@ -327,24 +340,24 @@ class POESingleSNP(BasePOE):
                     "Unrecognized p value option %s" % self.pval_method
                 )
 
+        n_p_b = self.n_permutations_bootstrap
         # Bootstrap parameter confidence intervals
         if self.compute_ci:
+            ci_eigenvector = np.zeros((self.n_phenotypes, 2))
+
             bootstrap_samples_ = np.zeros(
                 (self.n_permutations_bootstrap, self.n_phenotypes)
             )
-            for i in trange(self.n_permutations_bootstrap):
-                X_homo = resample(X_homozygotes, n_samples=n_homo, replace=True)
-                X_hetero = resample(
-                    X_heterozygotes, n_samples=n_hetero, replace=True
+
+            for i in trange(n_p_b):
+                X_het_resampled = resample(
+                    X_het_whitened_original, n_samples=n_hetero, replace=True
                 )
-                X_homo = X_homo - np.mean(X_homo, axis=0)
-                X_hetero = X_hetero - np.mean(X_hetero, axis=0)
-                self.cov_reg.fit(X_homo)
-                Sigma_AA = np.array(self.cov_reg.covariance)
-                L = la.cholesky(Sigma_AA)
-                L_inv = la.inv(L)
-                X_het_whitened = np.dot(X_hetero, L_inv.T)
-                Sigma_AB_white = np.cov(X_het_whitened.T)
+
+                X_het_resampled = X_het_resampled - np.mean(
+                    X_het_resampled, axis=0
+                )
+                Sigma_AB_white = np.cov(X_het_resampled.T)
 
                 U, s, Vt = la.svd(Sigma_AB_white)
                 if self.svd_loss:
@@ -362,16 +375,67 @@ class POESingleSNP(BasePOE):
                 else:
                     bootstrap_samples_[i] = -1 * parent_effects
 
-            if self.store_samples:
-                self.bootstrap_samples_ = bootstrap_samples_
+            # Formulas for the BCA algorithm come from 14.3 in the book
+            # "An introduction to the Bootstrap" By Efron and Tibshirani.
+            # The specific formula is
+            # a = [sum_{i=1}^n(\hat{\theta}-\hat{\theta}_i)^3]/
+            #     6[\sum_{i=1}^n(\hat{\theta}-\hat{\theta}_i)^2]^{3/2}
+            # z_0 = \Phi^{-1}(#{\theta^{b}<\hat{\theta})/B)
+            # lb = \Phi(z_0 + (z_0+z^{alpha})/(1-a(z_0+z^{alpha})))
+            # ub = \Phi(z_0 + (z_0+z^{1-alpha})/(1-a(z_0+z^{1-alpha})))
+            alpha = 0.05
+            alpha1 = alpha / 2
+            alpha2 = 1 - alpha / 2
+            ci_eigenvector = np.zeros((self.n_phenotypes, 2))
+            for j in range(self.n_phenotypes):
+                bootstrap_vector_component = bootstrap_samples_[:, j]
+                z0_vector_component = norm.ppf(
+                    np.mean(bootstrap_vector_component < self.parent_effect_[j])
+                )
+                j_values_vector_component = np.array(
+                    [
+                        np.delete(bootstrap_vector_component, i).mean()
+                        for i in range(n_p_b)
+                    ]
+                )
+                jackknife_mean_vector_component = (
+                    j_values_vector_component.mean()
+                )
+                a_vector_component = np.sum(
+                    (
+                        jackknife_mean_vector_component
+                        - j_values_vector_component
+                    )
+                    ** 3
+                ) / (
+                    6.0
+                    * np.sum(
+                        (
+                            jackknife_mean_vector_component
+                            - j_values_vector_component
+                        )
+                        ** 2
+                    )
+                    ** 1.5
+                )
+                ci_eigenvector[j] = np.percentile(
+                    bootstrap_vector_component,
+                    [
+                        100
+                        * norm.cdf(
+                            2 * z0_vector_component
+                            + norm.ppf(alpha1 + a_vector_component)
+                        ),
+                        100
+                        * norm.cdf(
+                            2 * z0_vector_component
+                            + norm.ppf(alpha2 - a_vector_component)
+                        ),
+                    ],
+                )
 
-            lb = np.quantile(bootstrap_samples_, 0.025, axis=0)
-            ub = np.quantile(bootstrap_samples_, 0.975, axis=0)
-            confidence_interval_ = np.zeros((2, self.n_phenotypes))
-            confidence_interval_[0] = lb
-            confidence_interval_[1] = ub
+            self.confidence_interval_ = ci_eigenvector
 
-            self.confidence_interval_ = confidence_interval_
         return self
 
 
@@ -574,7 +638,19 @@ class POEMultipleSNP(BasePOE):
 
 
 class POEMultipleSNP2(BasePOE):
-    """ """
+    """
+    This class performs parent of origin effect estimation for multiple SNPs simultaneously.
+    It applies the POESingleSNP model to each SNP in the set,
+    calculating parent effects and p-values for each SNP.
+
+    Attributes
+    ----------
+    self.p_vals : np.ndarray
+        The computed p-values for each SNP.
+
+    self.parent_effects_ : np.ndarray
+        The computed parent effects for each SNP.
+    """
 
     def __init__(
         self,
@@ -647,70 +723,16 @@ class POEMultipleSNP2(BasePOE):
         self.p_vals = -1 * np.ones(self.n_genotypes)
         self.parent_effects_ = np.zeros((self.n_genotypes, self.n_phenotypes))
 
-        maf_vals = np.mean(Y > 0, axis=0)
-        maf_thresholds = [0.05, 0.01, 0.001]
-        maf_perms: Dict[float, np.ndarray] = {}
-
-        rng = np.random.default_rng(seed)
-        for maf in maf_thresholds:
-            perms = []
-            for _ in range(self.n_repeats):
-                n_total = X.shape[0]
-                homo_prob = (1 - maf) ** 2
-                homo_count = int(homo_prob * n_total)
-                het_count = n_total - homo_count
-
-                perm_indices = rng.permutation(n_total)
-                homo_indices = perm_indices[:homo_count]
-                het_indices = perm_indices[homo_count : homo_count + het_count]
-
-                X_homo = X[homo_indices]
-                X_het = X[het_indices]
-
-                X_homo = X_homo - np.mean(X_homo, axis=0)
-                X_het = X_het - np.mean(X_het, axis=0)
-                cov_reg = self.cov_reg
-                cov_reg.fit(X_homo)
-                Sigma_AA = np.array(cov_reg.covariance)
-                L = la.cholesky(Sigma_AA)
-                L_inv = la.inv(L)
-
-                X_het_whitened = np.dot(X_het, L_inv.T)
-                Sigma_AB_white = np.cov(X_het_whitened.T)
-
-                U, s, Vt = la.svd(Sigma_AB_white)
-
-                if self.svd_loss:
-                    s, _ = optimal_shrinkage(
-                        s, self.n_phenotypes / X_het.shape[0], self.svd_loss
-                    )
-
-                norm_a = np.maximum(s[0] - 1, 0)
-                parent_effect_white = Vt[0] * 2 * np.sqrt(norm_a)
-                parent_effect = np.dot(parent_effect_white, L.T)
-                perms.append(np.linalg.norm(parent_effect))
-            maf_perms[maf] = np.array(perms)
-
-        for i in range(self.n_genotypes):
-            current_maf = maf_vals[i]
-            appropriate_threshold = max(
-                [t for t in maf_thresholds if t <= current_maf],
-                default=min(maf_thresholds),
-            )
-            relevant_perms = maf_perms[appropriate_threshold]
-
+        for i in trange(self.n_genotypes):
             model = POESingleSNP(
-                compute_pvalue=False,
+                compute_pvalue=True,
                 compute_ci=False,
                 cov_regularization=self.cov_regularization,
                 svd_loss=self.svd_loss,
             )
             model.fit(X, Y[:, i], seed=seed)
             self.parent_effects_[i] = model.parent_effect_
-            norm_effect = np.linalg.norm(model.parent_effect_)
-
-            p_value = (relevant_perms >= norm_effect).mean()
-            self.p_vals[i] = p_value
+            self.p_vals[i] = model.p_val
 
         return self
 
