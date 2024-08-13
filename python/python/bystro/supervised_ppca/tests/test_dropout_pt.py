@@ -4,7 +4,7 @@ from sklearn.metrics import roc_auc_score  # type: ignore
 from scipy.stats import ortho_group  # type: ignore
 from scipy.stats import binom  # type: ignore
 
-from bystro.supervised_ppca.gf_dropout_pt import PPCADropout
+from bystro.supervised_ppca.gf_dropout_pt2 import PPCADropout
 
 
 def PPCA_generate_data(N=10000, L=5, p=30, phi=1.0, sigma=1.0):
@@ -45,3 +45,10 @@ def test_ppca():
         2, mu=100.0, gamma=10.0, delta=5.0, training_options=training_options
     )
     model.fit(X, y)
+
+    training_options = {"n_iterations": 1000, "use_gpu": False}
+    model = PPCADropout(
+        2, mu=100.0, gamma=10.0, delta=5.0, training_options=training_options
+    )
+    model.fit(X, logits,task='regression')
+
