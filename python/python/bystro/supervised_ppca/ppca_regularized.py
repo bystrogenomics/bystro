@@ -13,13 +13,13 @@ from bystro.covariance._covariance_np import (
 class PPCARegularized(BaseGaussianFactorModel):
     """
     This implements PPCA but with a regularized covariance matrix. PPCA
-    can be viewed as fitting a low rank model to the marginal covariance 
-    matrix on the data, with a noise term that is calculated based on the 
+    can be viewed as fitting a low rank model to the marginal covariance
+    matrix on the data, with a noise term that is calculated based on the
     unexplained variance. This is traditionally done using the empirical
     covariance matrix. However, this estimate of the covariance matrix
-    is known to perform poorly in practice. So as an alternative, we 
+    is known to perform poorly in practice. So as an alternative, we
     compute this low rank approximation on regularized covariance matrices
-    using a variety of strategies. 
+    using a variety of strategies.
 
     Parameters
     ----------
@@ -30,12 +30,12 @@ class PPCARegularized(BaseGaussianFactorModel):
         The regularization options
 
     Regularization options: The most important choice is regularization_
-    options['method']  which determines which strategy is used for 
+    options['method']  which determines which strategy is used for
     shrinkage. Current are linear and NonLinear
 
     Linear: Honey I shrunk the covariance matrix by Ledoit and wolfe
 
-    NonLinear: Analytical NonLinear Shrinkage of Large Dimensional 
+    NonLinear: Analytical NonLinear Shrinkage of Large Dimensional
         Covariance Matrices by Ledoit and wolf
         https://www.jstor.org/stable/27028732
 
@@ -71,7 +71,9 @@ class PPCARegularized(BaseGaussianFactorModel):
         L = self.n_components
         regularization_options = self.regularization_options
 
-        model_cov : Union[LinearShrinkageCovariance, NonLinearShrinkageCovariance]
+        model_cov: Union[
+            LinearShrinkageCovariance, NonLinearShrinkageCovariance
+        ]
         if regularization_options["method"] == "LinearShrinkage":
             model_cov = LinearShrinkageCovariance()
         elif regularization_options["method"] == "NonLinearShrinkage":
@@ -94,11 +96,8 @@ class PPCARegularized(BaseGaussianFactorModel):
         eigenvectors = eigenvectors[:, sorted_idx]
         eigenvalues = eigenvalues[sorted_idx]
 
-
         sigma2 = np.mean(eigenvalues[L:])
-        W = eigenvectors[:, :L] * np.sqrt(
-            eigenvalues[:L] - sigma2
-        )
+        W = eigenvectors[:, :L] * np.sqrt(eigenvalues[:L] - sigma2)
 
         self._store_instance_variables((W, sigma2))
 
