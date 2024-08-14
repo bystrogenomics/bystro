@@ -33,7 +33,7 @@ dependencies = [
     "psutil==5.9.6",
     "matplotlib==3.7.1",
     "ecos==2.0.13",
-    "osqp==0.6.3",
+    "osqp==0.6.5",
     "cvxpy==1.5.2",
     "somadata==1.0.0",
     "statsmodels==0.14.2",
