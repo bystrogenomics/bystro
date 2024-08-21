@@ -2,6 +2,7 @@ from unittest.mock import patch
 import json
 
 from msgspec import json as mjson
+import numpy as np
 import pandas as pd
 import pyarrow as pa  # type: ignore
 import pytest
@@ -12,7 +13,6 @@ from bystro.prs.preprocess_for_prs import (
     _preprocess_scores,
     calculate_abs_effect_weights,
     compare_alleles,
-    get_p_value_thresholded_indices,
     find_bin_for_row,
     generate_c_and_t_prs_scores,
     select_max_effect_per_bin,
@@ -24,17 +24,34 @@ AD_SCORE_FILEPATH = "fake_file.txt"
 
 
 @pytest.fixture()
+def mock_population_allele_frequencies():
+    return pd.DataFrame(
+        {
+            "locus": ["chr8:132782505:T:C", "chr3:183978846:A:G"],
+            "AFR": [0.0460780002176762, 0.158682003617287],
+            "AMR": [0.0814258009195328, 0.273122996091843],
+            "EAS": [0.0251158997416496, 0.713967978954315],
+            "EUR": [0.156823992729187, 0.303905993700027],
+            "SAS": [0.108804002404213, 0.559723019599915],
+        }
+    ).set_index("locus")
+
+
+@pytest.fixture()
 def mock_scores_df() -> pd.DataFrame:
     return pd.DataFrame(
         {
-            "SNPID": ["chr8:132782505:T:C", "chr3:183978846:A:G"],
             "CHR": [1, 1],
             "POS": [566875, 728951],
             "OTHER_ALLELE": ["C", "G"],
             "EFFECT_ALLELE": ["T", "A"],
             "P": [0.699009, 0.0030673],
             "BETA": [0.007630, -0.020671],
-        }
+            "EFFECT_ALLELE_FREQUENCY": [0.1, 0.2],
+            "SNPID": ["chr8:132782505:T:C", "chr3:183978846:A:G"],
+            "VARIANT_ID": ["rs123", "rs456"],
+        },
+        index=["chr8:132782505:T:C", "chr3:183978846:A:G"],
     )
 
 
@@ -46,12 +63,14 @@ def mock_processed_scores_df() -> pd.DataFrame:
         "OTHER_ALLELE": ["C", "G"],
         "EFFECT_ALLELE": ["T", "A"],
         "P": [0.699009, 0.0030673],
-        "SNPID": ["chr8:132782505:T:C", "chr3:183978846:A:G"],
         "BETA": [0.007630, -0.020671],
-        "ID_effect_as_alt": ["chr8:132782505:C:T", "chr3:183978846:G:A"],
-        "ID_effect_as_ref": ["chr8:132782505:T:C", "chr3:183978846:A:G"],
+        "EFFECT_ALLELE_FREQUENCY": [0.1, 0.2],
+        "SNPID": ["chr8:132782505:T:C", "chr3:183978846:A:G"],
+        "VARIANT_ID": ["rs123", "rs456"],
+        "ID_effect_as_alt": ["chr8:132782505:T:C", "chr3:183978846:A:G"],
+        "ID_effect_as_ref": ["chr8:132782505:C:T", "chr3:183978846:G:A"],
     }
-    return pd.DataFrame(mock_gwas_data)
+    return pd.DataFrame(mock_gwas_data, index=["chr8:132782505:T:C", "chr3:183978846:A:G"])
 
 
 @pytest.fixture()
@@ -65,8 +84,8 @@ def mock_dosage_df():
         {
             "locus": [
                 "chr8:132782505:C:T",
-                "chr3:183978846:G:A",
-                "chr2:4000400:T:C",
+                "chr3:183978846:A:G",
+                "chr2:4000400:C:T",
                 "chr21:24791946:C:T",
             ],
             "ID00096": [1, 1, 2, -1],
@@ -79,7 +98,7 @@ def mock_dosage_df():
 def mock_dosage_df_clean():
     return pd.DataFrame(
         {
-            "locus": ["chr8:132782505:C:T", "chr3:183978846:G:A", "chr2:4000400:T:C"],
+            "locus": ["chr8:132782505:C:T", "chr3:183978846:A:G", "chr2:4000400:C:T"],
             "ID00096": [1, 1, 2],
             "ID00097": [0, 1, 1],
         }
@@ -138,7 +157,18 @@ def test_load_genetic_maps_from_feather(tmp_path, mock_genetic_maps):
 def test_load_scores(mock_read_feather, mock_scores_df: pd.DataFrame):
     mock_read_feather.return_value = mock_scores_df.reset_index()
     result_df = _load_association_scores("fake_file_path.feather")
-    expected_columns = ["CHR", "POS", "OTHER_ALLELE", "EFFECT_ALLELE", "P", "SNPID", "BETA"]
+    print("result_df.columns", result_df.columns)
+    expected_columns = [
+        "CHR",
+        "POS",
+        "OTHER_ALLELE",
+        "EFFECT_ALLELE",
+        "P",
+        "BETA",
+        "EFFECT_ALLELE_FREQUENCY",
+        "SNPID",
+        "VARIANT_ID",
+    ]
 
     assert not result_df.empty, "The DataFrame should not be empty."
     assert (
@@ -155,24 +185,6 @@ def test_preprocess_scores(mock_load_association_scores, mock_scores_df: pd.Data
     assert processed_scores.index.name == "SNPID"
     assert "ID_effect_as_alt" in processed_scores.columns
     assert "ID_effect_as_ref" in processed_scores.columns
-
-
-def test_get_p_value_thresholded_indices(mock_processed_scores_df: pd.DataFrame):
-    p_value_threshold = 0.005
-    thresholded_indices = get_p_value_thresholded_indices(
-        mock_processed_scores_df.set_index("SNPID"), p_value_threshold
-    )
-    filtered_scores = mock_processed_scores_df.set_index("SNPID").loc[list(thresholded_indices)]
-
-    assert (
-        len(filtered_scores) == 1
-    ), "Filtered scores should only contain 1 row for p_value_threshold=0.005."
-    assert all(
-        filtered_scores["P"] < p_value_threshold
-    ), "All rows should have P-values less than the threshold."
-
-    expected_snps = {"chr3:183978846:A:G"}
-    assert set(filtered_scores.index) == expected_snps, "Filtered scores should contain expected SNP(s)."
 
 
 def test_compare_alleles():
@@ -254,14 +266,23 @@ def test_select_max_effect_per_bin():
     ), "The result DataFrame should have one row per (CHR, bin) group."
 
 
-def test_generate_c_and_t_prs_scores(tmp_path, mock_finalize_dosage_after_c_t, mock_dosage_df):
+def test_generate_c_and_t_prs_scores(
+    tmp_path, mock_dosage_df, mock_population_allele_frequencies, mock_processed_scores_df
+):
+
+    print("mock_dosage_df", mock_dosage_df)
     table = pa.Table.from_pandas(mock_dosage_df)
     test_file = tmp_path / "test_dosage_matrix.feather"
     pa.feather.write_feather(table, test_file)
-    with patch(
-        "bystro.prs.preprocess_for_prs.finalize_dosage_after_c_t",
-        side_effect=mock_finalize_dosage_after_c_t,
+
+    with (
+        patch(
+            "bystro.prs.preprocess_for_prs._extract_af_and_loci_overlap",
+            return_value=mock_population_allele_frequencies,
+        ),
+        patch("bystro.prs.preprocess_for_prs._prune_scores", return_value=mock_processed_scores_df),
     ):
+
         dosage_matrix_path = test_file
         p_value_threshold = 0.05
 
@@ -312,7 +333,28 @@ def test_generate_c_and_t_prs_scores(tmp_path, mock_finalize_dosage_after_c_t, m
             ancestry=ancestry_results,
             dosage_matrix_path=dosage_matrix_path,
             p_value_threshold=p_value_threshold,
+            disease_prevalence=0.01,
+            continuous_trait=False,
+            index_name="foo",
         ).to_dict()
-        expected_result = {"ID00096": 0.09220000356435776, "ID00097": -0.028599999845027924}
+        expected_result = {
+            "PRS": {"ID00096": -0.0051128566817909005, "ID00097": -0.0051128566817909005},
+            "Corrected OR": {"ID00096": 0.9862663882534203, "ID00097": 0.9862663882534203},
+            "Sex": {"ID00096": np.nan, "ID00097": np.nan},
+            "Affectation": {"ID00096": np.nan, "ID00097": np.nan},
+        }
 
-        assert result == expected_result, f"Expected {expected_result}, but got {result}"
+        assert set(result.keys()) == set(
+            expected_result.keys()
+        ), "Result keys do not match expected keys"
+
+        assert result["PRS"] == expected_result["PRS"], "PRS values do not match expected values."
+        assert (
+            result["Corrected OR"] == expected_result["Corrected OR"]
+        ), "Corrected OR values do not match expected values."
+
+        for sample in result["Sex"]:
+            assert np.isnan(result["Sex"][sample]), f"{sample} Sex status should be nan"
+
+        for sample in result["Affectation"]:
+            assert np.isnan(result["Affectation"][sample]), f"{sample} Sex status should be nan"
