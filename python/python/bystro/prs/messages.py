@@ -31,8 +31,8 @@ class PRSJobData(BaseMessage, frozen=True, forbid_unknown_fields=True, rename="c
     index_name: str
         The index of the dataset in the OpenSearch cluster
     covariates_path: str | None
-        The path to the covariates file, which is expected to be a tab-separated file with the first column
-        being the sample id, and the subsequent columns being the covariates.
+        The path to the covariates file, which is expected to be a tab-separated file
+        with the first column being the sample id, and the subsequent columns being the covariates.
 
         Bystro understands the following reserved covariates:
             1. "phenotype" - The sample phenotype. Expected to be 0 or 1.

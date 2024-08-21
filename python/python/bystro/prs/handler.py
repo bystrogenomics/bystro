@@ -7,7 +7,7 @@ from msgspec import json
 from bystro.beanstalkd.messages import ProgressPublisher, get_progress_reporter
 from bystro.ancestry.ancestry_types import AncestryResults
 from bystro.prs.messages import PRSJobData, PRSJobResult
-from bystro.prs.preprocess_for_prs import generate_c_and_t_prs_scores, ld_clump
+from bystro.prs.preprocess_for_prs import generate_c_and_t_prs_scores
 
 def make_calculate_prs_scores(
     cluster_opensearch_config: dict[str, Any]

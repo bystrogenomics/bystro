@@ -4,7 +4,8 @@
     Summary statistics are expected to be in the format:
     CHR, POS, OTHER_ALLELE, EFFECT_ALLELE, P, SNPID, BETA, EFFECT_ALLELE_FREQUENCY
 
-    The only required columns are CHR, POS, OTHER_ALLELE, EFFECT_ALLELE, P, SNPID, BETA, EFFECT_ALLELE_FREQUENCY
+    The only required columns are CHR, POS, OTHER_ALLELE, EFFECT_ALLELE,
+                                  P, SNPID, BETA, EFFECT_ALLELE_FREQUENCY
 
     SNPID: chr{CHR}:{POS}:{OTHER_ALLELE}:{EFFECT_ALLELE}
 
@@ -21,7 +22,6 @@ import logging
 from typing import Any, Optional
 import os
 from bystro.beanstalkd.messages import ProgressReporter
-from pandas._libs import missing
 import psutil
 
 import matplotlib.pyplot as plt  # type: ignore
@@ -35,7 +35,7 @@ from pyarrow import feather  # type: ignore
 from scipy.stats import norm
 
 from bystro.api.auth import CachedAuth
-from bystro.utils.covariates import Covariates, ExperimentMapping, ExperimentMappings
+from bystro.utils.covariates import Covariates, ExperimentMappings
 from bystro.proteomics.annotation_interface import get_annotation_result_from_query
 from bystro.ancestry.ancestry_types import AncestryResults, PopulationVector, SuperpopVector
 from bystro.prs.model import get_sumstats_file, get_map_file
@@ -517,7 +517,7 @@ def prune_by_window(df: pd.DataFrame, window_size: int):
     df["Position"] = df["Position"].astype(int)
 
     # Sort by Chromosome and Position
-    df = df.sort_values(by=["Chromosome", "Position"]).reset_index(drop=True)
+    df = df.sort_values(by=["Chromosome", "Position"]).reset_index(drop=True) # noqa: PD901
 
     # Function to perform binning and pruning
     def bin_and_prune(df):
@@ -535,7 +535,7 @@ def prune_by_window(df: pd.DataFrame, window_size: int):
                 if row["Position"] - last_position >= window_size:
                     bin_counter += 1
                     last_position = row["Position"]
-                df.at[idx, "Bin"] = bin_counter
+                df.loc[idx, "Bin"] = bin_counter
 
         # Within each bin, keep the SNP with the lowest p-value
         pruned_df = df.loc[df.groupby("Bin")[P_COLUMN].idxmin()].reset_index(drop=True)
@@ -554,7 +554,17 @@ def prune_by_window(df: pd.DataFrame, window_size: int):
     # Drop the intermediate columns if not needed
     return final_pruned_df.drop(columns=["Chromosome", "Position", "Ref", "Alt"])
 
-def _prune_scores(scores: pd.DataFrame, p_value_threshold: float, min_abs_beta: float, max_abs_beta: float, ld_window_bp: int | None = None, distance_based_cluster: bool = True, training_populations: list | None = None) -> pd.DataFrame:
+
+def _prune_scores(
+    scores: pd.DataFrame,
+    assembly: str,
+    p_value_threshold: float,
+    min_abs_beta: float,
+    max_abs_beta: float,
+    ld_window_bp: int | None = None,
+    distance_based_cluster: bool = True,
+    training_populations: list | None = None,
+) -> pd.DataFrame:
     """
     Prune scores based on p-value threshold
     """
@@ -578,9 +588,7 @@ def _prune_scores(scores: pd.DataFrame, p_value_threshold: float, min_abs_beta: 
         return _preprocess_scores(scores)
 
     if training_populations is None:
-        raise ValueError(
-            "If distance_based_cluster is False, training_populations must be provided"
-        )
+        raise ValueError("If distance_based_cluster is False, training_populations must be provided")
 
     if len(training_populations) > 1:
         raise ValueError(
@@ -597,9 +605,7 @@ def _prune_scores(scores: pd.DataFrame, p_value_threshold: float, min_abs_beta: 
     try:
         sumstat_ld_map_path = get_map_file(assembly, sumstat_population)
     except ValueError as e:
-        raise ValueError(
-            f"{sumstat_population} is likely not supported. Failed to get map file: {e}"
-        )
+        raise ValueError(f"{sumstat_population} is likely not supported. Failed to get map file: {e}")
 
     # TODO: check for non-direct match and warn
     preprocessed_scores = _preprocess_scores(scores)
@@ -610,9 +616,11 @@ def _prune_scores(scores: pd.DataFrame, p_value_threshold: float, min_abs_beta: 
 
     return preprocessed_scores.loc[scores_after_c_t.index]
 
+
 def _experiment_mapping_to_dict(experiment_mapping: ExperimentMappings) -> dict[str, Covariates]:
     """
-    Create dictionary, keyed on sample_id and containing a dictionary of all covariates belonging to this sample
+    Create dictionary, keyed on sample_id and containing a dictionary
+    of all covariates belonging to this sample
     """
 
     sample_covariates: dict[str, Covariates] = {}
@@ -641,8 +649,7 @@ def generate_c_and_t_prs_scores(
     sample_chunk_size: int = 200,
     user: CachedAuth | None = None,
     cluster_opensearch_config: dict[str, Any] | None = None,
-    reporter: ProgressReporter | None = None,
-    debug: bool = True,
+    reporter: ProgressReporter | None = None
 ) -> pd.DataFrame:
     """
     Calculate PRS scores using the C+T method.
@@ -699,6 +706,7 @@ def generate_c_and_t_prs_scores(
     with Timer() as timer:
         preprocessed_scores = _prune_scores(
             scores=scores,
+            assembly=assembly,
             p_value_threshold=p_value_threshold,
             min_abs_beta=min_abs_beta,
             max_abs_beta=max_abs_beta,
@@ -785,7 +793,7 @@ def generate_c_and_t_prs_scores(
 
     logger.debug("mean_q: %s", mean_q)
     logger.debug("Time to query for gnomad allele frequencies: %s", query_timer.elapsed_time)
-    print('set(dosage_loci)', set(dosage_loci))
+    print("set(dosage_loci)", set(dosage_loci))
     print("set(population_allele_frequencies.index)", set(population_allele_frequencies.index))
     # get all ancestry_weighted_afs loci that are not missing
     dosage_loci_nonmissing_afs = list(
