@@ -32,7 +32,7 @@ import pyarrow.compute as pc  # type: ignore
 import pyarrow.dataset as ds  # type: ignore
 from pyarrow import feather  # type: ignore
 
-from scipy.stats import norm
+from scipy.stats import norm # type: ignore
 
 from bystro.api.auth import CachedAuth
 from bystro.utils.covariates import Covariates, ExperimentMappings
@@ -641,7 +641,7 @@ def generate_c_and_t_prs_scores(
     index_name: str,
     training_populations: list[str] | None = None,
     distance_based_cluster: bool = True,
-    ld_window_bp: int = 1e6,
+    ld_window_bp: int = 1_000_000,
     experiment_mapping: ExperimentMappings | None = None,
     min_abs_beta: float = 0.01,
     max_abs_beta: float = 3.0,

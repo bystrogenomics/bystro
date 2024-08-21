@@ -51,7 +51,7 @@ class PRSJobData(BaseMessage, frozen=True, forbid_unknown_fields=True, rename="c
     continuous_trait: bool
     index_name: str
     covariates_path: str | None = None
-    ld_window_bp: int = 1e6
+    ld_window_bp: int = 1_000_000
     distance_based_cluster: bool = False
     min_abs_beta: float = 0.01
     max_abs_beta: float = 3.0
