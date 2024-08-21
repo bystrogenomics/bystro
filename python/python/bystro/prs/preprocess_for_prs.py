@@ -141,7 +141,7 @@ HARMONIZED_SUMSTAT_COLUMNS = [
     P_COLUMN,
     BETA_COLUMN,
     EFFECT_FREQUENCY_COLUMN,
-    SNPID_COLUMN
+    SNPID_COLUMN,
 ]
 HARMONIZED_SUMSTAT_COLUMN_TYPES = {
     CHROM_COLUMN: "string[pyarrow]",
@@ -211,6 +211,7 @@ def _load_genetic_maps_from_feather(map_path: str) -> dict[str, pd.DataFrame]:
     except Exception as e:
         logger.exception("Failed to load genetic map from: %s: %s", map_path, e)
         raise e
+
 
 # We rely on the locus query directly, because
 # gnomad.joint does not record the rsid
@@ -292,7 +293,7 @@ def _extract_af_and_loci_overlap(
     and return the loci with gnomad allele frequencies.
     """
     query, gnomad_af_fields, gnomad_af_fields_map = _convert_query(assembly, score_loci)
-    print("query 1", query)
+
     missing_track_or_documents: RuntimeError | None = None
     try:
         res = get_annotation_result_from_query(
@@ -317,9 +318,9 @@ def _extract_af_and_loci_overlap(
         logger.warning(
             "Couldn't find gnomad.joint records, trying to find gnomad.genomes records instead."
         )
-        print("attempting query 2")
+
         query, gnomad_af_fields, gnomad_af_fields_map = _convert_query(assembly, score_loci, True)
-        print("query 2", query)
+
         try:
             res = get_annotation_result_from_query(
                 query_string=query,
@@ -544,8 +545,7 @@ def get_allelic_effect(df: pd.DataFrame, prevalence: float) -> pd.Series:
         raise ValueError("Prevalence must be between 0 and 1")
 
     threshold = norm.ppf(1.0 - prevalence)
-    print("threshold", threshold)
-    print('df["EFFECT_ALLELE_FREQUENCY"]', df["EFFECT_ALLELE_FREQUENCY"])
+
     pene_effect = prevalence / (
         df["EFFECT_ALLELE_FREQUENCY"] + (1 - df["EFFECT_ALLELE_FREQUENCY"]) / np.exp(df["BETA"])
     )
@@ -553,17 +553,10 @@ def get_allelic_effect(df: pd.DataFrame, prevalence: float) -> pd.Series:
         1 - df["EFFECT_ALLELE_FREQUENCY"]
     )
 
-    print("pene_effect", pene_effect)
-    print("pene_ref", pene_ref)
-
     alpha_effect = threshold - norm.ppf(1.0 - pene_effect)
     alpha_ref = threshold - norm.ppf(1.0 - pene_ref)
 
-    print("alpha_effect", alpha_effect)
-    print("alpha_ref", alpha_ref)
-
     beta = alpha_effect - alpha_ref
-    print("beta", beta)
 
     return beta
 
@@ -774,8 +767,6 @@ def generate_c_and_t_prs_scores(
             training_populations=training_populations,
         )
 
-        print("preprocessed_scores", preprocessed_scores)
-
     logger.debug("Time to preprocess scores: %s", timer.elapsed_time)
 
     if reporter is not None:
@@ -785,7 +776,6 @@ def generate_c_and_t_prs_scores(
     score_loci_filter = pc.field(GENOTYPE_DOSAGE_LOCUS_COLUMN).isin(
         pa.array(list(preprocessed_scores_loci))
     )
-    print("preprocessed_scores_loci", preprocessed_scores_loci)
 
     dosage_ds = ds.dataset(dosage_matrix_path, format="feather").filter(score_loci_filter)
 
@@ -851,8 +841,7 @@ def generate_c_and_t_prs_scores(
 
     logger.debug("mean_q: %s", mean_q)
     logger.debug("Time to query for gnomad allele frequencies: %s", query_timer.elapsed_time)
-    print("set(dosage_loci)", set(dosage_loci))
-    print("set(population_allele_frequencies.index)", set(population_allele_frequencies.index))
+
     # get all ancestry_weighted_afs loci that are not missing
     dosage_loci_nonmissing_afs = list(
         set(dosage_loci).intersection(set(population_allele_frequencies.index))
@@ -908,7 +897,9 @@ def generate_c_and_t_prs_scores(
                 )
                 # set the index using an explicit index constructor to avoid
                 # pandas warning about dtype inference on pandas object
-                sample_genotypes.index = pd.Index(sample_genotypes[SNPID_COLUMN], dtype="string[pyarrow]")
+                sample_genotypes.index = pd.Index(
+                    sample_genotypes[SNPID_COLUMN], dtype="string[pyarrow]"
+                )
                 sample_genotypes = sample_genotypes.drop(columns=[SNPID_COLUMN])
 
                 # TODO @akotlar: 2024-08-06 impute genotypes
