@@ -307,6 +307,8 @@ def _extract_af_and_loci_overlap(
     except RuntimeError as e:
         if str(e).startswith("Expected at least one document"):
             missing_track_or_documents = e
+        else:
+            raise e
 
     if missing_track_or_documents:
         if assembly != HG38_ASSEMBLY:
@@ -331,10 +333,13 @@ def _extract_af_and_loci_overlap(
                 fields=gnomad_af_fields,
             ).set_index(GENOTYPE_DOSAGE_LOCUS_COLUMN)
         except RuntimeError as e:
-            raise RuntimeError(
-                "Couldn't find any allele frequency information for loci."
-                "Please make sure that gnomad.genomes or gnomad.joint is available in the annotation index."
-            )
+            if str(e).startswith("Expected at least one document"):
+                raise RuntimeError(
+                    "Couldn't find any allele frequency information for loci. "
+                    "Please make sure that gnomad.genomes or gnomad.joint "
+                    "are available in the annotation index."
+                )
+            raise e
 
     missing_cols = set(gnomad_af_fields) - set(res.columns)
 
