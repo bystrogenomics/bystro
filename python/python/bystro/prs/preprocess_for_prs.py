@@ -32,7 +32,7 @@ import pyarrow.compute as pc  # type: ignore
 import pyarrow.dataset as ds  # type: ignore
 from pyarrow import feather  # type: ignore
 
-from scipy.stats import norm # type: ignore
+from scipy.stats import norm  # type: ignore
 
 from bystro.api.auth import CachedAuth
 from bystro.utils.covariates import Covariates, ExperimentMappings
@@ -42,7 +42,6 @@ from bystro.prs.model import get_sumstats_file, get_map_file
 from bystro.utils.timer import Timer
 
 logging.basicConfig(
-    filename="preprocess_for_prs.log",
     level=logging.DEBUG,
     format="%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
@@ -93,19 +92,33 @@ HG19_GNOMAD_AF_SUPERPOPS_MAP = {
     "gnomad.genomes.AF_eas": EAS,
     "gnomad.genomes.AF_nfe": EUR,
 }
-HG38_GNOMAD_AF_SUPERPOPS = [
+HG38_GNOMAD_AF_SUPERPOPS_v8 = [
     "gnomad.genomes.AF_joint_afr",
     "gnomad.genomes.AF_joint_amr",
     "gnomad.genomes.AF_joint_eas",
     "gnomad.genomes.AF_joint_nfe",
     "gnomad.genomes.AF_joint_sas",
 ]
-HG38_GNOMAD_AF_SUPERPOPS_MAP = {
+HG38_GNOMAD_AF_SUPERPOPS_MAP_v8 = {
     "gnomad.genomes.AF_joint_afr": AFR,
     "gnomad.genomes.AF_joint_amr": AMR,
     "gnomad.genomes.AF_joint_eas": EAS,
     "gnomad.genomes.AF_joint_nfe": EUR,
     "gnomad.genomes.AF_joint_sas": SAS,
+}
+HG38_GNOMAD_AF_SUPERPOPS = [
+    "gnomad.joint.AF_joint_afr",
+    "gnomad.joint.AF_joint_amr",
+    "gnomad.joint.AF_joint_eas",
+    "gnomad.joint.AF_joint_nfe",
+    "gnomad.joint.AF_joint_sas",
+]
+HG38_GNOMAD_AF_SUPERPOPS_MAP = {
+    "gnomad.joint.AF_joint_afr": AFR,
+    "gnomad.joint.AF_joint_amr": AMR,
+    "gnomad.joint.AF_joint_eas": EAS,
+    "gnomad.joint.AF_joint_nfe": EUR,
+    "gnomad.joint.AF_joint_sas": SAS,
 }
 
 ######### SUMSTAT COLUMNS #########
@@ -113,7 +126,6 @@ HG38_GNOMAD_AF_SUPERPOPS_MAP = {
 CHROM_COLUMN = "CHR"
 POS_COLUMN = "POS"
 SNPID_COLUMN = "SNPID"
-VARIANT_ID_COLUMN = "VARIANT_ID"
 OTHER_ALLELE_COLUMN = "OTHER_ALLELE"
 EFFECT_ALLELE_COLUMN = "EFFECT_ALLELE"
 P_COLUMN = "P"
@@ -129,8 +141,7 @@ HARMONIZED_SUMSTAT_COLUMNS = [
     P_COLUMN,
     BETA_COLUMN,
     EFFECT_FREQUENCY_COLUMN,
-    SNPID_COLUMN,
-    VARIANT_ID_COLUMN,
+    SNPID_COLUMN
 ]
 HARMONIZED_SUMSTAT_COLUMN_TYPES = {
     CHROM_COLUMN: "string[pyarrow]",
@@ -201,8 +212,29 @@ def _load_genetic_maps_from_feather(map_path: str) -> dict[str, pd.DataFrame]:
         logger.exception("Failed to load genetic map from: %s: %s", map_path, e)
         raise e
 
-
+# We rely on the locus query directly, because
+# gnomad.joint does not record the rsid
+# and because we want to support cases
+# where the rsid is missing
 def _convert_loci_to_query_format(score_loci: set) -> str:
+    """
+    Convert a set of loci from the format 'chr10:105612479:G:T' to
+    '(chrom:chr10 pos:105612479 inputRef:G alt:T)'
+    and separate them by '||' in order to issue queries with them.
+    """
+    if not score_loci:
+        raise ValueError("No loci provided for conversion to query format.")
+
+    finalized_loci = []
+    for locus in score_loci:
+        chrom, pos, inputRef, alt = locus.split(":")
+        single_query = f"(chrom:{chrom} pos:{pos} inputRef:{inputRef} alt:{alt})"
+        finalized_loci.append(single_query)
+
+    return f"(_exists_:gnomad.joint) && ({' || '.join(finalized_loci)})"
+
+
+def _convert_loci_to_query_format_legacy(score_loci: set) -> str:
     """
     Convert a set of loci from the format 'chr10:105612479:G:T' to
     '(chrom:chr10 pos:105612479 inputRef:G alt:T)'
@@ -220,29 +252,38 @@ def _convert_loci_to_query_format(score_loci: set) -> str:
     return f"(_exists_:gnomad.genomes) && ({' || '.join(finalized_loci)})"
 
 
-def _convert_rsid_to_query_format(rsids: set) -> str:
-    """
-    Convert a set of rsids from the format 'rs123' to
-    '(gnomad.genomes.id:rs123)'
-    and separate them by '||' in order to issue queries with them.
-    """
-    if not rsids:
-        raise ValueError("No rsids provided for conversion to query format.")
+def _convert_query(
+    assembly: str, score_loci: set, legacy_v8: bool = False
+) -> tuple[str, list[str], dict[str, str]]:
 
-    query = []
+    if assembly == HG19_ASSEMBLY:
+        gnomad_af_fields = HG19_GNOMAD_AF_SUPERPOPS
+        gnomad_af_fields_map = HG19_GNOMAD_AF_SUPERPOPS_MAP
 
-    for rsid in rsids:
-        single_query = f"(gnomad.genomes.id:{rsid})"
-        query.append(single_query)
+        locus_convert_fn = _convert_loci_to_query_format_legacy
+    elif assembly == HG38_ASSEMBLY:
+        if legacy_v8:
+            gnomad_af_fields = HG38_GNOMAD_AF_SUPERPOPS_v8
+            gnomad_af_fields_map = HG38_GNOMAD_AF_SUPERPOPS_MAP_v8
 
-    return " || ".join(query)
+            locus_convert_fn = _convert_loci_to_query_format_legacy
+        else:
+            gnomad_af_fields = HG38_GNOMAD_AF_SUPERPOPS
+            gnomad_af_fields_map = HG38_GNOMAD_AF_SUPERPOPS_MAP
+
+            locus_convert_fn = _convert_loci_to_query_format
+    else:
+        raise ValueError(f"Assembly {assembly} is not supported.")
+
+    query = locus_convert_fn(score_loci)
+
+    return query, gnomad_af_fields, gnomad_af_fields_map
 
 
 def _extract_af_and_loci_overlap(
     score_loci: set,
     index_name: str,
     assembly: str,
-    rsids: set | None = None,
     user: CachedAuth | None = None,
     cluster_opensearch_config: dict[str, Any] | None = None,
 ) -> pd.DataFrame:
@@ -250,38 +291,56 @@ def _extract_af_and_loci_overlap(
     Convert loci to query format, perform annotation query,
     and return the loci with gnomad allele frequencies.
     """
-    if rsids is not None:
-        # check that there are no missing values in the set; by checking for None or np.nan
-        if (None in rsids) or (np.nan in rsids):
-            logger.warning("There are missing values in the set of rsids, defaulting to score_loci.")
-            query = _convert_loci_to_query_format(score_loci)
-        else:
-            query = _convert_rsid_to_query_format(rsids)
-    else:
-        query = _convert_loci_to_query_format(score_loci)
-
-    if assembly == HG19_ASSEMBLY:
-        gnomad_af_fields = HG19_GNOMAD_AF_SUPERPOPS
-        gnomad_af_fields_map = HG19_GNOMAD_AF_SUPERPOPS_MAP
-    elif assembly == HG38_ASSEMBLY:
-        gnomad_af_fields = HG38_GNOMAD_AF_SUPERPOPS
-        gnomad_af_fields_map = HG38_GNOMAD_AF_SUPERPOPS_MAP
-    else:
-        raise ValueError(f"Assembly {assembly} is not supported.")
-
-    res = (
-        get_annotation_result_from_query(
+    query, gnomad_af_fields, gnomad_af_fields_map = _convert_query(assembly, score_loci)
+    print("query 1", query)
+    missing_track_or_documents: RuntimeError | None = None
+    try:
+        res = get_annotation_result_from_query(
             query_string=query,
             index_name=index_name,
             bystro_api_auth=user,
             cluster_opensearch_config=cluster_opensearch_config,
             melt_samples=False,
             fields=gnomad_af_fields,
-        )
-        .set_index(GENOTYPE_DOSAGE_LOCUS_COLUMN)
-        .rename(columns=gnomad_af_fields_map)
-    )
+        ).set_index(GENOTYPE_DOSAGE_LOCUS_COLUMN)
+    except RuntimeError as e:
+        if str(e).startswith("Expected at least one document"):
+            missing_track_or_documents = e
 
+    if missing_track_or_documents:
+        if assembly != HG38_ASSEMBLY:
+            raise RuntimeError(
+                "Couldn't find any allele frequency information for loci."
+                "Please make sure that gnomad.genomes is available in the annotation index."
+            )
+
+        logger.warning(
+            "Couldn't find gnomad.joint records, trying to find gnomad.genomes records instead."
+        )
+        print("attempting query 2")
+        query, gnomad_af_fields, gnomad_af_fields_map = _convert_query(assembly, score_loci, True)
+        print("query 2", query)
+        try:
+            res = get_annotation_result_from_query(
+                query_string=query,
+                index_name=index_name,
+                bystro_api_auth=user,
+                cluster_opensearch_config=cluster_opensearch_config,
+                melt_samples=False,
+                fields=gnomad_af_fields,
+            ).set_index(GENOTYPE_DOSAGE_LOCUS_COLUMN)
+        except RuntimeError as e:
+            raise RuntimeError(
+                "Couldn't find any allele frequency information for loci."
+                "Please make sure that gnomad.genomes or gnomad.joint is available in the annotation index."
+            )
+
+    missing_cols = set(gnomad_af_fields) - set(res.columns)
+
+    if missing_cols:
+        raise RuntimeError(f"Missing expected allele frequency fields: {missing_cols}.")
+
+    res = res.rename(columns=gnomad_af_fields_map)
     return res[ANCESTRY_SUPERPOPS]
 
 
@@ -517,7 +576,7 @@ def prune_by_window(df: pd.DataFrame, window_size: int):
     df["Position"] = df["Position"].astype(int)
 
     # Sort by Chromosome and Position
-    df = df.sort_values(by=["Chromosome", "Position"]).reset_index(drop=True) # noqa: PD901
+    df = df.sort_values(by=["Chromosome", "Position"]).reset_index(drop=True)  # noqa: PD901
 
     # Function to perform binning and pruning
     def bin_and_prune(df):
@@ -649,7 +708,7 @@ def generate_c_and_t_prs_scores(
     sample_chunk_size: int = 200,
     user: CachedAuth | None = None,
     cluster_opensearch_config: dict[str, Any] | None = None,
-    reporter: ProgressReporter | None = None
+    reporter: ProgressReporter | None = None,
 ) -> pd.DataFrame:
     """
     Calculate PRS scores using the C+T method.
@@ -771,7 +830,6 @@ def generate_c_and_t_prs_scores(
 
         population_allele_frequencies = _extract_af_and_loci_overlap(
             score_loci=set(dosage_loci),
-            rsids=set(preprocessed_scores[VARIANT_ID_COLUMN]),
             index_name=index_name,
             assembly=assembly,
             user=user,
@@ -848,7 +906,10 @@ def generate_c_and_t_prs_scores(
                 sample_genotypes = sample_genotypes.rename(
                     columns={GENOTYPE_DOSAGE_LOCUS_COLUMN: SNPID_COLUMN}
                 )
-                sample_genotypes = sample_genotypes.set_index(SNPID_COLUMN)
+                # set the index using an explicit index constructor to avoid
+                # pandas warning about dtype inference on pandas object
+                sample_genotypes.index = pd.Index(sample_genotypes[SNPID_COLUMN], dtype="string[pyarrow]")
+                sample_genotypes = sample_genotypes.drop(columns=[SNPID_COLUMN])
 
                 # TODO @akotlar: 2024-08-06 impute genotypes
                 sample_genotypes = sample_genotypes.replace(-1, np.nan)
