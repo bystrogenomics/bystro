@@ -868,7 +868,7 @@ mappings:
           normalizer: lowercase_normalizer
         description:
           type: text
-          analyzer: clnsig_analyzer
+          analyzer: autocomplete_english_split
           search_analyzer: search_english_simple
           fields:
             exact:
