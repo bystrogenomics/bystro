@@ -1,7 +1,7 @@
 ---
 assembly: hg38
 build_author: alexkotlar
-build_date: 2024-05-05T22:08:00
+build_date: 2024-08-12T11:02:00
 chromosomes:
   - chr1
   - chr2
@@ -28,7 +28,7 @@ chromosomes:
   - chrM
   - chrX
   - chrY
-database_dir: /mnt/annotator/hg38_v8
+database_dir: /mnt/annotator/hg38_v11
 fileProcessors:
   snp:
     args: --emptyField NA --minGq .95
@@ -54,15 +54,18 @@ tracks:
     - refSeq
     - nearest.refSeq
     - nearestTss.refSeq
+    - gnomad.joint
     - gnomad.exomes
     - gnomad.genomes
     - dbSNP
     - cadd
     - caddIndel
     - clinvarVcf
+    - logofunc
+    - genebass
   tracks:
     - build_author: alexkotlar
-      build_date: 2024-05-05T22:08:00
+      build_date: 2024-08-12T11:02:00
       local_files:
         - chr1.fa.gz
         - chr2.fa.gz
@@ -122,9 +125,9 @@ tracks:
               - chrM.fa.gz
           completed: 2024-03-11T12:19:00
           name: fetch
-      version: 37
+      version: 38
     - build_author: alexkotlar
-      build_date: 2024-05-05T22:08:00
+      build_date: 2024-08-12T11:02:00
       build_field_transformations:
         description: split [;]
         ensemblID: split [;]
@@ -199,9 +202,9 @@ tracks:
                   chrom=%chromosomes%;
           completed: 2024-05-05T21:56:00
           name: fetch
-      version: 37
+      version: 38
     - build_author: alexkotlar
-      build_date: 2024-05-05T22:08:00
+      build_date: 2024-08-12T11:02:00
       features:
         - alt
         - id
@@ -258,115 +261,65 @@ tracks:
         - AN_grpmax: number
         - AF_grpmax_non_ukb: number
         - AN_grpmax_non_ukb: number
-        - AF_grpmax_joint: number
-        - AN_grpmax_joint: number
       local_files:
-        - gnomad.exomes.v4.0.sites.chr1.vcf.bgz
-        - gnomad.exomes.v4.0.sites.chr2.vcf.bgz
-        - gnomad.exomes.v4.0.sites.chr3.vcf.bgz
-        - gnomad.exomes.v4.0.sites.chr4.vcf.bgz
-        - gnomad.exomes.v4.0.sites.chr5.vcf.bgz
-        - gnomad.exomes.v4.0.sites.chr6.vcf.bgz
-        - gnomad.exomes.v4.0.sites.chr7.vcf.bgz
-        - gnomad.exomes.v4.0.sites.chr8.vcf.bgz
-        - gnomad.exomes.v4.0.sites.chr9.vcf.bgz
-        - gnomad.exomes.v4.0.sites.chr10.vcf.bgz
-        - gnomad.exomes.v4.0.sites.chr11.vcf.bgz
-        - gnomad.exomes.v4.0.sites.chr12.vcf.bgz
-        - gnomad.exomes.v4.0.sites.chr13.vcf.bgz
-        - gnomad.exomes.v4.0.sites.chr14.vcf.bgz
-        - gnomad.exomes.v4.0.sites.chr15.vcf.bgz
-        - gnomad.exomes.v4.0.sites.chr16.vcf.bgz
-        - gnomad.exomes.v4.0.sites.chr17.vcf.bgz
-        - gnomad.exomes.v4.0.sites.chr18.vcf.bgz
-        - gnomad.exomes.v4.0.sites.chr19.vcf.bgz
-        - gnomad.exomes.v4.0.sites.chr20.vcf.bgz
-        - gnomad.exomes.v4.0.sites.chr21.vcf.bgz
-        - gnomad.exomes.v4.0.sites.chr22.vcf.bgz
-        - gnomad.exomes.v4.0.sites.chrX.vcf.bgz
-        - gnomad.exomes.v4.0.sites.chrY.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chr1.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chr2.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chr3.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chr4.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chr5.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chr6.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chr7.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chr8.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chr9.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chr10.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chr11.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chr12.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chr13.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chr14.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chr15.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chr16.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chr17.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chr18.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chr19.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chr20.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chr21.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chr22.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chrX.vcf.bgz
+        - gnomad.exomes.v4.1.sites.chrY.vcf.bgz
       name: gnomad.exomes
       type: vcf
       utils:
         - args:
             remoteFiles:
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chr1.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chr2.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chr3.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chr4.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chr5.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chr6.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chr7.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chr8.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chr9.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chr10.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chr11.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chr12.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chr13.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chr14.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chr15.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chr16.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chr17.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chr18.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chr19.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chr20.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chr21.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chr22.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chrX.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/exomes/gnomad.exomes.v4.0.sites.chrY.vcf.bgz
-          completed: 2024-03-07T14:23:00
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chr1.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chr2.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chr3.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chr4.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chr5.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chr6.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chr7.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chr8.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chr9.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chr10.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chr11.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chr12.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chr13.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chr14.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chr15.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chr16.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chr17.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chr18.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chr19.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chr20.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chr21.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chr22.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chrX.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/exomes/gnomad.exomes.v4.1.sites.chrY.vcf.bgz
+          completed: 2024-08-12T01:37:00
           name: fetch
-      version: 32
-    - based: 1
-      build_author: alexkotlar
-      build_date: 2023-09-20T00:17:00
-      build_field_transformations:
-        chrom: chr .
-        clinicalSignificance: split [;]
-        origin: split [;]
-        phenotypeList: split [;]
-        reviewStatus: split [;]
-        type: split [;]
-      build_row_filters:
-        Assembly: == GRCh38
-      features:
-        - alleleID: number
-        - phenotypeList
-        - clinicalSignificance
-        - type
-        - origin
-        - numberSubmitters: number
-        - reviewStatus
-        - referenceAllele
-        - alternateAllele
-      fieldMap:
-        "#AlleleID": alleleID
-        AlternateAllele: alternateAllele
-        Chromosome: chrom
-        ClinicalSignificance: clinicalSignificance
-        NumberSubmitters: numberSubmitters
-        Origin: origin
-        PhenotypeIDS: phenotypeIDs
-        PhenotypeList: phenotypeList
-        ReferenceAllele: referenceAllele
-        ReviewStatus: reviewStatus
-        Start: chromStart
-        Stop: chromEnd
-        Type: type
-      local_files:
-        - variant_summary.txt.gz
-      name: clinvar
-      no_build: true
-      type: sparse
-      utils:
-        - args:
-            remoteFiles:
-              - ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/variant_summary.txt.gz
-          completed: 2024-03-07T22:09:00
-          name: fetch
-      version: 24
+      version: 33
     - build_author: alexkotlar
-      build_date: 2024-05-05T22:08:00
+      build_date: 2024-08-12T11:02:00
       local_files:
         - whole_genome_SNVs.tsv.chr1.organized-by-chr.txt.sorted.txt.gz
         - whole_genome_SNVs.tsv.chr10.organized-by-chr.txt.sorted.txt.gz
@@ -398,9 +351,9 @@ tracks:
       utils:
         - completed: 2023-09-09T11:18:00
           name: SortCadd
-      version: 7
+      version: 8
     - build_author: alexkotlar
-      build_date: 2024-05-05T22:08:00
+      build_date: 2024-08-12T11:02:00
       features:
         - alt
         - PHRED: number
@@ -408,9 +361,9 @@ tracks:
         - /mnt/files1/bystro_annotator/raw_files/hg38/caddIndel/gnomad.genomes.r4.0.indel.vcf.gz
       name: caddIndel
       type: vcf
-      version: 9
+      version: 10
     - build_author: alexkotlar
-      build_date: 2024-05-05T22:08:00
+      build_date: 2024-08-12T11:02:00
       dist: true
       features:
         - name2
@@ -420,9 +373,9 @@ tracks:
       ref: refSeq
       to: txEnd
       type: nearest
-      version: 12
+      version: 13
     - build_author: alexkotlar
-      build_date: 2024-05-05T22:08:00
+      build_date: 2024-08-12T11:02:00
       dist: true
       features:
         - name2
@@ -431,9 +384,105 @@ tracks:
       name: nearestTss.refSeq
       ref: refSeq
       type: nearest
-      version: 7
+      version: 8
     - build_author: alexkotlar
-      build_date: 2024-05-05T22:08:00
+      build_date: 2024-08-12T11:02:00
+      features:
+        - alt
+        - id
+        - AF_exomes: number
+        - AN_exomes: number
+        - AF_genomes: number
+        - AN_genomes: number
+        - AF_joint: number
+        - AN_joint: number
+        - AF_joint_XX: number
+        - AN_joint_XX: number
+        - AF_joint_XY: number
+        - AN_joint_XY: number
+        - AF_joint_afr: number
+        - AN_joint_afr: number
+        - AF_joint_ami: number
+        - AN_joint_ami: number
+        - AF_joint_amr: number
+        - AN_joint_amr: number
+        - AF_joint_asj: number
+        - AN_joint_asj: number
+        - AF_joint_eas: number
+        - AN_joint_eas: number
+        - AF_joint_fin: number
+        - AN_joint_fin: number
+        - AF_joint_mid: number
+        - AN_joint_mid: number
+        - AF_joint_nfe: number
+        - AN_joint_nfe: number
+        - AF_joint_raw: number
+        - AN_joint_raw: number
+        - AF_joint_remaining: number
+        - AN_joint_remaining: number
+        - AF_joint_sas: number
+        - AN_joint_sas: number
+        - AF_grpmax_joint: number
+        - AN_grpmax_joint: number
+      local_files:
+        - gnomad.joint.v4.1.sites.chr1.vcf.bgz
+        - gnomad.joint.v4.1.sites.chr2.vcf.bgz
+        - gnomad.joint.v4.1.sites.chr3.vcf.bgz
+        - gnomad.joint.v4.1.sites.chr4.vcf.bgz
+        - gnomad.joint.v4.1.sites.chr5.vcf.bgz
+        - gnomad.joint.v4.1.sites.chr6.vcf.bgz
+        - gnomad.joint.v4.1.sites.chr7.vcf.bgz
+        - gnomad.joint.v4.1.sites.chr8.vcf.bgz
+        - gnomad.joint.v4.1.sites.chr9.vcf.bgz
+        - gnomad.joint.v4.1.sites.chr10.vcf.bgz
+        - gnomad.joint.v4.1.sites.chr11.vcf.bgz
+        - gnomad.joint.v4.1.sites.chr12.vcf.bgz
+        - gnomad.joint.v4.1.sites.chr13.vcf.bgz
+        - gnomad.joint.v4.1.sites.chr14.vcf.bgz
+        - gnomad.joint.v4.1.sites.chr15.vcf.bgz
+        - gnomad.joint.v4.1.sites.chr16.vcf.bgz
+        - gnomad.joint.v4.1.sites.chr17.vcf.bgz
+        - gnomad.joint.v4.1.sites.chr18.vcf.bgz
+        - gnomad.joint.v4.1.sites.chr19.vcf.bgz
+        - gnomad.joint.v4.1.sites.chr20.vcf.bgz
+        - gnomad.joint.v4.1.sites.chr21.vcf.bgz
+        - gnomad.joint.v4.1.sites.chr22.vcf.bgz
+        - gnomad.joint.v4.1.sites.chrX.vcf.bgz
+        - gnomad.joint.v4.1.sites.chrY.vcf.bgz
+      name: gnomad.joint
+      type: vcf
+      utils:
+        - args:
+            remoteFiles:
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chr1.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chr2.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chr3.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chr4.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chr5.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chr6.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chr7.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chr8.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chr9.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chr10.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chr11.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chr12.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chr13.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chr14.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chr15.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chr16.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chr17.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chr18.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chr19.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chr20.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chr21.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chr22.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chrX.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/joint/gnomad.joint.v4.1.sites.chrY.vcf.bgz
+          completed: 2024-08-12T02:43:00
+          name: fetch
+      version: 31
+    - build_author: alexkotlar
+      build_date: 2024-08-12T11:02:00
       features:
         - alt
         - id
@@ -468,95 +517,67 @@ tracks:
         - AN_remaining: number
         - AF_sas: number
         - AN_sas: number
-        - AF_joint_XX: number
-        - AN_joint_XX: number
-        - AF_joint_XY: number
-        - AN_joint_XY: number
-        - AF_joint: number
-        - AN_joint: number
-        - AF_joint_afr: number
-        - AN_joint_afr: number
-        - AF_joint_ami: number
-        - AN_joint_ami: number
-        - AF_joint_amr: number
-        - AN_joint_amr: number
-        - AF_joint_asj: number
-        - AN_joint_asj: number
-        - AF_joint_eas: number
-        - AN_joint_eas: number
-        - AF_joint_fin: number
-        - AN_joint_fin: number
-        - AF_joint_mid: number
-        - AN_joint_mid: number
-        - AF_joint_nfe: number
-        - AN_joint_nfe: number
-        - AF_joint_remaining: number
-        - AN_joint_remaining: number
-        - AF_joint_sas: number
-        - AN_joint_sas: number
         - AF_grpmax: number
         - AN_grpmax: number
-        - AF_grpmax_joint: number
-        - AN_grpmax_joint: number
       local_files:
-        - gnomad.genomes.v4.0.sites.chr1.vcf.bgz
-        - gnomad.genomes.v4.0.sites.chr2.vcf.bgz
-        - gnomad.genomes.v4.0.sites.chr3.vcf.bgz
-        - gnomad.genomes.v4.0.sites.chr4.vcf.bgz
-        - gnomad.genomes.v4.0.sites.chr5.vcf.bgz
-        - gnomad.genomes.v4.0.sites.chr6.vcf.bgz
-        - gnomad.genomes.v4.0.sites.chr7.vcf.bgz
-        - gnomad.genomes.v4.0.sites.chr8.vcf.bgz
-        - gnomad.genomes.v4.0.sites.chr9.vcf.bgz
-        - gnomad.genomes.v4.0.sites.chr10.vcf.bgz
-        - gnomad.genomes.v4.0.sites.chr11.vcf.bgz
-        - gnomad.genomes.v4.0.sites.chr12.vcf.bgz
-        - gnomad.genomes.v4.0.sites.chr13.vcf.bgz
-        - gnomad.genomes.v4.0.sites.chr14.vcf.bgz
-        - gnomad.genomes.v4.0.sites.chr15.vcf.bgz
-        - gnomad.genomes.v4.0.sites.chr16.vcf.bgz
-        - gnomad.genomes.v4.0.sites.chr17.vcf.bgz
-        - gnomad.genomes.v4.0.sites.chr18.vcf.bgz
-        - gnomad.genomes.v4.0.sites.chr19.vcf.bgz
-        - gnomad.genomes.v4.0.sites.chr20.vcf.bgz
-        - gnomad.genomes.v4.0.sites.chr21.vcf.bgz
-        - gnomad.genomes.v4.0.sites.chr22.vcf.bgz
-        - gnomad.genomes.v4.0.sites.chrX.vcf.bgz
-        - gnomad.genomes.v4.0.sites.chrY.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chr1.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chr2.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chr3.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chr4.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chr5.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chr6.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chr7.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chr8.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chr9.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chr10.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chr11.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chr12.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chr13.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chr14.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chr15.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chr16.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chr17.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chr18.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chr19.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chr20.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chr21.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chr22.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chrX.vcf.bgz
+        - gnomad.genomes.v4.1.sites.chrY.vcf.bgz
       name: gnomad.genomes
       type: vcf
       utils:
         - args:
             remoteFiles:
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chr1.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chr2.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chr3.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chr4.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chr5.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chr6.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chr7.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chr8.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chr9.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chr10.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chr11.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chr12.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chr13.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chr14.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chr15.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chr16.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chr17.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chr18.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chr19.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chr20.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chr21.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chr22.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chrX.vcf.bgz
-              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.0/vcf/genomes/gnomad.genomes.v4.0.sites.chrY.vcf.bgz
-          completed: 2024-03-07T15:59:00
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chr1.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chr2.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chr3.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chr4.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chr5.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chr6.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chr7.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chr8.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chr9.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chr10.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chr11.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chr12.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chr13.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chr14.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chr15.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chr16.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chr17.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chr18.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chr19.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chr20.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chr21.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chr22.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chrX.vcf.bgz
+              - https://gnomad-public-us-east-1.s3.amazonaws.com/release/4.1/vcf/genomes/gnomad.genomes.v4.1.sites.chrY.vcf.bgz
+          completed: 2024-08-11T22:41:00
           name: fetch
-      version: 30
+      version: 31
     - build_author: alexkotlar
-      build_date: 2024-05-05T22:08:00
+      build_date: 2024-08-12T11:02:00
       features:
         - id
         - alt
@@ -613,9 +634,33 @@ tracks:
       utils:
         - completed: 2024-03-10T16:30:00
           name: DbSnp2FormatInfo
-      version: 9
+      version: 10
     - build_author: alexkotlar
-      build_date: 2024-05-05T22:08:00
+      build_date: 2024-08-12T11:02:00
+      features:
+        - id
+        - alt
+        - prediction
+        - neutral: number
+        - gof: number
+        - lof: number
+      fieldMap:
+        LoGoFunc_GOF: gof
+        LoGoFunc_LOF: lof
+        LoGoFunc_neutral: neutral
+      local_files:
+        - LoGoFuncVotingEnsemble_preds_final.vcf.gz
+      name: logofunc
+      type: vcf
+      utils:
+        - args:
+            remoteFiles:
+              - https://bystro-db.s3.amazonaws.com/src/LoGoFuncVotingEnsemble/LoGoFuncVotingEnsemble_preds_final.vcf.gz
+          completed: 2024-07-29T10:52:00
+          name: fetch
+      version: 3
+    - build_author: alexkotlar
+      build_date: 2024-08-12T11:02:00
       build_field_transformations:
         CLNDN: split [|]
         CLNSIGCONF: split [|]
@@ -646,7 +691,28 @@ tracks:
         - args:
             remoteFiles:
               - https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh38/clinvar.vcf.gz
-          completed: 2024-03-07T22:09:00
+          completed: 2024-08-12T08:44:00
           name: fetch
-      version: 5
-version: 232
+      version: 6
+    - build_author: alexkotlar
+      build_date: 2024-08-12T11:02:00
+      build_field_transformations:
+        description: split [|]
+        phenocode: split [|]
+      features:
+        - id
+        - alt
+        - phenocode
+        - description
+      local_files:
+        - processed_genebass_significant.vcf.gz
+      name: genebass
+      type: vcf
+      utils:
+        - args:
+            remoteFiles:
+              - https://bystro-db.s3.amazonaws.com/src/genebass/processed_genebass_significant.vcf.gz
+          completed: 2024-07-30T21:44:00
+          name: fetch
+      version: 7
+version: 235

@@ -48,8 +48,7 @@ def mock_scores_df() -> pd.DataFrame:
             "P": [0.699009, 0.0030673],
             "BETA": [0.007630, -0.020671],
             "EFFECT_ALLELE_FREQUENCY": [0.1, 0.2],
-            "SNPID": ["chr8:132782505:T:C", "chr3:183978846:A:G"],
-            "VARIANT_ID": ["rs123", "rs456"],
+            "SNPID": ["chr8:132782505:T:C", "chr3:183978846:A:G"]
         },
         index=["chr8:132782505:T:C", "chr3:183978846:A:G"],
     )
@@ -66,7 +65,6 @@ def mock_processed_scores_df() -> pd.DataFrame:
         "BETA": [0.007630, -0.020671],
         "EFFECT_ALLELE_FREQUENCY": [0.1, 0.2],
         "SNPID": ["chr8:132782505:T:C", "chr3:183978846:A:G"],
-        "VARIANT_ID": ["rs123", "rs456"],
         "ID_effect_as_alt": ["chr8:132782505:T:C", "chr3:183978846:A:G"],
         "ID_effect_as_ref": ["chr8:132782505:C:T", "chr3:183978846:G:A"],
     }
@@ -166,8 +164,7 @@ def test_load_scores(mock_read_feather, mock_scores_df: pd.DataFrame):
         "P",
         "BETA",
         "EFFECT_ALLELE_FREQUENCY",
-        "SNPID",
-        "VARIANT_ID",
+        "SNPID"
     ]
 
     assert not result_df.empty, "The DataFrame should not be empty."
