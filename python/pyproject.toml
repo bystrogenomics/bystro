@@ -31,6 +31,7 @@ dependencies = [
     "cloudpickle==3.0.0",
     "torch==2.2",
     "psutil==5.9.6",
+    "pymanopt==2.2.0",
     "matplotlib==3.7.1",
     "ecos==2.0.13",
     "osqp==0.6.5",
