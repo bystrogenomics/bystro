@@ -4,6 +4,8 @@ from typing import List, Union
 
 
 def sample_from_data_list(
+    data_list: List[np.ndarray], n_permutations: int
+) -> List[np.ndarray]:
     """
     Randomly samples values from a list of data arrays, creating new 
     sampled vectors.
@@ -23,8 +25,6 @@ def sample_from_data_list(
         A list of arrays, where each array is a sampled version of the 
         original data vectors.
     """
-    data_list: List[np.ndarray], n_permutations: int
-) -> List[np.ndarray]:
     rng = np.random.default_rng()
 
     sampled_vectors: List[np.ndarray] = []
