@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.optimize import minimize
+from scipy.optimize import minimize # type: ignore
 from typing import List, Union
 
 
