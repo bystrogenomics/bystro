@@ -1,5 +1,4 @@
 import numpy as np
-import numpy.linalg as la
 from scipy.optimize import minimize
 from typing import List, Union
 
@@ -132,7 +131,6 @@ class BatchAdaptationUnivariate:
         vec[1] = sigma2_eps_theta
         vec[2] = sigma2_eps_delta
 
-        # estimate = np.dot(la.inv(mat), vec)
         x0 = np.ones(mat.shape[1])
         cons = {"type": "ineq", "fun": lambda x: constraint(x, self.c)}
         result = minimize(
