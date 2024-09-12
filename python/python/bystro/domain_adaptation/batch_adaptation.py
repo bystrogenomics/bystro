@@ -1,6 +1,7 @@
 import numpy as np
-from scipy.optimize import minimize # type: ignore
+from scipy.optimize import minimize  # type: ignore
 from typing import List, Union
+from tqdm import trange
 
 
 # Define the objective function to minimize: ||Ax - y||^2
@@ -181,4 +182,56 @@ class BatchAdaptationUnivariate:
             previously fitted parameters.
         """
         data_adjusted = data_new - self.w * (control - self.mu_theta)
+        return data_adjusted
+
+
+class BatchAdaptationMultivariate:
+    def __init__(
+        self, ddof: int = -1, c: float = 0.5, n_permutations: int = 1000
+    ) -> None:
+        self.ddof = ddof
+        self.n_permutations = n_permutations
+        self.c = c
+        self.p = 0
+        self.batch_adaptation_list = [type[BatchAdaptationUnivariate]]
+
+    def fit_transform(
+        self,
+        data_list: List[np.ndarray],
+        controls: np.ndarray,
+        progress_bar: bool = True,
+    ) -> List[np.ndarray]:
+        self.p = int(data_list[0].shape[1])
+        ng = len(data_list)
+
+        data_new = [np.zeros(data_list[0].shape) for i in range(ng)]
+
+        for i in trange(self.p, disable=not progress_bar):
+            data_list_subset = [
+                data_list[j][:, i] for j in range(len(data_list))
+            ]
+            controls_subset = controls[:, i]
+            model = BatchAdaptationUnivariate(
+                int(self.ddof),
+                self.c,
+                self.n_permutations,
+            )
+            data_adjusted = model.fit_transform(
+                data_list_subset, controls_subset
+            )
+            self.batch_adaptation_list.append(model)
+            for j in range(ng):
+                data_new[j][:, i] = data_adjusted[j]
+
+        return data_new
+
+    def transform(
+        self, data_new: np.ndarray, control: np.ndarray
+    ) -> np.ndarray:
+        data_adjusted = np.zeros(data_new.shape)
+        for j in range(self.p):
+            data_adj = data_new - self.batch_adaptation_list[j].w * (
+                control[j] - self.batch_adaptation_list[j].mu_theta
+            )
+            data_adjusted[:, j] = data_adj
         return data_adjusted
