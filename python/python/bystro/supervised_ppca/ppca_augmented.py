@@ -691,8 +691,7 @@ class PPCAadversarialRandomized(BaseGaussianFactorModel):
 
     def fit(
     def fit(
-        self, X: NDArray[np.float64], Y: NDArray[np.float64]
-    ) -> "PPCAadversarialRandomized":
+        self, X: NDArray[np.float_], Y: NDArray[np.float_]
     ) -> "PPCAadversarialRandomized":
         """
         Fits a model given covariates X
@@ -806,7 +805,7 @@ class PPCAadversarialRandomized(BaseGaussianFactorModel):
     def _store_instance_variables(
         self,
         trainable_variables: tuple[
-            NDArray[np.float64], np.float64, 
+            NDArray[np.float_], np.float_, 
         ],
     ) -> None:
         ],
