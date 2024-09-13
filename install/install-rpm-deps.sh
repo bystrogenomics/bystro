@@ -1,37 +1,46 @@
 #!/usr/bin/env bash
+set -e
+set -o pipefail
 
-echo -e "\n\nInstalling Debian (rpm) dependencies\n";
+# Ensure the script is run with root privileges
+if [[ $EUID -ne 0 ]]; then
+   echo "This script must be run as root. Use sudo."
+   exit 1
+fi
 
-sudo yum install gcc -y;
-sudo yum install openssl -y;
-sudo yum install openssl-devel -y;
-# Not strictly necessary, useful however for much of what we do
-sudo yum install git-all -y;
-# pigz for Bystro, used to speed up decompression primarily
-sudo yum install pigz -y;
-sudo yum install unzip -y;
-sudo yum install wget -y;
-# For tests involving querying ucsc directly
-sudo yum install mysql-devel -y;
-# For Search::Elasticsearch::Client::5_0::Direct
-sudo yum install libcurl-devel -y
+echo -e "\n\nUpdating system packages\n"
+dnf update -y
 
-# for perlbrew, in case you want to install a different perl version
-#https://www.digitalocean.com/community/tutorials/how-to-install-perlbrew-and-manage-multiple-versions-of-perl-5-on-centos-7
-# centos 7 doesn't include bzip2
-sudo yum install bzip2  -y;
-sudo yum install lz4 --enable-repo=epel;
-sudo yum install patch -y;
+echo -e "\n\nInstalling RPM dependencies\n"
 
-sudo yum install cpan -y;
+# Install all required packages
+dnf install -y \
+  gcc \
+  openssl \
+  openssl-devel \
+  git \
+  pigz \
+  unzip \
+  wget \
+  tar \
+  mariadb-connector-c-devel \
+  libcurl-devel \
+  bzip2 \
+  lz4 \
+  patch \
+  perl \
+  perl-core \
+  awscli \
+  pkgconf-pkg-config
 
-curl --silent --location https://rpm.nodesource.com/setup_12.x | sudo bash -;
+# Install Node.js 20.x
+curl --silent --location https://rpm.nodesource.com/setup_20.x | bash -
+dnf install -y nodejs
 
-sudo yum install nodejs -y;
+# Install pm2 globally using npm
+npm install -g pm2
 
-sudo npm install -g pm2;
+# Install cpanminus directly using cURL
+curl -L https://cpanmin.us | perl - App::cpanminus
 
-sudo yum install awscli -y;
-
-# pkg-config is required for building the wheel
-sudo yum install -y pkg-config;
+echo -e "\n\nAll dependencies have been installed successfully.\n"
