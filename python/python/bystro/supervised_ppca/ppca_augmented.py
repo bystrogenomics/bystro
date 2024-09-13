@@ -690,7 +690,6 @@ class PPCAadversarialRandomized(BaseGaussianFactorModel):
         self.sigma2_: np.float_ | None = None
 
     def fit(
-    def fit(
         self, X: NDArray[np.float_], Y: NDArray[np.float_]
     ) -> "PPCAadversarialRandomized":
         """
