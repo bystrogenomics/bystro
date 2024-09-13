@@ -801,12 +801,7 @@ class PPCAadversarialRandomized(BaseGaussianFactorModel):
     def _store_instance_variables(
         self,
         trainable_variables: tuple[
-    def _store_instance_variables(
-        self,
-        trainable_variables: tuple[
             NDArray[np.float_], np.float_, 
-        ],
-    ) -> None:
         ],
     ) -> None:
         """
