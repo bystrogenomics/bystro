@@ -10,7 +10,7 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-version = "2.0.0-beta15"
+version = "2.0.0-beta17"
 dependencies = [
     "openpyxl==3.1.2",
     "boto3==1.28.9",
@@ -33,7 +33,8 @@ dependencies = [
     "psutil==5.9.6",
     "matplotlib==3.7.1",
     "ecos==2.0.13",
-    "cvxpy==1.5.0",
+    "osqp==0.6.5",
+    "cvxpy==1.5.2",
     "somadata==1.0.0",
     "statsmodels==0.14.2",
     "nest-asyncio==1.6.0",

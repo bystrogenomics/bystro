@@ -31,6 +31,7 @@ import torch
 from torch import Tensor, nn
 from torch.distributions.multivariate_normal import MultivariateNormal
 from sklearn.linear_model import LogisticRegression, Ridge
+from sklearn.decomposition import PCA
 from bystro.supervised_ppca._misc_np import softplus_inverse_np
 
 from bystro.supervised_ppca.gf_generative_pt import PPCA
@@ -137,7 +138,7 @@ class PPCADropout(PPCA):
             else "cpu"
         )
 
-        W_, sigmal_ = self._initialize_variables(device, X)
+        W_, sigmal_ = self._initialize_variables(device, X, y)
         X_, y_ = self._transform_training_data(device, X, 1.0 * y)
         softplus = nn.Softplus()
 
@@ -155,16 +156,7 @@ class PPCADropout(PPCA):
             supervision_loss = nn.MSELoss()
 
             # Now initializing the predictive coefficients
-            sigma = softplus(sigmal_)
-            P_x, Cov = _get_projection_matrix(W_, sigma, device)
-            mean_z = torch.matmul(X_, torch.transpose(P_x, 0, 1))
-            eps = torch.rand_like(mean_z)
-            C1_2 = torch.linalg.cholesky(Cov)
-            z_samples = mean_z + torch.matmul(eps, C1_2)
-            zs = z_samples.detach().cpu().numpy()
-            mod = Ridge(fit_intercept=False)
-            mod.fit(zs, y)
-            beta_init = softplus_inverse_np(np.squeeze(np.abs(mod.coef_)))
+            beta_init = np.ones(self.n_supervised)
             beta_l = torch.tensor(
                 beta_init.astype(np.float32).T,
                 device=device,
@@ -216,8 +208,10 @@ class PPCADropout(PPCA):
 
             if task == "regression":
                 beta_ = softplus(beta_l)
-                y_hat = torch.matmul(z_samples[:, : self.n_supervised], beta_)
-                loss_y = supervision_loss(y_hat, y_batch)
+                y_hat = torch.squeeze(
+                    torch.matmul(z_samples[:, : self.n_supervised], beta_)
+                )
+                loss_y = supervision_loss(y_hat, torch.squeeze(y_batch))
             else:
                 y_hat = (
                     self.delta
@@ -293,6 +287,41 @@ class PPCADropout(PPCA):
             self.sigma2_ = (
                 nn.Softplus()(trainable_variables[1]).detach().numpy()
             )
+
+    def _initialize_variables(self, device, X, Y):
+        """
+        Initializes the variables of the model. Right now fits a PCA model
+        in sklearn, uses the loadings and sets sigma^2 to be unexplained
+        variance.
+
+        Parameters
+        ----------
+        device ; pytorch.device
+            The device used for trainging (gpu or cpu)
+
+        X : NDArray,(n_samples,p)
+            The data
+
+        Returns
+        -------
+        W_ : torch.tensor,shape=(n_components,p)
+            The loadings of our latent factor model
+
+        sigmal_ : torch.tensor
+            The unrectified variance of the model
+        """
+        model = PCA(self.n_components)
+        S_hat = model.fit_transform(X)
+        W_init = model.components_.astype(np.float32)
+        rr = Ridge()
+        rr.fit(X, Y)
+        W_init[0] = np.squeeze(rr.coef_)
+        W_ = torch.tensor(W_init, requires_grad=True, device=device)
+        X_recon = np.dot(S_hat, W_init)
+        diff = np.mean((X - X_recon) ** 2)
+        sinv = softplus_inverse_np(diff * np.ones(1).astype(np.float32))
+        sigmal_ = torch.tensor(sinv, requires_grad=True, device=device)
+        return W_, sigmal_
 
     def _test_inputs(self, X, y):
         """
