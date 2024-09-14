@@ -32,7 +32,8 @@ dnf install -y \
   perl \
   perl-core \
   awscli \
-  pkgconf-pkg-config
+  pkgconf-pkg-config \
+  grep
 
 # Install Node.js 20.x
 curl --silent --location https://rpm.nodesource.com/setup_20.x | bash -
