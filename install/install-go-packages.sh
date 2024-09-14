@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -e
 
+if [ "$#" -ne 1 ]; then
+    echo "Usage: $0 <BYSTRO_INSTALL_DIR>"
+    exit 1
+fi
+
+BYSTRO_INSTALL_DIR="$1"
+
 echo -e "\n\nInstalling Go packages (bystro-vcf, stats, snp)\n"
 
 # Check if Go is installed
@@ -18,9 +25,7 @@ if [[ "$(printf '%s\n' "$GO_REQUIRED_VERSION" "$GO_VERSION" | sort -V | head -n1
     exit 1
 fi
 
-# Navigate to the 'go' directory
-cd "./go"
-
+cd "$BYSTRO_INSTALL_DIR/go"
 # Initialize the Go module if it doesn't exist
 if [ ! -f "go.mod" ]; then
     echo "Initializing Go module..."

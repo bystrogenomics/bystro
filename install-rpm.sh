@@ -10,17 +10,24 @@ fi
 
 
 if [[ -n "$1" ]]; then
-  INSTALL_DIR="$1"
+  HOME_DIR="$1"
 else
   # Use the home directory of the invoking user, not root
   if [[ -n "$SUDO_USER" ]]; then
-    INSTALL_DIR="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
+    HOME_DIR="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
   else
-    INSTALL_DIR="$HOME"
+    HOME_DIR="$HOME"
   fi
 fi
 
+echo "home directory is $HOME_DIR"
+
+INSTALL_DIR=$(pwd)
+
+echo "install directory is $INSTALL_DIR"
+
 PROFILE_FILE=$(./install/detect-shell-profile.sh)
+GO_PLATFORM="linux-amd64"
 
 # Install RPM dependencies
 ./install/install-rpm-deps.sh
@@ -32,11 +39,11 @@ PROFILE_FILE=$(./install/detect-shell-profile.sh)
 ./install/install-lmdb-linux.sh
 
 # Install Perlbrew
-./install/install-perlbrew-linux.sh "$INSTALL_DIR" perl-5.34.0
+./install/install-perlbrew-linux.sh "$HOME_DIR" perl-5.34.0
 
 # Source Perlbrew environment for the current script execution
-if [[ -f "$INSTALL_DIR/perl5/perlbrew/etc/bashrc" ]]; then
-  source "$INSTALL_DIR/perl5/perlbrew/etc/bashrc"
+if [[ -f "$HOME_DIR/perl5/perlbrew/etc/bashrc" ]]; then
+  source "$HOME_DIR/perl5/perlbrew/etc/bashrc"
 else
   echo "Error: Perlbrew bashrc not found. Ensure Perlbrew was installed correctly."
   exit 1
@@ -56,18 +63,17 @@ fi
 ./install/install-perl-libs.sh
 
 # Install Go
-./install/install-go-linux.sh "$INSTALL_DIR" "$PROFILE_FILE"
+./install/install-go.sh "$HOME_DIR" "$PROFILE_FILE"
 
-echo "Install dir is $INSTALL_DIR"
 echo "Sourcing $PROFILE_FILE";
 
 source $PROFILE_FILE;
 
 # Install Go packages
-./install/install-go-packages.sh
+./install/install-go-packages.sh "$INSTALL_DIR"
 
 # Export Bystro libraries to bash_profile
-./install/export-bystro-libs.sh "$INSTALL_DIR/.bash_profile"
+./install/export-bystro-libs.sh "$INSTALL_DIR" "$PROFILE_FILE"
 
 # Create logs directory
 mkdir -p logs

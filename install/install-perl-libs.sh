@@ -5,10 +5,6 @@ echo -e "\n\nInstalling Perl libraries\n"
 
 echo "PERL ROOT IN install/install-perl-libs.sh: $PERLBREW_ROOT"
 
-# Export locale settings to prevent warnings
-export LANG=en_US.UTF-8
-export LC_ALL=en_US.UTF-8
-
 # Install multiple modules at once
 cpanm Capture::Tiny Mouse Path::Tiny namespace::autoclean DDP YAML::XS JSON::XS Getopt::Long::Descriptive Types::Path::Tiny Sereal MCE::Shared List::MoreUtils Log::Fast Parallel::ForkManager Cpanel::JSON::XS Mouse::Meta::Attribute::Custom::Trait::Array Net::HTTP Math::SigFigs PerlIO::utf8_strict PerlIO::gzip MouseX::SimpleConfig MouseX::ConfigFromFile Archive::Extract DBI String::Strip File::Which Hash::Merge::Simple Module::Build::XSUtil Test::LeakTrace Test::Pod Test::Exception Log::Any::Adapter File::Copy::Recursive
 

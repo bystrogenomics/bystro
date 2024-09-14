@@ -3,18 +3,19 @@ set -e
 
 # Ensure that INSTALL_DIR is provided
 if [ -z "$1" ]; then
-  echo "Usage: $0 <INSTALL_DIR> [PROFILE_FILE]"
+  echo "Usage: $0 <BYSTRO_INSTALL_DIR> [PROFILE_FILE]"
+  echo "Install directory is the directory where Bystro source files are located"
   exit 1
 fi
 
 # Get absolute path of INSTALL_DIR
-INSTALL_DIR="$1"
+BYSTRO_INSTALL_DIR="$1"
 PROFILE_FILE="$2"
 
-echo -e "\n\nExporting paths from $INSTALL_DIR to $PROFILE\n"
+echo -e "\n\nExporting paths from $BYSTRO_INSTALL_DIR to $PROFILE\n"
 
 # Verify that $INSTALL_DIR/bystro/lib exists and contains at least one .pm file
-LIB_DIR="$INSTALL_DIR/bystro/perl/lib"
+LIB_DIR="$BYSTRO_INSTALL_DIR/perl/lib"
 
 if [ ! -d "$LIB_DIR" ]; then
   echo "Error: Directory $LIB_DIR does not exist."
@@ -28,7 +29,7 @@ if ! ls "$LIB_DIR"/*.pm >/dev/null 2>&1; then
 fi
 
 # Verify that $INSTALL_DIR/perl/bin exists and contains at least one .pl file
-PERL_BIN_DIR="$INSTALL_DIR/perl/bin"
+PERL_BIN_DIR="$BYSTRO_INSTALL_DIR/perl/bin"
 
 if [ ! -d "$PERL_BIN_DIR" ]; then
   echo "Error: Directory $PERL_BIN_DIR does not exist."
