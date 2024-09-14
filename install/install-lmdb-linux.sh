@@ -18,7 +18,7 @@ make -C "$TEMP_DIR/lmdb/libraries/liblmdb"
 
 # Install LMDB
 echo "Installing LMDB..."
-sudo make install -C "$TEMP_DIR/lmdb/libraries/liblmdb"
+make install -C "$TEMP_DIR/lmdb/libraries/liblmdb"
 
 # Clean up the temporary directory
 echo "Cleaning up..."
