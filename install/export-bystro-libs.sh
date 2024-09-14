@@ -12,7 +12,7 @@ fi
 BYSTRO_INSTALL_DIR="$1"
 PROFILE_FILE="$2"
 
-echo -e "\n\nExporting paths from $BYSTRO_INSTALL_DIR to $PROFILE\n"
+echo -e "\n\nExporting paths from $BYSTRO_INSTALL_DIR to $PROFILE_FILE\n"
 
 # Verify that $INSTALL_DIR/bystro/lib exists and contains at least one .pm file
 LIB_DIR="$BYSTRO_INSTALL_DIR/perl/lib"
@@ -42,7 +42,7 @@ if ! ls "$PERL_BIN_DIR"/*.pl >/dev/null 2>&1; then
   exit 1
 fi
 
-# Function to append a line to PROFILE if it doesn't already exist
+# Function to append a line to PROFILE_FILE if it doesn't already exist
 append_if_missing() {
   local line="$1"
   local found=0
@@ -53,14 +53,14 @@ append_if_missing() {
       found=1
       break
     fi
-  done < "$PROFILE"
+  done < "$PROFILE_FILE"
 
   # If the line was not found, append it to the file
   if [ $found -eq 0 ]; then
-    echo -e "\n$line" >> "$PROFILE"
-    echo "Added to $PROFILE: $line"
+    echo -e "\n$line" >> "$PROFILE_FILE"
+    echo "Added to $PROFILE_FILE: $line"
   else
-    echo "Already present in $PROFILE: $line"
+    echo "Already present in $PROFILE_FILE: $line"
   fi
 }
 
