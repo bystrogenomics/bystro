@@ -14,7 +14,7 @@ PROFILE_FILE="$2"
 echo -e "\n\nExporting paths from $INSTALL_DIR to $PROFILE\n"
 
 # Verify that $INSTALL_DIR/bystro/lib exists and contains at least one .pm file
-LIB_DIR="$INSTALL_DIR/bystro/lib"
+LIB_DIR="$INSTALL_DIR/bystro/perl/lib"
 
 if [ ! -d "$LIB_DIR" ]; then
   echo "Error: Directory $LIB_DIR does not exist."
