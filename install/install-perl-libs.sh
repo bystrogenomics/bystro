@@ -19,7 +19,6 @@ cpanm DBD::MariaDB
 
 # Custom installation of Data::MessagePack
 install_custom_msgpack() {
-    cpanm --uninstall -f Data::MessagePack
     rm -rf msgpack-perl
     git clone --recursive https://github.com/bystrogenomics/msgpack-perl.git
     cd msgpack-perl

@@ -104,7 +104,4 @@ dnf install -y nodejs
 # Install pm2 globally using npm
 npm install -g pm2
 
-# Install cpanminus directly using cURL
-curl -L https://cpanmin.us | perl - App::cpanminus
-
 echo -e "\n\nAll dependencies have been installed successfully.\n"
