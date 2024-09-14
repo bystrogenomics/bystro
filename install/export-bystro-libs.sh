@@ -45,13 +45,25 @@ fi
 # Function to append a line to PROFILE if it doesn't already exist
 append_if_missing() {
   local line="$1"
-  if ! grep -qxF "$line" "$PROFILE"; then
+  local found=0
+
+  # Read the profile file line by line and check if the line exists
+  while IFS= read -r current_line; do
+    if [ "$current_line" = "$line" ]; then
+      found=1
+      break
+    fi
+  done < "$PROFILE"
+
+  # If the line was not found, append it to the file
+  if [ $found -eq 0 ]; then
     echo -e "\n$line" >> "$PROFILE"
     echo "Added to $PROFILE: $line"
   else
     echo "Already present in $PROFILE: $line"
   fi
 }
+
 
 # Append entries only if they are missing
 append_if_missing 'export PERL5LIB=$PERL5LIB:'"$LIB_DIR"
