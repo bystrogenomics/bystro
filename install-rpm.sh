@@ -20,6 +20,8 @@ else
   fi
 fi
 
+PROFILE_FILE=$(./install/detect-shell-profile.sh)
+
 # Install RPM dependencies
 ./install/install-rpm-deps.sh
 
@@ -54,18 +56,15 @@ fi
 ./install/install-perl-libs.sh
 
 # Install Go
-./install/install-go-linux.sh "$INSTALL_DIR"
+./install/install-go-linux.sh "$INSTALL_DIR" "$PROFILE_FILE"
 
-# Source Go environment variables if necessary
-if [[ -f "$INSTALL_DIR/.bash_profile" ]]; then
-  source "$INSTALL_DIR/.bash_profile"
-fi
+echo "Install dir is $INSTALL_DIR"
+echo "Sourcing $PROFILE_FILE";
+
+source $PROFILE_FILE;
 
 # Install Go packages
 ./install/install-go-packages.sh
-
-# Update packages
-./install/update-packages.sh
 
 # Export Bystro libraries to bash_profile
 ./install/export-bystro-libs.sh "$INSTALL_DIR/.bash_profile"

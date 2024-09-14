@@ -1,19 +1,72 @@
 #!/usr/bin/env bash
+set -e
 
-echo -e "\n\nInstalling go packages (bystro-vcf, stats, snp)\n"
+echo -e "\n\nInstalling Go packages (bystro-vcf, stats, snp)\n"
 
-mkdir -p $GOPATH/src/github.com;
+# Check if Go is installed
+if ! command -v go >/dev/null 2>&1; then
+    echo "Error: Go is not installed. Please install Go to continue."
+    exit 1
+fi
 
-go mod init bystro
+# Check Go version (requires at least Go 1.16)
+GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
+GO_REQUIRED_VERSION="1.20"
 
-go install github.com/akotlar/bystro-stats@1.0.0;
+if [[ "$(printf '%s\n' "$GO_REQUIRED_VERSION" "$GO_VERSION" | sort -V | head -n1)" != "$GO_REQUIRED_VERSION" ]]; then
+    echo "Error: Go version $GO_REQUIRED_VERSION or higher is required. You have Go $GO_VERSION."
+    exit 1
+fi
 
-go install github.com/bystrogenomics/bystro-vcf@2.2.2;
+# Navigate to the 'go' directory
+cd "./go"
 
-go install github.com/akotlar/bystro-snp@1.0.0;
+# Initialize the Go module if it doesn't exist
+if [ ! -f "go.mod" ]; then
+    echo "Initializing Go module..."
+    go mod init bystro
+fi
 
-# allows us to modify our config files in place
-go install github.com/mikefarah/yq@2.4.1;
+# Ensure dependencies are up to date
+echo "Tidying up module dependencies..."
+go mod tidy
 
-# install local go packages
-(cd ./go && go install bystro/cmd/dosage);
+# Install the local 'dosage' command
+echo "Installing dosage command..."
+go install ./cmd/dosage
+
+# Install external packages
+echo "Installing bystro-stats..."
+go install github.com/bystrogenomics/bystro-stats@1.0.1
+
+echo "Installing bystro-vcf..."
+go install github.com/bystrogenomics/bystro-vcf@2.2.3
+
+echo "Installing bystro-snp..."
+go install github.com/bystrogenomics/bystro-snp@1.0.1
+
+# Install yq for modifying config files
+echo "Installing yq..."
+go install github.com/mikefarah/yq/v2@2.4.1
+
+# Return to the previous directory
+cd -
+
+echo -e "\nInstallation complete."
+
+# Determine the Go bin directory
+if [ -n "$GOBIN" ]; then
+    BINDIR="$GOBIN"
+else
+    if [ -n "$GOPATH" ]; then
+        BINDIR="$GOPATH/bin"
+    else
+        BINDIR="$HOME/go/bin"
+    fi
+fi
+
+# Check if the bin directory is in PATH
+if [[ ":$PATH:" != *":$BINDIR:"* ]]; then
+    echo "Warning: Your Go bin directory ($BINDIR) is not in your PATH."
+    echo "Please add it to your PATH to use the installed commands."
+fi
