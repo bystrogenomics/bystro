@@ -80,7 +80,7 @@ mkdir -p logs
 
 echo -e "\n\nREMEMBER TO INCREASE ULIMIT ABOVE 1024 IF RUNNING MANY FORKS\n\n"
 
-echo -e "If running for the first time, you may need to source the following in your shell:\n"
-echo "source $INSTALL_DIR/perl5/perlbrew/etc/bashrc"
-echo "source $INSTALL_DIR/.bash_profile"
-echo -e "\nAlternatively, add the above lines to your ~/.bash_profile or ~/.bashrc to make the changes permanent.\n"
+echo -e "To get started with Bystro, for instance to run Bystro Annotator: \n"
+echo "Update your shell to to reflect the newly installed programs: 'source $HOME_DIR/.bash_profile'"
+echo "Run Bystro Annotator: 'bystro-annotate.pl --help'"
+echo -e "\n\n"
