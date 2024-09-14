@@ -13,6 +13,8 @@ dnf update -y
 
 echo -e "\n\nInstalling RPM dependencies\n"
 
+dnf groupinstall -y "Development Tools"
+
 # Install all required packages
 dnf install -y \
   gcc \
