@@ -22,8 +22,8 @@ GOFILE=go1.21.4.linux-amd64.tar.gz
 wget https://dl.google.com/go/$GOFILE;
 tar -xf $GOFILE;
 echo "Deleting go in /usr/local"
-sudo rm -rf /usr/local/go
-sudo mv go /usr/local;
+rm -rf /usr/local/go
+mv go /usr/local;
 rm $GOFILE;
 cd -;
 

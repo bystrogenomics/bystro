@@ -23,7 +23,6 @@ dnf install -y \
   unzip \
   wget \
   tar \
-  mariadb-connector-c-devel \
   libcurl-devel \
   bzip2 \
   lz4 \

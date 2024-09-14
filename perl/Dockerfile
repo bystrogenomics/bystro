@@ -72,7 +72,7 @@ RUN git clone --depth 1 --recurse-submodules https://github.com/salortiz/LMDB_Fi
   && cpanm --quiet .
 
 # Install workaround because default DBD::mysql, i.e. version >5.x, will not automatically install on ubuntu
-RUN cpm install -g DBD::mysql@4.051
+RUN cpm install -g DBD::MariaDB@1.23
 
 # Remove perl-deps directory
 RUN rm -rf /app/perl-deps
