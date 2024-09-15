@@ -8,16 +8,11 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-
-if [[ -n "$1" ]]; then
-  HOME_DIR="$1"
+# Use the home directory of the invoking user, not root
+if [[ -n "$SUDO_USER" ]]; then
+  HOME_DIR="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
 else
-  # Use the home directory of the invoking user, not root
-  if [[ -n "$SUDO_USER" ]]; then
-    HOME_DIR="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
-  else
-    HOME_DIR="$HOME"
-  fi
+  HOME_DIR="$HOME"
 fi
 
 echo "home directory is $HOME_DIR"
