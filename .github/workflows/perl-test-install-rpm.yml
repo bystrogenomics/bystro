@@ -74,4 +74,5 @@ jobs:
       - name: Run tests
         run: |
           cd perl
+          source ~/.profile
           prove -r -j$(nproc) t
