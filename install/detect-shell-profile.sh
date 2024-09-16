@@ -10,28 +10,12 @@ else
   HOME_DIR="$HOME"
 fi
 
-case "$USER_SHELL" in
-    */bash)
-        # Use .bash_profile if it exists; otherwise, use .bashrc
-        if [ -f "$HOME_DIR/.bash_profile" ]; then
-            PROFILE_FILE="$HOME_DIR/.bash_profile"
-        elif [ -f "$HOME_DIR/.bashrc" ]; then
-            PROFILE_FILE="$HOME_DIR/.bashrc"
-        else
-            PROFILE_FILE="$HOME_DIR/.bash_profile"
-        fi
-        ;;
-    */zsh)
-        PROFILE_FILE="$HOME_DIR/.zshrc"
-        ;;
-    */ksh)
-        PROFILE_FILE="$HOME_DIR/.kshrc"
-        ;;
-    *)
-        # Default to .profile for other shells
-        PROFILE_FILE="$HOME_DIR/.profile"
-        ;;
-esac
+# Use ~/.profile unless ~/.bash_profile already exists
+PROFILE_FILE="$HOME_DIR/.profile"
+
+if [ -f "$HOME_DIR/.bash_profile" ]; then
+    PROFILE_FILE="$HOME_DIR/.bash_profile"
+fi
 
 # Ensure the profile file exists
 if [ ! -f "$PROFILE_FILE" ]; then
