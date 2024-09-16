@@ -1,13 +1,6 @@
 name: Install and Test Bystro
 
-on:
-  pull_request:
-    paths:
-      - "**.pl"
-      - "**.pm"
-      - "**.t"
-      - "**.sh"
-      - "**.go"
+on: [pull_request]
 
 jobs:
   build:
