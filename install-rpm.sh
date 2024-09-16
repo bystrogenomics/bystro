@@ -89,6 +89,6 @@ mkdir -p logs
 echo -e "\n\nREMEMBER TO INCREASE ULIMIT ABOVE 1024 IF RUNNING MANY FORKS\n\n"
 
 echo -e "To get started with Bystro, for instance to run Bystro Annotator: \n"
-echo "Update your shell to reflect the newly installed programs: 'source $HOME_DIR/.bash_profile'"
+echo "Update your shell to reflect the newly installed programs: 'source $PROFILE_FILE'"
 echo "Run Bystro Annotator: 'bystro-annotate.pl --help'"
 echo -e "\n\n"
