@@ -4,16 +4,28 @@ set -e
 ########## This script installs Go and configures the Go environment.
 
 # Ensure that DIR and PROFILE_FILE are provided
-if [ "$#" -ne 5 ]; then
-    echo "Usage: $0 <PROFILE_FILE> <INSTALL_DIR> <BYSTRO_INSTALL_DIR> <GO_PLATFORM> <GO_VERSION>"
+if [ "$#" -ne 6 ]; then
+    echo "Usage: $0 <PROFILE_FILE> <GOPATH_PARENT_DIR> <GO_INSTALL_DIR> <BYSTRO_INSTALL_DIR> <GO_PLATFORM> <GO_VERSION>"
     exit 1
 fi
 
 PROFILE_FILE="$1"
-INSTALL_DIR="$2"
-BYSTRO_INSTALL_DIR="$3"
-GO_PLATFORM="$4"
-GO_VERSION="$5"
+GOPATH_PARENT_DIR="$2"
+INSTALL_DIR="$3"
+BYSTRO_INSTALL_DIR="$4"
+GO_PLATFORM="$5"
+GO_VERSION="$6"
+GOFILE="go${GO_VERSION}.${GO_PLATFORM}.tar.gz"
+
+# Add Go binary directory to PATH
+GOPATH="$GOPATH_PARENT_DIR/go"
+BYSTRO_GO_PROGRAM_INSTALL_PATH="$GOPATH/bin"
+GO_INSTALL_DIR="$INSTALL_DIR/go"
+GO_BIN="$GO_INSTALL_DIR/bin"
+
+SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"
+# exports append_if_missing
+source "$SCRIPT_DIR/utils.sh"
 
 echo -e "\n\nInstalling Go\n"
 
@@ -22,67 +34,62 @@ if command -v go >/dev/null 2>&1; then
     INSTALLED_GO_VERSION=$(go version | awk '{print $3}')
     echo "Go is already installed: $INSTALLED_GO_VERSION"
     echo "Skipping Go installation."
-    exit 0
+else
+    echo "Go is not installed. Proceeding with installation..."
+
+    # Create temporary directory for download
+    TEMP_DIR=$(mktemp -d)
+    cd "$TEMP_DIR"
+
+    # Download Go
+    echo "Downloading Go $GO_VERSION for $GO_PLATFORM..."
+    wget -q "https://dl.google.com/go/$GOFILE"
+
+    # Verify download succeeded
+    if [[ ! -f "$GOFILE" ]]; then
+        echo "Error: Failed to download Go tarball."
+        exit 1
+    fi
+
+    # Remove existing Go installation
+    if [ -d "$GO_INSTALL_DIR" ]; then
+        echo "Removing existing Go installation at $GO_INSTALL_DIR..."
+        rm -rf "$GO_INSTALL_DIR"
+    fi
+
+    # Extract and install Go
+    echo "Installing Go to $INSTALL_DIR..."
+    tar -C "$INSTALL_DIR" -xzf "$GOFILE"
+
+    # Clean up
+    cd -
+    rm -rf "$TEMP_DIR"
+
+    # Set up environment variables
+    echo -e "\n\nConfiguring Go environment in $PROFILE_FILE\n"
+
+    # Ensure the profile file exists
+    touch "$PROFILE_FILE"
+
+    # Check if $GO_BIN is in the PATH and if not, add it
+    if [[ ":$PATH:" != *":$GO_BIN:"* ]]; then
+        export PATH="$PATH:$GO_BIN"
+        append_if_missing "export PATH=\$PATH:$GO_BIN" "$PROFILE_FILE"
+    fi
+
+    echo -e "\nGo installation complete in $GO_INSTALL_DIR. Installing Bystro Go dependencies...\n"
 fi
 
-echo "Go is not installed. Proceeding with installation..."
+# Set GOPATH if it is not already in the profile file
+export GOPATH=$GOPATH
+append_if_missing "export GOPATH=$GOPATH" "$PROFILE_FILE"
 
-
-# Define Go version and platform
-GO_PLATFORM=${$4:-"linux-amd64"}
-GO_VERSION=${$5:-"1.21.4"}
-GOFILE="go${GO_VERSION}.${GO_PLATFORM}.tar.gz"
-
-# Create temporary directory for download
-TEMP_DIR=$(mktemp -d)
-cd "$TEMP_DIR"
-
-# Download Go
-echo "Downloading Go $GO_VERSION for $GO_PLATFORM..."
-wget -q "https://dl.google.com/go/$GOFILE"
-
-# Verify download succeeded
-if [[ ! -f "$GOFILE" ]]; then
-    echo "Error: Failed to download Go tarball."
-    exit 1
+if [[ ":$PATH:" != *":$BYSTRO_GO_PROGRAM_INSTALL_PATH:"* ]]; then
+    export PATH="$PATH:$BYSTRO_GO_PROGRAM_INSTALL_PATH"
+    append_if_missing "export PATH=\$PATH:$BYSTRO_GO_PROGRAM_INSTALL_PATH" "$PROFILE_FILE"
+else
+    echo "$BYSTRO_GO_PROGRAM_INSTALL_PATH in PATH, skipping"
 fi
-
-# Remove existing Go installation
-if [ -d "$INSTALL_DIR/go" ]; then
-    echo "Removing existing Go installation at $INSTALL_DIR/go..."
-    rm -rf "$INSTALL_DIR/go"
-fi
-
-# Extract and install Go
-echo "Installing Go to $INSTALL_DIR..."
-tar -C "$INSTALL_DIR" -xzf "$GOFILE"
-
-# Clean up
-cd -
-rm -rf "$TEMP_DIR"
-
-# Set up environment variables
-echo -e "\n\nConfiguring Go environment in $PROFILE_FILE\n"
-
-# Ensure the profile file exists
-touch "$PROFILE_FILE"
-
-# Add Go binary directory to PATH
-GOPATH="$INSTALL_DIR/go"
-GO_BIN="$GOPATH/bin"
-if ! grep -qs "$GO_BIN" "$PROFILE_FILE"; then
-    export PATH="$PATH:$GO_BIN"
-    echo "export PATH=\$PATH:$GO_BIN" >> "$PROFILE_FILE"
-fi
-
-# Set GOPATH
-if ! grep -qs 'export GOPATH=' "$PROFILE_FILE"; then
-    export GOPATH=$GOPATH
-    echo "export GOPATH=$GOPATH" >> "$PROFILE_FILE"
-fi
-
-echo -e "\nGo installation complete in $GOPATH. Installing Bystro Go dependencies...\n"
-
 # Create GOPATH directories
 mkdir -p "$GOPATH/src/github.com"
 

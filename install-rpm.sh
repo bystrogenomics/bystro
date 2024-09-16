@@ -6,8 +6,6 @@ set -o pipefail
 DEFAULT_GO_PLATFORM="linux-amd64"
 DEFAULT_GO_VERSION="1.21.4"
 DEFAULT_PROFILE_FILE=$(./install/detect-shell-profile.sh "$HOME")
-DEFAULT_INSTALL_DIR="$HOME/.local"
-DEFAULT_BIN_DIR="$DEFAULT_INSTALL_DIR/bin"
 
 # Function to display usage information
 show_help() {
@@ -80,7 +78,7 @@ sudo ./install/install-lmdb-linux.sh
 ./install/install-perlbrew-linux.sh "$PROFILE_FILE" "$HOME_DIR" perl-5.34.0
 
 # Install Go
-./install/install-go.sh "$PROFILE_FILE" "$LOCAL_INSTALL_DIR" "$BYSTRO_INSTALL_DIR" "$GO_PLATFORM" "$GO_VERSION"
+./install/install-go.sh "$PROFILE_FILE" "$HOME_DIR" "$LOCAL_INSTALL_DIR" "$BYSTRO_INSTALL_DIR" "$GO_PLATFORM" "$GO_VERSION"
 
 # Export Bystro libraries to shell profile
 ./install/export-bystro-libs.sh "$PROFILE_FILE" "$BYSTRO_INSTALL_DIR" 
