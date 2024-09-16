@@ -1,26 +1,19 @@
 #!/usr/bin/env bash
 set -e
 
-# This script installs Go and configures the Go environment.
+########## This script installs Go and configures the Go environment.
 
 # Ensure that DIR and PROFILE_FILE are provided
-if [ "$#" -ne 2 ]; then
-    echo "Usage: $0 <HOME_DIR> <PROFILE_FILE>"
+if [ "$#" -ne 3 ]; then
+    echo "Usage: $0 <PROFILE_FILE> <GO_INSTALL_DIR> <BYSTRO_INSTALL_DIR>"
     exit 1
 fi
 
-HOME_DIR="$1"
-PROFILE_FILE="$2"
+PROFILE_FILE="$1"
+INSTALL_DIR="$2"
+BYSTRO_INSTALL_DIR="$3"
 
 echo -e "\n\nInstalling Go\n"
-
-# Determine the installation directory for Go
-if [ -w "/usr/local" ]; then
-    INSTALL_DIR="/usr/local"
-else
-    INSTALL_DIR="$HOME_DIR/.local"
-    mkdir -p "$INSTALL_DIR"
-fi
 
 # Check if Go is already installed
 if command -v go >/dev/null 2>&1; then
@@ -69,23 +62,61 @@ echo -e "\n\nConfiguring Go environment in $PROFILE_FILE\n"
 touch "$PROFILE_FILE"
 
 # Add Go binary directory to PATH
-GO_BIN="$INSTALL_DIR/go/bin"
+GOPATH="$INSTALL_DIR/go"
+GO_BIN="$GOPATH/bin"
 if ! grep -qs "$GO_BIN" "$PROFILE_FILE"; then
+    export PATH="$PATH:$GO_BIN"
     echo "export PATH=\$PATH:$GO_BIN" >> "$PROFILE_FILE"
 fi
 
 # Set GOPATH
 if ! grep -qs 'export GOPATH=' "$PROFILE_FILE"; then
-    echo "export GOPATH=$HOME_DIR/go" >> "$PROFILE_FILE"
-fi
-
-# Add $GOPATH/bin to PATH
-if ! grep -qs '\$HOME_DIR/go/bin' "$PROFILE_FILE"; then
-    echo 'export PATH=$PATH:$HOME_DIR/go/bin' >> "$PROFILE_FILE"
+    export GOPATH=$GOPATH
+    echo "export GOPATH=$GOPATH" >> "$PROFILE_FILE"
 fi
 
 # Create GOPATH directories
-mkdir -p "$HOME_DIR/go/src/github.com"
+mkdir -p "$GOPATH/src/github.com"
 
-echo -e "\nGo installation complete."
+echo -e "\nGo installation complete in $GOPATH. Installing Bystro Go dependencies...\n"
+
+
+#### Install go packages
+
+cd "$BYSTRO_INSTALL_DIR/go"
+# Initialize the Go module if it doesn't exist
+if [ ! -f "go.mod" ]; then
+    echo "Initializing Go module..."
+    go mod init bystro
+fi
+
+# Ensure dependencies are up to date
+echo "Tidying up module dependencies..."
+go mod tidy
+
+# Install the local 'dosage' command
+echo "Installing dosage command..."
+go install ./cmd/dosage
+
+# Install external packages
+echo "Installing bystro-stats..."
+go install github.com/bystrogenomics/bystro-stats@1.0.1
+
+echo "Installing bystro-vcf..."
+go install github.com/bystrogenomics/bystro-vcf@2.2.3
+
+echo "Installing bystro-snp..."
+go install github.com/bystrogenomics/bystro-snp@1.0.1
+
+# Install yq for modifying config files
+echo "Installing yq..."
+go install github.com/mikefarah/yq/v2@2.4.1
+
+# Return to the previous directory
+cd -
+
+echo -e "\nBystro Go dependency installation complete."
+
+####
+
 echo "Please start a new shell session or run 'source $PROFILE_FILE' to apply the changes."

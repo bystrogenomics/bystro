@@ -13,13 +13,7 @@ fi
 case "$USER_SHELL" in
     */bash)
         # Use .bash_profile if it exists; otherwise, use .bashrc
-        if [ -f "$HOME_DIR/.bash_profile" ]; then
-            PROFILE_FILE="$HOME_DIR/.bash_profile"
-        elif [ -f "$HOME_DIR/.bashrc" ]; then
-            PROFILE_FILE="$HOME_DIR/.bashrc"
-        else
-            PROFILE_FILE="$HOME_DIR/.bash_profile"
-        fi
+        PROFILE_FILE="$HOME_DIR/.bashrc"
         ;;
     */zsh)
         PROFILE_FILE="$HOME_DIR/.zshrc"
