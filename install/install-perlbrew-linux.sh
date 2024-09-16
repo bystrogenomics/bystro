@@ -4,14 +4,14 @@ set -e
 set -o pipefail
 
 if [[ "$#" -lt 3 ]]; then
-  echo "Usage: $0 <installation_directory> <perl_version> <profile_file> [skip_tests]"
+  echo "Usage: $0 <profile_file> <installation_directory> <perl_version> [skip_tests]"
   exit 1
 fi
 
 # Parse command-line arguments or set default values
-DIR=$1
-VERSION=$2
-PROFILE=$3
+PROFILE=$1
+DIR=$2
+VERSION=$3
 NOTEST="${4:-0}"
 
 SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"

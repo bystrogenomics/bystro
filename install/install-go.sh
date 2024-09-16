@@ -4,14 +4,16 @@ set -e
 ########## This script installs Go and configures the Go environment.
 
 # Ensure that DIR and PROFILE_FILE are provided
-if [ "$#" -ne 3 ]; then
-    echo "Usage: $0 <PROFILE_FILE> <INSTALL_DIR> <BYSTRO_INSTALL_DIR>"
+if [ "$#" -ne 5 ]; then
+    echo "Usage: $0 <PROFILE_FILE> <INSTALL_DIR> <BYSTRO_INSTALL_DIR> <GO_PLATFORM> <GO_VERSION>"
     exit 1
 fi
 
 PROFILE_FILE="$1"
 INSTALL_DIR="$2"
 BYSTRO_INSTALL_DIR="$3"
+GO_PLATFORM="$4"
+GO_VERSION="$5"
 
 echo -e "\n\nInstalling Go\n"
 
@@ -25,9 +27,10 @@ fi
 
 echo "Go is not installed. Proceeding with installation..."
 
+
 # Define Go version and platform
-GO_VERSION=${GO_VERSION:-"1.21.4"}
-GO_PLATFORM=${GO_PLATFORM:-"linux-amd64"}
+GO_PLATFORM=${$4:-"linux-amd64"}
+GO_VERSION=${$5:-"1.21.4"}
 GOFILE="go${GO_VERSION}.${GO_PLATFORM}.tar.gz"
 
 # Create temporary directory for download
