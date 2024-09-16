@@ -45,7 +45,7 @@ sub connect {
   my $connection = $self->driver;
   $connection .= ":database=$databaseName;host=" . $self->host if $self->host;
   $connection .= ";port=" . $self->port                        if $self->port;
-  $connection .= ";mariadb_socket=" . $self->port_num            if $self->socket;
+  $connection .= ";mariadb_socket=" . $self->port_num          if $self->socket;
   $connection .= ";mariadb_read_default_group=client"; # Change to MariaDB option
 
   return DBI->connect(
