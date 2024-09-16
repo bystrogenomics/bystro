@@ -19,10 +19,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install dependencies
+        run: |
+          dnf install -y curl tar wget sudo
+
       # Run the install script
       - name: Install Bystro using RPM script
         run: |
-          dnf install sudo -y
           touch ~/.profile
           ./install-rpm.sh --profile-file ~/.profile
 
