@@ -48,7 +48,9 @@ append_if_missing "source \"$PERLBREW_ROOT/etc/bashrc\"" "$PROFILE"
 
 # Check if $DIR/perl5/bin: is in path and if not, add it
 if [[ ":$PATH:" != *":$DIR/perl5/bin:"* ]]; then
-    append_if_missing "export PATH=\"$DIR/perl5/bin:\$PATH\"" "$PROFILE"
+  append_if_missing "export PATH=\"$DIR/perl5/bin:\$PATH\"" "$PROFILE"
+else
+  echo "$DIR/perl5/bin is in PATH, skipping addition"
 fi
 
 # Source the perlbrew environment

@@ -47,4 +47,10 @@ fi
 
 # Append entries only if they are missing
 append_if_missing 'export PERL5LIB=$PERL5LIB:'"$LIB_DIR" "$PROFILE_FILE"
-append_if_missing 'export PATH=$PATH:'"$PERL_BIN_DIR"  "$PROFILE_FILE"
+
+# Check if $PERL_BIN_DIR is in the PATH and if not, add it
+if [[ ":$PATH:" != *":$PERL_BIN_DIR:"* ]]; then
+  append_if_missing 'export PATH=$PATH:'"$PERL_BIN_DIR" "$PROFILE_FILE"
+else
+  echo "$PERL_BIN_DIR is in PATH"
+fi
