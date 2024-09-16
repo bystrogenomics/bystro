@@ -13,7 +13,13 @@ fi
 case "$USER_SHELL" in
     */bash)
         # Use .bash_profile if it exists; otherwise, use .bashrc
-        PROFILE_FILE="$HOME_DIR/.bashrc"
+        if [ -f "$HOME_DIR/.bash_profile" ]; then
+            PROFILE_FILE="$HOME_DIR/.bash_profile"
+        elif [ -f "$HOME_DIR/.bashrc" ]; then
+            PROFILE_FILE="$HOME_DIR/.bashrc"
+        else
+            PROFILE_FILE="$HOME_DIR/.bash_profile"
+        fi
         ;;
     */zsh)
         PROFILE_FILE="$HOME_DIR/.zshrc"
@@ -31,7 +37,7 @@ esac
 if [ ! -f "$PROFILE_FILE" ]; then
     touch "$PROFILE_FILE"
     echo "# Created $PROFILE_FILE" >> "$PROFILE_FILE"
-    echo "$PROFILE_FILE has been created."
+    echo "$PROFILE_FILE has been created." >&2
 fi
 
 echo "$PROFILE_FILE"
