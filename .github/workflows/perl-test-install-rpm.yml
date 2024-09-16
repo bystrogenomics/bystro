@@ -17,7 +17,7 @@ jobs:
     steps:
       - name: Install dependencies
         run: |
-          dnf install -y curl tar wget sudo
+          dnf install -y sudo tar
 
       # Checkout the repository
       - name: Checkout repository
