@@ -15,13 +15,13 @@ jobs:
       image: amazonlinux:2023
 
     steps:
-      # Checkout the repository
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Install dependencies
         run: |
           dnf install -y curl tar wget sudo
+
+      # Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       # Run the install script
       - name: Install Bystro using RPM script
