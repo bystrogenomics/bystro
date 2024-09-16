@@ -11,12 +11,12 @@ fi
 
 echo "home directory is $HOME_DIR"
 
-INSTALL_DIR=$(pwd)
+BYSTRO_INSTALL_DIR=$(pwd)
 
+LOCAL_INSTALL_DIR="$HOME_DIR/.local"
 BINARY_INSTALL_DIR="$HOME_DIR/.local/bin"
-GO_INSTALL_DIR="$HOME_DIR/.local"
 
-echo "install directory is $INSTALL_DIR"
+echo "install directory is $BYSTRO_INSTALL_DIR"
 
 PROFILE_FILE=$(./install/detect-shell-profile.sh "$HOME_DIR")
 GO_PLATFORM="linux-amd64"
@@ -36,10 +36,10 @@ sudo ./install/install-lmdb-linux.sh
 ./install/install-perlbrew-linux.sh "$HOME_DIR" perl-5.34.0
 
 # Install Go
-./install/install-go.sh "$PROFILE_FILE" "$INSTALL_DIR"
+./install/install-go.sh "$PROFILE_FILE" "LOCAL_INSTALL_DIR" "$BYSTRO_INSTALL_DIR"
 
 # Export Bystro libraries to bash_profile
-./install/export-bystro-libs.sh "$PROFILE_FILE" "$INSTALL_DIR" 
+./install/export-bystro-libs.sh "$PROFILE_FILE" "$BYSTRO_INSTALL_DIR" 
 
 # Create logs directory
 mkdir -p logs

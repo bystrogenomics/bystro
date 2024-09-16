@@ -5,7 +5,7 @@ set -e
 
 # Ensure that DIR and PROFILE_FILE are provided
 if [ "$#" -ne 3 ]; then
-    echo "Usage: $0 <PROFILE_FILE> <GO_INSTALL_DIR> <BYSTRO_INSTALL_DIR>"
+    echo "Usage: $0 <PROFILE_FILE> <INSTALL_DIR> <BYSTRO_INSTALL_DIR>"
     exit 1
 fi
 
@@ -20,7 +20,10 @@ if command -v go >/dev/null 2>&1; then
     INSTALLED_GO_VERSION=$(go version | awk '{print $3}')
     echo "Go is already installed: $INSTALLED_GO_VERSION"
     echo "Skipping Go installation."
+    exit 0
 fi
+
+echo "Go is not installed. Proceeding with installation..."
 
 # Define Go version and platform
 GO_VERSION=${GO_VERSION:-"1.21.4"}
@@ -75,11 +78,10 @@ if ! grep -qs 'export GOPATH=' "$PROFILE_FILE"; then
     echo "export GOPATH=$GOPATH" >> "$PROFILE_FILE"
 fi
 
-# Create GOPATH directories
-mkdir -p "$GOPATH/src/github.com"
-
 echo -e "\nGo installation complete in $GOPATH. Installing Bystro Go dependencies...\n"
 
+# Create GOPATH directories
+mkdir -p "$GOPATH/src/github.com"
 
 #### Install go packages
 
