@@ -11,6 +11,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: amazonlinux:2023
 
     steps:
       # Checkout the repository
@@ -20,6 +22,7 @@ jobs:
       # Run the install script
       - name: Install Bystro using RPM script
         run: |
+          dnf install sudo -y
           touch ~/.profile
           ./install-rpm.sh --profile-file ~/.profile
 
