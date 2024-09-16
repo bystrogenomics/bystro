@@ -33,5 +33,41 @@ jobs:
       - name: Verify installation by running bystro-annotate.pl --help
         run: |
           source ~/.profile
-          bystro-annotate.pl --help
-        continue-on-error: false # Ensure the action fails if this command fails
+          output=$(bystro-annotate.pl --help 2>&1)
+          exit_code=$?
+          first_line=$(echo "$output" | head -n 1)
+
+          if [ "$exit_code" -eq 255 ]; then
+            echo "Exit code 255 confirmed."
+          else
+            echo "Unexpected exit code: $exit_code" >&2
+            exit 1
+          fi
+
+          if [[ "$first_line" == "usage: bystro-annotate.pl"* ]]; then
+            echo "First line matches the expected 'usage: bystro-annotate.pl'."
+          else
+            echo "First line does not match the expected 'usage: bystro-annotate.pl'." >&2
+            echo "Actual first line: $first_line" >&2
+            exit 1
+          fi
+
+      # Test that bystro-build.pl works
+      - name: Verify installation by running bystro-build.pl --help
+        run: |
+          source ~/.profile
+          output=$(bystro-build.pl --help 2>&1)
+          first_line=$(echo "$output" | head -n 1)
+
+          if [[ "$first_line" == "Usage:"* ]]; then
+            echo "First line matches the expected 'Usage:'"
+          else
+            echo "First line does not match the expected 'Usage:'" >&2
+            echo "Actual first line: $first_line" >&2
+            exit 1
+          fi
+
+      - name: Run tests
+        run: |
+          cd perl
+          prove -r -j$(nproc) t

@@ -81,17 +81,17 @@ fi
 perlbrew switch "$VERSION"
 
 echo "PERLBREW_ROOT is set to: $PERLBREW_ROOT"
-# Install cpanm
-if [[ ! -x "$PERLBREW_ROOT/bin/cpanm" ]]; then
-  echo "Installing cpanm for Perl version $VERSION"
-  perlbrew install-cpanm
+# Install cpm
+if [[ ! -x "$PERLBREW_ROOT/bin/cpm" ]]; then
+  echo "Installing cpm for Perl version $VERSION"
+  perlbrew install-cpm
 else
-  echo "cpanm is already installed for Perl version $VERSION."
+  echo "cpm is already installed for Perl version $VERSION."
 fi
 
-# Install local::lib and set up environment
-cpanm --local-lib="$DIR/perl5" local::lib
-eval "$(perl -I"$LOCAL_LIB" -Mlocal::lib)"
+# Install local::lib and set up environment using cpm
+cpm install -g --local-lib-contained="$DIR/perl5" local::lib
+eval "$(perl -I"$DIR/perl5/lib/perl5" -Mlocal::lib="$DIR/perl5")"
 
 echo -e "\nPerlbrew installation and setup complete."
 
