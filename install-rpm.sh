@@ -86,6 +86,16 @@ sudo ./install/install-lmdb-linux.sh
 # Create logs directory
 mkdir -p logs
 
+echo "\nTesting Bystro installation"
+
+bash -c ". $PROFILE_FILE && cd perl && prove -r ./t -j$(nproc)"
+if [ $? -eq 0 ]; then
+  echo "\nBystro installation succeeded!"
+else
+  echo "\nBystro installation failed"
+  exit 1
+fi
+
 echo -e "\n\nREMEMBER TO INCREASE ULIMIT ABOVE 1024 IF RUNNING MANY FORKS\n\n"
 
 echo -e "To get started with Bystro, for instance to run Bystro Annotator: \n"
