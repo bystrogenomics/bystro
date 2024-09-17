@@ -74,13 +74,26 @@ rm -rf $TEMP_DIR
 
 # Verify the installation of bgzip and tabix
 echo "Verifying installation..."
-bgzip_output=$(bgzip --version)
-exit_code=$?
 
 # if exit code was 0 and bgzip output contains the expected version string
-if [[ $exit_code -eq 0 ]] && [[ $bgzip_output == *"bgzip"* ]]; then
-    echo "bgzip installed successfully."
+bash -c '
+    bgzip_output=$(bgzip --version)
+    exit_code=$?
+
+    # if exit code was 0 and bgzip output contains the expected version string
+    if [[ $exit_code -eq 0 ]] && [[ $bgzip_output == *"bgzip"* ]]; then
+        echo "bgzip installed successfully."
+    else
+        echo "bgzip installation failed."
+        exit 1
+    fi
+'
+
+exit_code=$?
+
+if [ $exit_code -eq 0 ]; then
+    echo "HTSlib installation completed successfully."
 else
-    echo "bgzip installation failed."
+    echo "HTSlib installation failed."
     exit 1
 fi
