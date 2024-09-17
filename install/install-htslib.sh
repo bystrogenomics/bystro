@@ -22,6 +22,53 @@ if command -v bgzip > /dev/null; then
     exit 0
 fi
 
+echo "Installing libdeflate"
+
+# Set the libdeflate version
+LIBDEFLATE_VERSION="1.21"
+LIBDEFLATE_URL="https://github.com/ebiggers/libdeflate/archive/refs/tags/v${LIBDEFLATE_VERSION}.tar.gz"
+
+# Create a temporary directory
+TEMP_DIR=$(mktemp -d)
+echo "Created temporary directory: $TEMP_DIR"
+
+# Change to the temporary directory
+cd $TEMP_DIR
+
+# Download libdeflate source code
+echo "Downloading libdeflate version $LIBDEFLATE_VERSION from $LIBDEFLATE_URL..."
+wget $LIBDEFLATE_URL
+
+# Extract the downloaded tar.gz file
+echo "Extracting libdeflate-${LIBDEFLATE_VERSION}.tar.gz..."
+tar -xvf v${LIBDEFLATE_VERSION}.tar.gz
+cd libdeflate-${LIBDEFLATE_VERSION}
+
+# Configure and build libdeflate using CMake
+echo "Building libdeflate..."
+cmake -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_INSTALL_LIBDIR=$INSTALL_DIR/lib -B build
+
+# Change to the build directory and run make
+cd build
+echo "Running make..."
+make
+
+# Install libdeflate
+echo "Installing libdeflate..."
+make install
+
+# Clean up by removing the temporary directory
+echo "Cleaning up temporary files..."
+rm -rf $TEMP_DIR
+
+# Add the installation directory to the PATH if it's not already in PATH
+append_if_missing "export PATH=$INSTALL_DIR/bin:\$PATH" "$PROFILE_FILE"
+export PATH=$INSTALL_DIR/bin:$PATH
+
+# ensure that the shared libraries are available
+append_if_missing "export LD_LIBRARY_PATH=$INSTALL_DIR/lib:\$LD_LIBRARY_PATH" "$PROFILE_FILE"
+export LD_LIBRARY_PATH=$INSTALL_DIR/lib:$LD_LIBRARY_PATH
+
 # Set the local installation directory
 echo "Installing HTSlib to $INSTALL_DIR"
 
@@ -59,14 +106,6 @@ make
 
 echo "Installing HTSlib locally to $INSTALL_DIR..."
 make install
-
-# Add the installation directory to the PATH if it's not already in PATH
-append_if_missing "export PATH=$INSTALL_DIR/bin:\$PATH" "$PROFILE_FILE"
-export PATH=$INSTALL_DIR/bin:$PATH
-
-# ensure that the shared libraries are available
-append_if_missing "export LD_LIBRARY_PATH=$INSTALL_DIR/lib:\$LD_LIBRARY_PATH" "$PROFILE_FILE"
-export LD_LIBRARY_PATH=$INSTALL_DIR/lib:$LD_LIBRARY_PATH
 
 # Clean up by removing the temporary directory
 echo "Cleaning up temporary files..."

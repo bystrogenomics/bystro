@@ -34,7 +34,8 @@ echo -e "\n\nInstalling development tools and dependencies\n"
 # Install build-essential and other required packages
 apt install -y \
   build-essential \
-  autoconf automake make gcc perl zlib1g-dev libbz2-dev liblzma-dev libcurl4-gnutls-dev libssl-dev libdeflate-dev \
+  autoconf automake make gcc perl zlib1g-dev libbz2-dev liblzma-dev libcurl4-gnutls-dev libssl-dev \
+  cmake \
   git \
   pigz \
   unzip \
