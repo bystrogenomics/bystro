@@ -8,19 +8,6 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-# Add MariaDB repository
-MARIADB_VERSION="11.4"
-
-# Import the MariaDB GPG key and add the repository without specifying architecture
-apt-key adv --fetch-keys 'https://mariadb.org/mariadb_release_signing_key.asc'
-add-apt-repository "deb http://mariadb.mirror.globo.tech/repo/$MARIADB_VERSION/ubuntu $(lsb_release -cs) main" -y
-
-# Update the package list
-apt update
-
-# Install MariaDB development libraries
-apt install -y libmariadb-dev
-
 # Check if mariadb_config is installed
 if command -v mariadb_config > /dev/null; then
     echo "MariaDB development libraries installed successfully."
