@@ -9,11 +9,11 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # Add MariaDB repository
-MARIADB_VERSION="10.5"
+MARIADB_VERSION="11.4"
 
 # Import the MariaDB GPG key and add the repository without specifying architecture
 apt-key adv --fetch-keys 'https://mariadb.org/mariadb_release_signing_key.asc'
-add-apt-repository "deb http://mariadb.mirror.globo.tech/repo/$MARIADB_VERSION/ubuntu $(lsb_release -cs) main"
+add-apt-repository "deb http://mariadb.mirror.globo.tech/repo/$MARIADB_VERSION/ubuntu $(lsb_release -cs) main" -y
 
 # Update the package list
 apt update
