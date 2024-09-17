@@ -23,7 +23,6 @@ apt install -y \
   unzip \
   wget \
   tar \
-  libcurl4-openssl-dev \
   bzip2 \
   lz4 \
   patch \
