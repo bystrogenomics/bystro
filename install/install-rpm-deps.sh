@@ -8,6 +8,13 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
+if [ "$#" -ne 1 ]; then
+    echo "Usage: $0 <PROFILE_FILE>"
+    exit 1
+fi
+
+PROFILE_FILE="$1"
+
 SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"
 # exports append_if_missing
 source "$SCRIPT_DIR/utils.sh"
