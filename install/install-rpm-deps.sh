@@ -90,7 +90,6 @@ dnf install -y \
   tar \
   libcurl-devel \
   lz4 \
-  curl \
   patch \
   perl \
   perl-core \
