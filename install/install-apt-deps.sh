@@ -35,6 +35,7 @@ echo -e "\n\nInstalling development tools and dependencies\n"
 apt install -y \
   build-essential \
   autoconf automake make gcc perl zlib1g-dev libbz2-dev liblzma-dev libcurl4-gnutls-dev libssl-dev \
+  libmariadb-dev \
   cmake \
   git \
   pigz \

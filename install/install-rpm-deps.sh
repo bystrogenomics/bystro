@@ -46,7 +46,7 @@ case "$ID" in
 esac
 
 # Set the MariaDB version you wish to install
-MARIADB_VERSION="10.5"
+MARIADB_VERSION="11.4"
 
 # Create the MariaDB.repo file
 cat <<EOF >/etc/yum.repos.d/MariaDB.repo
