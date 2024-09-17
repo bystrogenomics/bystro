@@ -8,14 +8,6 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-# Check if mariadb_config is installed
-if command -v mariadb_config > /dev/null; then
-    echo "MariaDB development libraries installed successfully."
-else
-    echo "Failed to install MariaDB development libraries. Please check the repository configuration."
-    exit 1
-fi
-
 echo -e "\n\nInstalling development tools and dependencies\n"
 
 apt update
