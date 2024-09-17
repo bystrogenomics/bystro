@@ -11,6 +11,11 @@ fi
 PROFILE_FILE="$1"
 INSTALL_DIR="$2"
 
+SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"
+# exports append_if_missing
+source "$SCRIPT_DIR/utils.sh"
+
+
 # Check if bgzip is already installed and skip installation if found
 if command -v bgzip > /dev/null; then
     echo "bgzip is already installed. Skipping installation."
@@ -46,7 +51,7 @@ autoreconf -i
 
 # Configure the build environment with the local installation directory
 echo "Running ./configure with prefix=$INSTALL_DIR..."
-./configure --prefix=$INSTALL_DIR
+./configure --prefix=$INSTALL_DIR --libdir=$INSTALL_DIR/lib
 
 # Compile and install htslib
 echo "Compiling HTSlib..."
@@ -56,14 +61,12 @@ echo "Installing HTSlib locally to $INSTALL_DIR..."
 make install
 
 # Add the installation directory to the PATH if it's not already in PATH
-if [[ ":$PATH:" != *":$INSTALL_DIR/bin:"* ]]; then
-    echo "Adding $INSTALL_DIR/bin to the PATH..."
-    echo "export PATH=$INSTALL_DIR/bin:\$PATH" >> $PROFILE_FILE
-    export PATH=$INSTALL_DIR/bin:$PATH
-    echo "$INSTALL_DIR/bin has been added to PATH. Please restart your terminal or run 'source $PROFILE_FILE' to apply changes."
-else
-    echo "$INSTALL_DIR/bin is already in the PATH."
-fi
+append_if_missing "export PATH=$INSTALL_DIR/bin:\$PATH" "$PROFILE_FILE"
+export PATH=$INSTALL_DIR/bin:$PATH
+
+# ensure that the shared libraries are available
+append_if_missing "export LD_LIBRARY_PATH=$INSTALL_DIR/lib:\$LD_LIBRARY_PATH" "$PROFILE_FILE"
+export LD_LIBRARY_PATH=$INSTALL_DIR/lib:$LD_LIBRARY_PATH
 
 # Clean up by removing the temporary directory
 echo "Cleaning up temporary files..."
@@ -71,10 +74,13 @@ rm -rf $TEMP_DIR
 
 # Verify the installation of bgzip and tabix
 echo "Verifying installation..."
-if command -v bgzip > /dev/null; then
-    echo "HTSlib (including bgzip) installed successfully."
-    exit 0
+bgzip_output=$(bgzip --version)
+exit_code=$?
+
+# if exit code was 0 and bgzip output contains the expected version string
+if [[ $exit_code -eq 0 ]] && [[ $bgzip_output == *"bgzip"* ]]; then
+    echo "bgzip installed successfully."
 else
-    echo "Installation failed. Please check for errors."
+    echo "bgzip installation failed."
     exit 1
 fi

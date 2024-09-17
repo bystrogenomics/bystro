@@ -127,7 +127,7 @@ cd libdeflate-${LIBDEFLATE_VERSION}
 # Configure and build libdeflate using CMake
 echo "Building libdeflate..."
 cmake -B build
-cmake --build build
+cmake --build build -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_INSTALL_LIBDIR=/usr/local/lib
 
 # Change to the build directory and run make
 cd build
@@ -141,5 +141,11 @@ make install
 # Clean up by removing the temporary directory
 echo "Cleaning up temporary files..."
 rm -rf $TEMP_DIR
+
+# ensure that the shared libraries are available
+append_if_missing "export LD_LIBRARY_PATH=/usr/local/lib:\$LD_LIBRARY_PATH" "$PROFILE_FILE"
+
+# ensure that any binaries are available
+append_if_missing "export PATH=/usr/local/bin:\$PATH" "$PROFILE_FILE"
 
 echo -e "\n\nAll dependencies have been installed successfully.\n"
