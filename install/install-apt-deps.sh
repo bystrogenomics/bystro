@@ -18,6 +18,8 @@ fi
 
 echo -e "\n\nInstalling development tools and dependencies\n"
 
+apt update
+
 # Install build-essential and other required packages
 apt install -y \
   build-essential \
