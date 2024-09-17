@@ -90,6 +90,7 @@ dnf install -y \
   tar \
   libcurl-devel \
   lz4 \
+  curl \
   patch \
   perl \
   perl-core \
@@ -101,6 +102,7 @@ curl --silent --location https://rpm.nodesource.com/setup_20.x | bash -
 dnf install -y nodejs
 
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
 sudo ./aws/install
 
 # Install pm2 globally using npm
