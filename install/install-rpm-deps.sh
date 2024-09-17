@@ -79,8 +79,9 @@ dnf groupinstall -y "Development Tools"
 
 # Install all required packages
 # autoconf automake make gcc perl-Data-Dumper zlib-devel bzip2 bzip2-devel xz-devel curl-devel openssl-devel libdeflate-devel are required to build htslib
+# cmake required to build libdeflate-devel, which is not available on amazonlinux 2023
 dnf install -y \
-  autoconf automake make gcc perl-Data-Dumper zlib-devel bzip2 bzip2-devel xz-devel curl-devel openssl-devel libdeflate-devel \
+  autoconf automake make gcc perl-Data-Dumper zlib-devel bzip2 bzip2-devel xz-devel curl-devel openssl-devel cmake \
   openssl \
   git \
   pigz \
@@ -102,5 +103,53 @@ dnf install -y nodejs
 
 # Install pm2 globally using npm
 npm install -g pm2
+
+# Set the libdeflate version
+LIBDEFLATE_VERSION="1.21"
+LIBDEFLATE_URL="https://github.com/ebiggers/libdeflate/archive/refs/tags/v${LIBDEFLATE_VERSION}.tar.gz"
+
+# Create a temporary directory
+TEMP_DIR=$(mktemp -d)
+echo "Created temporary directory: $TEMP_DIR"
+
+# Change to the temporary directory
+cd $TEMP_DIR
+
+# Download libdeflate source code
+echo "Downloading libdeflate version $LIBDEFLATE_VERSION from $LIBDEFLATE_URL..."
+wget $LIBDEFLATE_URL
+
+# Extract the downloaded tar.gz file
+echo "Extracting libdeflate-${LIBDEFLATE_VERSION}.tar.gz..."
+tar -xvf v${LIBDEFLATE_VERSION}.tar.gz
+cd libdeflate-${LIBDEFLATE_VERSION}
+
+# Configure and build libdeflate using CMake
+echo "Building libdeflate..."
+cmake -B build
+cmake --build build
+
+# Change to the build directory and run make
+cd build
+echo "Running make..."
+make
+
+# Install libdeflate
+echo "Installing libdeflate..."
+make install
+
+# Clean up by removing the temporary directory
+echo "Cleaning up temporary files..."
+rm -rf $TEMP_DIR
+
+# Verify the installation
+echo "Verifying installation..."
+if ldconfig -p | grep -q libdeflate; then
+    echo "libdeflate installed successfully."
+else
+    echo "Installation failed. Please check for errors."
+    exit 1
+fi
+
 
 echo -e "\n\nAll dependencies have been installed successfully.\n"
