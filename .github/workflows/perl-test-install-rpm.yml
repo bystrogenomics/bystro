@@ -1,4 +1,4 @@
-name: Install and Test Bystro
+name: Install and Test Bystro (RPM)
 
 on: [pull_request]
 
