@@ -27,7 +27,6 @@ apt install -y \
   bzip2 \
   lz4 \
   patch \
-  awscli \
   pkg-config \
   grep 
 
