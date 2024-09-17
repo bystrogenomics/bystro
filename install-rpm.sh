@@ -66,7 +66,7 @@ echo "PROFILE is $PROFILE_FILE"
 echo "Go platform is $GO_PLATFORM"
 
 # Install RPM dependencies
-sudo ./install/install-rpm-deps.sh "$PROFILE_FILE"
+sudo ./install/install-rpm-deps.sh "$PROFILE_FILE" "$LOCAL_INSTALL_DIR"
 
 # Install HTSlib
 ./install/install-htslib.sh "$PROFILE_FILE" "$LOCAL_INSTALL_DIR"

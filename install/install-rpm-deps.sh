@@ -8,12 +8,13 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-if [ "$#" -ne 1 ]; then
-    echo "Usage: $0 <PROFILE_FILE>"
+if [ "$#" -ne 12 ]; then
+    echo "Usage: $0 <PROFILE_FILE> <INSTALL_DIR>"
     exit 1
 fi
 
 PROFILE_FILE="$1"
+INSTALL_DIR="$2"
 
 SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"
 # exports append_if_missing
@@ -137,7 +138,7 @@ cd libdeflate-${LIBDEFLATE_VERSION}
 
 # Configure and build libdeflate using CMake
 echo "Building libdeflate..."
-cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_INSTALL_LIBDIR=/usr/local/lib -B build
+cmake -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR -DCMAKE_INSTALL_LIBDIR=$INSTALL_DIR/lib -B build
 
 # Change to the build directory and run make
 cd build
@@ -153,9 +154,9 @@ echo "Cleaning up temporary files..."
 rm -rf $TEMP_DIR
 
 # ensure that the shared libraries are available
-append_if_missing "export LD_LIBRARY_PATH=/usr/local/lib:\$LD_LIBRARY_PATH" "$PROFILE_FILE"
+append_if_missing "export LD_LIBRARY_PATH=$INSTALL_DIR/lib:\$LD_LIBRARY_PATH" "$PROFILE_FILE"
 
 # ensure that any binaries are available
-append_if_missing "export PATH=/usr/local/bin:\$PATH" "$PROFILE_FILE"
+append_if_missing "export PATH=$INSTALL_DIR/bin:\$PATH" "$PROFILE_FILE"
 
 echo -e "\n\nAll dependencies have been installed successfully.\n"
