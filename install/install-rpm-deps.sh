@@ -8,7 +8,7 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-if [ "$#" -ne 12 ]; then
+if [ "$#" -ne 2 ]; then
     echo "Usage: $0 <PROFILE_FILE> <INSTALL_DIR>"
     exit 1
 fi
