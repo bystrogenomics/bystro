@@ -126,8 +126,7 @@ cd libdeflate-${LIBDEFLATE_VERSION}
 
 # Configure and build libdeflate using CMake
 echo "Building libdeflate..."
-cmake -B build
-cmake --build build -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_INSTALL_LIBDIR=/usr/local/lib
+cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_INSTALL_LIBDIR=/usr/local/lib -B build
 
 # Change to the build directory and run make
 cd build
