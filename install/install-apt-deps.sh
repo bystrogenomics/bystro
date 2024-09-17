@@ -31,6 +31,9 @@ apt install -y \
   pkg-config \
   grep 
 
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+sudo ./aws/install
+
 # Install Node.js 20.x
 curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
 apt install -y nodejs
