@@ -102,7 +102,7 @@ dnf install -y nodejs
 
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip awscliv2.zip
-sudo ./aws/install
+./aws/install --update
 
 # Install pm2 globally using npm
 npm install -g pm2
