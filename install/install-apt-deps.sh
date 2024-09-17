@@ -12,12 +12,6 @@ echo -e "\n\nInstalling development tools and dependencies\n"
 
 apt update
 
-# needed for minimal installs for Perl to compile
-apt install unminimize
-yes | unminimize
-
-apt update
-
 # Install build-essential and other required packages
 apt install -y \
   build-essential \

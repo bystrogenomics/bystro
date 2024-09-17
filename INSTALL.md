@@ -113,15 +113,44 @@ There are 2 components to Bystro:
 
 1.  `git clone https://github.com/bystrogenomics/bystro.git && cd bystro && source ./install-rpm.sh`
 
-##### MacOS (tested on HighSierra, interactive)
+```sh
+dnf update
+dnf install -y git sudo
 
-1.  `git clone https://github.com/bystrogenomics/bystro.git && cd bystro && source ./install-mac.sh`
+# install Bystro
+git clone https://github.com/bystrogenomics/bystro.git
+cd bystro && ./install-rpm.sh
+```
+
+Once you have installed you will need to update your environment, by sourcing the interactive shell configuration, typically `.profile` or `.bash_profile`. Bystro will let you know which in its output message
+
+```sh
+source ~/.profile # or ~/.bash_profile
+bystro-annotate.pl --help
+```
 
 ##### Ubuntu
 
-1.  Ensure that packages are up to date (`sudo apt update`), or that you are satisified with the state of package versions.
-2.  `git clone https://github.com/bystrogenomics/bystro.git && cd bystro && source ./install-apt.sh`
-    - Please not that this installation script will ask you for the root password in order to install system dependencies
+To install on Ubuntu, you will need `sudo`, `git`, and if you are using a minimal Ubuntu install which has been "minimized", you will need to "unminimize" in order for Perl to be successfully installed (learn more: https://wiki.ubuntu.com/Minimal)
+
+```sh
+apt update
+apt install -y git sudo
+# needed for minimal installs for Perl to compile
+apt install -y unminimize
+yes | unminimize
+
+# install Bystro
+git clone https://github.com/bystrogenomics/bystro.git
+cd bystro && ./install-apt.sh
+```
+
+Once you have installed you will need to update your environment, by sourcing the interactive shell configuration, typically `.profile` or `.bash_profile`. Bystro will let you know which in its output message
+
+```sh
+source ~/.profile  # or ~/.bash_profile
+bystro-annotate.pl --help
+```
 
 ## Configuring the Bystro annotator
 
