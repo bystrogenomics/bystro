@@ -41,8 +41,5 @@ else
         echo "Added $INSTALL_DIR to PATH in $PROFILE_FILE"
     fi
 
-    # Make user install directory is in PROFILE_FILE
-
-
     echo "liftOver installed successfully to $INSTALL_DIR"
 fi
