@@ -8,6 +8,10 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
+SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"
+# exports append_if_missing
+source "$SCRIPT_DIR/utils.sh"
+
 # Import the MariaDB GPG key
 rpm --import https://yum.mariadb.org/RPM-GPG-KEY-MariaDB
 
