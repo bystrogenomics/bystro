@@ -18,6 +18,7 @@ apt install -y \
   autoconf automake make gcc perl zlib1g-dev libbz2-dev liblzma-dev libcurl4-gnutls-dev libssl-dev \
   libmariadb-dev \
   cmake \
+  curl \
   git \
   pigz \
   unzip \
