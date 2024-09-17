@@ -100,9 +100,14 @@ dnf install -y \
 curl --silent --location https://rpm.nodesource.com/setup_20.x | bash -
 dnf install -y nodejs
 
+# Create a temporary directory
+mkdir -p /tmp/awscli-install
+cd /tmp/awscli-install
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip awscliv2.zip
-./aws/install --update
+sudo ./aws/install --update
+cd -
+rm -rf /tmp/awscli-install
 
 # Install pm2 globally using npm
 npm install -g pm2

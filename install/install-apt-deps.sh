@@ -12,6 +12,12 @@ echo -e "\n\nInstalling development tools and dependencies\n"
 
 apt update
 
+# needed for minimal installs for Perl to compile
+apt install unminimize
+yes | unminimize
+
+apt update
+
 # Install build-essential and other required packages
 apt install -y \
   build-essential \
@@ -38,9 +44,14 @@ else
     echo "curl is already installed."
 fi
 
+# Create a temporary directory
+mkdir -p /tmp/awscli-install
+cd /tmp/awscli-install
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip awscliv2.zip
-./aws/install --update
+sudo ./aws/install --update
+cd -
+rm -rf /tmp/awscli-install
 
 # Install Node.js 20.x
 curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
