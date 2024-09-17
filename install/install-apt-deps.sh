@@ -1,36 +1,58 @@
 #!/usr/bin/env bash
+set -e
+set -o pipefail
 
-echo -e "\n\nInstalling Ubuntu/Debian (apt-get) dependencies\n";
+# Ensure the script is run with root privileges
+if [[ $EUID -ne 0 ]]; then
+   echo "This script must be run as root. Use sudo."
+   exit 1
+fi
 
-# Installs gcc, and more; may be too much
-sudo apt install -y build-essential;
+# Add MariaDB repository
+MARIADB_VERSION="10.5"
 
-# Not strictly necessary, useful however for much of what we do
-sudo apt install -y git-all;
-# pigz for Bystro, used to speed up decompression primarily
+# Import the MariaDB GPG key and add the repository without specifying architecture
+apt-key adv --fetch-keys 'https://mariadb.org/mariadb_release_signing_key.asc'
+add-apt-repository "deb http://mariadb.mirror.globo.tech/repo/$MARIADB_VERSION/ubuntu $(lsb_release -cs) main"
 
-sudo apt install -y pigz;
-sudo apt install -y unzip;
-sudo apt install -y wget;
-# For Search::Elasticsearch::Client::5_0::Direct
-sudo apt install -y openssl libcurl4-openssl-dev libssl-dev;
-# For tests involving querying ucsc directly
-sudo apt install -y libmysqlclient-dev;
+# Update the package list
+apt update
 
-# for perlbrew, in case you want to install a different perl version
-#https://www.digitalocean.com/community/tutorials/how-to-install-perlbrew-and-manage-multiple-versions-of-perl-5-on-centos-7
-# centos 7 doesn't include bzip2
-sudo apt install -y bzip2; 
-sudo apt install -y lz4;
-sudo apt install -y patch;
+# Install MariaDB development libraries
+apt install -y libmariadb-dev
 
-sudo apt install -y cpan;
+# Check if mariadb_config is installed
+if command -v mariadb_config > /dev/null; then
+    echo "MariaDB development libraries installed successfully."
+else
+    echo "Failed to install MariaDB development libraries. Please check the repository configuration."
+    exit 1
+fi
 
-sudo apt install -y nodejs;
-sudo apt install -y npm;
-sudo npm install -g pm2;
+echo -e "\n\nInstalling development tools and dependencies\n"
 
-sudo apt install -y awscli;
+# Install build-essential and other required packages
+apt install -y \
+  build-essential \
+  autoconf automake make gcc perl zlib1g-dev libbz2-dev liblzma-dev libcurl4-gnutls-dev libssl-dev libdeflate-dev \
+  git \
+  pigz \
+  unzip \
+  wget \
+  tar \
+  libcurl4-openssl-dev \
+  bzip2 \
+  lz4 \
+  patch \
+  awscli \
+  pkg-config \
+  grep 
 
-# pkg-config is required for building the wheel
-sudo apt install -y pkg-config;
+# Install Node.js 20.x
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt install -y nodejs
+
+# Install pm2 globally using npm
+npm install -g pm2
+
+echo -e "\n\nAll dependencies have been installed successfully.\n"

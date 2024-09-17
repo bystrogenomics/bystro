@@ -78,17 +78,16 @@ echo -e "\n\nInstalling RPM dependencies\n"
 dnf groupinstall -y "Development Tools"
 
 # Install all required packages
+# autoconf automake make gcc perl-Data-Dumper zlib-devel bzip2 bzip2-devel xz-devel curl-devel openssl-devel libdeflate-devel are required to build htslib
 dnf install -y \
-  gcc \
+  autoconf automake make gcc perl-Data-Dumper zlib-devel bzip2 bzip2-devel xz-devel curl-devel openssl-devel libdeflate-devel \
   openssl \
-  openssl-devel \
   git \
   pigz \
   unzip \
   wget \
   tar \
   libcurl-devel \
-  bzip2 \
   lz4 \
   patch \
   perl \

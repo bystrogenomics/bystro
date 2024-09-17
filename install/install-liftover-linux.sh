@@ -34,11 +34,11 @@ else
 
     wget -q http://hgdownload.cse.ucsc.edu/admin/exe/linux.x86_64/liftOver -O "$INSTALL_DIR/liftOver"
     chmod +x "$INSTALL_DIR/liftOver"
-    # Ensure $HOME/bin is in PATH
-    if [[ ":$PATH:" != *":$HOME/bin:"* ]]; then
-        echo 'export PATH="$HOME/bin:$PATH"' >> "$HOME/.bashrc"
-        export PATH="$HOME/bin:$PATH"
-        echo "Added $HOME/bin to PATH in ~/.bashrc"
+
+    if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
+        echo 'export PATH="$INSTALL_DIR:$PATH"' >> $PROFILE_FILE
+        export PATH="$INSTALL_DIR:$PATH"
+        echo "Added $INSTALL_DIR to PATH in $PROFILE_FILE"
     fi
 
     # Make user install directory is in PROFILE_FILE

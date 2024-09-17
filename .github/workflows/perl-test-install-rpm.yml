@@ -70,3 +70,55 @@ jobs:
           cd perl
           source ~/.profile
           prove -r -j$(nproc) t
+
+      - name: Check that expected programs are in the PATH
+        run: |
+          source ~/.profile
+          if command -v bystro-annotate.pl > /dev/null; then
+            echo "bystro-annotate.pl is in the PATH"
+          else
+            echo "bystro-annotate.pl is not in the PATH" >&2
+            exit 1
+          fi
+
+          if command -v bystro-build.pl > /dev/null; then
+            echo "bystro-build.pl is in the PATH"
+          else
+            echo "bystro-build.pl is not in the PATH" >&2
+            exit 1
+          fi
+
+          if command -v bystro-vcf > /dev/null; then
+            echo "bystro-vcf is in the PATH"
+          else
+            echo "bystro-vcf is not in the PATH" >&2
+            exit 1
+          fi
+
+          if command -v bystro-snp > /dev/null; then
+            echo "bystro-snp is in the PATH"
+          else
+            echo "bystro-snp is not in the PATH" >&2
+            exit 1
+          fi
+
+          if command -v bystro-stats > /dev/null; then
+            echo "bystro-stats is in the PATH"
+          else
+            echo "bystro-stats is not in the PATH" >&2
+            exit 1
+          fi
+
+          if command -v bgzip > /dev/null; then
+            echo "bgzip is in the PATH"
+          else
+            echo "bgzip is not in the PATH" >&2
+            exit 1
+          fi
+
+          if command -v yq > /dev/null; then
+            echo "yq is in the PATH"
+          else
+            echo "yq is not in the PATH" >&2
+            exit 1
+          fi

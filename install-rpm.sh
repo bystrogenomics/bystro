@@ -68,6 +68,9 @@ echo "Go platform is $GO_PLATFORM"
 # Install RPM dependencies
 sudo ./install/install-rpm-deps.sh
 
+# Install HTSlib
+./install/install-htslib.sh "$PROFILE_FILE" "$LOCAL_INSTALL_DIR"
+
 # Install LiftOver
 ./install/install-liftover-linux.sh "$PROFILE_FILE" "$BINARY_INSTALL_DIR" 
 
