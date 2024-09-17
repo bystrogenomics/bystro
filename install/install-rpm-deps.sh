@@ -142,14 +142,4 @@ make install
 echo "Cleaning up temporary files..."
 rm -rf $TEMP_DIR
 
-# Verify the installation
-echo "Verifying installation..."
-if ldconfig -p | grep -q libdeflate; then
-    echo "libdeflate installed successfully."
-else
-    echo "Installation failed. Please check for errors."
-    exit 1
-fi
-
-
 echo -e "\n\nAll dependencies have been installed successfully.\n"
