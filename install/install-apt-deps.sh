@@ -29,6 +29,15 @@ apt install -y \
   pkg-config \
   grep 
 
+# check whether curl is installed, because in some containers it is installed and then we get conflicts
+if ! command -v curl &> /dev/null
+then
+    echo "curl is not installed. Installing now..."
+    sudo apt install curl -y
+else
+    echo "curl is already installed."
+fi
+
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip awscliv2.zip
 ./aws/install --update
