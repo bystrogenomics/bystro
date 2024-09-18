@@ -9,6 +9,8 @@ class PRSJobData(Struct, frozen=True, rename="camel"):
     gwas_scores_path: str
     dosage_matrix_path: str
     map_path: str
+    training_populations: list[str]
+    covariates_path: str | None = None
     p_value_threshold: float = 0.05
 
 

@@ -8,6 +8,8 @@ from bystro.covariance.hypothesis_hd import (
     clx2013,
     hc2018,
     two_sample_test,
+    hd2017,
+    schott2007,
 )
 
 def get_pickle_file_path():
@@ -147,3 +149,41 @@ def test_two_sample_test():
     assert (
         result["reject"] == expected["reject"]
     ), f"Expected reject {expected['reject']}, got {result['reject']}"
+
+
+def test_hd2017():
+    with open(
+        "python/bystro/covariance/tests/hypothesis_hd_data.pkl", "rb"
+    ) as f:
+        data = pickle.load(f)
+    X = data["X"]
+    Y = data["Y"]
+
+    result = hd2017(X, Y, J=2500, seed=2021)
+    expected = {"statistics": 3.9948, "p.value": 0.5924}
+
+    assert np.isclose(
+        result["statistics"], expected["statistics"]
+    ), f"Expected {expected['statistics']}, got {result['statistics']}"
+    assert np.isclose(
+        result["p.value"], expected["p.value"], rtol=1e-3
+    ), f"Expected {expected['p.value']}, got {result['p.value']}"
+
+
+def test_schott2007():
+    with open(
+        "python/bystro/covariance/tests/hypothesis_hd_data.pkl", "rb"
+    ) as f:
+        data = pickle.load(f)
+    X = data["X"]
+    Y = data["Y"]
+
+    result = schott2007(X, Y)
+    expected = {"statistics": 0.82999, "p.value": 0.4065}
+
+    assert np.isclose(
+        result["statistics"], expected["statistics"]
+    ), f"Expected {expected['statistics']}, got {result['statistics']}"
+    assert np.isclose(
+        result["p.value"], expected["p.value"], rtol=1e-3
+    ), f"Expected {expected['p.value']}, got {result['p.value']}"

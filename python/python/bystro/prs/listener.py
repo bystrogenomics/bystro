@@ -2,6 +2,8 @@
     CLI tool to start PRS job listener
 """
 import argparse
+import logging
+
 from ruamel.yaml import YAML
 
 from bystro.beanstalkd.worker import (
@@ -11,6 +13,14 @@ from bystro.beanstalkd.worker import (
 from bystro.beanstalkd.messages import SubmittedJobMessage
 from bystro.prs.messages import PRSJobData, PRSJobResult, PRSJobResultMessage
 from bystro.prs.handler import make_calculate_prs_scores
+
+logging.basicConfig(
+    filename="prs_listener.log",
+    level=logging.DEBUG,
+    format="%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger()
 
 TUBE = "prs"
 

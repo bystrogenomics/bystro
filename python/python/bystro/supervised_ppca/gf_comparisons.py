@@ -470,8 +470,8 @@ class PPCASVAE(PPCA):
             loss_encoder = torch.mean(torch.square(Phi_)) + torch.mean(
                 torch.abs(Phi_)
             )
-            loss_decoder = torch.mean(torch.square(Phi_)) + torch.mean(
-                torch.abs(Phi_)
+            loss_decoder = torch.mean(torch.square(W_)) + torch.mean(
+                torch.abs(W_)
             )
 
             posterior = like_gen + 1 / N * like_prior
@@ -499,11 +499,6 @@ class PPCASVAE(PPCA):
                 self.losses_total[i] = loss.detach().numpy()
 
         self._store_instance_variables(device, trainable_variables)
-
-        if device.type == "cuda":
-            self.B_ = b_.detach().cpu().numpy()
-        else:
-            self.B_ = b_.detach().numpy()
 
         return self
 

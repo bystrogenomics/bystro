@@ -261,8 +261,6 @@ tracks:
         - AN_grpmax: number
         - AF_grpmax_non_ukb: number
         - AN_grpmax_non_ukb: number
-        - AF_grpmax_joint: number
-        - AN_grpmax_joint: number
       local_files:
         - gnomad.exomes.v4.1.sites.chr1.vcf.bgz
         - gnomad.exomes.v4.1.sites.chr2.vcf.bgz
