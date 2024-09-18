@@ -55,6 +55,10 @@ COPY ./Makefile ./
 
 RUN make install-python
 
+# Run pytest before installation
+RUN pytest python/ --maxfail=1 --disable-warnings
+
+
 ENTRYPOINT ["bystro-api"]
 
 CMD ["--help"]
