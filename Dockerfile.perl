@@ -20,4 +20,4 @@ COPY install-apt.sh /bystro/install-apt.sh
 RUN cd /bystro && ./install-apt.sh
 
 # Symlink everything in /bystro/perl/bin to /usr/local/bin
-RUN ln -s /bystro/perl/bin/* /usr/local/bin
+ENTRYPOINT ["/bin/bash", "-c", "source ~/.profile && exec \"$@\"", "--"]
