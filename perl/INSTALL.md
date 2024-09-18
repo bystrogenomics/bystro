@@ -17,7 +17,7 @@ First you'll need to install some prerequisites:
 
 The instructions for installing Bystro locally use [`cpm`](https://metacpan.org/pod/App::cpanminus).
 
-- Alternatively you can use [cpanm](https://metacpan.org/dist/App-cpanminus/view/bin/cpanm)
+- Alternatively you can use [cpanm](https://metacpan.org/dist/App-cpanminus/view/bin/cpanm), which can be installed with the following: `curl -fsSL https://cpanmin.us | perl - App::cpanminus`
 - Just replace every `cpm install --test` and `cpm install` command with `cpanm`
 
 To install `cpm`, run the following:
@@ -34,15 +34,6 @@ curl -fsSL https://raw.githubusercontent.com/skaji/cpm/main/cpm | perl - install
 export PERL5LIB=~/bystro/perl/local/lib/perl5/:~/bystro/perl/lib:$PERL5LIB
 export PATH=~/bystro/perl/bin:~/bystro/perl/local/bin:$PATH
 ```
-
-Another alternative package manager is [`cpanm`](https://metacpan.org/pod/App::cpanminus), which can be installed with the following:
-
-```bash
-curl -fsSL https://cpanmin.us | perl - App::cpanminus
-```
-
-- Please read the [cpanm documentation](https://metacpan.org/pod/App::cpanminus) for more information on how to use it.
-- Briefly, you would replace every `cpm install --test` and `cpm install` command with `cpanm`
 
 <br>
 
