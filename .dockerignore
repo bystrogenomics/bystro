@@ -1,0 +1,4 @@
+python/python/bystro/*.so
+python/target
+python/build
+python/python/bystro/examples
