@@ -152,9 +152,7 @@ def test_two_sample_test():
 
 
 def test_hd2017():
-    with open(
-        "python/bystro/covariance/tests/hypothesis_hd_data.pkl", "rb"
-    ) as f:
+    with open(get_pickle_file_path(), "rb") as f:
         data = pickle.load(f)
     X = data["X"]
     Y = data["Y"]
@@ -171,9 +169,7 @@ def test_hd2017():
 
 
 def test_schott2007():
-    with open(
-        "python/bystro/covariance/tests/hypothesis_hd_data.pkl", "rb"
-    ) as f:
+    with open(get_pickle_file_path(), "rb") as f:
         data = pickle.load(f)
     X = data["X"]
     Y = data["Y"]
