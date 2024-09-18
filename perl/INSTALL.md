@@ -6,7 +6,15 @@ To build a Docker image using the `Dockerfile`, run the following:
 
 ```bash
 cd ../ && docker build -t bystro-annotator -f Dockerfile.perl .
+# Run Bystro Annotator from the new Docker container; replace <command> with the desired command
+# If no command provided, will automatically run bystro-annotate.pl --help
+docker run bystro-annotator <command>
 ```
+
+- Commands:
+  - Run the annotator: `docker run bystro-annotator bystro-annotate.pl --help`
+  - Build a new Bystro database: `docker run bystro-annotator bystro-build.pl --help`
+  - Fetch dependencies, before building: `docker run bystro-annotator bystro-utils.pl --help`
 
 ## Installing Bystro Annotator Bare Metal / Locally
 
