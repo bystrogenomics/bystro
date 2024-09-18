@@ -96,7 +96,7 @@ has compress => (
   is            => 'ro',
   isa           => 'Str',
   metaclass     => 'Getopt',
-  documentation => 'Compress the output?',
+  documentation => 'Enable compression. Specify the type of compression: lz4 gz bgz. `bgz` is an alias for gz (gzip); when bgzip is available, it will be used and will generate a block gzipped file with index',
   default       => 0,
 );
 
