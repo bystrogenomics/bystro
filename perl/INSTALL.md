@@ -226,7 +226,7 @@ Database configurations are stored in YAML files in the `config` directory. By d
 
 2. (optional) Configure your Bystro Annotator to use a temporary directory with fast local storage, by editing the configuration files `tmp_dir` property to a directory on your fast local storage. This directory must be writable by the user running bystro-annotate.pl.
 
-   If you've installed `yq' this is easy:
+   If you've installed `yq` this is easy:
 
    ```bash
    MY_FAST_LOCAL_TEMP_STORAGE_FOLDER=/mnt/annotator/tmp
