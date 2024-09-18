@@ -5,8 +5,8 @@ echo -e "\n\nInstalling Perl libraries\n"
 
 echo "PERL ROOT IN install/install-perl-libs.sh: $PERLBREW_ROOT"
 
-# Install multiple modules at once using cpm
-cpm install -g --test Capture::Tiny Mouse Path::Tiny namespace::autoclean DDP YAML::XS JSON::XS Getopt::Long::Descriptive Types::Path::Tiny Sereal MCE::Shared List::MoreUtils Log::Fast Parallel::ForkManager Cpanel::JSON::XS Mouse::Meta::Attribute::Custom::Trait::Array Net::HTTP Math::SigFigs PerlIO::utf8_strict PerlIO::gzip MouseX::SimpleConfig MouseX::ConfigFromFile Archive::Extract DBI String::Strip File::Which Hash::Merge::Simple Module::Build::XSUtil Test::LeakTrace Test::Pod Test::Exception Log::Any::Adapter File::Copy::Recursive Clone
+BASEDIR=$(dirname $0)
+echo "install-perl-libs.sh basedir: $BASEDIR"
 
 # Install modules that require special handling
 ALIEN_INSTALL_TYPE=share cpm install -g --test Alien::LMDB
@@ -25,6 +25,15 @@ install_custom_msgpack() {
     git checkout 6fe098dd91e705b12c68d63bcb1f31c369c81e01
     cpm install -g --test .
     rm -rf msgpack-perl
+    cd -
 }
 
 install_custom_msgpack
+
+# Install the rest of the modules
+(
+  cd "$BASEDIR" || exit 1
+  cd ../ || exit 1
+  echo "Attempting to install remaining requirements from bystro/perl/cpanfile"
+  cpm install -g --test --cpanfile perl/cpanfile
+)
