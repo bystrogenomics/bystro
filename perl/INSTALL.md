@@ -92,7 +92,7 @@ By default, `cpm` will install libraries in `./local` in the current directory.
 
   ```bash
 
-  # Assumg you are in the ~/bystro/perl directory
+  # Assuming you are in the ~/bystro/perl directory
   # Put this in your ~/.profile or ~/.bash_profile
   export PERL5LIB=~/bystro/perl/local/lib/perl5:$PERL5LIB
 
