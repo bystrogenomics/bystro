@@ -8,7 +8,7 @@ To build a Docker image using the `Dockerfile`, run the following:
 cd ../ && docker build -t bystro-annotator -f Dockerfile.perl .
 ```
 
-## Installing Bystro Annotator Bare Metal / Locally
+## Installing Bystro Annotator Bare Metal / Locally For Development
 
 First you'll need to install some prerequisites:
 
