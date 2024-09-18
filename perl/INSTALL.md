@@ -1,4 +1,4 @@
-# Bystro Annotator Package
+# Bystro Annotator Package Installation
 
 ## Installing Bystro Annotator using Docker
 
