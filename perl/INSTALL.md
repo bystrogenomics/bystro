@@ -48,7 +48,7 @@ export PERL5LIB=~/bystro/perl/local/lib/perl5/:~/bystro/perl/lib:$PERL5LIB
 export PATH=~/bystro/perl/bin:~/bystro/perl/local/bin:$PATH
 ```
 
-- Alternatively to have `cpm` install libraries in your @INC path, you can run `cpm install -g` instead of `cpm install` (and then you can remove `/bystro/perl/local/lib/perl5/` from your `PERL5LIB` and `/bystro/perl/local/bin` from your `PATH`)
+- Alternatively to have `cpm` install libraries in your `@INC` path, you can run `cpm install -g` instead of `cpm install` (and then you can remove `/bystro/perl/local/lib/perl5/` from your `PERL5LIB` and `/bystro/perl/local/bin` from your `PATH`)
 
 <br>
 
@@ -73,8 +73,9 @@ cpm install MouseX::Getopt
     && git checkout 34acb71d7d86575fe7abb3f7ad95e8653019b282 \
     && perl Makefile.PL && make distmeta \
     && ln -s MYMETA.json META.json && ln -s MYMETA.yml META.yml \
-    && cpm install --show-build-log-on-failure . \
+    && cpm install --show-build-log-on-failure --test . \
     && cd ..
+    && rm -rf LMDB_File
   ```
 
 Now you can install the rest of the dependencies:
