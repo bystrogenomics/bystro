@@ -115,7 +115,3 @@ cpanm Code::TidyAll Perl::Tidy Perl::Critic
 
 To specify specific libraries for the Perl codebase, use `use <lib> <version>` (see [use documentation](https://perldoc.perl.org/functions/use)).
 Packaging with `Dist::Zilla` will specify them in the `Makefile.PL` that it creates.
-
-```
-
-```
