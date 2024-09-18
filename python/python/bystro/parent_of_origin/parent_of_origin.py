@@ -447,18 +447,7 @@ class POESingleSNP(BasePOE):
                     )
                 ci_eigenvector[j] = np.percentile(
                     bootstrap_vector_component,
-                    [
-                        100
-                        * norm.cdf(
-                            2 * z0_vector_component
-                            + norm.ppf(alpha1 + a_vector_component)
-                        ),
-                        100
-                        * norm.cdf(
-                            2 * z0_vector_component
-                            + norm.ppf(alpha2 - a_vector_component)
-                        ),
-                    ],
+                    [percentile_lower, percentile_upper],
                 )
 
             self.confidence_interval_ = ci_eigenvector
