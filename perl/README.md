@@ -10,103 +10,94 @@ cd ../ && docker build -t bystro-annotator -f Dockerfile.perl .
 
 ## Installing Bystro Annotator Bare Metal / Locally
 
+First you'll need to install some prerequisites:
+
+- Debian/Ubuntu: 'sudo ../install/install-rpm-deps.sh`
+- Centos/Fedora/Amazon Linux: 'sudo ../install/install-apt-depts.sh`
+
 The instructions for installing Bystro locally use [`cpm`](https://metacpan.org/pod/App::cpanminus).
+
+- Alternatively you can use [cpanm](https://metacpan.org/dist/App-cpanminus/view/bin/cpanm)
+- Just replace every `cpm install --test` and `cpm install` command with `cpanm`
 
 To install `cpm`, run the following:
 
-- If using the system Perl:
+```bash
+curl -fsSL https://raw.githubusercontent.com/skaji/cpm/main/cpm | perl - install App::cpm
+```
 
-  ```bash
-  curl -fsSL https://raw.githubusercontent.com/skaji/cpm/main/cpm | sudo perl - install -g App::cpm
-  ```
-
-- If using local Perl through [perlbrew](https://perlbrew.pl) or [plenv](https://github.com/tokuhirom/plenv), or system Perl but with [local::lib](https://srcc.stanford.edu/farmshare/software-perllocallib) to ensure that libraries are installed locally (thus not requiring `sudo privileges`):
-
-  ```bash
-  curl -fsSL https://raw.githubusercontent.com/skaji/cpm/main/cpm | perl - install -g App::cpm
-  ```
-
-Assuming that you've cloned the repository and are working on it locally, then the dependencies can mostly be installed with cpm.
-But there are a few one-off dependencies that require a slightly modified approach.
-
-One-off dependencies can be installed as follows:
+- Note that this will by default have all perl libraries install in `./local`; assuming you are running these instructions from `~/bystro/perl` that means that installed Perl binaries and libraries will be in `~/bystro/perl/local`.
+- You will also need to make sure that you have the Bystro libraries and binaries in your PERL5LIB and PATH environment variables. You can do this by adding the following to your `~/.profile` or `~/.bash_profile`:
 
 ```bash
-cpm install -g --test https://github.com/bystrogenomics/msgpack-perl.git
+# Add this to your ~/.profile or ~/.bash_profile
+export PERL5LIB=~/bystro/perl/local/lib/perl5/:~/bystro/perl/lib:$PERL5LIB
+export PATH=~/bystro/perl/bin:~/bystro/perl/local/bin:$PATH
+```
 
-ALIEN_INSTALL_TYPE=share cpm install -g --test Alien::LMDB
-cpm install -g --test LMDB_File
-cpm install -g MouseX::Getopt # fails due to differences from expected output; unimportant
+Another alternative package manager is [`cpanm`](https://metacpan.org/pod/App::cpanminus), which can be installed with the following:
+
+```bash
+curl -fsSL https://cpanmin.us | perl - App::cpanminus
+```
+
+- Please read the [cpanm documentation](https://metacpan.org/pod/App::cpanminus) for more information on how to use it.
+- Briefly, you would replace every `cpm install --test` and `cpm install` command with `cpanm`
+
+<br>
+
+A few dependencies must be specially separately installed:
+
+```bash
+cpm install --test https://github.com/bystrogenomics/msgpack-perl.git
+
+ALIEN_INSTALL_TYPE=share cpm install --test Alien::LMDB
+cpm install --test LMDB_File
+
+# no --test option because it has a trivial failure related to formatting of cli help strings
+cpm install MouseX::Getopt
 ```
 
 - Please note, that if you are using Perl > 5.36.0, you will need to manually install LMDB_File 0.14, which will require `make`
 
   ```bash
-  ALIEN_INSTALL_TYPE=share cpm install -g --test Alien::LMDB
+  ALIEN_INSTALL_TYPE=share cpm install --test Alien::LMDB
   git clone --depth 1 --recurse-submodules https://github.com/salortiz/LMDB_File.git \
     && cd LMDB_File \
     && git checkout 34acb71d7d86575fe7abb3f7ad95e8653019b282 \
     && perl Makefile.PL && make distmeta \
     && ln -s MYMETA.json META.json && ln -s MYMETA.yml META.yml \
-    && cpm install --show-build-log-on-failure -g . \
+    && cpm install --show-build-log-on-failure . \
     && cd ..
   ```
 
-- Alternatively you can use [cpanm](https://metacpan.org/dist/App-cpanminus/view/bin/cpanm) to install the LMDB_File 0.14 dependencies:
-
-  ```bash
-    ALIEN_INSTALL_TYPE=share cpm install -g --test Alien::LMDB
-    git clone --depth 1 --recurse-submodules https://github.com/salortiz/LMDB_File.git \
-      && cd LMDB_File \
-      && cpanm . \
-      && cd .. \
-      && rm -rf LMDB_File
-  ```
-
-One of the dependencies, DBD::MariaDB, requires mysql_config to be installed. From DBD::MariaDB documentation:
-
-```
-MariaDB/MySQL
-You need not install the actual MariaDB or MySQL database server, the client files and the development files are sufficient. They are distributed either in Connector/C package or as part of server package. You need at least MySQL version 4.1.8.
-
-For example, Fedora, RedHat, CentOS Linux distribution comes with RPM files (using YUM) mariadb-devel, mariadb-embedded-devel, mysql-devel or mysql-embedded-devel (use yum search to find exact package names). Debian and Ubuntu comes with DEB packages libmariadb-dev, libmariadbclient-dev, libmariadbd-dev, libmysqlclient-dev or libmysqld-dev (use apt-cache search to find exact package names).
-
-In some cases MariaDB or MySQL libraries depends on external libpcre, libaio, libnuma, libjemalloc or libwrap libraries. If it is that case, they needs to be installed before MariaDB/MySQL libraries.
-
-These are sufficient, if the MariaDB/MySQL server is located on a foreign machine. You may also create client files by compiling from the MariaDB/MySQL source distribution and using
-```
-
-We provide the commands to install the dependencies for Ubuntu 22.04 LTS and Amazon Linux 2023, see `../install/install-apt-deps.sh` for Debian based systems like Ubuntu and `../install/install-rpm-deps.sh` for Centos/RedHat based systems like Amazon Linux 2023.
-
-Once the dependencies are installed, you can install the remaining dependencies with `cpm` and `dzil`:
-
-## Installing Bystro locally using dzil
-
-Bystro uses [`Dist::Zilla`](https://github.com/rjbs/dist-zilla) for packaging and is configured with `dist.ini`.
-This approach requires installing `Dist::Zilla` and author dependencies and one off-dependencies described in the above.
+Now you can install the rest of the dependencies:
 
 ```bash
-# Install cpm
-curl -fsSL https://raw.githubusercontent.com/skaji/cpm/main/cpm | perl - install -g App::cpm
-
-# Install Dist::Zilla and Archive::Tar::Wrapper (to slightly speed up building)
-cpm install -g Dist::Zilla Archive::Tar::Wrapper
-
-# Install all dependencies
-dzil authordeps --missing | cpm install -g
-dzil listdeps --author --missing | cpm install -g
-
-# To install Bystro annotator packages into your PATH
-dzil install
-
-# Or alternatively, make sure that the `bin` directory is in your PATH
-export PATH=~/bystro/perl/bin:$PATH
+  cpm install
 ```
 
-Bystro also relies on a few Go programs, which can be installed with the following:
+Bystro also relies on a few `Go` programs, which can be installed with the following:
 
 ```bash
-../install/install-go.sh
+mkdir ~/.local
+
+# Assuming we are installing this on linux, on an x86 processor
+# and that our login shell environment is stored in ~/.profile (another common one is ~/.bash_profile)
+../install/install-go.sh ~/.profile ~/ ~/.local ~/bystro/ linux-amd64 1.21.4
+
+source ~/.profile
+```
+
+Now you're ready to try Bystro:
+
+```bash
+# First let's run our test suite
+cd ~/bystro/perl
+prove -r ./t -j$(nproc)
+
+# Then let's try running bystro-annotate.pl
+bystro-annotate.pl --help
 ```
 
 ## Coding style and tidying
@@ -124,3 +115,7 @@ cpanm Code::TidyAll Perl::Tidy Perl::Critic
 
 To specify specific libraries for the Perl codebase, use `use <lib> <version>` (see [use documentation](https://perldoc.perl.org/functions/use)).
 Packaging with `Dist::Zilla` will specify them in the `Makefile.PL` that it creates.
+
+```
+
+```
