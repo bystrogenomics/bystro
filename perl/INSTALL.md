@@ -69,38 +69,42 @@ mkdir -p $GOLANG_BINARY_INSTALL_DIR
 source ~/.profile
 ```
 
-Next, we need to install the Bystro Perl library and its Perl dependencies.
-
-The instructions for installing the Bystro Perl library use [`cpm`](https://metacpan.org/pod/App::cpanminus).
+Next, we need to install the Bystro Perl library and its Perl dependencies. The instructions for installing the Bystro Perl library use [`cpm`](https://metacpan.org/pod/App::cpanminus).
 
 - Alternatively you can use [cpanm](https://metacpan.org/dist/App-cpanminus/view/bin/cpanm), which can be installed with the following: `curl -fsSL https://cpanmin.us | perl - App::cpanminus`
 - Just replace every `cpm install --test` and `cpm install` command with `cpanm`
+
+<br>
 
 To install `cpm`, run the following:
 
 ```bash
 # Install cpm
 curl -fsSL https://raw.githubusercontent.com/skaji/cpm/main/cpm | perl - install App::cpm
-
 ```
 
-You will need to configure where Perl stores its libraries.
+You will need to configure where Perl stores its libraries. By default, `cpm` will install libraries in `./local` in the current directory.
 
-By default, `cpm` will install libraries in `./local` in the current directory.
-
-- You will need to make sure that this path is in your `PERL5LIB` environment variable.
+- You will need to make sure that this path is in your `PERL5LIB` environment variable:
 
   ```bash
-
-  # Assuming you are in the ~/bystro/perl directory
-  # Put this in your ~/.profile or ~/.bash_profile
+  # Assuming you were in the ~/bystro/perl directory when you ran `cpm install`, you would get a folder `~/bystro/perl/local` with the libraries and binaries cpm installed
+  # We need to add this to our PERL5LIB and PATH environment variables
+  # You would put these commands in your ~/.profile or ~/.bash_profile
   export PERL5LIB=~/bystro/perl/local/lib/perl5:$PERL5LIB
-
+  export PATH=~/bystro/perl/local/bin:$PATH
   ```
 
-- If you want to install libraries in the default Perl library path, as specified by @INC, replace the `cpm install` commands with `cpm install -g`. To control where `cpm install -g` installs libraries, you can set @INC, which is Perl's library path, by setting the `PERL5LIB` environment variable, or by configuring [local::lib](https://metacpan.org/pod/local::lib)
+- If you want to install libraries and binaries into a different local directory, replace `cpm install` with `cpm install -L=/path/to`, which will cause libraries to be installed in `/path/to/lib/perl5` and binaries into `/path/to/bin`. You will need to make sure that these paths are in your `PERL5LIB` and `PATH` environment variables respectively:
 
-- If you want to install them into a different directory, replace `cpm install` with `cpm install -L=/path/to/install/libraries`. You will need to make sure that this path is in your `PERL5LIB` environment variable.
+  ```bash
+  # Assuming you ran `cpm install -L=/path/to` for all of your cpm install commands
+  # Put this in your ~/.profile or ~/.bash_profile
+  export PERL5LIB=/path/to/lib/perl5:$PERL5LIB
+  export PATH=/path/to/bin:$PATH
+  ```
+
+- If you want to install libraries in the default Perl library path, as specified by Perl's @INC, replace the `cpm install` commands with `cpm install -g`
 
 <br>
 
@@ -116,7 +120,7 @@ cpm install --test LMDB_File
 cpm install MouseX::Getopt
 ```
 
-However, if you are using Perl > 5.36.0, you will need to manually install LMDB_File 0.14, which will require `make`
+However, if you are using Perl > 5.36.0, you will need to manually install LMDB_File 0.14, which will require `make`:
 
 ```bash
 ALIEN_INSTALL_TYPE=share cpm install --test Alien::LMDB
@@ -135,6 +139,8 @@ Now you can install the rest of the dependencies:
 ```bash
   cpm install
 ```
+
+<br>
 
 Now you're ready to try Bystro:
 
@@ -191,9 +197,9 @@ bystro-annotate.pl --help
 
 ## Configuring the Bystro Annotator
 
-Once Bystro is installed, we will need to download a database for your species/assembly, and configure the Bystro Annotator to use it.
+Once Bystro is installed, we need to download a database for the species/assembly we're going to be analyzing and then configure the Bystro Annotator to use it.
 
-Database configurations are stored in YAML files in the `config` directory. By default Bystro ships with configurations for human genome assemblies hg19 and hg38, though you can create your own configurations for other species/assembly.
+Database configurations are stored in YAML files in the `config` directory. By default Bystro ships with configurations for human genome assemblies hg19 (~/bystro/config/hg19.yml) and hg38 (~/bystro/config/hg38.yml), though you can create your own configurations for other species/assemblies.
 
 ### Example Configuration
 
@@ -208,21 +214,23 @@ Database configurations are stored in YAML files in the `config` directory. By d
    bgzip -d -c --threads 32 hg38_v11.tar.gz | tar xvf -
    ```
 
-   - You can chooose a directory other than `/mnt/annotator/`, that is just the default expected by ~/bystro/config/hg38.yml. If you choose something else, just update the `database_dir` property in the configuration file
+   - You can chooose a directory other than `/mnt/annotator/`; that is just the default expected by ~/bystro/config/hg38.yml. If you choose something else, just update the `database_dir` property in the configuration file
 
      - with `yq`:
 
        ```bash
-       # Update the database_dir property in the configuration file
+       MY_DATABASE_DIR=/path/somewhere/else
+       # Assuming we downloaded and unpacked the database to /path/somewhere/else/hg38_v11
+       # Update the database_dir property in the configuration file using `yq`
        # You can also do this manually by editing the configuration file (in this example ~/bystro/config/hg38.yml)
        yq write -i ~/bystro/config/hg38.yml database_dir $MY_DATABASE_DIR/hg38_v11
        ```
 
-   - `tar` is required, but you can unpack uzing `gzip -d -c` instead of `bgzip -d -c --threads 32` if you don't have `bgzip` installed. It will work, just slower.
+   - `tar` is required to unpack the database, which is stored as a compresssed tarball, but you can unzip the tarball uzing `gzip -d -c` instead of `bgzip -d -c --threads 32` if you don't have `bgzip` installed. It will work, just slower.
 
-   - You need ~691GB of free space for hg38 and ~376GB of free space for hg19, including the space for the tar.gz archives
+   - You need ~691GB of free space for hg38 and ~376GB of free space for hg19, including the space for the tar.gz archives.
 
-   - The unpacked databases are ~517GB for hg38 and ~283GB for hg19
+   - The unpacked databases are ~517GB for hg38 and ~283GB for hg19.
 
 2. (optional) Configure your Bystro Annotator to use a temporary directory with fast local storage, by editing the configuration files `tmp_dir` property to a directory on your fast local storage. This directory must be writable by the user running bystro-annotate.pl.
 
@@ -236,17 +244,17 @@ Database configurations are stored in YAML files in the `config` directory. By d
    yq write -i ~/bystro/config/hg38.yml temp_dir $MY_FAST_LOCAL_TEMP_STORAGE_FOLDER
    ```
 
-   If temp_dir is not set, the files will be written directly to the output directory (see `--output` option in `bystro-annotate.pl`)
+   If temp_dir is not set, the files will be written directly to the output directory (see `--output` option in `bystro-annotate.pl`).
 
 ## Databases
 
 1. [Human (hg38) database](https://s3.amazonaws.com/bystro-db/hg38_v11.tar.gz)
 2. [Human (hg19) database](https://s3.amazonaws.com/bystro-db/hg19_v10.tar.gz)
-3. There are no restrictions on species support, but we currently only build human genomes. Please create a GitHub issue if you would like us to support others.
+3. There are no restrictions on species support, but we currently only build human genomes. Please create a GitHub issue if you would like us to support others
 
 ## Running your first annotation
 
-Ex: Runing hg38 annotation
+Example: Annotate an hg38 VCF file:
 
 ```sh
 bystro-annotate.pl --config ~/bystro/config/hg38.yml --threads 32 --input gnomad.genomes.v4.0.sites.chr22.vcf.bgz --output test/my_annotation --compress gz
@@ -283,9 +291,9 @@ Explanation of the output:
 - `my_annotation.annotation.header.json`: The header of the annotated dataset
 - `my_annotation.sample_list`: The list of samples in the annotated dataset
 - `my_annotation.annotation.tsv.gz`: A gzipped TSV file with one row per variant and one column per annotation
-- `my_annotation.dosage.feather`: The dosage matrix file, where the first column is the `locus` column in the format "chr:pos:ref:alt", and columns following that are sample columns, with the dosage of the variant for that sample (0 for homozygous reference, 1 for 1 copy of the alternate allele, 2 for 2, and so on). -1 indicates missing genotypes. The dosage is the expected number of alternate alleles, given the genotype. This is useful for downstream analyses like imputation, or for calculating polygenic risk scores.
+- `my_annotation.dosage.feather`: The dosage matrix file, where the first column is the `locus` column in the format "chr:pos:ref:alt", and columns following that are sample columns, with the dosage of the variant for that sample (0 for homozygous reference, 1 for 1 copy of the alternate allele, 2 for 2, and so on). -1 indicates missing genotypes. The dosage is the expected number of alternate alleles, given the genotype. This is useful for downstream analyses like imputation, or for calculating polygenic risk scores
   - This file is in the [Arrow feather format](https://arrow.apache.org/docs/python/feather.html), also known as the "IPC" format. This is an ultra-efficient format for machine learning, and is widely supported, in Python libraries like [Pandas](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_feather.html), [Polars](https://docs.pola.rs/api/python/stable/reference/api/polars.read_ipc.html), [PyArrow](https://arrow.apache.org/docs/python/generated/pyarrow.feather.read_feather.html), as well as languages like [R](https://arrow.apache.org/docs/r/reference/read_feather.html) and [Julia](https://github.com/apache/arrow-julia)
-- `hg38.yml`: The configuration file used for the annotation. You can use this to either re-build the Bystro database from scratch, or to re-run the annotation with the same configuration.
+- `hg38.yml`: The configuration file used for the annotation. You can use this to either re-build the Bystro database from scratch, or to re-run the annotation with the same configuration
 - `my_annotation.annotation.log.txt`: The log file for the annotation
 - `my_annotation.statistics.tsv`: A TSV file with sample-wise statistics on the annotation
 - `my_annotation.statistics.qc.tsv`: A TSV file that lists any samples that failed quality control checks, currently defined as being outside 3 standard deviations from the mean on any of the sample-wise statistics
@@ -306,7 +314,7 @@ Explanation of the output:
 The `.perltidyrc` gives the coding style and `tidyall` from [Code::TidyAll](https://metacpan.org/dist/Code-TidyAll) can be used to tidy all files with `tidyall -a`.
 Please tidy all files before submitting patches.
 
-Install tidyall, perltidy, and perlcritic like so
+Install tidyall, perltidy, and perlcritic like so:
 
 ```bash
 cpanm Code::TidyAll Perl::Tidy Perl::Critic
