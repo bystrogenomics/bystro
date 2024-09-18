@@ -46,8 +46,8 @@ ENV PATH="/usr/local/go/bin:${PATH}"
 WORKDIR /workspace
 
 COPY ./startup.yml ./startup.yml
-# Copy the entire monorepo
 COPY ./python ./python
+COPY ./config ./config
 
 # Install Python and dependencies
 RUN pip install --upgrade pip && pip install python/ -r python/requirements-dev.txt
