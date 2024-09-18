@@ -21,7 +21,7 @@ install-python: build-python
 	fi
 
 install-go:
-	go install github.com/bystrogenomics/bystro-vcf@2.2.2
+	go install github.com/bystrogenomics/bystro-vcf@2.2.3
 	(cd ./go && go install bystro/cmd/dosage)
 	(cd ./go && go install bystro/cmd/dosage-filter)
 	(cd ./go && go install bystro/cmd/opensearch)

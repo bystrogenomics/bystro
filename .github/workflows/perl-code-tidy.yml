@@ -3,14 +3,14 @@ name: Perl Tidy & Critic Check
 on:
   push:
     paths:
-    - '**.pl'
-    - '**.pm'
-    - '**.t'
+      - "**.pl"
+      - "**.pm"
+      - "**.t"
   pull_request:
     paths:
-    - '**.pl'
-    - '**.pm'
-    - '**.t'
+      - "**.pl"
+      - "**.pm"
+      - "**.t"
 
 jobs:
   tidy-critic-check:

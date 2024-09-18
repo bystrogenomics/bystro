@@ -1,36 +1,57 @@
 #!/usr/bin/env bash
+set -e
+set -o pipefail
 
-echo -e "\n\nInstalling Ubuntu/Debian (apt-get) dependencies\n";
+# Ensure the script is run with root privileges
+if [[ $EUID -ne 0 ]]; then
+   echo "This script must be run as root. Use sudo."
+   exit 1
+fi
 
-# Installs gcc, and more; may be too much
-sudo apt install -y build-essential;
+echo -e "\n\nInstalling development tools and dependencies\n"
 
-# Not strictly necessary, useful however for much of what we do
-sudo apt install -y git-all;
-# pigz for Bystro, used to speed up decompression primarily
+apt update
 
-sudo apt install -y pigz;
-sudo apt install -y unzip;
-sudo apt install -y wget;
-# For Search::Elasticsearch::Client::5_0::Direct
-sudo apt install -y openssl libcurl4-openssl-dev libssl-dev;
-# For tests involving querying ucsc directly
-sudo apt install -y libmysqlclient-dev;
+# Install build-essential and other required packages
+apt install -y \
+  build-essential \
+  autoconf automake make gcc perl zlib1g-dev libbz2-dev liblzma-dev libcurl4-gnutls-dev libssl-dev \
+  libmariadb-dev \
+  cmake \
+  git \
+  pigz \
+  unzip \
+  wget \
+  tar \
+  bzip2 \
+  lz4 \
+  patch \
+  pkg-config \
+  grep 
 
-# for perlbrew, in case you want to install a different perl version
-#https://www.digitalocean.com/community/tutorials/how-to-install-perlbrew-and-manage-multiple-versions-of-perl-5-on-centos-7
-# centos 7 doesn't include bzip2
-sudo apt install -y bzip2; 
-sudo apt install -y lz4;
-sudo apt install -y patch;
+# check whether curl is installed, because in some containers it is installed and then we get conflicts
+if ! command -v curl &> /dev/null
+then
+    echo "curl is not installed. Installing now..."
+    sudo apt install curl -y
+else
+    echo "curl is already installed."
+fi
 
-sudo apt install -y cpan;
+# Create a temporary directory
+mkdir -p /tmp/awscli-install
+cd /tmp/awscli-install
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install --update
+cd -
+rm -rf /tmp/awscli-install
 
-sudo apt install -y nodejs;
-sudo apt install -y npm;
-sudo npm install -g pm2;
+# Install Node.js 20.x
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt install -y nodejs
 
-sudo apt install -y awscli;
+# Install pm2 globally using npm
+npm install -g pm2
 
-# pkg-config is required for building the wheel
-sudo apt install -y pkg-config;
+echo -e "\n\nAll dependencies have been installed successfully.\n"
