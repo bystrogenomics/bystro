@@ -14,8 +14,21 @@ First you'll need to install some prerequisites:
 
 - Debian/Ubuntu: 'sudo ../install/install-rpm-deps.sh`
 - Centos/Fedora/Amazon Linux: 'sudo ../install/install-apt-depts.sh`
+- bgzip: `../install/install-htslib.sh ~/.profile ~/.local`
 
-The instructions for installing Bystro locally use [`cpm`](https://metacpan.org/pod/App::cpanminus).
+Bystro also relies on a few `Go` programs, which can be installed with the following:
+
+```bash
+mkdir ~/.local
+
+# Assuming we are installing this on linux, on an x86 processor
+# and that our login shell environment is stored in ~/.profile (another common one is ~/.bash_profile)
+../install/install-go.sh ~/.profile ~/ ~/.local ~/bystro/ linux-amd64 1.21.4
+
+source ~/.profile
+```
+
+The instructions for installing the Bystro Perl library use [`cpm`](https://metacpan.org/pod/App::cpanminus).
 
 - Alternatively you can use [cpanm](https://metacpan.org/dist/App-cpanminus/view/bin/cpanm), which can be installed with the following: `curl -fsSL https://cpanmin.us | perl - App::cpanminus`
 - Just replace every `cpm install --test` and `cpm install` command with `cpanm`
@@ -34,6 +47,8 @@ curl -fsSL https://raw.githubusercontent.com/skaji/cpm/main/cpm | perl - install
 export PERL5LIB=~/bystro/perl/local/lib/perl5/:~/bystro/perl/lib:$PERL5LIB
 export PATH=~/bystro/perl/bin:~/bystro/perl/local/bin:$PATH
 ```
+
+- Alternatively to have `cpm` install libraries in your @INC path, you can run `cpm install -g` instead of `cpm install` (and then you can remove `/bystro/perl/local/lib/perl5/` from your `PERL5LIB` and `/bystro/perl/local/bin` from your `PATH`)
 
 <br>
 
@@ -66,18 +81,6 @@ Now you can install the rest of the dependencies:
 
 ```bash
   cpm install
-```
-
-Bystro also relies on a few `Go` programs, which can be installed with the following:
-
-```bash
-mkdir ~/.local
-
-# Assuming we are installing this on linux, on an x86 processor
-# and that our login shell environment is stored in ~/.profile (another common one is ~/.bash_profile)
-../install/install-go.sh ~/.profile ~/ ~/.local ~/bystro/ linux-amd64 1.21.4
-
-source ~/.profile
 ```
 
 Now you're ready to try Bystro:
