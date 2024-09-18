@@ -8,12 +8,21 @@ To build a Docker image using the `Dockerfile`, run the following:
 cd ../ && docker build -t bystro-annotator -f Dockerfile.perl .
 ```
 
-## Installing Bystro Annotator Bare Metal / Locally For Development
+## Installing Bystro Annotator Bare Metal / Locally
+
+The easiest way to install Bystro directly on your machine is to run:
+
+- Debian/Ubuntu: `../install-apt.sh`
+- Centos/Fedora/Amazon Linux: `../install-rpm.sh`
+
+You will be prompted for "sudo" access to install the necessary system level dependencies.
+
+## Manual Install
 
 First you'll need to install some prerequisites:
 
-- Debian/Ubuntu: 'sudo ../install/install-rpm-deps.sh`
-- Centos/Fedora/Amazon Linux: 'sudo ../install/install-apt-depts.sh`
+- Debian/Ubuntu: 'sudo ../install/install-apt-deps.sh`
+- Centos/Fedora/Amazon Linux: 'sudo ../install/install-rmp-deps.sh`
 - bgzip: `../install/install-htslib.sh ~/.profile ~/.local`
 
 Bystro also relies on a few `Go` programs, which can be installed with the following:
