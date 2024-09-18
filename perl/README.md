@@ -103,6 +103,12 @@ dzil install
 export PATH=~/bystro/perl/bin:$PATH
 ```
 
+Bystro also relies on a few Go programs, which can be installed with the following:
+
+```bash
+../install/install-go.sh
+```
+
 ## Coding style and tidying
 
 The `.perltidyrc` gives the coding style and `tidyall` from [Code::TidyAll](https://metacpan.org/dist/Code-TidyAll) can be used to tidy all files with `tidyall -a`.
