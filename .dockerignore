@@ -2,6 +2,8 @@ python/python/bystro/*.so
 python/target
 python/build
 python/python/bystro/examples
+python/python/bystro/ancestry/data
+*.ipynb
 perl/.build
 perl/.build_backup/
 perl/*tar.gz
