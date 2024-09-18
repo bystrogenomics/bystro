@@ -80,6 +80,10 @@ class BasePOE:
             raise ValueError("y is numpy array")
         if X.shape[0] != len(y):
             raise ValueError("X and y have different samples")
+        if np.sum(y == 0) < 30:
+            raise ValueError("Too small of homozygous sample size, (>30)")
+        if np.sum(y == 1) < 30:
+            raise ValueError("Too small of heterozygous sample size, (>30)")
 
     def transform(
         self, X: np.ndarray, return_inner: bool = False
@@ -418,6 +422,29 @@ class POESingleSNP(BasePOE):
                     )
                     ** 1.5
                 )
+                percentile_lower = 100 * norm.cdf(
+                    2 * z0_vector_component
+                    + norm.ppf(alpha1 + a_vector_component)
+                )
+                percentile_upper = 100 * norm.cdf(
+                    2 * z0_vector_component
+                    + norm.ppf(alpha2 - a_vector_component)
+                )
+                if percentile_lower < 0:
+                    print("Z0=%0.5f" % z0_vector_component)
+                    print("alpha2=%0.5f" % alpha2)
+                    print("alpha_vector_component=%0.5f" % a_vector_component)
+                    raise ValueError(
+                        "Invalid lower percentile:%0.3f" % percentile_lower
+                    )
+
+                if percentile_upper > 100:
+                    print("Z0=%0.5f" % z0_vector_component)
+                    print("alpha2=%0.5f" % alpha2)
+                    print("alpha_vector_component=%0.5f" % a_vector_component)
+                    raise ValueError(
+                        "Invalid upper percentile:%0.3f" % percentile_lower
+                    )
                 ci_eigenvector[j] = np.percentile(
                     bootstrap_vector_component,
                     [
