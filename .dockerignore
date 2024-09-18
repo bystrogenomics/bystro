@@ -2,3 +2,9 @@ python/python/bystro/*.so
 python/target
 python/build
 python/python/bystro/examples
+perl/.build
+perl/.build_backup/
+perl/*tar.gz
+perl/.vscode
+perl/.tidyall.d
+perl/Bystro-*
