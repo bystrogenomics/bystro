@@ -1,12 +1,11 @@
-# Bystro Perl package
-
+# Bystro Annotator Perl package
 
 ## Installing Bystro using docker
 
 To build a docker image using the `Dockerfile`, run the following:
 
 ```bash
-docker build --tag bystro-cli .
+cd ../ && docker build -t bystro-perl -f Dockerfile.perl .
 ```
 
 ## Installing Bystro using `cpam`
@@ -43,7 +42,7 @@ After installing dependencies, use `prove -lr t` to run tests.
 ## Installing Bystro locally using dzil
 
 Bystro uses [`Dist::Zilla`](https://github.com/rjbs/dist-zilla) for packaging and is configured with `dist.ini`.
-This approach requires installing `Dist::Zilla` and author dependencies and one off-dependencies described in the  above.
+This approach requires installing `Dist::Zilla` and author dependencies and one off-dependencies described in the above.
 
 ```bash
 # Install Dist::Zilla and Archive::Tar::Wrapper (to slightly speed up building)
@@ -64,8 +63,8 @@ dzil install
 Install [cpm](https://metacpan.org/pod/App::cpm) with `curl -fsSL https://raw.githubusercontent.com/skaji/cpm/main/cpm | perl - install -g App::cpm`.
 
 NOTE: you will need mysql_config to install this:
-   ubuntu 22.04 LTS => sudo apt install -y libmariadb-dev libmariadb-dev-compat
-   amazon 2023 => sudo yum install -y <mariadb105>
+ubuntu 22.04 LTS => sudo apt install -y libmariadb-dev libmariadb-dev-compat
+amazon 2023 => sudo yum install -y <mariadb105>
 
 ```bash
 # install msgpack fork
