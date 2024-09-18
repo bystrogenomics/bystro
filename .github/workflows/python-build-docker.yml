@@ -1,0 +1,45 @@
+name: (ML/Bioinformatics) Build and Run Bystro Python Dockerfile
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build Docker Image from Local Context
+        run: |
+          docker build -t bystro-python -f Dockerfile.python .
+
+      - name: Run Docker Image and Capture Help Output
+        id: help-output
+        run: |
+          docker run --rm bystro-python > help_output_python.txt
+
+      - name: Assert Help Output Starts with Expected String
+        run: |
+          first_line=$(head -n 1 help_output_python.txt)
+          if [[ "$first_line" == "usage: bystro-api"* ]]; then
+            echo "Help output assertion passed!"
+          else
+            echo "Help output assertion failed. Got: $first_line"
+            exit 1
+          fi
+
+      - name: Upload Help Output as Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: help-output-python
+          path: help_output_python.txt
