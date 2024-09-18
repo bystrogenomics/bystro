@@ -73,10 +73,10 @@ if ! perlbrew list | grep -q "$VERSION"; then
   nCores=$(getconf _NPROCESSORS_ONLN)
   if [[ "$NOTEST" -eq 0 ]]; then
     echo "Installing Perl $VERSION with $nCores cores (running tests)"
-    perlbrew install "$VERSION" -j "$nCores"
+    perlbrew install "$VERSION" -n -j "$nCores"
   else
     echo "Installing Perl $VERSION with $nCores cores (skipping tests)"
-    perlbrew install "$VERSION" -j "$nCores" -n
+    perlbrew install "$VERSION" -n -j "$nCores" -n
   fi
 else
   echo "Perl version $VERSION is already installed."

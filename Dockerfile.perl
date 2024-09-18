@@ -9,7 +9,7 @@ RUN apt update && apt install -y git sudo
 # needed for minimal installs for Perl to compile
 RUN apt install -y unminimize && yes | unminimize
 
-COPY perl /bystro/install
+COPY perl /bystro/perl
 COPY go /bystro/go
 COPY install /bystro/install
 
@@ -20,4 +20,4 @@ COPY install-apt.sh /bystro/install-apt.sh
 RUN cd /bystro && ./install-apt.sh
 
 # Ensure .profile gets sourced when the container starts
-CMD ["/bin/bash", "-l"]
+CMD ["/bin/bash", "-c", "source ~/.profile && exec bash"]
