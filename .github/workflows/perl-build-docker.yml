@@ -18,6 +18,7 @@ jobs:
           docker build -t bystro-annotator -f Dockerfile.perl .
 
       - name: Run Docker Image and Capture Help Output
+        continue-on-error: true # This is necessary because the help output returns a 255
         id: help-output
         run: |
           docker run --rm bystro-annotator &> help_output.txt
