@@ -95,6 +95,66 @@ prove -r ./t -j$(nproc)
 bystro-annotate.pl --help
 ```
 
+## Configuring the Bystro Annotator
+
+Once Bystro is installed, it needs to be configured. The easiest step is choosing the species/assemblies to annotate.
+
+1. Download the Bystro database for your species/assembly
+
+- **Example:** hg38 (human reference GRCh38): `wget https://s3.amazonaws.com/bystro-db/hg38_v11.tar.gz`</strong>
+  - You need ~691GB of free space for hg38 and ~376GB of free space for hg19, including the space for the tar.gz archives
+    - The unpacked databases are ~517GB for hg38 and ~283GB for hg19
+
+2. To install the database:
+
+   **Example:**
+
+   ```shell
+   cd /mnt/annotator/
+   wget https://s3.amazonaws.com/bystro-db/hg38_v11.tar.gz
+   bgzip -d -c --threads 32 hg38_v11.tar.gz | tar xvf -
+   ```
+
+   In this example the hg38 database would located in `/mnt/annotator/hg38`
+
+3. Update the YAML configuration for the species/assembly to point to the database.
+
+   For human genome assemblies, we provide pre-configured hg19.yml and hg38.yml, which assume `/mnt/annotator/hg19_v10` and `/mnt/annotator/hg38_v11` database directories respectively.
+
+   If using a different mount point, different database folder name, or a different (or custom-built) database altogether,
+   you will need to update the `database_dir` property of the yaml config.
+
+   - Note for a custom database, you would also need to ensure the track `outputOrder` lists all tracks, and that each track has all desired `features` listed
+
+   For instance, using `yq` to can configure the `database_dir` and set `temp_dir` to have in-progress annotations written to local disk
+
+   ```shell
+   yq write -i config/hg38.yml database_dir /mnt/my_fast_local_storage/hg38_v11
+   yq write -i config/hg38.yml temp_dir /mnt/my_fast_local_storage/tmp
+   ```
+
+## Databases:
+
+1. Human (hg38): https://s3.amazonaws.com/bystro-db/hg38_v11.tar.gz
+2. Human (hg19): https://s3.amazonaws.com/bystro-db/hg19_v10.tar.gz
+3. There are no restrictions on species support, but we currently only build human genomes. Please create a GitHub issue if you would like us to support others.
+
+## Running your first annotation
+
+Ex: Runing hg38 annotation
+
+```sh
+bin/bystro-annotate.pl --config config/hg38.yml --in /path/in.vcf.gz --out /path/outPrefix --run_statistics [0,1] --compress
+```
+
+The outputs will be:
+
+- Annotation (compressed, due to --compress flag): `outPrefix.annotation.tsv.gz`
+- Annotation log: `outPrefix.log.txt`
+- Statistics JSON file `outPrefix.statistics.json`
+- Statistics tab-separated file: `outPrefix.statistics.tsv`
+  - Removing the `--run_statistics` flag will skip the generation of `outPrefix.statistics.*` files
+
 ## Coding style and tidying
 
 The `.perltidyrc` gives the coding style and `tidyall` from [Code::TidyAll](https://metacpan.org/dist/Code-TidyAll) can be used to tidy all files with `tidyall -a`.
