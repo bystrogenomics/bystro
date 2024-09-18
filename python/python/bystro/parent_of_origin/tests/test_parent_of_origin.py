@@ -12,6 +12,7 @@ from bystro.parent_of_origin.parent_of_origin import (
     POEMultipleSNP,
     POEMultipleSNP2,
 )
+import pytest
 
 
 def cosine_similarity(vec1, vec2):
@@ -20,6 +21,36 @@ def cosine_similarity(vec1, vec2):
     num = np.dot(v1, v2)
     denom = la.norm(v1) * la.norm(v2)
     return num / denom
+
+
+def test_min_sample_size_errors():
+    # Simulate the case where there are fewer than 30 homozygotes and heterozygotes
+    rng = np.random.default_rng(2021)
+
+    # Set a very small number of homozygotes and heterozygotes (less than 30)
+    n_homozygotes = 20
+    n_heterozygotes = 20
+
+    beta_m = np.zeros(10)  # Dummy beta values
+    beta_p = np.zeros(10)
+    beta_p[:3] = 0.5
+
+    # Generate data with too few samples for both homozygotes and heterozygotes
+    data = generate_data(
+        beta_m, beta_p, rng, n_individuals=n_homozygotes + n_heterozygotes
+    )
+
+    # Instantiate the model
+    model = POESingleSNP(
+        compute_pvalue=True, cov_regularization="QuadraticInverse"
+    )
+
+    # Capture the exact error message manually, checking for the specific message
+    with pytest.raises(ValueError) as excinfo:
+        model.fit(data["phenotypes"], data["genotype"])
+
+    # Ensure the message matches 'Too small of homozygous sample size, (>30)'
+    assert "Too small of homozygous sample size, (>30)" in str(excinfo.value)
 
 
 def generate_data(beta_m, beta_p, rng, n_individuals=10000, cov=None, maf=0.25):
