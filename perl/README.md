@@ -78,11 +78,7 @@ These are sufficient, if the MariaDB/MySQL server is located on a foreign machin
 
 We provide the commands to install the dependencies for Ubuntu 22.04 LTS and Amazon Linux 2023, see `../install/install-apt-deps.sh` for Debian based systems like Ubuntu and `../install/install-rpm-deps.sh` for Centos/RedHat based systems like Amazon Linux 2023.
 
-Once the dependencies are installed, you can install the remaining dependencies with `cpm`:
-
-````
-
-After installing dependencies, use `prove -lr t` to run tests.
+Once the dependencies are installed, you can install the remaining dependencies with `cpm` and `dzil`:
 
 ## Installing Bystro locally using dzil
 
@@ -96,49 +92,15 @@ curl -fsSL https://raw.githubusercontent.com/skaji/cpm/main/cpm | perl - install
 # Install Dist::Zilla and Archive::Tar::Wrapper (to slightly speed up building)
 cpm install -g Dist::Zilla Archive::Tar::Wrapper
 
-# Install build dependencies
-dzil authordeps --missing | cpanm
+# Install all dependencies
+dzil authordeps --missing | cpm install -g
+dzil listdeps --author --missing | cpm install -g
 
-# Install Bystro dependencies
-dzil authordeps --missing | cpanm
-
-# Install Bystro
+# To install Bystro annotator packages into your PATH
 dzil install
-````
 
-## Install Bystro using `cpm`
-
-Install [cpm](https://metacpan.org/pod/App::cpm) with `curl -fsSL https://raw.githubusercontent.com/skaji/cpm/main/cpm | perl - install -g App::cpm`.
-
-NOTE: you will need mysql_config to install this:
-ubuntu 22.04 LTS => sudo apt install -y libmariadb-dev libmariadb-dev-compat
-amazon 2023 => sudo yum install -y <mariadb105>
-
-```bash
-# install msgpack fork
-cpm install -g https://github.com/bystrogenomics/msgpack-perl.git
-
-# install MouseX::Getopt despite some tests failing
-cpm install -g --no-test MouseX::Getopt
-
-# install LMDB_File that comes with latest LMDB
-# NOTE: you will need mysql_config to install this
-#       ubuntu 22.04 LTS => sudo apt install -y libmariadb-dev libmariadb-dev-compat
-#       amazon 2023 => sudo yum install -y <mariadb105>
-git clone --depth 1 --recurse-submodules https://github.com/salortiz/LMDB_File.git \
-  && cd LMDB_File \
-  && cpanm . \
-  && cd .. \
-  && rm -rf LMDB_File
-
-# clone bystro and change into perl package
-git clone git@github.com:bystrogenomics/bystro.git && cd bystro/perl
-
-# install dependencies
-cpm install -g --with-develop
-
-# Install dzil build dependencies
-cpm install -g --show-build-log-on-failure $(dzil authordeps --missing)
+# Or alternatively, make sure that the `bin` directory is in your PATH
+export PATH=~/bystro/perl/bin:$PATH
 ```
 
 ## Coding style and tidying
