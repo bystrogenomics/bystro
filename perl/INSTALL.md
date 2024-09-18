@@ -132,7 +132,7 @@ Once Bystro is installed, it needs to be configured. The easiest step is choosin
    bgzip -d -c --threads 32 hg38_v11.tar.gz | tar xvf -
    ```
 
-   In this example the hg38 database would located in `/mnt/annotator/hg38`
+   In this example, the hg38 database would located in `/mnt/annotator/hg38`
 
 3. Update the YAML configuration for the species/assembly to point to the database.
 
@@ -150,10 +150,10 @@ Once Bystro is installed, it needs to be configured. The easiest step is choosin
    yq write -i config/hg38.yml temp_dir /mnt/my_fast_local_storage/tmp
    ```
 
-## Databases:
+## Databases
 
-1. Human (hg38): https://s3.amazonaws.com/bystro-db/hg38_v11.tar.gz
-2. Human (hg19): https://s3.amazonaws.com/bystro-db/hg19_v10.tar.gz
+1. [Human (hg38) database](https://s3.amazonaws.com/bystro-db/hg38_v11.tar.gz)
+2. [Human (hg19) database](https://s3.amazonaws.com/bystro-db/hg19_v10.tar.gz)
 3. There are no restrictions on species support, but we currently only build human genomes. Please create a GitHub issue if you would like us to support others.
 
 ## Running your first annotation
