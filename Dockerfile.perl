@@ -10,7 +10,7 @@ RUN apt update && apt install -y git sudo
 RUN apt install -y unminimize && yes | unminimize
 
 COPY perl /bystro/install
-COPY go /bystro/install
+COPY go /bystro/go
 COPY install /bystro/install
 
 # Copy your install-apt.sh script into the container
