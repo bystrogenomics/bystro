@@ -30,7 +30,7 @@ You will be prompted for "sudo" access to install the necessary system level dep
 First you'll need to install some prerequisites:
 
 - Debian/Ubuntu: 'sudo ../install/install-apt-deps.sh`
-- Centos/Fedora/Amazon Linux: 'sudo ../install/install-rmp-deps.sh`
+- Centos/Fedora/Amazon Linux: 'sudo ../install/install-rpm-deps.sh`
 - bgzip: `../install/install-htslib.sh ~/.profile ~/.local`
 
 Bystro also relies on a few `Go` programs, which can be installed with the following:
