@@ -19,5 +19,5 @@ COPY install-apt.sh /bystro/install-apt.sh
 # Install dependencies
 RUN cd /bystro && ./install-apt.sh
 
-# Ensure .profile gets sourced when the container starts
-CMD ["/bin/bash", "-c", "source ~/.profile && exec bash"]
+# Symlink everything in /bystro/perl/bin to /usr/local/bin
+RUN ln -s /bystro/perl/bin/* /usr/local/bin
