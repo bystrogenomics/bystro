@@ -220,7 +220,7 @@ class BatchAdaptationBayesian:
             if X_list[i].shape[1] != p:
                 raise ValueError("Batch %d has shape mismatch" % int(i))
 
-        delta_samples = [np.zeros(X_list[i].shape) for i in range(n_batches)]
+        delta_samples = [X_list[i].copy() for i in range(n_batches)]
         theta_samples = np.zeros(controls.shape)
 
         self.Posterior_Sigma_delta_mean = np.zeros((self.p, self.p))
@@ -231,12 +231,14 @@ class BatchAdaptationBayesian:
 
         if progress_bar:
             print("Starting burnin sampling")
-        for i in trange(self.n_burn, disable=not progress_bar):
+        for k in trange(self.n_burn, disable=not progress_bar):
             # Sample Sigma_delta
             Delta = np.vstack(delta_samples)
             S_delta = np.cov(Delta.T)
             nu_delta = p + self.nu_delta + Delta.shape[0]
             P_delta = self.Sigma_0_delta * np.eye(p) + S_delta * Delta.shape[0]
+            print(S_delta)
+
             Sigma_delta = invwishart.rvs(df=nu_delta, scale=P_delta)
 
             # Sample Sigma_epsilon
@@ -254,6 +256,8 @@ class BatchAdaptationBayesian:
 
             # Sample Sigma_theta
             S_theta = np.cov(theta_samples.T)
+            #if theta_true is not None:
+            #    S_theta = np.cov(theta_true.T)
             nu_theta = p + self.nu_theta + n_batches
             P_theta = self.Sigma_0_theta * np.eye(p) + S_theta * n_batches
             Sigma_theta = invwishart.rvs(df=nu_theta, scale=P_theta)
@@ -283,7 +287,9 @@ class BatchAdaptationBayesian:
 
         if progress_bar:
             print("Starting drawing samples")
-        for i in trange(self.n_samples, disable=not progress_bar):
+        for k in trange(self.n_samples, disable=not progress_bar):
+            if theta_true is not None:
+                theta_samples = theta_true.copy()
             Delta = np.vstack(delta_samples)
             S_delta = np.cov(Delta.T)
             nu_delta = p + self.nu_delta + Delta.shape[0]
@@ -305,13 +311,15 @@ class BatchAdaptationBayesian:
 
             # Sample Sigma_theta
             S_theta = np.cov(theta_samples.T)
+            if theta_true is not None:
+                S_theta = np.cov(theta_true.T)
             nu_theta = p + self.nu_theta + n_batches
             P_theta = self.Sigma_0_theta * np.eye(p) + S_theta * n_batches
             Sigma_theta = invwishart.rvs(df=nu_theta, scale=P_theta)
 
             #Sigma_theta = np.eye(p)
-            Sigma_delta = np.eye(p)
-            Sigma_epsilon = np.eye(p)
+            #Sigma_delta = np.eye(p)
+            #Sigma_epsilon = np.eye(p)
 
             # Sample theta_i
             Se_inv = la.inv(Sigma_epsilon)
@@ -323,17 +331,6 @@ class BatchAdaptationBayesian:
                 theta_samples[j] = multivariate_normal.rvs(
                     mean=mu_j, cov=Sigma_posterior
                 )
-            if theta_true is not None:
-                theta_samples = theta_true
-
-            if i == 10:
-                print(P_theta)
-            if i == 20:
-                print(P_theta)
-
-            if i == 60:
-                print(P_theta)
-                assert 1 == 2
 
             # Sample delta_ij
             Sd_inv = la.inv(Sigma_delta)

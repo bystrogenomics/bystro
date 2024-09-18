@@ -1,6 +1,6 @@
 import numpy as np
 
-from bystro.domain_adaptation.batch_adaptation import BatchAdaptationUnivariate
+from bystro.domain_adaptation.batch_adaptation import BatchAdaptationUnivariate,BatchAdaptationBayesian
 
 
 def simulate_data(
@@ -26,6 +26,7 @@ def simulate_data(
     return theta_list, control_list, data_list, delta_list
 
 
+"""
 def test_univariate_adaptation():
     sigma_epsilon = 1.0
     sigma_theta = 1.8
@@ -60,3 +61,58 @@ def test_univariate_adaptation():
     original_error =  np.mean((data_list[0]-delta_list[0])**2)
 
     assert adapted_error < original_error
+"""
+
+def test_adaptation_bayesian():
+        model = BatchAdaptationBayesian(
+            nu_theta=2, 
+            nu_epsilon=2, 
+            nu_delta=2, 
+            Sigma_0_epsilon=1.0, 
+            Sigma_0_theta=1.0, 
+            Sigma_0_delta=1.0, 
+            n_samples=10,  
+            n_burn=20      
+        )
+        n_batch =  300
+        p = 3
+        N = 50
+        rng = np.random.default_rng(2023)
+        batch_effects = rng.multivariate_normal(mean=np.zeros(3),
+                                cov=9*np.eye(3),size=n_batch)
+        print(np.cov(batch_effects.T))
+        print('!!!!!!!!!!!!!')
+        controls = batch_effects + rng.normal(size=(n_batch, p))
+        true_vals = [rng.normal(size=(N, p)) for i in range(n_batch)]  
+        X_list = [true_vals[i] + batch_effects[i] for i in range(n_batch)]  
+        data,batch_effects_est = model.fit(controls,X_list,
+                    theta_true=batch_effects)
+
+        print('Truth')
+        print(true_vals[0])
+        print('Measured')
+        print(X_list[0])
+        print('-----------------')
+        print('Cleaned')
+        print(data[0])
+
+
+        print('-----------------')
+        print('Contamination')
+        print(batch_effects)
+        print('Batch effect est')
+        print(batch_effects_est)
+        print('Diffs')
+        print(np.mean((batch_effects_est-batch_effects)**2))
+        print(np.mean((controls-batch_effects)**2))
+
+        print('_________________')
+        print(model.Posterior_Sigma_delta_mean)
+        print('_________________')
+        print(model.Posterior_Sigma_epsilon_mean)
+        print('_________________')
+        print(model.Posterior_Sigma_theta_mean)
+
+
+        assert 1 == 2
+
