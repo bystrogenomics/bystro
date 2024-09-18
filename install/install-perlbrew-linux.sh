@@ -14,6 +14,11 @@ DIR=$2
 VERSION=$3
 NOTEST="${4:-0}"
 
+# If $DIR ends in / strip it
+DIR="${DIR%/}"
+
+echo "DIR IS $DIR"
+
 SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"
 source "$SCRIPT_DIR/utils.sh"
 

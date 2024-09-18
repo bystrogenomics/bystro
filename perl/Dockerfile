@@ -17,7 +17,7 @@ RUN cd /app/bystro-go-tools && go install bystro/cmd/dosage
 # ---- Perl Stage ----
 # see https://hub.docker.com/_/perl/
 # comes with cpanm
-FROM perl:5.38
+FROM perl:5.34
 
 # Copy the compiled Go binaries from the builder stage
 COPY --from=go-builder /app/bin/ /app/bin/
@@ -67,12 +67,6 @@ RUN cpm install -g Dist::Zilla Archive::Tar::Wrapper
 # Install one-off Bystro dependencies that require special installation
 RUN cpm install -g https://github.com/bystrogenomics/msgpack-perl.git
 RUN cpm install -g --no-test MouseX::Getopt
-RUN git clone --depth 1 --recurse-submodules https://github.com/salortiz/LMDB_File.git \
-  && cd LMDB_File \
-  && cpanm --quiet .
-
-# Install workaround because default DBD::mysql, i.e. version >5.x, will not automatically install on ubuntu
-RUN cpm install -g DBD::MariaDB@1.23
 
 # Remove perl-deps directory
 RUN rm -rf /app/perl-deps

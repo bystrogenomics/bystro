@@ -36,7 +36,7 @@ The Bystro ancestry CLI `score` tool (`bystro-api ancestry score`) parses VCF fi
 
 ```sh
 # Requires Go: install from https://golang.org/doc/install
-go install github.com/bystrogenomics/bystro-vcf@2.2.2
+go install github.com/bystrogenomics/bystro-vcf@2.2.3
 ```
 
 Bystro is compatible with Linux and MacOS. Windows support is experimental. If you are installing on MacOS as a native binary (Arm), you will need to install the following additional dependencies:
@@ -55,8 +55,8 @@ Please refer to [INSTALL.md](INSTALL.md) for instructions on how to install the 
 
 Bystro relies on pluggable (via Bystro's YAML config) pre-processors to normalize variant inputs (**dealing with VCF issues such as padding**), calculate whether a site is a transition or transversion, calculate sample maf, identify hets/homozygotes/missing samples, calculate heterozygosity, homozygosity, missingness, and more.
 
-1. VCF format: [Bystro-Vcf](https://github.com/bystrogenomics/bystro-vcf/tree/2.2.2)
-2. SNP format: [Bystro-SNP](https://github.com/akotlar/bystro-snp)
+1. VCF format: [Bystro-Vcf](https://github.com/bystrogenomics/bystro-vcf/tree/2.2.3)
+2. SNP format: [Bystro-SNP](https://github.com/akotlar/bystro-snp/tree/1.0.1)
 3. Create your own to support other formats!
 
 ## Annotation (Output) Field Descriptions

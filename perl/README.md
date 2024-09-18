@@ -63,6 +63,10 @@ dzil install
 
 Install [cpm](https://metacpan.org/pod/App::cpm) with `curl -fsSL https://raw.githubusercontent.com/skaji/cpm/main/cpm | perl - install -g App::cpm`.
 
+NOTE: you will need mysql_config to install this:
+   ubuntu 22.04 LTS => sudo apt install -y libmariadb-dev libmariadb-dev-compat
+   amazon 2023 => sudo yum install -y <mariadb105>
+
 ```bash
 # install msgpack fork
 cpm install -g https://github.com/bystrogenomics/msgpack-perl.git
@@ -79,12 +83,6 @@ git clone --depth 1 --recurse-submodules https://github.com/salortiz/LMDB_File.g
   && cpanm . \
   && cd .. \
   && rm -rf LMDB_File
-
-# install mysql driver
-# NOTE: you will need mysql_config to install this
-#       ubuntu 22.04 LTS => sudo apt install -y libmariadb-dev libmariadb-dev-compat
-#       amazon 2023 => sudo yum install -y <mariadb105>
-cpm install -g DBD::MariaDB@1.23
 
 # clone bystro and change into perl package
 git clone git@github.com:bystrogenomics/bystro.git && cd bystro/perl

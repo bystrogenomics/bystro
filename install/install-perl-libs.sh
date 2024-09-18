@@ -23,10 +23,7 @@ install_custom_msgpack() {
     git clone --recursive https://github.com/bystrogenomics/msgpack-perl.git
     cd msgpack-perl
     git checkout 6fe098dd91e705b12c68d63bcb1f31c369c81e01
-    perl Build.PL
-    perl Build test
-    perl Build install
-    cd ..
+    cpm install -g --test .
     rm -rf msgpack-perl
 }
 

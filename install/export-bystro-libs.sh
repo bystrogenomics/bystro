@@ -11,6 +11,27 @@ fi
 PROFILE_FILE="$1"
 BYSTRO_INSTALL_DIR="$2"
 
+#Strip BYSTRO_INSTALL_DIR of trailing slashes
+BYSTRO_INSTALL_DIR="${BYSTRO_INSTALL_DIR%/}"
+
+echo "BYSTRO_INSTALL_DIR: $BYSTRO_INSTALL_DIR"
+
+# Verify that BYSTRO_INSTALL_DIR has perl, perl/bin, and perl/bin/bystro-annotate.pl
+if [ ! -d "$BYSTRO_INSTALL_DIR/perl" ]; then
+  echo "Error: Directory $BYSTRO_INSTALL_DIR/perl does not exist."
+  exit 1
+fi
+
+if [ ! -d "$BYSTRO_INSTALL_DIR/perl/bin" ]; then
+  echo "Error: Directory $BYSTRO_INSTALL_DIR/perl/bin does not exist."
+  exit 1
+fi
+
+if [ ! -f "$BYSTRO_INSTALL_DIR/perl/bin/bystro-annotate.pl" ]; then
+  echo "Error: File $BYSTRO_INSTALL_DIR/perl/bin/bystro-annotate.pl does not exist."
+  exit 1
+fi
+
 SCRIPT_DIR="$( cd "$( dirname "$0" )" && pwd )"
 # exports append_if_missing
 source "$SCRIPT_DIR/utils.sh"

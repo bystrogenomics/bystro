@@ -1,4 +1,4 @@
-# utils.sh
+#!/usr/bin/env bash
 
 # Function to append a line to PROFILE_FILE if it doesn't already exist
 append_if_missing() {
