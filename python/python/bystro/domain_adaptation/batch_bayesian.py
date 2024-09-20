@@ -45,6 +45,8 @@ class BatchAdaptationBayesian:
             Sigma_epsilon_list,
             Sigma_delta_list,
             theta_samples_list,
+            w,
+            w_list
         ) = gibbs_sampler(
             X_list, controls, n_samp=self.n_samples, n_burn=self.n_burn
         )
@@ -56,6 +58,8 @@ class BatchAdaptationBayesian:
         self.Sigma_theta_list = Sigma_theta_list
         self.Sigma_epsilon_list = Sigma_epsilon_list
         self.Sigma_delta_list = Sigma_delta_list
+        self.w = w
+        self.w_list = w_list
 
         return delta_estimates
 
@@ -129,6 +133,7 @@ def sample_sigma_eps_sigma_delta(
 
     # Run MCMC with the specified number of samples and warmup steps
     mcmc = MCMC(nuts_kernel, num_samples=num_samples, warmup_steps=warmup_steps)
+    #mcmc.disable_progbar()
     mcmc.run(x_obs, y_obs, nu_eps, nu_delta)
 
     # Extract samples
@@ -178,6 +183,8 @@ def gibbs_sampler(Yl, cont, n_samp=100, n_burn=50):
     Sigma_delta = np.eye(p)
     theta_samples = 0.9 * cont.copy()
     Y_tilde = [Yl[i] - theta_samples[i] for i in range(nb)]
+    w = np.zeros(p)
+    w_list = []
 
     rng = np.random.default_rng(2021)
 
@@ -206,11 +213,19 @@ def gibbs_sampler(Yl, cont, n_samp=100, n_burn=50):
         Sigma_delta_list.append(Sigma_delta)
         theta_samples_list.append(theta_samples)
 
+        Sig_eps = np.diag(Sigma_epsilon)
+        Sig_the = np.diag(Sigma_theta)
+        w_temp = Sig_the / (Sig_the + Sig_eps)
+        w += w_temp/n_samp
+        w_list.append(w_temp)
+
     return (
         Sigma_theta_list,
         Sigma_epsilon_list,
         Sigma_delta_list,
         theta_samples_list,
+        w,
+        w_list
     )
 
 
