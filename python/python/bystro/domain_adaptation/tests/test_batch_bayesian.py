@@ -21,7 +21,7 @@ def simulate_data(n_batches=30, n_samples=15, p=3, seed=1993):
 def test_bayesian():
     X_list, controls, true_vals, batch_effects = simulate_data()
 
-    model = BatchAdaptationBayesian(n_burn=20,n_samples=50)
+    model = BatchAdaptationBayesian(n_burn=20, n_samples=50)
     data_altered = model.fit_transform(X_list, controls)
 
     data_altered_stack = np.vstack(data_altered)
