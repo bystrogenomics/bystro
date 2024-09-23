@@ -84,8 +84,6 @@ class BasePOE:
             raise ValueError("Too small of homozygous sample size, (>30)")
         if np.sum(y == 1) < 30:
             raise ValueError("Too small of heterozygous sample size, (>30)")
-        if not np.all(np.isin(y, [0, 1, 2])):
-            raise ValueError("The array contains values other than 0, 1, or 2")
 
     def transform(
         self, X: np.ndarray, return_inner: bool = False
@@ -259,13 +257,20 @@ class POESingleSNP(BasePOE):
             The instance of the method.
         """
         self._test_inputs(X, y)
+        if not np.all(np.isin(y, [0, 1, 2])):
+            print(
+                "Non-valid genotypes detected (allowed = 0,1,2). Samples removed"
+            )
+            idxs_allowed = (y == 0) | (y == 1) | (y == 2)
+            X = X[idxs_allowed]
+            y = y[idxs_allowed]
         self.n_phenotypes = X.shape[1]
 
         n_0 = np.sum(y == 0)
         n_2 = np.sum(y == 2)
-        hetero_idx = 2 if self.allow_alternative_reference & (n_2 > n_0) else 0
+        homo_idx = 2 if self.allow_alternative_reference & (n_2 > n_0) else 0
 
-        X_homozygotes = X[y == hetero_idx]
+        X_homozygotes = X[y == homo_idx]
         X_heterozygotes = X[y == 1]
         X_homozygotes = X_homozygotes - np.mean(X_homozygotes, axis=0)
         X_heterozygotes = X_heterozygotes - np.mean(X_heterozygotes, axis=0)
@@ -310,7 +315,7 @@ class POESingleSNP(BasePOE):
                     idx_hetero[
                         rng.choice(n_total, size=n_hetero, replace=False)
                     ] = 1
-                    X_homo = X_total[idx_hetero == hetero_idx]
+                    X_homo = X_total[idx_hetero == homo_idx]
                     X_hetero = X_total[idx_hetero == 1]
                     X_homo = X_homo - np.mean(X_homo, axis=0)
                     X_hetero = X_hetero - np.mean(X_hetero, axis=0)
