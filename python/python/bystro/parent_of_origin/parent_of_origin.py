@@ -152,6 +152,7 @@ class POESingleSNP(BasePOE):
         compute_ci: bool = False,
         store_samples: bool = False,
         pval_method: str = "rmt4ds",
+        allow_alternative_reference: bool = True,
         n_permutations_pval: int = 10000,
         n_permutations_bootstrap: int = 10000,
         cov_regularization: str = "Empirical",
@@ -173,6 +174,9 @@ class POESingleSNP(BasePOE):
 
         pval_method : str, optional, default="rmt4ds"
             The method for p-value computation.
+
+        allow_alternative_reference : bool, optional, default=True
+            Whether to allow the "alternative" allele to be the reference
 
         n_permutations_pval : int, optional, default=10000
             The number of permutations for p-value calculation.
@@ -199,6 +203,7 @@ class POESingleSNP(BasePOE):
         self.n_permutations_bootstrap = n_permutations_bootstrap
         self.pval_method = pval_method
         self.store_samples = store_samples
+        self.allow_alternative_reference = allow_alternative_reference
 
         if cov_regularization == "Empirical":
             self.cov_reg: Union[
@@ -252,9 +257,20 @@ class POESingleSNP(BasePOE):
             The instance of the method.
         """
         self._test_inputs(X, y)
+        if not np.all(np.isin(y, [0, 1, 2])):
+            print(
+                "Non-valid genotypes detected (allowed = 0,1,2). Samples removed"
+            )
+            idxs_allowed = (y == 0) | (y == 1) | (y == 2)
+            X = X[idxs_allowed]
+            y = y[idxs_allowed]
         self.n_phenotypes = X.shape[1]
 
-        X_homozygotes = X[y == 0]
+        n_0 = np.sum(y == 0)
+        n_2 = np.sum(y == 2)
+        homo_idx = 2 if self.allow_alternative_reference & (n_2 > n_0) else 0
+
+        X_homozygotes = X[y == homo_idx]
         X_heterozygotes = X[y == 1]
         X_homozygotes = X_homozygotes - np.mean(X_homozygotes, axis=0)
         X_heterozygotes = X_heterozygotes - np.mean(X_heterozygotes, axis=0)
@@ -299,7 +315,7 @@ class POESingleSNP(BasePOE):
                     idx_hetero[
                         rng.choice(n_total, size=n_hetero, replace=False)
                     ] = 1
-                    X_homo = X_total[idx_hetero == 0]
+                    X_homo = X_total[idx_hetero == homo_idx]
                     X_hetero = X_total[idx_hetero == 1]
                     X_homo = X_homo - np.mean(X_homo, axis=0)
                     X_hetero = X_hetero - np.mean(X_hetero, axis=0)
@@ -672,6 +688,7 @@ class POEMultipleSNP2(BasePOE):
         self,
         pval_method: str = "rmt4ds",
         cov_regularization: str = "Empirical",
+        allow_alternative_reference: bool = True,
         svd_loss: Optional[str] = None,
         n_repeats: int = 4000,
     ) -> None:
@@ -683,6 +700,7 @@ class POEMultipleSNP2(BasePOE):
         """
         self.pval_method = pval_method
         self.cov_regularization = cov_regularization
+        self.allow_alternative_reference = allow_alternative_reference
         if cov_regularization == "Empirical":
             self.cov_reg: Union[
                 EmpiricalCovariance,
@@ -743,6 +761,7 @@ class POEMultipleSNP2(BasePOE):
             model = POESingleSNP(
                 compute_pvalue=True,
                 compute_ci=False,
+                allow_alternative_reference=self.allow_alternative_reference,
                 cov_regularization=self.cov_regularization,
                 svd_loss=self.svd_loss,
             )
