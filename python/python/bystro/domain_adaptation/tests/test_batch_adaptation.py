@@ -55,8 +55,8 @@ def test_univariate_adaptation():
     assert error_adapted < error_original
     assert error_adapted < error_subtracted
 
-    data_new = model.transform(data_list[0],control_list[0])
-    adapted_error =  np.mean((data_new-delta_list[0])**2)
-    original_error =  np.mean((data_list[0]-delta_list[0])**2)
+    data_new = model.transform(data_list[0], control_list[0])
+    adapted_error = np.mean((data_new - delta_list[0]) ** 2)
+    original_error = np.mean((data_list[0] - delta_list[0]) ** 2)
 
     assert adapted_error < original_error
