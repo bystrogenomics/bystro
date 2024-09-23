@@ -35,6 +35,7 @@ dependencies = [
     "ecos==2.0.13",
     "osqp==0.6.5",
     "cvxpy==1.5.2",
+    "pyro-ppl==1.9.0",
     "somadata==1.0.0",
     "statsmodels==0.14.2",
     "nest-asyncio==1.6.0",

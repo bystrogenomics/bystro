@@ -3,7 +3,7 @@ import numpy.linalg as la
 from scipy.stats import invwishart  # type: ignore
 import torch
 import pyro
-import pyro.distributions as dist  # type: ignore
+from pyro.distributions.torch import MultivariateNormal, LKJCholesky
 from pyro.infer import MCMC, NUTS
 
 
@@ -98,10 +98,10 @@ def sample_sigma_eps_sigma_delta(
         ]  # Number of dimensions, should be the same for both x and y
 
         # Sample Cholesky factor for Sigma_eps (L_eps)
-        L_eps = pyro.sample("L_eps", dist.LKJCholesky(d, d + nu_eps))  # type: ignore
+        L_eps = pyro.sample("L_eps", LKJCholesky(d, d + nu_eps))  # type: ignore
 
         # Sample Cholesky factor for Sigma_delta (L_delta)
-        L_delta = pyro.sample("L_delta", dist.LKJCholesky(d, d + nu_delta))  # type: ignore
+        L_delta = pyro.sample("L_delta", LKJCholesky(d, d + nu_delta))  # type: ignore
 
         # Convert Cholesky factors to covariance matrices
         Sigma_eps = L_eps @ L_eps.T
@@ -111,7 +111,7 @@ def sample_sigma_eps_sigma_delta(
         with pyro.plate("x_plate", x_obs.shape[0]):
             pyro.sample(
                 "x",
-                dist.MultivariateNormal(  # type: ignore
+                MultivariateNormal(  # type: ignore
                     torch.zeros_like(x_obs[0]), covariance_matrix=Sigma_eps
                 ),
                 obs=x_obs,
@@ -121,7 +121,7 @@ def sample_sigma_eps_sigma_delta(
         with pyro.plate("y_plate", y_obs.shape[0]):
             pyro.sample(
                 "y",
-                dist.MultivariateNormal(  # type: ignore
+                MultivariateNormal(  # type: ignore
                     torch.zeros_like(y_obs[0]),
                     covariance_matrix=Sigma_eps + Sigma_delta,
                 ),
