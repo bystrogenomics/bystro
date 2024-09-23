@@ -1,37 +1,115 @@
 #!/usr/bin/env bash
+set -e
+set -o pipefail
 
-echo -e "\n\nInstalling Debian (rpm) dependencies\n";
+# Ensure the script is run with root privileges
+if [[ $EUID -ne 0 ]]; then
+   echo "This script must be run as root. Use sudo."
+   exit 1
+fi
 
-sudo yum install gcc -y;
-sudo yum install openssl -y;
-sudo yum install openssl-devel -y;
-# Not strictly necessary, useful however for much of what we do
-sudo yum install git-all -y;
-# pigz for Bystro, used to speed up decompression primarily
-sudo yum install pigz -y;
-sudo yum install unzip -y;
-sudo yum install wget -y;
-# For tests involving querying ucsc directly
-sudo yum install mysql-devel -y;
-# For Search::Elasticsearch::Client::5_0::Direct
-sudo yum install libcurl-devel -y
+# Import the MariaDB GPG key
+rpm --import https://yum.mariadb.org/RPM-GPG-KEY-MariaDB
 
-# for perlbrew, in case you want to install a different perl version
-#https://www.digitalocean.com/community/tutorials/how-to-install-perlbrew-and-manage-multiple-versions-of-perl-5-on-centos-7
-# centos 7 doesn't include bzip2
-sudo yum install bzip2  -y;
-sudo yum install lz4 --enable-repo=epel;
-sudo yum install patch -y;
+# Source OS release information
+. /etc/os-release
 
-sudo yum install cpan -y;
+# Determine the appropriate base URL for your OS
+case "$ID" in
+  "fedora")
+    OS_NAME="fedora"
+    OS_VERSION="${VERSION_ID}"
+    ;;
 
-curl --silent --location https://rpm.nodesource.com/setup_12.x | sudo bash -;
+  "centos"|"rhel")
+    OS_NAME="centos"
+    OS_VERSION="${VERSION_ID%%.*}"
+    ;;
 
-sudo yum install nodejs -y;
+  "amzn")
+    if [[ "$VERSION_ID" == "2" ]]; then
+      OS_NAME="centos"
+      OS_VERSION="7"
+    elif [[ "$VERSION_ID" == "2023" ]]; then
+      OS_NAME="rhel"
+      OS_VERSION="9"
+    else
+      echo "Unsupported Amazon Linux version."
+      exit 1
+    fi
+    ;;
 
-sudo npm install -g pm2;
+  *)
+    echo "Unsupported OS. This script supports Fedora, CentOS, RHEL, and Amazon Linux."
+    exit 1
+    ;;
+esac
 
-sudo yum install awscli -y;
+# Set the MariaDB version you wish to install
+MARIADB_VERSION="11.4"
 
-# pkg-config is required for building the wheel
-sudo yum install -y pkg-config;
+# Create the MariaDB.repo file
+cat <<EOF >/etc/yum.repos.d/MariaDB.repo
+# MariaDB $MARIADB_VERSION repository list - created $(date +"%F %T")
+# https://mariadb.org/download/
+[mariadb]
+name = MariaDB
+baseurl = https://yum.mariadb.org/$MARIADB_VERSION/$OS_NAME$OS_VERSION-amd64
+gpgkey = https://yum.mariadb.org/RPM-GPG-KEY-MariaDB
+gpgcheck = 1
+EOF
+
+# Clean the dnf cache
+dnf clean all
+
+# Install MariaDB-devel
+dnf install -y MariaDB-devel
+
+# Check if mariadb_config is installed
+if command -v mariadb_config > /dev/null; then
+    echo "MariaDB development libraries installed successfully."
+else
+    echo "Failed to install MariaDB development libraries. Please check the repository configuration."
+    exit 1
+fi
+
+echo -e "\n\nInstalling RPM dependencies\n"
+
+dnf groupinstall -y "Development Tools"
+
+# Install all required packages
+# autoconf automake make gcc perl-Data-Dumper zlib-devel bzip2 bzip2-devel xz-devel curl-devel openssl-devel libdeflate-devel are required to build htslib
+# cmake required to build libdeflate-devel, which is not available on amazonlinux 2023
+dnf install -y \
+  autoconf automake make gcc perl-Data-Dumper zlib-devel bzip2 bzip2-devel xz-devel curl-devel openssl-devel cmake \
+  openssl \
+  git \
+  pigz \
+  unzip \
+  wget \
+  tar \
+  libcurl-devel \
+  lz4 \
+  patch \
+  perl \
+  perl-core \
+  pkgconf-pkg-config \
+  grep
+
+# Install Node.js 20.x
+curl --silent --location https://rpm.nodesource.com/setup_20.x | bash -
+dnf install -y nodejs
+
+# Create a temporary directory
+mkdir -p /tmp/awscli-install
+cd /tmp/awscli-install
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install --update
+cd -
+rm -rf /tmp/awscli-install
+
+# Install pm2 globally using npm
+npm install -g pm2
+
+echo -e "\n\nAll dependencies have been installed successfully.\n"

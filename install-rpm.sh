@@ -1,39 +1,107 @@
 #!/usr/bin/env bash
+set -e
+set -o pipefail
 
-if [[ -n "$1" ]]
-then
-  INSTALL_DIR=$1
+# Default values
+DEFAULT_GO_PLATFORM="linux-amd64"
+DEFAULT_GO_VERSION="1.21.4"
+DEFAULT_PROFILE_FILE=$(./install/detect-shell-profile.sh "$HOME")
+
+# Function to display usage information
+show_help() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --profile-file PROFILE_FILE   Specify the shell profile file to update (default: auto-detected, e.g., ~/.bash_profile)"
+    echo "  --go-platform GO_PLATFORM     Specify the Go platform (default: linux-amd64)"
+    echo "  --go-version GO_VERSION       Specify the Go version (default: 1.21.4)"
+    echo "  --help                        Show this help message and exit"
+    echo ""
+    exit 0
+}
+
+# Parse command-line arguments
+PROFILE_FILE="$DEFAULT_PROFILE_FILE"
+GO_PLATFORM="$DEFAULT_GO_PLATFORM"
+GO_VERSION="$DEFAULT_GO_VERSION"
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --profile-file)
+            PROFILE_FILE="$2"
+            shift 2
+            ;;
+        --go-platform)
+            GO_PLATFORM="$2"
+            shift 2
+            ;;
+        --go-version)
+            GO_VERSION="$2"
+            shift 2
+            ;;
+        --help)
+            show_help
+            ;;
+        *)
+            echo "Unknown option: $1"
+            show_help
+            ;;
+    esac
+done
+
+# Use the home directory of the invoking user, not root
+if [[ -n "$SUDO_USER" ]]; then
+    HOME_DIR="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
 else
-  INSTALL_DIR=~
+    HOME_DIR="$HOME"
 fi
 
-# # LiftOver is used for the LiftOverCadd.pm package, to liftOver cadd to hg38
-# and cadd's GRCh37.p13 MT to hg19
-. install/install-liftover-linux.sh;
-. install/install-rpm-deps.sh;
-. install/install-lmdb-linux.sh;
+echo "Home directory is $HOME_DIR"
 
-. ~/.bash_profile;
+BYSTRO_INSTALL_DIR=$(pwd)
+LOCAL_INSTALL_DIR="$HOME_DIR/.local"
+BINARY_INSTALL_DIR="$HOME_DIR/.local/bin"
 
-# Perlbrew simplifies version management
-. ./install/install-perlbrew-linux.sh $INSTALL_DIR perl-5.30.1;
-. ./install/install-perl-libs.sh;
+echo "Install directory is $BYSTRO_INSTALL_DIR"
+echo "PROFILE is $PROFILE_FILE"
+echo "Go platform is $GO_PLATFORM"
 
-. ~/.bash_profile;
+# Install RPM dependencies
+sudo ./install/install-rpm-deps.sh
 
-# # Bystro is increasingly a golang progrma. Perl currently handles db fetching,
-. install/install-go-linux.sh $INSTALL_DIR;
+# Install HTSlib
+./install/install-htslib.sh "$PROFILE_FILE" "$LOCAL_INSTALL_DIR"
 
-. ~/.bash_profile;
+# Install LiftOver
+./install/install-liftover-linux.sh "$PROFILE_FILE" "$BINARY_INSTALL_DIR" 
 
-. install/install-go-packages.sh;
-. install/update-packages.sh;
+# Install LMDB
+sudo ./install/install-lmdb-linux.sh
 
-. ./install/export-bystro-libs.sh ~/.bash_profile
+# Install Perlbrew
+./install/install-perlbrew-linux.sh "$PROFILE_FILE" "$HOME_DIR" perl-5.34.0
 
-. ~/.bash_profile;
+# Install Go
+./install/install-go.sh "$PROFILE_FILE" "$HOME_DIR" "$LOCAL_INSTALL_DIR" "$BYSTRO_INSTALL_DIR" "$GO_PLATFORM" "$GO_VERSION"
 
-mkdir -p logs;
+# Export Bystro libraries to shell profile
+./install/export-bystro-libs.sh "$PROFILE_FILE" "$BYSTRO_INSTALL_DIR" 
 
+# Create logs directory
+mkdir -p logs
 
-printf "\n\nREMEMBER TO INCREASE ULIMIT ABOVE 1024 IF RUNNING MANY FORKS\n\nF RUNNING 1st TIME RUN: `source $PERLBREW_ROOT/etc/bashrc`";
+echo "\nTesting Bystro installation"
+
+bash -c ". $PROFILE_FILE && cd perl && prove -r ./t -j$(nproc)"
+if [ $? -eq 0 ]; then
+  echo "\nBystro installation succeeded!"
+else
+  echo "\nBystro installation failed"
+  exit 1
+fi
+
+echo -e "\n\nREMEMBER TO INCREASE ULIMIT ABOVE 1024 IF RUNNING MANY FORKS\n\n"
+
+echo -e "To get started with Bystro, for instance to run Bystro Annotator: \n"
+echo "Update your shell to reflect the newly installed programs: 'source $PROFILE_FILE'"
+echo "Run Bystro Annotator: 'bystro-annotate.pl --help'"
+echo -e "\n\n"

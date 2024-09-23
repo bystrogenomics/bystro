@@ -1,32 +1,6 @@
-# Table of Contents
-
-1. [Installing Bystro Python Libraries and CLI Tools](#installing-the-bystro-python-libraries-and-cli-tools)
-2. [Installing Bystro Using Docker](#installing-bystro-using-docker)
-   - [Building the Latest Version of Bystro in Docker](#building-the-latest-version-of-bystro-in-docker)
-3. [Direct (Non-Docker) Installation](#direct-non-docker-installation)
-   - [Installing the Bystro Annotator (Perl/CLI)](#installing-the-bystro-annotator-perlcli)
-     - [For RPM-based Distros (Fedora, Red Hat, CentOS, etc.)](#fedora-redhat-centos-opensuse-mandriva)
-     - [For MacOS (Tested on High Sierra)](#macos-tested-on-highsierra-interactive)
-     - [For Ubuntu](#ubuntu)
-4. [Configuring the Bystro Annotator](#configuring-the-bystro-annotator)
-5. [Databases](#databases)
-6. [Running Your First Annotation](#running-your-first-annotation)
-
-For most users, we recommend not installing the software, and using https://bystro.io, where the software is hosted
-
-The web app provides full functionality for any size experiment, a convenient search interface, and excellent performance
-
 # Installing the Bystro Python libraries and cli tools
 
-Bystro consists of 2 main components:
-
-1. The Bystro annotator (Perl) which is a command line tool for building new Bystro annotation databases, and for annotating VCF files with those databases.
-2. The `bystro` Python package, which contains:
-   1. The `bystro` library, which contains general purpose machine learning / statistical methods as well as applications of these methods in biology, with methods like global ancestry, polygenic risk score calculation, and proteomic analysis (data cleaning, pQTL, joining/filtering on genetic data).
-   2. The `bystro-api` command line tool, which is a command line interface for the Bystro API server. This is used to login to Bystro cluster, submit jobs, and check job status. It has most of the functionality of the web application, but is more convenient for batch processing.
-   3. For enterprise users that have their own Bystro cluster, the Bystro Python package also gives the ability to launch workers to handle Bystro API server requests (`bystro-save-worker`, `bystro-index-worker`).
-
-To install the Bystro Python package, run:
+To install the Bystro Python package, which contains our machine learning library and some application in genetics and proteomics, run:
 
 ```sh
 pip install --pre bystro
@@ -85,99 +59,10 @@ To start the workers, update `config/beanstalk.yml` to point to the correct bean
 make serve-dev
 ```
 
-# Installing Bystro using Docker
+## Installing the Bystro Annotator
 
-###### The recommended way to use Bystro on the command line
+Besides the Bystro ML library, which lives in bystro/python, we also have a Perl library that is used to annotate genetic data, providing necessary information for the Bystro ML library bioinformatics modules.
 
-Make sure you have [Docker installed](https://store.docker.com/search?type=edition&offering=community)
+The Bystro Annotator, which handles processing genetic data (VCF files), performing quality control, feature labeling (annotation) of variants and samples, and generating an annotation output and genotype dosage matrices, is written in Perl.
 
-#### Building the latest version of Bystro in Docker
-
-```
-git clone https://github.com/bystrogenomics/bystro.git && cd bystro
-docker build -t bystro .
-docker run bystro bystro-annotate.pl #Annotate
-docker run bystro bystro-build.pl #Build
-```
-
-# Direct (non-Docker) installation
-
-There are 2 components to Bystro:
-
-1.  The Bystro annotator: a Perl program accessed through the command line (via bin/bystro-\*)
-2.  The Bystro Python package: where the rest of Bystro's functionality lives (statistics, proteomics, etc).
-
-## Installing the Bystro annotator (Perl/cli)
-
-##### (Fedora, Redhat, Centos, openSUSE, Mandriva)
-
-1.  `git clone https://github.com/bystrogenomics/bystro.git && cd bystro && source ./install-rpm.sh`
-
-##### MacOS (tested on HighSierra, interactive)
-
-1.  `git clone https://github.com/bystrogenomics/bystro.git && cd bystro && source ./install-mac.sh`
-
-##### Ubuntu
-
-1.  Ensure that packages are up to date (`sudo apt update`), or that you are satisified with the state of package versions.
-2.  `git clone https://github.com/bystrogenomics/bystro.git && cd bystro && source ./install-apt.sh`
-    - Please not that this installation script will ask you for the root password in order to install system dependencies
-
-## Configuring the Bystro annotator
-
-Once Bystro is installed, it needs to be configured. The easiest step is choosing the species/assemblies to annotate.
-
-1. Download the Bystro database for your species/assembly
-
-- **Example:** hg38 (human reference GRCh38): `wget https://s3.amazonaws.com/bystro-db/hg38_v8.tar.gz`</strong>
-  - You need ~700GB of free space for hg38 and ~400GB of free space for hg19, including the space for the tar.gz archives
-
-2. To install the database:
-
-   **Example:**
-
-   ```shell
-   cd /mnt/annotator/
-   wget https://s3.amazonaws.com/bystro-db/hg38_v8.tar.gz
-   bgzip -d -c --threads 32 hg38_v8.tar.gz | tar xvf -
-   ```
-
-   In this example the hg38 database would located in `/mnt/annotator/hg38`
-
-3. Update the YAML configuration for the species/assembly to point to the database.
-
-   For human genome assemblies, we provide pre-configured hg19.yml and hg38.yml, which assume `/mnt/annotator/hg19_v10` and `/mnt/annotator/hg38_v8` database directories respectively.
-
-   If using a different mount point, different database folder name, or a different (or custom-built) database altogether,
-   you will need to update the `database_dir` property of the yaml config.
-
-   - Note for a custom database, you would also need to ensure the track `outputOrder` lists all tracks, and that each track has all desired `features` listed
-
-   For instance, using `yq` to can configure the `database_dir` and set `temp_dir` to have in-progress annotations written to local disk
-
-   ```shell
-   yq write -i config/hg38.yml database_dir /mnt/my_fast_local_storage/hg38_v8
-   yq write -i config/hg38.yml temp_dir /mnt/my_fast_local_storage/tmp
-   ```
-
-## Databases:
-
-1. Human (hg38): https://s3.amazonaws.com/bystro-db/hg38_v8.tar.gz
-2. Human (hg19): https://s3.amazonaws.com/bystro-db/hg19_v10.tar.gz
-3. There are no restrictions on species support, but we currently only build human genomes. Please create a GitHub issue if you would like us to support others.
-
-## Running your first annotation
-
-Ex: Runing hg38 annotation
-
-```sh
-bin/bystro-annotate.pl --config config/hg38.yml --in /path/in.vcf.gz --out /path/outPrefix --run_statistics [0,1] --compress
-```
-
-The outputs will be:
-
-- Annotation (compressed, due to --compress flag): `outPrefix.annotation.tsv.gz`
-- Annotation log: `outPrefix.log.txt`
-- Statistics JSON file `outPrefix.statistics.json`
-- Statistics tab-separated file: `outPrefix.statistics.tsv`
-  - Removing the `--run_statistics` flag will skip the generation of `outPrefix.statistics.*` files
+To install and configure the Bystro Annotator, follow the instructions in [perl/INSTALL.md](perl/INSTALL.md).

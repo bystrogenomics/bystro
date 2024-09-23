@@ -4,6 +4,7 @@ from bystro.supervised_ppca.ppca_augmented import (
     PPCAadversarial,
     PPCAsupervised,
     PPCASupAdversarial,
+    PPCAadversarialRandomized,
 )
 
 
@@ -78,6 +79,24 @@ def test_fit_adversarial():
     pca_model = PPCAadversarial(
         n_components=2, mu=10000.0, regularization="NonLinear"
     )
+    pca_model.fit(X, Y)
+
+
+def test_fit_randomized():
+    rng = np.random.default_rng(2021)
+    L = 3
+    p = 100
+    N = 1000
+    S = rng.normal(size=(N, L))
+    W = rng.normal(size=(L, p))
+    W[0] = 3 * W[0]
+    W[1] = 2 * W[1]
+    X_hat = np.dot(S, W)
+    X = X_hat + rng.normal(size=(N, p))
+
+    Y = S[:, 0].reshape((-1, 1))
+
+    pca_model = PPCAadversarialRandomized(n_components=2, mu=10000.0)
     pca_model.fit(X, Y)
 
 
