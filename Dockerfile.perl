@@ -29,8 +29,8 @@ COPY install-apt.sh /bystro/install-apt.sh
 # Install dependencies
 RUN cd /bystro && ./install-apt.sh \
     && apt clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
-    && . /root/.profile && go clean -modcache && rm -rf /root/.cache/go-build && /root/go/src \
-    && rm -rf /root/perl5/perlbrew/build /root/.perl-cpm
+    && bash -c "source ~/.profile && go clean -modcache" && rm -rf ~/.cache/go-build && ~/go/src \
+    && rm -rf ~/perl5/perlbrew/build ~/.perl-cpm
 
 WORKDIR /bystro
 
