@@ -283,7 +283,7 @@ class POESingleSNP(BasePOE):
         if self.assess_model_assumptions:
             variances_homo = np.var(X_homozygotes, axis=0)
             variances_hetero = np.var(X_heterozygotes, axis=0)
-            invalid_variance = np.any(variances_hetero < variances_homo)
+            invalid_variance = np.all(variances_hetero < variances_homo)
             any_zero = np.any(variances_homo == 0)
             if invalid_variance or any_zero:
                 print("Data do not match model assumptions")

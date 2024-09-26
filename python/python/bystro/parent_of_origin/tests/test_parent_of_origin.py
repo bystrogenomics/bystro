@@ -244,12 +244,14 @@ def test_decision_function():
     beta_m = np.zeros(n_p)
     beta_p = np.zeros(n_p)
     beta_p[:3] = 0.5
-    data = generate_data(beta_m, beta_p, rng, maf=0.1, n_individuals=20000)
+    data = generate_data(beta_m, beta_p, rng, maf=0.1, n_individuals=200000)
     model = POESingleSNP(
         compute_pvalue=True, cov_regularization="QuadraticInverse"
     )
     model.fit(data["phenotypes"], data["genotype"])
     diff = beta_p - beta_m
+    X = data['phenotypes']
+    y = data['genotype']
     assert np.abs(cosine_similarity(diff, model.parent_effect_)) > 0.95
 
     model = POESingleSNP(
@@ -260,7 +262,6 @@ def test_decision_function():
     )
     model.fit(data["phenotypes"], data["genotype"])
     assert model.p_val < 0.01
-
 
 def test_multi_fit():
     np.set_printoptions(suppress=True)
@@ -274,7 +275,6 @@ def test_multi_fit():
     )
     model = POEMultipleSNP()
     model.fit(data["phenotypes"], data["genotypes"])
-
 
 def test_multi2_fit():
     np.set_printoptions(suppress=True)
