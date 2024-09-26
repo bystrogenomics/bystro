@@ -1,5 +1,8 @@
-import numpy as np
 import pickle
+import os
+
+import numpy as np
+
 from bystro.covariance.hypothesis_hd import (
     sy2010,
     clx2013,
@@ -9,11 +12,13 @@ from bystro.covariance.hypothesis_hd import (
     schott2007,
 )
 
+def get_pickle_file_path():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(script_dir, "hypothesis_hd_data.pkl")
+
 
 def test_sy2010():
-    with open(
-        "python/bystro/covariance/tests/hypothesis_hd_data.pkl", "rb"
-    ) as f:
+    with open(get_pickle_file_path(), "rb") as f:
         data = pickle.load(f)
     X = data["X"]
     Y = data["Y"]
@@ -30,9 +35,7 @@ def test_sy2010():
 
 
 def test_clx2013():
-    with open(
-        "python/bystro/covariance/tests/hypothesis_hd_data.pkl", "rb"
-    ) as f:
+    with open(get_pickle_file_path(), "rb") as f:
         data = pickle.load(f)
     X = data["X"]
     Y = data["Y"]
@@ -49,9 +52,7 @@ def test_clx2013():
 
 
 def test_hc2018():
-    with open(
-        "python/bystro/covariance/tests/hypothesis_hd_data.pkl", "rb"
-    ) as f:
+    with open(get_pickle_file_path(), "rb") as f:
         data = pickle.load(f)
     X = data["X"]
     Y = data["Y"]
@@ -119,9 +120,7 @@ def test_hc2018():
 
 
 def test_two_sample_test():
-    with open(
-        "python/bystro/covariance/tests/hypothesis_hd_data.pkl", "rb"
-    ) as f:
+    with open(get_pickle_file_path(), "rb") as f:
         data = pickle.load(f)
     X = data["X"]
     Y = data["Y"]
@@ -153,9 +152,7 @@ def test_two_sample_test():
 
 
 def test_hd2017():
-    with open(
-        "python/bystro/covariance/tests/hypothesis_hd_data.pkl", "rb"
-    ) as f:
+    with open(get_pickle_file_path(), "rb") as f:
         data = pickle.load(f)
     X = data["X"]
     Y = data["Y"]
@@ -172,9 +169,7 @@ def test_hd2017():
 
 
 def test_schott2007():
-    with open(
-        "python/bystro/covariance/tests/hypothesis_hd_data.pkl", "rb"
-    ) as f:
+    with open(get_pickle_file_path(), "rb") as f:
         data = pickle.load(f)
     X = data["X"]
     Y = data["Y"]

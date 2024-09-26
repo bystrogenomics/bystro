@@ -5,7 +5,7 @@ use warnings;
 package Utils::SqlWriter::Connection;
 
 use DBI;
-use DBD::mysql 4.051;
+use DBD::MariaDB 1.23; # Specify the version of DBD::MariaDB
 
 our $VERSION = '0.001';
 
@@ -15,26 +15,14 @@ use Mouse 2;
 use namespace::autoclean;
 
 # The actual configuration
-has driver   => ( is => 'ro', isa => 'Str', default => "DBI:mysql" );
+has driver => ( is => 'ro', isa => 'Str', default => "DBI:MariaDB" )
+  ;                    # Use MariaDB driver
 has host     => ( is => 'ro', isa => 'Str', default => "genome-mysql.soe.ucsc.edu" );
 has user     => ( is => 'ro', isa => 'Str', default => "genome" );
 has password => ( is => 'ro', isa => 'Str', );
 has port     => ( is => 'ro', isa => 'Int', );
 has socket   => ( is => 'ro', isa => 'Str', );
 has database => ( is => 'ro', isa => 'Maybe[Str]' );
-
-=method @public sub connect
-
-  Build database object, and return a handle object
-
-Called in: none
-
-@params:
-
-@return {DBI}
-  A connection object
-
-=cut
 
 around BUILDARGS => sub {
   my ( $orig, $self, $data ) = @_;
@@ -57,8 +45,8 @@ sub connect {
   my $connection = $self->driver;
   $connection .= ":database=$databaseName;host=" . $self->host if $self->host;
   $connection .= ";port=" . $self->port                        if $self->port;
-  $connection .= ";mysql_socket=" . $self->port_num            if $self->socket;
-  $connection .= ";mysql_read_default_group=client";
+  $connection .= ";mariadb_socket=" . $self->port_num          if $self->socket;
+  $connection .= ";mariadb_read_default_group=client"; # Change to MariaDB option
 
   return DBI->connect(
     $connection,

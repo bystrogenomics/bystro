@@ -12,7 +12,7 @@ analyses and handles large (Tb) sized experiments. Features include:
 
 ## Open Source
 
-The open source command line annotator that powers bystro is located at the [bystro](https://github.com/akotlar/bystro).
+The open source command line annotator that powers bystro is located at the [bystro](https://github.com/bystrogenomics/bystro).
 
 ## ACM-BCB 2018 Presentation
 

@@ -8,3 +8,5 @@
 *.feather binary
 
 *.zip binary
+
+*.ipynb linguist-vendored

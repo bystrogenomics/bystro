@@ -160,7 +160,6 @@ sub getInnerFileCommand {
   my $compressed =
        $innerFile =~ /[.]gz$/
     || $innerFile =~ /[.]bgz$/
-    || $innerFile =~ /[.]zip$/
     || $filePath  =~ /[.]lz4$/;
 
   my $innerCommand;
@@ -204,7 +203,7 @@ sub isCompressedSingle {
     return 0;
   }
 
-  if ( $basename =~ /[.]gz$/ || $basename =~ /[.]bgz$/ || $basename =~ /[.]zip$/ ) {
+  if ( $basename =~ /[.]gz$/ || $basename =~ /[.]bgz$/ ) {
     return "gzip";
   }
 
@@ -251,7 +250,7 @@ sub getWriteFh {
   }
 
   my $fh;
-  my $hasGz  = $file =~ /[.]gz$/ || $file =~ /[.]bgz$/ || $file =~ /[.]zip$/;
+  my $hasGz  = $file =~ /[.]gz$/ || $file =~ /[.]bgz$/;
   my $hasLz4 = $file =~ /[.]lz4$/;
   if ( $hasGz || $hasLz4 || $compress ) {
     if ( $hasLz4 || ( $compress && $compress =~ /[.]lz4$/ ) ) {

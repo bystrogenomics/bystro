@@ -47,7 +47,7 @@ statistics:
   programPath: bystro-stats
   refTrackField: ref
   siteTypeField: refSeq.siteType
-temp_dir: /mnt/annotator/tmp
+temp_dir: ~
 tracks:
   outputOrder:
     - ref

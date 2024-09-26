@@ -1,13 +1,13 @@
 # ---- Build Golang Binaries ----
-FROM golang:1.21.3 AS go-builder
+FROM golang:1.21.4 AS go-builder
 
 # Set the environment variable for Go binaries. This makes sure the binaries are saved to a defined path.
 ENV GOBIN=/app/bin
 
 # Install the specific versions of the Go programs
-RUN go install github.com/akotlar/bystro-stats@1.0.0
-RUN go install github.com/bystrogenomics/bystro-vcf@2.2.2;
-RUN go install github.com/akotlar/bystro-snp@1.0.0
+RUN go install github.com/bystrogenomics/bystro-stats@1.0.1;
+RUN go install github.com/bystrogenomics/bystro-vcf@2.2.3;
+RUN go install github.com/bystrogenomics/bystro-snp@1.0.1;
 RUN go install github.com/mikefarah/yq@2.4.1
 
 COPY ./go /app/bystro-go-tools
@@ -45,8 +45,9 @@ ENV PATH="/usr/local/go/bin:${PATH}"
 # Set up the workspace
 WORKDIR /workspace
 
-# Copy the entire monorepo
+COPY ./startup.yml ./startup.yml
 COPY ./python ./python
+COPY ./config ./config
 
 # Install Python and dependencies
 RUN pip install --upgrade pip && pip install python/ -r python/requirements-dev.txt
@@ -54,6 +55,10 @@ RUN pip install --upgrade pip && pip install python/ -r python/requirements-dev.
 COPY ./Makefile ./
 
 RUN make install-python
+
+# Run pytest before installation
+RUN pytest python/ --maxfail=1 --disable-warnings
+
 
 ENTRYPOINT ["bystro-api"]
 
