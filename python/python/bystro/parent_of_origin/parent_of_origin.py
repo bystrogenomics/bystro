@@ -180,9 +180,9 @@ class POESingleSNP(BasePOE):
             Whether to allow the "alternative" allele to be the reference
 
         assess_model_assumptions : bool, optional, default=True
-            There's no point running the model if the data violate model
-            assumptions, namely variance of heterozygotes exceed homozygotes
-
+            If True, the model will assess whether certain assumptions are met before running.
+            Specifically, it checks if the variance of heterozygotes is less than that of homozygotes.
+            If the assumptions are violated, the model will not proceed with further computations.
         n_permutations_pval : int, optional, default=10000
             The number of permutations for p-value calculation.
 
