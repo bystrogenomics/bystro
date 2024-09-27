@@ -5,6 +5,7 @@ import torch
 import pyro
 from pyro.distributions import MultivariateNormal, LKJCholesky
 from pyro.infer import MCMC, NUTS
+from tqdm import trange
 
 
 class BatchAdaptationBayesian:
@@ -132,7 +133,7 @@ def sample_sigma_eps_sigma_delta(
     nuts_kernel = NUTS(model)
 
     # Run MCMC with the specified number of samples and warmup steps
-    mcmc = MCMC(nuts_kernel, num_samples=num_samples, warmup_steps=warmup_steps)
+    mcmc = MCMC(nuts_kernel, num_samples=num_samples, warmup_steps=warmup_steps,disable_progbar=True)
     mcmc.run(x_obs, y_obs, nu_eps, nu_delta)
 
     # Extract samples
@@ -187,7 +188,7 @@ def gibbs_sampler(Yl, cont, n_samp=100, n_burn=50):
 
     rng = np.random.default_rng(2021)
 
-    for i in range(n_burn):
+    for i in trange(n_burn):
         y_obs = torch.tensor(np.vstack(Y_tilde), dtype=torch.float)
         x_obs = torch.tensor(cont - theta_samples, dtype=torch.float)
         Sigma_epsilon, Sigma_delta = sample_sigma_eps_sigma_delta(
@@ -197,7 +198,7 @@ def gibbs_sampler(Yl, cont, n_samp=100, n_burn=50):
         theta_samples = sample_thetas(Sigma_theta, Sigma_epsilon, cont, rng)
         Y_tilde = [Yl[i] - theta_samples[i] for i in range(nb)]
 
-    for i in range(n_samp):
+    for i in trange(n_samp):
         y_obs = torch.tensor(np.vstack(Y_tilde), dtype=torch.float)
         x_obs = torch.tensor(cont - theta_samples, dtype=torch.float)
         Sigma_epsilon, Sigma_delta = sample_sigma_eps_sigma_delta(
