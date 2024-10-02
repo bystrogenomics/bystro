@@ -16,30 +16,30 @@ use DDP;
 use Seq::Build;
 
 my (
-  $yaml_config, $wantedType,      $wantedName, $verbose,
-  $maxThreads,  $help,            $wantedChr,  $dryRunInsertions,
-  $logDir,      $debug,      $overwrite,
-  $delete,      $regionTrackOnly, $skipCompletionCheck
+  $yaml_config,     $wantedType, $wantedName, $verbose,
+  $maxThreads,      $help,       $wantedChr,  $dryRunInsertions,
+  $logDir,          $debug,      $overwrite,  $delete,
+  $regionTrackOnly, $skipCompletionCheck
 );
 
 $debug = 0;
 
 # usage
 GetOptions(
-  'c|config=s'                                => \$yaml_config,
-  't|type=s'                                  => \$wantedType,
-  'n|name=s'                                  => \$wantedName,
-  'v|verbose=i'                               => \$verbose,
-  'h|help'                                    => \$help,
-  'd|debug=i'                                 => \$debug,
-  'o|overwrite'                               => \$overwrite,
-  'chr=s'                                     => \$wantedChr,
-  'delete'                                    => \$delete,
-  'build_region_track_only'                   => \$regionTrackOnly,
-  'skip_completion_check'                     => \$skipCompletionCheck,
-  'dry_run_insertions|dry|dryRun'             => \$dryRunInsertions,
-  'log_dir=s'                                 => \$logDir,
-  'threads=i'                                 => \$maxThreads
+  'c|config=s'                    => \$yaml_config,
+  't|type=s'                      => \$wantedType,
+  'n|name=s'                      => \$wantedName,
+  'v|verbose=i'                   => \$verbose,
+  'h|help'                        => \$help,
+  'd|debug=i'                     => \$debug,
+  'o|overwrite'                   => \$overwrite,
+  'chr=s'                         => \$wantedChr,
+  'delete'                        => \$delete,
+  'build_region_track_only'       => \$regionTrackOnly,
+  'skip_completion_check'         => \$skipCompletionCheck,
+  'dry_run_insertions|dry|dryRun' => \$dryRunInsertions,
+  'log_dir=s'                     => \$logDir,
+  'threads=i'                     => \$maxThreads
 ) or pod2usage(2);
 
 if ($help) {
