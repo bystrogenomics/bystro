@@ -5,7 +5,7 @@ setup(
     name="bystro",
     package_dir={"bystro": "python/bystro"},
     ext_modules=cythonize(
-        "python/bystro/search/**/*.pyx",
+        "python/bystro/**/**/*.pyx",
         build_dir="build",
         compiler_directives={"language_level": "3"},
     ),
