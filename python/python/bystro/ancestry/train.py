@@ -8,6 +8,8 @@ This script takes a vcf of preprocessed variants (see preprocess_vcfs.sh) and ge
 
 3.  Classifiers mapping PC space to the 26 HapMap populations as well as 5 continent-level
 superpopulations.
+
+Training for current models occurs in train_chip_model.py and train_gnomad_model.py
 """
 
 import dataclasses
@@ -43,15 +45,17 @@ ANCESTRY_DIR = Path(__file__).parent
 DATA_DIR = ANCESTRY_DIR / "data"
 KGP_VCF_DIR = DATA_DIR / "kgp_vcfs"
 INTERMEDIATE_DATA_DIR = ANCESTRY_DIR / "intermediate_data"
-VCF_PATH = DATA_DIR / "1KGP_final_variants_1percent.vcf.gz"
+VCF_PATH = DATA_DIR / "1kgp_gnomadset_unrelated.vcf.gz"
 ANCESTRY_MODEL_PRODUCTS_DIR = ANCESTRY_DIR / "ancestry_model_products"
+PCA_FPATH = ANCESTRY_MODEL_PRODUCTS_DIR / "hg38_gnomadset_pca.csv"
+RFC_FPATH = ANCESTRY_MODEL_PRODUCTS_DIR / "hg38_gnomadset_rfc.skop"
 # TODO Set up download of gnomad loadings in preprocess step
 GNOMAD_LOADINGS_PATH = "gnomadloadings.tsv"
 # TODO Set up preprocess of this file that doesn't include dependency like plink or bcftools
 KGP_VCF_FILTERED_TO_GNOMAD_LOADINGS_FILEPATH = "1kgpGnomadList.vcf"
 
 
-ANCESTRY_INFO_PATH = DATA_DIR / "20130606_sample_info.txt"
+ANCESTRY_INFO_PATH = DATA_DIR / "KGP_ancestry.csv"
 ROWS, COLS = 0, 1
 QUALITY_CUTOFF = 100  # for variant quality filtering
 PLOIDY = 2
@@ -110,38 +114,34 @@ Variant = str
 def _load_callset() -> dict[str, Any]:
     """Load callset and perform as many checks as can be done without processing it."""
     callset = allel.read_vcf(str(VCF_PATH), log=sys.stdout)
-    num_variants, num_samples = 1203135, 2504
+    genotypes = callset["calldata/GT"]
+    num_variants, num_samples = genotypes.shape[0], genotypes.shape[1]
     assert_equals(
         f"chromosomes in {VCF_PATH}",
         {int(chrom) for chrom in callset["variants/CHROM"]},
         "autosomal chromosomes",
         AUTOSOMAL_CHROMOSOMES,
     )
-    genotypes = callset["calldata/GT"]
-    assert_equals(
-        "genotype dimensions",
-        genotypes.shape,
-        "predicted genotype dimensions",
-        (num_variants, num_samples, PLOIDY),
+    assert_true(
+        "variant and sample dimensions",
+        num_variants > 33000 and num_samples >= 2504,
         comment=(
-            f"VCF file {VCF_PATH} had unexpected dimensions.  Expected matrix of shape: "
-            f"(num_variants: {num_variants}, num_samples: {num_samples}, ploidy: {PLOIDY})"
-        ),
+            f"VCF file {VCF_PATH} had unexpected dimensions. "
+            f"Expected more than 33,000 variants and 2504 or more samples, "
+            f"but got {num_variants} variants and {num_samples} samples."
+        )
     )
     return callset
 
 
 def load_callset_for_variants(variants: set[str]) -> pd.DataFrame:
     """Load Thousand Genomes data filtered to variants."""
-    file_template = "ALL.chr{}.shapeit2_integrated_v1a.GRCh38.20181129.phased.vcf.gz"
     genotype_dfs = []
-    for chromosome in range(1, 22 + 1):
-        logger.info("starting on chromosome: %s", chromosome)
-        file_path = str(KGP_VCF_DIR / file_template.format(chromosome))
-        genotype_df = parse_vcf(file_path, variants)
-        logger.info("got genotype_df of shape: %s", genotype_df.shape)
-        genotype_dfs.append(genotype_df)
-    return pd.concat(genotype_dfs, axis=1)
+    logger.info("starting on loading callset")
+    genotype_df = parse_vcf(VCF_PATH, variants)
+    logger.info("got genotype_df of shape: %s", genotype_df.shape)
+    genotype_dfs.append(genotype_df)
+    return pd.concat(genotype_dfs, axis=0)
 
 
 def _parse_vcf_line_for_dosages(
@@ -361,35 +361,37 @@ def filter_samples_for_relatedness(
 
 
 def _load_ancestry_df() -> pd.DataFrame:
-    ancestry_df = pd.read_csv(ANCESTRY_INFO_PATH, sep="\t", index_col=0)
-    assert_equals("number of rows", 3500, "actual number of rows", len(ancestry_df))
+    ancestry_df = pd.read_csv(ANCESTRY_INFO_PATH, sep=",")
+    assert_equals("number of rows", 3195, "actual number of rows", len(ancestry_df))
     expected_samples = ["NA12865", "HG03930", "NA19171"]
     assert_true(
-        "Index passes spot checks", all(sample in ancestry_df.index for sample in expected_samples)
+        "Sample name column passes spot checks", 
+        all(sample in ancestry_df['Sample name'].values for sample in expected_samples)
     )
+    ancestry_df.set_index('Sample name', inplace=True)
     return ancestry_df
-
 
 def load_label_data(samples: pd.Index) -> pd.DataFrame:
     """Load dataframe of population, superpop labels for samples."""
     ancestry_df = _load_ancestry_df()
-    missing_samples = set(samples) - set(ancestry_df.index)
+    missing_samples = set(samples) - set(ancestry_df.index.values)
     if missing_samples:
         msg = f"Ancestry dataframe is missing samples: {missing_samples}"
         raise AssertionError(msg)
-    populations = sorted(ancestry_df["Population"].unique())
+    populations = sorted(ancestry_df["Population elastic ID"].unique())
     if EXPECTED_NUM_POPULATIONS != len(populations):
         msg = (
             f"Found wrong number of populations ({len(populations)}) in ancestry df, "
             f"expected {EXPECTED_NUM_POPULATIONS}"
         )
         raise ValueError(msg)
-    get_pop_from_sample = ancestry_df["Population"].to_dict()
+    get_pop_from_sample = ancestry_df["Population elastic ID"].to_dict()
     labels = pd.DataFrame(
         [get_pop_from_sample[s] for s in samples],
         index=samples,
-        columns=["population"],
+        columns=["Population elastic ID"],
     )
+    labels.rename(columns={'Population elastic ID': 'population'}, inplace=True)
     labels["superpop"] = labels["population"].apply(SUPERPOP_FROM_POP.get)
 
     assert_true("no missing data in labels", labels.notna().all().all())
@@ -846,10 +848,8 @@ def _get_mi_df(train_X: pd.DataFrame, train_y_pop: pd.Series) -> pd.DataFrame:
 
 def serialize_model_products(pca_df: pd.DataFrame, rfc: RandomForestClassifier) -> None:
     """Serialize variant list, pca and rfc to disk as .txt, .skops files."""
-    pca_fpath = ANCESTRY_MODEL_PRODUCTS_DIR / "pca.csv"
-    rfc_fpath = ANCESTRY_MODEL_PRODUCTS_DIR / "rfc.skop"
-    pca_df.to_csv(pca_fpath)
-    skops_dump(rfc, rfc_fpath)
+    pca_df.to_csv(PCA_FPATH)
+    skops_dump(rfc, RFC_FPATH)
 
 
 def main() -> None:
