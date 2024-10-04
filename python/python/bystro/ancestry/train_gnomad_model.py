@@ -4,7 +4,6 @@ import pandas as pd
 from sklearn.decomposition import PCA
 
 from bystro.ancestry.train import (
-    filter_samples_for_relatedness,
     load_callset_for_variants,
     load_label_data,
     make_rfc,
@@ -38,7 +37,6 @@ def main() -> None:
     """Train PCA, RF for gnomad variants, save model products to disk."""
     kgp_genotypes = load_kgp_genotypes_for_shared_variants()
     labels = load_label_data(kgp_genotypes.index)
-    kgp_genotypes, labels = filter_samples_for_relatedness(kgp_genotypes, labels)
     train_X, test_X, train_y, test_y = make_train_test_split(
         kgp_genotypes,
         labels,
