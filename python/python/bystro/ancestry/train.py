@@ -129,7 +129,7 @@ def _load_callset() -> dict[str, Any]:
             f"VCF file {VCF_PATH} had unexpected dimensions. "
             f"Expected more than 33,000 variants and 2504 or more samples, "
             f"but got {num_variants} variants and {num_samples} samples."
-        )
+        ),
     )
     return callset
 
@@ -365,16 +365,17 @@ def _load_ancestry_df() -> pd.DataFrame:
     assert_equals("number of rows", 3195, "actual number of rows", len(ancestry_df))
     expected_samples = ["NA12865", "HG03930", "NA19171"]
     assert_true(
-        "Sample name column passes spot checks", 
-        all(sample in ancestry_df['Sample name'].values for sample in expected_samples)
+        "Sample name column passes spot checks",
+        all(sample in ancestry_df["Sample name"].to_numpy() for sample in expected_samples),
     )
-    ancestry_df.set_index('Sample name', inplace=True)
+    ancestry_df = ancestry_df.set_index("Sample name")
     return ancestry_df
+
 
 def load_label_data(samples: pd.Index) -> pd.DataFrame:
     """Load dataframe of population, superpop labels for samples."""
     ancestry_df = _load_ancestry_df()
-    missing_samples = set(samples) - set(ancestry_df.index.values)
+    missing_samples = set(samples) - set(ancestry_df.index)
     if missing_samples:
         msg = f"Ancestry dataframe is missing samples: {missing_samples}"
         raise AssertionError(msg)
@@ -391,7 +392,7 @@ def load_label_data(samples: pd.Index) -> pd.DataFrame:
         index=samples,
         columns=["Population elastic ID"],
     )
-    labels.rename(columns={'Population elastic ID': 'population'}, inplace=True)
+    labels = labels.rename(columns={"Population elastic ID": "population"})
     labels["superpop"] = labels["population"].apply(SUPERPOP_FROM_POP.get)
 
     assert_true("no missing data in labels", labels.notna().all().all())

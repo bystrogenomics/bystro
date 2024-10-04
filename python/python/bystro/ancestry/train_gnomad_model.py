@@ -4,7 +4,6 @@ import pandas as pd
 from sklearn.decomposition import PCA
 
 from bystro.ancestry.train import (
-    INTERMEDIATE_DATA_DIR,
     filter_samples_for_relatedness,
     load_callset_for_variants,
     load_label_data,
@@ -17,10 +16,12 @@ VARIANT_PATH = "hg38_gnomad_snpset.csv"
 
 pd.options.future.infer_string = True  # type: ignore
 
+
 def load_model_variants() -> set[str]:
     """Get set of variants to train ancestry model."""
     return set(pd.read_csv(VARIANT_PATH).variants)
-    
+
+
 def load_kgp_genotypes_for_shared_variants() -> pd.DataFrame:
     """Get KGP genotypes filtered to shared variants."""
     variants = load_model_variants()
