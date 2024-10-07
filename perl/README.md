@@ -180,7 +180,7 @@ print(df)
 - Note that missing genotypes are reprsented as -1 in the genotype dosage matrix output
 - If a sample's genotype contains any missing genotypes, the sample is considered missing for the site
 
-#### Explanation For SIMPLE_SNP
+#### Explanation for SIMPLE_SNP
 
 VCF Representation:
 
@@ -202,7 +202,7 @@ Bystro Genotype Dosage Matrix Output:
 
 The Bystro and VCF formats for simple, well-normalized SNPs are the same. In addition to the position, variant type, reference, and alternate, Bystro's VCF preprocessor (bystro-vcf) also outputs whether a variant is a transition (1), transversion (2) or neither (0), descriptive information about the genotypes, including which samples are heterozyogtes, homozygotes, or missing genotypes, vcfPos (which describes the original position in the VCF file, pre-normalization), and the VCF ID. Meanwhile the genotype dosage matrix output shows the number of alternate alleles for each sample at each variant.
 
-#### Explanation For MULTIALLELIC_SNP
+#### Explanation for MULTIALLELIC_SNP
 
 VCF Representation:
 
@@ -219,7 +219,7 @@ Bystro Representation:
 
 The VCF representation shows two different SNPs at the same position. NA00001 and NA00002 have 1 copy of each allele, while NA00003 has 2 copies of the A>T allele and 0 copies of A>G. Bystro's representation decomposes the multiallelic site into two separate rows, one for each allele. The first row shows the A>G allele, and the second row shows the A>T allele. Since NA00001 and NA00002 are heterozygous for both A>G and A>T, on each line they are listed in the heterozygotes columns, while NA00003 is homozygous for A>T and is listed in the homozygotes column only for the A>T allele row. The zygosity and sampleMaf (sample minor allele frequency) fields are calculated based on the allele in the row.
 
-#### Explanation For SIMPLE_INSERTION
+#### Explanation for SIMPLE_INSERTION
 
 VCF Representation:
 
@@ -235,7 +235,7 @@ Bystro Representation:
 
 The VCF representation shows an insertion of a C base after the A base at position 1. Bystro's representation shows the insertion as occurring at the A base, with the reference base being A and the alternate allele being +C. The heterozygotes column lists NA00003 as heterozygous for the insertion.
 
-#### Explanation For INSERTION_BETWEEN_TWO_BASES
+#### Explanation for INSERTION_BETWEEN_TWO_BASES
 
 VCF Representation:
 
@@ -251,7 +251,7 @@ Bystro Representation:
 
 The VCF representation shows an insertion of CC between the A and T bases. Bystro's representation shows the insertion as occurring after the A base, with the reference base being A and the alternate allele being +CC. NA00001 and NA00002 are heterozygous for the insertion, while NA00003 is homozygous for the insertion and therefore listed in the homozygotes column.
 
-#### Explanation For microsat1
+#### Explanation for microsat1
 
 VCF Representation:
 
@@ -270,7 +270,7 @@ The VCF representation shows a multiallelic site with two alleles. The first all
 
 The second allele is GTCT>GTACT, with the insertion of an "A" occuring after the "T" base at position 1234568. Again, because of the VCF format's padding rule, this representation cannot be shown directly in the VCF format, but must be inferred. Bystro normalizes the representation, showing the insertion at the correct base, 1234568.
 
-#### Explanation For EXAMPLE_MISSING_MNP
+#### Explanation for EXAMPLE_MISSING_MNP
 
 VCF Representation:
 
