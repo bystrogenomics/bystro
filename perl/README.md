@@ -1013,6 +1013,8 @@ A machine learning method for predicting pathogenic GOF, pathogenic LOF, and neu
 
 `logofunc.lof`: The LoGoFunc loss of function (LOF) score
 
+<br/>
+
 ### (hg38-only) [GeneBass](<https://www.cell.com/cell-genomics/pdf/S2666-979X(22)00110-0.pdf>)
 
 GeneBass provides statistics on the impact of genetic variants from gene-based phenome-wide association study (PheWAS) analysis results. See the link for more information.
