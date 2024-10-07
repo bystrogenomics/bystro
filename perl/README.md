@@ -118,7 +118,7 @@ The Bystro Genotype Dosage Matrix, is a columnar dataset, generated for every co
 
 Below we'll demonstrate how the Bystro Annotator handles different kinds of variants, using some examples. We'll do these demonstartions using the Bystro VCF preprocessor, which is a Go program used by the Bystro Annotator to convert a VCF into a partially annotated tab-separated output. The Bystro VCF preprocessor is installed with Bystro Annotator (see the [INSTALL.md](./INSTALL.md) file for instructions on how to install Bystro Annotator). If you don't have Bystro Annotator installed, you can still run the examples as long as you install the Bystro VCF preprocessor by running `go install github.com/bystrogenomics/bystro-vcf@2.2.3`.
 
-Please note that we are not showing the full Bystro Annotator outputs, which are far too extensive to easily display here.
+Please note that we are not showing the full Bystro Annotator output described below. We're showing just the first 17 columns of the output, which are the most important for understanding the variant representation and sample genotype handling.
 
 ```
 cat ~/bystro/perl/example_vcf.tsv | bystro-vcf --keepId --emptyField "NA" --keepPos
