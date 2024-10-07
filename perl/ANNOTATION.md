@@ -999,6 +999,8 @@ A machine learning method for predicting pathogenic GOF, pathogenic LOF, and neu
 
 ### (hg38-only) [GeneBass](<https://www.cell.com/cell-genomics/pdf/S2666-979X(22)00110-0.pdf>)
 
+GeneBass provides statistics on the impact of genetic variants from gene-based phenome-wide association study (PheWAS) analysis results. See the link for more information.
+
 `genebass.id`: The GeneBass VCF `ID`
 
 `genebass.alt`: The Bystro VCF-preprocessor's ALT record for this GeneBass site. This should always match the row's `alt` field value
