@@ -199,7 +199,7 @@ bystro-annotate.pl --help
 
 Once Bystro is installed, we need to download a database for the species/assembly we're going to be analyzing and then configure the Bystro Annotator to use it.
 
-Database configurations are stored in YAML files in the `config` directory. By default Bystro ships with configurations for human genome assemblies hg19 (~/bystro/config/hg19.yml) and hg38 (~/bystro/config/hg38.yml), though you can create your own configurations for other species/assemblies.
+Database configurations are stored in YAML files in the `config` directory. By default Bystro ships with configurations for human genome assemblies hg19 (`~/bystro/config/hg19.yml`) and hg38 (`~/bystro/config/hg38.yml`), and the Rat assembly rn7 (`~/bystro/config/rn7.yml`) though you can create your own configurations for other species/assemblies.
 
 ### Example Configuration
 
