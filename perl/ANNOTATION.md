@@ -46,7 +46,7 @@ Compared with the VCF format, Bystro's variant representation has the following 
 
 SNPs: Unchanged
 
-Insertions: The reference base is always the base just before the insertion, and the alternate allele is the inserted sequence, preceeded by a +. The position is the first affected base.
+Insertions: The reference base is always the base just before the insertion, and the alternate allele is the inserted sequence, preceded by a +. The position is the first affected base.
 
 - For instance, if the VCF had POS: 1 REF: AT and ALT: ACCT, Bystro will represent this as inputRef: T, alt: +CCT, pos: 1, with the position the same as that in the VCF file, which is the first position of the reference base (the base just before the first inserted base). In Bystro's case there is only 1 reference base always, so the position is that of the only affected base.
 
