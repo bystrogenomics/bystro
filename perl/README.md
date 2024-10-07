@@ -1022,4 +1022,4 @@ GeneBass provides statistics on the impact of genetic variants from gene-based p
 
 `genebass.phenocode`: The GeneBass phenotype code
 
-`genebass.description: The GeneBass description
+`genebass.description`: The GeneBass description
