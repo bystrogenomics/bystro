@@ -40,7 +40,7 @@ Bystro Databases can be re-created from the YAML configuration file correspondin
 
 #### Variant Representation
 
-Bystro's variant representation deviates slightly from the standard VCF format. Namely, Bystro ensures that the reference base is always a single nuleotide, and does the appropriate normalization/transformation of input variants to ensure this. This variant representation greatly simplifies downstream analysis.
+Bystro's variant representation deviates slightly from the standard VCF format. Namely, Bystro ensures that the reference base is always a single nucleotide, and does the appropriate normalization/transformation of input variants to ensure this. This variant representation greatly simplifies downstream analysis.
 
 Compared with the VCF format, Bystro's variant representation has the following differences:
 
