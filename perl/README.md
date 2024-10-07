@@ -991,8 +991,6 @@ ClinVar annotations, sourced from the ClinVar VCF dataset
 
 `clinvarVcf.RS`: dbSNP ID (i.e. rs number)
 
-// add logofunc.id logofunc.alt logofunc.prediction logofunc.neutral logofunc.gof logofunc.lof genebass.id genebass.alt genebass.phenocode genebass.description
-
 <br/>
 
 ### (hg38-only) [LoGoFunc](
