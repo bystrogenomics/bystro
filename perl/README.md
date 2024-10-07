@@ -10,7 +10,7 @@ Bystro Annotator annotates variants as well as sample genotypes. It is capable o
 
 Bystro's performance isn't just about speed, it's also about comprehensiveness. In statistics "dimensionality" refers to how many parameters/covariates/descriptions a model has. Imagine that we are modeling a genetic variant to try to understand how it impacts a disease. The parameters in the model are the annotations we have for that variant. Bystro can output thousands of annotations for each variant, and can do so for millions of variants in seconds. This is why we call it "high dimensional".
 
-For exampole, Bystro can afford to provide complete annotations from gnomad v4.1, for all gnomAD populations and subpopulations, from the exomes, genomes, and joint datasets, genome-wide. This means intersecting terabytes of data over the entire genome with each individual variant, all done in microseconds per variant. **No other tool can do this**.
+For example, Bystro can afford to provide complete annotations from gnomad v4.1, for all gnomAD populations and subpopulations, from the exomes, genomes, and joint datasets, genome-wide. This means intersecting terabytes of data over the entire genome with each individual variant, all done in microseconds per variant. **No other tool can do this**.
 
 ## Running Your First Annotation
 
