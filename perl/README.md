@@ -116,7 +116,7 @@ The Bystro Genotype Dosage Matrix, is a columnar dataset, generated for every co
 
 ### Comparing the VCF and Bystro Variant Representations
 
-Below we'll demonstrate the Bystro Annotation and Dosage Matrix outputs, using some examples. You may run these examples, if you have Bystro installed, or at least the Bystro VCF Preprocessor. The Bystro VCF Preprocessor, which is a tool that takes a VCF file and outputs a Bystro-annotator compatible TSV file, which is then used by the Perl Bystro Annotator to add annotations to the VCF file from the Bystro Annotation Database. You can install it by running `go install github.com/bystrogenomics/bystro-vcf@2.2.3`.
+Below we'll demonstrate how the Bystro Annotator handles different kinds of variants, using some examples. We'll do these demonstartions using the Bystro VCF preprocessor, which is a Go program used by the Bystro Annotator to convert a VCF into a partially annotated tab-separated output. The Bystro VCF preprocessor is installed with Bystro Annotator (see the [INSTALL.md](./INSTALL.md) file for instructions on how to install Bystro Annotator). If you don't have Bystro Annotator installed, you can still run the examples as long as you install the Bystro VCF preprocessor by running `go install github.com/bystrogenomics/bystro-vcf@2.2.3`.
 
 Please note that we are not showing the full Bystro Annotator outputs, which are far too extensive to easily display here.
 
@@ -141,7 +141,7 @@ Input Example VCF:
 | 20    | 1234567 | microsat1                   | GTCT | G,GTACT | 50   | PASS   | .                                 | GT:GQ:DP    | 0/1:35:4       | 0/2:17:2       | 1/1:40:3       |
 | 20    | 3       | EXAMPLE_MISSING_MNP         | CCC  | AAA     | 50   | PASS   | NS=3;DP=9;AA=G                    | GT          | ./1            | 0/0            | 1/1            |
 
-Expected Bystro VCF Preprocessor Output:
+Expected Bystro VCF preprocessor Output:
 
 | chrom | pos     | type         | inputRef | alt | trTv | heterozygotes   | heterozygosity | homozygotes | homozygosity | missingGenos | missingness | ac  | an  | sampleMaf | vcfPos  | id                          |
 | ----- | ------- | ------------ | -------- | --- | ---- | --------------- | -------------- | ----------- | ------------ | ------------ | ----------- | --- | --- | --------- | ------- | --------------------------- |
