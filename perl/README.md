@@ -108,7 +108,7 @@ Bystro's variant representation deviates slightly from the standard VCF format i
 
 - The `inputRef` (reference base) in Bystro's annotation outputs is always exactly 1 base long
 
-- The `pos' (position) in Bystro's annotation outputs is always the first affected base, except in the case of insertions, where it is the base before the insertion, since the insertion by definition is between two reference bases
+- The `pos` (position) in Bystro's annotation outputs is always the first affected base, except in the case of insertions, where it is the base before the insertion, since the insertion by definition is between two reference bases
 
 - It is possible to represent all multiallelic site using a single reference base, a single position, and a list of alleles
 
