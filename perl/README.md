@@ -350,7 +350,7 @@ Sourced from the input file, or calculated based on input fields from the VCF or
 
 `missingGenos` - The samples that did not have a genotype (e.g., ".") at the site. If an individual has at least 1 missing genotype, they are considered missing for the site.
 
-- e.g., .|., .|0 are all considered missing
+- For instance, `0|.` , `.|.` , `.|0` are all considered missing and result in the sample being added to the `missingGenos` field, and the `an` being decremented by the zygosity (typically 2 for humans)
 
 `missingness` - The fraction of all samples that have missing genotypes for the alternate allele
 
