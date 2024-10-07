@@ -1,4 +1,4 @@
-# Bystro High Dimensional Genomic Variant and Sample Annotator Documentation
+# Bystro High Dimensional Genomic Annotator Documentation
 
 ## What is the Bystro Annotator?
 
