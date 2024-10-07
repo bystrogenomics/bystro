@@ -177,7 +177,7 @@ print(df)
 | chr20:4:C:A        | -1     | 0      | 2      |
 | chr20:5:C:A        | -1     | 0      | 2      |
 
-- Note that missing genotypes are reprsented as -1 in the genotype dosage matrix output
+- Note that missing genotypes are represented as -1 in the genotype dosage matrix output
 - If a sample's genotype for a variant has any missing alleles, we consider that sample as missing for the variant: in the annotation output it is added to the `missingGenos` column, `an` is subtracted by the zygosity (typically 2 for humans), while in the genotype dosage matrix, the sample's genotype dosage is `-1`
 - If every sample's genotype for a variant has 1+ missing alleles, the variant is dropped from all outputs
 
