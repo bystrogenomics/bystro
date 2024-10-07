@@ -106,11 +106,11 @@ Bystro Annotator is a general-purpose data curation and labeling engine for gene
 
 Bystro's variant representation deviates slightly from the standard VCF format in the name of simplicity. In particular, it drops the rule that the alternate allele must be ACTG. Dropping this single restriction allows us to represent deletions as occuring at the actual first deleted base, rather than the base before, as in the VCF format. This has a number of knock on benefits:
 
-    The `inputRef` (reference base) in Bystro's annotation outputs is always exactly 1 base long
+- The `inputRef` (reference base) in Bystro's annotation outputs is always exactly 1 base long
 
-    The `pos' (position) in Bystro's annotation outputs is always the first affected base, except in the case of insertions, where it is the base before the insertion, since the insertion by definition is between two reference bases
+- The `pos' (position) in Bystro's annotation outputs is always the first affected base, except in the case of insertions, where it is the base before the insertion, since the insertion by definition is between two reference bases
 
-    It is possible to represent all multiallelic site using a single reference base, a single position, and a list of alleles
+- It is possible to represent all multiallelic site using a single reference base, a single position, and a list of alleles
 
 The Bystro Genotype Dosage Matrix, is a columnar dataset, generated for every collection of VCFs submitted. Its first column is the `locus`, which is `chr:pos:ref:alt`. Every column after that is labeled by the sample name, and contains a -1 for missing genotypes, 0 for reference, 1 for a single alternate allele, 2 for 2 alternate alleles (homozygous in a diploid organism), and so on. It can be used for many things, such as to calculate polygenic risk scores.
 
