@@ -459,6 +459,8 @@ Annotations from the gnomAD v4.1 (hg38 assembly annotations) or v2.1.1 (hg19 ass
 
 Since the data available for hg19 and hg38 differ, we will discuss them separately below.
 
+<br/>
+
 ### hg38 gnomad.joint
 
 Annotations from the gnomAD v4.1 (hg38 assembly annotations) joint set
@@ -534,6 +536,8 @@ Annotations from the gnomAD v4.1 (hg38 assembly annotations) joint set
 `gnomad.joint.AF_grpmax_joint`: Maximum allele frequency across genetic ancestry groups in the joint subset
 
 `gnomad.joint.AN_grpmax_joint`: Total number of alleles in the genetic ancestry group with the maximum allele frequency in the joint subset
+
+<br/>
 
 ### hg38 gnomad.genomes
 
