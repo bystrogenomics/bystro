@@ -303,6 +303,10 @@ Key points:
 
 ## Annotation Fields for Default Human Assembly hg38 and hg19 Bystro Annotation Databases
 
+The default Bystro Annotation Databases for humans (hg38 and hg19) contain a large number of annotations, including transcript annotations, regulatory annotations, and conservation scores. Below are the default fields outputted by the Bystro Annotator when using the latest default hg38 and hg19 databases. See [INSTALL.md#databases](./INSTALL.md#databases) for more information on how to download these databases.
+
+The total number of annotation fields outputted when using the default Human hg38 Bystro Annotation Databases is 226.
+
 ### Basic Fields
 
 Sourced from the input file, or calculated based on input fields from the VCF or SNP file pre-processor.
