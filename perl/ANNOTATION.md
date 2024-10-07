@@ -1,46 +1,93 @@
-# Annotation Fields (Human Assembly hg38 and hg19)
+# Bystro High Dimensional Genetics Annotator Documentation
 
-<h2>Annotation Field Description</h2>
+## What is the Bystro Annotator?
 
-##### _Italicized fields_ are custom Bystro fields. All others are sourced as described.
+The Bystro Annotator is the fastest and most comprehensive data curation and labeling library in the world for genetic data. It take 1 or more VCF ([Variant Call Format](https://samtools.github.io/hts-specs/VCFv4.2.pdf)) or SNP ([PEMapper/PECaller](https://www.pnas.org/doi/full/10.1073/pnas.1618065114)) files as input, and outputs a cleaned and thoroughly labeled (annotated) representation of your data, along with a genotype dosage matrix in the [Arrow Feather V2/IPC format](https://arrow.apache.org/docs/python/feather.html), and a set of statistics on the data.
 
-<br/>
+Bystro Annotator processes both variants and sample genotypes. It is capable of processing millions of samples and billions of mutations on commodity hardware such as a laptop or a workstation. It is roughly **100,000** times faster than [Variant Effect Predictor](https://www.ensembl.org/info/docs/tools/vep/index.html) (VEP), **1,000** times faster than [Annovar](https://doc-openbio.readthedocs.io/projects/annovar/en/latest/), and **100** times faster than [Illumina Connected Annotations](https://developer.illumina.com/illumina-connected-annotations), all while outputting more annotations than any of these tools. What takes VEP years to do, Bystro can do in minutes to hours, all without requiring multiple servers.
 
-#### Summary of the Bystro Annotator
+Bystro's performance isn't just about speed, it's also about comprehensiveness. For instance, because of it's performance, Bystro can afford to provide complete annotations, both genome and exome wide, from gnomad v4.1, for all populations and subpopulations. **No other tool can do this**.
 
-Bystro takes 1 or more VCF ([Variant Call Format](https://samtools.github.io/hts-specs/VCFv4.2.pdf)) or SNP ([PEMapper/PECaller](https://www.pnas.org/doi/full/10.1073/pnas.1618065114) output) files, performs quality control, generates statistics, and outputs an annotated file that is in an easy-to-parse tab-separated format.
+## Running Your First Annotation
 
-Each row in the output file corresponds to a single variant (mutation), and contains a set of annotations that describe the site's genomic context, functional impact, allele frequencies in various populations, and more.
+See the [INSTALL.md#configuring-the-bystro-annotator](../INSTALL.md#configuring-the-bystro-annotator) section for instructions on how to configure# Bystro Annotator
 
-The annotations are divided into several categories, each of which is described in detail below.
+```sh
+bystro-annotate.pl --config ~/bystro/config/hg38.yml --threads 32 --input gnomad.genomes.v4.0.sites.chr22.vcf.bgz --output test/my_annotation --compress gz
+```
 
-#### Output Data Structures
+The above command will annotate the `gnomad.genomes.v4.0.sites.chr22.vcf.bgz` file with the hg38 database, using 32 threads, and output the results to `test`, and will use `my_annotation` as the prefix for output files.
 
-Bystro's output format is designed to retain and reflect complex relationships within genomic annotations. Here are key aspects of how we store the data:
+The result of this command will be:
+
+```sh
+Created completion file
+{
+   "error" : null,
+   "totalProgress" : 8599234,
+   "totalSkipped" : 0,
+   "results" : {
+      "header" : "my_annotation.annotation.header.json",
+      "sampleList" : "my_annotation.sample_list",
+      "annotation" : "my_annotation.annotation.tsv.gz",
+      "dosageMatrixOutPath" : "my_annotation.dosage.feather",
+      "config" : "hg38.yml",
+      "log" : "my_annotation.annotation.log.txt",
+      "statistics" : {
+         "qc" : "my_annotation.statistics.qc.tsv",
+         "json" : "my_annotation.statistics.json",
+         "tab" : "my_annotation.statistics.tsv"
+      }
+   }
+}
+```
+
+Explanation of the output:
+
+- `my_annotation.annotation.header.json`: The header of the annotated dataset
+- `my_annotation.sample_list`: The list of samples in the annotated dataset
+- `my_annotation.annotation.tsv.gz`: A block gzipped TSV file with one row per variant and one column per annotation. Can be decompressed with `bgzip` or any program compatible with the gzip format, like `gzip` and `pigz`.
+- `my_annotation.dosage.feather`: The dosage matrix file, where the first column is the `locus` column in the format "chr:pos:ref:alt", and columns following that are sample columns, with the dosage of the variant for that sample (0 for homozygous reference, 1 for 1 copy of the alternate allele, 2 for 2, and so on). -1 indicates missing genotypes. The dosage is the expected number of alternate alleles, given the genotype. This is useful for downstream analyses like imputation, or for calculating polygenic risk scores
+  - This file is in the [Arrow feather format](https://arrow.apache.org/docs/python/feather.html), also known as the "IPC" format. This is an ultra-efficient format for machine learning, and is widely supported, in Python libraries like [Pandas](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_feather.html), [Polars](https://docs.pola.rs/api/python/stable/reference/api/polars.read_ipc.html), [PyArrow](https://arrow.apache.org/docs/python/generated/pyarrow.feather.read_feather.html), as well as languages like [R](https://arrow.apache.org/docs/r/reference/read_feather.html) and [Julia](https://github.com/apache/arrow-julia)
+- `hg38.yml`: The configuration file used for the annotation. You can use this to either re-build the Bystro Annotation Database from scratch, or to re-run the annotation with the same configuration
+- `my_annotation.annotation.log.txt`: The log file for the annotation
+- `my_annotation.statistics.tsv`: A TSV file with sample-wise statistics on the annotation
+- `my_annotation.statistics.qc.tsv`: A TSV file that lists any samples that failed quality control checks, currently defined as being outside 3 standard deviations from the mean on any of the sample-wise statistics
+- `my_annotation.statistics.json`: A JSON file with the same sample-wise statistics on the annotation
+- 'totalProgress': The number of variants processed; this is the number of variants passed to the Bystro annotator by the bystro-vcf pre-processor, which performs primary quality control checks, such as excluding sites that have no samples with non-missing genotypes, or which are not FILTER=PASS in the input VCF. We also exclude sites that are not in the Bystro Annotation Database, and sites that are not in the Bystro Annotation Database that are not in the input VCF. In more detail:
+  - Variants must have FILTER value of PASS or " . "
+  - Variants and ref must be ACTG (no structural variants retained)
+  - Multiallelics are split into separate records, and annotated separately
+  - MNPs are split into separate SNPs and annotated separately
+  - Indels are left-aligned
+  - The first base of an indel must be the reference base after multiallelic decomposition and left-alignment
+  - If genotypes are provided, entirely missing sites are dropped
+
+## Let's Take a Closer Look at the Annotation Output
+
+The Bystro annotation outputs is a tab-separated file with one header row, and then N rows of annotated variants, one variant per row. The annotations are divided into several categories, each of which is described in detail in the [Bystro Annotation Fields](#bystro-annotation-fields) section.
+
+## Bystro Annotation Output In Depth
+
+One of the key advantages of Bystro's design is that it outputs data in such a complete manner that it is possible to re-create the source files used for annotation from the Bystro annotation output.
+
+Bystro's output formats are designed to retain and reflect complex nested relationships between variant descriptions. Here are key aspects of how we output the data:
 
 1. **Array-Based Fields**: Each annotation field is an array. For fields with multiple values (e.g., transcripts, gene names), the values are separated by semicolons (`;`). The order of the values is maintained across related fields to preserve relationships between the data points. For example:
 
    - `refSeq.name` might contain `NM1;NM2`, and `refSeq.name2` (gene symbols for these transcripts) could be `Gene1;Gene1`. This ensures the first transcript, `NM1`, corresponds to `Gene1`, and the second transcript, `NM2`, also corresponds to `Gene1`. These relationships are maintained across all fields within a track.
 
-2. **Nested Arrays**: Some fields may be nested arrays, where the individual entries are further divided using forward slashes (`/`). For example, if a transcript has alternate IDs, you may see `NM1a/NM1b;NM2`, indicating two alternate IDs for the first transcript. This way we can maintain the relationships between the order of fields.
+2. **Nested Arrays**: Some fields may be nested arrays, where the individual entries are further divided using forward slashes (`/`). For example, if a transcript has alternate IDs, you may see `NM1a/NM1b;NM2`, indicating two alternate IDs for the first transcript (NM1a and NM1b) and 1 for the 2nd (NM2). This way we can maintain the relationships between the order of fields.
 
-3. **Insertions and Deletions**: For transcript-level annotations like `refSeq.*` (refSeq transcript annotations), `nearest.*`, and `nearestTss.*`, insertions and deletions affecting multiple nucleotides are separated by pipes (`|`). This allows reporting a transcript consequence per disrupted base.
+3. **Insertions and Deletions**: For transcript-level annotations like `refSeq.*` (refSeq transcript annotations), `nearest.*`, and `nearestTss.*` (nearest gene by transcript boundaries and by distance to the transcription start site respectively), insertions and deletions affecting multiple nucleotides are separated by pipes (`|`). This allows reporting a transcript consequence per disrupted base.
 
-4. **Reserved Delimiters**: Reserved delimiters like `;`, `/`, and `|` are essential for maintaining the structure of relationships in the data. If these characters appear in the source data, they are replaced with commas to ensure they can still be used effectively as delimiters in the output.
+4. **Reserved Delimiters**: The reserved delimiters described in points 1-3 (`;`, `/`, and `|`) will be stripped and replaced with a comma if found in source inputs to the Bystro Annotation Database.
 
-This structure enables precise retention of complex data relationships across multiple annotation fields while maintaining a highly structured and parseable output.
+## What Information Can Bystro Annotator Output?
 
-#### What Information Can Bystro Output?
+Bystro Annotator is a general-purpose data curation and labeling engine, and has no restrictions on the types of annotations/feature labels it can output.
 
-Bystro is a general-purpose annotation engine, and has no restrictions on the types of annotations/feature labels it can output. To output annotations, the user must provide a Bystro Database, which is a lightning-fast embedded key-value database that is keyed on genomic position, and a YAML configuration file that describes the fields to be output and where to source them from.
-
-- A Bystro Database is a high-performance key-value database that uses the Lightning Memory Map Database (LMDB) engine. It supports millions of lookups per second on a single machine, and can be used to store and retrieve annotations for millions of variants.
-
-- Bystro Databases can be re-created from the YAML configuration file corresponding to that database, and new databases with different information can be created by editing the YAML configuration file, and re-running the Bystro Database creation process.
-
-- To create a Bystro Database, the user needs to provide a YAML configuration file that specifies all of the source file locations, the location to write the database, and the tracks/fields to output, and then runs `bystro-build.pl --config /path/to/config`. This will create a Bystro Database that can be used to annotate VCF or SNP files.
-
-#### Variant Representation
+## Variant Representations
 
 Bystro's variant representation deviates slightly from the standard VCF format in the name of simplicity. In particular, it drops the rule that the alternate allele must be ACTG, so that it can represent deletions on the base that the deletion actually occurs, rather than the base before the deletion. This has a number of surprising benefits:
 
@@ -52,11 +99,11 @@ Bystro's variant representation deviates slightly from the standard VCF format i
 
 Bystro also has the ability to output a genotype dosage matrix in the [Arrow Feather V2/IPC format](https://arrow.apache.org/docs/python/feather.html) which is a matrix of the number of alternate alleles for each sample at each variant.
 
-#### Comparing the VCF and Bystro Variant Representations
+### Comparing the VCF and Bystro Variant Representations
 
 To run these example, you will need to have the Bystro VCF preprocessor installed. You can install it by running `go install github.com/bystrogenomics/bystro-vcf@2.2.3`.
 
-Please note that we are not showing the full Bystro Annotator outputs, which are far too extensive to easily display here. Instead, we are showing a subset of the fields outputted by the Bystro VCF preprocessor, which is a tool that takes a VCF file and outputs a Bystro-annotator compatible TSV file, which is then used by the Perl Bystro Annotator to add annotations to the VCF file from the Bystro Database.
+Please note that we are not showing the full Bystro Annotator outputs, which are far too extensive to easily display here. Instead, we are showing a subset of the fields outputted by the Bystro VCF preprocessor, which is a tool that takes a VCF file and outputs a Bystro-annotator compatible TSV file, which is then used by the Perl Bystro Annotator to add annotations to the VCF file from the Bystro Annotation Database.
 
 ```
 cat ~/bystro/perl/example_vcf.tsv | bystro-vcf --keepId --emptyField "NA" --keepPos
@@ -118,7 +165,7 @@ print(df)
 - Note that missing genotypes are reprsented as -1 in the genotype dosage matrix output
 - If a sample's genotype contains any missing genotypes, the sample is considered missing for the site
 
-##### Explanation For SIMPLE_SNP
+#### Explanation For SIMPLE_SNP
 
 VCF Representation:
 
@@ -140,7 +187,7 @@ Bystro Genotype Dosage Matrix Output:
 
 The Bystro and VCF formats for simple, well-normalized SNPs are the same. In addition to the position, variant type, reference, and alternate, Bystro's VCF preprocessor (bystro-vcf) also outputs whether a variant is a transition (1), transversion (2) or neither (0), descriptive information about the genotypes, including which samples are heterozyogtes, homozygotes, or missing genotypes, vcfPos (which describes the original position in the VCF file, pre-normalization), and the VCF ID. Meanwhile the genotype dosage matrix output shows the number of alternate alleles for each sample at each variant.
 
-##### Explanation For MULTIALLELIC_SNP
+#### Explanation For MULTIALLELIC_SNP
 
 VCF Representation:
 
@@ -157,7 +204,7 @@ Bystro Representation:
 
 The VCF representation shows two different SNPs at the same position. NA00001 and NA00002 have 1 copy of each allele, while NA00003 has 2 copies of the A>T allele and 0 copies of A>G. Bystro's representation decomposes the multiallelic site into two separate rows, one for each allele. The first row shows the A>G allele, and the second row shows the A>T allele. Since NA00001 and NA00002 are heterozygous for both A>G and A>T, on each line they are listed in the heterozygotes columns, while NA00003 is homozygous for A>T and is listed in the homozygotes column only for the A>T allele row. The zygosity and sampleMaf (sample minor allele frequency) fields are calculated based on the allele in the row.
 
-##### Explanation For SIMPLE_INSERTION
+#### Explanation For SIMPLE_INSERTION
 
 VCF Representation:
 
@@ -173,7 +220,7 @@ Bystro Representation:
 
 The VCF representation shows an insertion of a C base after the A base at position 1. Bystro's representation shows the insertion as occurring at the A base, with the reference base being A and the alternate allele being +C. The heterozygotes column lists NA00003 as heterozygous for the insertion.
 
-##### Explanation For INSERTION_BETWEEN_TWO_BASES
+#### Explanation For INSERTION_BETWEEN_TWO_BASES
 
 VCF Representation:
 
@@ -189,7 +236,7 @@ Bystro Representation:
 
 The VCF representation shows an insertion of CC between the A and T bases. Bystro's representation shows the insertion as occurring after the A base, with the reference base being A and the alternate allele being +CC. NA00001 and NA00002 are heterozygous for the insertion, while NA00003 is homozygous for the insertion and therefore listed in the homozygotes column.
 
-##### Explanation For microsat1
+#### Explanation For microsat1
 
 VCF Representation:
 
@@ -208,7 +255,7 @@ The VCF representation shows a multiallelic site with two alleles. The first all
 
 The second allele is GTCT>GTACT, with the insertion of an "A" occuring after the "T" base at position 1234568. Again, because of the VCF format's padding rule, this representation cannot be shown directly in the VCF format, but must be inferred. Bystro normalizes the representation, showing the insertion at the correct base, 1234568.
 
-##### Explanation For EXAMPLE_MISSING_MNP
+#### Explanation For EXAMPLE_MISSING_MNP
 
 VCF Representation:
 
@@ -226,9 +273,21 @@ Bystro Representation:
 
 The VCF representation shows a multi-nucleotide polymorphism (MNP) at position 3, where 3 bases are changed from CCC to AAA. An MNP is really 3 single nucleotide polymorphisms next to each other, typically linked on the same chromosome. Bystro decomposes the MNP into 3 separate rows, each with a single nucleotide change. The first row shows the first base change, the second row shows the second base change, and the third row shows the third base change. NA00001 was unsuccessfully typed, with 1 of its 2 chromosomes having an ambiguous or low quality genotype ("."). Bystro, to be conservative ("garbage in means garbage out"), counts this sample as having a missing genotype, and subtracts 2 from the `an` (allele number).
 
-### Annotation Fields for Default Human Assembly hg38 and hg19 Bystro Databases
+## What is the Bystro Annotation Database?
 
-#### Basic Fields
+To output annotations, the user must point Bystro Annotator at a Bystro Annotator Database, which is a high-performance embedded memory-mapped database used by the Bystro Annotator to label variants. Three default databases are provided, for Humans (hg19 and hg38), and rats (rn11). See the [INSTALL.md#databases](./INSTALL.md#databases) section for more information on how to download these databases.
+
+Key points:
+
+- A Bystro Annotation Database is a high-performance memory-mapped key-value database that uses the Lightning Memory Map Database (LMDB) engine. It supports millions of lookups per second on a single machine, and can be used to store and retrieve annotations for millions of variants.
+
+- Bystro Annotation Databases can be re-created from the YAML configuration file corresponding to that database, and new databases with different information can be created by editing the YAML configuration file, and re-running the Bystro Annotation Database creation process.
+
+- To create a Bystro Annotation Database, the user needs to provide a YAML configuration file that specifies all of the source file locations, the location to write the database, and the tracks/fields to output, and then runs `bystro-build.pl --config /path/to/config`. This will create a Bystro Annotation Database that can be used to annotate VCF or SNP files.
+
+## Annotation Fields for Default Human Assembly hg38 and hg19 Bystro Annotation Databases
+
+### Basic Fields
 
 Sourced from the input file, or calculated based on input fields from the VCF or SNP file pre-processor.
 
@@ -287,22 +346,22 @@ Sourced from the input file, or calculated based on input fields from the VCF or
 
 `discordant` - TRUE if the reference base provided in the input VCF matches the Bystro-annotated UCSC reference, FALSE otherwise
 
-`ref` - The Bystro-annotated reference base(s), from the 'ref' track in the Bystro Database
+`ref` - The Bystro-annotated reference base(s), from the 'ref' track in the Bystro Annotation Database
 
-- In the default Bystro Database, this is sourced from the UCSC reference genome
-- In custom Bystro Databases, this can be sourced from any reference genome
+- In the default Bystro Annotation Database, this is sourced from the UCSC reference genome
+- In custom Bystro Annotation Databases, this can be sourced from any reference genome
 - In the case of insertions the `ref` will be 2 bases long, the base just before the insertion, and the one right after
 - In the case of deletions, the ref will be as long as the deletion, up to 32 bases (after that, the ref will be truncated)
 
 <br/>
 
-#### Transcript Annotations
+### Transcript Annotations
 
-In the default Bystro Database, we source transcript annotations from the UCSC refGene track, joined on other UCSC tracks: knownToEnsembl, kgXref, knownCanonical.
+In the default Bystro Annotation Database, we source transcript annotations from the UCSC refGene track, joined on other UCSC tracks: knownToEnsembl, kgXref, knownCanonical.
 
 - See [refGene]('https://sc-bro.nhlbi.nih.gov/cgi-bin/hgTables?hgsid=554_JXUlabut7OUQtCyNphC8FGaeUJnj&hgta_doSchemaDb=hg38&hgta_doSchemaTable=refGene') and [kgXref]('https://sc-bro.nhlbi.nih.gov/cgi-bin/hgTables?hgsid=554_JXUlabut7OUQtCyNphC8FGaeUJnj&hgta_doSchemaDb=hg38& hgta_doSchemaTable=kgXref') for more information
 
-- In custom Bystro Databases, these annotations can be sourced from any UCSC transcript track, and multiple such `gene` type tracks can be defined in a single Bystro Database (annotations for all will be outputted)
+- In custom Bystro Annotation Databases, these annotations can be sourced from any UCSC transcript track, and multiple such `gene` type tracks can be defined in a single Bystro Annotation Database (annotations for all will be outputted)
 
 - **When a site is intergenic, all `refSeq` annotations will be `NA`**
 
@@ -355,7 +414,7 @@ In the default Bystro Database, we source transcript annotations from the UCSC r
 
 <br/>
 
-#### nearest.refSeq
+### nearest.refSeq
 
 The nearest transcript(s), calculated by trascript start, transcript end boundaries. Transcripts that are equidistant are all outputted.
 
@@ -367,7 +426,7 @@ The nearest transcript(s), calculated by trascript start, transcript end boundar
 
 <br/>
 
-#### nearestTss.refSeq
+### nearestTss.refSeq
 
 The nearest transcript(s), calculated by the distance to the nearest transcript start site (TSS). Transcripts with the same TSS are all outputted.
 
@@ -379,13 +438,13 @@ The nearest transcript(s), calculated by the distance to the nearest transcript 
 
 <br/>
 
-#### gnomAD Annotations
+### gnomAD Annotations
 
 Annotations from the gnomAD v4.1 (hg38 assembly annotations) or v2.1.1 (hg19 assembly annotations) whole-genome set
 
 Since the data available for hg19 and hg38 differ, we will discuss them separately below.
 
-#### hg38 gnomad.joint
+### hg38 gnomad.joint
 
 Annotations from the gnomAD v4.1 (hg38 assembly annotations) joint set
 
@@ -461,7 +520,7 @@ Annotations from the gnomAD v4.1 (hg38 assembly annotations) joint set
 
 `gnomad.joint.AN_grpmax_joint`: Total number of alleles in the genetic ancestry group with the maximum allele frequency in the joint subset
 
-#### hg38 gnomad.genomes
+### hg38 gnomad.genomes
 
 Annotations from the gnomAD v4.1 whole-genome set
 
@@ -537,7 +596,7 @@ Annotations from the gnomAD v4.1 whole-genome set
 
 <br/>
 
-#### hg38 gnomad.exomes
+### hg38 gnomad.exomes
 
 Annotations from gnomAD v4.1 whole-exome set
 
@@ -657,7 +716,7 @@ Annotations from gnomAD v4.1 whole-exome set
 
 <br/>
 
-#### hg19 gnomad.genomes (v2.1.1 - latest release for hg19)
+### hg19 gnomad.genomes (v2.1.1 - latest release for hg19)
 
 `gnomad.genomes.alt`: The Bystro VCF-preprocessor's ALT record for this gnomAD site. This should always match the row's `alt` field value
 
@@ -725,7 +784,7 @@ Annotations from gnomAD v4.1 whole-exome set
 
 <br/>
 
-#### hg19 gnomad.exomes (v2.1.1 - latest release for hg19)
+### hg19 gnomad.exomes (v2.1.1 - latest release for hg19)
 
 Annotations from the gnomAD v2.1.1 exome set
 
@@ -803,7 +862,7 @@ Annotations from the gnomAD v2.1.1 exome set
 
 <br/>
 
-#### [dbSNP](https://www.ncbi.nlm.nih.gov/snp)
+### [dbSNP](https://www.ncbi.nlm.nih.gov/snp)
 
 dbSNP 155 annotations. Descriptions taken from UCSC's [reference on dbSNP155](https://genome.ucsc.edu/cgi-bin/hgTrackUi?db=hg38&g=dbSnp155Composite)
 
@@ -857,14 +916,14 @@ dbSNP 155 annotations. Descriptions taken from UCSC's [reference on dbSNP155](ht
 
 <br/>
 
-#### [cadd](http://cadd.gs.washington.edu)
+### [cadd](http://cadd.gs.washington.edu)
 
 A score >=0 that indicates deleteriousness of a variant. Variants with cadd > 15 are more likely to be deleterious.
 See http://cadd.gs.washington.edu.
 
 <br/>
 
-#### [caddIndel](http://cadd.gs.washington.edu)
+### [caddIndel](http://cadd.gs.washington.edu)
 
 A score >=0 that indicates deleteriousness of a variant. Variants with cadd > 15 are more likely to be deleterious.
 See http://cadd.gs.washington.edu.
@@ -881,7 +940,7 @@ caddIndel scores are only defined for indels and MNPs. For SNPs, use the `cadd` 
 
 <br/>
 
-#### clinvarVcf
+### clinvarVcf
 
 ClinVar annotations, sourced from the ClinVar VCF dataset
 
@@ -921,7 +980,7 @@ ClinVar annotations, sourced from the ClinVar VCF dataset
 
 <br/>
 
-#### (hg38-only) [LoGoFunc](
+### (hg38-only) [LoGoFunc](
 
 https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10688473/)
 A machine learning method for predicting pathogenic GOF, pathogenic LOF, and neutral genetic variants, trained on a broad range of gene-, protein-, and variant-level features describing diverse biological characteristics.
@@ -938,7 +997,7 @@ A machine learning method for predicting pathogenic GOF, pathogenic LOF, and neu
 
 `logofunc.lof`: The LoGoFunc loss of function (LOF) score
 
-#### (hg38-only) [GeneBass](<https://www.cell.com/cell-genomics/pdf/S2666-979X(22)00110-0.pdf>)
+### (hg38-only) [GeneBass](<https://www.cell.com/cell-genomics/pdf/S2666-979X(22)00110-0.pdf>)
 
 `genebass.id`: The GeneBass VCF `ID`
 

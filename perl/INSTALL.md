@@ -250,7 +250,8 @@ Database configurations are stored in YAML files in the `config` directory. By d
 
 1. [Human (hg38) database](https://s3.amazonaws.com/bystro-db/hg38_v11.tar.gz)
 2. [Human (hg19) database](https://s3.amazonaws.com/bystro-db/hg19_v10.tar.gz)
-3. There are no restrictions on species support, but we currently only build human genomes. Please create a GitHub issue if you would like us to support others
+3. [Rat (rn7) database](https://s3.amazonaws.com/bystro-db/rn7.tar.gz)
+4. There are no restrictions on species support, but for the open source Bystro Annotator we currently only build human and rat genomes, and do not guarantee that the open-source version will be up to date. Please create a GitHub issue if you would like us to support others or need updates to the current databases.
 
 ## Running your first annotation
 
