@@ -199,7 +199,7 @@ bystro-annotate.pl --help
 
 Once Bystro is installed, we need to download a database for the species/assembly we're going to be analyzing and then configure the Bystro Annotator to use it.
 
-Database configurations are stored in YAML files in the `config` directory. By default Bystro ships with configurations for human genome assemblies hg19 (~/bystro/config/hg19.yml) and hg38 (~/bystro/config/hg38.yml), though you can create your own configurations for other species/assemblies.
+Database configurations are stored in YAML files in the `config` directory. By default Bystro ships with configurations for human genome assemblies hg19 (`~/bystro/config/hg19.yml`) and hg38 (`~/bystro/config/hg38.yml`), and the Rat assembly rn7 (`~/bystro/config/rn7.yml`) though you can create your own configurations for other species/assemblies.
 
 ### Example Configuration
 
@@ -250,7 +250,8 @@ Database configurations are stored in YAML files in the `config` directory. By d
 
 1. [Human (hg38) database](https://s3.amazonaws.com/bystro-db/hg38_v11.tar.gz)
 2. [Human (hg19) database](https://s3.amazonaws.com/bystro-db/hg19_v10.tar.gz)
-3. There are no restrictions on species support, but we currently only build human genomes. Please create a GitHub issue if you would like us to support others
+3. [Rat (rn7) database](https://s3.amazonaws.com/bystro-db/rn7.tar.gz)
+4. There are no restrictions on species support, but for the open source Bystro Annotator we currently only build human and rat genomes, and do not guarantee that the open-source version will be up to date. Please create a GitHub issue if you would like us to support others or need updates to the current databases.
 
 ## Running your first annotation
 
@@ -290,7 +291,7 @@ Explanation of the output:
 
 - `my_annotation.annotation.header.json`: The header of the annotated dataset
 - `my_annotation.sample_list`: The list of samples in the annotated dataset
-- `my_annotation.annotation.tsv.gz`: A gzipped TSV file with one row per variant and one column per annotation
+- `my_annotation.annotation.tsv.gz`: A block gzipped TSV file with one row per variant and one column per annotation. Can be decompressed with `bgzip` or any program compatible with the gzip format, like `gzip` and `pigz`.
 - `my_annotation.dosage.feather`: The dosage matrix file, where the first column is the `locus` column in the format "chr:pos:ref:alt", and columns following that are sample columns, with the dosage of the variant for that sample (0 for homozygous reference, 1 for 1 copy of the alternate allele, 2 for 2, and so on). -1 indicates missing genotypes. The dosage is the expected number of alternate alleles, given the genotype. This is useful for downstream analyses like imputation, or for calculating polygenic risk scores
   - This file is in the [Arrow feather format](https://arrow.apache.org/docs/python/feather.html), also known as the "IPC" format. This is an ultra-efficient format for machine learning, and is widely supported, in Python libraries like [Pandas](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_feather.html), [Polars](https://docs.pola.rs/api/python/stable/reference/api/polars.read_ipc.html), [PyArrow](https://arrow.apache.org/docs/python/generated/pyarrow.feather.read_feather.html), as well as languages like [R](https://arrow.apache.org/docs/r/reference/read_feather.html) and [Julia](https://github.com/apache/arrow-julia)
 - `hg38.yml`: The configuration file used for the annotation. You can use this to either re-build the Bystro database from scratch, or to re-run the annotation with the same configuration
