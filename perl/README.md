@@ -997,9 +997,8 @@ ClinVar annotations, sourced from the ClinVar VCF dataset
 
 <br/>
 
-### (hg38-only) [LoGoFunc](
+### (hg38-only) [LoGoFunc](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10688473/)
 
-https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10688473/)
 A machine learning method for predicting pathogenic GOF, pathogenic LOF, and neutral genetic variants, trained on a broad range of gene-, protein-, and variant-level features describing diverse biological characteristics.
 
 `logofunc.id`: The LoGoFunc VCF `ID`
