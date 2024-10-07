@@ -128,14 +128,14 @@ cat ~/bystro/perl/example_vcf.tsv | bystro-vcf --keepId --emptyField "NA" --keep
 
 Input Example VCF:
 
-| CHROM | POS     | ID                          | REF  | ALT     | QUAL | FILTER | INFO                              | FORMAT      | NA00001        | NA00002        | NA00003  |
-| ----- | ------- | --------------------------- | ---- | ------- | ---- | ------ | --------------------------------- | ----------- | -------------- | -------------- | -------- |
-| 20    | 1       | SIMPLE_SNP                  | A    | T       | 50   | PASS   | .                                 | GT:GQ:DP:HQ | 0/1:54:7:56,60 | 0/0:48:4:51,51 | 0/0:61:2 |
-| 20    | 1110696 | MULTIALLELIC_SNP            | A    | G,T     | 67   | PASS   | NS=2;DP=10;AF=0.333,0.667;AA=T;DB | GT:GQ:DP:HQ | 1/2:21:6:23,27 | 2/1:2:0:18,2   | 2/2:35:4 |
-| 20    | 1       | SIMPLE_INSERTION            | A    | AC      | 50   | PASS   | .                                 | GT:GQ:DP:HQ | 0/0:54:7:56,60 | 0/0:48:4:51,51 | 1/0:61:2 |
-| 20    | 1       | INSERTION_BETWEEN_TWO_BASES | AT   | ACCT    | 50   | PASS   | .                                 | GT:GQ:DP    | 0/1:35:4       | 0/1:17:2       | 1/1:40:3 |
-| 20    | 1234567 | microsat1                   | GTCT | G,GTACT | 50   | PASS   | .                                 | GT:GQ:DP    | 0/1:35:4       | 0/2:17:2       | 1/1:40:3 |
-| 20    | 3       | EXAMPLE_MISSING_MNP         | CCC  | AAA     | 50   | PASS   | NS=3;DP=9;AA=G                    | GT          | ./1            | 0/0            | 1/1      |
+| CHROM | POS     | ID                          | REF  | ALT     | QUAL | FILTER | INFO                              | FORMAT      | NA00001        | NA00002        | NA00003        |
+| ----- | ------- | --------------------------- | ---- | ------- | ---- | ------ | --------------------------------- | ----------- | -------------- | -------------- | -------------- |
+| 20    | 1       | SIMPLE_SNP                  | A    | T       | 50   | PASS   | .                                 | GT:GQ:DP:HQ | 0/1:54:7:56,60 | 0/0:48:4:51,51 | 0/0:48:4:51,51 |
+| 20    | 1110696 | MULTIALLELIC_SNP            | A    | G,T     | 67   | PASS   | NS=2;DP=10;AF=0.333,0.667;AA=T;DB | GT:GQ:DP    | 1/2:21:6       | 2/1:2:0        | 2/2:35:4       |
+| 20    | 1       | SIMPLE_INSERTION            | A    | AC      | 50   | PASS   | .                                 | GT:GQ:DP    | 0/0:54:7       | 0/0:48:4       | 1/0:61:2       |
+| 20    | 1       | INSERTION_BETWEEN_TWO_BASES | AT   | ACCT    | 50   | PASS   | .                                 | GT:GQ:DP    | 0/1:35:4       | 0/1:17:2       | 1/1:40:3       |
+| 20    | 1234567 | microsat1                   | GTCT | G,GTACT | 50   | PASS   | .                                 | GT:GQ:DP    | 0/1:35:4       | 0/2:17:2       | 1/1:40:3       |
+| 20    | 3       | EXAMPLE_MISSING_MNP         | CCC  | AAA     | 50   | PASS   | NS=3;DP=9;AA=G                    | GT          | ./1            | 0/0            | 1/1            |
 
 Expected Bystro VCF Preprocessor Output:
 
@@ -180,9 +180,9 @@ print(df)
 
 VCF Representation:
 
-| CHROM | POS | ID         | REF | ALT | QUAL | FILTER | INFO | FORMAT | NA00001        | NA00002        | NA00003  |
-| ----- | --- | ---------- | --- | --- | ---- | ------ | ---- | ------ | -------------- | -------------- | -------- |
-| 20    | 1   | SIMPLE_SNP | A   | T   | 50   | PASS   | .    | GT:GQ  | 0/1:54:7:56,60 | 0/0:48:4:51,51 | 0/0:61:2 |
+| CHROM | POS | ID         | REF | ALT | QUAL | FILTER | INFO | FORMAT      | NA00001        | NA00002        | NA00003        |
+| ----- | --- | ---------- | --- | --- | ---- | ------ | ---- | ----------- | -------------- | -------------- | -------------- |
+| 20    | 1   | SIMPLE_SNP | A   | T   | 50   | PASS   | .    | GT:GQ:DP:HQ | 0/1:54:7:56,60 | 0/0:48:4:51,51 | 0/0:48:4:51,51 |
 
 Bystro Representation:
 
@@ -202,9 +202,9 @@ The Bystro and VCF formats for simple, well-normalized SNPs are the same. In add
 
 VCF Representation:
 
-| CHROM | POS     | ID               | REF | ALT | QUAL | FILTER | INFO                              | FORMAT      | NA00001        | NA00002      | NA00003  |
-| ----- | ------- | ---------------- | --- | --- | ---- | ------ | --------------------------------- | ----------- | -------------- | ------------ | -------- |
-| 20    | 1110696 | MULTIALLELIC_SNP | A   | G,T | 67   | PASS   | NS=2;DP=10;AF=0.333,0.667;AA=T;DB | GT:GQ:DP:HQ | 1/2:21:6:23,27 | 2/1:2:0:18,2 | 2/2:35:4 |
+| CHROM | POS     | ID               | REF | ALT | QUAL | FILTER | INFO                              | FORMAT   | NA00001  | NA00002 | NA00003  |
+| ----- | ------- | ---------------- | --- | --- | ---- | ------ | --------------------------------- | -------- | -------- | ------- | -------- |
+| 20    | 1110696 | MULTIALLELIC_SNP | A   | G,T | 67   | PASS   | NS=2;DP=10;AF=0.333,0.667;AA=T;DB | GT:GQ:DP | 1/2:21:6 | 2/1:2:0 | 2/2:35:4 |
 
 Bystro Representation:
 
@@ -219,9 +219,9 @@ The VCF representation shows two different SNPs at the same position. NA00001 an
 
 VCF Representation:
 
-| CHROM | POS | ID               | REF | ALT | QUAL | FILTER | INFO | FORMAT | NA00001        | NA00002        | NA00003  |
-| ----- | --- | ---------------- | --- | --- | ---- | ------ | ---- | ------ | -------------- | -------------- | -------- |
-| 20    | 1   | SIMPLE_INSERTION | A   | AC  | 50   | PASS   | .    | GT:GQ  | 0/0:54:7:56,60 | 0/0:48:4:51,51 | 1/0:61:2 |
+| CHROM | POS | ID               | REF | ALT | QUAL | FILTER | INFO | FORMAT   | NA00001  | NA00002  | NA00003  |
+| ----- | --- | ---------------- | --- | --- | ---- | ------ | ---- | -------- | -------- | -------- | -------- |
+| 20    | 1   | SIMPLE_INSERTION | A   | AC  | 50   | PASS   | .    | GT:GQ:DP | 0/0:54:7 | 0/0:48:4 | 1/0:61:2 |
 
 Bystro Representation:
 
@@ -235,9 +235,9 @@ The VCF representation shows an insertion of a C base after the A base at positi
 
 VCF Representation:
 
-| CHROM | POS | ID                          | REF | ALT  | QUAL | FILTER | INFO | FORMAT | NA00001 | NA00002 | NA00003 |
-| ----- | --- | --------------------------- | --- | ---- | ---- | ------ | ---- | ------ | ------- | ------- | ------- |
-| 20    | 1   | INSERTION_BETWEEN_TWO_BASES | AT  | ACCT | 50   | PASS   | .    | GT:GQ  | 0/1:35  | 0/1:17  | 1/1:40  |
+| CHROM | POS | ID                          | REF | ALT  | QUAL | FILTER | INFO | FORMAT   | NA00001  | NA00002  | NA00003  |
+| ----- | --- | --------------------------- | --- | ---- | ---- | ------ | ---- | -------- | -------- | -------- | -------- |
+| 20    | 1   | INSERTION_BETWEEN_TWO_BASES | AT  | ACCT | 50   | PASS   | .    | GT:GQ:DP | 0/1:35:4 | 0/1:17:2 | 1/1:40:3 |
 
 Bystro Representation:
 
@@ -251,9 +251,9 @@ The VCF representation shows an insertion of CC between the A and T bases. Bystr
 
 VCF Representation:
 
-| CHROM | POS     | ID        | REF  | ALT     | QUAL | FILTER | INFO | FORMAT | NA00001 | NA00002 | NA00003 |
-| ----- | ------- | --------- | ---- | ------- | ---- | ------ | ---- | ------ | ------- | ------- | ------- |
-| 20    | 1234567 | microsat1 | GTCT | G,GTACT | 50   | PASS   | .    | GT     | 0/1     | 0/2     | 1/1     |
+| CHROM | POS     | ID        | REF  | ALT     | QUAL | FILTER | INFO | FORMAT   | NA00001  | NA00002  | NA00003  |
+| ----- | ------- | --------- | ---- | ------- | ---- | ------ | ---- | -------- | -------- | -------- | -------- |
+| 20    | 1234567 | microsat1 | GTCT | G,GTACT | 50   | PASS   | .    | GT:GQ:DP | 0/1:35:4 | 0/2:17:2 | 1/1:40:3 |
 
 Bystro Representation:
 
