@@ -82,9 +82,7 @@ As mentioned, corresponding to the annotation output is a genotype dosage matrix
 
 ## Bystro Annotation Output In Depth
 
-One of the key advantages of Bystro's design is that it outputs data in such a complete manner that it is possible to re-create the source files used for annotation from the Bystro annotation output.
-
-Bystro's output formats are designed to retain and reflect complex nested relationships between variant descriptions. Here are key aspects of how we output the data:
+One of the key advantages of Bystro's design is that it outputs data in such a complete manner that it is possible to re-create the source files used for annotation from the Bystro annotation output. Bystro's output formats are therefore designed to retain and reflect complex nested relationships between variant descriptions. Here are key aspects of how we output the data:
 
 1. **Array-Based Fields**: Each annotation field is an array. For fields with multiple values (e.g., transcripts, gene names), the values are separated by semicolons (`;`). The order of the values is maintained across related fields to preserve relationships between the data points. For example:
 
@@ -98,11 +96,11 @@ Bystro's output formats are designed to retain and reflect complex nested relati
 
 ## What Information Can Bystro Annotator Output?
 
-Bystro Annotator is a general-purpose data curation and labeling engine, and has no restrictions on the types of annotations/feature labels it can output.
+Bystro Annotator is a general-purpose data curation and labeling engine for genetic data, and has no restrictions on the types of annotations/feature labels it can output. Theoretically it can even support binary data, such as images.
 
 ## Variant Representations
 
-Bystro's variant representation deviates slightly from the standard VCF format in the name of simplicity. In particular, it drops the rule that the alternate allele must be ACTG, so that it can represent deletions on the base that the deletion actually occurs, rather than the base before the deletion. This has a number of surprising benefits:
+Bystro's variant representation deviates slightly from the standard VCF format in the name of simplicity. In particular, it drops the rule that the alternate allele must be ACTG. Dropping this single restriction allows us to represent deletions as occuring at the actual first deleted base, rather than the base before, as in the VCF format. This has a number of knock on benefits:
 
     The `inputRef` (reference base) in Bystro's annotation outputs is always exactly 1 base long
 
@@ -110,13 +108,13 @@ Bystro's variant representation deviates slightly from the standard VCF format i
 
     It is possible to represent all multiallelic site using a single reference base, a single position, and a list of alleles
 
-Bystro also has the ability to output a genotype dosage matrix in the [Arrow Feather V2/IPC format](https://arrow.apache.org/docs/python/feather.html) which is a matrix of the number of alternate alleles for each sample at each variant.
+The Bystro Genotype Dosage Matrix, is a columnar dataset, generated for every collection of VCFs submitted. Its first column is the `locus`, which is `chr:pos:ref:alt`. Every column after that is labeled by the sample name, and contains a -1 for missing genotypes, 0 for reference, 1 for a single alternate allele, 2 for 2 alternate alleles (homozygous in a diploid organism), and so on. It can be used for many things, such as to calculate polygenic risk scores.
 
 ### Comparing the VCF and Bystro Variant Representations
 
-To run these example, you will need to have the Bystro VCF preprocessor installed. You can install it by running `go install github.com/bystrogenomics/bystro-vcf@2.2.3`.
+Below we'll demonstrate the Bystro Annotation and Dosage Matrix outputs, using some examples. You may run these examples, if you have Bystro installed, or at least the Bystro VCF Preprocessor. The Bystro VCF Preprocessor, which is a tool that takes a VCF file and outputs a Bystro-annotator compatible TSV file, which is then used by the Perl Bystro Annotator to add annotations to the VCF file from the Bystro Annotation Database. You can install it by running `go install github.com/bystrogenomics/bystro-vcf@2.2.3`.
 
-Please note that we are not showing the full Bystro Annotator outputs, which are far too extensive to easily display here. Instead, we are showing a subset of the fields outputted by the Bystro VCF preprocessor, which is a tool that takes a VCF file and outputs a Bystro-annotator compatible TSV file, which is then used by the Perl Bystro Annotator to add annotations to the VCF file from the Bystro Annotation Database.
+Please note that we are not showing the full Bystro Annotator outputs, which are far too extensive to easily display here.
 
 ```
 cat ~/bystro/perl/example_vcf.tsv | bystro-vcf --keepId --emptyField "NA" --keepPos
@@ -139,7 +137,7 @@ Input Example VCF:
 | 20    | 1234567 | microsat1                   | GTCT | G,GTACT | 50   | PASS   | .                                 | GT:GQ:DP    | 0/1:35:4       | 0/2:17:2       | 1/1:40:3 |
 | 20    | 3       | EXAMPLE_MISSING_MNP         | CCC  | AAA     | 50   | PASS   | NS=3;DP=9;AA=G                    | GT          | ./1            | 0/0            | 1/1      |
 
-Expected Bystro VCF Pre-Processor Output:
+Expected Bystro VCF Preprocessor Output:
 
 | chrom | pos     | type         | inputRef | alt | trTv | heterozygotes   | heterozygosity | homozygotes | homozygosity | missingGenos | missingness | ac  | an  | sampleMaf | vcfPos  | id                          |
 | ----- | ------- | ------------ | -------- | --- | ---- | --------------- | -------------- | ----------- | ------------ | ------------ | ----------- | --- | --- | --------- | ------- | --------------------------- |
