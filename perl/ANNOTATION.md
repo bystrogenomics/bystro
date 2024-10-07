@@ -8,9 +8,9 @@
 
 #### Summary of the Bystro Annotator
 
-Bystro takes 1+ VCF or SNP (PEMapper/PECaller) files, performs quality control, generates statistics, and outputs an annotated file that is in an easy-to-parse tab-separated format.
+Bystro takes 1 or more VCF ([Variant Call Format](https://samtools.github.io/hts-specs/VCFv4.2.pdf)) or SNP ([PEMapper/PECaller](https://www.pnas.org/doi/full/10.1073/pnas.1618065114) output) files, performs quality control, generates statistics, and outputs an annotated file that is in an easy-to-parse tab-separated format.
 
-Each row in the output file corresponds to a single variant site, and contains a set of annotations that describe the site's genomic context, functional impact, allele frequencies in various populations, and more.
+Each row in the output file corresponds to a single variant (mutation), and contains a set of annotations that describe the site's genomic context, functional impact, allele frequencies in various populations, and more.
 
 The annotations are divided into several categories, each of which is described in detail below.
 
@@ -32,31 +32,199 @@ This structure enables precise retention of complex data relationships across mu
 
 #### What Information Can Bystro Output?
 
-Bystro is a general-purpose annotation engine, and has no restrictions on the types of annotations/feature labels it can output. The annotations are sourced from the Bystro Database chosen, and is described based on a YAML configuration file, which describes the fields to be output, and the sources of the annotations.
+Bystro is a general-purpose annotation engine, and has no restrictions on the types of annotations/feature labels it can output. To output annotations, the user must provide a Bystro Database, which is a lightning-fast embedded key-value database that is keyed on genomic position, and a YAML configuration file that describes the fields to be output and where to source them from.
 
-A Bystro Database is a high-performance key-value database that uses the Lightning Memory Map Database (LMDB) engine. It supports millions of lookups per second on a single machine, and can be used to store and retrieve annotations for millions of variants.
+- A Bystro Database is a high-performance key-value database that uses the Lightning Memory Map Database (LMDB) engine. It supports millions of lookups per second on a single machine, and can be used to store and retrieve annotations for millions of variants.
 
-Bystro Databases can be re-created from the YAML configuration file corresponding to that database, and new databases with different information can be created by editing the YAML configuration file, and re-running the Bystro Database creation process.
+- Bystro Databases can be re-created from the YAML configuration file corresponding to that database, and new databases with different information can be created by editing the YAML configuration file, and re-running the Bystro Database creation process.
+
+- To create a Bystro Database, the user needs to provide a YAML configuration file that specifies all of the source file locations, the location to write the database, and the tracks/fields to output, and then runs `bystro-build.pl --config /path/to/config`. This will create a Bystro Database that can be used to annotate VCF or SNP files.
 
 #### Variant Representation
 
-Bystro's variant representation deviates slightly from the standard VCF format. Namely, Bystro ensures that the reference base is always a single nuleotide, and does the appropriate normalization/transformation of input variants to ensure this. This variant representation greatly simplifies downstream analysis.
+Bystro's variant representation deviates slightly from the standard VCF format in the name of simplicity. In particular, it drops the rule that the alternate allele must be ACTG, so that it can represent deletions on the base that the deletion actually occurs, rather than the base before the deletion. This has a number of surprising benefits:
 
-Compared with the VCF format, Bystro's variant representation has the following differences:
+    The `inputRef` (reference base) in Bystro's annotation outputs is always exactly 1 base long
 
-SNPs: Unchanged
+    The `pos' (position) in Bystro's annotation outputs is always the first affected base, except in the case of insertions, where it is the base before the insertion, since the insertion by definition is between two reference bases
 
-Insertions: The reference base is always the base just before the insertion, and the alternate allele is the inserted sequence, preceeded by a +. The position is the first affected base.
+    It is possible to represent all multiallelic site using a single reference base, a single position, and a list of alleles
 
-- For instance, if the VCF had POS: 1 REF: AT and ALT: ACCT, Bystro will represent this as inputRef: T, alt: +CCT, pos: 1, with the position the same as that in the VCF file, which is the first position of the reference base (the base just before the first inserted base). In Bystro's case there is only 1 reference base always, so the position is that of the only affected base.
+Bystro also has the ability to output a genotype dosage matrix in the [Arrow Feather V2/IPC format](https://arrow.apache.org/docs/python/feather.html) which is a matrix of the number of alternate alleles for each sample at each variant.
 
-Deletions: VCFs require ALT alleles to be at least 1 nucleotide long, which means that to represent a deletion, the VCF has to "pad" the reference. Bystro removes this padding, and represents deletions as the reference base, followed by a - and the number of deleted bases. The position is the first affected base.
+#### Comparing the VCF and Bystro Variant Representations
 
-- For instance if the VCF had POS:1 REF: AT and ALT: A, Bystro will represent this as inputRef: T, alt: -1, pos: 2, notably shifting the position of the allele up by 1 base, since the deletion did not actually occur at position 1, but the next base over.
+To run these example, you will need to have the Bystro VCF preprocessor installed. You can install it by running `go install github.com/bystrogenomics/bystro-vcf@2.2.3`.
 
-Multiallelics: Bystro decomposes multiallelic sites into separate rows, each with a single alternate allele. This ensures that each row has a single alternate allele, and that the annotations are accurate for each allele. The appropriate transformations are done to ensure that VCF padding rules are correctly transformed into Bystro's representation, and ensures that all variants outtputted in Bystro are left-aligned.
+Please note that we are not showing the full Bystro Annotator outputs, which are far too extensive to easily display here. Instead, we are showing a subset of the fields outputted by the Bystro VCF preprocessor, which is a tool that takes a VCF file and outputs a Bystro-annotator compatible TSV file, which is then used by the Perl Bystro Annotator to add annotations to the VCF file from the Bystro Database.
 
-<br/>
+```
+cat ~/bystro/perl/example_vcf.tsv | bystro-vcf --keepId --emptyField "NA" --keepPos
+```
+
+If you also want to output the **Bystro Genotype Dosage Matrix**, at a small performance hit, you can run:
+
+```
+cat ~/bystro/perl/example_vcf.tsv | bystro-vcf --keepId --emptyField "NA" --keepPos --dosageOutput example_vcf_dosage_matrix.feather
+```
+
+Input Example VCF:
+
+| CHROM | POS     | ID                          | REF  | ALT     | QUAL | FILTER | INFO                              | FORMAT      | NA00001        | NA00002        | NA00003  |
+| ----- | ------- | --------------------------- | ---- | ------- | ---- | ------ | --------------------------------- | ----------- | -------------- | -------------- | -------- |
+| 20    | 1       | SIMPLE_SNP                  | A    | T       | 50   | PASS   | .                                 | GT:GQ:DP:HQ | 0/1:54:7:56,60 | 0/0:48:4:51,51 | 0/0:61:2 |
+| 20    | 1110696 | MULTIALLELIC_SNP            | A    | G,T     | 67   | PASS   | NS=2;DP=10;AF=0.333,0.667;AA=T;DB | GT:GQ:DP:HQ | 1/2:21:6:23,27 | 2/1:2:0:18,2   | 2/2:35:4 |
+| 20    | 1       | SIMPLE_INSERTION            | A    | AC      | 50   | PASS   | .                                 | GT:GQ:DP:HQ | 0/0:54:7:56,60 | 0/0:48:4:51,51 | 1/0:61:2 |
+| 20    | 1       | INSERTION_BETWEEN_TWO_BASES | AT   | ACCT    | 50   | PASS   | .                                 | GT:GQ:DP    | 0/1:35:4       | 0/1:17:2       | 1/1:40:3 |
+| 20    | 1234567 | microsat1                   | GTCT | G,GTACT | 50   | PASS   | .                                 | GT:GQ:DP    | 0/1:35:4       | 0/2:17:2       | 1/1:40:3 |
+| 20    | 3       | EXAMPLE_MISSING_MNP         | CCC  | AAA     | 50   | PASS   | NS=3;DP=9;AA=G                    | GT          | ./1            | 0/0            | 1/1      |
+
+Expected Bystro VCF Pre-Processor Output:
+
+| chrom | pos     | type         | inputRef | alt | trTv | heterozygotes   | heterozygosity | homozygotes | homozygosity | missingGenos | missingness | ac  | an  | sampleMaf | vcfPos  | id                          |
+| ----- | ------- | ------------ | -------- | --- | ---- | --------------- | -------------- | ----------- | ------------ | ------------ | ----------- | --- | --- | --------- | ------- | --------------------------- |
+| chr20 | 1       | SNP          | A        | T   | 2    | NA00001         | 0.333          | NA          | 0            | NA           | 0           | 1   | 6   | 0.167     | 1       | SIMPLE_SNP                  |
+| chr20 | 1110696 | MULTIALLELIC | A        | G   | 0    | NA00001;NA00002 | 0.667          | NA          | 0            | NA           | 0           | 2   | 6   | 0.333     | 1110696 | MULTIALLELIC_SNP            |
+| chr20 | 1110696 | MULTIALLELIC | A        | T   | 0    | NA00001;NA00002 | 0.667          | NA00003     | 0.333        | NA           | 0           | 4   | 6   | 0.667     | 1110696 | MULTIALLELIC_SNP            |
+| chr20 | 1       | INS          | A        | +C  | 0    | NA00003         | 0.333          | NA          | 0            | NA           | 0           | 1   | 6   | 0.167     | 1       | SIMPLE_INSERTION            |
+| chr20 | 1       | INS          | A        | +CC | 0    | NA00001;NA00002 | 0.667          | NA00003     | 0.333        | NA           | 0           | 4   | 6   | 0.667     | 1       | INSERTION_BETWEEN_TWO_BASES |
+| chr20 | 1234568 | MULTIALLELIC | T        | -3  | 0    | NA00001         | 0.333          | NA00003     | 0.333        | NA           | 0           | 3   | 6   | 0.5       | 1234567 | microsat1                   |
+| chr20 | 1234568 | MULTIALLELIC | T        | +A  | 0    | NA00002         | 0.333          | NA          | 0            | NA           | 0           | 1   | 6   | 0.167     | 1234567 | microsat1                   |
+| chr20 | 3       | MNP          | C        | A   | 2    | NA              | 0              | NA00003     | 0.5          | NA00001      | 0.333       | 2   | 4   | 0.5       | 3       | EXAMPLE_MISSING_MNP         |
+| chr20 | 4       | MNP          | C        | A   | 2    | NA              | 0              | NA00003     | 0.5          | NA00001      | 0.333       | 2   | 4   | 0.5       | 3       | EXAMPLE_MISSING_MNP         |
+| chr20 | 5       | MNP          | C        | A   | 2    | NA              | 0              | NA00003     | 0.5          | NA00001      | 0.333       | 2   | 4   | 0.5       | 3       | EXAMPLE_MISSING_MNP         |
+
+Expected Bystro Genotype Dosage Matrix Output:
+
+```python
+import pandas as pd
+df = pd.read_feather('example_vcf_dosage_matrix.feather')
+print(df)
+```
+
+| locus              | NA0001 | NA0002 | NA0003 |
+| ------------------ | ------ | ------ | ------ |
+| chr20:1:A:T        | 1      | 0      | 0      |
+| chr20:1110696:A:G  | 1      | 1      | 0      |
+| chr20:1110696:A:T  | 1      | 1      | 2      |
+| chr20:1:A:+C       | 0      | 0      | 1      |
+| chr20:1:A:+CC      | 1      | 1      | 2      |
+| chr20:1234568:T:-3 | 1      | 0      | 2      |
+| chr20:1234568:T:+A | 0      | 1      | 0      |
+| chr20:3:C:A        | -1     | 0      | 2      |
+| chr20:4:C:A        | -1     | 0      | 2      |
+| chr20:5:C:A        | -1     | 0      | 2      |
+
+- Note that missing genotypes are reprsented as -1 in the genotype dosage matrix output
+- If a sample's genotype contains any missing genotypes, the sample is considered missing for the site
+
+##### Explanation For SIMPLE_SNP
+
+VCF Representation:
+
+| CHROM | POS | ID         | REF | ALT | QUAL | FILTER | INFO | FORMAT | NA00001        | NA00002        | NA00003  |
+| ----- | --- | ---------- | --- | --- | ---- | ------ | ---- | ------ | -------------- | -------------- | -------- |
+| 20    | 1   | SIMPLE_SNP | A   | T   | 50   | PASS   | .    | GT:GQ  | 0/1:54:7:56,60 | 0/0:48:4:51,51 | 0/0:61:2 |
+
+Bystro Representation:
+
+| chrom | pos | type | inputRef | alt | trTv | heterozygotes | heterozygosity | homozygotes | homozygosity | missingGenos | missingness | ac  | an  | sampleMaf | vcfPos | id         |
+| ----- | --- | ---- | -------- | --- | ---- | ------------- | -------------- | ----------- | ------------ | ------------ | ----------- | --- | --- | --------- | ------ | ---------- |
+| chr20 | 1   | SNP  | A        | T   | 2    | NA00001       | 0.333          | NA          | 0            | NA           | 0           | 1   | 6   | 0.167     | 1      | SIMPLE_SNP |
+
+Bystro Genotype Dosage Matrix Output:
+
+| locus       | NA0001 | NA0002 | NA0003 |
+| ----------- | ------ | ------ | ------ |
+| chr20:1:A:T | 1      | 0      | 0      |
+
+The Bystro and VCF formats for simple, well-normalized SNPs are the same. In addition to the position, variant type, reference, and alternate, Bystro's VCF preprocessor (bystro-vcf) also outputs whether a variant is a transition (1), transversion (2) or neither (0), descriptive information about the genotypes, including which samples are heterozyogtes, homozygotes, or missing genotypes, vcfPos (which describes the original position in the VCF file, pre-normalization), and the VCF ID. Meanwhile the genotype dosage matrix output shows the number of alternate alleles for each sample at each variant.
+
+##### Explanation For MULTIALLELIC_SNP
+
+VCF Representation:
+
+| CHROM | POS     | ID               | REF | ALT | QUAL | FILTER | INFO                              | FORMAT      | NA00001        | NA00002      | NA00003  |
+| ----- | ------- | ---------------- | --- | --- | ---- | ------ | --------------------------------- | ----------- | -------------- | ------------ | -------- |
+| 20    | 1110696 | MULTIALLELIC_SNP | A   | G,T | 67   | PASS   | NS=2;DP=10;AF=0.333,0.667;AA=T;DB | GT:GQ:DP:HQ | 1/2:21:6:23,27 | 2/1:2:0:18,2 | 2/2:35:4 |
+
+Bystro Representation:
+
+| chrom | pos     | type         | inputRef | alt | trTv | heterozygotes   | heterozygosity | homozygotes | homozygosity | missingGenos | missingness | ac  | an  | sampleMaf | vcfPos  | id               |
+| ----- | ------- | ------------ | -------- | --- | ---- | --------------- | -------------- | ----------- | ------------ | ------------ | ----------- | --- | --- | --------- | ------- | ---------------- |
+| chr20 | 1110696 | MULTIALLELIC | A        | G   | 0    | NA00001;NA00002 | 0.667          | NA          | 0            | NA           | 0           | 2   | 6   | 0.333     | 1110696 | MULTIALLELIC_SNP |
+| chr20 | 1110696 | MULTIALLELIC | A        | T   | 0    | NA00001;NA00002 | 0.667          | NA00003     | 0.333        | NA           | 0           | 4   | 6   | 0.667     | 1110696 | MULTIALLELIC_SNP |
+
+The VCF representation shows two different SNPs at the same position. NA00001 and NA00002 have 1 copy of each allele, while NA00003 has 2 copies of the A>T allele and 0 copies of A>G. Bystro's representation decomposes the multiallelic site into two separate rows, one for each allele. The first row shows the A>G allele, and the second row shows the A>T allele. Since NA00001 and NA00002 are heterozygous for both A>G and A>T, on each line they are listed in the heterozygotes columns, while NA00003 is homozygous for A>T and is listed in the homozygotes column only for the A>T allele row. The zygosity and sampleMaf (sample minor allele frequency) fields are calculated based on the allele in the row.
+
+##### Explanation For SIMPLE_INSERTION
+
+VCF Representation:
+
+| CHROM | POS | ID               | REF | ALT | QUAL | FILTER | INFO | FORMAT | NA00001        | NA00002        | NA00003  |
+| ----- | --- | ---------------- | --- | --- | ---- | ------ | ---- | ------ | -------------- | -------------- | -------- |
+| 20    | 1   | SIMPLE_INSERTION | A   | AC  | 50   | PASS   | .    | GT:GQ  | 0/0:54:7:56,60 | 0/0:48:4:51,51 | 1/0:61:2 |
+
+Bystro Representation:
+
+| chrom | pos | type | inputRef | alt | trTv | heterozygotes | heterozygosity | homozygotes | homozygosity | missingGenos | missingness | ac  | an  | sampleMaf | vcfPos | id               |
+| ----- | --- | ---- | -------- | --- | ---- | ------------- | -------------- | ----------- | ------------ | ------------ | ----------- | --- | --- | --------- | ------ | ---------------- |
+| chr20 | 1   | INS  | A        | +C  | 0    | NA00003       | 0.333          | NA          | 0            | NA           | 0           | 1   | 6   | 0.167     | 1      | SIMPLE_INSERTION |
+
+The VCF representation shows an insertion of a C base after the A base at position 1. Bystro's representation shows the insertion as occurring at the A base, with the reference base being A and the alternate allele being +C. The heterozygotes column lists NA00003 as heterozygous for the insertion.
+
+##### Explanation For INSERTION_BETWEEN_TWO_BASES
+
+VCF Representation:
+
+| CHROM | POS | ID                          | REF | ALT  | QUAL | FILTER | INFO | FORMAT | NA00001 | NA00002 | NA00003 |
+| ----- | --- | --------------------------- | --- | ---- | ---- | ------ | ---- | ------ | ------- | ------- | ------- |
+| 20    | 1   | INSERTION_BETWEEN_TWO_BASES | AT  | ACCT | 50   | PASS   | .    | GT:GQ  | 0/1:35  | 0/1:17  | 1/1:40  |
+
+Bystro Representation:
+
+| chrom | pos | type | inputRef | alt | trTv | heterozygotes   | heterozygosity | homozygotes | homozygosity | missingGenos | missingness | ac  | an  | sampleMaf | vcfPos | id                          |
+| ----- | --- | ---- | -------- | --- | ---- | --------------- | -------------- | ----------- | ------------ | ------------ | ----------- | --- | --- | --------- | ------ | --------------------------- |
+| chr20 | 1   | INS  | A        | +CC | 0    | NA00001;NA00002 | 0.667          | NA00003     | 0.333        | NA           | 0           | 4   | 6   | 0.667     | 1      | INSERTION_BETWEEN_TWO_BASES |
+
+The VCF representation shows an insertion of CC between the A and T bases. Bystro's representation shows the insertion as occurring after the A base, with the reference base being A and the alternate allele being +CC. NA00001 and NA00002 are heterozygous for the insertion, while NA00003 is homozygous for the insertion and therefore listed in the homozygotes column.
+
+##### Explanation For microsat1
+
+VCF Representation:
+
+| CHROM | POS     | ID        | REF  | ALT     | QUAL | FILTER | INFO | FORMAT | NA00001 | NA00002 | NA00003 |
+| ----- | ------- | --------- | ---- | ------- | ---- | ------ | ---- | ------ | ------- | ------- | ------- |
+| 20    | 1234567 | microsat1 | GTCT | G,GTACT | 50   | PASS   | .    | GT     | 0/1     | 0/2     | 1/1     |
+
+Bystro Representation:
+
+| chrom | pos     | type         | inputRef | alt | trTv | heterozygotes | heterozygosity | homozygotes | homozygosity | missingGenos | missingness | ac  | an  | sampleMaf | vcfPos  | id        |
+| ----- | ------- | ------------ | -------- | --- | ---- | ------------- | -------------- | ----------- | ------------ | ------------ | ----------- | --- | --- | --------- | ------- | --------- |
+| chr20 | 1234568 | MULTIALLELIC | T        | -3  | 0    | NA00001       | 0.333          | NA00003     | 0.333        | NA           | 0           | 3   | 6   | 0.5       | 1234567 | microsat1 |
+| chr20 | 1234568 | MULTIALLELIC | T        | +A  | 0    | NA00002       | 0.333          | NA          | 0            | NA           | 0           | 1   | 6   | 0.167     | 1234567 | microsat1 |
+
+The VCF representation shows a multiallelic site with two alleles. The first allele is GTCT>G at position 124567, because the VCF format's POS is the first base of the reference. In reality, this deletion is the deletion of the TCT bases starting at position 1234568, but because of VCF's padding requirements, the VCF format cannot show it as such. Bystro shows this allele at the correct position, 1234568, as a `-3`. 2 samples have this allele, NA00001 and NA00003. NA00001 is heterozygous, and NA00003 is homozygous, and are listed as such in the Bystro output.
+
+The second allele is GTCT>GTACT, with the insertion of an "A" occuring after the "T" base at position 1234568. Again, because of the VCF format's padding rule, this representation cannot be shown directly in the VCF format, but must be inferred. Bystro normalizes the representation, showing the insertion at the correct base, 1234568.
+
+##### Explanation For EXAMPLE_MISSING_MNP
+
+VCF Representation:
+
+| CHROM | POS | ID                  | REF | ALT | QUAL | FILTER | INFO           | FORMAT | NA00001 | NA00002 | NA00003 |
+| ----- | --- | ------------------- | --- | --- | ---- | ------ | -------------- | ------ | ------- | ------- | ------- |
+| 20    | 3   | EXAMPLE_MISSING_MNP | CCC | AAA | 50   | PASS   | NS=3;DP=9;AA=G | GT     | ./1     | 0/0     | 1/1     |
+
+Bystro Representation:
+
+| chrom | pos | type | inputRef | alt | trTv | heterozygotes | heterozygosity | homozygotes | homozygosity | missingGenos | missingness | ac  | an  | sampleMaf | vcfPos | id                  |
+| ----- | --- | ---- | -------- | --- | ---- | ------------- | -------------- | ----------- | ------------ | ------------ | ----------- | --- | --- | --------- | ------ | ------------------- |
+| chr20 | 3   | MNP  | C        | A   | 2    | NA            | 0              | NA00003     | 0.5          | NA00001      | 0.333       | 2   | 4   | 0.5       | 3      | EXAMPLE_MISSING_MNP |
+| chr20 | 4   | MNP  | C        | A   | 2    | NA            | 0              | NA00003     | 0.5          | NA00001      | 0.333       | 2   | 4   | 0.5       | 3      | EXAMPLE_MISSING_MNP |
+| chr20 | 5   | MNP  | C        | A   | 2    | NA            | 0              | NA00003     | 0.5          | NA00001      | 0.333       | 2   | 4   | 0.5       | 3      | EXAMPLE_MISSING_MNP |
+
+The VCF representation shows a multi-nucleotide polymorphism (MNP) at position 3, where 3 bases are changed from CCC to AAA. An MNP is really 3 single nucleotide polymorphisms next to each other, typically linked on the same chromosome. Bystro decomposes the MNP into 3 separate rows, each with a single nucleotide change. The first row shows the first base change, the second row shows the second base change, and the third row shows the third base change. NA00001 was unsuccessfully typed, with 1 of its 2 chromosomes having an ambiguous or low quality genotype ("."). Bystro, to be conservative ("garbage in means garbage out"), counts this sample as having a missing genotype, and subtracts 2 from the `an` (allele number).
 
 ### Annotation Fields for Default Human Assembly hg38 and hg19 Bystro Databases
 
