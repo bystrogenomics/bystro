@@ -201,7 +201,7 @@ Bystro Genotype Dosage Matrix Output:
 | ----------- | ------ | ------ | ------ |
 | chr20:1:A:T | 1      | 0      | 0      |
 
-The Bystro and VCF formats for simple, well-normalized SNPs are the same. In addition to the position, variant type, reference, and alternate, Bystro's VCF preprocessor (bystro-vcf) also outputs whether a variant is a transition (1), transversion (2) or neither (0), descriptive information about the genotypes, including which samples are heterozyogtes, homozygotes, or missing genotypes, vcfPos (which describes the original position in the VCF file, pre-normalization), and the VCF ID. Meanwhile the genotype dosage matrix output shows the number of alternate alleles for each sample at each variant.
+The Bystro and VCF formats for simple, well-normalized SNPs are the same. In addition to the position, variant type, reference, and alternate, Bystro's VCF preprocessor (bystro-vcf) also outputs whether a variant is a transition (1), transversion (2) or neither (0), descriptive information about the genotypes, including which samples are heterozygotes, homozygotes, or missing genotypes, vcfPos (which describes the original position in the VCF file, pre-normalization), and the VCF ID. Meanwhile the genotype dosage matrix output shows the number of alternate alleles for each sample at each variant.
 
 #### Explanation for MULTIALLELIC_SNP
 
