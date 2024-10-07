@@ -10,7 +10,7 @@ Bystro's performance isn't just about speed, it's also about comprehensiveness. 
 
 ## Running Your First Annotation
 
-See the [INSTALL.md#configuring-the-bystro-annotator](../INSTALL.md#configuring-the-bystro-annotator) section for instructions on how to configure# Bystro Annotator
+See the [INSTALL.md#configuring-the-bystro-annotator](./INSTALL.md#configuring-the-bystro-annotator) section for instructions on how to configure# Bystro Annotator
 
 ```sh
 bystro-annotate.pl --config ~/bystro/config/hg38.yml --threads 32 --input gnomad.genomes.v4.0.sites.chr22.vcf.bgz --output test/my_annotation --compress gz
