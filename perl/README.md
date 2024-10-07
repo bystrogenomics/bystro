@@ -4,13 +4,13 @@
 
 The Bystro Annotator is the fastest and most comprehensive data curation and labeling library in the world for genetic data. It take 1 or more VCF ([Variant Call Format](https://samtools.github.io/hts-specs/VCFv4.2.pdf)) or SNP ([PEMapper/PECaller](https://www.pnas.org/doi/full/10.1073/pnas.1618065114)) files as input, and outputs a cleaned and thoroughly labeled (annotated) representation of your data, along with a genotype dosage matrix in the [Arrow Feather V2/IPC format](https://arrow.apache.org/docs/python/feather.html), and a set of statistics on the data.
 
-Bystro Annotator processes both variants and sample genotypes. It is capable of processing millions of samples and billions of mutations on commodity hardware such as a laptop or a workstation. It is roughly **100,000** times faster than [Variant Effect Predictor](https://www.ensembl.org/info/docs/tools/vep/index.html) (VEP), **1,000** times faster than [Annovar](https://doc-openbio.readthedocs.io/projects/annovar/en/latest/), and **50** times faster than [Illumina Connected Annotations](https://developer.illumina.com/illumina-connected-annotations), all while outputting more annotations than any of these tools. What takes VEP years to do, Bystro can do in minutes to hours, all without requiring multiple servers.
+Bystro Annotator processes both variant and sample genotypes. It is capable of processing millions of samples and billions of mutations on commodity hardware such as a laptop or a workstation. It is roughly **100,000** times faster than [Variant Effect Predictor](https://www.ensembl.org/info/docs/tools/vep/index.html) (VEP), **100** times faster than [Annovar](https://doc-openbio.readthedocs.io/projects/annovar/en/latest/), and **50** times faster than [Illumina Connected Annotations](https://developer.illumina.com/illumina-connected-annotations), all while outputting more annotations than any of these tools. What takes VEP years to do, Bystro can do in minutes to hours, all without requiring multiple servers.
 
-Bystro's performance isn't just about speed, it's also about comprehensiveness. For instance, because of it's performance, Bystro can afford to provide complete annotations, both genome and exome wide, from gnomad v4.1, for all populations and subpopulations. **No other tool can do this**.
+Bystro's performance isn't just about speed, it's also about comprehensiveness. For instance, because of its performance, Bystro can afford to provide complete annotations from gnomad v4.1, for all populations and subpopulations, from the exomes, genomes, and joint datasets, genome-wide. This is intersecting terabytes of data over the entire genome with each variant, all done in microseconds per variant. **No other tool can do this**.
 
 ## Running Your First Annotation
 
-See the [INSTALL.md#configuring-the-bystro-annotator](./INSTALL.md#configuring-the-bystro-annotator) section for instructions on how to configure# Bystro Annotator
+See the [INSTALL.md#configuring-the-bystro-annotator](./INSTALL.md#configuring-the-bystro-annotator) section for instructions on how to configure the Bystro Annotator
 
 ```sh
 bystro-annotate.pl --config ~/bystro/config/hg38.yml --threads 32 --input gnomad.genomes.v4.0.sites.chr22.vcf.bgz --output test/my_annotation --compress gz
@@ -45,16 +45,27 @@ Created completion file
 Explanation of the output:
 
 - `my_annotation.annotation.header.json`: The header of the annotated dataset
+
 - `my_annotation.sample_list`: The list of samples in the annotated dataset
+
 - `my_annotation.annotation.tsv.gz`: A block gzipped TSV file with one row per variant and one column per annotation. Can be decompressed with `bgzip` or any program compatible with the gzip format, like `gzip` and `pigz`.
+
 - `my_annotation.dosage.feather`: The dosage matrix file, where the first column is the `locus` column in the format "chr:pos:ref:alt", and columns following that are sample columns, with the dosage of the variant for that sample (0 for homozygous reference, 1 for 1 copy of the alternate allele, 2 for 2, and so on). -1 indicates missing genotypes. The dosage is the expected number of alternate alleles, given the genotype. This is useful for downstream analyses like imputation, or for calculating polygenic risk scores
-  - This file is in the [Arrow feather format](https://arrow.apache.org/docs/python/feather.html), also known as the "IPC" format. This is an ultra-efficient format for machine learning, and is widely supported, in Python libraries like [Pandas](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_feather.html), [Polars](https://docs.pola.rs/api/python/stable/reference/api/polars.read_ipc.html), [PyArrow](https://arrow.apache.org/docs/python/generated/pyarrow.feather.read_feather.html), as well as languages like [R](https://arrow.apache.org/docs/r/reference/read_feather.html) and [Julia](https://github.com/apache/arrow-julia)
+
+  - This file is in the [Arrow Feather V2 / IPC format](https://arrow.apache.org/docs/python/feather.html), also known as the "IPC" format. This is an ultra-efficient format for machine learning, and is widely supported, in Python libraries like [Pandas](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_feather.html), [Polars](https://docs.pola.rs/api/python/stable/reference/api/polars.read_ipc.html), [PyArrow](https://arrow.apache.org/docs/python/generated/pyarrow.feather.read_feather.html), as well as languages like [R](https://arrow.apache.org/docs/r/reference/read_feather.html) and [Julia](https://github.com/apache/arrow-julia)
+
 - `hg38.yml`: The configuration file used for the annotation. You can use this to either re-build the Bystro Annotation Database from scratch, or to re-run the annotation with the same configuration
+
 - `my_annotation.annotation.log.txt`: The log file for the annotation
+
 - `my_annotation.statistics.tsv`: A TSV file with sample-wise statistics on the annotation
+
 - `my_annotation.statistics.qc.tsv`: A TSV file that lists any samples that failed quality control checks, currently defined as being outside 3 standard deviations from the mean on any of the sample-wise statistics
+
 - `my_annotation.statistics.json`: A JSON file with the same sample-wise statistics on the annotation
-- 'totalProgress': The number of variants processed; this is the number of variants passed to the Bystro annotator by the bystro-vcf pre-processor, which performs primary quality control checks, such as excluding sites that have no samples with non-missing genotypes, or which are not FILTER=PASS in the input VCF. We also exclude sites that are not in the Bystro Annotation Database, and sites that are not in the Bystro Annotation Database that are not in the input VCF. In more detail:
+
+- `totalProgress`: The number of variants processed; this is the number of variants passed to the Bystro annotator by the bystro-vcf pre-processor, which performs primary quality control checks, such as excluding sites that have no samples with non-missing genotypes, or which are not FILTER=PASS in the input VCF. We also exclude sites that are not in the Bystro Annotation Database, and sites that are not in the Bystro Annotation Database that are not in the input VCF. In more detail:
+
   - Variants must have FILTER value of PASS or " . "
   - Variants and ref must be ACTG (no structural variants retained)
   - Multiallelics are split into separate records, and annotated separately
@@ -65,7 +76,9 @@ Explanation of the output:
 
 ## Let's Take a Closer Look at the Annotation Output
 
-The Bystro annotation outputs is a tab-separated file with one header row, and then N rows of annotated variants, one variant per row. The annotations are divided into several categories, each of which is described in detail in the [Bystro Annotation Fields](#bystro-annotation-fields) section.
+The Bystro annotation outputs is a tab-separated file with one header row, and then N rows of annotated variants, one variant per row. The sample genotypes for each variant, and sample-level statistics for each variant are stored in each row in sparse fashion. The annotations are divided into several categories, each of which is described in detail in the [Bystro Annotation Fields](#bystro-annotation-fields) section.
+
+As mentioned, corresponding to the annotation output is a genotype dosage matrix output, which contains the dense representation of genotypes, 1 byte per genotype. It is stored in the [Arrow Feather V2 format](https://arrow.apache.org/docs/python/feather.html), with data compressed using `zstd` compression. Arrow Feather V2 is a columnar datastore, so despite the genotype dosage matrix being typically large, it can be read in a streaming fashion, and even in chunks of samples. We find that we can process thousands of samples within just a few gigabytes of RAM.
 
 ## Bystro Annotation Output In Depth
 
