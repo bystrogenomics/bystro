@@ -374,7 +374,7 @@ Sourced from the input file, or calculated based on input fields from the VCF or
 
 In the default Bystro Annotation Database, we source transcript annotations from the UCSC refGene track, joined on other UCSC tracks: knownToEnsembl, kgXref, knownCanonical.
 
-- See [refGene]('https://sc-bro.nhlbi.nih.gov/cgi-bin/hgTables?hgsid=554_JXUlabut7OUQtCyNphC8FGaeUJnj&hgta_doSchemaDb=hg38&hgta_doSchemaTable=refGene') and [kgXref]('https://sc-bro.nhlbi.nih.gov/cgi-bin/hgTables?hgsid=554_JXUlabut7OUQtCyNphC8FGaeUJnj&hgta_doSchemaDb=hg38& hgta_doSchemaTable=kgXref') for more information
+- See [refGene](https://genome.ucsc.edu/cgi-bin/hgTables?db=hg38&hgta_group=genes&hgta_track=refSeqComposite&hgta_table=refGene&hgta_doSchema=describe+table+schema) and [kgXref](https://genome.cse.ucsc.edu/cgi-bin/hgTables?hgsid=1893397768_GDljX7p8FQaqUVJ3FZD1cSUFpeV2&hgta_doSchemaDb=hg38&hgta_doSchemaTable=kgXref) for more information
 
 - In custom Bystro Annotation Databases, these annotations can be sourced from any UCSC transcript track, and multiple such `gene` type tracks can be defined in a single Bystro Annotation Database (annotations for all will be outputted)
 
