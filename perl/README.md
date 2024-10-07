@@ -286,7 +286,7 @@ The VCF representation shows a multi-nucleotide polymorphism (MNP) at position 3
 
 ## What is the Bystro Annotation Database?
 
-To output annotations, the user must point Bystro Annotator at a Bystro Annotator Database, which is a high-performance embedded memory-mapped database used by the Bystro Annotator to label variants. Three default databases are provided, for Humans (hg19 and hg38), and rats (rn11). See the [INSTALL.md#databases](./INSTALL.md#databases) section for more information on how to download these databases.
+To output annotations, the user must point Bystro Annotator at a Bystro Annotator Database, which is a high-performance embedded memory-mapped database used by the Bystro Annotator to label variants. Three default databases are provided, for Humans (hg19 and hg38), and rats (rn7). See the [INSTALL.md#databases](./INSTALL.md#databases) section for more information on how to download these databases.
 
 Key points:
 
