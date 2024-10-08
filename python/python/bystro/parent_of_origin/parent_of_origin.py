@@ -153,6 +153,7 @@ class POESingleSNP(BasePOE):
         store_samples: bool = False,
         pval_method: str = "rmt4ds",
         allow_alternative_reference: bool = True,
+        assess_model_assumptions: bool = True,
         n_permutations_pval: int = 10000,
         n_permutations_bootstrap: int = 10000,
         cov_regularization: str = "Empirical",
@@ -178,6 +179,10 @@ class POESingleSNP(BasePOE):
         allow_alternative_reference : bool, optional, default=True
             Whether to allow the "alternative" allele to be the reference
 
+        assess_model_assumptions : bool, optional, default=True
+            If True, the model will assess whether certain assumptions are met before running.
+            Specifically, it checks if the variance of heterozygotes is less than that of homozygotes.
+            If the assumptions are violated, the model will not proceed with further computations.
         n_permutations_pval : int, optional, default=10000
             The number of permutations for p-value calculation.
 
@@ -204,7 +209,7 @@ class POESingleSNP(BasePOE):
         self.pval_method = pval_method
         self.store_samples = store_samples
         self.allow_alternative_reference = allow_alternative_reference
-
+        self.assess_model_assumptions = assess_model_assumptions
         if cov_regularization == "Empirical":
             self.cov_reg: Union[
                 EmpiricalCovariance,
@@ -274,6 +279,27 @@ class POESingleSNP(BasePOE):
         X_heterozygotes = X[y == 1]
         X_homozygotes = X_homozygotes - np.mean(X_homozygotes, axis=0)
         X_heterozygotes = X_heterozygotes - np.mean(X_heterozygotes, axis=0)
+
+        if self.assess_model_assumptions:
+            variances_homo = np.var(X_homozygotes, axis=0)
+            variances_hetero = np.var(X_heterozygotes, axis=0)
+            invalid_variance = np.all(variances_hetero < variances_homo)
+            any_zero = np.any(variances_homo == 0)
+            if invalid_variance or any_zero:
+                print("Data do not match model assumptions")
+                print("Homozygous variances are 0: ", any_zero)
+                print(
+                    "Homozygous variances larger than hetero: ",
+                    invalid_variance,
+                )
+                self.parent_effect_ = np.zeros(self.n_phenotypes)
+                if self.compute_pvalue:
+                    self.p_val = 1.0
+
+                if self.compute_ci:
+                    self.confidence_interval_ = np.zeros((self.n_phenotypes, 2))
+
+                return self
 
         n_hetero = X_heterozygotes.shape[0]
         n_homo = X_homozygotes.shape[0]
@@ -689,6 +715,7 @@ class POEMultipleSNP2(BasePOE):
         pval_method: str = "rmt4ds",
         cov_regularization: str = "Empirical",
         allow_alternative_reference: bool = True,
+        assess_model_assumptions: bool = True,
         svd_loss: Optional[str] = None,
         n_repeats: int = 4000,
     ) -> None:
@@ -701,6 +728,7 @@ class POEMultipleSNP2(BasePOE):
         self.pval_method = pval_method
         self.cov_regularization = cov_regularization
         self.allow_alternative_reference = allow_alternative_reference
+        self.assess_model_assumptions = assess_model_assumptions
         if cov_regularization == "Empirical":
             self.cov_reg: Union[
                 EmpiricalCovariance,
@@ -762,6 +790,7 @@ class POEMultipleSNP2(BasePOE):
                 compute_pvalue=True,
                 compute_ci=False,
                 allow_alternative_reference=self.allow_alternative_reference,
+                assess_model_assumptions=self.assess_model_assumptions,
                 cov_regularization=self.cov_regularization,
                 svd_loss=self.svd_loss,
             )
