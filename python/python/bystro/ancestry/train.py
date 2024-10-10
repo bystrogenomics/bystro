@@ -133,13 +133,11 @@ def _load_callset() -> dict[str, Any]:
 
 
 def load_callset_for_variants(variants: set[str]) -> pd.DataFrame:
-    """Load Thousand Genomes data filtered to variants."""
-    genotype_dfs = []
-    logger.info("starting on loading callset")
+    """Load merged 1000 genomes data filtered to specified variants."""
+    logger.info("Starting to load callset")
     genotype_df = parse_vcf(VCF_PATH, variants)
-    logger.info("got genotype_df of shape: %s", genotype_df.shape)
-    genotype_dfs.append(genotype_df)
-    return pd.concat(genotype_dfs, axis=0)
+    logger.info("Got genotype_df of shape: %s", genotype_df.shape)
+    return genotype_df
 
 
 def _parse_vcf_line_for_dosages(
