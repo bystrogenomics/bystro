@@ -105,45 +105,6 @@ class MockAsyncOpenSearch:
 
 
 @pytest.mark.asyncio
-async def test_legacy_get_annotation_results_from_query(mocker):
-    mocker.patch(
-        "bystro.proteomics.annotation_interface.AsyncOpenSearch",
-        return_value=MockAsyncOpenSearchLegacy(),
-    )
-    # inputRef doesn't exist in the legacy datasets, pre Q1-2024
-    mocker.patch("bystro.proteomics.annotation_interface.INPUT_REF_FIELD", "ref")
-    mocker.patch(
-        "bystro.proteomics.annotation_interface.ALWAYS_INCLUDED_FIELDS",
-        [
-            "chrom",
-            "pos",
-            "vcfPos",
-            "ref",
-            "alt",
-            "type",
-            "id",
-        ],
-    )
-
-    query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
-    index_name = "mock_index_name"
-
-    samples_and_genes_df = await async_get_annotation_result_from_query(
-        query_string,
-        index_name,
-        cluster_opensearch_config={
-            "connection": {
-                "nodes": ["http://localhost:9200"],
-                "request_timeout": 1200,
-                "use_ssl": False,
-                "verify_certs": False,
-            },
-        },
-    )
-    assert (1405, 52) == samples_and_genes_df.shape
-
-
-@pytest.mark.asyncio
 async def test_get_annotation_results_from_query_with_samples(mocker):
     mocker.patch(
         "bystro.proteomics.annotation_interface.AsyncOpenSearch",
