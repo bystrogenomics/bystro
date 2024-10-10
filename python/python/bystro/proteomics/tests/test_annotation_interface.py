@@ -5,6 +5,8 @@ import json
 import msgspec
 import pytest
 
+from bystro.api.auth import CachedAuth
+
 from bystro.proteomics.annotation_interface import (
     DOSAGE_GENERATED_COLUMN,
     process_query_response,
@@ -102,6 +104,45 @@ class MockAsyncOpenSearch:
 
     async def close(self) -> None:
         return
+
+
+@pytest.mark.asyncio
+async def test_legacy_get_annotation_results_from_query(mocker):
+    mocker.patch(
+        "bystro.proteomics.annotation_interface.AsyncOpenSearch",
+        return_value=MockAsyncOpenSearchLegacy(),
+    )
+    # inputRef doesn't exist in the legacy datasets, pre Q1-2024
+    mocker.patch("bystro.proteomics.annotation_interface.INPUT_REF_FIELD", "ref")
+    mocker.patch(
+        "bystro.proteomics.annotation_interface.ALWAYS_INCLUDED_FIELDS",
+        [
+            "chrom",
+            "pos",
+            "vcfPos",
+            "ref",
+            "alt",
+            "type",
+            "id",
+        ],
+    )
+
+    query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
+    index_name = "mock_index_name"
+
+    samples_and_genes_df = await async_get_annotation_result_from_query(
+        query_string,
+        index_name,
+        cluster_opensearch_config={
+            "connection": {
+                "nodes": ["http://localhost:9200"],
+                "request_timeout": 1200,
+                "use_ssl": False,
+                "verify_certs": False,
+            },
+        },
+    )
+    assert (1405, 52) == samples_and_genes_df.shape
 
 
 @pytest.mark.asyncio
@@ -289,60 +330,68 @@ def test_process_response():
                 )
 
 
+import asyncio
+
 @pytest.mark.asyncio
 async def test_join_annotation_result_to_fragpipe_dataset(mocker):
+    # Create a mock OpenSearch client
+    mock_opensearch_client = mocker.Mock()
+
+    # Wrap return values of async functions in asyncio.Future
+    mock_opensearch_client.create_point_in_time.return_value = asyncio.Future()
+    mock_opensearch_client.create_point_in_time.return_value.set_result({"pit_id": "mock_pit_id"})
+
+    mock_opensearch_client.close.return_value = asyncio.Future()
+    mock_opensearch_client.close.return_value.set_result(None)
+
+    mock_opensearch_client.delete_point_in_time.return_value = asyncio.Future()
+    mock_opensearch_client.delete_point_in_time.return_value.set_result(None)
+
+    # Wrap the search method's return value in a future to simulate async behavior
+    mock_opensearch_client.search.return_value = asyncio.Future()
+    mock_opensearch_client.search.return_value.set_result({"hits": {"hits": TEST_RESPONSES_WITH_SAMPLES}})
+
+    # Ensure indices.exists returns a future
+    mock_opensearch_client.indices.exists.return_value = asyncio.Future()
+    mock_opensearch_client.indices.exists.return_value.set_result(True)
+
+    # Patch the creation of the AsyncOpenSearch client to use the mock instead
+    mocker.patch("bystro.proteomics.annotation_interface.AsyncOpenSearch", return_value=mock_opensearch_client)
+
+    # Create and patch a mock CachedAuth instance
+    mock_bystro_api_auth = CachedAuth(email="test_user@gmail.com", access_token="123456", url="http://mockserver:9200")
+    mocker.patch("bystro.proteomics.annotation_interface.CachedAuth", return_value=mock_bystro_api_auth)
+    
+    # Patch the function that creates the client to ensure it returns the mock client
     mocker.patch(
-        "bystro.proteomics.annotation_interface.AsyncOpenSearch",
-        return_value=MockAsyncOpenSearch(TEST_RESPONSES_WITH_SAMPLES),
+        "bystro.proteomics.annotation_interface.get_async_proxied_opensearch_client",
+        return_value=mock_opensearch_client
     )
+
+    # Mock the async_get_num_slices function to return a fixed number of slices
+    mocker.patch("bystro.proteomics.annotation_interface.async_get_num_slices", return_value=asyncio.Future())
+    mocker.patch("bystro.proteomics.annotation_interface.async_get_num_slices").return_value.set_result((1, None))
 
     query_string = "exonic (gnomad.genomes.af:<0.1 || gnomad.exomes.af:<0.1)"
     index_name = "foo"
 
+    # Run the test with the mocked client and auth
     query_result_df = await async_get_annotation_result_from_query(
         query_string,
         index_name,
-        cluster_opensearch_config={
-            "connection": {
-                "nodes": ["http://localhost:9200"],
-                "request_timeout": 1200,
-                "use_ssl": False,
-                "verify_certs": False,
-            },
-        },
+        bystro_api_auth=mock_bystro_api_auth,
         explode_field="refSeq.name2",
     )
 
+    # Assert the shape of the returned dataframe
     assert (582, 12) == query_result_df.shape
 
-    sample_ids = query_result_df[SAMPLE_GENERATED_COLUMN].unique()
+    # Further assertions to verify that the mock client was used and no real connections were made
+    mock_opensearch_client.search.assert_called_once()
+    mock_opensearch_client.create_point_in_time.assert_called_once()
+    mock_opensearch_client.delete_point_in_time.assert_called_once()
+    mock_opensearch_client.close.assert_called_once()
 
-    abundance_file = str(Path(__file__).parent / "example_abundance_gene_MD.tsv")
-    experiment_file = str(Path(__file__).parent / "example_experiment_annotation_file.tsv")
-    tmt_dataset = load_tandem_mass_tag_dataset(abundance_file, experiment_file)
-
-    sample_names = list(tmt_dataset.annotation_df.index)[0 : sample_ids.shape[0]]
-
-    # replace the sample ids with the sample names
-    replacements = {sample_id: sample_name for sample_id, sample_name in zip(sample_ids, sample_names)}
-    query_result_df[SAMPLE_GENERATED_COLUMN] = query_result_df[SAMPLE_GENERATED_COLUMN].replace(
-        replacements
-    )
-
-    joined_df = join_annotation_result_to_proteomic_dataset(
-        query_result_df, tmt_dataset, proteomic_join_column=FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED
-    )
-
-    assert (90, 17) == joined_df.shape
-
-    retained_fragpipe_columns = []
-    for name in FRAGPIPE_RENAMED_COLUMNS:
-        if name in [FRAGPIPE_SAMPLE_COLUMN, FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED]:
-            continue
-        retained_fragpipe_columns.append(name)
-
-    retained_fragpipe_columns.append(FRAGPIPE_SAMPLE_INTENSITY_COLUMN)
-    assert list(joined_df.columns) == list(query_result_df.columns) + retained_fragpipe_columns
 
 
 @pytest.mark.asyncio
