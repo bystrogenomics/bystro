@@ -18,7 +18,13 @@ pd.options.future.infer_string = True  # type: ignore
 
 def load_model_variants() -> set[str]:
     """Get set of variants to train ancestry model."""
-    return set(pd.read_csv(VARIANT_PATH).variants)
+    try:
+        variants_df = pd.read_csv(VARIANT_PATH)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Variant file '{VARIANT_PATH}' not found.")
+    except pd.errors.ParserError as e:
+        raise Exception(f"Error parsing variant file '{VARIANT_PATH}': {e}")
+    return set(variants_df.variants)
 
 
 def load_kgp_genotypes_for_shared_variants() -> pd.DataFrame:
