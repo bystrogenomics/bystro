@@ -14,7 +14,6 @@ from bystro.ancestry.train import (
     superpop_predictions_from_pop_probs,
     superpop_probs_from_pop_probs,
 )
-from bystro.vcf_utils.simulate_random_vcf import generate_simulated_vcf, convert_sim_vcf_to_df
 
 pd.options.future.infer_string = True  # type: ignore
 
@@ -287,4 +286,3 @@ def test_superpop_predictions_from_pop_probs():
         "AFR",
     ]
     assert expected_superpop_predictions == superpop_predictions
-

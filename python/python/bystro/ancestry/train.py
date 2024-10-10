@@ -17,7 +17,6 @@ import gzip
 import logging
 import random
 import sys
-from collections import Counter
 from collections.abc import Collection, Container, Iterable
 from pathlib import Path
 from typing import Any, Literal, TypeVar, get_args
@@ -35,7 +34,6 @@ from skops.io import dump as skops_dump
 
 from bystro.ancestry.asserts import assert_equals, assert_true
 from bystro.ancestry.train_utils import get_variant_ids_from_callset, head
-from bystro.vcf_utils.simulate_random_vcf import HEADER_COLS
 
 logger = logging.getLogger(__name__)
 
@@ -378,18 +376,6 @@ def load_label_data(samples: pd.Index) -> pd.DataFrame:
     )
     assert_equals("samples", samples, "labels", labels.index)
     return labels
-
-
-def _load_dataset() -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Return the final dataset consisting of genotype matrix, labels."""
-    genotypes = _load_genotypes()
-    labels = load_label_data(genotypes.index)
-    genotypes, labels = filter_samples_for_relatedness(genotypes, labels)
-    genotypes = _filter_variants_for_maf(genotypes)
-    genotypes = _filter_variants_for_ld(genotypes)
-    assert_genotypes_and_label_agree(genotypes, labels)
-    assert_equals("genotypes.shape", genotypes.shape, "expected genotypes.shape", (1870, 150502))
-    return genotypes, labels
 
 
 def assert_genotypes_and_label_agree(genotypes: pd.DataFrame, labels: pd.DataFrame) -> None:
