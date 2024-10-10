@@ -27,12 +27,6 @@ def load_kgp_genotypes_for_shared_variants() -> pd.DataFrame:
     return load_callset_for_variants(variants)
 
 
-def pca_transform_df(pca: PCA, X: pd.DataFrame) -> pd.DataFrame:
-    """PCA transform dataframe, retaining index and labeling columns appropriately."""
-    pc_columns = ["pc" + str(i) for i in range(1, pca.num_components_ + 1)]
-    return pd.DataFrame(pca.transform(X), index=X.index, columns=pc_columns)
-
-
 def main() -> None:
     """Train PCA, RF for gnomad variants, save model products to disk."""
     kgp_genotypes = load_kgp_genotypes_for_shared_variants()
