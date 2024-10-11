@@ -8,6 +8,8 @@ This script takes a vcf of preprocessed variants (see preprocess_vcfs.sh) and ge
 
 3.  Classifiers mapping PC space to the 26 HapMap populations as well as 5 continent-level
 superpopulations.
+
+Training for current models occurs in train_chip_model.py and train_gnomad_model.py
 """
 
 import dataclasses
@@ -15,7 +17,6 @@ import gzip
 import logging
 import random
 import sys
-from collections import Counter
 from collections.abc import Collection, Container, Iterable
 from pathlib import Path
 from typing import Any, Literal, TypeVar, get_args
@@ -33,7 +34,6 @@ from skops.io import dump as skops_dump
 
 from bystro.ancestry.asserts import assert_equals, assert_true
 from bystro.ancestry.train_utils import get_variant_ids_from_callset, head
-from bystro.vcf_utils.simulate_random_vcf import HEADER_COLS
 
 logger = logging.getLogger(__name__)
 
@@ -43,15 +43,17 @@ ANCESTRY_DIR = Path(__file__).parent
 DATA_DIR = ANCESTRY_DIR / "data"
 KGP_VCF_DIR = DATA_DIR / "kgp_vcfs"
 INTERMEDIATE_DATA_DIR = ANCESTRY_DIR / "intermediate_data"
-VCF_PATH = DATA_DIR / "1KGP_final_variants_1percent.vcf.gz"
+VCF_PATH = DATA_DIR / "1kgp_gnomadset_unrelated.vcf.gz"
 ANCESTRY_MODEL_PRODUCTS_DIR = ANCESTRY_DIR / "ancestry_model_products"
+PCA_FPATH = ANCESTRY_MODEL_PRODUCTS_DIR / "hg38_gnomadset_pca.csv"
+RFC_FPATH = ANCESTRY_MODEL_PRODUCTS_DIR / "hg38_gnomadset_rfc.skop"
 # TODO Set up download of gnomad loadings in preprocess step
 GNOMAD_LOADINGS_PATH = "gnomadloadings.tsv"
 # TODO Set up preprocess of this file that doesn't include dependency like plink or bcftools
 KGP_VCF_FILTERED_TO_GNOMAD_LOADINGS_FILEPATH = "1kgpGnomadList.vcf"
 
 
-ANCESTRY_INFO_PATH = DATA_DIR / "20130606_sample_info.txt"
+ANCESTRY_INFO_PATH = DATA_DIR / "KGP_ancestry.csv"
 ROWS, COLS = 0, 1
 QUALITY_CUTOFF = 100  # for variant quality filtering
 PLOIDY = 2
@@ -110,38 +112,32 @@ Variant = str
 def _load_callset() -> dict[str, Any]:
     """Load callset and perform as many checks as can be done without processing it."""
     callset = allel.read_vcf(str(VCF_PATH), log=sys.stdout)
-    num_variants, num_samples = 1203135, 2504
+    genotypes = callset["calldata/GT"]
+    num_variants, num_samples = genotypes.shape[0], genotypes.shape[1]
     assert_equals(
         f"chromosomes in {VCF_PATH}",
         {int(chrom) for chrom in callset["variants/CHROM"]},
         "autosomal chromosomes",
         AUTOSOMAL_CHROMOSOMES,
     )
-    genotypes = callset["calldata/GT"]
-    assert_equals(
-        "genotype dimensions",
-        genotypes.shape,
-        "predicted genotype dimensions",
-        (num_variants, num_samples, PLOIDY),
+    assert_true(
+        "variant and sample dimensions",
+        num_variants > 33000 and num_samples >= 2504,
         comment=(
-            f"VCF file {VCF_PATH} had unexpected dimensions.  Expected matrix of shape: "
-            f"(num_variants: {num_variants}, num_samples: {num_samples}, ploidy: {PLOIDY})"
+            f"VCF file {VCF_PATH} had unexpected dimensions. "
+            f"Expected more than 33,000 variants and 2504 or more samples, "
+            f"but got {num_variants} variants and {num_samples} samples."
         ),
     )
     return callset
 
 
 def load_callset_for_variants(variants: set[str]) -> pd.DataFrame:
-    """Load Thousand Genomes data filtered to variants."""
-    file_template = "ALL.chr{}.shapeit2_integrated_v1a.GRCh38.20181129.phased.vcf.gz"
-    genotype_dfs = []
-    for chromosome in range(1, 22 + 1):
-        logger.info("starting on chromosome: %s", chromosome)
-        file_path = str(KGP_VCF_DIR / file_template.format(chromosome))
-        genotype_df = parse_vcf(file_path, variants)
-        logger.info("got genotype_df of shape: %s", genotype_df.shape)
-        genotype_dfs.append(genotype_df)
-    return pd.concat(genotype_dfs, axis=1)
+    """Load merged 1000 genomes data filtered to specified variants."""
+    logger.info("Starting to load callset")
+    genotype_df = parse_vcf(VCF_PATH, variants)
+    logger.info("Got genotype_df of shape: %s", genotype_df.shape)
+    return genotype_df
 
 
 def _parse_vcf_line_for_dosages(
@@ -328,45 +324,15 @@ def _load_genotypes() -> pd.DataFrame:
     return pd.DataFrame(filtered_genotypes, index=samples, columns=variant_ids)
 
 
-# TODO(pat) we will basically never want to consider closely related
-# individuals in an ancestry model, so consider baking this further
-# into the KGP loading code.
-def filter_samples_for_relatedness(
-    genotypes: pd.DataFrame,
-    labels: pd.DataFrame,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Filter samples for relatedness, returning subset of unrelated individuals."""
-    logger.info("Filtering samples for relatedness")
-    ancestry_df = _load_ancestry_df()
-    assert_equals("genotype samples", genotypes.index, "label samples", labels.index)
-    samples = genotypes.index
-    ancestry_df = ancestry_df[ancestry_df.index.isin(samples)]
-    family_ids = ancestry_df["Family ID"].unique()
-    logger.info("Found %s unique families", len(family_ids))
-    unrelated_samples = []
-    random.seed(1337)
-    for family_id in family_ids:
-        family_members = ancestry_df[ancestry_df["Family ID"] == family_id].index
-        # grab value out of array...
-        family_member = random.choice(family_members)
-        unrelated_samples.append(family_member)
-    unrelated_sample_idx = np.array(unrelated_samples)
-    genotypes, labels = (
-        genotypes.loc[unrelated_sample_idx],
-        labels.loc[unrelated_sample_idx],
-    )
-    # we did this earlier but removing samples could make more variants monomorphic
-    genotypes = _filter_variants_for_monomorphism(genotypes)
-    return genotypes, labels
-
-
 def _load_ancestry_df() -> pd.DataFrame:
-    ancestry_df = pd.read_csv(ANCESTRY_INFO_PATH, sep="\t", index_col=0)
-    assert_equals("number of rows", 3500, "actual number of rows", len(ancestry_df))
+    ancestry_df = pd.read_csv(ANCESTRY_INFO_PATH, sep=",")
+    assert_equals("number of rows", 3195, "actual number of rows", len(ancestry_df))
     expected_samples = ["NA12865", "HG03930", "NA19171"]
     assert_true(
-        "Index passes spot checks", all(sample in ancestry_df.index for sample in expected_samples)
+        "Sample name column passes spot checks",
+        all(sample in ancestry_df["Sample name"].to_numpy() for sample in expected_samples),
     )
+    ancestry_df = ancestry_df.set_index("Sample name")
     return ancestry_df
 
 
@@ -377,19 +343,20 @@ def load_label_data(samples: pd.Index) -> pd.DataFrame:
     if missing_samples:
         msg = f"Ancestry dataframe is missing samples: {missing_samples}"
         raise AssertionError(msg)
-    populations = sorted(ancestry_df["Population"].unique())
+    populations = sorted(ancestry_df["Population elastic ID"].unique())
     if EXPECTED_NUM_POPULATIONS != len(populations):
         msg = (
             f"Found wrong number of populations ({len(populations)}) in ancestry df, "
             f"expected {EXPECTED_NUM_POPULATIONS}"
         )
         raise ValueError(msg)
-    get_pop_from_sample = ancestry_df["Population"].to_dict()
+    get_pop_from_sample = ancestry_df["Population elastic ID"].to_dict()
     labels = pd.DataFrame(
         [get_pop_from_sample[s] for s in samples],
         index=samples,
-        columns=["population"],
+        columns=["Population elastic ID"],
     )
+    labels = labels.rename(columns={"Population elastic ID": "population"})
     labels["superpop"] = labels["population"].apply(SUPERPOP_FROM_POP.get)
 
     assert_true("no missing data in labels", labels.notna().all().all())
@@ -409,208 +376,9 @@ def load_label_data(samples: pd.Index) -> pd.DataFrame:
     return labels
 
 
-def _filter_variants_for_maf(genotypes: pd.DataFrame, threshold: float = 0.1) -> pd.DataFrame:
-    logger.info("Filtering %s genotypes for MAF threshold {threshold}", len(genotypes.columns))
-    frequencies = genotypes.mean(axis=0) / PLOIDY
-    maf_mask = (frequencies) > threshold
-    num_passing_variants = sum(maf_mask)
-    filtered_genotypes = genotypes[genotypes.columns[maf_mask]]
-    assert_equals(
-        "Number of passing variants",
-        num_passing_variants,
-        "number of filtered genotype columns",
-        filtered_genotypes.shape[1],
-    )
-    logger.info("After MAF filtering: %s", len(filtered_genotypes.columns))
-    return filtered_genotypes
-
-
-def _filter_variants_for_ld(
-    genotypes: pd.DataFrame,
-    size: int = 500,
-    step: int = 200,
-    threshold: float = 0.1,
-    n_iter: int = 5,
-) -> pd.DataFrame:
-    logger.info("LD pruning genotypes of shape %s", genotypes.shape)
-    for i in range(n_iter):
-        loc_unlinked = allel.locate_unlinked(
-            genotypes.to_numpy().T,
-            size=size,
-            step=step,
-            threshold=threshold,
-        )
-        n = np.count_nonzero(loc_unlinked)
-        n_remove = genotypes.shape[1] - n
-        logger.info("iteration %s retaining %s removing %s variants", i + 1, n, n_remove)
-        genotypes = genotypes[genotypes.columns[loc_unlinked]]
-    logger.info("After LD pruning, genotypes of shape %s", genotypes.shape)
-    return genotypes
-
-
-def _filter_variants_for_monomorphism(genotypes: pd.DataFrame) -> pd.DataFrame:
-    """Exclude monomorphic variants, i.e. those with no variation in dataset."""
-    monomorphic_mask = genotypes.std(axis="index") > 0
-    num_excluded_monomorphic_variants = np.sum(~monomorphic_mask)
-    logger.info("Removing %s monomorphic variants", num_excluded_monomorphic_variants)
-    monomorphic_fraction = num_excluded_monomorphic_variants / len(monomorphic_mask)
-    assert_true("fraction of excluded monomorphic variants less than 1%", monomorphic_fraction < 1 / 100)
-    return genotypes[genotypes.columns[monomorphic_mask]]
-
-
-def _filter_variants_for_fst(genotypes: pd.DataFrame, labels: pd.DataFrame) -> pd.DataFrame:
-    """Filter out variants far from HWE, which are likely to be genotyping errors."""
-    fsts = np.array(
-        [_calc_fst(genotypes[variant], labels) for variant in tqdm.tqdm(genotypes.columns)],
-    )
-    fst_mask = fsts < FST_THRESHOLD
-    fst_included_fraction = 0.99
-    assert_true(
-        f"Greater than {fst_included_fraction}% of variants retained by Fst filtering",
-        np.mean(fst_mask) > fst_included_fraction,
-    )
-    return genotypes[genotypes.columns[fst_mask]]
-
-
-def _load_dataset() -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Return the final dataset consisting of genotype matrix, labels."""
-    genotypes = _load_genotypes()
-    labels = load_label_data(genotypes.index)
-    genotypes, labels = filter_samples_for_relatedness(genotypes, labels)
-    genotypes = _filter_variants_for_maf(genotypes)
-    genotypes = _filter_variants_for_ld(genotypes)
-    assert_genotypes_and_label_agree(genotypes, labels)
-    assert_equals("genotypes.shape", genotypes.shape, "expected genotypes.shape", (1870, 150502))
-    return genotypes, labels
-
-
 def assert_genotypes_and_label_agree(genotypes: pd.DataFrame, labels: pd.DataFrame) -> None:
     """Check that genotypes, labels agree on indices."""
     assert_equals("genotypes index", genotypes.index, "labels index", labels.index)
-
-
-def _calc_fst(variant_counts: pd.Series, samples: pd.DataFrame) -> float:
-    """Calculate Fst from variant array, using samples for population labels."""
-    N = len(variant_counts)
-    p = np.mean(variant_counts) / PLOIDY
-    total = 0.0
-    for pop in samples.population.unique():
-        idx = samples.population == pop
-        ci = sum(idx) / N
-        gs = variant_counts[idx]
-        pi = np.mean(gs) / PLOIDY
-        total += ci * pi * (1 - pi)
-    return (p * (1 - p) - total) / (p * (1 - p))
-
-
-def _load_1kgp_vcf_to_df() -> pd.DataFrame:
-    """Loads in 1kgp vcf filtered using plink2 down to the same variants as the
-    gnomad loadings for WGS ancestry analysis.
-    """
-    # TODO Determine file structure of final version of preprocessed ref vcf
-    vcf_with_header = pd.read_csv(
-        KGP_VCF_FILTERED_TO_GNOMAD_LOADINGS_FILEPATH, delimiter="\t", skiprows=107
-    )
-    return vcf_with_header
-
-
-def convert_1kgp_vcf_to_dosage(vcf_with_header: pd.DataFrame) -> pd.DataFrame:
-    """Converts phased genotype vcf to dosage matrix"""
-    # TODO Determine whether we should always expect phased genotypes for reference data for training
-    dosage_vcf = vcf_with_header.replace("0|0", "0")
-    dosage_vcf = dosage_vcf.replace("0|1", "1")
-    dosage_vcf = dosage_vcf.replace("1|0", "1")
-    dosage_vcf = dosage_vcf.replace("1|1", "2")
-    dosage_vcf = dosage_vcf.rename(columns={"#CHROM": "Chromosome", "POS": "Position"}, errors="raise")
-
-    sample_columns_dtypes = {}
-    vcf_columns = ["Chromosome", "Position", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"]
-    for column in dosage_vcf.columns:
-        if column not in vcf_columns:
-            sample_columns_dtypes[column] = "uint8"
-
-    dosage_vcf = dosage_vcf.set_index("ID", drop=False).astype(sample_columns_dtypes)
-    return dosage_vcf
-
-
-def process_vcf_for_pc_transformation(dosage_vcf: pd.DataFrame) -> pd.DataFrame:
-    """Process dosage_vcf and transpose so that it only includes
-    genotypes in correct configuration for analysis."""
-    genos = dosage_vcf.iloc[:, len(HEADER_COLS) :]
-    genos = genos.set_index(dosage_vcf.index)
-    genos = genos.sort_index()
-    # Check that not all genotypes are the same for QC
-    assert len(set(genos.to_numpy().flatten())) > 1, "All genotypes are the same"
-    # Transpose genos_overlap for analysis
-    genos_transpose = genos.T
-    return genos_transpose
-
-
-def _load_pca_loadings() -> pd.DataFrame:
-    """Load in the gnomad PCs and reformat for PC transformation."""
-    loadings = pd.read_csv(GNOMAD_LOADINGS_PATH, sep="\t")
-    return loadings
-
-
-def process_pca_loadings(loadings: pd.DataFrame) -> pd.DataFrame:
-    """Sanitize additional formatting in Gnomad pc loadings file"""
-    pc_loadings: pd.DataFrame = loadings.copy(deep=True)
-    pc_loadings[["Chromosome", "Position"]] = pc_loadings["locus"].str.split(":", expand=True)
-
-    # Match variant format of gnomad loadings with 1kgp vcf
-    def get_chr_pos(x):
-        return x["locus"][3:]
-
-    def get_ref_allele(x):
-        return x["alleles"][2]
-
-    def get_alt_allele(x):
-        return x["alleles"][6]
-
-    def get_variant(x):
-        return ":".join([get_chr_pos(x), get_ref_allele(x), get_alt_allele(x)])
-
-    pc_loadings["variant"] = pc_loadings.apply(get_variant, axis=1)
-    # Remove brackets
-    pc_loadings["loadings"] = pc_loadings["loadings"].str[1:-1]
-    # Split PCs and join back
-    gnomadPCs = pc_loadings["loadings"].str.split(",", expand=True)
-    pc_loadings = pc_loadings.join(gnomadPCs)
-    pc_loadings = pc_loadings.set_index("variant")
-    pc_range = slice(6, 36)
-    pc_loadings = pc_loadings.iloc[:, pc_range]
-    pc_loadings = pc_loadings.sort_index()
-    pc_loadings = pc_loadings.astype(float)
-    assert all(pc_loadings.dtypes == np.float64)
-    return pc_loadings
-
-
-def restrict_loadings_variants_to_vcf(
-    pc_loadings: pd.DataFrame, genos_transpose: pd.DataFrame
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Restrict variant list to overlap between gnomad loadings and transposed
-    reference vcf and return versions only including the overlapping variants."""
-    # IGSR version of 1kgp is current reference vcf
-    var_overlap = pc_loadings.index.intersection(genos_transpose.columns)
-    pc_loadings_overlap = pc_loadings[pc_loadings.index.isin(var_overlap)]
-    genos_overlap_transpose = genos_transpose[genos_transpose.columns.isin(var_overlap)]
-    # Ensure that genos transpose and pc_loadings have corresponding shape and vars
-    assert genos_overlap_transpose.shape[1] == pc_loadings_overlap.shape[0]
-    assert set(genos_overlap_transpose.columns) == set(pc_loadings_overlap.index)
-    assert (genos_overlap_transpose.index == genos_transpose.index).all()
-    # Record amount of overlap
-    num_var_overlap = len(var_overlap)
-    logger.info("Number of overlapping variants: %d", num_var_overlap)
-    return pc_loadings_overlap, genos_overlap_transpose
-
-
-def apply_pca_transform(
-    pc_loadings_overlap: pd.DataFrame, genos_overlap_transpose: pd.DataFrame
-) -> pd.DataFrame:
-    """Transform vcf with genotypes in dosage format with PCs loadings from gnomad PCA."""
-    # Dot product
-    transformed_data = genos_overlap_transpose @ pc_loadings_overlap
-    return transformed_data
 
 
 def _perform_pca(train_X: pd.DataFrame, test_X: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, PCA]:
@@ -804,64 +572,7 @@ def superpop_predictions_from_pop_probs(pop_probs: pd.DataFrame) -> list[str]:
     return [superpops[np.argmax(ps)] for i, ps in superpop_probs.iterrows()]
 
 
-def _filter_variants_for_mi(
-    train_X: pd.DataFrame, test_X: pd.DataFrame, train_y_pop: pd.Series
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    mi_df = _get_mi_df(train_X, train_y_pop)
-    mi_keep_cols = mi_df[mi_df.mutual_info > MI_THRESHOLD].index
-
-    return train_X[mi_keep_cols], test_X[mi_keep_cols]
-
-
-def _calc_mi(xs: list[T], ys: list[T]) -> float:
-    """Calculate mutual information (in bits) between xs and ys."""
-    if len(xs) != len(ys):
-        msg = "xs and ys must have same length."
-        raise ValueError(msg)
-    N = len(xs)
-    x_counts: dict[T, int] = Counter()
-    y_counts: dict[T, int] = Counter()
-    xy_counts: dict[tuple[T, T], int] = Counter()
-    for x, y in zip(xs, ys):  # noqa: B905
-        x_counts[x] += 1
-        y_counts[y] += 1
-        xy_counts[(x, y)] += 1
-    x_ps = np.array(list(x_counts.values())) / N
-    y_ps = np.array(list(y_counts.values())) / N
-    xy_ps = np.array(list(xy_counts.values())) / N
-    x_entropy = -(x_ps @ np.log2(x_ps))
-    y_entropy = -(y_ps @ np.log2(y_ps))
-    xy_entropy = -(xy_ps @ np.log2(xy_ps))
-    return (x_entropy + y_entropy) - xy_entropy
-
-
-def _get_mi_df(train_X: pd.DataFrame, train_y_pop: pd.Series) -> pd.DataFrame:
-    mis = mis = np.array(
-        [_calc_mi(col, train_y_pop.population) for col in tqdm.tqdm(train_X.to_numpy().T)]
-    )
-    mi_df = pd.DataFrame(mis, columns=["mutual_info"], index=train_X.columns)
-    mi_df.to_parquet("mi_df.parquet")
-    return mi_df
-
-
 def serialize_model_products(pca_df: pd.DataFrame, rfc: RandomForestClassifier) -> None:
     """Serialize variant list, pca and rfc to disk as .txt, .skops files."""
-    pca_fpath = ANCESTRY_MODEL_PRODUCTS_DIR / "pca.csv"
-    rfc_fpath = ANCESTRY_MODEL_PRODUCTS_DIR / "rfc.skop"
-    pca_df.to_csv(pca_fpath)
-    skops_dump(rfc, rfc_fpath)
-
-
-def main() -> None:
-    """Train global ancestry model."""
-    err_msg = "This module isn't production-ready yet!"
-    raise NotImplementedError(err_msg)
-    genotypes, labels = _load_dataset()
-    train_X, test_X, train_y, test_y = make_train_test_split(
-        genotypes,
-        labels,
-    )
-    train_X_filtered, test_X_filtered = _filter_variants_for_mi(train_X, test_X, train_y.population)
-    train_Xpc, test_Xpc, pca = _perform_pca(train_X_filtered, test_X_filtered)
-    rfc = make_rfc(train_Xpc, test_Xpc, train_y.population, test_y.population)
-    serialize_model_products(list(train_X_filtered.columns), pca, rfc)
+    pca_df.to_csv(PCA_FPATH)
+    skops_dump(rfc, RFC_FPATH)
