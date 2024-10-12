@@ -365,12 +365,10 @@ def _calculate_ancestry_weighted_af(
 
     sample_superprop_probs_df = pd.DataFrame(sample_superprop_probs, dtype=np.float32)
 
-    sample_superprop_probs_df.to_csv("sample_superprop_probs_df_big_daly.tsv", sep="\t")
     # Normalize, just in case
     sample_superprop_probs_df = sample_superprop_probs_df.div(
         sample_superprop_probs_df.sum(axis=0), axis=1
     )
-    sample_superprop_probs_df.to_csv("sample_superprop_probs_df_normalized_big_daly.tsv", sep="\t")
 
     return gnomad_afs @ sample_superprop_probs_df.loc[gnomad_afs.columns.tolist()]
 
