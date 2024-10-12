@@ -576,3 +576,40 @@ def serialize_model_products(pca_df: pd.DataFrame, rfc: RandomForestClassifier) 
     """Serialize variant list, pca and rfc to disk as .txt, .skops files."""
     pca_df.to_csv(PCA_FPATH)
     skops_dump(rfc, RFC_FPATH)
+
+def filter_samples_for_relatedness(
+    genotypes: pd.DataFrame,
+    labels: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Filter samples for relatedness, returning subset of unrelated individuals."""
+    logger.info("Filtering samples for relatedness")
+    ancestry_df = _load_ancestry_df()
+    assert_equals("genotype samples", genotypes.index, "label samples", labels.index)
+    samples = genotypes.index
+    ancestry_df = ancestry_df[ancestry_df.index.isin(samples)]
+    family_ids = ancestry_df["Family ID"].unique()
+    logger.info("Found %s unique families", len(family_ids))
+    unrelated_samples = []
+    random.seed(1337)
+    for family_id in family_ids:
+        family_members = ancestry_df[ancestry_df["Family ID"] == family_id].index
+        # grab value out of array...
+        family_member = random.choice(family_members)
+        unrelated_samples.append(family_member)
+    unrelated_sample_idx = np.array(unrelated_samples)
+    genotypes, labels = (
+        genotypes.loc[unrelated_sample_idx],
+        labels.loc[unrelated_sample_idx],
+    )
+    # we did this earlier but removing samples could make more variants monomorphic
+    genotypes = _filter_variants_for_monomorphism(genotypes)
+    return genotypes, labels
+
+def _filter_variants_for_monomorphism(genotypes: pd.DataFrame) -> pd.DataFrame:
+    """Exclude monomorphic variants, i.e. those with no variation in dataset."""
+    monomorphic_mask = genotypes.std(axis="index") > 0
+    num_excluded_monomorphic_variants = np.sum(~monomorphic_mask)
+    logger.info("Removing %s monomorphic variants", num_excluded_monomorphic_variants)
+    monomorphic_fraction = num_excluded_monomorphic_variants / len(monomorphic_mask)
+    assert_true("fraction of excluded monomorphic variants less than 1%", monomorphic_fraction < 1 / 100)
+    return genotypes[genotypes.columns[monomorphic_mask]]
