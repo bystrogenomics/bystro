@@ -5,10 +5,10 @@
 Bytro-*
 t/db
 t/tracks/build/db
-t/tracks/gene/db
-t/tracks/nearest/db/hg19
-t/tracks/reference/db
-t/tracks/score/db
+t/tracks/gene/db/index
+t/tracks/nearest/db/hg19/index
+t/tracks/reference/db/index
+t/tracks/score/db/index
 t/tracks/sparse/index
 t/tracks/vcf/index
 t/utils/filterCadd.*.yml
