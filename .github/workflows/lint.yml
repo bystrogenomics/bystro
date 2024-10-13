@@ -1,45 +1,48 @@
-name: lint
+name: Python Lint and Test
 
 on: [pull_request]
 
 jobs:
   build:
+    name: Python Lint and Test
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.11"]
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v3
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Set up cache for pip
+          cache: "pip" # Use built-in pip caching
+
+      - name: Cache Rust build artifacts
         uses: actions/cache@v3
         with:
           path: |
-            ~/.cache/pip
-            ~/.cache/pypoetry
-          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('python/pyproject.toml', 'python/requirements-dev.txt') }}
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-pip-
-      - name: Install dependencies
+            ${{ runner.os }}-cargo-
+
+      - name: Install dependencies and build
         run: |
-          python -m venv ~/.venv/ci-venv
-          source ~/.venv/ci-venv/bin/activate
           python -m pip install --upgrade pip
           pip install -r python/requirements-dev.txt
           make develop
+
       - name: Linting with ruff
         run: |
-          source ~/.venv/ci-venv/bin/activate
           cd python && ruff $(git ls-files '*.py')
+
       - name: Static analysis with mypy
         run: |
-          source ~/.venv/ci-venv/bin/activate
           mypy --version
           mypy --config-file python/mypy.ini $(git ls-files '*.py')
+
       - name: Tests
         run: |
-          source ~/.venv/ci-venv/bin/activate
-          cd python && pytest --durations=0
+          cd python && pytest --durations=0 --n auto
