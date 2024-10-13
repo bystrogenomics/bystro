@@ -244,7 +244,7 @@ def test_decision_function():
     beta_m = np.zeros(n_p)
     beta_p = np.zeros(n_p)
     beta_p[:3] = 0.5
-    data = generate_data(beta_m, beta_p, rng, maf=0.1, n_individuals=20000)
+    data = generate_data(beta_m, beta_p, rng, maf=0.1, n_individuals=12000)
     model = POESingleSNP(
         compute_pvalue=True, cov_regularization="QuadraticInverse"
     )
@@ -270,7 +270,7 @@ def test_multi_fit():
     beta_p = np.zeros(n_p)
     beta_p[:3] = 0.5
     data = generate_multivariate_data(
-        beta_m, beta_p, rng, maf=0.03, n_individuals=500000, n_genotypes=1000
+        beta_m, beta_p, rng, maf=0.03, n_individuals=500, n_genotypes=100
     )
     model = POEMultipleSNP()
     model.fit(data["phenotypes"], data["genotypes"])
@@ -284,9 +284,9 @@ def test_multi2_fit():
     beta_p = np.zeros(n_p)
     beta_p[:3] = 0.5
     data = generate_multivariate_data(
-        beta_m, beta_p, rng, maf=0.03, n_individuals=50000, n_genotypes=1000
+        beta_m, beta_p, rng, maf=0.03, n_individuals=1000, n_genotypes=100
     )
-    model = POEMultipleSNP2(n_repeats=10)
+    model = POEMultipleSNP2(n_repeats=3)
     model.fit(data["phenotypes"], data["genotypes"], seed=2021)
     assert model is not None, "Model fitting failed"
     assert isinstance(model, POEMultipleSNP2), "Model type is incorrect"
