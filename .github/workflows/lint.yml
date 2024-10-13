@@ -24,14 +24,25 @@ jobs:
           go-version: "1.21.3"
           cache: true
 
-      - name: Cache Rust build artifacts
+      - name: Cache Rust Cargo registry and git
         uses: actions/cache@v3
         with:
           path: |
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('python/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
+
+      - name: Cache Go modules and build cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('go/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
       - name: Cache pip cache
         uses: actions/cache@v3
@@ -46,6 +57,9 @@ jobs:
           python -m venv ~/.venv/ci-venv
 
       - name: Install dependencies and build
+        env:
+          GOROOT: /opt/hostedtoolcache/go/1.21.3/x64
+          GOPATH: ${{ env.GOPATH }}
         run: |
           source ~/.venv/ci-venv/bin/activate
           python -m pip install --upgrade pip
