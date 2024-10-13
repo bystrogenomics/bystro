@@ -16,4 +16,4 @@ Cython==3.0.10
 maturin[zig]==1.5.1
 setuptools==70.0.0
 types-PyYAML==6.0.12
-pytest-xdist=3.6.1
+pytest-xdist==3.6.1
