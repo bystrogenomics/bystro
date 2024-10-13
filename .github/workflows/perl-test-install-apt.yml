@@ -3,6 +3,10 @@ name: Bystro Annotator Install Script (APT)
 on:
   release:
     types: [created]
+  pull_request:
+    paths:
+      - "install-apt.sh"
+      - "install/**"
   workflow_dispatch: # Optional: allows manual triggering of the workflow
 
 jobs:
