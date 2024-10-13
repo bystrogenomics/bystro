@@ -1,11 +1,6 @@
 name: Build Bystro Perl Package
 
-on:
-  pull_request:
-    paths:
-      - "perl/**" # Only run on changes to relevant files
-      - "go/**"
-      - "config/**"
+on: [pull_request]
 
 jobs:
   test-perl-package:
@@ -110,6 +105,8 @@ jobs:
       - name: Install one-off Bystro dependencies
         shell: bash
         run: |
+          go install github.com/bystrogenomics/bystro-vcf@2.2.3
+          cpm install -g https://github.com/bystrogenomics/msgpack-perl.git
           ALIEN_INSTALL_TYPE=share cpm install -g --test Alien::LMDB
           cpm install -g --test LMDB_File
           cpm install -g MouseX::Getopt # fails due to differences from expected output; unimportant

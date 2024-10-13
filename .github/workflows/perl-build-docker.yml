@@ -18,28 +18,14 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-        with:
-          driver: docker-container
-          buildkitd-flags: --allow-insecure-entitlement network.host
-
-      - name: Cache Docker layers
-        uses: actions/cache@v3
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
 
       - name: Build Docker Image from Local Context
         run: |
-          docker buildx build \
-            --cache-from=type=local,src=/tmp/.buildx-cache \
-            --cache-to=type=local,dest=/tmp/.buildx-cache,mode=max \
-            --output=type=docker \
-            -t bystro-annotator -f Dockerfile.perl .
+          docker build -t bystro-annotator -f Dockerfile.perl .
 
       - name: Run Docker Image and Capture Help Output
         continue-on-error: true # This is necessary because the help output returns a 255
+        id: help-output
         run: |
           docker run --rm bystro-annotator &> help_output.txt
 
