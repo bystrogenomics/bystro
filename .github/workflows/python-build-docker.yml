@@ -6,6 +6,7 @@ on:
       - "Dockerfile.python"
       - "python/**" # Only run on changes to relevant Python files
       - "go/**"
+      - "config/**"
 
 jobs:
   build:

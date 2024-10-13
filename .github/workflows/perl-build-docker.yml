@@ -6,6 +6,7 @@ on:
       - "Dockerfile.perl"
       - "perl/**" # Only run on changes to relevant files
       - "go/**"
+      - "config/**"
 
 jobs:
   build:

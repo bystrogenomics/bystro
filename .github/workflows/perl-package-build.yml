@@ -5,6 +5,7 @@ on:
     paths:
       - "perl/**" # Only run on changes to relevant files
       - "go/**"
+      - "config/**"
 
 jobs:
   test-perl-package:
