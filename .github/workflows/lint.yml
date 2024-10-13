@@ -54,13 +54,16 @@ jobs:
 
       - name: Linting with Ruff
         run: |
+          source ~/.venv/ci-venv/bin/activate
           cd python && ruff $(git ls-files '*.py')
 
       - name: Static analysis with MyPy
         run: |
+          source ~/.venv/ci-venv/bin/activate
           mypy --version
           mypy --config-file python/mypy.ini $(git ls-files '*.py')
 
       - name: Tests
         run: |
+          source ~/.venv/ci-venv/bin/activate
           cd python && pytest --durations=0 -n auto
