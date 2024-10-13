@@ -18,6 +18,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: "pip" # Use built-in pip caching
+          cache-dependency-path: |
+            python/requirements-dev.txt
+            python/pyproject.toml
+            python/poetry.lock  # If you use Poetry
 
       - name: Cache Rust build artifacts
         uses: actions/cache@v3
@@ -34,15 +38,15 @@ jobs:
           pip install -r python/requirements-dev.txt
           make develop
 
-      - name: Linting with ruff
+      - name: Linting with Ruff
         run: |
           cd python && ruff $(git ls-files '*.py')
 
-      - name: Static analysis with mypy
+      - name: Static analysis with MyPy
         run: |
           mypy --version
           mypy --config-file python/mypy.ini $(git ls-files '*.py')
 
       - name: Tests
         run: |
-          cd python && pytest --durations=0 --n auto
+          cd python && pytest --durations=0 -n auto
