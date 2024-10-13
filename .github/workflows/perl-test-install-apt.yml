@@ -2,7 +2,7 @@ name: Bystro Annotator Install Script (APT)
 
 on:
   release:
-    types: [created, published]
+    types: [created]
   workflow_dispatch: # Optional: allows manual triggering of the workflow
 
 jobs:

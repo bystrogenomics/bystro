@@ -1,6 +1,11 @@
-name: Build Bystro Perl Package
+name: Build Bystro Annotator Perl Package
 
-on: [pull_request]
+on:
+  pull_request:
+    paths:
+      - "perl/**" # The Bystro Annotator has no dependencies on the Python code
+      - "go/**"
+      - "config/**"
 
 jobs:
   test-perl-package:
