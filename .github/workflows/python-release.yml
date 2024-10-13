@@ -7,7 +7,7 @@ name: Python Release
 
 on:
   release:
-    types: [published] # Trigger only when a release is published
+    types: [created, published]
   workflow_dispatch: # Optional: allows manual triggering of the workflow
 
 permissions:

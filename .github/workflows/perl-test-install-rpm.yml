@@ -1,6 +1,9 @@
-name: Install and Test Bystro (RPM)
+name: Bystro Annotator Install Script (RPM)
 
-on: [pull_request]
+on:
+  release:
+    types: [created, published]
+  workflow_dispatch: # Optional: allows manual triggering of the workflow
 
 jobs:
   build:
