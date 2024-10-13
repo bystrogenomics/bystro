@@ -19,7 +19,7 @@ jobs:
     strategy:
       matrix:
         platform:
-          - runner: ubuntu-latest
+          - runner: ubuntu-22.04
             target: x86_64
             local_name: x86_64
     steps:
@@ -149,7 +149,7 @@ jobs:
           cd python && pytest --durations=0
 
   sdist:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - name: Build sdist
@@ -165,7 +165,7 @@ jobs:
 
   release:
     name: Release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     if: "startsWith(github.ref, 'refs/tags/')"
     needs: [linux, macos, sdist]
     steps:
