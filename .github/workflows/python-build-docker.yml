@@ -1,6 +1,11 @@
 name: (ML/Bioinformatics) Build and Run Bystro Python Dockerfile
 
-on: [pull_request]
+on:
+  pull_request:
+    paths:
+      - "Dockerfile.python"
+      - "python/**" # Only run on changes to relevant Python files
+      - "go/**"
 
 jobs:
   build:
@@ -13,9 +18,19 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
       - name: Build Docker Image from Local Context
         run: |
-          docker build -t bystro-python -f Dockerfile.python .
+          docker build --cache-from=type=local,src=/tmp/.buildx-cache \
+                       --cache-to=type=local,dest=/tmp/.buildx-cache,mode=max \
+                       -t bystro-python -f Dockerfile.python .
 
       - name: Run Docker Image and Capture Help Output
         id: help-output
