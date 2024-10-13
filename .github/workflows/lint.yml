@@ -42,4 +42,4 @@ jobs:
       - name: Tests
         run: |
           source ~/.venv/ci-venv/bin/activate
-          cd python && pytest
+          cd python && pytest --durations=0

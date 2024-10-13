@@ -78,7 +78,7 @@ jobs:
 
           pip install pytest
           ray start --head
-          cd python && pytest
+          cd python && pytest --durations=0
 
   macos:
     runs-on: ${{ matrix.platform.runner }}
@@ -146,7 +146,7 @@ jobs:
 
           pip install pytest
           ray start --head
-          cd python && pytest
+          cd python && pytest --durations=0
 
   sdist:
     runs-on: ubuntu-latest
