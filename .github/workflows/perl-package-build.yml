@@ -1,6 +1,10 @@
 name: Build Bystro Perl Package
 
-on: [push, pull_request]
+on:
+  pull_request:
+    paths:
+      - "perl/**" # Only run on changes to relevant files
+      - "go/**"
 
 jobs:
   test-perl-package:
