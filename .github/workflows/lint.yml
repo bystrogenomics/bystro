@@ -17,11 +17,12 @@ jobs:
         uses: actions/setup-python@v3
         with:
           python-version: ${{ matrix.python-version }}
-          cache: "pip" # Use built-in pip caching
-          cache-dependency-path: |
-            python/requirements-dev.txt
-            python/pyproject.toml
-            python/poetry.lock  # If you use Poetry
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21.3"
+          cache: true
 
       - name: Cache Rust build artifacts
         uses: actions/cache@v3
@@ -32,8 +33,21 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
+      - name: Cache pip cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('python/requirements-dev.txt', 'python/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Set up virtual environment
+        run: |
+          python -m venv ~/.venv/ci-venv
+
       - name: Install dependencies and build
         run: |
+          source ~/.venv/ci-venv/bin/activate
           python -m pip install --upgrade pip
           pip install -r python/requirements-dev.txt
           make develop
