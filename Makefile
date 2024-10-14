@@ -1,9 +1,3 @@
-ray-start-local:
-	ray stop && ray start --head --disable-usage-stats
-
-ray-stop-local:
-	ray stop
-
 build-python:
 	(cd python && maturin build --release)
 
@@ -32,15 +26,4 @@ uninstall:
 	pip uninstall -y bystro
 	(cd ./go && go clean -i bystro/cmd/opensearch)
 
-develop: install-go build-python-dev ray-start-local
-
-run-local: install ray-start-local
-
-pm2:
-	pm2 delete all 2> /dev/null || true && pm2 start startup.yml
-
-# Currently assumes that Perl package has been separately installed
-serve-local: ray-stop-local run-local pm2
-
-# Currently assumes that Perl package has been separately installed
-serve-dev: ray-stop-local develop pm2
+develop: install-go build-python-dev

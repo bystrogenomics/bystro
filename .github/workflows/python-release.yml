@@ -77,7 +77,6 @@ jobs:
           bystro-api --help
 
           pip install pytest
-          ray start --head
           cd python && pytest --durations=0
 
   macos:
@@ -145,7 +144,6 @@ jobs:
           bystro-api --help
 
           pip install pytest
-          ray start --head
           cd python && pytest --durations=0
 
   sdist:
