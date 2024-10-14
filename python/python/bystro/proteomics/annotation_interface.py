@@ -951,7 +951,7 @@ async def async_run_annotation_query(
         query (dict[str, Any]): The OpenSearch query.
         index_name (str): The name of the index.
         fields (list[str] | None): Additional fields to include in the DataFrame, defaults to None.
-        bystro_api_auth (CachedAuth | None): Bystro API authentication, defaults to None.
+        bystro_api_auth (CachedAuth): Bystro API authentication, defaults to None.
         additional_client_args (dict[str, Any] | None):
             Additional arguments for the OpenSearch client, defaults to None.
         structs_of_arrays (bool): Whether to return structs of arrays, defaults to True.

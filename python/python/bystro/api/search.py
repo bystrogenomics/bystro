@@ -187,7 +187,9 @@ class BystroProxyAsyncHttpConnection(AsyncHttpConnection):
         )
 
 
-def get_async_proxied_opensearch_client(auth: CachedAuth, job_id: str, client_args: dict | None = None):
+def get_async_proxied_opensearch_client(
+    auth: CachedAuth, job_id: str, client_args: dict | None = None
+) -> AsyncOpenSearch:
     """
     Create an OpenSearch client that uses a proxy to connect to the OpenSearch server.
 

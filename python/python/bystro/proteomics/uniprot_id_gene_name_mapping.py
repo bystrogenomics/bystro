@@ -1,16 +1,19 @@
 """Provide functions to convert Uniprot IDs to gene names and vice versa."""
+from pathlib import Path
+import os
 
 import pandas as pd
 
-from bystro.utils.config import BYSTRO_PROJECT_ROOT
-
 pd.options.future.infer_string = True  # type: ignore
 
-_MAPPING_FILENAME = (
-    BYSTRO_PROJECT_ROOT / "python/python/bystro/proteomics" / "uniprot_id_gene_name_mapping.csv"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+MAPPING_FILENAME = (
+    Path(SCRIPT_DIR) / "uniprot_id_gene_name_mapping.csv"
 )
+
 try:
-    _UNIPROT_ID_GENE_NAME_MAPPING = pd.read_csv(_MAPPING_FILENAME)
+    _UNIPROT_ID_GENE_NAME_MAPPING = pd.read_csv(MAPPING_FILENAME)
 except FileNotFoundError as e:
     err_msg = (
         "Uniprot ID / gene name mapping file not found: "
