@@ -2,7 +2,7 @@ name: Bystro Annotator Install Script (RPM)
 
 on:
   release:
-    types: [created]
+    types: [published]
   pull_request:
     paths:
       - "install-rpm.sh"
