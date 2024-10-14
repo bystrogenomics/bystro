@@ -1,6 +1,5 @@
 from setuptools import setup  # type: ignore
 from Cython.Build import cythonize  # type: ignore
-import os
 import glob
 
 # Search for all .pyx files recursively in the specified directory

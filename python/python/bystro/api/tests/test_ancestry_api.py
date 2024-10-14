@@ -3,14 +3,14 @@ import os
 
 import pandas as pd
 
-from msgspec import json
 import pytest
 
+from bystro.ancestry.ancestry_types import AncestryResults
 from bystro.ancestry.inference import AncestryModels
 from bystro.ancestry.tests.test_inference import (
     ANCESTRY_MODEL,
-    _infer_ancestry,
 )
+
 from bystro.api.ancestry import calculate_ancestry_scores, ancestry_json_to_format
 
 
