@@ -7,7 +7,7 @@ import pandas as pd
 import tqdm
 from unipressed import UniprotkbClient  # type: ignore[import]
 
-from bystro.utils.config import BYSTRO_PROJECT_ROOT
+from bystro.proteomics.uniprot_id_gene_name_mapping import MAPPING_FILENAME
 
 logger = logging.getLogger(__file__)
 
@@ -43,7 +43,4 @@ if __name__ == "__main__":
     logger.info("Downloading Uniprot ID / gene name data...")
     uniprot_id_gene_name_mapping_df = get_uniprot_id_gene_name_mapping()
     logger.info("Download complete")
-    output_filename = (
-        BYSTRO_PROJECT_ROOT / "python/python/bystro/proteomics" / "uniprot_id_gene_name_mapping.csv"
-    )
-    uniprot_id_gene_name_mapping_df.to_csv(output_filename, index=False)
+    uniprot_id_gene_name_mapping_df.to_csv(MAPPING_FILENAME, index=False)

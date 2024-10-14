@@ -23,7 +23,6 @@ from bystro.proteomics.fragpipe_tandem_mass_tag import (
     FRAGPIPE_SAMPLE_COLUMN,
     FRAGPIPE_GENE_GENE_NAME_COLUMN_RENAMED,
 )
-from bystro.search.utils.opensearch import gather_opensearch_args
 
 
 logger = logging.getLogger(__file__)
@@ -936,9 +935,8 @@ async def async_get_num_slices(
 async def async_run_annotation_query(
     query: dict[str, Any],
     index_name: str,
+    bystro_api_auth: CachedAuth,
     fields: list[str] | None = None,
-    cluster_opensearch_config: dict[str, Any] | None = None,
-    bystro_api_auth: CachedAuth | None = None,
     additional_client_args: dict[str, Any] | None = None,
     structs_of_arrays: bool = True,
     melt_samples: bool = False,
@@ -953,9 +951,7 @@ async def async_run_annotation_query(
         query (dict[str, Any]): The OpenSearch query.
         index_name (str): The name of the index.
         fields (list[str] | None): Additional fields to include in the DataFrame, defaults to None.
-        cluster_opensearch_config (dict[str, Any] | None):
-            Configuration for the OpenSearch cluster,defaults to None.
-        bystro_api_auth (CachedAuth | None): Bystro API authentication, defaults to None.
+        bystro_api_auth (CachedAuth): Bystro API authentication, defaults to None.
         additional_client_args (dict[str, Any] | None):
             Additional arguments for the OpenSearch client, defaults to None.
         structs_of_arrays (bool): Whether to return structs of arrays, defaults to True.
@@ -984,11 +980,6 @@ async def async_run_annotation_query(
     Returns:
         pd.DataFrame: A DataFrame of query results.
     """
-    if cluster_opensearch_config is not None and bystro_api_auth is not None:
-        raise ValueError(
-            "Cannot provide both cluster_opensearch_config and bystro_api_auth. Select one."
-        )
-
     if structs_of_arrays is False and fields is not None:
         raise ValueError(
             "Cannot yet, return structs of arrays when fields are specified, "
@@ -1035,15 +1026,9 @@ async def async_run_annotation_query(
                         primary_key_for_explode_track,
                     )
 
-    if bystro_api_auth is not None:
-        # If auth is provided, use the proxied client
-        job_id = index_name.split("_")[0]
-        client = get_async_proxied_opensearch_client(bystro_api_auth, job_id, additional_client_args)
-    elif cluster_opensearch_config is not None:
-        search_client_args = gather_opensearch_args(cluster_opensearch_config)
-        client = AsyncOpenSearch(**search_client_args)
-    else:
-        raise ValueError("Must provide either cluster_opensearch_config or bystro_api_auth.")
+    # If auth is provided, use the proxied client
+    job_id = index_name.split("_")[0]
+    client = get_async_proxied_opensearch_client(bystro_api_auth, job_id, additional_client_args)
 
     num_slices, _ = await async_get_num_slices(client, index_name, query)
 
@@ -1085,9 +1070,8 @@ async def async_run_annotation_query(
 async def async_get_annotation_result_from_query(
     query_string: str,
     index_name: str,
+    bystro_api_auth: CachedAuth,
     fields: list[str] | None = None,
-    cluster_opensearch_config: dict[str, Any] | None = None,
-    bystro_api_auth: CachedAuth | None = None,
     additional_client_args: dict[str, Any] | None = None,
     structs_of_arrays: bool = True,
     melt_samples: bool = True,
@@ -1101,10 +1085,8 @@ async def async_get_annotation_result_from_query(
     Args:
         query_string (str): The query string to use for the search.
         index_name (str): The name of the index to search.
+        bystro_api_auth (CachedAuth): The authentication for the Bystro API.
         fields (list[str] | None): The fields to include in the results, defaults to None.
-        cluster_opensearch_config (dict[str, Any] | None):
-            The configuration for the OpenSearch cluster, defaults to None.
-        bystro_api_auth (CachedAuth | None): The authentication for the Bystro API, defaults to None.
         additional_client_args (dict[str, Any] | None):
             Additional arguments for the OpenSearch client, defaults to None.
         structs_of_arrays (bool): Whether to return structs of arrays, defaults to True.
@@ -1134,11 +1116,6 @@ async def async_get_annotation_result_from_query(
         pd.DataFrame: DataFrame of variant / sample_id records matching query.
     """
 
-    if cluster_opensearch_config is not None and bystro_api_auth is not None:
-        raise ValueError(
-            "Cannot provide both cluster_opensearch_config and bystro_api_auth. Select one."
-        )
-
     query = _build_opensearch_query_from_query_string(
         query_string, fields=fields, melt_samples=melt_samples
     )
@@ -1147,7 +1124,6 @@ async def async_get_annotation_result_from_query(
         query,
         index_name,
         fields=fields,
-        cluster_opensearch_config=cluster_opensearch_config,
         bystro_api_auth=bystro_api_auth,
         additional_client_args=additional_client_args,
         structs_of_arrays=structs_of_arrays,
@@ -1161,9 +1137,8 @@ async def async_get_annotation_result_from_query(
 def get_annotation_result_from_query(
     query_string: str,
     index_name: str,
+    bystro_api_auth: CachedAuth,
     fields: list[str] | None = None,
-    cluster_opensearch_config: dict[str, Any] | None = None,
-    bystro_api_auth: CachedAuth | None = None,
     additional_client_args: dict[str, Any] | None = None,
     structs_of_arrays: bool = True,
     melt_samples: bool = True,
@@ -1178,9 +1153,7 @@ def get_annotation_result_from_query(
         query_string (str): The query string to use for the search.
         index_name (str): The name of the index to search.
         fields (list[str] | None): The fields to include in the results, defaults to None.
-        cluster_opensearch_config (dict[str, Any] | None):
-            The configuration for the OpenSearch cluster, defaults to None.
-        bystro_api_auth (CachedAuth | None): The authentication for the Bystro API, defaults to None.
+        bystro_api_auth (CachedAuth): The authentication for the Bystro API.
         additional_client_args (dict[str, Any] | None):
             Additional arguments for the OpenSearch client, defaults to None.
         structs_of_arrays (bool): Whether to return structs of arrays, defaults to True.
@@ -1214,7 +1187,6 @@ def get_annotation_result_from_query(
         query_string,
         index_name,
         fields=fields,
-        cluster_opensearch_config=cluster_opensearch_config,
         bystro_api_auth=bystro_api_auth,
         additional_client_args=additional_client_args,
         structs_of_arrays=structs_of_arrays,

@@ -17,9 +17,6 @@ brew install wget;
 brew install pigz;
 brew install lz4;
 
-brew install nodejs;
-sudo npm install -g pm2;
-
 brew install awscli;
 
 # pkg-config is required for building the wheel

@@ -96,10 +96,6 @@ dnf install -y \
   pkgconf-pkg-config \
   grep
 
-# Install Node.js 20.x
-curl --silent --location https://rpm.nodesource.com/setup_20.x | bash -
-dnf install -y nodejs
-
 # Create a temporary directory
 mkdir -p /tmp/awscli-install
 cd /tmp/awscli-install
@@ -108,8 +104,5 @@ unzip awscliv2.zip
 sudo ./aws/install --update
 cd -
 rm -rf /tmp/awscli-install
-
-# Install pm2 globally using npm
-npm install -g pm2
 
 echo -e "\n\nAll dependencies have been installed successfully.\n"
