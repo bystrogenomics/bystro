@@ -1,6 +1,12 @@
 name: Python Lint and Test
 
-on: [pull_request]
+on:
+  pull_request:
+    paths:
+      - "perl/**"
+      - "python/**"
+      - "go/**"
+      - "config/**"
 
 jobs:
   build:
