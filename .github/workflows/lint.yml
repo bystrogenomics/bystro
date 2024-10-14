@@ -28,7 +28,7 @@ jobs:
         run: |
           python -m venv ~/.venv/ci-venv
 
-      - name: Install dependencies and build
+      - name: Install dependencies
         run: |
           source ~/.venv/ci-venv/bin/activate
           python -m pip install --upgrade pip
@@ -49,4 +49,4 @@ jobs:
       - name: Tests
         run: |
           source ~/.venv/ci-venv/bin/activate
-          cd python && pytest --durations=0 -n auto
+          cd python && pytest --durations=0

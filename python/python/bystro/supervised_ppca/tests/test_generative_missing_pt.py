@@ -10,7 +10,7 @@ def test_ppcam_fit():
     n_samples, n_covariates, n_components = 100, 5, 2
     X = rng.normal(size=(n_samples, n_covariates))
 
-    ppcam = PPCAM(n_components=n_components)
+    ppcam = PPCAM(n_components=n_components, training_options={"n_iterations": 20})
     ppcam.fit(X)
 
     # Test if the model is fitted
@@ -19,7 +19,7 @@ def test_ppcam_fit():
     assert ppcam.p is not None
 
     ppcam = PPCAM(
-        n_components=n_components, training_options={"use_gpu": False}
+        n_components=n_components, training_options={"use_gpu": False, "n_iterations": 20}
     )
     ppcam.fit(X)
 
@@ -29,7 +29,7 @@ def test_ppcam_get_covariance():
     n_samples, n_covariates, n_components = 100, 5, 2
     X = rng.normal(size=(n_samples, n_covariates))
 
-    ppcam = PPCAM(n_components=n_components)
+    ppcam = PPCAM(n_components=n_components, training_options={"n_iterations": 20})
     ppcam.fit(X)
 
     # Test get_covariance method
@@ -42,7 +42,7 @@ def test_ppcam_get_noise():
     n_samples, n_covariates, n_components = 100, 5, 2
     X = rng.normal(size=(n_samples, n_covariates))
 
-    ppcam = PPCAM(n_components=n_components)
+    ppcam = PPCAM(n_components=n_components, training_options={"n_iterations": 20})
     ppcam.fit(X)
 
     # Test get_noise method
