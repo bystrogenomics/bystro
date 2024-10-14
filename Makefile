@@ -16,12 +16,11 @@ install-python: build-python
 
 install-go:
 	go install github.com/bystrogenomics/bystro-vcf@2.2.3
-	(cd ./go && go install bystro/cmd/dosage)
 
 install: install-python install-go
 
 uninstall:
 	pip uninstall -y bystro
-	(cd ./go && go clean -i bystro/cmd/dosage)
+	binary_path=$(which bystro-vcf 2>/dev/null) && [ -n "$binary_path" ] && rm "$binary_path"
 
 develop: install-go build-python-dev
