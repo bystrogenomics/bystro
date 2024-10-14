@@ -1,6 +1,13 @@
-name: Install and Test Bystro (APT)
+name: Bystro Annotator Install Script (APT)
 
-on: [pull_request]
+on:
+  release:
+    types: [published]
+  pull_request:
+    paths:
+      - "install-apt.sh"
+      - "install/**"
+  workflow_dispatch: # Optional: allows manual triggering of the workflow
 
 jobs:
   build:

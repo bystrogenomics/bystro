@@ -10,7 +10,7 @@ The Bystro ancestry CLI `score` tool (`bystro-api ancestry score`) parses VCF fi
 
 ```sh
 # Requires Go: install from https://golang.org/doc/install
-go install github.com/bystrogenomics/bystro-vcf@2.2.2
+go install github.com/bystrogenomics/bystro-vcf@2.2.3
 ```
 
 Bystro is compatible with Linux and MacOS. Windows support is experimental. If you are installing on MacOS as a native binary (Apple ARM Architecture), you will need to install the following additional dependencies:
