@@ -2,7 +2,7 @@ name: (ML/Bioinformatics) Build and Run Bystro Python Dockerfile
 
 on:
   release:
-    types: [created]
+    types: [published]
   pull_request:
     paths:
       - "Dockerfile.python"
