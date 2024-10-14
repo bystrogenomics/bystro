@@ -135,7 +135,6 @@ class PrsCSData(BasePrsCS):
                 pyro.sample("obs", Normal(prediction_mean, sigma2), obs=y)
 
         nuts_kernel = mcmc.NUTS(model, step_size=5e-3, adapt_step_size=False)
-        print("self.mcmc_options", self.mcmc_options)
         mcmc_run = mcmc.MCMC(nuts_kernel, **self.mcmc_options)
         mcmc_run.run(
             Z,

@@ -60,7 +60,7 @@ jobs:
           python --version
           ls -la dist
 
-          go install github.com/bystrogenomics/bystro-vcf@2.2.2
+          go install github.com/bystrogenomics/bystro-vcf@2.2.3
 
           PYTHON_VERSION=$(python -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
           ARCHITECTURE=${{ matrix.platform.local_name }}
@@ -128,7 +128,7 @@ jobs:
           python --version
           ls -la dist
 
-          go install github.com/bystrogenomics/bystro-vcf@2.2.2
+          go install github.com/bystrogenomics/bystro-vcf@2.2.3
 
           PYTHON_VERSION=$(python -c "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')")
           ARCHITECTURE=${{ matrix.platform.local_name }}
