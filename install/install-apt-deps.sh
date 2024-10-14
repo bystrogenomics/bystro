@@ -47,11 +47,4 @@ sudo ./aws/install --update
 cd -
 rm -rf /tmp/awscli-install
 
-# Install Node.js 20.x
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-apt install -y nodejs
-
-# Install pm2 globally using npm
-npm install -g pm2
-
 echo -e "\n\nAll dependencies have been installed successfully.\n"
