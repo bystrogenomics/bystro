@@ -12,7 +12,7 @@ RUN go install github.com/mikefarah/yq@2.4.1
 
 COPY ./go /app/bystro-go-tools
 
-RUN cd /app/bystro-go-tools && go install bystro/cmd/opensearch
+RUN cd /app/bystro-go-tools && go install bystro/cmd/dosage
 
 # Use Ubuntu as the base image to match the GitHub Actions environment
 FROM python:3.11.8-bookworm
