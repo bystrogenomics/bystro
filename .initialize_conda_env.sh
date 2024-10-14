@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Follow https://docs.conda.io/en/latest/miniconda.html to install miniconda
 # Call this using "source .initialize_conda_env.sh"
-# Ray 2.4.0 on Mac OS (arm64) does not have stable 3.11 support, see https://docs.ray.io/en/latest/ray-overview/installation.html
 version="3.11"
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
