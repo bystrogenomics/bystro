@@ -52,7 +52,7 @@ class BasePrsCS:
         """
         default_options = {
             "num_chains": 1,
-            "num_warmup": 1000,
+            "warmup_steps": 1000,
             "num_samples": 5000,
         }
         mopts = {**default_options, **mcmc_options}
@@ -135,7 +135,7 @@ class PrsCSData(BasePrsCS):
                 pyro.sample("obs", Normal(prediction_mean, sigma2), obs=y)
 
         nuts_kernel = mcmc.NUTS(model, step_size=5e-3, adapt_step_size=False)
-        mcmc_run = mcmc.MCMC(nuts_kernel, num_samples=100, warmup_steps=20)
+        mcmc_run = mcmc.MCMC(nuts_kernel, **self.mcmc_options)
         mcmc_run.run(
             Z,
             y,

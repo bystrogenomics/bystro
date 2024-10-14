@@ -1,6 +1,12 @@
 name: (ML/Bioinformatics) Build and Run Bystro Python Dockerfile
 
-on: [pull_request]
+on:
+  release:
+    types: [created]
+  pull_request:
+    paths:
+      - "Dockerfile.python"
+  workflow_dispatch: # Optional: allows manual triggering of the workflow
 
 jobs:
   build:

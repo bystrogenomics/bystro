@@ -19,8 +19,8 @@ def generate_data_prscs(N=100000, p=25, sigma=np.sqrt(0.1)):
 
 
 def test_prscs():
-    X, y = generate_data_prscs()
-    model = PrsCSData()
+    X, y = generate_data_prscs(N=100, p=5)
+    model = PrsCSData(mcmc_options={"num_samples": 10, "warmup_steps": 1})
     try:
         model.fit(X.astype(np.float32), y.astype(np.float32))
     except Exception as e:
