@@ -54,7 +54,6 @@ from bystro.covariance._base_covariance import (
     _entropy_subset,
     _mutual_information,
     inv_sherman_woodbury_fa,
-    _get_conditional_parameters_sherman_woodbury,
     _conditional_score_sherman_woodbury,
     _conditional_score_samples_sherman_woodbury,
     _marginal_score_sherman_woodbury,
@@ -273,12 +272,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
             prec = self.get_precision()
             coefs = np.dot(self.W_, prec)
         else:
-            Lambda = self.get_noise()
-            A = la.solve(Lambda, self.W_)
-            B = np.dot(A, self.W_.T)
-            IpB = np.eye(self.n_components) + B
-            end = la.solve(IpB, A)
-            coefs = A - np.dot(B, end)
+            raise NotImplementedError("Subclass PCA required for this Sherman Woodbury")
 
         return np.dot(X, coefs.T)
 
@@ -308,20 +302,15 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         if self.W_ is None:
             raise ValueError("Model has not been fit yet")
 
+        Wo = self.W_[:, observed_feature_idxs]
         if sherman_woodbury is False:
             covariance = self.get_covariance()
             cov_sub = covariance[
                 np.ix_(observed_feature_idxs, observed_feature_idxs)
             ]
-            Wo = self.W_[:, observed_feature_idxs]
             coefs = np.dot(Wo, la.inv(cov_sub))
         else:
-            noise = self.get_noise()
-            noise_sub = noise[observed_feature_idxs]
-            coef, _ = _get_conditional_parameters_sherman_woodbury(
-                noise_sub, self.W_, observed_feature_idxs
-            )
-
+            raise NotImplementedError("Subclass PCA required for this Sherman Woodbury")
         return np.dot(X, coefs.T)
 
     def conditional_score(
