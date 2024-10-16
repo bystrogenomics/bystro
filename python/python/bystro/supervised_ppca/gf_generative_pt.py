@@ -606,6 +606,71 @@ class FactorAnalysis(BasePCASGDModel):
                 nn.Softplus()(trainable_variables[1]).detach().numpy()
             )
 
+    def transform(self, X: NDArray[np.float_], sherman_woodbury: bool = False):
+        """ 
+        This returns the latent variable estimates given X
+
+        Parameters
+        ----------
+        X : np array-like,(N_samples,p)
+            The data to transform.
+
+        Returns
+        -------
+        S : NDArray,(N_samples,n_components)
+            The factor estimates
+        """
+        if self.W_ is None:
+            raise ValueError("Model has not been fit yet")
+
+        if sherman_woodbury is False:
+            prec = self.get_precision()
+            coefs = np.dot(self.W_, prec)
+        else:
+            M = np.dot(self.W_, self.W_.T) + np.eye(self.n_components) * self.sigma2_
+            coefs = np.dot(self.W_.T, la.inv(M)).T
+
+        return np.dot(X, coefs.T)
+ 
+    def transform_subset(
+        self,
+        X: NDArray[np.float_],
+        observed_feature_idxs: NDArray[np.float_],
+        sherman_woodbury: bool = False,
+    ) -> NDArray[np.float_]:
+        """
+        This returns the latent variable estimates given partial observations
+        contained in X
+
+        Parameters
+        ----------
+        X : NDArray,(N_samples,sum(observed_feature_idxs))
+            The data to transform.
+
+        observed_feature_idxs: np.array-like,(sum(p),)
+            The observation locations
+
+        Returns
+        -------
+        S : NDArray,(N_samples,n_components)
+            The factor estimates
+        """
+        if self.W_ is None:
+            raise ValueError("Model has not been fit yet")
+
+        Wo = self.W_[:, observed_feature_idxs]
+        if sherman_woodbury is False:
+            covariance = self.get_covariance()
+            cov_sub = covariance[
+                np.ix_(observed_feature_idxs, observed_feature_idxs)
+            ]
+            coefs = np.dot(Wo, la.inv(cov_sub))
+        else:
+            M = np.dot(Wo, Wo.T) + np.eye(self.n_components) * self.sigma2_
+            coefs = np.dot(Wo.T, la.inv(M)).T
+        return np.dot(X, coefs.T)
+
+
     def _test_inputs(self, X: NDArray[np.float_]):
         """
         Just tests to make sure data is numpy array
