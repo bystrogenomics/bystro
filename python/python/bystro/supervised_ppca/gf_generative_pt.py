@@ -39,7 +39,7 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Any, Callable
 
-from sklearn.decomposition import PCA
+from sklearn.decomposition import PCA # type: ignore
 from tqdm import trange
 import torch
 from torch import Tensor, nn
