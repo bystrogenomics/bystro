@@ -36,7 +36,6 @@ Methods
 None
 """
 import numpy as np
-import numpy.linalg as la
 from numpy.typing import NDArray
 from typing import Any, Callable
 
