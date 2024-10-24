@@ -207,9 +207,9 @@ class PPCADropout(PPCA):
             z_samples = mean_z + torch.matmul(eps, C1_2)
 
             if task == "regression":
-                beta_ = softplus(beta_l)
+                beta_ = softplus(beta_l) + .01
                 y_hat = torch.squeeze(
-                    torch.matmul(z_samples[:, : self.n_supervised], beta_)
+                    torch.matmul(20*z_samples[:, : self.n_supervised], beta_)
                 )
                 loss_y = supervision_loss(y_hat, torch.squeeze(y_batch))
             else:
