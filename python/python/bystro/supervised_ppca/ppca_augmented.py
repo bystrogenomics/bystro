@@ -5,7 +5,7 @@ import numpy.linalg as la
 from bystro.supervised_ppca._base import BaseGaussianFactorModel
 from numpy.typing import NDArray
 
-from sklearn.utils.extmath import randomized_range_finder
+from sklearn.utils.extmath import randomized_range_finder # type: ignore
 
 from bystro.covariance._covariance_np import (
     EmpiricalCovariance,
