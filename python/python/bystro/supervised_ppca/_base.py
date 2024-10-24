@@ -279,7 +279,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
     def transform_subset(
         self,
         X: NDArray[np.float_],
-        observed_feature_idxs: NDArray[np.int_],
+        observed_feature_idxs: NDArray[np.float_],
         sherman_woodbury: bool = False,
     ) -> NDArray[np.float_]:
         """
@@ -316,7 +316,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
     def conditional_score(
         self,
         X: NDArray[np.float_],
-        observed_feature_idxs: NDArray[np.int_],
+        observed_feature_idxs: NDArray[np.float_],
         weights: NDArray[np.float_] | None = None,
         sherman_woodbury: bool = False,
     ) -> np.float_:
@@ -330,7 +330,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         X : NDArray,(N,sum(observed_feature_idxs))
             The data
 
-        observed_feature_idxs: NDArray[np.int_],(sum(p),)
+        observed_feature_idxs: NDArray,(sum(p),)
             The observation locations
 
         weights : NDArray,(N,),default=None
@@ -361,7 +361,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
     def conditional_score_samples(
         self,
         X: NDArray[np.float_],
-        observed_feature_idxs: NDArray[np.int_],
+        observed_feature_idxs: NDArray[np.float_],
         sherman_woodbury: bool = False,
     ) -> NDArray[np.float_]:
         """
@@ -374,7 +374,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         X : np.array-like,(N,p)
             The data
 
-        observed_feature_idxs: NDArray[np.int_],(p,)
+        observed_feature_idxs: np.array-like,(p,)
             The observation locations
 
         sherman_woodbury : bool,default=False
@@ -401,7 +401,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
     def marginal_score(
         self,
         X: NDArray[np.float_],
-        observed_feature_idxs: NDArray[np.int_],
+        observed_feature_idxs: NDArray[np.float_],
         weights: NDArray[np.float_] | None = None,
         sherman_woodbury: bool = False,
     ) -> np.float_:
@@ -413,7 +413,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         X : np.array-like,(N,sum(idxs))
             The data
 
-        observed_feature_idxs: NDArray[np.int_],(sum(p),)
+        observed_feature_idxs: np.array-like,(sum(p),)
             The observation locations
 
         weights : np.array-like,(N,),default=None
@@ -444,7 +444,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
     def marginal_score_samples(
         self,
         X: NDArray,
-        observed_feature_idxs: NDArray[np.int_],
+        observed_feature_idxs: NDArray,
         sherman_woodbury: bool = False,
     ):
         """
@@ -455,7 +455,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         X : np.array-like,(N,sum(observed_feature_idxs))
             The data
 
-        observed_feature_idxs: NDArray[np.int_],(sum(p),)
+        observed_feature_idxs: np.array-like,(sum(p),)
             The observation locations
 
         Returns
@@ -547,7 +547,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
         return _entropy(self.get_covariance())
 
     def get_entropy_subset(
-        self, observed_feature_idxs: NDArray[np.int_]
+        self, observed_feature_idxs: NDArray[np.float_]
     ) -> np.float_:
         """
         Computes the entropy of a subset of the Gaussian distribution
@@ -555,7 +555,7 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
 
         Parameters
         ----------
-        observed_feature_idxs: NDArray[np.int_],(sum(p),)
+        observed_feature_idxs: NDArray[np.float_],(sum(p),)
             The observation locations
 
         Returns
@@ -567,8 +567,8 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
 
     def mutual_information(
         self,
-        observed_feature_idxs1: NDArray[np.int_],
-        observed_feature_idxs2: NDArray[np.int_],
+        observed_feature_idxs1: NDArray[np.float_],
+        observed_feature_idxs2: NDArray[np.float_],
     ) -> np.float_:
         """
         This computes the mutual information bewteen the two sets of
@@ -576,10 +576,10 @@ class BaseGaussianFactorModel(BaseSGDModel, ABC):
 
         Parameters
         ----------
-        observed_feature_idxs1 : NDArray[np.int_],(p,)
+        observed_feature_idxs1 : np.array-like,(p,)
             First group of variables
 
-        observed_feature_idxs2 : NDArray[np.int_],(p,)
+        observed_feature_idxs2 : np.array-like,(p,)
             Second group of variables
 
         Returns
