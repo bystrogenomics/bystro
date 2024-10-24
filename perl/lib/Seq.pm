@@ -744,6 +744,12 @@ sub _preparePreprocessorProgram {
 
   my $basename = path($inPath)->basename;
 
+  # Remove all non-alphanumeric characters to make sure
+  # the shell/bash command doens't crash
+  $basename =~ s/[^a-zA-Z0-9-_]/_/g;
+
+  $inPath = quotemeta($inPath);
+
   my $errPath = $self->_workingDir->child( $basename . '.file-log.log' );
 
   #cat is wasteful, but we expect no one reads large uncompressed files
