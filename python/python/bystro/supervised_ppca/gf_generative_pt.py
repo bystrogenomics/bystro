@@ -36,6 +36,7 @@ Methods
 None
 """
 import numpy as np
+import numpy.linalg as la
 from numpy.typing import NDArray
 from typing import Any, Callable
 
@@ -607,7 +608,7 @@ class FactorAnalysis(BasePCASGDModel):
             )
 
     def transform(self, X: NDArray[np.float_], sherman_woodbury: bool = False):
-        """ 
+        """
         This returns the latent variable estimates given X
 
         Parameters
@@ -627,11 +628,14 @@ class FactorAnalysis(BasePCASGDModel):
             prec = self.get_precision()
             coefs = np.dot(self.W_, prec)
         else:
-            M = np.dot(self.W_, self.W_.T) + np.eye(self.n_components) * self.sigma2_
+            M = (
+                np.dot(self.W_, self.W_.T)
+                + np.eye(self.n_components) * self.sigma2_
+            )
             coefs = np.dot(self.W_.T, la.inv(M)).T
 
         return np.dot(X, coefs.T)
- 
+
     def transform_subset(
         self,
         X: NDArray[np.float_],
@@ -669,7 +673,6 @@ class FactorAnalysis(BasePCASGDModel):
             M = np.dot(Wo, Wo.T) + np.eye(self.n_components) * self.sigma2_
             coefs = np.dot(Wo.T, la.inv(M)).T
         return np.dot(X, coefs.T)
-
 
     def _test_inputs(self, X: NDArray[np.float_]):
         """

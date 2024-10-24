@@ -715,7 +715,7 @@ class PPCAadversarialRandomized(BaseGaussianFactorModel):
         X_dm = X - self.mean_x
         Y_dm = Y - self.mean_y
         N, self.p = X.shape
-        p,q = X.shape[1],Y.shape[1]
+        q = Y.shape[1]
 
         n_random = self.n_components + self.n_oversamples
         Q = randomized_range_finder(
@@ -739,10 +739,8 @@ class PPCAadversarialRandomized(BaseGaussianFactorModel):
         model_cov.fit(XX)
         cov = model_cov.covariance
 
-        #B_11 = np.cov(X_tilde)
-        B_11 = cov[:n_random,:n_random]
-        B_12 = cov[n_random:,:n_random].T
-        #B_12 = 1 / N * np.dot(X_tilde, Y_dm)
+        B_11 = cov[:n_random, :n_random]
+        B_12 = cov[n_random:, :n_random].T
         B_22 = B_12.T @ la.solve(B_11 + self.eps * np.eye(n_random), B_12)
 
         B = np.zeros((n_random + q, n_random + q))
@@ -769,7 +767,7 @@ class PPCAadversarialRandomized(BaseGaussianFactorModel):
         A = W.T @ W
         B = W.T @ X_dm.T
         S = la.solve(A, B).T
-        self.explained_variance_ = np.mean(S**2,axis=0)
+        self.explained_variance_ = np.mean(S**2, axis=0)
         X_recon = S @ W.T
         var = np.mean((X - X_recon) ** 2)
         self._store_instance_variables((W, var))
@@ -797,7 +795,6 @@ class PPCAadversarialRandomized(BaseGaussianFactorModel):
         exp_var_diff = self.explained_variance_ - self.sigma2_
         W_mod = self.W_.T * np.sqrt(exp_var_diff)
         return np.dot(W_mod, W_mod.T) + self.sigma2_ * np.eye(self.p)
-        #return np.dot(self.W_.T, self.W_) + self.sigma2_ * np.eye(self.p)
 
     def get_noise(self):
         """
@@ -820,7 +817,8 @@ class PPCAadversarialRandomized(BaseGaussianFactorModel):
     def _store_instance_variables(
         self,
         trainable_variables: tuple[
-            NDArray[np.float_], np.float_, 
+            NDArray[np.float_],
+            np.float_,
         ],
     ) -> None:
         """
@@ -903,7 +901,7 @@ class PPCAsupervisedRandomized(BaseGaussianFactorModel):
         X_dm = X - self.mean_x
         Y_dm = Y - self.mean_y
         N, self.p = X.shape
-        p,q = X.shape[1],Y.shape[1]
+        q = Y.shape[1]
 
         n_random = self.n_components + self.n_oversamples
         Q = randomized_range_finder(
@@ -927,10 +925,8 @@ class PPCAsupervisedRandomized(BaseGaussianFactorModel):
         model_cov.fit(XX)
         cov = model_cov.covariance
 
-        #B_11 = np.cov(X_tilde)
-        B_11 = cov[:n_random,:n_random]
-        B_12 = cov[n_random:,:n_random].T
-        #B_12 = 1 / N * np.dot(X_tilde, Y_dm)
+        B_11 = cov[:n_random, :n_random]
+        B_12 = cov[n_random:, :n_random].T
         B_22 = B_12.T @ la.solve(B_11 + self.eps * np.eye(n_random), B_12)
 
         B = np.zeros((n_random + q, n_random + q))
@@ -957,7 +953,7 @@ class PPCAsupervisedRandomized(BaseGaussianFactorModel):
         A = W.T @ W
         B = W.T @ X_dm.T
         S = la.solve(A, B).T
-        self.explained_variance_ = np.mean(S**2,axis=0)
+        self.explained_variance_ = np.mean(S**2, axis=0)
         X_recon = S @ W.T
         var = np.mean((X - X_recon) ** 2)
         self._store_instance_variables((W, var))
@@ -985,7 +981,6 @@ class PPCAsupervisedRandomized(BaseGaussianFactorModel):
         exp_var_diff = self.explained_variance_ - self.sigma2_
         W_mod = self.W_.T * np.sqrt(exp_var_diff)
         return np.dot(W_mod, W_mod.T) + self.sigma2_ * np.eye(self.p)
-        #return np.dot(self.W_.T, self.W_) + self.sigma2_ * np.eye(self.p)
 
     def get_noise(self):
         """
@@ -1008,7 +1003,8 @@ class PPCAsupervisedRandomized(BaseGaussianFactorModel):
     def _store_instance_variables(
         self,
         trainable_variables: tuple[
-            NDArray[np.float_], np.float_, 
+            NDArray[np.float_],
+            np.float_,
         ],
     ) -> None:
         """
