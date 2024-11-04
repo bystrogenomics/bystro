@@ -14,6 +14,8 @@ from bystro.ancestry.model import get_models
 
 pd.options.future.infer_string = True # type: ignore
 
+np.random.seed(0) # noqa: NPY002
+
 SAMPLES = [f"sample{i}" for i in range(len(POPS))]
 VARIANTS = ["variant1", "variant2", "variant3"]
 PC_COLUMNS = ["pc1", "pc2", "pc3", "pc4"]
@@ -107,7 +109,6 @@ def test_infer_ancestry_from_model():
     genotypes = ds.dataset(pa.Table.from_pandas(genotypes, preserve_index=False).to_batches())
 
     ancestry_response = infer_ancestry(ancestry_models, genotypes)
-
     assert len(samples) == len(ancestry_response.results)
 
     top_hits = set()

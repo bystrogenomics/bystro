@@ -1,5 +1,6 @@
 """Classes for common shapes of data in ancestry."""
 from msgspec import Struct
+from bystro.beanstalkd.messages import BaseMessage, CompletedJobMessage
 
 LOWER_UNIT_BOUND = 0.0
 UPPER_UNIT_BOUND = 1.0
@@ -137,3 +138,30 @@ class AncestryResults(Struct, frozen=True, rename="camel"):
 
     results: list[AncestryScoresOneSample]
     pcs: dict[str, list[float]]
+
+
+class AncestryJobData(BaseMessage, frozen=True, rename="camel"):
+    """
+    The expected JSON message for the Ancestry job.
+
+    Parameters
+    ----------
+    submission_id: str
+        The unique identifier for the job.
+    dosage_matrix_path: str
+        The path to the dosage matrix file.
+    out_dir: str
+        The directory to write the results to.
+    assembly: str
+        The genome assembly used for the dosage matrix.
+    """
+
+    dosage_matrix_path: str
+    out_dir: str
+    assembly: str
+
+
+class AncestryJobCompleteMessage(CompletedJobMessage, frozen=True, kw_only=True, rename="camel"):
+    """The returned JSON message expected by the API server"""
+
+    result_path: str
