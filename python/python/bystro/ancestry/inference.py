@@ -232,17 +232,9 @@ def infer_ancestry(
         if model is None:
             logger.debug("No model specified, selecting model with lowest missing")
 
-            # give slight preference to gnomad model if missingness is very simliar
-            # because gnomad model has 2x as many snps
-            if gnomad_completeness >= (array_completeness * 0.95):
-                scanner = scanner_gnomad
-                ancestry_model = gnomad_model
-
-                logger.debug("Using gnomAD PCA loadings for ancestry inference due to lower missingness")
-                num_snps_selected = gnomad_matching_row_count
-                del scanner_array
-                del array_model
-            else:
+            # give slight preference to array model if missingness is very simliar
+            # because array model performs better
+            if array_completeness >= (gnomad_completeness * 0.95):
                 scanner = scanner_array
                 ancestry_model = array_model
 
@@ -250,6 +242,14 @@ def infer_ancestry(
                 num_snps_selected = array_matching_row_count
                 del scanner_gnomad
                 del gnomad_model
+            else:
+                scanner = scanner_gnomad
+                ancestry_model = gnomad_model
+
+                logger.debug("Using gnomAD PCA loadings for ancestry inference due to lower missingness")
+                num_snps_selected = gnomad_matching_row_count
+                del scanner_array
+                del array_model
         else:
             if model == "gnomad":
                 scanner = scanner_gnomad
