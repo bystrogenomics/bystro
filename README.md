@@ -4,9 +4,15 @@ https://bystro.io
 
 ## Bystro Annotator
 
-TLDR; 1,000x+ faster than VEP, more complete annotation + online search (https://bystro.io) for datasets of up to 47TB (compressed) online, or petabytes offline.
+TLDR; The fastest and most complete data curation and annotation library in the world. 
+
+100,000x+ faster than VEP, 50x faster than Illumina, more complete annotation + online search (https://bystro.io) for datasets of petabytes in size.
 
 ![Bystro Performance](https://i.imgur.com/ve8hUF8.png)
+
+## Bystro Machine Learning
+
+We have novel, cutting edge algorithms for robust discovery, using Fair Machine Leaning principles. 
 
 ## Bystro Publication
 
