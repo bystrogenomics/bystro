@@ -1,6 +1,6 @@
 # Bystro Open Source
 
-At Bystro, we believe natural language is the right interface for genetic and proteomic analysis. We are buildign the world's first LLM-powered natural language analysis engine that takes your questions about complex genetic and proteomic datasets, and converts them into statistical answers with easy to understand summaries and visualizations.
+At Bystro, we believe natural language is the right interface for genetic and proteomic analysis. We are building the world's first LLM-powered natural language analysis engine that takes your questions about complex genetic and proteomic datasets, and converts them into statistical answers with easy to understand summaries and visualizations.
 
 This is our open-source repo of machine learning methods for high dimensional statistics, as well as some applications in genomics and proteomics.
 
@@ -31,7 +31,6 @@ Random Matrix Theory modules that are foundational for significance tests, such 
 ```python
 from bystro.stochastic_gradient_langevin import *
 ```
-
 Implementation of Stochastic Gradient Langevin algorithm in  https://www.ics.uci.edu/~welling/publications/papers/stoclangevin
 
 ### Fair Machine Learning and Supervised PPCA / Variational Principal Component Regression
@@ -41,8 +40,8 @@ from bystro.supervised_ppca import *
 
 `supervised_ppca` is a collection of generative methods:
   1. Probabilistic PCA (PPCA)
-  2. Supervised PPCA (also know as Variationl Principal Component Regression): Novel method for network analysis that is able to pick up dynamics of interest in low variance components. Also competitive with Elastic Net in a regression context, without shrinking covariates (instead shrinks them in latent space). See our recent publication: https://arxiv.org/abs/2409.02327
-  3. Adversarial Probabilistic PCA: Fair ML method that removes the influence of M sensitive variables, from high dimensional data
+  2. Supervised PPCA (also know as Variational Principal Component Regression): Novel method for network analysis that is able to pick up dynamics of interest in low variance components. Also competitive with Elastic Net in a regression context, without shrinking covariates (instead shrinks them in latent space). See our recent publication: https://arxiv.org/abs/2409.02327
+  3. Adversarial Probabilistic PCA: Fair ML method that removes the influence of M sensitive variables (confounding factors), from high dimensional data
 
 <br>
 
