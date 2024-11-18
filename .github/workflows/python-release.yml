@@ -18,7 +18,7 @@ jobs:
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11"]
         platform:
           - runner: ubuntu-22.04
             target: x86_64
@@ -84,9 +84,9 @@ jobs:
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11"]
         platform:
-          - runner: macos-12
+          - runner: macos-14
             target: x86_64
             local_name: x86_64
           - runner: macos-14
