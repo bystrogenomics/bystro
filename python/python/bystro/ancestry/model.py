@@ -22,12 +22,15 @@ logger = logging.getLogger()
 
 pd.options.future.infer_string = True  # type: ignore
 
+ARRAYSET_MODEL_KEY = "array"
+GNOMADSET_MODEL_KEY = "gnomad"
+
 ANCESTRY_BUCKET = os.getenv("ANCESTRY_BUCKET", "bystro-ancestry-public")
 ANCESTRY_MODEL_DIR = os.getenv("ANCESTRY_MODEL_DIR", str(Path(__file__).parent / "data"))
-GNOMAD_PCA_FILE = "gnomadset_pca.csv"
-GNOMAD_RFC_FILE = "gnomadset_rfc.skop"
-ARRAY_PCA_FILE = "arrayset_pca.csv"
-ARRAY_RFC_FILE = "arrayset_rfc.skop"
+GNOMAD_PCA_FILE = "gnomadset_pca_sklearn_151.csv"
+GNOMAD_RFC_FILE = "gnomadset_rfc_sklearn_151.skop"
+ARRAY_PCA_FILE = "arrayset_pca_sklearn_151.csv"
+ARRAY_RFC_FILE = "arrayset_rfc_sklearn_151.skop"
 
 models_cache: dict[str, AncestryModels] = {}
 
@@ -115,33 +118,32 @@ def get_models(assembly: str) -> AncestryModels:
     paths = _get_local_paths(assembly)
 
     if (
-        Path(paths["gnomad"]["pca_local_path"]).exists()
-        and Path(paths["gnomad"]["rfc_local_path"]).exists()
-        and Path(paths["array"]["pca_local_path"]).exists()
-        and Path(paths["array"]["rfc_local_path"]).exists()
+        Path(paths[GNOMADSET_MODEL_KEY]["pca_local_path"]).exists()
+        and Path(paths[GNOMADSET_MODEL_KEY]["rfc_local_path"]).exists()
+        and Path(paths[ARRAYSET_MODEL_KEY]["pca_local_path"]).exists()
+        and Path(paths[ARRAYSET_MODEL_KEY]["rfc_local_path"]).exists()
     ):
         logger.info("Loading models from disk.")
         gnomad_model = get_one_model_from_file_system(
-            paths["gnomad"]["pca_local_path"], paths["gnomad"]["rfc_local_path"]
+            paths[GNOMADSET_MODEL_KEY]["pca_local_path"], paths[GNOMADSET_MODEL_KEY]["rfc_local_path"]
         )
         array_model = get_one_model_from_file_system(
-            paths["array"]["pca_local_path"], paths["array"]["rfc_local_path"]
+            paths[ARRAYSET_MODEL_KEY]["pca_local_path"], paths[ARRAYSET_MODEL_KEY]["rfc_local_path"]
         )
         models = AncestryModels(gnomad_model, array_model)
     else:
         gnomad_model = get_one_model(
-            paths["gnomad"]["pca_local_path"],
-            paths["gnomad"]["rfc_local_path"],
-            paths["gnomad"]["pca_remote_path"],
-            paths["gnomad"]["rfc_remote_path"],
+            paths[GNOMADSET_MODEL_KEY]["pca_local_path"],
+            paths[GNOMADSET_MODEL_KEY]["rfc_local_path"],
+            paths[GNOMADSET_MODEL_KEY]["pca_remote_path"],
+            paths[GNOMADSET_MODEL_KEY]["rfc_remote_path"],
         )
         array_model = get_one_model(
-            paths["array"]["pca_local_path"],
-            paths["array"]["rfc_local_path"],
-            paths["array"]["pca_remote_path"],
-            paths["array"]["rfc_remote_path"],
+            paths[ARRAYSET_MODEL_KEY]["pca_local_path"],
+            paths[ARRAYSET_MODEL_KEY]["rfc_local_path"],
+            paths[ARRAYSET_MODEL_KEY]["pca_remote_path"],
+            paths[ARRAYSET_MODEL_KEY]["rfc_remote_path"],
         )
-
         models = AncestryModels(gnomad_model, array_model)
 
     # Update the cache with the new model
@@ -205,10 +207,10 @@ def get_models_from_file_system(assembly: str) -> AncestryModels:
     paths = _get_local_paths(assembly)
 
     gnomad_model = get_one_model_from_file_system(
-        paths["gnomad"]["pca_local_path"], paths["gnomad"]["rfc_local_path"]
+        paths[GNOMADSET_MODEL_KEY]["pca_local_path"], paths[GNOMADSET_MODEL_KEY]["rfc_local_path"]
     )
     array_model = get_one_model_from_file_system(
-        paths["array"]["pca_local_path"], paths["array"]["rfc_local_path"]
+        paths[ARRAYSET_MODEL_KEY]["pca_local_path"], paths[ARRAYSET_MODEL_KEY]["rfc_local_path"]
     )
 
     models = AncestryModels(gnomad_model, array_model)
@@ -229,21 +231,22 @@ def _get_local_paths(assembly: str) -> dict[str, dict[str, str]]:
 
     gnomad_pca_basename = f"{assembly}_{GNOMAD_PCA_FILE}"
     gnomad_rfc_basename = f"{assembly}_{GNOMAD_RFC_FILE}"
+
     array_pca_basename = f"{assembly}_{ARRAY_PCA_FILE}"
     array_rfc_basename = f"{assembly}_{ARRAY_RFC_FILE}"
 
     pca_local_path_gnomad = local_dir / gnomad_pca_basename
     rfc_local_path_gnomad = local_dir / gnomad_rfc_basename
+
     pca_local_path_array = local_dir / array_pca_basename
     rfc_local_path_array = local_dir / array_rfc_basename
-
     pca_remote_path_gnomad = f"{assembly}/{gnomad_pca_basename}"
     rfc_remote_path_gnomad = f"{assembly}/{gnomad_rfc_basename}"
     pca_remote_path_array = f"{assembly}/{array_pca_basename}"
     rfc_remote_path_array = f"{assembly}/{array_rfc_basename}"
 
     return {
-        "gnomad": {
+        GNOMADSET_MODEL_KEY: {
             "pca_local_path": str(pca_local_path_gnomad),
             "rfc_local_path": str(rfc_local_path_gnomad),
             "pca_remote_path": pca_remote_path_gnomad,
@@ -251,7 +254,7 @@ def _get_local_paths(assembly: str) -> dict[str, dict[str, str]]:
             "pca_basename": gnomad_pca_basename,
             "rfc_basename": gnomad_rfc_basename,
         },
-        "array": {
+        ARRAYSET_MODEL_KEY: {
             "pca_local_path": str(pca_local_path_array),
             "rfc_local_path": str(rfc_local_path_array),
             "pca_remote_path": pca_remote_path_array,
