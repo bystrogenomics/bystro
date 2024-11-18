@@ -4,13 +4,13 @@ build-backend = "maturin"
 
 [project]
 name = "bystro"
-requires-python = ">=3.11.0"
+requires-python = ">=3.11.0, <3.13.0" # numba does not support 3.13 yet
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-version = "2.0.0-beta23"
+version = "2.0.0-beta24"
 dependencies = [
     "openpyxl==3.1.2",
     "boto3==1.28.9",
