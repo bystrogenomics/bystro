@@ -370,4 +370,13 @@ def _superpop_probs_from_pop_probs(pop_probs: pd.DataFrame) -> pd.DataFrame:
 def _make_trivial_probability_interval(x: float) -> ProbabilityInterval:
     """Promote a value to a trivial ProbabilityInterval with equal lower, upper bounds."""
     # The ancestry calculations come out as np.float64, which is not JSON serializable in msgspec.
+
+    # Allow for floating point precision error
+    if x > 1.005:
+        raise ValueError(f"Expected value between 0 and 1, got {x}")
+    if x < -0.005:
+        raise ValueError(f"Expected value between 0 and 1, got {x}")
+
+    x = min(1, max(0, x))
+
     return ProbabilityInterval(float(x), float(x))
