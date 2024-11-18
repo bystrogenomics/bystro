@@ -1,6 +1,6 @@
 [package]
 name = "bystro"
-version = "1.0.0-beta21"
+version = "2.0.0-beta24"
 edition = "2021"
 build = "build.rs"
 
