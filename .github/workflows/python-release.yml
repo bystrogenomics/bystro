@@ -6,6 +6,11 @@
 name: Python Release
 
 on:
+  pull_request:
+    paths:
+      - "python/**"
+      - "go/**"
+      - "config/**"
   release:
     types: [published]
   workflow_dispatch: # Optional: allows manual triggering of the workflow
@@ -86,7 +91,7 @@ jobs:
       matrix:
         python-version: ["3.11"]
         platform:
-          - runner: macos-14
+          - runner: macos-latest
             target: x86_64
             local_name: x86_64
           - runner: macos-14
@@ -113,8 +118,8 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist --find-interpreter --manifest-path python/Cargo.toml
-          sccache: "false"
+          args: --release --out dist --find-interpreter
+          sccache: "true"
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
