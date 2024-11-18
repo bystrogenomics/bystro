@@ -35,6 +35,9 @@ pd.options.future.infer_string = True  # type: ignore
 
 ANCESTRY_SCORE_SAMPLE_CHUNK_SIZE = int(os.getenv("ANCESTRY_SCORE_SAMPLE_CHUNK_SIZE", 200))
 
+DEBUG = False
+DEBUG_MISSINGNESS_IMPOSED = 0.0
+
 
 class AncestryModel(Struct, frozen=True, forbid_unknown_fields=True, rename="camel"):
     """Bundle together PCA and RFC models for bookkeeping purposes."""
@@ -62,9 +65,16 @@ class AncestryModel(Struct, frozen=True, forbid_unknown_fields=True, rename="cam
                 A dosage matrix with samples as rows and variants as columns.
         """
         logger.debug("computing PCA transformation")
+        genotypes = genotypes.fillna(0)
 
         with Timer() as timer:
-            Xpc = genotypes.T @ self.pca_loadings_df
+            Xpc = genotypes.T @ self.pca_loadings_df.loc[genotypes.index, :]
+
+        # get memory usage
+        logger.info(
+            "Memory usage after PCA transformation: %s (MB)",
+            psutil.Process(os.getpid()).memory_info().rss / 1024**2,
+        )
 
         logger.debug("finished computing PCA transformation in %f seconds", timer.elapsed_time)
         logger.debug("computing RFC classification")
@@ -137,7 +147,9 @@ class AncestryModels(Struct, frozen=True, forbid_unknown_fields=True, rename="ca
     array_model: AncestryModel
 
 
-def infer_ancestry(ancestry_models: AncestryModels, genotypes: Dataset) -> AncestryResults:
+def infer_ancestry(
+    ancestry_models: AncestryModels, genotypes: Dataset, model: str | None = None
+) -> AncestryResults:
     """
     Infer ancestry from genotypes using a trained model.
 
@@ -148,6 +160,11 @@ def infer_ancestry(ancestry_models: AncestryModels, genotypes: Dataset) -> Ances
 
     genotypes: Arrow Dataset, shape (n_variants, m_samples)
         A dataset containing genotypes to be classified.
+
+    model: str, optional
+        The model to use for ancestry inference.
+        The model name must be one of "array" or "gnomad"
+        If None, the model with the lowest missingness will be used.
 
     Returns
     -------
@@ -209,23 +226,49 @@ def infer_ancestry(ancestry_models: AncestryModels, genotypes: Dataset) -> Ances
             psutil.Process(os.getpid()).memory_info().rss / 1024**2,
         )
 
-        num_snps_selected = max(gnomad_matching_row_count, array_matching_row_count)
-        if gnomad_matching_row_count >= array_matching_row_count:
-            scanner = scanner_gnomad
-            ancestry_model = gnomad_model
+        gnomad_completeness = gnomad_matching_row_count / len(gnomad_model.pca_loadings_df.index)
+        array_completeness = array_matching_row_count / len(array_model.pca_loadings_df.index)
 
-            logger.debug("Using gnomAD PCA loadings for ancestry inference due to lower missingness")
+        if model is None:
+            logger.debug("No model specified, selecting model with lowest missing")
 
-            del scanner_array
-            del array_model
+            # give slight preference to array model if missingness is very simliar
+            # because array model performs better
+            if array_completeness >= (gnomad_completeness * 0.95):
+                scanner = scanner_array
+                ancestry_model = array_model
+
+                logger.debug("Using array PCA loadings for ancestry inference due to lower missingness")
+                num_snps_selected = array_matching_row_count
+                del scanner_gnomad
+                del gnomad_model
+            else:
+                scanner = scanner_gnomad
+                ancestry_model = gnomad_model
+
+                logger.debug("Using gnomAD PCA loadings for ancestry inference due to lower missingness")
+                num_snps_selected = gnomad_matching_row_count
+                del scanner_array
+                del array_model
         else:
-            scanner = scanner_array
-            ancestry_model = array_model
+            if model == "gnomad":
+                scanner = scanner_gnomad
+                ancestry_model = gnomad_model
 
-            logger.debug("Using array PCA loadings for ancestry inference due to lower missingness")
+                logger.debug("Using gnomAD PCA loadings for ancestry inference")
+                num_snps_selected = gnomad_matching_row_count
+                del scanner_array
+                del array_model
+            elif model == "array":
+                scanner = scanner_array
+                ancestry_model = array_model
 
-            del scanner_gnomad
-            del gnomad_model
+                logger.debug("Using array PCA loadings for ancestry inference")
+                num_snps_selected = array_matching_row_count
+                del scanner_gnomad
+                del gnomad_model
+            else:
+                raise ValueError(f"Invalid model specified: {model}")
 
     logger.info("Completed ancestry model selection in %f seconds", timer.elapsed_time)
 
@@ -266,16 +309,15 @@ def infer_ancestry(ancestry_models: AncestryModels, genotypes: Dataset) -> Ances
                 psutil.Process(os.getpid()).memory_info().rss / 1024**2,
             )
 
-            missing_rows = list(set(ancestry_model.pca_loadings_df.index) - set(genotypes_df.index))
-            if missing_rows:
-                missing_rows_df = pd.DataFrame(
-                    np.ones((len(missing_rows), len(genotypes_df.columns))),
-                    index=missing_rows,
-                    columns=genotypes_df.columns,
+            if DEBUG and DEBUG_MISSINGNESS_IMPOSED > 0:
+                # drop a random DEBUG_MISSINGNESS_IMPOSED number of rows
+                genotypes_df = genotypes_df.sample(
+                    frac=1 - DEBUG_MISSINGNESS_IMPOSED, random_state=42, axis=0
                 )
-                genotypes_df = pd.concat([genotypes_df, missing_rows_df])
 
-            genotypes_df[genotypes_df.isna() | (genotypes_df < 0)] = 1
+                logger.info(
+                    "DEBUG: imposed missingness, genotypes_df shape after: %s", genotypes_df.shape
+                )
 
             pcs_for_plotting, pop_probs_df = ancestry_model.predict_proba(genotypes_df)
 
@@ -328,4 +370,13 @@ def _superpop_probs_from_pop_probs(pop_probs: pd.DataFrame) -> pd.DataFrame:
 def _make_trivial_probability_interval(x: float) -> ProbabilityInterval:
     """Promote a value to a trivial ProbabilityInterval with equal lower, upper bounds."""
     # The ancestry calculations come out as np.float64, which is not JSON serializable in msgspec.
+
+    # Allow for floating point precision error
+    if x > 1.005:
+        raise ValueError(f"Expected value between 0 and 1, got {x}")
+    if x < -0.005:
+        raise ValueError(f"Expected value between 0 and 1, got {x}")
+
+    x = min(1, max(0, x))
+
     return ProbabilityInterval(float(x), float(x))
