@@ -19,19 +19,9 @@ Bystro is compatible with Linux and MacOS. Windows support is experimental. If y
 brew install cmake
 ```
 
-## Installing the Bystro Annotator
-
-Besides the Bystro ML library, which lives in bystro/python, we also have a Perl library that is used to annotate genetic data, providing necessary information for the Bystro ML library bioinformatics modules.
-
-The Bystro Annotator, which handles processing genetic data (VCF files), performing quality control, feature labeling (annotation) of variants and samples, and generating an annotation output and genotype dosage matrices, is written in Perl.
-
-To install and configure the Bystro Annotator, follow the instructions in [perl/INSTALL.md](perl/INSTALL.md).
-
 ## Setting up the Bystro project for development
 
 If you wish to stand up a local development environment, we recommend using Miniconda to manage Bystro Python dependencies: https://docs.conda.io/projects/miniconda/en/latest/
-
-Once Bystro annotator installation is complete, and assuming Conda/Miniconda has been installed, run :
 
 ```sh
 # Install Rust
