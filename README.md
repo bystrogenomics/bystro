@@ -8,49 +8,54 @@ This work is the basis for the Bystro natural language analysis platform for gen
 
 <br/>
 
-
 ## Machine Learning Methods
 
 We are working hard on cutting edge algorithms, and haven't found much time for documentation. More detailed descriptions coming soon, but until then, a brief summary is found below:
 
-
 ### Covariance Matrix Estimation and Hypothesis Testing
+
 ```python
 from bystro.covariance import *
 ```
+
 1. Regularized covariance matrix estimation methods well suited for smaller sample size regimes where n << p
 2. Covariance matrix hypothesis tests, like the 2 sample covariance test (`from bystro.random_matrix_theory.rmt4ds_cov_test import two_sample_cov_test`)
 
 ### Random Matrix Theory Methods
+
 ```python
 from bystro.random_matrix_theory import *
 ```
+
 Random Matrix Theory modules that are foundational for significance tests, such as our `two_sample_cov_test`
 
 ### Stochastic Gradient Langevin
+
 ```python
 from bystro.stochastic_gradient_langevin import *
 ```
-Implementation of Stochastic Gradient Langevin algorithm in  https://www.ics.uci.edu/~welling/publications/papers/stoclangevin
+
+Implementation of Stochastic Gradient Langevin algorithm in https://www.ics.uci.edu/~welling/publications/papers/stoclangevin
 
 ### Fair Machine Learning and Supervised PPCA / Variational Principal Component Regression
+
 ```python
 from bystro.supervised_ppca import *
 ```
 
 `supervised_ppca` is a collection of generative methods:
-  1. Probabilistic PCA (PPCA)
-  2. Supervised PPCA (also know as Variational Principal Component Regression): Novel method for network analysis that is able to pick up dynamics of interest in low variance components. Also competitive with Elastic Net in a regression context, without shrinking covariates (instead shrinks them in latent space). See our recent publication: https://arxiv.org/abs/2409.02327
-  3. Adversarial Probabilistic PCA: Fair ML method that removes the influence of M sensitive variables (confounding factors), from high dimensional data
+
+1. Probabilistic PCA (PPCA)
+2. Supervised PPCA (also know as Variational Principal Component Regression): Novel method for network analysis that is able to pick up dynamics of interest in low variance components. Also competitive with Elastic Net in a regression context, without shrinking covariates (instead shrinks them in latent space). See our recent publication: https://arxiv.org/abs/2409.02327
+3. Adversarial Probabilistic PCA: Fair ML method that removes the influence of M sensitive variables (confounding factors), from high dimensional data
 
 <br>
 
-## Applications in Proteomics 
+## Applications in Proteomics
 
 Description coming soon
 
 <br>
-
 
 ## Applications in Genetics
 
@@ -71,7 +76,7 @@ Description coming soon
 To install the Bystro Python package, run:
 
 ```sh
-pip install --pre bystro
+pip install bystro
 ```
 
 The Bystro ancestry CLI `score` tool (`bystro-api ancestry score`) parses VCF files to generate dosage matrices. This requires `bystro-vcf`, a Go program which can be installed with:
@@ -90,7 +95,6 @@ brew install cmake
 Please refer to [INSTALL.md](INSTALL.md) for more details.
 
 <br>
-
 
 ### Installing the Bystro Annotator
 

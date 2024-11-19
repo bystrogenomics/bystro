@@ -3,7 +3,7 @@
 To install the Bystro Python package, which contains our machine learning library and some application in genetics and proteomics, run:
 
 ```sh
-pip install --pre bystro
+pip install bystro
 ```
 
 The Bystro ancestry CLI `score` tool (`bystro-api ancestry score`) parses VCF files to generate dosage matrices. This requires `bystro-vcf`, a Go program which can be installed with:
