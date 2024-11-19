@@ -1,4 +1,5 @@
 import argparse
+import json
 
 from bystro.api.auth import signup, login, get_user, UserProfile, CachedAuth
 
@@ -8,7 +9,6 @@ from bystro.cli.proteomics_cli import add_proteomics_subparser
 
 from bystro.api.streaming import stream_file
 
-import json
 
 def signup_cli(args: argparse.Namespace, print_result=True) -> CachedAuth:
     """
@@ -145,7 +145,7 @@ def query_cli(args: argparse.Namespace) -> None:
         The queried results
     """
 
-    res =  query(
+    res = query(
         job_id=args.job_id,
         query=args.query,
         size=args.size,
@@ -175,7 +175,7 @@ def stream_file_cli(args: argparse.Namespace) -> None:
         output=args.output,
         key_path=args.key_path,
         out_dir=args.out_dir,
-        write_stdout=not args.out_dir
+        write_stdout=not args.out_dir,
     )
 
 
@@ -323,7 +323,6 @@ def main():
     fetch_parser.set_defaults(func=stream_file_cli)
 
     add_proteomics_subparser(subparsers)
-    add_ancestry_subparser(subparsers)
 
     args = parser.parse_args()
     if hasattr(args, "func"):
