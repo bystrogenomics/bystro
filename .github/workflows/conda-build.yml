@@ -13,9 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
-    env:
-      CARGO_TARGET_DIR: target-${{ matrix.python-version }}
+        python-version: ["3.11"]
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -29,12 +27,6 @@ jobs:
 
       - name: Install Bystro using Maturin
         run: |
-          rm -rf target-${{ matrix.python-version }}
-          rm -rf python/build
-          rm -rf python/target
-          rm -rf python/build-${{ matrix.python-version }}
-          rm -rf python/target-${{ matrix.python-version }}
-          find python -name '*.so' -delete
           . .initialize_conda_env.sh
           make install
           echo "PATH=$CONDA/bin:$PATH" >> $GITHUB_ENV
