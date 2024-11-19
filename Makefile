@@ -14,13 +14,10 @@ install-python: build-python
 		pip install "$$WHEEL_FILE"; \
 	fi
 
-install-go:
-	go install github.com/bystrogenomics/bystro-vcf@2.2.3
-
-install: install-python install-go
+install: install-python
 
 uninstall:
 	pip uninstall -y bystro
 	binary_path=$(which bystro-vcf 2>/dev/null) && [ -n "$binary_path" ] && rm "$binary_path"
 
-develop: install-go build-python-dev
+develop: build-python-dev
