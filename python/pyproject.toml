@@ -10,7 +10,7 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-version = "2.0.0-beta24"
+version = "2.0.0"
 dependencies = [
     "openpyxl==3.1.2",
     "boto3==1.28.9",

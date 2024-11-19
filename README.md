@@ -93,9 +93,3 @@ brew install cmake
 ```
 
 Please refer to [INSTALL.md](INSTALL.md) for more details.
-
-<br>
-
-### Installing the Bystro Annotator
-
-Please refer to [INSTALL.md](INSTALL.md) for instructions on how to install the Bystro annotator.
