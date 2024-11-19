@@ -24,6 +24,13 @@ jobs:
           auto-activate-base: true
           activate-environment: true
           python-version: ${{ matrix.python-version }}
+
+      - name: Remove target directory
+        run: rm -rf python/target
+
+      - name: Remove any stray .so files
+        run: find python -name '*.so' -delete
+
       - name: Install Bystro using Maturin
         run: |
           . .initialize_conda_env.sh
