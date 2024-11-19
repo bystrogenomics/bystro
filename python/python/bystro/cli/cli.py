@@ -8,8 +8,6 @@ from bystro.cli.proteomics_cli import add_proteomics_subparser
 
 from bystro.api.streaming import stream_file
 
-from bystro.cli.ancestry import add_ancestry_subparser
-
 import json
 
 def signup_cli(args: argparse.Namespace, print_result=True) -> CachedAuth:
