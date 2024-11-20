@@ -3,7 +3,7 @@
 To install the Bystro Python package, which contains our machine learning library and some application in genetics and proteomics, run:
 
 ```sh
-pip install --pre bystro
+pip install bystro
 ```
 
 Bystro is compatible with Linux and MacOS. Windows support is experimental. If you are installing on MacOS as a native binary (Apple ARM Architecture), you will need to install the following additional dependencies:
