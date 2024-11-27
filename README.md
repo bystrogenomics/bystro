@@ -53,7 +53,7 @@ from bystro.supervised_ppca import *
 
 ## Applications in Proteomics
 
-For proteomics analyses, we have 4 modular steps that can be applied alone or combined together:
+For proteomics analyses, we have 4 modular steps that can be applied alone or combined:
 
 1. Imputation   
     - Recommended if there are missing values within your data, demo here: [Soft Impute Demo](python/python/bystro/examples/Demo_Imputing_Missing_Data.ipynb)
@@ -68,9 +68,9 @@ For proteomics analyses, we have 4 modular steps that can be applied alone or co
 ## Applications in Genetics
 
 Make genetic results more generalizable by removing information from confounding factors:
-  - Remove ancestry-related information in multi-ancestry cohorts to reduce bias
-  - Remove effect of batch in meta-analyses
-  - See demo here: [Fair PCA Demo](python/python/bystro/examples/Demo_Fair_PCA.ipynb)
+- Remove ancestry-related information in multi-ancestry cohorts to reduce bias
+- Remove effect of batch in meta-analyses
+- See demo here: [Fair PCA Demo](python/python/bystro/examples/Demo_Fair_PCA.ipynb)
 <br>
 
 ## Combined (Multi-omics) Applications
