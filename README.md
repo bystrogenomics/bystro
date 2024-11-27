@@ -53,13 +53,30 @@ from bystro.supervised_ppca import *
 
 ## Applications in Proteomics
 
-Description coming soon
+For proteomics analyses, we have 4 modular steps that can be applied alone or combined:
 
+1. Imputation   
+    - Recommended if there are missing values within your data, demo here: [Soft Impute Demo](python/python/bystro/examples/Demo_Imputing_Missing_Data.ipynb)
+2. Batch Correction
+    - Recommended for TMT data that has a control per batch to correct for small batches, demo here: [Small sample batch correction Demo](python/python/bystro/examples/Demo_accounting_for_batch_effects_with_control.ipynb)
+3. Removal of Confounding factors
+    - Recommended if there are confounding factors such as sex or ancestry that you want to remove from your data, demo here: [Fair PCA Demo](python/python/bystro/examples/Demo_Fair_PCA.ipynb)
+4. Network Analysis
+    - Recommended if you want to discover predictive networks in your proteomic data, demo here: [Learning Predictive Network Demo](python/python/bystro/examples/Demo_Learning_Predictive_Network.ipynb)
 <br>
 
 ## Applications in Genetics
 
-Description coming soon
+Make genetic results more generalizable by removing information from confounding factors:
+- Remove ancestry-related information in multi-ancestry cohorts to reduce bias
+- Remove effect of batch in meta-analyses
+- See demo here: [Fair PCA Demo](python/python/bystro/examples/Demo_Fair_PCA.ipynb)
+<br>
+
+## Combined (Multi-omics) Applications
+
+Combine genomic and proteomic data for any downstream analyses or data exploration
+- Read more here: [Proteomics combine README.md](python/python/bystro/proteomics/README.md)
 
 <br>
 
