@@ -4,14 +4,22 @@ build-backend = "maturin"
 
 [project]
 name = "bystro"
+description = "Statistical genomics tools and the Bystro Think agent API"
+readme = "THINK_API.md"
+license = { text = "MPL-2.0" }
 requires-python = ">=3.11.0, <3.13.0" # numba does not support 3.13 yet
 classifiers = [
+    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
+    "requests>=2.31.0,<3",
+    "python-socketio[client]>=5.11.0,<6",
     "openpyxl==3.1.2",
     "boto3==1.28.9",
     "liftover==1.2.2",
@@ -122,12 +130,20 @@ unfixable = [
     'D103',    # don't require docstrings in tests: method names should suffice
     'ANN201',  # don't worry about return types in tests
 ]
+"python/bystro/think/client.py" = [
+    "SLF001", # Run is a friend handle over ThinkClient's internal transport.
+]
 
 [project.scripts]
 bystro-save-worker = "bystro.search.save.listener:main"
 bystro-index-worker = "bystro.search.index.listener:main"
 bystro-annotation-worker = "bystro.annotation.listener:main"
 bystro-api = "bystro.cli.cli:main"
+
+[project.urls]
+Homepage = "https://bystro.io"
+Repository = "https://github.com/bystrogenomics/bystro"
+Documentation = "https://github.com/bystrogenomics/bystro/blob/main/python/THINK_API.md"
 
 [tool.pytest.ini_options]
 addopts = "--cov --cov-report term-missing" # add detailed coverage report by default

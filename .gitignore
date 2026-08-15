@@ -5,3 +5,6 @@ t/utils/filterCadd.yml
 t/utils/index/
 *lock.mdb
 .coverage*
+.hypothesis/
+__pycache__/
+*.py[cod]

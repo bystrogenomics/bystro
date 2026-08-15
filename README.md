@@ -110,3 +110,64 @@ brew install cmake
 ```
 
 Please refer to [INSTALL.md](INSTALL.md) for more details.
+
+## Run Bystro Think from Python
+
+The Python package can submit durable agentic workloads to the same Bystro
+Think account used at [bystro.cloud](https://bystro.cloud):
+
+```python
+from bystro.api import auth
+from bystro.think import NeedsInput, RunOptions, ThinkClient
+
+auth.login("you@example.com", "your-password")
+
+with ThinkClient() as client:
+    run = client.submit(
+        "Compare the case and control cohorts in these files.",
+        files=["cases.vcf.gz", "controls.vcf.gz"],
+        options=RunOptions(mode="plus", advanced_planning=True),
+    )
+
+    outcome = run.wait()
+    while isinstance(outcome, NeedsInput):
+        print(outcome.prompt)
+        outcome = run.respond(input("> ")).wait()
+
+    print(outcome.output)
+```
+
+On deployments with Bystro's shared site-access gate, pass
+`site_access_code=os.environ["BYSTRO_SITE_ACCESS_CODE"]` to `auth.login` or
+`ThinkClient.login`; the gate code is used for that login session and is not
+cached.
+
+```python
+import os
+
+auth.login(
+    "you@example.com",
+    "your-password",
+    site_access_code=os.environ["BYSTRO_SITE_ACCESS_CODE"],
+)
+```
+
+Local files are uploaded as resumable personal artifacts and attached to the
+same question. Existing genetic jobs, artifacts, and prior conversations can
+be composed into a message without stringly-typed metadata:
+
+```python
+from bystro.think import (
+    add_artifact_context,
+    add_genetic_context,
+    add_previous_conversation_context,
+)
+
+message = add_genetic_context("annotation-job-id", "Investigate this phenotype")
+message = add_previous_conversation_context("earlier-thread-id", message)
+message = add_artifact_context("existing-artifact-id", message)
+run = client.submit(message)
+```
+
+See the [Think Python API guide](python/THINK_API.md) for progress events,
+large uploads, reconnecting to runs, typed errors, and context composition.

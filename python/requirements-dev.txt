@@ -1,5 +1,6 @@
 black==24.3.0
 flaky==3.7.0
+hypothesis>=6.100.0,<7
 mypy==1.10.0
 pandas-stubs==2.2.1.240316
 pytest==7.3.1

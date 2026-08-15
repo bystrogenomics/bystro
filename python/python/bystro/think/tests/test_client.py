@@ -1,0 +1,1526 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+from pathlib import Path
+import time
+
+from hypothesis import given, settings
+from hypothesis import strategies as st
+import pytest
+import requests
+import socketio
+
+from bystro.api import auth as dashboard_auth
+from bystro.api.auth import CachedAuth
+import bystro.think.client as think_client_module
+from bystro.think import (
+    Dataset,
+    EventKind,
+    InputKind,
+    InputResponseError,
+    MessageWithContext,
+    NeedsInput,
+    RunOptions,
+    RunProtocolError,
+    RunRejectedError,
+    RunResult,
+    RunStatus,
+    RunTimeoutError,
+    ThinkClient,
+    ThinkAuthenticationError,
+    ThinkEvent,
+    ThinkHTTPError,
+    UploadedFile,
+    UploadPhase,
+    UploadProgress,
+    add_artifact_context,
+    add_genetic_context,
+    add_previous_conversation_context,
+)
+
+
+class FakeResponse:
+    def __init__(self, status_code: int, payload: object) -> None:
+        self.status_code = status_code
+        self._payload = payload
+        self.reason = "OK" if status_code < 400 else "Error"
+
+    def json(self) -> object:
+        return self._payload
+
+
+class InvalidJSONResponse(FakeResponse):
+    def json(self) -> object:
+        raise ValueError("not JSON")
+
+
+class FakeSession:
+    def __init__(self) -> None:
+        self.cookies = requests.cookies.RequestsCookieJar()
+        self.posts: list[tuple[str, dict[str, object]]] = []
+        self.gets: list[tuple[str, dict[str, object]]] = []
+        self.upload_responses: list[FakeResponse] = []
+        self.status_responses: list[FakeResponse] = []
+        self.artifact_responses: dict[str, FakeResponse] = {}
+
+    def post(self, url: str, **kwargs: object) -> FakeResponse:
+        self.posts.append((url, kwargs))
+        if url.endswith("/auth/cookie"):
+            self.cookies.set("access_token", "chainlit-session", path="/")
+            return FakeResponse(200, {"success": True})
+        if url.endswith("/set-session-cookie"):
+            return FakeResponse(200, {"message": "Session cookie set"})
+        if url.endswith("/user/files/chunk"):
+            return self.upload_responses.pop(0)
+        raise AssertionError(f"unexpected POST {url}")
+
+    def get(self, url: str, **kwargs: object) -> FakeResponse:
+        self.gets.append((url, kwargs))
+        if "/user/files/chunk/status" in url:
+            return self.status_responses.pop(0)
+        if "/user/files/" in url:
+            artifact_id = url.rsplit("/", maxsplit=1)[-1]
+            return self.artifact_responses[artifact_id]
+        raise AssertionError(f"unexpected GET {url}")
+
+    def close(self) -> None:
+        return None
+
+
+class FakeSocket:
+    def __init__(self) -> None:
+        self.handlers: dict[str, Callable[..., object]] = {}
+        self.calls: list[tuple[str, object, float | None]] = []
+        self.emits: list[tuple[str, object]] = []
+        self.connect_args: tuple[str, dict[str, object]] | None = None
+        self.connected = False
+        self.next_message_ack: dict[str, object] = {
+            "success": True,
+            "threadId": "thread-1",
+            "created": True,
+            "dispatched": True,
+        }
+        self.call_hook: Callable[[str, object, float | None], None] | None = None
+        self.emit_hook: Callable[[str, object], None] | None = None
+
+    def on(
+        self,
+        event: str,
+        handler: Callable[..., object] | None = None,
+        namespace: str | None = None,
+    ) -> Callable[..., object]:
+        del namespace
+
+        def register(callback: Callable[..., object]) -> Callable[..., object]:
+            self.handlers[event] = callback
+            return callback
+
+        if handler is not None:
+            return register(handler)
+        return register
+
+    def connect(self, url: str, **kwargs: object) -> None:
+        self.connect_args = (url, kwargs)
+        self.connected = True
+        callback = self.handlers.get("connect")
+        if callback is not None:
+            callback()
+
+    def call(
+        self,
+        event: str,
+        data: object = None,
+        timeout: float | None = None,
+    ) -> object:
+        self.calls.append((event, data, timeout))
+        if self.call_hook is not None:
+            self.call_hook(event, data, timeout)
+        if event == "thread_detach":
+            return {"success": True}
+        if event == "thread_change":
+            assert isinstance(data, dict)
+            return {"success": True, "threadId": data["threadId"]}
+        if event == "client_message":
+            return dict(self.next_message_ack)
+        if event == "action":
+            return {"success": True}
+        raise AssertionError(f"unexpected socket call {event}")
+
+    def emit(self, event: str, data: object = None) -> None:
+        self.emits.append((event, data))
+        if self.emit_hook is not None:
+            self.emit_hook(event, data)
+
+    def disconnect(self) -> None:
+        self.connected = False
+
+    def trigger(self, event: str, payload: object = None) -> object:
+        callback = self.handlers[event]
+        if payload is None:
+            return callback()
+        return callback(payload)
+
+
+@pytest.fixture
+def auth_state() -> CachedAuth:
+    return CachedAuth(
+        email="scientist@example.com",
+        access_token="dashboard-jwt",
+        url="https://bystro.cloud",
+    )
+
+
+@pytest.fixture
+def transport() -> tuple[FakeSession, FakeSocket]:
+    return FakeSession(), FakeSocket()
+
+
+def make_client(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+    *,
+    on_event: Callable[[ThinkEvent], None] | None = None,
+    upload_chunk_size: int = 10 * 1024 * 1024,
+    sleep: Callable[[float], None] = time.sleep,
+    finalization_timeout: float = 10.0,
+) -> ThinkClient:
+    session, socket = transport
+    return ThinkClient(
+        auth=auth_state,
+        think_url="https://ai.bystro.cloud",
+        on_event=on_event,
+        _session=session,
+        _socket_factory=lambda **_kwargs: socket,
+        upload_chunk_size=upload_chunk_size,
+        finalization_timeout=finalization_timeout,
+        _sleep=sleep,
+    )
+
+
+def test_login_forwards_site_access_and_legal_consent(
+    monkeypatch,
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    session, socket = transport
+    calls: list[tuple[str, str, dict[str, object]]] = []
+
+    def fake_dashboard_login(
+        email: str,
+        password: str,
+        **kwargs: object,
+    ) -> CachedAuth:
+        calls.append((email, password, kwargs))
+        return auth_state
+
+    monkeypatch.setattr(dashboard_auth, "login", fake_dashboard_login)
+    monkeypatch.setattr(requests, "Session", lambda: session)
+    monkeypatch.setattr(socketio, "Client", lambda **_kwargs: socket)
+    consent = dashboard_auth.LegalConsent.accepted("Scientist Example")
+
+    client = ThinkClient.login(
+        "scientist@example.com",
+        "password",
+        dashboard_url="https://example.test",
+        site_access_code="invite-code",
+        legal_consent=consent,
+        cache=False,
+    )
+
+    assert calls == [
+        (
+            "scientist@example.com",
+            "password",
+            {
+                "host": "https://example.test",
+                "cache": False,
+                "site_access_code": "invite-code",
+                "legal_consent": consent,
+            },
+        )
+    ]
+    client.close()
+
+
+def test_connect_bootstraps_existing_browser_auth_contract(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    session, socket = transport
+    client = make_client(auth_state, transport)
+
+    client.connect()
+
+    assert [url for url, _ in session.posts[:2]] == [
+        "https://ai.bystro.cloud/auth/cookie",
+        "https://ai.bystro.cloud/set-session-cookie",
+    ]
+    assert all(options["allow_redirects"] is False for _, options in session.posts[:2])
+    assert session.posts[1][1]["json"] == {"session_id": client.session_id}
+    assert session.cookies.get("bystro_access_token", domain="ai.bystro.cloud") == "dashboard-jwt"
+    assert socket.connect_args is not None
+    socket_url, socket_kwargs = socket.connect_args
+    assert socket_url == "https://ai.bystro.cloud"
+    assert socket_kwargs["socketio_path"] == "ws/socket.io"
+    auth_callback = socket_kwargs["auth"]
+    assert callable(auth_callback)
+    auth_payload = auth_callback()
+    assert auth_payload == {
+        "clientType": "webapp",
+        "sessionId": client.session_id,
+        "threadId": "",
+        "userEnv": "{}",
+        "chatProfile": "",
+    }
+    assert ("connection_successful", None) in socket.emits
+
+
+def test_submit_reports_connected_before_submitted(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    events: list[ThinkEvent] = []
+    client = make_client(auth_state, transport, on_event=events.append)
+
+    run = client.submit("Analyze")
+
+    assert [(event.kind, event.run_id) for event in events[:2]] == [
+        (EventKind.CONNECTED, run.id),
+        (EventKind.SUBMITTED, run.id),
+    ]
+
+
+def test_non_json_unauthorized_response_still_has_typed_auth_error(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    session, _socket = transport
+    session.artifact_responses["private"] = InvalidJSONResponse(401, "login")
+    client = make_client(auth_state, transport)
+
+    with pytest.raises(ThinkAuthenticationError) as raised:
+        client.get_artifact("private")
+
+    assert raised.value.status_code == 401
+    assert session.gets[0][1]["allow_redirects"] is False
+
+
+def test_chunked_upload_is_bounded_retryable_and_reports_progress(
+    tmp_path: Path,
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    session, _socket = transport
+    source = tmp_path / "cohort.vcf"
+    source.write_bytes(b"abcdefghij")
+    session.upload_responses.extend(
+        [
+            FakeResponse(503, {"detail": "temporary"}),
+            FakeResponse(200, {"completed": False}),
+            FakeResponse(
+                200,
+                {
+                    "completed": True,
+                    "file": {
+                        "id": "file-1",
+                        "name": "cohort.vcf",
+                        "displayName": "inputs/cohort.vcf",
+                        "size": 10,
+                        "mime": "text/vcf",
+                    },
+                },
+            ),
+        ]
+    )
+    sleeps: list[float] = []
+    progress: list[UploadProgress] = []
+    client = make_client(
+        auth_state,
+        transport,
+        upload_chunk_size=5,
+        sleep=sleeps.append,
+    )
+
+    uploaded = client.upload(
+        source,
+        artifact_path="inputs/cohort.vcf",
+        on_progress=progress.append,
+    )
+
+    assert uploaded == UploadedFile(
+        id="file-1",
+        name="cohort.vcf",
+        display_name="inputs/cohort.vcf",
+        size=10,
+        mime="text/vcf",
+    )
+    upload_posts = [entry for entry in session.posts if entry[0].endswith("/user/files/chunk")]
+    assert len(upload_posts) == 3
+    assert all(options["allow_redirects"] is False for _, options in upload_posts)
+    first_data = upload_posts[0][1]["data"]
+    assert isinstance(first_data, dict)
+    assert first_data["chunkIndex"] == "0"
+    assert first_data["totalChunks"] == "2"
+    assert first_data["fileSize"] == "10"
+    assert first_data["artifact_path"] == "inputs/cohort.vcf"
+    assert first_data["chunkChecksum"] == (
+        "36bbe50ed96841d10443bcb670d6554f0a34b761be67ec9c4a8ad2c0c44ca42c"
+    )
+    retry_data = upload_posts[1][1]["data"]
+    assert isinstance(retry_data, dict)
+    assert retry_data["uploadId"] == first_data["uploadId"]
+    assert retry_data["chunkChecksum"] == first_data["chunkChecksum"]
+    assert sleeps == [1.0]
+    assert progress[-1].phase is UploadPhase.COMPLETE
+    assert progress[-1].bytes_sent == 10
+    assert progress[-1].total_bytes == 10
+
+
+def test_upload_rejects_mismatched_artifact_path_before_connecting(
+    tmp_path: Path,
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    session, socket = transport
+    source = tmp_path / "cohort.vcf"
+    source.write_bytes(b"variant data")
+    client = make_client(auth_state, transport)
+
+    with pytest.raises(
+        ValueError,
+        match="Artifact path must end with the uploaded file name",
+    ):
+        client.upload(source, artifact_path="inputs/renamed.vcf")
+
+    assert socket.connect_args is None
+    assert session.posts == []
+
+
+def test_chunked_upload_polls_async_finalization(
+    tmp_path: Path,
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    session, _socket = transport
+    source = tmp_path / "large.bam"
+    source.write_bytes(b"abcdef")
+    session.upload_responses.extend(
+        [
+            FakeResponse(200, {"completed": False}),
+            FakeResponse(200, {"completed": False}),
+        ]
+    )
+    session.status_responses.extend(
+        [
+            FakeResponse(200, {"status": "processing"}),
+            FakeResponse(
+                200,
+                {
+                    "status": "done",
+                    "file": {
+                        "id": "file-large",
+                        "name": "large.bam",
+                        "displayName": "large.bam",
+                        "size": 6,
+                        "mime": "application/octet-stream",
+                    },
+                },
+            ),
+        ]
+    )
+    sleeps: list[float] = []
+    progress: list[UploadProgress] = []
+    client = make_client(
+        auth_state,
+        transport,
+        upload_chunk_size=3,
+        sleep=sleeps.append,
+    )
+
+    uploaded = client.upload_artifact(source, on_progress=progress.append)
+
+    assert uploaded.id == "file-large"
+    assert [update.phase for update in progress][-2:] == [
+        UploadPhase.FINALIZING,
+        UploadPhase.COMPLETE,
+    ]
+    assert sleeps == [1.0]
+    assert len(session.gets) == 2
+    assert all("/user/files/chunk/status?uploadId=" in url for url, _ in session.gets)
+    assert all(options["allow_redirects"] is False for _, options in session.gets)
+
+
+def test_upload_finalization_fails_fast_on_nonretryable_http_error(
+    tmp_path: Path,
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    session, _socket = transport
+    source = tmp_path / "missing.vcf"
+    source.write_bytes(b"content")
+    session.upload_responses.append(FakeResponse(200, {"completed": False}))
+    session.status_responses.append(FakeResponse(404, {"detail": "Upload not found"}))
+    client = make_client(auth_state, transport)
+
+    with pytest.raises(ThinkHTTPError) as raised:
+        client.upload(source)
+
+    assert raised.value.status_code == 404
+    assert len(session.gets) == 1
+
+
+def test_upload_progress_callback_failure_does_not_abort_artifact_creation(
+    tmp_path: Path,
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    session, _socket = transport
+    source = tmp_path / "cohort.vcf"
+    source.write_bytes(b"content")
+    session.upload_responses.append(
+        FakeResponse(
+            200,
+            {
+                "completed": True,
+                "file": {
+                    "id": "file-callback",
+                    "name": "cohort.vcf",
+                    "displayName": "cohort.vcf",
+                    "size": 7,
+                    "mime": "text/vcf",
+                },
+            },
+        )
+    )
+    client = make_client(auth_state, transport)
+
+    def broken_callback(_progress: UploadProgress) -> None:
+        raise RuntimeError("callback bug")
+
+    uploaded = client.upload(source, on_progress=broken_callback)
+
+    assert uploaded.id == "file-callback"
+    assert "upload progress callback failed" in caplog.text.lower()
+
+
+def test_submit_uploads_multiple_files_and_attaches_them_to_same_question(
+    tmp_path: Path,
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    session, socket = transport
+    first = tmp_path / "variants.vcf"
+    second = tmp_path / "phenotypes.tsv"
+    first.write_bytes(b"vcf")
+    second.write_bytes(b"tsv")
+    session.upload_responses.extend(
+        [
+            FakeResponse(
+                200,
+                {
+                    "completed": True,
+                    "file": {
+                        "id": "file-vcf",
+                        "name": "variants.vcf",
+                        "displayName": "variants.vcf",
+                        "size": 3,
+                        "mime": "text/vcf",
+                    },
+                },
+            ),
+            FakeResponse(
+                200,
+                {
+                    "completed": True,
+                    "file": {
+                        "id": "file-tsv",
+                        "name": "phenotypes.tsv",
+                        "displayName": "phenotypes.tsv",
+                        "size": 3,
+                        "mime": "text/tab-separated-values",
+                    },
+                },
+            ),
+        ]
+    )
+    client = make_client(auth_state, transport)
+
+    client.submit("Analyze these files together", files=[first, second])
+
+    sent = [data for event, data, _timeout in socket.calls if event == "client_message"][-1]
+    assert isinstance(sent, dict)
+    message = sent["message"]
+    assert isinstance(message, dict)
+    assert message["output"] == "Analyze these files together"
+    metadata = message["metadata"]
+    assert isinstance(metadata, dict)
+    attachments = metadata["attached_input_artifacts"]
+    assert isinstance(attachments, list)
+    assert [attachment["id"] for attachment in attachments] == ["file-vcf", "file-tsv"]
+
+
+def test_submit_needs_input_respond_and_finish(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    uploaded = UploadedFile(
+        id="file-1",
+        name="cohort.vcf",
+        display_name="Cohort",
+        size=100,
+        mime="text/vcf",
+    )
+
+    run = client.submit(
+        "Analyze this cohort",
+        files=[uploaded],
+        datasets=[Dataset(id="job-1", name="Cases", assembly="hg38")],
+        options=RunOptions(mode="plus", advanced_planning=True),
+    )
+
+    assert run.id == "thread-1"
+    assert run.status is RunStatus.QUEUED
+    send = next(data for event, data, _timeout in socket.calls if event == "client_message")
+    assert isinstance(send, dict)
+    assert send["new"] is True
+    message = send["message"]
+    assert isinstance(message, dict)
+    assert message["output"] == "Analyze this cohort"
+    assert message["metadata"] == {
+        "mode": "plus",
+        "advancedPlanningEnabled": True,
+        "autoCompactEnabled": False,
+        "fastEnabled": False,
+        "verificationEnabled": True,
+        "searchVerificationEnabled": True,
+        "attached_input_artifacts": [
+            {
+                "id": "file-1",
+                "name": "cohort.vcf",
+                "displayName": "Cohort",
+                "size": 100,
+                "mime": "text/vcf",
+                "scope": "personal",
+            }
+        ],
+        "attached_bystro_datasets": [
+            {"id": "job-1", "name": "Cases", "assembly": "hg38"}
+        ],
+    }
+
+    socket.trigger("task_start", {"threadId": "thread-1", "taskId": "turn-1"})
+    socket.trigger(
+        "new_message",
+        {
+            "id": "question-1",
+            "threadId": "thread-1",
+            "type": "assistant_message",
+            "output": "Which phenotype column should I use?",
+            "metadata": {},
+        },
+    )
+    socket.trigger(
+        "status_overlay_update",
+        {
+            "threadId": "thread-1",
+            "visible": True,
+            "waitingForInput": True,
+            "humanApprovalStage": "clarifying_questions",
+            "checkpointId": "1f13d2a1-9893-603b-8000-000000000030",
+        },
+    )
+
+    paused = run.wait(timeout=0.1)
+    assert paused == NeedsInput(
+        run_id="thread-1",
+        kind=InputKind.CLARIFICATION,
+        prompt="Which phenotype column should I use?",
+        checkpoint_id="1f13d2a1-9893-603b-8000-000000000030",
+        details={},
+    )
+
+    socket.next_message_ack = {
+        "success": True,
+        "threadId": "thread-1",
+        "created": False,
+        "dispatched": True,
+    }
+    run.respond("Use case_control")
+    assert run.status is RunStatus.QUEUED
+    follow_up = [data for event, data, _timeout in socket.calls if event == "client_message"][-1]
+    assert isinstance(follow_up, dict)
+    assert follow_up["new"] is False
+    follow_up_message = follow_up["message"]
+    assert isinstance(follow_up_message, dict)
+    assert follow_up_message["threadId"] == "thread-1"
+    assert follow_up_message["metadata"] == {
+        "mode": "plus",
+        "advancedPlanningEnabled": True,
+        "autoCompactEnabled": False,
+        "fastEnabled": False,
+        "isPlanningResponse": True,
+    }
+
+    # A replay of the checkpoint that was just answered cannot reopen the pause.
+    socket.trigger(
+        "status_overlay_update",
+        {
+            "threadId": "thread-1",
+            "visible": True,
+            "waitingForInput": True,
+            "humanApprovalStage": "clarifying_questions",
+            "checkpointId": "1f13d2a1-9893-603b-8000-000000000030",
+        },
+    )
+    assert run.status is RunStatus.QUEUED
+
+    socket.trigger("task_start", {"threadId": "thread-1", "taskId": "turn-2"})
+    socket.trigger(
+        "new_message",
+        {
+            "id": "final-1",
+            "threadId": "thread-1",
+            "type": "assistant_message",
+            "output": "The association analysis is complete.",
+            "metadata": {"is_final_response": True},
+        },
+    )
+    socket.trigger("task_end", {"threadId": "thread-1", "taskId": "turn-2"})
+
+    result = run.wait(timeout=0.1)
+    assert result == RunResult(
+        run_id="thread-1",
+        output="The association analysis is complete.",
+    )
+    assert run.status is RunStatus.SUCCEEDED
+
+
+def test_respond_synchronizes_an_unstamped_pause_before_dispatch(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.submit(
+        "Develop and review a plan",
+        options=RunOptions(mode="plus", advanced_planning=True),
+    )
+    socket.trigger(
+        "new_message",
+        {
+            "id": "question-unstamped",
+            "threadId": "thread-1",
+            "type": "assistant_message",
+            "output": "Which phenotype should I use?",
+            "metadata": {},
+        },
+    )
+    socket.trigger(
+        "status_overlay_update",
+        {
+            "threadId": "thread-1",
+            "visible": True,
+            "waitingForInput": True,
+            "humanApprovalStage": "clarifying_questions",
+        },
+    )
+    paused = run.wait(timeout=0.1)
+    assert isinstance(paused, NeedsInput)
+    assert paused.checkpoint_id is None
+
+    def replay_stamped_pause(event: str, data: object) -> None:
+        if event != "action" or not isinstance(data, dict):
+            return
+        if data.get("name") != "status_client_ready":
+            return
+        socket.trigger(
+            "status_overlay_update",
+            {
+                "threadId": "thread-1",
+                "visible": True,
+                "waitingForInput": True,
+                "humanApprovalStage": "clarifying_questions",
+                "checkpointId": "1f13d2a1-9893-603b-8000-000000000040",
+            },
+        )
+
+    socket.emit_hook = replay_stamped_pause
+    socket.next_message_ack = {
+        "success": True,
+        "threadId": "thread-1",
+        "created": False,
+        "dispatched": True,
+    }
+    run.respond("Use case_control")
+
+    assert run.status is RunStatus.QUEUED
+    assert len([call for call in socket.calls if call[0] == "client_message"]) == 2
+    socket.trigger(
+        "status_overlay_update",
+        {
+            "threadId": "thread-1",
+            "visible": True,
+            "waitingForInput": True,
+            "humanApprovalStage": "clarifying_questions",
+            "checkpointId": "1f13d2a1-9893-603b-8000-000000000040",
+        },
+    )
+    assert run.status is RunStatus.QUEUED
+
+
+def test_respond_retries_checkpoint_replay_after_stale_processing_overlay(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport, finalization_timeout=1.0)
+    run = client.submit(
+        "Develop and review a plan",
+        options=RunOptions(mode="plus", advanced_planning=True),
+    )
+    socket.trigger(
+        "status_overlay_update",
+        {
+            "threadId": "thread-1",
+            "visible": True,
+            "waitingForInput": True,
+            "humanApprovalStage": "plan_review",
+        },
+    )
+    paused = run.wait(timeout=0.1)
+    assert isinstance(paused, NeedsInput)
+    assert paused.checkpoint_id is None
+
+    replay_count = 0
+
+    def replay_pause_after_stale_overlay(event: str, data: object) -> None:
+        nonlocal replay_count
+        if event != "action" or not isinstance(data, dict):
+            return
+        if data.get("name") != "status_client_ready":
+            return
+        replay_count += 1
+        if replay_count == 1:
+            socket.trigger(
+                "status_overlay_update",
+                {
+                    "threadId": "thread-1",
+                    "visible": True,
+                    "waitingForInput": False,
+                    "status": "processing",
+                },
+            )
+            return
+        socket.trigger(
+            "status_overlay_update",
+            {
+                "threadId": "thread-1",
+                "visible": True,
+                "waitingForInput": True,
+                "humanApprovalStage": "plan_review",
+                "checkpointId": "1f13d2a1-9893-603b-8000-000000000041",
+            },
+        )
+
+    socket.emit_hook = replay_pause_after_stale_overlay
+    socket.next_message_ack = {
+        "success": True,
+        "threadId": "thread-1",
+        "created": False,
+        "dispatched": True,
+    }
+
+    run.respond("accept")
+
+    assert replay_count >= 2
+    assert run.status is RunStatus.QUEUED
+    assert len([call for call in socket.calls if call[0] == "client_message"]) == 2
+
+
+def test_respond_fails_closed_when_pause_checkpoint_cannot_be_synchronized(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    client = make_client(auth_state, transport, finalization_timeout=0.001)
+    _session, socket = transport
+    run = client.submit("Develop and review a plan")
+    socket.trigger(
+        "status_overlay_update",
+        {
+            "threadId": "thread-1",
+            "visible": True,
+            "waitingForInput": True,
+            "humanApprovalStage": "clarifying_questions",
+        },
+    )
+
+    with pytest.raises(RunProtocolError, match="checkpoint"):
+        run.respond("Use case_control")
+
+    assert run.status is RunStatus.NEEDS_INPUT
+    assert len([call for call in socket.calls if call[0] == "client_message"]) == 1
+
+
+def test_hidden_overlay_clears_needs_input_without_an_invalid_transient_state(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.submit("Analyze")
+    checkpoint_id = "1f13d2a1-9893-603b-8000-000000000031"
+    socket.trigger(
+        "status_overlay_update",
+        {
+            "threadId": run.id,
+            "visible": True,
+            "waitingForInput": True,
+            "checkpointId": checkpoint_id,
+        },
+    )
+    assert run.status is RunStatus.NEEDS_INPUT
+
+    socket.trigger(
+        "status_overlay_update",
+        {
+            "threadId": run.id,
+            "visible": False,
+            "waitingForInput": False,
+            "checkpointId": checkpoint_id,
+        },
+    )
+
+    assert run.needs_input is None
+    assert run.status is RunStatus.RUNNING
+
+
+def test_stream_token_keeps_final_output_current_after_task_end(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.submit("Analyze")
+    socket.trigger("task_start", {"threadId": run.id})
+    socket.trigger(
+        "stream_start",
+        {
+            "id": "streamed-final",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "",
+            "metadata": {"is_final_response": True},
+        },
+    )
+    socket.trigger("task_end", {"threadId": run.id})
+    socket.trigger(
+        "stream_token",
+        {
+            "id": "streamed-final",
+            "threadId": run.id,
+            "token": "Durable answer",
+            "isSequence": True,
+        },
+    )
+
+    result = run.wait(timeout=0.1)
+
+    assert isinstance(result, RunResult)
+    assert result.output == "Durable answer"
+
+
+def test_message_context_resolves_existing_artifact_and_uses_structured_metadata(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    session, socket = transport
+    session.artifact_responses["existing-file"] = FakeResponse(
+        200,
+        {
+            "id": "existing-file",
+            "name": "phenotypes.tsv",
+            "displayName": "Phenotypes",
+            "size": 200,
+            "mime": "text/tab-separated-values",
+        },
+    )
+    client = make_client(auth_state, transport)
+    message: MessageWithContext = add_genetic_context("job-1", "Analyze", name="Cohort")
+    message = add_previous_conversation_context("thread-prior", message, name="Prior")
+    message = add_artifact_context("existing-file", message)
+
+    client.submit(message)
+
+    sent = [data for event, data, _timeout in socket.calls if event == "client_message"][-1]
+    assert isinstance(sent, dict)
+    payload = sent["message"]
+    assert isinstance(payload, dict)
+    assert payload["output"] == "Analyze"
+    metadata = payload["metadata"]
+    assert isinstance(metadata, dict)
+    assert metadata["attached_bystro_datasets"] == [
+        {"id": "job-1", "name": "Cohort"}
+    ]
+    assert metadata["context_conversations"] == [
+        {"id": "thread-prior", "name": "Prior"}
+    ]
+    assert metadata["attached_input_artifacts"] == [
+        {
+            "id": "existing-file",
+            "name": "phenotypes.tsv",
+            "displayName": "Phenotypes",
+            "size": 200,
+            "mime": "text/tab-separated-values",
+            "scope": "personal",
+        }
+    ]
+
+
+def test_submit_rejects_a_pre_ack_event_for_a_different_thread(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+
+    def inject_stale_event(event: str, data: object, timeout: float | None) -> None:
+        del data, timeout
+        if event == "client_message":
+            socket.trigger("task_start", {"threadId": "stale-thread"})
+
+    socket.call_hook = inject_stale_event
+
+    with pytest.raises(RunProtocolError, match="different run"):
+        client.submit("Analyze")
+
+
+def test_submit_preserves_a_matching_pre_ack_event(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+
+    def inject_matching_event(event: str, data: object, timeout: float | None) -> None:
+        del data, timeout
+        if event == "client_message":
+            socket.trigger("task_start", {"threadId": "thread-1"})
+
+    socket.call_hook = inject_matching_event
+
+    run = client.submit("Analyze")
+
+    assert run.id == "thread-1"
+    assert run.status is RunStatus.RUNNING
+    assert any(
+        event.kind is EventKind.STARTED and event.run_id == "thread-1"
+        for event in run.history
+    )
+
+
+def test_threadless_task_end_cannot_complete_the_active_run(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.submit("Analyze")
+    socket.trigger("task_start", {"threadId": run.id})
+    socket.trigger("task_end", {})
+    socket.trigger(
+        "new_message",
+        {
+            "id": "final-after-threadless-end",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "Done",
+            "metadata": {"is_final_response": True},
+        },
+    )
+
+    assert run.status is RunStatus.RUNNING
+
+
+def test_threadless_resume_error_is_ignored_outside_transcript_hydration(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.submit("Analyze")
+
+    socket.trigger("resume_thread_error", {"error": "stale resume failure"})
+
+    assert run.status is RunStatus.QUEUED
+
+
+def test_threadless_resume_error_fails_active_transcript_hydration(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.resume("thread-existing")
+
+    socket.trigger("resume_thread_error", {"error": "resume denied"})
+
+    with pytest.raises(RunProtocolError, match="resume denied"):
+        run.wait(timeout=0.1)
+    assert run.status is RunStatus.FAILED
+
+
+def test_resume_hydrates_a_completed_run(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+
+    run = client.resume("thread-existing")
+
+    assert socket.connect_args is not None
+    auth_callback = socket.connect_args[1]["auth"]
+    assert callable(auth_callback)
+    auth_payload = auth_callback()
+    assert auth_payload["threadId"] == "thread-existing"
+    assert any(
+        event == "action" and isinstance(data, dict) and data.get("name") == "status_client_ready"
+        for event, data in socket.emits
+    )
+
+    socket.trigger(
+        "resume_thread",
+        {
+            "id": "thread-existing",
+            "steps": [
+                {
+                    "id": "final-existing",
+                    "threadId": "thread-existing",
+                    "type": "assistant_message",
+                    "output": "Persisted answer",
+                    "metadata": {"is_final_response": True},
+                }
+            ],
+            "elements": [],
+        },
+    )
+
+    assert run.wait(timeout=0.1) == RunResult(
+        run_id="thread-existing",
+        output="Persisted answer",
+    )
+
+
+def test_resume_waits_for_transcript_before_returning_pause_prompt(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.resume("thread-paused")
+
+    socket.trigger(
+        "status_overlay_update",
+        {
+            "threadId": "thread-paused",
+            "waitingForInput": True,
+            "humanApprovalStage": "clarifying_questions",
+            "checkpointId": "1f13d2a1-9893-603b-8000-000000000040",
+        },
+    )
+
+    with pytest.raises(RunTimeoutError):
+        run.wait(timeout=0.001)
+
+    socket.trigger(
+        "resume_thread",
+        {
+            "id": "thread-paused",
+            "steps": [
+                {
+                    "id": "user-current",
+                    "threadId": "thread-paused",
+                    "type": "user_message",
+                    "output": "Analyze the cohort",
+                    "metadata": {},
+                },
+                {
+                    "id": "question-current",
+                    "threadId": "thread-paused",
+                    "type": "assistant_message",
+                    "output": "Which phenotype column should I use?",
+                    "metadata": {},
+                },
+            ],
+            "elements": [],
+        },
+    )
+
+    assert run.wait(timeout=0.1) == NeedsInput(
+        run_id="thread-paused",
+        kind=InputKind.CLARIFICATION,
+        prompt="Which phenotype column should I use?",
+        checkpoint_id="1f13d2a1-9893-603b-8000-000000000040",
+        details={},
+    )
+
+
+def test_resume_does_not_complete_new_turn_from_an_older_final_response(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.resume("thread-existing")
+
+    socket.trigger(
+        "resume_thread",
+        {
+            "id": "thread-existing",
+            "steps": [
+                {
+                    "id": "user-old",
+                    "threadId": "thread-existing",
+                    "type": "user_message",
+                    "output": "First question",
+                    "metadata": {},
+                },
+                {
+                    "id": "final-old",
+                    "threadId": "thread-existing",
+                    "type": "assistant_message",
+                    "output": "First answer",
+                    "metadata": {"is_final_response": True},
+                },
+                {
+                    "id": "user-current",
+                    "threadId": "thread-existing",
+                    "type": "user_message",
+                    "output": "Current follow-up",
+                    "metadata": {},
+                },
+            ],
+            "elements": [],
+        },
+    )
+
+    assert run.status is RunStatus.QUEUED
+    assert all(event.kind is not EventKind.COMPLETED for event in run.history)
+
+
+def test_late_final_message_emits_completion_after_task_end(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.submit("Analyze")
+
+    socket.trigger("task_start", {"threadId": run.id})
+    socket.trigger("task_end", {"threadId": run.id})
+    socket.trigger(
+        "new_message",
+        {
+            "id": "final-late",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "Late durable answer",
+            "metadata": {"is_final_response": True},
+        },
+    )
+
+    result = run.wait(timeout=0.1)
+    assert isinstance(result, RunResult)
+    assert result.output == "Late durable answer"
+    assert [event.kind for event in run.history].count(EventKind.COMPLETED) == 1
+
+
+def test_events_fail_closed_after_task_end_without_a_final_response(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport, finalization_timeout=0.001)
+    run = client.submit("Analyze")
+    socket.trigger("task_end", {"threadId": run.id})
+    events = run.events(timeout=0.02)
+
+    assert [next(events).kind, next(events).kind] == [
+        EventKind.CONNECTED,
+        EventKind.SUBMITTED,
+    ]
+    with pytest.raises(RunProtocolError, match="ended the task"):
+        next(events)
+
+    assert run.status is RunStatus.FAILED
+
+
+def test_bounded_history_does_not_stall_event_iterator_after_eviction(
+    monkeypatch,
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    monkeypatch.setattr(think_client_module, "_MAX_EVENT_HISTORY", 3)
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.submit("Analyze")
+    stream = run.events(timeout=0.1)
+
+    assert next(stream).kind is EventKind.CONNECTED
+    assert next(stream).kind is EventKind.SUBMITTED
+    socket.trigger("task_start", {"threadId": run.id})
+    assert next(stream).kind is EventKind.STARTED
+    socket.trigger(
+        "status_overlay_update",
+        {"threadId": run.id, "visible": True, "display": "after eviction"},
+    )
+
+    assert next(stream).message == "after eviction"
+
+
+def test_bounded_history_does_not_stall_wait_callback_after_eviction(
+    monkeypatch,
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    monkeypatch.setattr(think_client_module, "_MAX_EVENT_HISTORY", 3)
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.submit("Analyze")
+    socket.trigger("task_start", {"threadId": run.id})
+    observed: list[str] = []
+
+    def on_event(event: ThinkEvent) -> None:
+        if event.kind is EventKind.STARTED:
+            socket.trigger(
+                "status_overlay_update",
+                {"threadId": run.id, "visible": True, "display": "after eviction"},
+            )
+        if event.message == "after eviction":
+            observed.append(event.message)
+            socket.trigger(
+                "new_message",
+                {
+                    "id": "final-after-eviction",
+                    "threadId": run.id,
+                    "type": "assistant_message",
+                    "output": "Done",
+                    "metadata": {"is_final_response": True},
+                },
+            )
+            socket.trigger("task_end", {"threadId": run.id})
+
+    result = run.wait(timeout=0.2, on_event=on_event)
+
+    assert isinstance(result, RunResult)
+    assert result.output == "Done"
+    assert observed == ["after eviction"]
+
+
+def test_invalid_response_performs_no_file_or_artifact_io(
+    tmp_path: Path,
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    session, _socket = transport
+    source = tmp_path / "should-not-upload.txt"
+    source.write_text("private")
+    client = make_client(auth_state, transport)
+    run = client.submit("Still running")
+    posts_before = list(session.posts)
+
+    with pytest.raises(InputResponseError, match="not waiting for input"):
+        run.respond(
+            add_artifact_context("should-not-fetch", "Too early"),
+            files=[source],
+        )
+
+    assert session.posts == posts_before
+    assert session.gets == []
+
+
+def test_billing_pause_is_durable_but_cannot_be_answered_as_chat(
+    tmp_path: Path,
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    session, socket = transport
+    source = tmp_path / "should-not-upload.txt"
+    source.write_text("private")
+    client = make_client(auth_state, transport)
+    run = client.submit("Expensive analysis")
+    socket.trigger(
+        "status_overlay_update",
+        {
+            "threadId": run.id,
+            "visible": True,
+            "waitingForInput": True,
+            "status": "mid_turn_billing_required",
+            "checkpointId": "1f13d2a1-9893-603b-8000-000000000040",
+            "billingRequired": {"cost": 3.25, "currency": "USD"},
+        },
+    )
+
+    outcome = run.wait(timeout=0.1)
+
+    assert isinstance(outcome, NeedsInput)
+    assert outcome.kind is InputKind.BILLING
+    assert outcome.details == {"cost": 3.25, "currency": "USD"}
+    posts_before = list(session.posts)
+    with pytest.raises(InputResponseError, match="paused for billing"):
+        run.respond("continue", files=[source])
+    assert session.posts == posts_before
+
+
+def test_rejected_follow_up_restores_completed_turn(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.submit("First question")
+    socket.trigger(
+        "new_message",
+        {
+            "id": "first-final",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "First answer",
+            "metadata": {"is_final_response": True},
+        },
+    )
+    socket.trigger("task_end", {"threadId": run.id})
+    first_result = run.wait(timeout=0.1)
+    assert isinstance(first_result, RunResult)
+    assert first_result.output == "First answer"
+    socket.next_message_ack = {
+        "success": False,
+        "error": "admission_rejected",
+        "retryable": False,
+    }
+
+    with pytest.raises(RunRejectedError, match="admission_rejected"):
+        run.follow_up("Second question")
+
+    assert run.status is RunStatus.SUCCEEDED
+    restored_result = run.wait(timeout=0.1)
+    assert isinstance(restored_result, RunResult)
+    assert restored_result.output == "First answer"
+
+
+@settings(max_examples=50, deadline=None, database=None)
+@given(
+    message_kinds=st.lists(
+        st.sampled_from(["user", "assistant", "final"]),
+        min_size=1,
+        max_size=20,
+    )
+)
+def test_resume_transcript_fuzz_only_completes_the_latest_turn(
+    message_kinds: list[str],
+) -> None:
+    auth_state = CachedAuth(
+        email="scientist@example.com",
+        access_token="dashboard-jwt",
+        url="https://bystro.cloud",
+    )
+    transport = (FakeSession(), FakeSocket())
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.resume("thread-fuzz")
+    steps: list[dict[str, object]] = []
+    expected_output: str | None = None
+    for index, message_kind in enumerate(message_kinds):
+        output = f"output-{index}"
+        if message_kind == "user":
+            expected_output = None
+            message_type = "user_message"
+            metadata: dict[str, object] = {}
+        else:
+            message_type = "assistant_message"
+            metadata = {"is_final_response": True} if message_kind == "final" else {}
+            if message_kind == "final":
+                expected_output = output
+        steps.append(
+            {
+                "id": f"message-{index}",
+                "threadId": "thread-fuzz",
+                "type": message_type,
+                "output": output,
+                "metadata": metadata,
+            }
+        )
+
+    socket.trigger(
+        "resume_thread",
+        {"id": "thread-fuzz", "steps": steps, "elements": []},
+    )
+
+    completed_events = [event for event in run.history if event.kind is EventKind.COMPLETED]
+    if expected_output is None:
+        assert run.status is RunStatus.QUEUED
+        assert completed_events == []
+    else:
+        assert run.status is RunStatus.SUCCEEDED
+        result = run.wait(timeout=0.1)
+        assert isinstance(result, RunResult)
+        assert result.output == expected_output
+        assert len(completed_events) == 1
+
+
+@settings(max_examples=30, deadline=None, database=None)
+@given(
+    checkpoint_numbers=st.lists(
+        st.integers(min_value=1, max_value=999),
+        min_size=1,
+        max_size=25,
+        unique=True,
+    )
+)
+def test_needs_input_fuzz_converges_on_newest_checkpoint_and_rejects_replays(
+    checkpoint_numbers: list[int],
+) -> None:
+    auth_state = CachedAuth(
+        email="scientist@example.com",
+        access_token="dashboard-jwt",
+        url="https://bystro.cloud",
+    )
+    transport = (FakeSession(), FakeSocket())
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.submit("Analyze")
+    checkpoints = [
+        f"1f13d2a1-9893-603b-8000-{number:012d}" for number in checkpoint_numbers
+    ]
+    for checkpoint_id in checkpoints:
+        socket.trigger(
+            "status_overlay_update",
+            {
+                "threadId": run.id,
+                "visible": True,
+                "waitingForInput": True,
+                "humanApprovalStage": "clarifying_questions",
+                "checkpointId": checkpoint_id,
+            },
+        )
+
+    outcome = run.wait(timeout=0.1)
+
+    assert isinstance(outcome, NeedsInput)
+    assert outcome.checkpoint_id == max(checkpoints)
+    run.respond("Use phenotype")
+    for checkpoint_id in checkpoints:
+        socket.trigger(
+            "status_overlay_update",
+            {
+                "threadId": run.id,
+                "visible": True,
+                "waitingForInput": True,
+                "humanApprovalStage": "clarifying_questions",
+                "checkpointId": checkpoint_id,
+            },
+        )
+    assert run.status is RunStatus.QUEUED
