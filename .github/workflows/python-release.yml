@@ -45,7 +45,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist --find-interpreter --manifest-path python/Cargo.toml --zig
+          args: --release --out dist -i python3.11 python3.12 --manifest-path python/Cargo.toml --zig
           sccache: "false"
           manylinux: auto
 
@@ -68,7 +68,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: |
+            3.11
+            3.12
 
       - name: Update pip
         run: python -m pip install --upgrade pip
@@ -80,7 +82,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist --find-interpreter --manifest-path python/Cargo.toml
+          args: --release --out dist -i python3.11 python3.12 --manifest-path python/Cargo.toml
           sccache: "false"
       - name: Upload wheels
         uses: actions/upload-artifact@v4
