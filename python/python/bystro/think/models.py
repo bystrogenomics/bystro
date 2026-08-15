@@ -74,7 +74,7 @@ class RunOptions:
 class Dataset:
     """A Bystro dataset to attach to the agent context."""
 
-    id: str
+    id: str  # noqa: A003 - mirrors the dataset API field
     name: str
     assembly: str | None = None
 
@@ -89,7 +89,7 @@ class Dataset:
 class UploadedFile:
     """A durable personal input artifact returned by Think."""
 
-    id: str
+    id: str  # noqa: A003 - mirrors the artifact API field
     name: str
     display_name: str
     size: int
@@ -130,9 +130,9 @@ class UploadProgress:
 class ThinkMessage:
     """A user or assistant message in the durable run transcript."""
 
-    id: str
+    id: str  # noqa: A003 - mirrors the message API field
     run_id: str
-    type: str
+    type: str  # noqa: A003 - mirrors the message API field
     output: str
     name: str | None = None
     metadata: Mapping[str, object] = field(default_factory=dict)

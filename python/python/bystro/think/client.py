@@ -85,7 +85,9 @@ class _Response(Protocol):
 
 
 class _CookieJar(Protocol):
-    def set(self, name: str, value: str, **kwargs: object) -> object: ...
+    def set(  # noqa: A003 - mirrors the requests cookie-jar interface
+        self, name: str, value: str, **kwargs: object
+    ) -> object: ...
 
 
 class _HTTPSession(Protocol):
@@ -1632,7 +1634,7 @@ class Run:
         self._tracker = tracker
 
     @property
-    def id(self) -> str:
+    def id(self) -> str:  # noqa: A003 - concise public run identifier
         with self._tracker.condition:
             if self._tracker.run_id is None:
                 raise RunProtocolError("Think run id is not available yet")

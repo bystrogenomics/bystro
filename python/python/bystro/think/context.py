@@ -20,7 +20,7 @@ from bystro.think.models import Dataset, UploadedFile
 class PreviousConversation:
     """Reference to a durable Think conversation."""
 
-    id: str
+    id: str  # noqa: A003 - mirrors the conversation API field
     name: str | None = None
 
     def __post_init__(self) -> None:
@@ -32,7 +32,7 @@ class PreviousConversation:
 class ArtifactReference:
     """Reference to an existing personal input artifact."""
 
-    id: str
+    id: str  # noqa: A003 - mirrors the artifact API field
 
     def __post_init__(self) -> None:
         if not self.id.strip():
