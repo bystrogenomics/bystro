@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator
 from pathlib import Path
 import time
+from typing import cast
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -376,7 +377,10 @@ def test_output_files_and_downloads_use_authenticated_streaming_routes(
     assert image.read_bytes() == b"PNGDATA"
     assert archive.read_bytes() == b"TARDATA"
     output_gets = session.gets[-4:]
-    assert [options["params"]["offset"] for _, options in output_gets[:2]] == [0, 1]
+    assert [
+        cast(dict[str, object], options["params"])["offset"]
+        for _, options in output_gets[:2]
+    ] == [0, 1]
     assert output_gets[2][0].endswith("/api/user-output/download/images/duck%20final.png")
     assert output_gets[2][1]["stream"] is True
     gets_before = len(session.gets)
