@@ -127,6 +127,17 @@ class UploadProgress:
 
 
 @dataclass(frozen=True, slots=True)
+class OutputFile:
+    """A file generated in a Think conversation's output directory."""
+
+    name: str
+    path: str
+    size: int
+    modified: float
+    created: float
+
+
+@dataclass(frozen=True, slots=True)
 class ThinkMessage:
     """A user or assistant message in the durable run transcript."""
 
@@ -179,6 +190,7 @@ __all__ = [
     "FileInput",
     "InputKind",
     "NeedsInput",
+    "OutputFile",
     "RunOptions",
     "RunOutcome",
     "RunResult",

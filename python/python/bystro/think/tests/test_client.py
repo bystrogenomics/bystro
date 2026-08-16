@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 import time
+from typing import cast
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -20,6 +21,8 @@ from bystro.think import (
     InputResponseError,
     MessageWithContext,
     NeedsInput,
+    OutputFile,
+    PreviousConversation,
     RunOptions,
     RunProtocolError,
     RunRejectedError,
@@ -40,13 +43,29 @@ from bystro.think import (
 
 
 class FakeResponse:
-    def __init__(self, status_code: int, payload: object) -> None:
+    def __init__(
+        self,
+        status_code: int,
+        payload: object,
+        *,
+        chunks: tuple[bytes, ...] = (),
+    ) -> None:
         self.status_code = status_code
         self._payload = payload
+        self._chunks = chunks
         self.reason = "OK" if status_code < 400 else "Error"
+        self.chunk_sizes: list[int] = []
+        self.closed = False
 
     def json(self) -> object:
         return self._payload
+
+    def iter_content(self, chunk_size: int) -> Iterator[bytes]:
+        self.chunk_sizes.append(chunk_size)
+        yield from self._chunks
+
+    def close(self) -> None:
+        self.closed = True
 
 
 class InvalidJSONResponse(FakeResponse):
@@ -62,6 +81,8 @@ class FakeSession:
         self.upload_responses: list[FakeResponse] = []
         self.status_responses: list[FakeResponse] = []
         self.artifact_responses: dict[str, FakeResponse] = {}
+        self.conversation_responses: list[FakeResponse] = []
+        self.output_responses: list[FakeResponse] = []
 
     def post(self, url: str, **kwargs: object) -> FakeResponse:
         self.posts.append((url, kwargs))
@@ -72,10 +93,14 @@ class FakeSession:
             return FakeResponse(200, {"message": "Session cookie set"})
         if url.endswith("/user/files/chunk"):
             return self.upload_responses.pop(0)
+        if url.endswith("/project/threads"):
+            return self.conversation_responses.pop(0)
         raise AssertionError(f"unexpected POST {url}")
 
     def get(self, url: str, **kwargs: object) -> FakeResponse:
         self.gets.append((url, kwargs))
+        if "/api/user-output/" in url:
+            return self.output_responses.pop(0)
         if "/user/files/chunk/status" in url:
             return self.status_responses.pop(0)
         if "/user/files/" in url:
@@ -288,6 +313,119 @@ def test_submit_reports_connected_before_submitted(
         (EventKind.CONNECTED, run.id),
         (EventKind.SUBMITTED, run.id),
     ]
+
+
+def test_submit_with_progress_is_the_canonical_concise_renderer(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+
+    run = client.submit_with_progress("Analyze a secret prompt")
+    socket.trigger("task_start", {"threadId": run.id})
+    socket.trigger("status_overlay_update", {"threadId": run.id, "display": "progress"})
+    socket.trigger(
+        "status_overlay_update",
+        {"threadId": run.id, "visible": True, "display": "Processing..."},
+    )
+    socket.trigger("disconnect", "client disconnect")
+
+    output = capsys.readouterr().out
+    assert "secret prompt" not in output
+    assert output.splitlines() == [
+        "[connected] Connected to Think",
+        "[submitted] Workload submitted",
+        "[started] Analysis started",
+        "[progress] Processing...",
+    ]
+
+
+def test_output_files_and_downloads_use_authenticated_streaming_routes(
+    tmp_path: Path,
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    session, _socket = transport
+    row = {
+        "name": "duck final.png",
+        "path": "images/duck final.png",
+        "size": 7,
+        "modified": 2,
+        "created": 1,
+    }
+    session.output_responses.extend(
+        [
+            FakeResponse(
+                200,
+                {"files": [row], "hasMore": True},
+            ),
+            FakeResponse(200, {"files": [], "hasMore": False}),
+            FakeResponse(200, None, chunks=(b"PNG", b"DATA")),
+            FakeResponse(200, None, chunks=(b"TAR", b"DATA")),
+        ]
+    )
+    client = make_client(auth_state, transport)
+    run = client.submit("Draw a duck")
+
+    files = run.output_files(page_size=1)
+    image = run.download_file(files[0], tmp_path / "duck.png", chunk_size=3)
+    archive = run.download_all(tmp_path, chunk_size=4)
+
+    assert files == (OutputFile("duck final.png", "images/duck final.png", 7, 2.0, 1.0),)
+    assert image.read_bytes() == b"PNGDATA"
+    assert archive.read_bytes() == b"TARDATA"
+    output_gets = session.gets[-4:]
+    assert [
+        cast(dict[str, object], options["params"])["offset"]
+        for _, options in output_gets[:2]
+    ] == [0, 1]
+    assert output_gets[2][0].endswith("/api/user-output/download/images/duck%20final.png")
+    assert output_gets[2][1]["stream"] is True
+    gets_before = len(session.gets)
+    with pytest.raises(ValueError):
+        run.download_file("../secret", tmp_path / "unsafe")
+    assert len(session.gets) == gets_before
+
+
+def test_list_conversations_searches_and_paginates(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    session, _socket = transport
+    session.conversation_responses.extend(
+        [
+            FakeResponse(
+                200,
+                {
+                    "data": [{"id": "thread-2", "name": "CAR-T update"}],
+                    "pageInfo": {"hasNextPage": True, "endCursor": "thread-2"},
+                },
+            ),
+            FakeResponse(
+                200,
+                {
+                    "data": [{"id": "thread-1", "name": None}],
+                    "pageInfo": {"hasNextPage": False, "endCursor": "thread-1"},
+                },
+            ),
+        ]
+    )
+    client = make_client(auth_state, transport)
+
+    conversations = client.list_conversations(search=" CAR-T ", page_size=1)
+    assert conversations[0] == PreviousConversation("thread-2", "CAR-T update")
+    assert conversations[1] == PreviousConversation("thread-1")
+    requests = [options for url, options in session.posts if url.endswith("/project/threads")]
+    assert requests[0]["json"] == {
+        "pagination": {"first": 1, "cursor": None},
+        "filter": {"search": "CAR-T"},
+    }
+    assert requests[1]["json"] == {
+        "pagination": {"first": 1, "cursor": "thread-2"},
+        "filter": {"search": "CAR-T"},
+    }
 
 
 def test_non_json_unauthorized_response_still_has_typed_auth_error(
