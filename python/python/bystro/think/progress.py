@@ -362,7 +362,8 @@ class ProgressRenderer:
                     message = progress_message
             else:
                 message = (
-                    _PROGRESS_MESSAGES.get(event.kind, event.message)
+                    _PROGRESS_MESSAGES.get(event.kind)
+                    or event.message
                     or event.kind.value
                 )
                 state.last_activity_monotonic = time.monotonic()
