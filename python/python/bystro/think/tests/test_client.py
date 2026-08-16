@@ -2544,7 +2544,7 @@ def test_run_result_lazily_exposes_structured_files_and_notebook_markdown(
     )
     assert result.artifacts is result.files
     assert len(session.gets) == 1
-    assert result._repr_markdown_() == result.output
+    assert result._repr_markdown_() == result.output  # noqa: SLF001 - notebook display protocol
     assert hash(result) == hash(RunResult(result.run_id, result.output))
 
 
