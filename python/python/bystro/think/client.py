@@ -2,11 +2,13 @@
 
 # ``Run`` is intentionally a friend handle over ``ThinkClient`` internals.
 # pyright: reportPrivateUsage=false
+# ruff: noqa: SLF001
 
 from __future__ import annotations
 
+import asyncio
 from collections import deque
-from collections.abc import Callable, Iterable, Iterator, Mapping
+from collections.abc import AsyncIterator, Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import hashlib
@@ -35,6 +37,7 @@ from bystro.think.context import (
 )
 from bystro.think.errors import (
     InputResponseError,
+    RunCancelledError,
     RunProtocolError,
     RunRejectedError,
     RunTimeoutError,
@@ -45,21 +48,32 @@ from bystro.think.errors import (
     ThinkHTTPError,
 )
 from bystro.think.models import (
+    ConversationMode,
     Dataset,
     EventKind,
     FileInput,
     InputKind,
     NeedsInput,
     OutputFile,
+    ProgressPhase,
+    ProgressUpdate,
     RunOptions,
     RunOutcome,
     RunResult,
     RunStatus,
+    StreamOperation,
+    StreamUpdate,
     ThinkEvent,
     ThinkMessage,
     UploadedFile,
     UploadPhase,
     UploadProgress,
+)
+from bystro.think.progress import (
+    ProgressCallback,
+    ProgressRenderer,
+    close_progress_callback,
+    show_progress as show_progress,
 )
 
 logger = logging.getLogger(__name__)
@@ -73,31 +87,12 @@ _CHECKPOINT_REPLAY_INTERVAL = 0.25
 _ARTIFACT_PATH_MAX_LENGTH = 2_048
 _ARTIFACT_PATH_MAX_DEPTH = 64
 _MAX_EVENT_HISTORY = 2_000
+_ALLOWED_TRANSPORTS = frozenset({"polling", "websocket"})
 
-ProgressCallback: TypeAlias = Callable[[ThinkEvent], None]
 UploadProgressCallback: TypeAlias = Callable[[UploadProgress], None]
-
-_PROGRESS_MESSAGES: dict[EventKind, str] = {
-    EventKind.SUBMITTED: "Workload submitted",
-    EventKind.STARTED: "Analysis started",
-    EventKind.NEEDS_INPUT: "Input required",
-    EventKind.COMPLETED: "Analysis complete",
-}
-
-
-def show_progress(event: ThinkEvent) -> None:
-    """Print concise live progress without echoing prompts or final results."""
-
-    if event.kind is EventKind.MESSAGE or event.message == "progress":
-        return
-    if (
-        event.kind is EventKind.DISCONNECTED
-        and event.message
-        and ("client disconnect" in event.message.casefold())
-    ):
-        return
-    message = _PROGRESS_MESSAGES.get(event.kind, event.message)
-    print(f"[{event.kind.value}] {message or event.kind.value}", flush=True)
+FileInputs: TypeAlias = FileInput | Iterable[FileInput]
+TransportInputs: TypeAlias = str | Iterable[str]
+InputCallback: TypeAlias = Callable[[NeedsInput], MessageInput]
 
 
 class _Response(Protocol):
@@ -173,10 +168,38 @@ def _boolean(value: object) -> bool:
     return value is True
 
 
+def _nonnegative_int(value: object) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
+def _nonnegative_float(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
+        return None
+    normalized = float(value)
+    return normalized if math.isfinite(normalized) else None
+
+
 def _normalize_base_url(url: str) -> str:
     normalized = dashboard_auth.normalize_url(url)
     parsed = urlsplit(normalized)
     return urlunsplit((parsed.scheme, parsed.netloc, parsed.path.rstrip("/"), "", ""))
+
+
+def _normalize_transports(transports: TransportInputs | None) -> tuple[str, ...] | None:
+    if transports is None:
+        return None
+    candidates = (transports,) if isinstance(transports, str) else tuple(transports)
+    if not candidates:
+        raise ValueError("Think transports cannot be empty")
+    if any(
+        not isinstance(candidate, str) or candidate not in _ALLOWED_TRANSPORTS
+        for candidate in candidates
+    ):
+        allowed = ", ".join(sorted(_ALLOWED_TRANSPORTS))
+        raise ValueError(f"unsupported Think transport; expected one of: {allowed}")
+    return tuple(dict.fromkeys(candidates))
 
 
 def _normalize_artifact_path(
@@ -208,9 +231,25 @@ def _normalize_output_path(output_path: str) -> str:
     if not normalized or normalized.startswith(("/", "\\")) or "\\" in normalized:
         raise ValueError("output file path must be a non-empty relative path")
     parts = normalized.split("/")
-    if ".." in normalized or any(not part or part == "." for part in parts):
+    if any(not part or part in {".", ".."} for part in parts):
         raise ValueError("output file path contains invalid components")
     return normalized
+
+
+def _optional_utc_datetime(value: object, *, field_name: str) -> datetime | None:
+    if value is None:
+        return None
+    raw_value = _text(value)
+    if raw_value is None:
+        raise RunProtocolError(f"Think returned an invalid {field_name}")
+    normalized = raw_value[:-1] + "+00:00" if raw_value.endswith("Z") else raw_value
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise RunProtocolError(f"Think returned an invalid {field_name}") from exc
+    if parsed.tzinfo is None:
+        raise RunProtocolError(f"Think returned an invalid {field_name}")
+    return parsed.astimezone(timezone.utc)
 
 
 def _json_payload(response: _Response) -> dict[str, object]:
@@ -298,6 +337,97 @@ def _message_from_payload(payload: Mapping[str, object], run_id: str) -> ThinkMe
     )
 
 
+def _stream_traits(message: ThinkMessage) -> tuple[str | None, bool]:
+    stream_type = _text(message.metadata.get("stream_type"))
+    is_reasoning = message.metadata.get("is_reasoning") is True or stream_type in {
+        "reasoning",
+        "thinking",
+    }
+    return stream_type, is_reasoning
+
+
+def _progress_update(message: ThinkMessage) -> ProgressUpdate | None:
+    """Parse the backend progress card without trusting its metadata shape."""
+
+    if _text(message.metadata.get("section")) != "progress":
+        return None
+    raw_progress = _mapping(message.metadata.get("progress"))
+    raw_phases = raw_progress.get("phases")
+    if not isinstance(raw_phases, list):
+        return ProgressUpdate(done=_boolean(raw_progress.get("done")), phases=())
+    phases: list[ProgressPhase] = []
+    for raw_phase in cast(list[object], raw_phases):
+        phase = _mapping(raw_phase)
+        phase_id = _text(phase.get("id"))
+        kind = _text(phase.get("kind"))
+        state = _text(phase.get("state"))
+        label = _text(phase.get("label"))
+        if None in {phase_id, kind, state, label}:
+            continue
+        count = _mapping(phase.get("count"))
+        started_at: datetime | None = None
+        started_at_ms = _nonnegative_float(phase.get("started_at"))
+        if started_at_ms is not None:
+            try:
+                started_at = datetime.fromtimestamp(
+                    started_at_ms / 1000,
+                    timezone.utc,
+                )
+            except (OverflowError, OSError, ValueError):
+                started_at = None
+        phases.append(
+            ProgressPhase(
+                id=cast(str, phase_id),
+                kind=cast(str, kind),
+                state=cast(str, state),
+                label=cast(str, label),
+                detail=_text(phase.get("detail")),
+                completed=_nonnegative_int(count.get("done")),
+                total=_nonnegative_int(count.get("total")),
+                started_at=started_at,
+                duration_seconds=_nonnegative_float(phase.get("duration_s")),
+            )
+        )
+    return ProgressUpdate(
+        done=_boolean(raw_progress.get("done")),
+        phases=tuple(phases),
+    )
+
+
+def _run_options_from_metadata(
+    metadata: Mapping[str, object],
+    current: RunOptions,
+) -> RunOptions:
+    raw_mode = _text(metadata.get("mode"))
+    mode = current.mode
+    if raw_mode in {"base", "plus", "plus2", "phd"}:
+        mode = cast(ConversationMode, raw_mode)
+
+    def boolean(key: str, default: bool) -> bool:
+        value = metadata.get(key)
+        return value if isinstance(value, bool) else default
+
+    raw_zdr = metadata.get("zdrEnabled")
+    zero_data_retention = (
+        raw_zdr if isinstance(raw_zdr, bool) else current.zero_data_retention
+    )
+    return RunOptions(
+        mode=mode,
+        advanced_planning=boolean(
+            "advancedPlanningEnabled",
+            current.advanced_planning,
+        ),
+        auto_compact=boolean("autoCompactEnabled", current.auto_compact),
+        fast=boolean("fastEnabled", current.fast),
+        verify=boolean("verificationEnabled", current.verify),
+        verify_sources=boolean(
+            "searchVerificationEnabled",
+            current.verify_sources,
+        ),
+        zero_data_retention=zero_data_retention,
+    )
+
+
 def _uploaded_file(payload: Mapping[str, object]) -> UploadedFile:
     file_id = _text(payload.get("id"))
     name = _text(payload.get("name"))
@@ -348,6 +478,7 @@ class _RunTracker:
     events: list[ThinkEvent] = field(default_factory=list)
     messages: dict[str, ThinkMessage] = field(default_factory=dict)
     message_order: list[str] = field(default_factory=list)
+    streamed_message_ids: set[str] = field(default_factory=set)
     needs_input: NeedsInput | None = None
     final_output: str | None = None
     failure: Exception | None = None
@@ -356,7 +487,12 @@ class _RunTracker:
     answered_checkpoint_id: str | None = None
     final_message_id: str | None = None
     completed_message_id: str | None = None
+    final_result: RunResult | None = None
     task_ended_at: float | None = None
+    task_id: str | None = None
+    cancel_requested: bool = False
+    cancelling_event_emitted: bool = False
+    stop_released: bool = False
     refresh_requested: bool = False
     awaiting_transcript: bool = False
     progress_callback: ProgressCallback | None = None
@@ -382,7 +518,7 @@ class ThinkClient:
         socket_timeout: float = _DEFAULT_SOCKET_TIMEOUT,
         http_timeout: tuple[float, float] = _DEFAULT_HTTP_TIMEOUT,
         finalization_timeout: float = _DEFAULT_FINALIZATION_TIMEOUT,
-        transports: Iterable[str] | None = None,
+        transports: TransportInputs | None = None,
         _session: _HTTPSession | None = None,
         _socket_factory: SocketFactory | None = None,
         _sleep: Callable[[float], None] = time.sleep,
@@ -414,7 +550,7 @@ class ThinkClient:
         self._socket_timeout = socket_timeout
         self._http_timeout = http_timeout
         self._finalization_timeout = finalization_timeout
-        self._transports = tuple(transports) if transports is not None else None
+        self._transports = _normalize_transports(transports)
         self._sleep = _sleep
         self._clock = _clock
         self._session = (
@@ -455,7 +591,7 @@ class ThinkClient:
         socket_timeout: float = _DEFAULT_SOCKET_TIMEOUT,
         http_timeout: tuple[float, float] = _DEFAULT_HTTP_TIMEOUT,
         finalization_timeout: float = _DEFAULT_FINALIZATION_TIMEOUT,
-        transports: Iterable[str] | None = None,
+        transports: TransportInputs | None = None,
     ) -> Self:
         """Log in through the dashboard and construct a Think client."""
 
@@ -492,7 +628,7 @@ class ThinkClient:
         socket_timeout: float = _DEFAULT_SOCKET_TIMEOUT,
         http_timeout: tuple[float, float] = _DEFAULT_HTTP_TIMEOUT,
         finalization_timeout: float = _DEFAULT_FINALIZATION_TIMEOUT,
-        transports: Iterable[str] | None = None,
+        transports: TransportInputs | None = None,
     ) -> Self:
         """Construct a client from ``~/.bystro`` authentication state."""
 
@@ -533,9 +669,12 @@ class ThinkClient:
             "disconnect": self._handle_disconnect,
             "task_start": self._handle_task_start,
             "task_end": self._handle_task_end,
+            "task_stopping": self._handle_task_stopping,
+            "thread_stop_released": self._handle_thread_stop_released,
             "new_message": self._handle_message,
-            "update_message": self._handle_message,
-            "stream_start": self._handle_message,
+            "update_message": self._handle_update_message,
+            "delete_message": self._handle_delete_message,
+            "stream_start": self._handle_stream_start,
             "stream_token": self._handle_stream_token,
             "status_overlay_update": self._handle_overlay,
             "resume_thread": self._handle_resume_thread,
@@ -635,6 +774,10 @@ class ThinkClient:
                 run_id = tracker.run_id
             if run_id:
                 self._emit_status_ready(run_id)
+            with tracker.condition:
+                cancel_requested = tracker.cancel_requested and not tracker.stop_released
+            if cancel_requested:
+                self._emit_stop_request(tracker)
 
     def _handle_connect_error(self, error: object) -> None:
         tracker = self._active_tracker_snapshot()
@@ -679,6 +822,8 @@ class ThinkClient:
         *,
         message: str | None = None,
         data: Mapping[str, object] | None = None,
+        stream_update: StreamUpdate | None = None,
+        progress: ProgressUpdate | None = None,
     ) -> ThinkEvent:
         with tracker.condition:
             tracker.sequence += 1
@@ -689,6 +834,8 @@ class ThinkClient:
                 created_at=datetime.now(timezone.utc),
                 message=message,
                 data=dict(data or {}),
+                stream_update=stream_update,
+                progress=progress,
             )
             tracker.events.append(event)
             if len(tracker.events) > _MAX_EVENT_HISTORY:
@@ -720,11 +867,25 @@ class ThinkClient:
         if tracker is None:
             return
         with tracker.condition:
-            tracker.status = RunStatus.RUNNING
+            if tracker.status in {
+                RunStatus.SUCCEEDED,
+                RunStatus.FAILED,
+                RunStatus.CANCELLED,
+            }:
+                return
+            tracker.task_id = _text(payload.get("taskId")) or tracker.task_id
             tracker.task_ended_at = None
             tracker.refresh_requested = False
+            cancel_requested = tracker.cancel_requested
+            tracker.status = (
+                RunStatus.CANCELLING
+                if cancel_requested
+                else RunStatus.RUNNING
+            )
             tracker.condition.notify_all()
         self._record_event(tracker, EventKind.STARTED, data=payload)
+        if cancel_requested:
+            self._emit_stop_request(tracker)
 
     def _handle_task_end(self, raw_payload: object) -> None:
         payload = _mapping(raw_payload)
@@ -734,15 +895,94 @@ class ThinkClient:
         completed = False
         final_output: str | None = None
         with tracker.condition:
+            if tracker.status is RunStatus.CANCELLED:
+                return
+            incoming_task_id = _text(payload.get("taskId"))
+            if (
+                incoming_task_id is not None
+                and tracker.task_id is not None
+                and incoming_task_id != tracker.task_id
+            ):
+                return
             tracker.task_ended_at = self._clock()
-            completed = self._mark_succeeded_locked(tracker, require_task_end=True)
+            tracker.task_id = incoming_task_id or tracker.task_id
+            if tracker.cancel_requested:
+                tracker.status = RunStatus.CANCELLING
+            else:
+                completed = self._mark_succeeded_locked(
+                    tracker,
+                    require_task_end=True,
+                )
             final_output = tracker.final_output
             tracker.condition.notify_all()
         if completed:
             self._record_event(tracker, EventKind.COMPLETED, message=final_output)
 
+    def _handle_task_stopping(self, raw_payload: object) -> None:
+        payload = _mapping(raw_payload)
+        tracker = self._tracker_for_payload(payload)
+        if tracker is None:
+            return
+        with tracker.condition:
+            if tracker.stop_released or tracker.status not in {
+                RunStatus.SUBMITTING,
+                RunStatus.QUEUED,
+                RunStatus.RUNNING,
+                RunStatus.CANCELLING,
+            }:
+                return
+            incoming_task_id = _text(payload.get("taskId"))
+            if (
+                incoming_task_id is not None
+                and tracker.task_id is not None
+                and incoming_task_id != tracker.task_id
+            ):
+                return
+            tracker.cancel_requested = True
+            tracker.task_id = incoming_task_id or tracker.task_id
+            tracker.status = RunStatus.CANCELLING
+            should_emit = not tracker.cancelling_event_emitted
+            tracker.cancelling_event_emitted = True
+            tracker.condition.notify_all()
+        if should_emit:
+            self._record_event(
+                tracker,
+                EventKind.CANCELLING,
+                message="Cancelling analysis",
+                data=payload,
+            )
+
+    def _handle_thread_stop_released(self, raw_payload: object) -> None:
+        payload = _mapping(raw_payload)
+        tracker = self._tracker_for_payload(payload)
+        if tracker is None:
+            return
+        with tracker.condition:
+            incoming_task_id = _text(payload.get("taskId"))
+            if tracker.stop_released or not tracker.cancel_requested or (
+                incoming_task_id is not None
+                and tracker.task_id is not None
+                and incoming_task_id != tracker.task_id
+            ):
+                return
+            tracker.stop_released = True
+            tracker.task_id = incoming_task_id or tracker.task_id
+            tracker.status = RunStatus.CANCELLED
+            tracker.failure = RunCancelledError(
+                f"Think run {tracker.run_id or ''} was cancelled"
+            )
+            tracker.needs_input = None
+        self._record_event(
+            tracker,
+            EventKind.CANCELLED,
+            message="Analysis cancelled",
+            data=payload,
+        )
+
     @staticmethod
     def _recompute_final_locked(tracker: _RunTracker) -> None:
+        previous_final_message_id = tracker.final_message_id
+        previous_final_output = tracker.final_output
         latest_final: ThinkMessage | None = None
         for message_id in tracker.message_order:
             message = tracker.messages[message_id]
@@ -752,6 +992,11 @@ class ThinkClient:
                 latest_final = message
         tracker.final_message_id = latest_final.id if latest_final is not None else None
         tracker.final_output = latest_final.output if latest_final is not None else None
+        if (
+            tracker.final_message_id != previous_final_message_id
+            or tracker.final_output != previous_final_output
+        ):
+            tracker.final_result = None
 
     @staticmethod
     def _mark_succeeded_locked(
@@ -759,6 +1004,8 @@ class ThinkClient:
         *,
         require_task_end: bool,
     ) -> bool:
+        if tracker.cancel_requested:
+            return False
         final_message_id = tracker.final_message_id
         if final_message_id is None or tracker.final_output is None:
             return False
@@ -796,7 +1043,72 @@ class ThinkClient:
             details=input_state.details,
         )
 
-    def _handle_message(self, raw_payload: object) -> None:
+    @staticmethod
+    def _stream_update(
+        message: ThinkMessage,
+        previous_output: str | None,
+    ) -> StreamUpdate | None:
+        """Convert cumulative Socket.IO snapshots into bounded incremental updates."""
+
+        if message.type != "assistant_message":
+            return None
+        stream_type, is_reasoning = _stream_traits(message)
+        if is_reasoning:
+            if previous_output is not None:
+                return None
+            return StreamUpdate(
+                message_id=message.id,
+                delta="",
+                operation="append",
+                content_length=len(message.output),
+                message_type=message.type,
+                name=message.name,
+                stream_type=stream_type,
+                is_reasoning=True,
+            )
+        if previous_output is None or message.output.startswith(previous_output):
+            delta = message.output[len(previous_output or "") :]
+            operation: StreamOperation = "append"
+        else:
+            delta = message.output
+            operation = "replace"
+        if not delta:
+            return None
+        return StreamUpdate(
+            message_id=message.id,
+            delta=delta,
+            operation=operation,
+            content_length=len(message.output),
+            message_type=message.type,
+            name=message.name,
+            stream_type=stream_type,
+            is_reasoning=False,
+        )
+
+    def _record_stream_update(
+        self,
+        tracker: _RunTracker,
+        message: ThinkMessage,
+        *,
+        previous_output: str | None,
+    ) -> None:
+        with tracker.condition:
+            tracker.streamed_message_ids.add(message.id)
+        update = self._stream_update(message, previous_output)
+        if update is not None:
+            self._record_event(
+                tracker,
+                EventKind.STREAM,
+                stream_update=update,
+            )
+
+    def _handle_message_payload(
+        self,
+        raw_payload: object,
+        *,
+        stream_start: bool,
+        continue_stream: bool,
+    ) -> None:
         payload = _mapping(raw_payload)
         tracker = self._tracker_for_payload(payload)
         if tracker is None:
@@ -808,17 +1120,102 @@ class ThinkClient:
         message = _message_from_payload(payload, run_id)
         if message is None:
             return
+        with tracker.condition:
+            previous = tracker.messages.get(message.id)
+            was_streamed = message.id in tracker.streamed_message_ids
         completed = self._store_message(tracker, message)
-        self._record_event(
-            tracker,
-            EventKind.MESSAGE,
-            message=message.output,
-            data={"message_id": message.id, "message_type": message.type},
-        )
+        stream_type, is_reasoning = _stream_traits(message)
+        progress = _progress_update(message)
+        event_data: dict[str, object] = {
+            "message_id": message.id,
+            "message_type": message.type,
+            "is_reasoning": is_reasoning,
+        }
+        if stream_type is not None:
+            event_data["stream_type"] = stream_type
+        if progress is not None:
+            self._record_event(
+                tracker,
+                EventKind.PROGRESS,
+                message=message.output,
+                data=event_data,
+                progress=progress,
+            )
+        else:
+            self._record_event(
+                tracker,
+                EventKind.MESSAGE,
+                message=None if is_reasoning else message.output,
+                data=event_data,
+            )
+        if progress is None and (stream_start or (continue_stream and was_streamed)):
+            previous_output = (
+                previous.output if was_streamed and previous is not None else None
+            )
+            self._record_stream_update(
+                tracker,
+                message,
+                previous_output=previous_output,
+            )
         if completed:
             with tracker.condition:
                 final_output = tracker.final_output
             self._record_event(tracker, EventKind.COMPLETED, message=final_output)
+
+    def _handle_message(self, raw_payload: object) -> None:
+        self._handle_message_payload(
+            raw_payload,
+            stream_start=False,
+            continue_stream=False,
+        )
+
+    def _handle_update_message(self, raw_payload: object) -> None:
+        self._handle_message_payload(
+            raw_payload,
+            stream_start=False,
+            continue_stream=True,
+        )
+
+    def _handle_stream_start(self, raw_payload: object) -> None:
+        self._handle_message_payload(
+            raw_payload,
+            stream_start=True,
+            continue_stream=False,
+        )
+
+    def _handle_delete_message(self, raw_payload: object) -> None:
+        payload = _mapping(raw_payload)
+        tracker = self._tracker_for_payload(payload)
+        if tracker is None:
+            return
+        message_id = _text(payload.get("id"))
+        if message_id is None:
+            return
+        with tracker.condition:
+            removed = tracker.messages.pop(message_id, None)
+            if message_id in tracker.message_order:
+                tracker.message_order.remove(message_id)
+            was_streamed = message_id in tracker.streamed_message_ids
+            tracker.streamed_message_ids.discard(message_id)
+            self._recompute_final_locked(tracker)
+            self._refresh_needs_input_prompt_locked(tracker)
+            tracker.condition.notify_all()
+        if was_streamed and removed is not None:
+            stream_type, is_reasoning = _stream_traits(removed)
+            self._record_event(
+                tracker,
+                EventKind.STREAM,
+                stream_update=StreamUpdate(
+                    message_id=removed.id,
+                    delta="",
+                    operation="retract",
+                    content_length=0,
+                    message_type=removed.type,
+                    name=removed.name,
+                    stream_type=stream_type,
+                    is_reasoning=is_reasoning,
+                ),
+            )
 
     def _handle_stream_token(self, raw_payload: object) -> None:
         payload = _mapping(raw_payload)
@@ -836,8 +1233,10 @@ class ThinkClient:
             existing = tracker.messages.get(message_id)
             if existing is None or tracker.run_id is None:
                 return
+            was_streamed = message_id in tracker.streamed_message_ids
+            previous_output = existing.output if was_streamed else None
             output = token if payload.get("isSequence") is True else f"{existing.output}{token}"
-            tracker.messages[message_id] = ThinkMessage(
+            updated_message = ThinkMessage(
                 id=existing.id,
                 run_id=existing.run_id,
                 type=existing.type,
@@ -845,11 +1244,17 @@ class ThinkClient:
                 name=existing.name,
                 metadata=existing.metadata,
             )
+            tracker.messages[message_id] = updated_message
             self._recompute_final_locked(tracker)
             self._refresh_needs_input_prompt_locked(tracker)
             completed = self._mark_succeeded_locked(tracker, require_task_end=True)
             final_output = tracker.final_output
             tracker.condition.notify_all()
+        self._record_stream_update(
+            tracker,
+            updated_message,
+            previous_output=previous_output,
+        )
         if completed:
             self._record_event(tracker, EventKind.COMPLETED, message=final_output)
 
@@ -860,7 +1265,12 @@ class ThinkClient:
             if message.type == "user_message":
                 prompt = None
                 continue
-            if message.type == "assistant_message" and message.output.strip():
+            if (
+                message.type == "assistant_message"
+                and not _stream_traits(message)[1]
+                and _progress_update(message) is None
+                and message.output.strip()
+            ):
                 prompt = message.output
         return prompt
 
@@ -912,7 +1322,9 @@ class ThinkClient:
                     or tracker.status is RunStatus.NEEDS_INPUT
                 )
                 tracker.needs_input = None
-                if tracker.final_output is not None and tracker.task_ended_at is not None:
+                if tracker.cancel_requested:
+                    tracker.status = RunStatus.CANCELLING
+                elif tracker.final_output is not None and tracker.task_ended_at is not None:
                     tracker.status = RunStatus.SUCCEEDED
                 elif payload.get("visible") is True or was_waiting:
                     tracker.status = RunStatus.RUNNING
@@ -947,12 +1359,20 @@ class ThinkClient:
                 message = _message_from_payload(step, run_id)
                 if message is not None:
                     self._store_message(tracker, message)
+                    if message.type == "user_message":
+                        with tracker.condition:
+                            tracker.options = _run_options_from_metadata(
+                                message.metadata,
+                                tracker.options,
+                            )
         completed = False
         final_output: str | None = None
         with tracker.condition:
             tracker.awaiting_transcript = False
             self._refresh_needs_input_prompt_locked(tracker)
-            if tracker.final_output is not None:
+            if tracker.cancel_requested:
+                tracker.status = RunStatus.CANCELLING
+            elif tracker.final_output is not None:
                 completed = self._mark_succeeded_locked(tracker, require_task_end=False)
             elif tracker.status in {RunStatus.SUBMITTING, RunStatus.SUCCEEDED}:
                 tracker.status = RunStatus.QUEUED
@@ -996,6 +1416,48 @@ class ThinkClient:
         message = _text(payload.get("message"))
         if message:
             self._record_event(tracker, EventKind.PROGRESS, message=message, data=payload)
+
+    def _emit_stop_request(
+        self,
+        tracker: _RunTracker,
+        *,
+        raise_on_error: bool = False,
+    ) -> None:
+        with tracker.condition:
+            run_id = tracker.run_id
+            task_id = tracker.task_id
+            client_observed_active = tracker.status in {
+                RunStatus.SUBMITTING,
+                RunStatus.QUEUED,
+                RunStatus.RUNNING,
+                RunStatus.CANCELLING,
+            }
+        if run_id is None:
+            raise RunProtocolError("Cannot cancel a run without an id")
+        payload: dict[str, object] = {
+            "threadId": run_id,
+            "clientObservedActive": client_observed_active,
+        }
+        if task_id is not None:
+            payload["taskId"] = task_id
+        try:
+            self._socket.emit("stop", payload)
+        except (SocketIOError, OSError) as exc:
+            if raise_on_error:
+                raise ThinkConnectionError(
+                    "Could not request Think cancellation"
+                ) from exc
+            logger.warning(
+                "Think cancellation request failed; reconnect will retry",
+                exc_info=True,
+            )
+        except Exception:
+            logger.warning(
+                "Unexpected Think cancellation request failure; reconnect will retry",
+                exc_info=True,
+            )
+            if raise_on_error:
+                raise
 
     def _emit_status_ready(self, run_id: str) -> None:
         self._socket.emit(
@@ -1163,11 +1625,16 @@ class ThinkClient:
 
     def _resolve_files(
         self,
-        files: Iterable[FileInput],
+        files: FileInputs,
         on_upload_progress: UploadProgressCallback | None,
     ) -> list[UploadedFile]:
         resolved: list[UploadedFile] = []
-        for item in files:
+        items = (
+            (files,)
+            if isinstance(files, (UploadedFile, str, Path))
+            else files
+        )
+        for item in items:
             if isinstance(item, UploadedFile):
                 resolved.append(item)
             else:
@@ -1204,7 +1671,7 @@ class ThinkClient:
         self,
         prompt: MessageInput,
         *,
-        files: Iterable[FileInput] = (),
+        files: FileInputs = (),
         datasets: Iterable[Dataset] = (),
         options: RunOptions | None = None,
         on_upload_progress: UploadProgressCallback | None = None,
@@ -1224,13 +1691,13 @@ class ThinkClient:
         self,
         prompt: MessageInput,
         *,
-        files: Iterable[FileInput] = (),
+        files: FileInputs = (),
         datasets: Iterable[Dataset] = (),
         options: RunOptions | None = None,
         on_upload_progress: UploadProgressCallback | None = None,
         on_event: ProgressCallback | None = None,
     ) -> "Run":
-        """Submit a workload and render live progress by default."""
+        """Submit and render lifecycle plus browser-visible streamed output."""
 
         return self._submit(
             prompt,
@@ -1238,14 +1705,14 @@ class ThinkClient:
             datasets=datasets,
             options=options,
             on_upload_progress=on_upload_progress,
-            progress_callback=on_event or self._on_event or show_progress,
+            progress_callback=on_event or self._on_event or ProgressRenderer(),
         )
 
     def _submit(
         self,
         prompt: MessageInput,
         *,
-        files: Iterable[FileInput],
+        files: FileInputs,
         datasets: Iterable[Dataset],
         options: RunOptions | None,
         on_upload_progress: UploadProgressCallback | None,
@@ -1333,12 +1800,21 @@ class ThinkClient:
         tracker.awaiting_transcript = True
         with self._state_lock:
             self._active_tracker = tracker
-        was_connected = self._socket.connected
-        self.connect()
-        if was_connected:
-            self._room_sync(normalized_id)
-            self._socket.emit("connection_successful")
-            self._emit_status_ready(normalized_id)
+        try:
+            was_connected = self._socket.connected
+            self.connect()
+            if was_connected:
+                self._room_sync(normalized_id)
+                self._socket.emit("connection_successful")
+                self._emit_status_ready(normalized_id)
+        except Exception as exc:
+            logger.debug("Think resume failed before transcript hydration", exc_info=True)
+            with tracker.condition:
+                tracker.failure = exc
+                tracker.status = RunStatus.FAILED
+                tracker.awaiting_transcript = False
+                tracker.condition.notify_all()
+            raise
         return Run(self, tracker)
 
     def _synchronize_pause_checkpoint(self, tracker: _RunTracker) -> None:
@@ -1403,7 +1879,7 @@ class ThinkClient:
         tracker: _RunTracker,
         prompt: MessageInput,
         *,
-        files: Iterable[FileInput],
+        files: FileInputs,
         datasets: Iterable[Dataset],
         planning_response: bool,
         on_upload_progress: UploadProgressCallback | None,
@@ -1421,8 +1897,13 @@ class ThinkClient:
             prior_input = tracker.needs_input
             prior_final_output = tracker.final_output
             prior_final_message_id = tracker.final_message_id
+            prior_final_result = tracker.final_result
             prior_failure = tracker.failure
             prior_task_ended_at = tracker.task_ended_at
+            prior_task_id = tracker.task_id
+            prior_cancel_requested = tracker.cancel_requested
+            prior_cancelling_event_emitted = tracker.cancelling_event_emitted
+            prior_stop_released = tracker.stop_released
             prior_refresh_requested = tracker.refresh_requested
             prior_answered_checkpoint_id = tracker.answered_checkpoint_id
             if run_id is None:
@@ -1441,8 +1922,13 @@ class ThinkClient:
             tracker.needs_input = None
             tracker.final_output = None
             tracker.final_message_id = None
+            tracker.final_result = None
             tracker.failure = None
             tracker.task_ended_at = None
+            tracker.task_id = None
+            tracker.cancel_requested = False
+            tracker.cancelling_event_emitted = False
+            tracker.stop_released = False
             tracker.refresh_requested = False
             tracker.status = RunStatus.SUBMITTING
             tracker.condition.notify_all()
@@ -1478,8 +1964,13 @@ class ThinkClient:
                     tracker.needs_input = prior_input
                     tracker.final_output = prior_final_output
                     tracker.final_message_id = prior_final_message_id
+                    tracker.final_result = prior_final_result
                     tracker.failure = prior_failure
                     tracker.task_ended_at = prior_task_ended_at
+                    tracker.task_id = prior_task_id
+                    tracker.cancel_requested = prior_cancel_requested
+                    tracker.cancelling_event_emitted = prior_cancelling_event_emitted
+                    tracker.stop_released = prior_stop_released
                     tracker.refresh_requested = prior_refresh_requested
                     tracker.answered_checkpoint_id = prior_answered_checkpoint_id
                 tracker.condition.notify_all()
@@ -1505,6 +1996,9 @@ class ThinkClient:
         self._emit_status_ready(run_id)
 
     def _refresh(self, tracker: _RunTracker) -> None:
+        with self._state_lock:
+            if tracker is not self._active_tracker:
+                raise InputResponseError("This run is no longer active on its client")
         with tracker.condition:
             run_id = tracker.run_id
         if run_id is None:
@@ -1626,21 +2120,29 @@ class ThinkClient:
         *,
         search: str | None = None,
         page_size: int = 50,
+        limit: int | None = None,
     ) -> tuple[PreviousConversation, ...]:
         """List the authenticated user's conversations, newest first."""
 
         if not 1 <= page_size <= 1_000:
             raise ValueError("page_size must be between 1 and 1000")
+        if limit is not None and limit <= 0:
+            raise ValueError("limit must be positive")
         self.connect()
         conversations: list[PreviousConversation] = []
         cursor: str | None = None
         normalized_search = _text(search)
         while True:
+            request_size = (
+                page_size
+                if limit is None
+                else min(page_size, limit - len(conversations))
+            )
             try:
                 response = self._session.post(
                     f"{self.think_url}/project/threads",
                     json={
-                        "pagination": {"first": page_size, "cursor": cursor},
+                        "pagination": {"first": request_size, "cursor": cursor},
                         "filter": {"search": normalized_search},
                     },
                     timeout=self._http_timeout,
@@ -1666,8 +2168,17 @@ class ThinkClient:
                 if conversation_id is None:
                     raise RunProtocolError("Think conversation listing omitted an id")
                 conversations.append(
-                    PreviousConversation(conversation_id, _text(conversation.get("name")))
+                    PreviousConversation(
+                        conversation_id,
+                        _text(conversation.get("name")),
+                        _optional_utc_datetime(
+                            conversation.get("createdAt"),
+                            field_name="conversation creation timestamp",
+                        ),
+                    )
                 )
+                if limit is not None and len(conversations) >= limit:
+                    return tuple(conversations)
             if not has_next_page:
                 return tuple(conversations)
             next_cursor = _text(page_info.get("endCursor"))
@@ -1876,6 +2387,15 @@ class ThinkClient:
             if self._closed:
                 return
             self._closed = True
+            with self._state_lock:
+                tracker = self._active_tracker
+            if tracker is None:
+                tracker_callback = None
+                run_id = None
+            else:
+                with tracker.condition:
+                    tracker_callback = tracker.progress_callback
+                    run_id = tracker.run_id
             if self._socket.connected:
                 try:
                     self._socket.disconnect()
@@ -1883,6 +2403,9 @@ class ThinkClient:
                     logger.debug("Think socket disconnect failed", exc_info=True)
                 except Exception:
                     logger.warning("Unexpected Think socket disconnect failure", exc_info=True)
+            close_progress_callback(tracker_callback, run_id)
+            if self._on_event is not tracker_callback:
+                close_progress_callback(self._on_event, run_id)
             if self._owns_session:
                 self._session.close()
 
@@ -1917,6 +2440,8 @@ class Run:
             return tuple(
                 self._tracker.messages[message_id]
                 for message_id in self._tracker.message_order
+                if not _stream_traits(self._tracker.messages[message_id])[1]
+                and _progress_update(self._tracker.messages[message_id]) is None
             )
 
     @property
@@ -1934,7 +2459,13 @@ class Run:
         if self._tracker.status is RunStatus.SUCCEEDED:
             if self._tracker.final_output is None:
                 raise RunProtocolError("Run succeeded without a final response")
-            return RunResult(run_id=self.id, output=self._tracker.final_output)
+            if self._tracker.final_result is None:
+                self._tracker.final_result = RunResult(
+                    run_id=self.id,
+                    output=self._tracker.final_output,
+                    _file_loader=self.output_files,
+                )
+            return self._tracker.final_result
         return None
 
     def _terminal_state_locked(
@@ -1946,6 +2477,7 @@ class Run:
         if (
             failure is None
             and outcome is None
+            and not self._tracker.cancel_requested
             and self._tracker.task_ended_at is not None
         ):
             elapsed = self._client._clock() - self._tracker.task_ended_at
@@ -2033,6 +2565,7 @@ class Run:
             outcome: RunOutcome | None = None
             failure: Exception | None = None
             should_refresh = False
+            remaining: float | None = None
             with self._tracker.condition:
                 if not pending_events:
                     pending_events.extend(self._events_after_locked(cursor))
@@ -2069,11 +2602,113 @@ class Run:
             if should_refresh:
                 self.refresh()
 
+    async def aevents(
+        self,
+        timeout: float | None = None,
+        *,
+        poll_interval: float = 0.1,
+    ) -> AsyncIterator[ThinkEvent]:
+        """Asynchronously yield ordered events without blocking the event loop."""
+
+        if timeout is not None and timeout <= 0:
+            raise ValueError("timeout must be positive")
+        if poll_interval <= 0:
+            raise ValueError("poll_interval must be positive")
+        deadline = None if timeout is None else self._client._clock() + timeout
+        cursor = 0
+        pending_events: deque[ThinkEvent] = deque()
+        while True:
+            event: ThinkEvent | None = None
+            outcome: RunOutcome | None = None
+            failure: Exception | None = None
+            should_refresh = False
+            remaining: float | None = None
+            with self._tracker.condition:
+                if not pending_events:
+                    pending_events.extend(self._events_after_locked(cursor))
+                if pending_events:
+                    event = pending_events.popleft()
+                    cursor = event.sequence
+                else:
+                    outcome, failure, should_refresh = self._terminal_state_locked()
+                    remaining = (
+                        None
+                        if deadline is None
+                        else deadline - self._client._clock()
+                    )
+            if failure is not None:
+                raise failure
+            if event is not None:
+                yield event
+                continue
+            if outcome is not None:
+                return
+            if should_refresh:
+                await asyncio.to_thread(self.refresh)
+                continue
+            if remaining is not None and remaining <= 0:
+                raise RunTimeoutError(f"Timed out streaming Think run {self.id}")
+            await asyncio.sleep(
+                poll_interval
+                if remaining is None
+                else min(poll_interval, remaining)
+            )
+
+    async def await_result(self, timeout: float | None = None) -> RunOutcome:
+        """Await the current turn while keeping an asyncio loop responsive."""
+
+        async for _event in self.aevents(timeout=timeout):
+            pass
+        with self._tracker.condition:
+            outcome, failure, _should_refresh = self._terminal_state_locked()
+        if failure is not None:
+            raise failure
+        if outcome is None:
+            raise RunProtocolError("Think event stream ended without an outcome")
+        return outcome
+
+    def interact(
+        self,
+        timeout: float | None = None,
+        *,
+        on_clarification: InputCallback | None = None,
+        on_plan_review: InputCallback | None = None,
+    ) -> RunOutcome:
+        """Drive clarification and plan-review pauses until the turn completes.
+
+        Missing callbacks use a terminal/notebook input prompt. Billing pauses
+        remain explicit and are returned unchanged for dashboard resolution.
+        """
+
+        if timeout is not None and timeout <= 0:
+            raise ValueError("timeout must be positive")
+        deadline = None if timeout is None else self._client._clock() + timeout
+        while True:
+            remaining = (
+                None if deadline is None else deadline - self._client._clock()
+            )
+            if remaining is not None and remaining <= 0:
+                raise RunTimeoutError(f"Timed out interacting with Think run {self.id}")
+            outcome = self.wait(timeout=remaining)
+            if isinstance(outcome, RunResult) or outcome.kind is InputKind.BILLING:
+                return outcome
+            callback = (
+                on_plan_review
+                if outcome.kind is InputKind.PLAN_REVIEW
+                else on_clarification
+            )
+            if callback is None:
+                prompt = outcome.prompt or f"Input required ({outcome.kind.value})"
+                response: MessageInput = input(f"{prompt}\n> ")
+            else:
+                response = callback(outcome)
+            self.respond(response)
+
     def respond(
         self,
         response: MessageInput,
         *,
-        files: Iterable[FileInput] = (),
+        files: FileInputs = (),
         datasets: Iterable[Dataset] = (),
         on_upload_progress: UploadProgressCallback | None = None,
     ) -> Self:
@@ -2093,7 +2728,7 @@ class Run:
         self,
         prompt: MessageInput,
         *,
-        files: Iterable[FileInput] = (),
+        files: FileInputs = (),
         datasets: Iterable[Dataset] = (),
         on_upload_progress: UploadProgressCallback | None = None,
     ) -> Self:
@@ -2108,6 +2743,57 @@ class Run:
             on_upload_progress=on_upload_progress,
         )
         return self
+
+    def cancel(self, timeout: float = 60.0) -> Self:
+        """Cancel durable server work and wait for stop cleanup to be released."""
+
+        if timeout <= 0:
+            raise ValueError("timeout must be positive")
+        with self._tracker.condition:
+            status = self._tracker.status
+            if status is RunStatus.CANCELLED:
+                return self
+            if status in {RunStatus.SUCCEEDED, RunStatus.FAILED}:
+                raise InputResponseError("A terminal run cannot be cancelled")
+            if status is RunStatus.NEEDS_INPUT:
+                raise InputResponseError(
+                    "A paused run has no active work to cancel; respond or detach instead"
+                )
+            self._tracker.cancel_requested = True
+            self._tracker.status = RunStatus.CANCELLING
+            should_emit = not self._tracker.cancelling_event_emitted
+            self._tracker.cancelling_event_emitted = True
+            self._tracker.condition.notify_all()
+        if should_emit:
+            self._client._record_event(
+                self._tracker,
+                EventKind.CANCELLING,
+                message="Cancelling analysis",
+            )
+        self._client.connect()
+        self._client._emit_stop_request(self._tracker, raise_on_error=True)
+        deadline = self._client._clock() + timeout
+        with self._tracker.condition:
+            while self._tracker.status is not RunStatus.CANCELLED:
+                failure = self._tracker.failure
+                if failure is not None and not isinstance(
+                    failure,
+                    RunCancelledError,
+                ):
+                    raise failure
+                remaining = deadline - self._client._clock()
+                if remaining <= 0:
+                    raise RunTimeoutError(
+                        f"Timed out cancelling Think run {self.id}; "
+                        "the request will be retried after reconnect"
+                    )
+                self._tracker.condition.wait(timeout=remaining)
+        return self
+
+    def detach(self) -> None:
+        """Disconnect locally while leaving durable server work running."""
+
+        self._client.close()
 
     def refresh(self) -> Self:
         """Rehydrate durable transcript and pause state after reconnecting."""

@@ -1,316 +1,236 @@
 # Bystro Think Python API
 
-The Think SDK is a synchronous, typed client for durable Bystro agent
-workloads. It intentionally exposes a small surface: authenticate, upload
-artifacts, compose context, submit work, observe progress, answer pauses, and
-resume by run ID.
+The Think SDK submits durable agent workloads, streams visible output and
+structured progress, handles human-input pauses, uploads large files in chunks,
+reuses Bystro datasets and conversations as context, and downloads protected
+results.
 
 ## Install
 
-Bystro 2.1.1 supports CPython 3.11 and 3.12. Activate the environment you want
-to use, confirm it with `python --version`, and install from PyPI:
+Bystro 2.1.2 supports CPython 3.11 and 3.12:
 
 ```sh
-python -m pip install "bystro>=2.1.1,<2.2"
+python --version
+python -m pip install "bystro>=2.1.2,<2.2"
 ```
 
-Production endpoints use publicly trusted HTTPS certificates, so no custom CA
-bundle or TLS override is required. A private CA bundle is only needed for a
-local development deployment that uses its own certificate authority.
+Production uses publicly trusted HTTPS certificates. Customers do not need a
+custom CA bundle or TLS override; those are only for local development servers
+using a private certificate authority.
 
-## Authenticate
+## Authenticate once, then use the cached login
 
-`auth.login` uses the same `bystro.cloud` dashboard account as the browser and
-caches its JWT in `~/.bystro/bystro_authentication_token.json`. The directory
-is mode `0700`, the file is atomically replaced at mode `0600`, and tokens are
-never printed.
+Use `getpass` for the one-time interactive login so secrets do not appear in
+source code, notebook output, shell history, or environment listings:
 
 ```python
+from getpass import getpass
+
 from bystro.api import auth
+
+
+email = input("Bystro email: ").strip()
+site_access_code = getpass("Site access code (leave blank if not required): ")
+auth.login(
+    email,
+    getpass("Bystro password: "),
+    site_access_code=site_access_code or None,
+)
+```
+
+The login JWT is stored in `~/.bystro/bystro_authentication_token.json`; the
+directory is mode `0700` and the atomically replaced file is mode `0600`. The
+site-access code is used only for that login session and is not cached.
+
+Normal scripts then use the cached login without handling a password:
+
+```python
 from bystro.think import ThinkClient
 
-auth.login("you@example.com", "your-password")
 client = ThinkClient.from_cached_login()
 ```
 
-For short scripts, login and construction can be one call:
+New accounts must accept the current legal assertions once. Use
+`LegalConsent.accepted(name)` with `auth.signup(...)`, or complete signup in the
+dashboard before running the login snippet above.
+
+## Canonical interactive workflow
+
+This is the recommended customer experience. It prints lifecycle changes,
+backend-owned phases such as web search and source verification, visible answer
+chunks, and an elapsed heartbeat if no server frame arrives for 30 seconds.
+`interact()` prompts for any number of clarification or plan-review pauses.
 
 ```python
-client = ThinkClient.login("you@example.com", "your-password")
-```
-
-If the deployment keeps Bystro's shared site-access gate enabled, present its
-code during the same login. The SDK establishes the gate cookie and performs
-dashboard login in one private session; the code is never written to the auth
-cache:
-
-```python
-import os
-
-client = ThinkClient.login(
-    "you@example.com",
-    "your-password",
-    site_access_code=os.environ["BYSTRO_SITE_ACCESS_CODE"],
-)
-```
-
-New accounts must explicitly provide the dashboard's signed legal assertions:
-
-```python
-from bystro.api.auth import LegalConsent, signup
-
-signup(
-    "you@example.com",
-    "your-password",
-    "Your Name",
-    legal_consent=LegalConsent.accepted("Your Name"),
-    site_access_code=os.environ["BYSTRO_SITE_ACCESS_CODE"],
-)
-```
-
-`site_access_code` is the Bystro application gate, not a Cloudflare credential.
-Cloudflare must still allow non-browser traffic to the dashboard authentication
-and Think API routes while retaining its challenge on browser pages.
-
-The SDK exchanges that dashboard session through Think's existing cookie-auth
-admission endpoint. The application credential created by Think remains on the
-server; it is not copied into local code or exposed as a second API key.
-
-## Customer quickstart: complete examples
-
-Start with this shared setup. Credentials come from environment variables, and
-the `wait_for_result` loop handles any number of durable clarification or plan
-review pauses while progress continues to stream. A billing pause must be
-resolved in the dashboard before refreshing the run.
-
-```python
-import os
-
-from bystro.think import (
-    InputKind,
-    NeedsInput,
-    Run,
-    RunResult,
-    ThinkClient,
-    show_progress,
-)
+from bystro.think import NeedsInput, RunResult, ThinkClient, show_progress
 
 
-def login() -> ThinkClient:
-    return ThinkClient.login(
-        os.environ["BYSTRO_EMAIL"],
-        os.environ["BYSTRO_PASSWORD"],
-        site_access_code=os.environ.get("BYSTRO_SITE_ACCESS_CODE"),
-        on_event=show_progress,
-    )
-
-
-def wait_for_result(run: Run) -> RunResult:
-    while True:
-        outcome = run.wait(timeout=3600)
-        if not isinstance(outcome, NeedsInput):
-            return outcome
-
-        print(f"\n{outcome.prompt}")
-        if outcome.kind is InputKind.BILLING:
-            input("Resolve billing in the dashboard, then press Enter: ")
-            run.refresh()
-            continue
-
-        run.respond(input("> "))
-```
-
-Set credentials before running an example:
-
-```sh
-export BYSTRO_EMAIL="you@example.com"
-export BYSTRO_PASSWORD="your-password"
-export BYSTRO_SITE_ACCESS_CODE="your-site-code"  # omit when not required
-```
-
-### 1. Submit a question with live progress
-
-`submit_with_progress` installs the concise progress renderer automatically.
-Passing `show_progress` at login also reports connection and reconnect events.
-The final answer remains available as the typed `RunResult.output` value.
-
-```python
-with login() as client:
+with ThinkClient.from_cached_login(on_event=show_progress) as client:
     run = client.submit_with_progress(
         "Research the latest CAR-T therapies and cite primary sources."
     )
-    result = wait_for_result(run)
+    outcome = run.interact(timeout=3600)
 
-    print("\n--- Final response ---\n")
-    print(result.output)
+    if isinstance(outcome, NeedsInput):
+        # interact() handles clarification and plan-review pauses itself.
+        # A returned NeedsInput is a billing pause that must be resolved in
+        # the dashboard, followed by run.refresh(). Unlimited accounts should
+        # not enter this branch.
+        print(outcome)
+    else:
+        assert isinstance(outcome, RunResult)
+        print("\nFinal Markdown is also available as outcome.output")
 ```
 
-Progress is based on durable server lifecycle and status events; it is not a
-token-by-token stream of the final prose.
+`submit_with_progress()` installs a progress renderer automatically. Supplying
+`show_progress` on the client also includes connection and reconnect events.
+Do not pass the same callback again to `run.wait(on_event=...)`.
 
-### 2. Submit a question with files
+Think uses authenticated Socket.IO transport. It normally upgrades to WebSocket
+and retains HTTP polling as a compatibility fallback. Output frames are
+cumulative short snapshots, not necessarily one event per tokenizer token; the
+SDK turns them into exact append/replace/retract updates and never exposes
+internal reasoning text.
 
-Paths passed through `files` are uploaded first and then attached to the same
-question. Large files automatically use the resumable, chunked upload path.
+To require native WebSocket and fail rather than fall back to polling:
 
 ```python
-from bystro.think import UploadProgress
+with ThinkClient.from_cached_login(
+    on_event=show_progress,
+    transports=("websocket",),
+) as client:
+    result = client.submit_with_progress("Draw a duck.").interact(timeout=3600)
+```
+
+## Non-interactive input callbacks
+
+Applications can answer pauses without calling `input()`. Manual `wait()` and
+`respond()` remain available when the application needs complete control.
+
+```python
+from bystro.think import NeedsInput, ThinkClient
 
 
-def report_upload(progress: UploadProgress) -> None:
+def answer_clarification(request: NeedsInput) -> str:
+    print("Clarification:", request.prompt)
+    return "Cover all disease areas and the last 24 months."
+
+
+def review_plan(request: NeedsInput) -> str:
+    print("Proposed plan:", request.prompt)
+    return "accept"
+
+
+with ThinkClient.from_cached_login() as client:
+    run = client.submit_with_progress("Research recent CAR-T therapies.")
+    result = run.interact(
+        timeout=3600,
+        on_clarification=answer_clarification,
+        on_plan_review=review_plan,
+    )
+```
+
+For manual control:
+
+```python
+from bystro.think import InputKind, NeedsInput
+
+
+outcome = run.wait(timeout=3600)
+if isinstance(outcome, NeedsInput):
+    if outcome.kind is InputKind.PLAN_REVIEW:
+        run.respond("accept")
+    elif outcome.kind is InputKind.CLARIFICATION:
+        run.respond("Use case_control as the phenotype column")
+```
+
+The first live pause can precede its durable checkpoint commit. `respond()`
+waits for the checkpoint replay before uploading attachments or dispatching the
+answer, and ignores stale replayed checkpoints after reconnect.
+
+## Choose a mode
+
+The default mode is `base`. Pass `RunOptions` per submitted conversation:
+
+```python
+from bystro.think import RunOptions
+
+
+run = client.submit_with_progress(
+    "Research the latest CAR-T therapies and cite primary sources.",
+    options=RunOptions(mode="plus2"),
+)
+```
+
+| Value | Dashboard name | Intended use |
+| --- | --- | --- |
+| `base` | Base | Faster, token-efficient work with lighter research. |
+| `plus` | Plus v1 | Verified analysis with deep research. |
+| `plus2` | Plus v2 | Stronger experimental research workflow. |
+| `phd` | PhD | Deepest reasoning for demanding analyses. |
+
+Other controls are typed fields on `RunOptions`: `advanced_planning`,
+`auto_compact`, `fast`, `verify`, `verify_sources`, and
+`zero_data_retention`. Availability and billing follow the authenticated
+account and deployment configuration.
+
+## Submit files with the question
+
+A path passed in `files` is uploaded to the authenticated user's personal
+artifacts and attached to the same message. Large inputs use resumable bounded
+10 MiB chunks, SHA-256 checksums, idempotent retries, and asynchronous
+finalization polling.
+
+```python
+from bystro.think import ThinkClient, UploadProgress
+
+
+def upload_progress(progress: UploadProgress) -> None:
     print(
         f"[upload:{progress.phase.value}] {progress.fraction:.0%}",
         flush=True,
     )
 
 
-with login() as client:
+with ThinkClient.from_cached_login() as client:
     run = client.submit_with_progress(
         "Analyze the cohort using the attached phenotype table.",
         files=["cohort.vcf.gz", "phenotypes.tsv"],
-        on_upload_progress=report_upload,
+        on_upload_progress=upload_progress,
     )
-    result = wait_for_result(run)
-    print(result.output)
+    result = run.interact(timeout=3600)
 ```
 
-### 3. Submit with genetic, conversation, and artifact context
-
-The `add_*_context` helpers accept a string or an existing
-`MessageWithContext`, so context can be built one layer at a time. Existing
-references are resolved under the authenticated user's ownership.
+A single path can be passed directly:
 
 ```python
-import os
-
-from bystro.think import (
-    add_artifact_context,
-    add_genetic_context,
-    add_previous_conversation_context,
-)
-
-
-with login() as client:
-    artifact = client.upload_artifact("study-notes.pdf")
-
-    message = "Re-evaluate the strongest phenotype associations."
-    message = add_genetic_context(
-        os.environ["BYSTRO_JOB_ID"],
-        message,
-        name="Case cohort",
-        assembly="hg38",
-    )
-    message = add_previous_conversation_context(
-        os.environ["BYSTRO_PRIOR_THREAD_ID"],
-        message,
-        name="Previous analysis",
-    )
-    message = add_artifact_context(artifact, message)
-
-    run = client.submit_with_progress(message)
-    result = wait_for_result(run)
-    print(result.output)
-```
-
-For a reusable higher-order context pipeline:
-
-```python
-from bystro.think import (
-    artifact_context,
-    compose_context,
-    genetic_context,
-    previous_conversation_context,
-)
-
-add_study_context = compose_context(
-    genetic_context("annotation-job-id", assembly="hg38"),
-    previous_conversation_context("prior-thread-id"),
-    artifact_context("existing-artifact-id"),
-)
-
-message = add_study_context("Compare the strongest signals.")
-```
-
-### 4. List conversations, browse results, and download files
-
-`list_conversations` returns the authenticated user's conversations newest
-first and transparently follows every cursor page. Pass `search` to filter by
-conversation name. Resume a returned ID to browse or download its protected
-output files through the same authenticated session.
-
-```python
-from pathlib import Path
-
-
-with login() as client:
-    conversations = client.list_conversations(search="CAR-T")
-    for conversation in conversations:
-        print(conversation.id, conversation.name)
-
-    if not conversations:
-        raise RuntimeError("No matching conversations")
-
-    previous_run = client.resume(conversations[0].id)
-    files = previous_run.output_files()
-    for output_file in files:
-        print(output_file.path, output_file.size)
-
-    if files:
-        downloaded = previous_run.download_file(
-            files[0],
-            Path("downloads") / files[0].path,
-        )
-        print("Downloaded:", downloaded)
-
-    archive = previous_run.download_all(
-        Path("downloads") / f"{previous_run.id}.tar"
-    )
-    print("Archive:", archive)
-```
-
-`download_file` and `download_all` stream to a temporary file and only publish
-the destination after the authenticated download completes. Existing targets
-are not overwritten unless `overwrite=True` is passed explicitly.
-
-## Upload files and submit them with a question
-
-Passing paths to `submit` uploads each file to personal input artifacts first,
-then attaches the resulting artifact records to the same user message:
-
-```python
-run = client.submit(
-    "Find variants associated with the case phenotype.",
-    files=["cohort.vcf.gz", "phenotypes.tsv"],
+run = client.submit_with_progress(
+    "Summarize this study protocol.",
+    files="protocol.pdf",
 )
 ```
 
-Uploads use the production resumable protocol: bounded 10 MiB chunks,
-per-chunk SHA-256 checksums, idempotent retries with exponential backoff, and
-polling for asynchronous server finalization. The chunk size and retry policy
-can be configured on `ThinkClient`. An `artifact_path` is relative, has at most
-64 components, and must end in the local file's exact name; invalid paths fail
-locally before authentication or upload begins.
-
-Use `upload_artifact` when the artifact should be created before the question:
+Create a reusable artifact before submission with `upload_artifact()` (or its
+short alias `upload()`):
 
 ```python
-def report_upload(progress):
-    print(progress.phase.value, f"{progress.fraction:.0%}")
-
 artifact = client.upload_artifact(
     "cohort.vcf.gz",
     artifact_path="study/cohort.vcf.gz",
-    on_progress=report_upload,
+    on_progress=upload_progress,
 )
-run = client.submit("Run QC on this cohort", files=[artifact])
+run = client.submit_with_progress("Run QC on this cohort.", files=[artifact])
 ```
 
-`upload` is an equivalent shorter alias.
+Artifact paths are relative, have at most 64 components, and must end with the
+local file's exact name. Invalid paths fail locally before upload.
 
 ## Compose genetic, conversation, and artifact context
 
-Context helpers accept either a plain string or an immutable
-`MessageWithContext`, so calls compose naturally:
+The context helpers accept either a string or an immutable
+`MessageWithContext`, so they compose without constructing XML manually. The
+SDK serializes an escaped XML preview with `message.to_xml()`, while the live
+request keeps ownership-bearing references in structured metadata.
 
 ```python
 from bystro.think import (
@@ -319,7 +239,8 @@ from bystro.think import (
     add_previous_conversation_context,
 )
 
-message = "Compare the strongest signals"
+
+message = "Re-evaluate the strongest phenotype associations."
 message = add_genetic_context(
     "annotation-job-id",
     message,
@@ -333,10 +254,10 @@ message = add_previous_conversation_context(
 )
 message = add_artifact_context(artifact, message)
 
-run = client.submit(message)
+run = client.submit_with_progress(message)
 ```
 
-Reusable higher-order transforms are also available:
+Reusable higher-order transforms are available:
 
 ```python
 from bystro.think import (
@@ -346,107 +267,235 @@ from bystro.think import (
     previous_conversation_context,
 )
 
+
 study_context = compose_context(
-    genetic_context("annotation-job-id", name="Case cohort", assembly="hg38"),
+    genetic_context("annotation-job-id", assembly="hg38"),
     previous_conversation_context("prior-thread-id"),
     artifact_context("existing-artifact-id"),
 )
 
-run = client.submit(study_context("Re-evaluate the phenotype association"))
+run = client.submit_with_progress(
+    study_context("Compare the strongest signals.")
+)
 ```
 
-`message.to_xml()` returns a safely escaped preview of the semantic context.
-On the wire, references remain structured metadata. Think resolves artifacts
-against the authenticated user before creating canonical input-file context;
-dataset and conversation retrieval tools independently enforce ownership
-before returning referenced data. Raw user-authored XML is never treated as an
-ownership boundary.
+Think resolves every dataset, conversation, and artifact under the
+authenticated user's ownership. User-authored XML is never an authorization
+boundary.
 
-## Handle `needs_input`
+## Structured progress and custom presentation
 
-`wait()` returns exactly one of two values: `RunResult` or `NeedsInput`.
-Clarifications and plan review are durable checkpoint states, not transient
-socket prompts.
+`ThinkEvent.progress` contains the server's current phase snapshot. Typical
+phase kinds are `search`, `verify`, `compute`, `query`, and `think`.
+`ThinkEvent.stream_update` contains safe visible-output deltas.
 
 ```python
-from bystro.think import InputKind, NeedsInput
+from bystro.think import EventKind, ThinkEvent
 
-outcome = run.wait(timeout=3600)
-if isinstance(outcome, NeedsInput):
-    if outcome.kind is InputKind.PLAN_REVIEW:
-        run.respond("accept")
-    else:
-        run.respond("Use case_control as the phenotype column")
-    outcome = run.wait(timeout=3600)
+
+def on_event(event: ThinkEvent) -> None:
+    if event.progress is not None:
+        phase = event.progress.active_phase
+        if phase is not None:
+            print(phase.kind, phase.label, phase.completed, phase.total)
+        return
+
+    update = event.stream_update
+    if event.kind is EventKind.STREAM and update is not None:
+        if update.operation == "append":
+            print(update.delta, end="", flush=True)
+        elif update.operation == "replace":
+            print("\n[corrected output]\n", update.delta)
+        elif update.operation == "retract":
+            print(f"\n[removed message {update.message_id}]")
 ```
 
-The first live pause notification can arrive just before its checkpoint is
-committed, so `checkpoint_id` may initially be `None`. `run.respond()` requests
-the durable replay automatically and will not upload attachments or dispatch
-the response until the checkpoint is present. Once answered, replays of that
-same or an older checkpoint are ignored, preventing reconnect races from
-reopening a stale question. If synchronization fails, the pause remains intact
-and `RunProtocolError` asks you to call `run.refresh()` and retry. A billing
-pause is also represented as `NeedsInput`, but must be resolved through the
-billing action in the dashboard; then call `run.refresh()`.
+`ProgressRenderer(heartbeat_interval=30)` provides the canonical terminal
+presentation. Generic `Thinking...` and `Processing...` states print at most
+once per turn; meaningful phase/count changes print immediately; and the renderer emits
+`Still working... (… elapsed)` during complete transport silence. Heartbeat
+workers stop on input, completion, failure, cancellation, or local detach.
 
-## Progress and reconnects
+## Results, conversations, and downloads
 
-`submit_with_progress` uses `show_progress`; use `submit` for silent workloads:
+Generated files are available directly on a successful `RunResult`. The
+listing is authenticated and loaded once, on first access, so access it while
+the client context is open:
 
 ```python
-from bystro.think import ThinkClient, show_progress
+from pathlib import Path
 
-with ThinkClient.login(
-    "you@example.com", "your-password", on_event=show_progress
-) as client:
-    run = client.submit_with_progress("Perform a GWAS", files=["cohort.vcf.gz"])
-    result = run.wait()
+from bystro.think import RunResult, ThinkClient
+
+
+with ThinkClient.from_cached_login() as client:
+    run = client.submit_with_progress("Draw and save a cartoon duck.")
+    result = run.interact(timeout=3600)
+    if not isinstance(result, RunResult):
+        raise RuntimeError("The run paused for billing")
+
+    for output_file in result.files:  # result.artifacts is the same tuple
+        print(output_file.path, output_file.size)
+
+    if result.files:
+        first = run.download_file(
+            result.files[0],
+            Path("downloads") / result.files[0].path,
+        )
+        print("Downloaded:", first)
+
+    archive = run.download_all(Path("downloads") / f"{run.id}.tar")
+    print("Archive:", archive)
 ```
 
-## Browse and download generated results
+`download_file()` and `download_all()` stream to a temporary file and publish
+the destination only after the authenticated download completes. Existing
+targets are never replaced unless `overwrite=True` is explicit.
+
+List and resume past conversations:
 
 ```python
-conversations = client.list_conversations(search="CAR-T")
+conversations = client.list_conversations(search="CAR-T", limit=20)
 for conversation in conversations:
-    print(conversation.id, conversation.name)
+    print(conversation.id, conversation.name, conversation.created_at)
 
-files = run.output_files()
-print([(output_file.path, output_file.size) for output_file in files])
-image = run.download_file(files[0], "downloads/duck.png")
-archive = run.download_all("downloads/all-results.tar")
+previous = client.resume(conversations[0].id)
+print(previous.messages)
+print(previous.output_files())
 ```
 
-The durable run ID is available immediately after admission:
+Omit `limit` to traverse all cursor pages. `run.messages` excludes internal
+reasoning and progress-card messages; `run.history` is bounded SDK event
+history. A resumed run restores its submitted mode and other `RunOptions`, so
+`run.follow_up(...)` continues with the original settings.
+
+In Jupyter, `RunResult` and `NeedsInput` implement `_repr_markdown_()`, so
+placing either object at the end of a cell renders its Markdown naturally.
+
+## Cancellation, detach, and reconnect
+
+Cancellation is distinct from closing a local client:
 
 ```python
-print(run.id)
+from bystro.think import RunCancelledError
+
+
+run.cancel(timeout=60)  # waits for durable server cleanup to be released
+try:
+    run.wait()
+except RunCancelledError:
+    print("Cancelled")
 ```
 
-Another process can attach to it later:
+`cancel()` sends the active task ID when available, ignores delayed lifecycle
+events from older tasks, and reissues an interrupted stop after reconnect until
+the server emits its durable release event.
+
+Use `run.detach()` (or close the `ThinkClient`) to disconnect locally while the
+server keeps working. Reattach from another process later:
 
 ```python
-client = ThinkClient()
-run = client.resume("run-or-thread-id")
-outcome = run.wait()
+run_id = run.id
+run.detach()
+
+with ThinkClient.from_cached_login() as client:
+    resumed = client.resume(run_id)
+    outcome = resumed.wait(timeout=3600)
 ```
 
-`run.messages` provides the hydrated transcript and `run.history` provides
-bounded SDK progress history. Socket reconnects automatically replay the
-current overlay state. When a replayed `needs_input` overlay arrives before its
-transcript, `wait()` holds the outcome until transcript hydration restores the
-clarification or plan-review prompt.
+A `ThinkClient` owns one foreground conversation at a time. Use separate
+clients for concurrently controlled conversations.
 
-## Follow-up turns and errors
+## Async applications
 
-After a successful result, start another turn in the same conversation:
+The submission API is synchronous; the live event iterator and terminal wait
+also have event-loop-friendly async forms:
 
 ```python
-run.follow_up("Now stratify the result by ancestry")
-next_result = run.wait()
+import asyncio
+
+from bystro.think import ThinkClient
+
+
+async def main() -> None:
+    with ThinkClient.from_cached_login() as client:
+        run = client.submit("Research recent CAR-T approvals.")
+        async for event in run.aevents(timeout=3600):
+            print(event.kind.value)
+        result = await run.await_result(timeout=30)
+        print(result)
+
+
+asyncio.run(main())
 ```
 
-Transport, HTTP, billing, admission, timeout, and protocol failures have typed
-exceptions under `bystro.think`. A `ThinkClient` owns one foreground run at a
-time; use separate clients for concurrently controlled conversations. Closing
-a client disconnects local transports but does not cancel durable server work.
+`aevents()` never blocks the event loop while waiting for Socket.IO events;
+durable refreshes run outside the loop.
+
+## Cloudflare configuration
+
+No Cloudflare change is needed when the installed SDK connects, uploads, and
+downloads successfully. If browser-only challenges intercept Python traffic,
+create a **zone-level custom rule** with action **Skip** and match only the API
+hosts/routes used by the SDK. Select only:
+
+- All Super Bot Fight Mode rules
+- Browser Integrity Check
+- Security Level
+
+Keep **Log matching requests** enabled. Do not select all remaining custom
+rules, rate limiting rules, or managed WAF rules unless a specific logged false
+positive proves one of those components is responsible. Cloudflare documents
+that Skip can target these products independently, leaving other security
+layers active: [Skip action](https://developers.cloudflare.com/waf/custom-rules/skip/)
+and [available skip options](https://developers.cloudflare.com/waf/custom-rules/skip/options/).
+
+For `ai.bystro.cloud`, the complete SDK transport surface is:
+
+```text
+/auth/cookie
+/set-session-cookie
+/ws/socket.io
+/project/threads
+/user/files/*
+/api/user-output/*
+```
+
+For `bystro.cloud`, one-time programmatic login uses:
+
+```text
+/api/site-gate/authenticate
+/api/user/auth/local
+```
+
+If customers also need to discover existing genetic-analysis jobs with
+`bystro.api.annotation.get_jobs`, include the narrow `/api/jobs*` path prefix
+on `bystro.cloud`. This route is optional when the caller already knows the
+genetic job ID. It remains protected by Bystro authentication and authorization;
+the Cloudflare rule skips only the selected browser-oriented checks.
+
+Keep the route expression narrow rather than bypassing by user agent or a
+shared customer token. Application authentication and ownership checks still
+run at the origin, while Cloudflare DDoS protection, managed WAF, and rate
+limits remain available.
+
+An easy verification is to install the wheel in a clean environment, unset
+`REQUESTS_CA_BUNDLE` and `SSL_CERT_FILE`, require
+`transports=("websocket",)`, submit a small run, list conversations, upload a
+file larger than 10 MiB, and download one result plus the tar archive. A
+Cloudflare HTML challenge or `cf-ray` 403 indicates the route rule still does
+not match; a typed JSON/application error means the request reached Bystro.
+
+## Errors
+
+Transport, HTTP, authentication, billing, admission, cancellation, timeout, and
+protocol failures have typed exceptions under `bystro.think`. In particular:
+
+- `ThinkAuthenticationError`: cached dashboard login is missing or expired.
+- `ThinkBillingRequiredError`: initial admission requires plan/credit action.
+- `RunRejectedError`: submission was rejected before dispatch.
+- `RunTimeoutError`: a local wait deadline elapsed; the durable run may continue.
+- `RunCancelledError`: server-side cancellation completed.
+- `RunProtocolError`: the server returned contradictory or incomplete state.
+
+Closing a client never implies cancellation.

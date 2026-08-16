@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable, Iterator
+from datetime import datetime, timedelta, timezone
+from io import StringIO
 from pathlib import Path
 import time
 from typing import cast
@@ -23,15 +26,21 @@ from bystro.think import (
     NeedsInput,
     OutputFile,
     PreviousConversation,
+    ProgressPhase,
+    ProgressUpdate,
+    ProgressRenderer,
+    RunCancelledError,
     RunOptions,
     RunProtocolError,
     RunRejectedError,
     RunResult,
     RunStatus,
     RunTimeoutError,
+    StreamUpdate,
     ThinkClient,
     ThinkAuthenticationError,
     ThinkEvent,
+    ThinkConnectionError,
     ThinkHTTPError,
     UploadedFile,
     UploadPhase,
@@ -119,6 +128,7 @@ class FakeSocket:
         self.emits: list[tuple[str, object]] = []
         self.connect_args: tuple[str, dict[str, object]] | None = None
         self.connected = False
+        self.connect_failure: Exception | None = None
         self.next_message_ack: dict[str, object] = {
             "success": True,
             "threadId": "thread-1",
@@ -145,6 +155,8 @@ class FakeSocket:
         return register
 
     def connect(self, url: str, **kwargs: object) -> None:
+        if self.connect_failure is not None:
+            raise self.connect_failure
         self.connect_args = (url, kwargs)
         self.connected = True
         callback = self.handlers.get("connect")
@@ -208,6 +220,7 @@ def make_client(
     upload_chunk_size: int = 10 * 1024 * 1024,
     sleep: Callable[[float], None] = time.sleep,
     finalization_timeout: float = 10.0,
+    transports: tuple[str, ...] | None = None,
 ) -> ThinkClient:
     session, socket = transport
     return ThinkClient(
@@ -218,6 +231,7 @@ def make_client(
         _socket_factory=lambda **_kwargs: socket,
         upload_chunk_size=upload_chunk_size,
         finalization_timeout=finalization_timeout,
+        transports=transports,
         _sleep=sleep,
     )
 
@@ -300,6 +314,55 @@ def test_connect_bootstraps_existing_browser_auth_contract(
     assert ("connection_successful", None) in socket.emits
 
 
+def test_connect_can_require_websocket_transport(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport, transports=("websocket",))
+
+    client.connect()
+
+    assert socket.connect_args is not None
+    _socket_url, socket_kwargs = socket.connect_args
+    assert socket_kwargs["transports"] == ["websocket"]
+
+
+def test_connect_accepts_a_single_transport_string(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    session, socket = transport
+    client = ThinkClient(
+        auth=auth_state,
+        think_url="https://ai.bystro.cloud",
+        _session=session,
+        _socket_factory=lambda **_kwargs: socket,
+        transports="websocket",
+    )
+
+    client.connect()
+
+    assert socket.connect_args is not None
+    _socket_url, socket_kwargs = socket.connect_args
+    assert socket_kwargs["transports"] == ["websocket"]
+
+
+def test_connect_rejects_unknown_or_empty_transports(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    session, socket = transport
+    for transports in ((), ("websocket", "invalid")):
+        with pytest.raises(ValueError, match="transport"):
+            ThinkClient(
+                auth=auth_state,
+                _session=session,
+                _socket_factory=lambda **_kwargs: socket,
+                transports=transports,
+            )
+
+
 def test_submit_reports_connected_before_submitted(
     auth_state: CachedAuth,
     transport: tuple[FakeSession, FakeSocket],
@@ -340,6 +403,671 @@ def test_submit_with_progress_is_the_canonical_concise_renderer(
         "[started] Analysis started",
         "[progress] Processing...",
     ]
+
+
+def test_progress_renderer_coalesces_repeated_overlay_snapshots(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+
+    run = client.submit_with_progress("Analyze")
+    for _ in range(4):
+        socket.trigger(
+            "status_overlay_update",
+            {
+                "threadId": run.id,
+                "visible": True,
+                "display": "Processing...",
+            },
+        )
+
+    output = capsys.readouterr().out
+    assert output.count("[progress] Processing...") == 1
+
+
+def test_progress_renderer_coalesces_alternating_generic_states() -> None:
+    output = StringIO()
+    renderer = ProgressRenderer(file=output, heartbeat_interval=30.0)
+    started_at = datetime(2026, 8, 15, tzinfo=timezone.utc)
+
+    renderer(ThinkEvent(1, EventKind.SUBMITTED, "thread-1", started_at))
+    for sequence in (2, 4):
+        renderer(
+            ThinkEvent(
+                sequence,
+                EventKind.STREAM,
+                "thread-1",
+                started_at + timedelta(seconds=sequence),
+                stream_update=StreamUpdate(
+                    message_id=f"reasoning-{sequence}",
+                    delta="",
+                    operation="append",
+                    content_length=10,
+                    message_type="assistant_message",
+                    is_reasoning=True,
+                ),
+            )
+        )
+        renderer(
+            ThinkEvent(
+                sequence + 1,
+                EventKind.PROGRESS,
+                "thread-1",
+                started_at + timedelta(seconds=sequence + 1),
+                message="Processing...",
+            )
+        )
+
+    rendered = output.getvalue()
+    assert rendered.count("[progress] Thinking...") == 1
+    assert rendered.count("[progress] Processing...") == 1
+
+
+def test_progress_renderer_turns_repeated_processing_into_elapsed_heartbeats() -> None:
+    output = StringIO()
+    renderer = ProgressRenderer(file=output, heartbeat_interval=30.0)
+    started_at = datetime(2026, 8, 15, tzinfo=timezone.utc)
+
+    renderer(
+        ThinkEvent(
+            1,
+            EventKind.SUBMITTED,
+            "thread-1",
+            started_at,
+        )
+    )
+    for sequence, seconds in ((2, 1), (3, 15), (4, 31), (5, 45), (6, 61)):
+        renderer(
+            ThinkEvent(
+                sequence,
+                EventKind.PROGRESS,
+                "thread-1",
+                started_at + timedelta(seconds=seconds),
+                message="Processing...",
+            )
+        )
+
+    assert output.getvalue().splitlines() == [
+        "[submitted] Workload submitted",
+        "[progress] Processing...",
+        "[progress] Still working... (31s elapsed)",
+        "[progress] Still working... (1m 1s elapsed)",
+    ]
+
+
+def test_structured_backend_progress_is_typed_rendered_and_not_transcript(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    output = StringIO()
+    renderer = ProgressRenderer(file=output)
+    events: list[ThinkEvent] = []
+    _session, socket = transport
+
+    def capture_and_render(event: ThinkEvent) -> None:
+        events.append(event)
+        renderer(event)
+
+    client = make_client(
+        auth_state,
+        transport,
+        on_event=capture_and_render,
+    )
+    run = client.submit("Research")
+
+    socket.trigger(
+        "new_message",
+        {
+            "id": "progress-card",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "🔍 Gathering the evidence…",
+            "metadata": {
+                "section": "progress",
+                "progress": {
+                    "done": False,
+                    "phases": [
+                        {
+                            "id": "search-123",
+                            "kind": "search",
+                            "state": "active",
+                            "label": "Gathering the evidence…",
+                            "detail": "PubMed and FDA",
+                            "count": {"done": 3, "total": 8},
+                            "started_at": 1_786_752_000_000,
+                        }
+                    ],
+                },
+            },
+        },
+    )
+
+    progress_events = [event for event in events if event.progress is not None]
+    assert len(progress_events) == 1
+    update = progress_events[0].progress
+    assert isinstance(update, ProgressUpdate)
+    assert update.done is False
+    assert update.active_phase == ProgressPhase(
+        id="search-123",
+        kind="search",
+        state="active",
+        label="Gathering the evidence…",
+        detail="PubMed and FDA",
+        completed=3,
+        total=8,
+        started_at=datetime(2026, 8, 15, tzinfo=timezone.utc),
+        duration_seconds=None,
+    )
+    assert run.messages == ()
+    assert "Gathering the evidence… — PubMed and FDA (3/8)" in output.getvalue()
+
+
+def test_progress_renderer_emits_elapsed_heartbeat_without_server_frames() -> None:
+    output = StringIO()
+    renderer = ProgressRenderer(file=output, heartbeat_interval=0.02)
+    now = datetime.now(timezone.utc)
+
+    renderer(ThinkEvent(1, EventKind.SUBMITTED, "thread-1", now))
+    deadline = time.monotonic() + 0.5
+    while "Still working" not in output.getvalue() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    renderer(
+        ThinkEvent(2, EventKind.COMPLETED, "thread-1", datetime.now(timezone.utc))
+    )
+    rendered_after_completion = output.getvalue()
+    time.sleep(0.05)
+
+    assert "Still working" in rendered_after_completion
+    assert output.getvalue() == rendered_after_completion
+
+
+def test_detach_stops_the_run_progress_renderer(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    output = StringIO()
+    renderer = ProgressRenderer(file=output, heartbeat_interval=0.02)
+    client = make_client(auth_state, transport)
+    run = client.submit_with_progress("Analyze", on_event=renderer)
+
+    run.detach()
+    rendered_after_detach = output.getvalue()
+    time.sleep(0.05)
+
+    assert output.getvalue() == rendered_after_detach
+
+
+def test_detach_stops_the_canonical_show_progress_renderer(
+    monkeypatch: pytest.MonkeyPatch,
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    output = StringIO()
+    renderer = ProgressRenderer(file=output, heartbeat_interval=0.02)
+    monkeypatch.setattr(
+        "bystro.think.progress._DEFAULT_PROGRESS_RENDERER",
+        renderer,
+    )
+    client = make_client(
+        auth_state,
+        transport,
+        on_event=think_client_module.show_progress,
+    )
+    run = client.submit("Analyze")
+
+    run.detach()
+    rendered_after_detach = output.getvalue()
+    time.sleep(0.05)
+
+    assert output.getvalue() == rendered_after_detach
+
+
+def test_progress_renderer_does_not_reprint_the_unchanged_prefix_on_correction() -> None:
+    output = StringIO()
+    renderer = ProgressRenderer(file=output)
+    now = datetime(2026, 8, 15, tzinfo=timezone.utc)
+    prefix = "stable-prefix-" * 20
+    renderer(ThinkEvent(1, EventKind.SUBMITTED, "thread-1", now))
+    renderer(
+        ThinkEvent(
+            2,
+            EventKind.STREAM,
+            "thread-1",
+            now,
+            stream_update=StreamUpdate(
+                "answer",
+                prefix + "old ending",
+                "append",
+                len(prefix) + len("old ending"),
+                "assistant_message",
+            ),
+        )
+    )
+    renderer(
+        ThinkEvent(
+            3,
+            EventKind.STREAM,
+            "thread-1",
+            now,
+            stream_update=StreamUpdate(
+                "answer",
+                prefix + "new ending",
+                "replace",
+                len(prefix) + len("new ending"),
+                "assistant_message",
+            ),
+        )
+    )
+
+    rendered = output.getvalue()
+    assert rendered.count(prefix) == 1
+    assert f"[stream updated from character {len(prefix)}]" in rendered
+    assert rendered.endswith("new ending")
+
+
+def test_progress_renderer_coalesces_replayed_needs_input_checkpoint(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.submit_with_progress("Analyze")
+    before_commit = {
+        "threadId": run.id,
+        "visible": True,
+        "waitingForInput": True,
+        "humanApprovalStage": "clarifying_questions",
+    }
+    after_commit = {
+        **before_commit,
+        "checkpointId": "1f13d2a1-9893-603b-8000-000000000001",
+    }
+
+    socket.trigger("status_overlay_update", before_commit)
+    socket.trigger("status_overlay_update", after_commit)
+
+    run.respond("skip")
+    socket.trigger(
+        "status_overlay_update",
+        {
+            **before_commit,
+            "checkpointId": "1f13d2a1-9893-603b-8000-000000000002",
+        },
+    )
+
+    output = capsys.readouterr().out
+    assert output.count("[needs_input] Input required") == 2
+
+
+def test_progress_renderer_coalesces_started_replay_around_input_response(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.submit_with_progress("Analyze")
+    socket.trigger("task_start", {"threadId": run.id})
+    socket.trigger(
+        "new_message",
+        {
+            "id": "question",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "Which cohort?",
+            "metadata": {},
+        },
+    )
+    socket.trigger(
+        "status_overlay_update",
+        {
+            "threadId": run.id,
+            "visible": True,
+            "waitingForInput": True,
+            "humanApprovalStage": "clarifying_questions",
+            "checkpointId": "1f13d2a1-9893-603b-8000-000000000001",
+        },
+    )
+
+    def start_before_response_ack(
+        event: str,
+        data: object,
+        timeout: float | None,
+    ) -> None:
+        del data, timeout
+        if event == "client_message":
+            socket.trigger("task_start", {"threadId": run.id})
+
+    socket.call_hook = start_before_response_ack
+    run.respond("Use all cohorts")
+    socket.trigger("task_start", {"threadId": run.id})
+
+    lines = capsys.readouterr().out.splitlines()
+    assert lines.count("[submitted] Workload submitted") == 2
+    assert lines.count("[started] Analysis started") == 2
+    second_submission = lines.index("[submitted] Workload submitted", 2)
+    assert lines[second_submission + 1] == "[started] Analysis started"
+
+
+def test_websocket_stream_snapshots_become_incremental_typed_events(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    events: list[ThinkEvent] = []
+    _session, socket = transport
+    client = make_client(auth_state, transport, on_event=events.append)
+    run = client.submit("Analyze")
+
+    socket.trigger(
+        "new_message",
+        {
+            "id": "answer",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "Hel",
+            "metadata": {"stream_type": "text"},
+        },
+    )
+    socket.trigger(
+        "stream_start",
+        {
+            "id": "answer",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "Hel",
+            "metadata": {"stream_type": "text"},
+        },
+    )
+    socket.trigger(
+        "stream_token",
+        {
+            "id": "answer",
+            "threadId": run.id,
+            "token": "Hello",
+            "isSequence": True,
+        },
+    )
+    socket.trigger(
+        "stream_token",
+        {
+            "id": "answer",
+            "threadId": run.id,
+            "token": "Hello",
+            "isSequence": True,
+        },
+    )
+    socket.trigger(
+        "stream_token",
+        {
+            "id": "answer",
+            "threadId": run.id,
+            "token": "!",
+            "isSequence": False,
+        },
+    )
+    socket.trigger(
+        "update_message",
+        {
+            "id": "answer",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "Hello! Done.",
+            "metadata": {"stream_type": "text", "is_final_response": True},
+        },
+    )
+
+    stream_updates = [
+        event.stream_update
+        for event in events
+        if event.kind is EventKind.STREAM and event.stream_update is not None
+    ]
+    assert [update.delta for update in stream_updates] == [
+        "Hel",
+        "lo",
+        "!",
+        " Done.",
+    ]
+    assert [update.operation for update in stream_updates] == [
+        "append",
+        "append",
+        "append",
+        "append",
+    ]
+    assert [update.content_length for update in stream_updates] == [
+        3,
+        5,
+        6,
+        12,
+    ]
+    assert all(update.message_id == "answer" for update in stream_updates)
+
+
+def test_streaming_progress_hides_reasoning_and_prints_visible_deltas(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.submit_with_progress("Analyze")
+
+    socket.trigger(
+        "stream_start",
+        {
+            "id": "reasoning",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "private reasoning text",
+            "metadata": {"stream_type": "reasoning", "is_reasoning": True},
+        },
+    )
+    socket.trigger(
+        "stream_start",
+        {
+            "id": "answer",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "Visible",
+            "metadata": {"stream_type": "text", "is_reasoning": False},
+        },
+    )
+    socket.trigger(
+        "stream_token",
+        {
+            "id": "answer",
+            "threadId": run.id,
+            "token": "Visible answer",
+            "isSequence": True,
+        },
+    )
+
+    output = capsys.readouterr().out
+    assert "private reasoning text" not in output
+    assert output.count("[progress] Thinking...") == 1
+    assert "[stream]\nVisible answer" in output
+
+
+def test_streaming_progress_strips_terminal_control_sequences(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.submit_with_progress("Analyze")
+
+    socket.trigger(
+        "stream_start",
+        {
+            "id": "answer",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "safe\x1b[31m answer\x1b[0m",
+            "metadata": {"stream_type": "text"},
+        },
+    )
+
+    output = capsys.readouterr().out
+    assert "\x1b" not in output
+    assert "safe[31m answer[0m" in output
+
+
+def test_websocket_stream_events_redact_reasoning_content(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    events: list[ThinkEvent] = []
+    _session, socket = transport
+    client = make_client(auth_state, transport, on_event=events.append)
+    run = client.submit("Analyze")
+
+    socket.trigger(
+        "stream_start",
+        {
+            "id": "reasoning",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "private reasoning text",
+            "metadata": {"stream_type": "reasoning", "is_reasoning": True},
+        },
+    )
+    socket.trigger(
+        "stream_token",
+        {
+            "id": "reasoning",
+            "threadId": run.id,
+            "token": "private reasoning text continued",
+            "isSequence": True,
+        },
+    )
+    socket.trigger(
+        "status_overlay_update",
+        {
+            "threadId": run.id,
+            "visible": True,
+            "waitingForInput": True,
+            "humanApprovalStage": "clarifying_questions",
+        },
+    )
+
+    stream_updates = [
+        event.stream_update
+        for event in events
+        if event.kind is EventKind.STREAM and event.stream_update is not None
+    ]
+    assert len(stream_updates) == 1
+    assert stream_updates[0].delta == ""
+    assert stream_updates[0].is_reasoning is True
+    assert stream_updates[0].content_length == len("private reasoning text")
+    message_events = [event for event in events if event.kind is EventKind.MESSAGE]
+    assert len(message_events) == 1
+    assert message_events[0].message is None
+    assert message_events[0].data["is_reasoning"] is True
+    assert run.messages == ()
+    assert run.needs_input is not None
+    assert run.needs_input.prompt is None
+    assert all("private reasoning text" not in repr(event) for event in events)
+
+
+def test_websocket_stream_reports_replacements_and_retractions(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    events: list[ThinkEvent] = []
+    _session, socket = transport
+    client = make_client(auth_state, transport, on_event=events.append)
+    run = client.submit("Analyze")
+
+    socket.trigger(
+        "stream_start",
+        {
+            "id": "answer",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "Draft",
+            "metadata": {"stream_type": "text"},
+        },
+    )
+    socket.trigger(
+        "stream_token",
+        {
+            "id": "answer",
+            "threadId": run.id,
+            "token": "Corrected",
+            "isSequence": True,
+        },
+    )
+    socket.trigger("delete_message", {"id": "answer", "threadId": run.id})
+
+    stream_updates = [
+        event.stream_update
+        for event in events
+        if event.kind is EventKind.STREAM and event.stream_update is not None
+    ]
+    assert [(update.operation, update.delta) for update in stream_updates] == [
+        ("append", "Draft"),
+        ("replace", "Corrected"),
+        ("retract", ""),
+    ]
+
+
+@settings(max_examples=30, deadline=None, database=None)
+@given(
+    fragments=st.lists(
+        st.text(alphabet=" abcdefghijklmnopqrstuvwxyz", min_size=0, max_size=12),
+        min_size=1,
+        max_size=20,
+    )
+)
+def test_websocket_cumulative_snapshots_have_linear_incremental_payloads(
+    fragments: list[str],
+) -> None:
+    auth_state = CachedAuth(
+        email="scientist@example.com",
+        access_token="dashboard-jwt",
+        url="https://bystro.cloud",
+    )
+    transport = (FakeSession(), FakeSocket())
+    _session, socket = transport
+    events: list[ThinkEvent] = []
+    client = make_client(auth_state, transport, on_event=events.append)
+    run = client.submit("Analyze")
+    cumulative = fragments[0]
+
+    socket.trigger(
+        "stream_start",
+        {
+            "id": "answer",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": cumulative,
+            "metadata": {"stream_type": "text"},
+        },
+    )
+    for fragment in fragments[1:]:
+        cumulative += fragment
+        socket.trigger(
+            "stream_token",
+            {
+                "id": "answer",
+                "threadId": run.id,
+                "token": cumulative,
+                "isSequence": True,
+            },
+        )
+
+    stream_updates = [
+        event.stream_update
+        for event in events
+        if event.kind is EventKind.STREAM and event.stream_update is not None
+    ]
+    assert all(update.operation == "append" for update in stream_updates)
+    assert "".join(update.delta for update in stream_updates) == cumulative
+    assert sum(len(update.delta) for update in stream_updates) == len(cumulative)
 
 
 def test_output_files_and_downloads_use_authenticated_streaming_routes(
@@ -389,6 +1117,27 @@ def test_output_files_and_downloads_use_authenticated_streaming_routes(
     assert len(session.gets) == gets_before
 
 
+def test_output_download_allows_doubled_dots_inside_a_file_name(
+    tmp_path: Path,
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    session, _socket = transport
+    session.output_responses.append(FakeResponse(200, None, chunks=(b"RESULT",)))
+    client = make_client(auth_state, transport)
+    run = client.submit("Create a report")
+
+    downloaded = run.download_file(
+        "reports/report..final.txt",
+        tmp_path / "report..final.txt",
+    )
+
+    assert downloaded.read_bytes() == b"RESULT"
+    assert session.gets[-1][0].endswith(
+        "/api/user-output/download/reports/report..final.txt"
+    )
+
+
 def test_list_conversations_searches_and_paginates(
     auth_state: CachedAuth,
     transport: tuple[FakeSession, FakeSocket],
@@ -399,7 +1148,13 @@ def test_list_conversations_searches_and_paginates(
             FakeResponse(
                 200,
                 {
-                    "data": [{"id": "thread-2", "name": "CAR-T update"}],
+                    "data": [
+                        {
+                            "id": "thread-2",
+                            "name": "CAR-T update",
+                            "createdAt": "2026-08-15T18:24:30.123Z",
+                        }
+                    ],
                     "pageInfo": {"hasNextPage": True, "endCursor": "thread-2"},
                 },
             ),
@@ -415,7 +1170,11 @@ def test_list_conversations_searches_and_paginates(
     client = make_client(auth_state, transport)
 
     conversations = client.list_conversations(search=" CAR-T ", page_size=1)
-    assert conversations[0] == PreviousConversation("thread-2", "CAR-T update")
+    assert conversations[0] == PreviousConversation(
+        "thread-2",
+        "CAR-T update",
+        datetime(2026, 8, 15, 18, 24, 30, 123000, tzinfo=timezone.utc),
+    )
     assert conversations[1] == PreviousConversation("thread-1")
     requests = [options for url, options in session.posts if url.endswith("/project/threads")]
     assert requests[0]["json"] == {
@@ -426,6 +1185,52 @@ def test_list_conversations_searches_and_paginates(
         "pagination": {"first": 1, "cursor": "thread-2"},
         "filter": {"search": "CAR-T"},
     }
+
+
+def test_list_conversations_can_bound_history_without_fetching_every_page(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    session, _socket = transport
+    session.conversation_responses.extend(
+        [
+            FakeResponse(
+                200,
+                {
+                    "data": [{"id": "thread-new", "name": "Newest"}],
+                    "pageInfo": {"hasNextPage": True, "endCursor": "thread-new"},
+                },
+            ),
+            FakeResponse(
+                200,
+                {
+                    "data": [{"id": "thread-old", "name": "Older"}],
+                    "pageInfo": {"hasNextPage": False, "endCursor": "thread-old"},
+                },
+            ),
+        ]
+    )
+    client = make_client(auth_state, transport)
+
+    conversations = client.list_conversations(page_size=50, limit=1)
+
+    assert conversations == (PreviousConversation("thread-new", "Newest"),)
+    requests = [options for url, options in session.posts if url.endswith("/project/threads")]
+    assert len(requests) == 1
+    assert requests[0]["json"] == {
+        "pagination": {"first": 1, "cursor": None},
+        "filter": {"search": None},
+    }
+
+
+def test_list_conversations_rejects_nonpositive_limit(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    client = make_client(auth_state, transport)
+
+    with pytest.raises(ValueError, match="limit"):
+        client.list_conversations(limit=0)
 
 
 def test_non_json_unauthorized_response_still_has_typed_auth_error(
@@ -696,6 +1501,44 @@ def test_submit_uploads_multiple_files_and_attaches_them_to_same_question(
     attachments = metadata["attached_input_artifacts"]
     assert isinstance(attachments, list)
     assert [attachment["id"] for attachment in attachments] == ["file-vcf", "file-tsv"]
+
+
+def test_submit_accepts_one_file_path_without_wrapping_it_in_a_list(
+    tmp_path: Path,
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    session, socket = transport
+    source = tmp_path / "cohort.csv"
+    source.write_bytes(b"sample,value\nA,1\n")
+    session.upload_responses.append(
+        FakeResponse(
+            200,
+            {
+                "completed": True,
+                "file": {
+                    "id": "file-csv",
+                    "name": "cohort.csv",
+                    "displayName": "cohort.csv",
+                    "size": source.stat().st_size,
+                    "mime": "text/csv",
+                },
+            },
+        )
+    )
+    client = make_client(auth_state, transport)
+
+    client.submit("Analyze this file", files=str(source))
+
+    sent = [data for event, data, _timeout in socket.calls if event == "client_message"][-1]
+    assert isinstance(sent, dict)
+    message = sent["message"]
+    assert isinstance(message, dict)
+    metadata = message["metadata"]
+    assert isinstance(metadata, dict)
+    attachments = metadata["attached_input_artifacts"]
+    assert isinstance(attachments, list)
+    assert [attachment["id"] for attachment in attachments] == ["file-csv"]
 
 
 def test_submit_needs_input_respond_and_finish(
@@ -1252,6 +2095,113 @@ def test_resume_hydrates_a_completed_run(
     )
 
 
+def test_resume_restores_run_options_for_follow_up_turns(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.resume("thread-mode")
+    socket.trigger(
+        "resume_thread",
+        {
+            "id": "thread-mode",
+            "steps": [
+                {
+                    "id": "user-existing",
+                    "threadId": "thread-mode",
+                    "type": "user_message",
+                    "output": "Deep analysis",
+                    "metadata": {
+                        "mode": "plus2",
+                        "advancedPlanningEnabled": True,
+                        "autoCompactEnabled": True,
+                        "fastEnabled": True,
+                        "verificationEnabled": False,
+                        "searchVerificationEnabled": False,
+                        "zdrEnabled": True,
+                    },
+                },
+                {
+                    "id": "final-existing",
+                    "threadId": "thread-mode",
+                    "type": "assistant_message",
+                    "output": "Persisted answer",
+                    "metadata": {"is_final_response": True},
+                },
+            ],
+            "elements": [],
+        },
+    )
+    assert isinstance(run.wait(timeout=0.1), RunResult)
+    socket.next_message_ack = {
+        "success": True,
+        "threadId": "thread-mode",
+        "created": True,
+        "dispatched": True,
+    }
+
+    run.follow_up("Continue in the same mode")
+
+    sent = [data for event, data, _timeout in socket.calls if event == "client_message"][-1]
+    assert isinstance(sent, dict)
+    message = sent["message"]
+    assert isinstance(message, dict)
+    metadata = message["metadata"]
+    assert isinstance(metadata, dict)
+    assert metadata["mode"] == "plus2"
+    assert metadata["advancedPlanningEnabled"] is True
+    assert metadata["autoCompactEnabled"] is True
+    assert metadata["fastEnabled"] is True
+    assert metadata["verificationEnabled"] is False
+    assert metadata["searchVerificationEnabled"] is False
+    assert metadata["zdrEnabled"] is True
+
+
+def test_failed_resume_connection_does_not_poison_the_client(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    socket.connect_failure = OSError("offline")
+
+    with pytest.raises(ThinkConnectionError, match="live connection"):
+        client.resume("thread-unreachable")
+
+    socket.connect_failure = None
+    run = client.submit("A new workload")
+    assert run.id == "thread-1"
+
+
+def test_stale_run_cannot_refresh_the_socket_away_from_the_active_run(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    first = client.submit("First workload")
+    socket.trigger("task_end", {"threadId": first.id})
+    socket.trigger(
+        "new_message",
+        {
+            "id": "first-final",
+            "threadId": first.id,
+            "type": "assistant_message",
+            "output": "First answer",
+            "metadata": {"is_final_response": True},
+        },
+    )
+    second = client.submit("Second workload")
+    calls_before = len(socket.calls)
+
+    with pytest.raises(InputResponseError, match="no longer active"):
+        first.refresh()
+
+    assert len(socket.calls) == calls_before
+    assert second.status is RunStatus.QUEUED
+
+
 def test_resume_waits_for_transcript_before_returning_pause_prompt(
     auth_state: CachedAuth,
     transport: tuple[FakeSession, FakeSocket],
@@ -1547,6 +2497,333 @@ def test_rejected_follow_up_restores_completed_turn(
     restored_result = run.wait(timeout=0.1)
     assert isinstance(restored_result, RunResult)
     assert restored_result.output == "First answer"
+
+
+def test_run_result_lazily_exposes_structured_files_and_notebook_markdown(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.submit("Draw a duck")
+    socket.trigger(
+        "new_message",
+        {
+            "id": "final",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "## Duck\n\n![Duck](/api/user-files/thread-1/images/duck.png)",
+            "metadata": {"is_final_response": True},
+        },
+    )
+    socket.trigger("task_end", {"threadId": run.id})
+
+    result = run.wait(timeout=0.1)
+
+    assert isinstance(result, RunResult)
+    assert session.gets == []
+    session.output_responses.append(
+        FakeResponse(
+            200,
+            {
+                "files": [
+                    {
+                        "name": "duck.png",
+                        "path": "images/duck.png",
+                        "size": 1234,
+                        "modified": 10.0,
+                        "created": 9.0,
+                    }
+                ],
+                "hasMore": False,
+            },
+        )
+    )
+    assert result.files == (
+        OutputFile("duck.png", "images/duck.png", 1234, 10.0, 9.0),
+    )
+    assert result.artifacts is result.files
+    assert len(session.gets) == 1
+    assert result._repr_markdown_() == result.output  # noqa: SLF001 - notebook display protocol
+    assert hash(result) == hash(RunResult(result.run_id, result.output))
+
+
+def test_interact_handles_clarification_callback_until_result(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.submit("Analyze")
+    socket.trigger(
+        "new_message",
+        {
+            "id": "question",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "Which cohort?",
+            "metadata": {},
+        },
+    )
+    socket.trigger(
+        "status_overlay_update",
+        {
+            "threadId": run.id,
+            "visible": True,
+            "waitingForInput": True,
+            "humanApprovalStage": "clarifying_questions",
+            "checkpointId": "1f13d2a1-9893-603b-8000-000000000001",
+        },
+    )
+
+    def finish_after_response(
+        event: str,
+        data: object,
+        timeout: float | None,
+    ) -> None:
+        del data, timeout
+        if event != "client_message":
+            return
+        socket.trigger("task_start", {"threadId": run.id})
+        socket.trigger(
+            "new_message",
+            {
+                "id": "final",
+                "threadId": run.id,
+                "type": "assistant_message",
+                "output": "All cohorts analyzed",
+                "metadata": {"is_final_response": True},
+            },
+        )
+        socket.trigger("task_end", {"threadId": run.id})
+
+    socket.call_hook = finish_after_response
+    seen: list[NeedsInput] = []
+
+    def answer_clarification(request: NeedsInput) -> str:
+        seen.append(request)
+        return "all cohorts"
+
+    result = run.interact(
+        timeout=1.0,
+        on_clarification=answer_clarification,
+    )
+
+    assert isinstance(result, RunResult)
+    assert result.output == "All cohorts analyzed"
+    assert [request.prompt for request in seen] == ["Which cohort?"]
+
+
+def test_cancel_waits_for_durable_stop_release_and_detach_does_not_cancel(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    events: list[ThinkEvent] = []
+    client = make_client(auth_state, transport, on_event=events.append)
+    run = client.submit("Long analysis")
+    socket.trigger("task_start", {"threadId": run.id, "taskId": "task-1"})
+
+    def release_stop(event: str, data: object) -> None:
+        if event != "stop":
+            return
+        assert data == {
+            "threadId": run.id,
+            "clientObservedActive": True,
+            "taskId": "task-1",
+        }
+        socket.trigger("task_stopping", {"threadId": run.id, "taskId": "task-1"})
+        socket.trigger("task_end", {"threadId": run.id, "taskId": "task-1"})
+        socket.trigger(
+            "thread_stop_released",
+            {"threadId": run.id, "taskId": "task-1"},
+        )
+
+    socket.emit_hook = release_stop
+    run.cancel(timeout=0.5)
+
+    assert run.status is RunStatus.CANCELLED
+    assert EventKind.CANCELLING in {event.kind for event in events}
+    assert EventKind.CANCELLED in {event.kind for event in events}
+    with pytest.raises(RunCancelledError):
+        run.wait(timeout=0.1)
+
+    second_transport = (FakeSession(), FakeSocket())
+    _second_session, second_socket = second_transport
+    second_client = make_client(auth_state, second_transport)
+    second_run = second_client.submit("Keep running")
+    second_socket.trigger("task_start", {"threadId": second_run.id})
+    second_run.detach()
+    assert second_socket.connected is False
+    assert not any(event == "stop" for event, _data in second_socket.emits)
+
+
+def test_cancel_is_reissued_after_reconnect_until_stop_release(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.submit("Long analysis")
+    socket.trigger("task_start", {"threadId": run.id})
+
+    with pytest.raises(RunTimeoutError):
+        run.cancel(timeout=0.02)
+    assert sum(event == "stop" for event, _data in socket.emits) == 1
+
+    socket.connected = False
+    client.connect()
+    assert sum(event == "stop" for event, _data in socket.emits) == 2
+    socket.trigger("thread_stop_released", {"threadId": run.id})
+    assert run.status is RunStatus.CANCELLED
+    socket.trigger("task_start", {"threadId": run.id, "taskId": "late-task"})
+    socket.trigger("task_stopping", {"threadId": run.id, "taskId": "late-task"})
+    assert run.status is RunStatus.CANCELLED
+
+
+def test_stale_task_lifecycle_events_do_not_settle_the_active_turn(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.submit("Analyze")
+    socket.trigger("task_start", {"threadId": run.id, "taskId": "current-task"})
+
+    socket.trigger("task_end", {"threadId": run.id, "taskId": "old-task"})
+    socket.trigger("task_stopping", {"threadId": run.id, "taskId": "old-task"})
+    socket.trigger(
+        "thread_stop_released",
+        {"threadId": run.id, "taskId": "old-task"},
+    )
+    socket.trigger(
+        "thread_stop_released",
+        {"threadId": run.id, "taskId": "current-task"},
+    )
+
+    assert run.status is RunStatus.RUNNING
+    with pytest.raises(RunTimeoutError):
+        run.wait(timeout=0.01)
+
+
+def test_follow_up_cancel_before_task_start_does_not_reuse_the_prior_task_id(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.submit("First turn")
+    socket.trigger("task_start", {"threadId": run.id, "taskId": "first-task"})
+    socket.trigger(
+        "new_message",
+        {
+            "id": "first-final",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "First answer",
+            "metadata": {"is_final_response": True},
+        },
+    )
+    socket.trigger("task_end", {"threadId": run.id, "taskId": "first-task"})
+    assert isinstance(run.wait(timeout=0.1), RunResult)
+
+    run.follow_up("Second turn")
+    with pytest.raises(RunTimeoutError):
+        run.cancel(timeout=0.01)
+
+    stop_payloads = [data for event, data in socket.emits if event == "stop"]
+    assert stop_payloads[-1] == {
+        "threadId": run.id,
+        "clientObservedActive": True,
+    }
+    socket.trigger("task_start", {"threadId": run.id, "taskId": "second-task"})
+    assert run.status is RunStatus.CANCELLING
+    assert socket.emits[-1] == (
+        "stop",
+        {
+            "threadId": run.id,
+            "clientObservedActive": True,
+            "taskId": "second-task",
+        },
+    )
+
+
+@settings(max_examples=50, deadline=None, database=None)
+@given(
+    lifecycle_events=st.lists(
+        st.tuples(
+            st.sampled_from(
+                ["task_end", "task_stopping", "thread_stop_released"]
+            ),
+            st.sampled_from([None, "current-task", "stale-task"]),
+        ),
+        max_size=30,
+    )
+)
+def test_task_lifecycle_routing_fuzz_matches_the_active_task_only(
+    lifecycle_events: list[tuple[str, str | None]],
+) -> None:
+    auth_state = CachedAuth(
+        email="scientist@example.com",
+        access_token="dashboard-jwt",
+        url="https://bystro.cloud",
+    )
+    transport = (FakeSession(), FakeSocket())
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.submit("Analyze")
+    socket.trigger("task_start", {"threadId": run.id, "taskId": "current-task"})
+    expected_status = RunStatus.RUNNING
+    cancel_requested = False
+
+    for event, task_id in lifecycle_events:
+        payload: dict[str, object] = {"threadId": run.id}
+        if task_id is not None:
+            payload["taskId"] = task_id
+        task_matches = task_id in {None, "current-task"}
+        if expected_status is not RunStatus.CANCELLED:
+            if event == "task_stopping" and task_matches:
+                cancel_requested = True
+                expected_status = RunStatus.CANCELLING
+            elif (
+                event == "thread_stop_released"
+                and task_matches
+                and cancel_requested
+            ):
+                expected_status = RunStatus.CANCELLED
+        socket.trigger(event, payload)
+        assert run.status is expected_status
+
+
+def test_async_event_iterator_and_wait_return_the_terminal_result(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.submit("Analyze")
+    socket.trigger("task_start", {"threadId": run.id})
+    socket.trigger(
+        "new_message",
+        {
+            "id": "final",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "Done",
+            "metadata": {"is_final_response": True},
+        },
+    )
+    socket.trigger("task_end", {"threadId": run.id})
+
+    async def consume() -> tuple[list[ThinkEvent], RunResult]:
+        events = [event async for event in run.aevents(timeout=1.0)]
+        outcome = await run.await_result(timeout=1.0)
+        assert isinstance(outcome, RunResult)
+        return events, outcome
+
+    events, result = asyncio.run(consume())
+    assert EventKind.COMPLETED in {event.kind for event in events}
+    assert result.output == "Done"
 
 
 @settings(max_examples=50, deadline=None, database=None)

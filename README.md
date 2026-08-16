@@ -117,38 +117,35 @@ The Python package can submit durable agentic workloads to the same Bystro
 Think account used at [bystro.cloud](https://bystro.cloud):
 
 ```python
-from bystro.api import auth
-from bystro.think import NeedsInput, RunOptions, ThinkClient
+from bystro.think import RunOptions, ThinkClient, show_progress
 
-auth.login("you@example.com", "your-password")
 
-with ThinkClient() as client:
-    run = client.submit(
+# Complete the one-time getpass-based login in python/THINK_API.md first.
+with ThinkClient.from_cached_login(on_event=show_progress) as client:
+    run = client.submit_with_progress(
         "Compare the case and control cohorts in these files.",
         files=["cases.vcf.gz", "controls.vcf.gz"],
         options=RunOptions(mode="plus", advanced_planning=True),
     )
-
-    outcome = run.wait()
-    while isinstance(outcome, NeedsInput):
-        print(outcome.prompt)
-        outcome = run.respond(input("> ")).wait()
-
-    print(outcome.output)
+    outcome = run.interact(timeout=3600)
+    print(outcome)
 ```
 
-On deployments with Bystro's shared site-access gate, pass
-`site_access_code=os.environ["BYSTRO_SITE_ACCESS_CODE"]` to `auth.login` or
-`ThinkClient.login`; the gate code is used for that login session and is not
-cached.
+The one-time login uses `getpass` and can include Bystro's shared site-access
+code. Neither the password nor gate code needs to appear in normal scripts;
+only the dashboard JWT is cached with owner-only filesystem permissions.
 
 ```python
-import os
+from getpass import getpass
 
+from bystro.api import auth
+
+
+site_access_code = getpass("Site access code (leave blank if not required): ")
 auth.login(
-    "you@example.com",
-    "your-password",
-    site_access_code=os.environ["BYSTRO_SITE_ACCESS_CODE"],
+    input("Bystro email: ").strip(),
+    getpass("Bystro password: "),
+    site_access_code=site_access_code or None,
 )
 ```
 
@@ -166,8 +163,9 @@ from bystro.think import (
 message = add_genetic_context("annotation-job-id", "Investigate this phenotype")
 message = add_previous_conversation_context("earlier-thread-id", message)
 message = add_artifact_context("existing-artifact-id", message)
-run = client.submit(message)
+run = client.submit_with_progress(message)
 ```
 
-See the [Think Python API guide](python/THINK_API.md) for progress events,
-large uploads, reconnecting to runs, typed errors, and context composition.
+See the [Think Python API guide](python/THINK_API.md) for structured phases and
+heartbeats, chunked uploads, interactive callbacks, cancellation versus detach,
+async iteration, conversation history, and protected result downloads.

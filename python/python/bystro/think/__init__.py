@@ -2,23 +2,20 @@
 
 Typical usage::
 
-    from bystro.api import auth
-    from bystro.think import NeedsInput, ThinkClient
+    from bystro.think import ThinkClient, show_progress
 
-    auth.login("you@example.com", "password")
-    with ThinkClient() as client:
-        run = client.submit("Summarize this cohort", files=["cohort.vcf"])
-        outcome = run.wait()
-        if isinstance(outcome, NeedsInput):
-            outcome = run.respond("Use the case_control column").wait()
-        print(outcome.output)
+    with ThinkClient.from_cached_login(on_event=show_progress) as client:
+        run = client.submit_with_progress(
+            "Summarize this cohort",
+            files=["cohort.vcf"],
+        )
+        outcome = run.interact()
+        print(outcome)
 """
 
 from bystro.think.client import (
     DEFAULT_THINK_URL,
-    ProgressCallback,
     Run,
-    show_progress,
     ThinkClient,
     UploadProgressCallback,
 )
@@ -39,6 +36,7 @@ from bystro.think.context import (
 )
 from bystro.think.errors import (
     InputResponseError,
+    RunCancelledError,
     RunProtocolError,
     RunRejectedError,
     RunTimeoutError,
@@ -56,16 +54,21 @@ from bystro.think.models import (
     InputKind,
     NeedsInput,
     OutputFile,
+    ProgressPhase,
+    ProgressUpdate,
     RunOptions,
     RunOutcome,
     RunResult,
     RunStatus,
+    StreamOperation,
+    StreamUpdate,
     ThinkEvent,
     ThinkMessage,
     UploadedFile,
     UploadPhase,
     UploadProgress,
 )
+from bystro.think.progress import ProgressCallback, ProgressRenderer, show_progress
 
 __all__ = [
     "ArtifactReference",
@@ -82,15 +85,21 @@ __all__ = [
     "MessageWithContext",
     "NeedsInput",
     "OutputFile",
+    "ProgressPhase",
+    "ProgressUpdate",
     "ProgressCallback",
     "PreviousConversation",
+    "ProgressRenderer",
     "Run",
+    "RunCancelledError",
     "RunOptions",
     "RunOutcome",
     "RunProtocolError",
     "RunRejectedError",
     "RunResult",
     "RunStatus",
+    "StreamOperation",
+    "StreamUpdate",
     "RunTimeoutError",
     "show_progress",
     "ThinkAuthenticationError",
