@@ -59,6 +59,10 @@ class RunTimeoutError(ThinkError, TimeoutError):
     """Waiting for a run outcome exceeded the requested timeout."""
 
 
+class RunCancelledError(ThinkError):
+    """The run was durably cancelled rather than merely detached."""
+
+
 class RunProtocolError(ThinkError):
     """The live server sent an incomplete or contradictory run state."""
 
@@ -69,6 +73,7 @@ class InputResponseError(ThinkError):
 
 __all__ = [
     "InputResponseError",
+    "RunCancelledError",
     "RunProtocolError",
     "RunRejectedError",
     "RunTimeoutError",

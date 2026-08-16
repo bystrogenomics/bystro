@@ -6,9 +6,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Literal, Mapping, TypeAlias
+import threading
+from typing import Callable, Literal, Mapping, TypeAlias
 
 ConversationMode: TypeAlias = Literal["base", "plus", "plus2", "phd"]
+StreamOperation: TypeAlias = Literal["append", "replace", "retract"]
 
 
 class RunStatus(str, Enum):
@@ -18,6 +20,7 @@ class RunStatus(str, Enum):
     QUEUED = "queued"
     RUNNING = "running"
     NEEDS_INPUT = "needs_input"
+    CANCELLING = "cancelling"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     CANCELLED = "cancelled"
@@ -39,8 +42,11 @@ class EventKind(str, Enum):
     SUBMITTED = "submitted"
     STARTED = "started"
     PROGRESS = "progress"
+    STREAM = "stream"
     MESSAGE = "message"
     NEEDS_INPUT = "needs_input"
+    CANCELLING = "cancelling"
+    CANCELLED = "cancelled"
     COMPLETED = "completed"
     FAILED = "failed"
 
@@ -150,6 +156,53 @@ class ThinkMessage:
 
 
 @dataclass(frozen=True, slots=True)
+class StreamUpdate:
+    """A typed update derived from a live Socket.IO output frame."""
+
+    message_id: str
+    delta: str
+    operation: StreamOperation
+    content_length: int
+    message_type: str
+    name: str | None = None
+    stream_type: str | None = None
+    is_reasoning: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ProgressPhase:
+    """One backend-owned unit of work in a structured progress update."""
+
+    id: str  # noqa: A003 - mirrors the progress protocol field
+    kind: str
+    state: str
+    label: str
+    detail: str | None = None
+    completed: int | None = None
+    total: int | None = None
+    started_at: datetime | None = None
+    duration_seconds: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ProgressUpdate:
+    """A complete snapshot of the server's current workload phases."""
+
+    done: bool
+    phases: tuple[ProgressPhase, ...]
+
+    @property
+    def active_phase(self) -> ProgressPhase | None:
+        """Return the most relevant current phase, if the snapshot has one."""
+
+        for state in ("active", "pending"):
+            for phase in reversed(self.phases):
+                if phase.state == state:
+                    return phase
+        return self.phases[-1] if self.phases else None
+
+
+@dataclass(frozen=True, slots=True)
 class ThinkEvent:
     """An ordered, SDK-level progress event."""
 
@@ -159,6 +212,8 @@ class ThinkEvent:
     created_at: datetime
     message: str | None = None
     data: Mapping[str, object] = field(default_factory=dict)
+    stream_update: StreamUpdate | None = None
+    progress: ProgressUpdate | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,13 +226,62 @@ class NeedsInput:
     checkpoint_id: str | None
     details: Mapping[str, object] = field(default_factory=dict)
 
+    def _repr_markdown_(self) -> str:
+        """Render the durable input request naturally in notebooks."""
+
+        return self.prompt or f"Input required: {self.kind.value}"
+
+
+OutputFileLoader: TypeAlias = Callable[[], tuple[OutputFile, ...]]
+
 
 @dataclass(frozen=True, slots=True)
 class RunResult:
-    """Successful Think run result."""
+    """Successful Think output with lazily discovered generated files."""
 
     run_id: str
     output: str
+    _file_loader: OutputFileLoader | None = field(
+        default=None,
+        repr=False,
+        compare=False,
+    )
+    _files: tuple[OutputFile, ...] | None = field(
+        default=None,
+        init=False,
+        repr=False,
+        compare=False,
+    )
+    _files_lock: threading.Lock = field(
+        default_factory=threading.Lock,
+        init=False,
+        repr=False,
+        compare=False,
+    )
+
+    @property
+    def files(self) -> tuple[OutputFile, ...]:
+        """Return generated files, loading the protected listing once on demand."""
+
+        with self._files_lock:
+            cached = self._files
+            if cached is None:
+                loader = self._file_loader
+                cached = () if loader is None else tuple(loader())
+                object.__setattr__(self, "_files", cached)
+                object.__setattr__(self, "_file_loader", None)
+            return cached
+
+    @property
+    def artifacts(self) -> tuple[OutputFile, ...]:
+        """Alias for :attr:`files`, matching agent-artifact terminology."""
+
+        return self.files
+
+    def _repr_markdown_(self) -> str:
+        """Render the final Markdown response naturally in notebooks."""
+
+        return self.output
 
 
 RunOutcome: TypeAlias = NeedsInput | RunResult
@@ -191,10 +295,14 @@ __all__ = [
     "InputKind",
     "NeedsInput",
     "OutputFile",
+    "ProgressPhase",
+    "ProgressUpdate",
     "RunOptions",
     "RunOutcome",
     "RunResult",
     "RunStatus",
+    "StreamOperation",
+    "StreamUpdate",
     "ThinkEvent",
     "ThinkMessage",
     "UploadedFile",

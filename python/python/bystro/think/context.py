@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+from datetime import datetime
 import html
 from typing import TypeAlias, TypeVar
 
@@ -22,6 +23,7 @@ class PreviousConversation:
 
     id: str  # noqa: A003 - mirrors the conversation API field
     name: str | None = None
+    created_at: datetime | None = None
 
     def __post_init__(self) -> None:
         if not self.id.strip():
