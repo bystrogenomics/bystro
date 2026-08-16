@@ -7,11 +7,11 @@ resume by run ID.
 
 ## Install
 
-Bystro 2.1 supports CPython 3.11 and 3.12. Activate the environment you want
+Bystro 2.1.1 supports CPython 3.11 and 3.12. Activate the environment you want
 to use, confirm it with `python --version`, and install from PyPI:
 
 ```sh
-python -m pip install "bystro>=2.1.0,<2.2"
+python -m pip install "bystro>=2.1.1,<2.2"
 ```
 
 Production endpoints use publicly trusted HTTPS certificates, so no custom CA
@@ -75,6 +75,202 @@ and Think API routes while retaining its challenge on browser pages.
 The SDK exchanges that dashboard session through Think's existing cookie-auth
 admission endpoint. The application credential created by Think remains on the
 server; it is not copied into local code or exposed as a second API key.
+
+## Customer quickstart: complete examples
+
+Start with this shared setup. Credentials come from environment variables, and
+the `wait_for_result` loop handles any number of durable clarification or plan
+review pauses while progress continues to stream. A billing pause must be
+resolved in the dashboard before refreshing the run.
+
+```python
+import os
+
+from bystro.think import (
+    InputKind,
+    NeedsInput,
+    Run,
+    RunResult,
+    ThinkClient,
+    show_progress,
+)
+
+
+def login() -> ThinkClient:
+    return ThinkClient.login(
+        os.environ["BYSTRO_EMAIL"],
+        os.environ["BYSTRO_PASSWORD"],
+        site_access_code=os.environ.get("BYSTRO_SITE_ACCESS_CODE"),
+        on_event=show_progress,
+    )
+
+
+def wait_for_result(run: Run) -> RunResult:
+    while True:
+        outcome = run.wait(timeout=3600)
+        if not isinstance(outcome, NeedsInput):
+            return outcome
+
+        print(f"\n{outcome.prompt}")
+        if outcome.kind is InputKind.BILLING:
+            input("Resolve billing in the dashboard, then press Enter: ")
+            run.refresh()
+            continue
+
+        run.respond(input("> "))
+```
+
+Set credentials before running an example:
+
+```sh
+export BYSTRO_EMAIL="you@example.com"
+export BYSTRO_PASSWORD="your-password"
+export BYSTRO_SITE_ACCESS_CODE="your-site-code"  # omit when not required
+```
+
+### 1. Submit a question with live progress
+
+`submit_with_progress` installs the concise progress renderer automatically.
+Passing `show_progress` at login also reports connection and reconnect events.
+The final answer remains available as the typed `RunResult.output` value.
+
+```python
+with login() as client:
+    run = client.submit_with_progress(
+        "Research the latest CAR-T therapies and cite primary sources."
+    )
+    result = wait_for_result(run)
+
+    print("\n--- Final response ---\n")
+    print(result.output)
+```
+
+Progress is based on durable server lifecycle and status events; it is not a
+token-by-token stream of the final prose.
+
+### 2. Submit a question with files
+
+Paths passed through `files` are uploaded first and then attached to the same
+question. Large files automatically use the resumable, chunked upload path.
+
+```python
+from bystro.think import UploadProgress
+
+
+def report_upload(progress: UploadProgress) -> None:
+    print(
+        f"[upload:{progress.phase.value}] {progress.fraction:.0%}",
+        flush=True,
+    )
+
+
+with login() as client:
+    run = client.submit_with_progress(
+        "Analyze the cohort using the attached phenotype table.",
+        files=["cohort.vcf.gz", "phenotypes.tsv"],
+        on_upload_progress=report_upload,
+    )
+    result = wait_for_result(run)
+    print(result.output)
+```
+
+### 3. Submit with genetic, conversation, and artifact context
+
+The `add_*_context` helpers accept a string or an existing
+`MessageWithContext`, so context can be built one layer at a time. Existing
+references are resolved under the authenticated user's ownership.
+
+```python
+import os
+
+from bystro.think import (
+    add_artifact_context,
+    add_genetic_context,
+    add_previous_conversation_context,
+)
+
+
+with login() as client:
+    artifact = client.upload_artifact("study-notes.pdf")
+
+    message = "Re-evaluate the strongest phenotype associations."
+    message = add_genetic_context(
+        os.environ["BYSTRO_JOB_ID"],
+        message,
+        name="Case cohort",
+        assembly="hg38",
+    )
+    message = add_previous_conversation_context(
+        os.environ["BYSTRO_PRIOR_THREAD_ID"],
+        message,
+        name="Previous analysis",
+    )
+    message = add_artifact_context(artifact, message)
+
+    run = client.submit_with_progress(message)
+    result = wait_for_result(run)
+    print(result.output)
+```
+
+For a reusable higher-order context pipeline:
+
+```python
+from bystro.think import (
+    artifact_context,
+    compose_context,
+    genetic_context,
+    previous_conversation_context,
+)
+
+add_study_context = compose_context(
+    genetic_context("annotation-job-id", assembly="hg38"),
+    previous_conversation_context("prior-thread-id"),
+    artifact_context("existing-artifact-id"),
+)
+
+message = add_study_context("Compare the strongest signals.")
+```
+
+### 4. List conversations, browse results, and download files
+
+`list_conversations` returns the authenticated user's conversations newest
+first and transparently follows every cursor page. Pass `search` to filter by
+conversation name. Resume a returned ID to browse or download its protected
+output files through the same authenticated session.
+
+```python
+from pathlib import Path
+
+
+with login() as client:
+    conversations = client.list_conversations(search="CAR-T")
+    for conversation in conversations:
+        print(conversation.id, conversation.name)
+
+    if not conversations:
+        raise RuntimeError("No matching conversations")
+
+    previous_run = client.resume(conversations[0].id)
+    files = previous_run.output_files()
+    for output_file in files:
+        print(output_file.path, output_file.size)
+
+    if files:
+        downloaded = previous_run.download_file(
+            files[0],
+            Path("downloads") / files[0].path,
+        )
+        print("Downloaded:", downloaded)
+
+    archive = previous_run.download_all(
+        Path("downloads") / f"{previous_run.id}.tar"
+    )
+    print("Archive:", archive)
+```
+
+`download_file` and `download_all` stream to a temporary file and only publish
+the destination after the authenticated download completes. Existing targets
+are not overwritten unless `overwrite=True` is passed explicitly.
 
 ## Upload files and submit them with a question
 
@@ -196,20 +392,30 @@ billing action in the dashboard; then call `run.refresh()`.
 
 ## Progress and reconnects
 
-Pass a callback to the client for all runs, or to `wait` for one wait cycle:
+`submit_with_progress` uses `show_progress`; use `submit` for silent workloads:
 
 ```python
-def progress(event):
-    print(event.sequence, event.kind.value, event.message or "")
+from bystro.think import ThinkClient, show_progress
 
-client = ThinkClient(on_event=progress)
-run = client.submit("Perform a GWAS", files=["cohort.vcf.gz"])
-result = run.wait()
+with ThinkClient.login(
+    "you@example.com", "your-password", on_event=show_progress
+) as client:
+    run = client.submit_with_progress("Perform a GWAS", files=["cohort.vcf.gz"])
+    result = run.wait()
 ```
 
-Alternatively, omit the client-level callback and pass `on_event=progress` to
-one `wait()` call. Do not pass the same callback at both levels unless duplicate
-delivery is intentional.
+## Browse and download generated results
+
+```python
+conversations = client.list_conversations(search="CAR-T")
+for conversation in conversations:
+    print(conversation.id, conversation.name)
+
+files = run.output_files()
+print([(output_file.path, output_file.size) for output_file in files])
+image = run.download_file(files[0], "downloads/duck.png")
+archive = run.download_all("downloads/all-results.tar")
+```
 
 The durable run ID is available immediately after admission:
 

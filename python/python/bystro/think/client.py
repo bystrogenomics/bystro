@@ -50,6 +50,7 @@ from bystro.think.models import (
     FileInput,
     InputKind,
     NeedsInput,
+    OutputFile,
     RunOptions,
     RunOutcome,
     RunResult,
@@ -76,12 +77,38 @@ _MAX_EVENT_HISTORY = 2_000
 ProgressCallback: TypeAlias = Callable[[ThinkEvent], None]
 UploadProgressCallback: TypeAlias = Callable[[UploadProgress], None]
 
+_PROGRESS_MESSAGES: dict[EventKind, str] = {
+    EventKind.SUBMITTED: "Workload submitted",
+    EventKind.STARTED: "Analysis started",
+    EventKind.NEEDS_INPUT: "Input required",
+    EventKind.COMPLETED: "Analysis complete",
+}
+
+
+def show_progress(event: ThinkEvent) -> None:
+    """Print concise live progress without echoing prompts or final results."""
+
+    if event.kind is EventKind.MESSAGE or event.message == "progress":
+        return
+    if (
+        event.kind is EventKind.DISCONNECTED
+        and event.message
+        and ("client disconnect" in event.message.casefold())
+    ):
+        return
+    message = _PROGRESS_MESSAGES.get(event.kind, event.message)
+    print(f"[{event.kind.value}] {message or event.kind.value}", flush=True)
+
 
 class _Response(Protocol):
     status_code: int
     reason: str
 
     def json(self) -> object: ...
+
+    def iter_content(self, chunk_size: int) -> Iterator[bytes]: ...
+
+    def close(self) -> None: ...
 
 
 class _CookieJar(Protocol):
@@ -174,6 +201,16 @@ def _normalize_artifact_path(
     if parts[0] == ".metadata":
         raise ValueError("Artifact path uses a reserved folder")
     return "/".join(parts)
+
+
+def _normalize_output_path(output_path: str) -> str:
+    normalized = output_path.strip()
+    if not normalized or normalized.startswith(("/", "\\")) or "\\" in normalized:
+        raise ValueError("output file path must be a non-empty relative path")
+    parts = normalized.split("/")
+    if ".." in normalized or any(not part or part == "." for part in parts):
+        raise ValueError("output file path contains invalid components")
+    return normalized
 
 
 def _json_payload(response: _Response) -> dict[str, object]:
@@ -279,6 +316,29 @@ def _uploaded_file(payload: Mapping[str, object]) -> UploadedFile:
     )
 
 
+def _output_file(payload: Mapping[str, object]) -> OutputFile:
+    name = _text(payload.get("name"))
+    raw_path = _text(payload.get("path"))
+    raw_size = payload.get("size")
+    raw_modified = payload.get("modified")
+    raw_created = payload.get("created")
+    if name is None or raw_path is None:
+        raise RunProtocolError("Think output listing omitted a file name or path")
+    path = _normalize_output_path(raw_path)
+    if path.rsplit("/", maxsplit=1)[-1] != name:
+        raise RunProtocolError("Think output listing returned a mismatched file name")
+    if isinstance(raw_size, bool) or not isinstance(raw_size, int) or raw_size < 0:
+        raise RunProtocolError("Think output listing returned an invalid file size")
+    if (
+        isinstance(raw_modified, bool)
+        or not isinstance(raw_modified, (int, float))
+        or isinstance(raw_created, bool)
+        or not isinstance(raw_created, (int, float))
+    ):
+        raise RunProtocolError("Think output listing returned invalid timestamps")
+    return OutputFile(name, path, raw_size, float(raw_modified), float(raw_created))
+
+
 @dataclass(slots=True)
 class _RunTracker:
     run_id: str | None
@@ -299,6 +359,7 @@ class _RunTracker:
     task_ended_at: float | None = None
     refresh_requested: bool = False
     awaiting_transcript: bool = False
+    progress_callback: ProgressCallback | None = None
 
 
 class ThinkClient:
@@ -633,9 +694,10 @@ class ThinkClient:
             if len(tracker.events) > _MAX_EVENT_HISTORY:
                 del tracker.events[: len(tracker.events) - _MAX_EVENT_HISTORY]
             tracker.condition.notify_all()
-        if self._on_event is not None:
+        callback = tracker.progress_callback or self._on_event
+        if callback is not None:
             try:
-                self._on_event(event)
+                callback(event)
             except Exception:
                 logger.warning("Think progress callback failed", exc_info=True)
         return event
@@ -1149,6 +1211,46 @@ class ThinkClient:
     ) -> "Run":
         """Upload inputs and submit a new Think workload."""
 
+        return self._submit(
+            prompt,
+            files=files,
+            datasets=datasets,
+            options=options,
+            on_upload_progress=on_upload_progress,
+            progress_callback=None,
+        )
+
+    def submit_with_progress(
+        self,
+        prompt: MessageInput,
+        *,
+        files: Iterable[FileInput] = (),
+        datasets: Iterable[Dataset] = (),
+        options: RunOptions | None = None,
+        on_upload_progress: UploadProgressCallback | None = None,
+        on_event: ProgressCallback | None = None,
+    ) -> "Run":
+        """Submit a workload and render live progress by default."""
+
+        return self._submit(
+            prompt,
+            files=files,
+            datasets=datasets,
+            options=options,
+            on_upload_progress=on_upload_progress,
+            progress_callback=on_event or self._on_event or show_progress,
+        )
+
+    def _submit(
+        self,
+        prompt: MessageInput,
+        *,
+        files: Iterable[FileInput],
+        datasets: Iterable[Dataset],
+        options: RunOptions | None,
+        on_upload_progress: UploadProgressCallback | None,
+        progress_callback: ProgressCallback | None,
+    ) -> "Run":
         message = prompt if isinstance(prompt, MessageWithContext) else MessageWithContext(prompt)
         normalized_prompt = message.prompt.strip()
         self._assert_can_activate()
@@ -1161,7 +1263,11 @@ class ThinkClient:
             ]
         )
         resolved_datasets = self._unique_datasets([*message.datasets, *datasets])
-        tracker = _RunTracker(run_id=None, options=resolved_options)
+        tracker = _RunTracker(
+            run_id=None,
+            options=resolved_options,
+            progress_callback=progress_callback,
+        )
         with self._state_lock:
             self._active_tracker = tracker
         message_id = str(uuid.uuid4())
@@ -1515,6 +1621,161 @@ class ThinkClient:
         payload = _raise_for_response(response, action="artifact lookup")
         return _uploaded_file(payload)
 
+    def list_conversations(
+        self,
+        *,
+        search: str | None = None,
+        page_size: int = 50,
+    ) -> tuple[PreviousConversation, ...]:
+        """List the authenticated user's conversations, newest first."""
+
+        if not 1 <= page_size <= 1_000:
+            raise ValueError("page_size must be between 1 and 1000")
+        self.connect()
+        conversations: list[PreviousConversation] = []
+        cursor: str | None = None
+        normalized_search = _text(search)
+        while True:
+            try:
+                response = self._session.post(
+                    f"{self.think_url}/project/threads",
+                    json={
+                        "pagination": {"first": page_size, "cursor": cursor},
+                        "filter": {"search": normalized_search},
+                    },
+                    timeout=self._http_timeout,
+                    allow_redirects=False,
+                )
+            except requests.RequestException as exc:
+                raise ThinkConnectionError("Could not list Think conversations") from exc
+            try:
+                payload = _raise_for_response(response, action="conversation listing")
+            finally:
+                try:
+                    response.close()
+                except Exception:
+                    logger.warning("Think conversation listing cleanup failed", exc_info=True)
+            raw_conversations = payload.get("data")
+            page_info = _mapping(payload.get("pageInfo"))
+            has_next_page = page_info.get("hasNextPage")
+            if not isinstance(raw_conversations, list) or not isinstance(has_next_page, bool):
+                raise RunProtocolError("Think returned an invalid conversation listing")
+            for raw_conversation in cast(list[object], raw_conversations):
+                conversation = _mapping(raw_conversation)
+                conversation_id = _text(conversation.get("id"))
+                if conversation_id is None:
+                    raise RunProtocolError("Think conversation listing omitted an id")
+                conversations.append(
+                    PreviousConversation(conversation_id, _text(conversation.get("name")))
+                )
+            if not has_next_page:
+                return tuple(conversations)
+            next_cursor = _text(page_info.get("endCursor"))
+            if next_cursor is None or next_cursor == cursor:
+                raise RunProtocolError("Think conversation pagination did not advance")
+            cursor = next_cursor
+
+    def _list_output_files(
+        self,
+        run_id: str,
+        *,
+        page_size: int,
+    ) -> tuple[OutputFile, ...]:
+        if not 1 <= page_size <= 1_000:
+            raise ValueError("page_size must be between 1 and 1000")
+        self.connect()
+        files: list[OutputFile] = []
+        offset = 0
+        while True:
+            try:
+                response = self._session.get(
+                    f"{self.think_url}/api/user-output/list",
+                    params={"thread_id": run_id, "limit": page_size, "offset": offset},
+                    timeout=self._http_timeout,
+                    allow_redirects=False,
+                )
+            except requests.RequestException as exc:
+                raise ThinkConnectionError("Could not list Think output files") from exc
+            try:
+                payload = _raise_for_response(response, action="output listing")
+            finally:
+                try:
+                    response.close()
+                except Exception:
+                    logger.warning("Think output listing cleanup failed", exc_info=True)
+            raw_files = payload.get("files")
+            has_more = payload.get("hasMore")
+            if not isinstance(raw_files, list) or not isinstance(has_more, bool):
+                raise RunProtocolError("Think returned an invalid output listing")
+            page = [_output_file(_mapping(item)) for item in cast(list[object], raw_files)]
+            files.extend(page)
+            if not has_more:
+                return tuple(files)
+            if not page:
+                raise RunProtocolError("Think output pagination did not advance")
+            offset += len(page)
+
+    def _download_output(
+        self,
+        *,
+        route: str,
+        run_id: str,
+        destination: str | Path | None,
+        default_name: str,
+        overwrite: bool,
+        chunk_size: int,
+    ) -> Path:
+        if chunk_size <= 0:
+            raise ValueError("chunk_size must be positive")
+        target = Path(destination).expanduser() if destination is not None else Path(default_name)
+        if target.is_dir():
+            target /= default_name
+        if target.exists() and not overwrite:
+            raise FileExistsError(f"download destination already exists: {target}")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        self.connect()
+        try:
+            response = self._session.get(
+                f"{self.think_url}{route}",
+                params={"thread_id": run_id},
+                timeout=self._http_timeout,
+                allow_redirects=False,
+                stream=True,
+            )
+        except requests.RequestException as exc:
+            raise ThinkConnectionError("Could not download Think output") from exc
+        temporary = target.with_name(f".{target.name}.{uuid.uuid4().hex}.part")
+        completed = False
+        try:
+            if not 200 <= response.status_code < 300:
+                _raise_for_response(response, action="output download")
+            try:
+                with temporary.open("xb") as handle:
+                    for chunk in response.iter_content(chunk_size=chunk_size):
+                        if chunk:
+                            handle.write(chunk)
+            except requests.RequestException as exc:
+                raise ThinkConnectionError("Think output download was interrupted") from exc
+            if overwrite:
+                temporary.replace(target)
+            else:
+                target.hardlink_to(temporary)
+                temporary.unlink()
+            completed = True
+            return target
+        finally:
+            try:
+                response.close()
+            except Exception:
+                logger.warning("Think download response cleanup failed", exc_info=True)
+            if not completed:
+                try:
+                    temporary.unlink(missing_ok=True)
+                except OSError:
+                    logger.warning("Think partial download cleanup failed", exc_info=True)
+                except Exception:
+                    logger.warning("Unexpected Think download cleanup failure", exc_info=True)
+
     def _upload_chunk(
         self,
         *,
@@ -1854,11 +2115,55 @@ class Run:
         self._client._refresh(self._tracker)
         return self
 
+    def output_files(self, *, page_size: int = 500) -> tuple[OutputFile, ...]:
+        """Return every generated output file, transparently paginating."""
+
+        return self._client._list_output_files(self.id, page_size=page_size)
+
+    def download_file(
+        self,
+        output: OutputFile | str,
+        destination: str | Path | None = None,
+        *,
+        overwrite: bool = False,
+        chunk_size: int = 1024 * 1024,
+    ) -> Path:
+        """Stream one generated file to disk through the authenticated session."""
+
+        output_path = _normalize_output_path(output.path if isinstance(output, OutputFile) else output)
+        return self._client._download_output(
+            route=f"/api/user-output/download/{quote(output_path, safe='/')}",
+            run_id=self.id,
+            destination=destination,
+            default_name=output_path.rsplit("/", maxsplit=1)[-1],
+            overwrite=overwrite,
+            chunk_size=chunk_size,
+        )
+
+    def download_all(
+        self,
+        destination: str | Path | None = None,
+        *,
+        overwrite: bool = False,
+        chunk_size: int = 1024 * 1024,
+    ) -> Path:
+        """Stream all generated files to an uncompressed tar archive."""
+
+        return self._client._download_output(
+            route="/api/user-output/download-all",
+            run_id=self.id,
+            destination=destination,
+            default_name=f"output-{self.id}.tar",
+            overwrite=overwrite,
+            chunk_size=chunk_size,
+        )
+
 
 __all__ = [
     "DEFAULT_THINK_URL",
     "ProgressCallback",
     "Run",
+    "show_progress",
     "ThinkClient",
     "UploadProgressCallback",
 ]
