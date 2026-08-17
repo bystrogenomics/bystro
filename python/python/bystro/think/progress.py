@@ -48,6 +48,8 @@ def _common_prefix_length(left: str, right: str) -> int:
 @dataclass(slots=True)
 class _ProgressRenderState:
     last_progress: str | None = None
+    heartbeat_progress: str | None = None
+    structured_heartbeat_active: bool = False
     last_progress_at: datetime | None = None
     turn_started_at: datetime | None = None
     needs_input_rendered: bool = False
@@ -140,10 +142,17 @@ class ProgressRenderer:
                 elapsed = max(0, int(now - started_at))
                 minutes, seconds = divmod(elapsed, 60)
                 elapsed_text = f"{minutes}m {seconds}s" if minutes else f"{seconds}s"
+                current_phase = state.heartbeat_progress
+                message = (
+                    f"{current_phase} ({elapsed_text} elapsed)"
+                    if current_phase
+                    and current_phase not in _GENERIC_PROGRESS_MESSAGES
+                    else f"Still working... ({elapsed_text} elapsed)"
+                )
                 self._write_status(
                     state,
                     EventKind.PROGRESS,
-                    f"Still working... ({elapsed_text} elapsed)",
+                    message,
                 )
                 state.last_progress_at = datetime.now(timezone.utc)
                 state.last_activity_monotonic = now
@@ -160,6 +169,27 @@ class ProgressRenderer:
         state.heartbeat_stop = stop
         state.heartbeat_thread = thread
         thread.start()
+
+    def _begin_turn(
+        self,
+        state: _ProgressRenderState,
+        created_at: datetime,
+    ) -> None:
+        self._stop_heartbeat(state)
+        state.turn += 1
+        state.started_turn = -1
+        state.waiting_for_submission = False
+        state.needs_input_rendered = False
+        state.last_progress = None
+        state.heartbeat_progress = None
+        state.structured_heartbeat_active = False
+        state.last_progress_at = None
+        state.generic_progress_seen.clear()
+        state.turn_started_at = created_at
+        state.turn_started_monotonic = time.monotonic()
+        state.last_activity_monotonic = state.turn_started_monotonic
+        state.visible_message_id = None
+        state.visible_content = ""
 
     def _write_status(
         self,
@@ -181,13 +211,13 @@ class ProgressRenderer:
         update: StreamUpdate,
         created_at: datetime,
     ) -> None:
-        state.last_activity_monotonic = time.monotonic()
         if update.is_reasoning:
             message = "Thinking..."
             if message in state.generic_progress_seen:
                 return
             state.generic_progress_seen.add(message)
             self._write_status(state, EventKind.PROGRESS, message)
+            state.last_activity_monotonic = time.monotonic()
             state.last_progress = message
             state.last_progress_at = created_at
             return
@@ -196,6 +226,7 @@ class ProgressRenderer:
         if update.operation == "retract":
             self._close_stream_line(state)
             print("[stream restarted]", file=self._output(), flush=True)
+            state.last_activity_monotonic = time.monotonic()
             state.stream_message_id = None
             if state.visible_message_id == update.message_id:
                 state.visible_message_id = None
@@ -214,11 +245,13 @@ class ProgressRenderer:
                 file=self._output(),
                 flush=True,
             )
+            state.last_activity_monotonic = time.monotonic()
             state.stream_message_id = update.message_id
             visible_delta = update.delta[unchanged_prefix:]
         elif state.stream_message_id != update.message_id:
             self._close_stream_line(state)
             print("[stream]", file=self._output(), flush=True)
+            state.last_activity_monotonic = time.monotonic()
             state.stream_message_id = update.message_id
 
         if update.operation == "replace":
@@ -234,6 +267,7 @@ class ProgressRenderer:
             output = self._output()
             output.write(terminal_delta)
             output.flush()
+            state.last_activity_monotonic = time.monotonic()
             state.stream_line_open = bool(terminal_delta) and not terminal_delta.endswith("\n")
 
     @staticmethod
@@ -275,19 +309,7 @@ class ProgressRenderer:
             ):
                 return
             if event.kind is EventKind.SUBMITTED:
-                self._stop_heartbeat(state)
-                state.turn += 1
-                state.started_turn = -1
-                state.waiting_for_submission = False
-                state.needs_input_rendered = False
-                state.last_progress = None
-                state.last_progress_at = None
-                state.generic_progress_seen.clear()
-                state.turn_started_at = event.created_at
-                state.turn_started_monotonic = time.monotonic()
-                state.last_activity_monotonic = state.turn_started_monotonic
-                state.visible_message_id = None
-                state.visible_content = ""
+                self._begin_turn(state, event.created_at)
                 self._write_status(state, event.kind, _PROGRESS_MESSAGES[event.kind])
                 if state.pending_started:
                     self._write_status(
@@ -300,6 +322,16 @@ class ProgressRenderer:
                 self._start_heartbeat(event.run_id, state)
                 return
             if event.kind is EventKind.STARTED:
+                if event.data.get("resumed") is True:
+                    self._begin_turn(state, event.created_at)
+                    state.started_turn = state.turn
+                    self._write_status(
+                        state,
+                        event.kind,
+                        event.message or "Analysis resumed",
+                    )
+                    self._start_heartbeat(event.run_id, state)
+                    return
                 if state.waiting_for_submission or state.turn == 0:
                     state.pending_started = True
                     return
@@ -314,6 +346,17 @@ class ProgressRenderer:
                     if event.progress is not None
                     else None
                 )
+                if event.progress is not None:
+                    phase = event.progress.active_phase
+                    structured_progress = (
+                        progress_message
+                        if not event.progress.done
+                        and phase is not None
+                        and phase.state in {"active", "pending"}
+                        else None
+                    )
+                    state.heartbeat_progress = structured_progress
+                    state.structured_heartbeat_active = structured_progress is not None
                 if progress_message is None:
                     detail = event.data.get("detail")
                     progress_message = (
@@ -323,6 +366,11 @@ class ProgressRenderer:
                     )
                 if progress_message is None or progress_message == "progress":
                     return
+                if (
+                    event.data.get("activity") == progress_message
+                    and not state.structured_heartbeat_active
+                ):
+                    state.heartbeat_progress = progress_message
                 generic_progress = (
                     event.progress is None
                     and progress_message in _GENERIC_PROGRESS_MESSAGES
@@ -352,7 +400,12 @@ class ProgressRenderer:
                     elapsed_text = (
                         f"{minutes}m {seconds}s" if minutes else f"{seconds}s"
                     )
-                    message = f"Still working... ({elapsed_text} elapsed)"
+                    current_phase = state.heartbeat_progress
+                    message = (
+                        f"{current_phase} ({elapsed_text} elapsed)"
+                        if current_phase
+                        else f"Still working... ({elapsed_text} elapsed)"
+                    )
                 else:
                     state.last_progress = progress_message
                     state.last_progress_at = event.created_at

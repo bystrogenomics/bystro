@@ -18,6 +18,8 @@ from bystro.api import auth as dashboard_auth
 from bystro.api.auth import CachedAuth
 import bystro.think.client as think_client_module
 from bystro.think import (
+    BillingTopUpApproval,
+    BillingTopUpRequest,
     Dataset,
     EventKind,
     InputKind,
@@ -30,6 +32,7 @@ from bystro.think import (
     ProgressUpdate,
     ProgressRenderer,
     RunCancelledError,
+    RunFailedError,
     RunOptions,
     RunProtocolError,
     RunRejectedError,
@@ -39,6 +42,7 @@ from bystro.think import (
     StreamUpdate,
     ThinkClient,
     ThinkAuthenticationError,
+    ThinkBillingRequiredError,
     ThinkEvent,
     ThinkConnectionError,
     ThinkHTTPError,
@@ -86,7 +90,9 @@ class FakeSession:
     def __init__(self) -> None:
         self.cookies = requests.cookies.RequestsCookieJar()
         self.posts: list[tuple[str, dict[str, object]]] = []
+        self.puts: list[tuple[str, dict[str, object]]] = []
         self.gets: list[tuple[str, dict[str, object]]] = []
+        self.spend_cap_responses: list[FakeResponse] = []
         self.upload_responses: list[FakeResponse] = []
         self.status_responses: list[FakeResponse] = []
         self.artifact_responses: dict[str, FakeResponse] = {}
@@ -117,6 +123,12 @@ class FakeSession:
             return self.artifact_responses[artifact_id]
         raise AssertionError(f"unexpected GET {url}")
 
+    def put(self, url: str, **kwargs: object) -> FakeResponse:
+        self.puts.append((url, kwargs))
+        if url.endswith("/user/billing/spend-cap"):
+            return self.spend_cap_responses.pop(0)
+        raise AssertionError(f"unexpected PUT {url}")
+
     def close(self) -> None:
         return None
 
@@ -135,6 +147,7 @@ class FakeSocket:
             "created": True,
             "dispatched": True,
         }
+        self.message_acks: list[dict[str, object]] = []
         self.call_hook: Callable[[str, object, float | None], None] | None = None
         self.emit_hook: Callable[[str, object], None] | None = None
 
@@ -178,6 +191,8 @@ class FakeSocket:
             assert isinstance(data, dict)
             return {"success": True, "threadId": data["threadId"]}
         if event == "client_message":
+            if self.message_acks:
+                return dict(self.message_acks.pop(0))
             return dict(self.next_message_ack)
         if event == "action":
             return {"success": True}
@@ -217,6 +232,7 @@ def make_client(
     transport: tuple[FakeSession, FakeSocket],
     *,
     on_event: Callable[[ThinkEvent], None] | None = None,
+    on_billing_required: think_client_module.BillingApprovalCallback | None = None,
     upload_chunk_size: int = 10 * 1024 * 1024,
     sleep: Callable[[float], None] = time.sleep,
     finalization_timeout: float = 10.0,
@@ -227,6 +243,7 @@ def make_client(
         auth=auth_state,
         think_url="https://ai.bystro.cloud",
         on_event=on_event,
+        on_billing_required=on_billing_required,
         _session=session,
         _socket_factory=lambda **_kwargs: socket,
         upload_chunk_size=upload_chunk_size,
@@ -405,6 +422,36 @@ def test_submit_with_progress_is_the_canonical_concise_renderer(
     ]
 
 
+def test_live_agent_activity_is_exposed_as_progress(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    events: list[ThinkEvent] = []
+    _session, socket = transport
+    client = make_client(auth_state, transport, on_event=events.append)
+    run = client.submit("Analyze")
+
+    socket.trigger(
+        "new_message",
+        {
+            "id": "agent-execution",
+            "threadId": run.id,
+            "type": "run",
+            "output": "",
+            "metadata": {
+                "section": "intermediate_outputs",
+                "activity": "Sketching the Python analysis",
+            },
+        },
+    )
+
+    activity_event = next(event for event in events if event.data.get("activity"))
+    assert activity_event.kind is EventKind.PROGRESS
+    assert activity_event.message == "Sketching the Python analysis"
+    assert activity_event.data["section"] == "intermediate_outputs"
+    assert activity_event.data["activity"] == "Sketching the Python analysis"
+
+
 def test_progress_renderer_coalesces_repeated_overlay_snapshots(
     auth_state: CachedAuth,
     transport: tuple[FakeSession, FakeSocket],
@@ -464,6 +511,51 @@ def test_progress_renderer_coalesces_alternating_generic_states() -> None:
     rendered = output.getvalue()
     assert rendered.count("[progress] Thinking...") == 1
     assert rendered.count("[progress] Processing...") == 1
+
+
+def test_progress_renderer_streams_user_visible_plan_sections() -> None:
+    output = StringIO()
+    renderer = ProgressRenderer(file=output, heartbeat_interval=30.0)
+    started_at = datetime(2026, 8, 15, tzinfo=timezone.utc)
+
+    renderer(ThinkEvent(1, EventKind.SUBMITTED, "thread-1", started_at))
+    renderer(
+        ThinkEvent(
+            2,
+            EventKind.STREAM,
+            "thread-1",
+            started_at + timedelta(seconds=1),
+            stream_update=StreamUpdate(
+                message_id="plan-message",
+                delta="## Proposed analysis plan\nReview the evidence.",
+                operation="append",
+                content_length=46,
+                message_type="assistant_message",
+                stream_type="text",
+                section="plan",
+            ),
+        )
+    )
+    renderer(
+        ThinkEvent(
+            3,
+            EventKind.STREAM,
+            "thread-1",
+            started_at + timedelta(seconds=2),
+            stream_update=StreamUpdate(
+                message_id="answer",
+                delta="Customer-facing answer.",
+                operation="append",
+                content_length=23,
+                message_type="assistant_message",
+                stream_type="text",
+            ),
+        )
+    )
+
+    rendered = output.getvalue()
+    assert "Proposed analysis plan" in rendered
+    assert "Customer-facing answer." in rendered
 
 
 def test_progress_renderer_turns_repeated_processing_into_elapsed_heartbeats() -> None:
@@ -582,6 +674,241 @@ def test_progress_renderer_emits_elapsed_heartbeat_without_server_frames() -> No
 
     assert "Still working" in rendered_after_completion
     assert output.getvalue() == rendered_after_completion
+
+
+def test_resumed_active_run_starts_elapsed_heartbeat_without_task_start(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    output = StringIO()
+    renderer = ProgressRenderer(file=output, heartbeat_interval=0.02)
+    _session, socket = transport
+    client = make_client(auth_state, transport, on_event=renderer)
+
+    run = client.resume("thread-active")
+    socket.trigger(
+        "resume_thread",
+        {
+            "id": "thread-active",
+            "steps": [
+                {
+                    "id": "user-active",
+                    "threadId": "thread-active",
+                    "type": "user_message",
+                    "output": "Analyze",
+                    "metadata": {},
+                }
+            ],
+            "elements": [],
+        },
+    )
+    deadline = time.monotonic() + 0.5
+    while "Still working" not in output.getvalue() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    run.detach()
+
+    rendered = output.getvalue()
+    assert "[started] Analysis resumed" in rendered
+    assert "Still working" in rendered
+
+
+def test_progress_renderer_heartbeat_repeats_the_current_meaningful_phase() -> None:
+    output = StringIO()
+    renderer = ProgressRenderer(file=output, heartbeat_interval=0.02)
+    now = datetime.now(timezone.utc)
+
+    renderer(ThinkEvent(1, EventKind.SUBMITTED, "thread-1", now))
+    renderer(
+        ThinkEvent(
+            2,
+            EventKind.PROGRESS,
+            "thread-1",
+            now,
+            progress=ProgressUpdate(
+                done=False,
+                phases=(
+                    ProgressPhase(
+                        id="search-1",
+                        kind="search",
+                        state="active",
+                        label="Gathering the evidence…",
+                        detail="Reading primary sources",
+                    ),
+                ),
+            ),
+        )
+    )
+    deadline = time.monotonic() + 0.5
+    while "elapsed)" not in output.getvalue() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    renderer(
+        ThinkEvent(3, EventKind.COMPLETED, "thread-1", datetime.now(timezone.utc))
+    )
+
+    rendered = output.getvalue()
+    assert "Gathering the evidence… — Reading primary sources" in rendered
+    assert "Gathering the evidence… — Reading primary sources (" in rendered
+    assert "elapsed)" in rendered
+
+
+def test_progress_renderer_does_not_repeat_a_completed_phase() -> None:
+    output = StringIO()
+    renderer = ProgressRenderer(file=output, heartbeat_interval=0.02)
+    now = datetime.now(timezone.utc)
+
+    renderer(ThinkEvent(1, EventKind.SUBMITTED, "thread-1", now))
+    renderer(
+        ThinkEvent(
+            2,
+            EventKind.PROGRESS,
+            "thread-1",
+            now,
+            progress=ProgressUpdate(
+                done=False,
+                phases=(
+                    ProgressPhase(
+                        id="search-1",
+                        kind="search",
+                        state="active",
+                        label="Searching sources",
+                    ),
+                ),
+            ),
+        )
+    )
+    renderer(
+        ThinkEvent(
+            3,
+            EventKind.PROGRESS,
+            "thread-1",
+            now,
+            progress=ProgressUpdate(
+                done=True,
+                phases=(
+                    ProgressPhase(
+                        id="search-1",
+                        kind="search",
+                        state="done",
+                        label="Search complete",
+                    ),
+                ),
+            ),
+        )
+    )
+    deadline = time.monotonic() + 0.5
+    while "Still working" not in output.getvalue() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    renderer(
+        ThinkEvent(4, EventKind.COMPLETED, "thread-1", datetime.now(timezone.utc))
+    )
+
+    rendered = output.getvalue()
+    assert rendered.count("Search complete") == 1
+    assert "Still working" in rendered
+
+
+def test_hidden_stream_frames_do_not_suppress_elapsed_heartbeat() -> None:
+    output = StringIO()
+    renderer = ProgressRenderer(
+        file=output,
+        stream_output=False,
+        heartbeat_interval=0.02,
+    )
+    now = datetime.now(timezone.utc)
+
+    renderer(ThinkEvent(1, EventKind.SUBMITTED, "thread-1", now))
+    for sequence in range(2, 14):
+        renderer(
+            ThinkEvent(
+                sequence,
+                EventKind.STREAM,
+                "thread-1",
+                datetime.now(timezone.utc),
+                stream_update=StreamUpdate(
+                    "hidden-answer",
+                    "internal update",
+                    "append",
+                    sequence,
+                    "assistant_message",
+                ),
+            )
+        )
+        time.sleep(0.01)
+    renderer(
+        ThinkEvent(14, EventKind.COMPLETED, "thread-1", datetime.now(timezone.utc))
+    )
+
+    assert "Still working" in output.getvalue()
+
+
+def test_generic_updates_do_not_replace_meaningful_heartbeat_phase() -> None:
+    output = StringIO()
+    renderer = ProgressRenderer(file=output, heartbeat_interval=0.02)
+    now = datetime.now(timezone.utc)
+    phase_text = "Gathering the evidence… — Reading primary sources"
+
+    renderer(ThinkEvent(1, EventKind.SUBMITTED, "thread-1", now))
+    renderer(
+        ThinkEvent(
+            2,
+            EventKind.PROGRESS,
+            "thread-1",
+            now,
+            message="Using tools",
+            data={"activity": "Using tools"},
+        )
+    )
+    activity_deadline = time.monotonic() + 0.5
+    while "Using tools (" not in output.getvalue() and time.monotonic() < activity_deadline:
+        time.sleep(0.01)
+    assert "Using tools (" in output.getvalue()
+    renderer(
+        ThinkEvent(
+            3,
+            EventKind.PROGRESS,
+            "thread-1",
+            now,
+            progress=ProgressUpdate(
+                done=False,
+                phases=(
+                    ProgressPhase(
+                        id="search-1",
+                        kind="search",
+                        state="active",
+                        label="Gathering the evidence…",
+                        detail="Reading primary sources",
+                    ),
+                ),
+            ),
+        )
+    )
+    renderer(
+        ThinkEvent(
+            4,
+            EventKind.PROGRESS,
+            "thread-1",
+            now,
+            message="Processing...",
+        )
+    )
+    renderer(
+        ThinkEvent(
+            5,
+            EventKind.PROGRESS,
+            "thread-1",
+            now,
+            message="Using tools",
+            data={"activity": "Using tools"},
+        )
+    )
+    deadline = time.monotonic() + 0.5
+    while output.getvalue().count(phase_text) < 2 and time.monotonic() < deadline:
+        time.sleep(0.01)
+    renderer(
+        ThinkEvent(6, EventKind.COMPLETED, "thread-1", datetime.now(timezone.utc))
+    )
+
+    assert output.getvalue().count(phase_text) >= 2
 
 
 def test_detach_stops_the_run_progress_renderer(
@@ -844,6 +1171,34 @@ def test_websocket_stream_snapshots_become_incremental_typed_events(
         12,
     ]
     assert all(update.message_id == "answer" for update in stream_updates)
+
+
+def test_websocket_stream_preserves_message_section(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    events: list[ThinkEvent] = []
+    _session, socket = transport
+    client = make_client(auth_state, transport, on_event=events.append)
+    run = client.submit("Analyze")
+
+    socket.trigger(
+        "stream_start",
+        {
+            "id": "internal-plan",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "Internal plan",
+            "metadata": {"stream_type": "text", "section": "plan"},
+        },
+    )
+
+    update = next(
+        event.stream_update
+        for event in events
+        if event.kind is EventKind.STREAM and event.stream_update is not None
+    )
+    assert update.section == "plan"
 
 
 def test_streaming_progress_hides_reasoning_and_prints_visible_deltas(
@@ -1675,6 +2030,7 @@ def test_submit_needs_input_respond_and_finish(
     assert result == RunResult(
         run_id="thread-1",
         output="The association analysis is complete.",
+        options=RunOptions(mode="plus", advanced_planning=True),
     )
     assert run.status is RunStatus.SUCCEEDED
 
@@ -2002,6 +2358,56 @@ def test_submit_preserves_a_matching_pre_ack_event(
     )
 
 
+def test_caller_idempotency_key_recovers_a_new_run_after_all_acks_are_lost(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport, sleep=lambda _seconds: None)
+
+    def lose_client_message_ack(
+        event: str,
+        data: object,
+        timeout: float | None,
+    ) -> None:
+        del data, timeout
+        if event == "client_message":
+            raise socketio.exceptions.TimeoutError("accepted but acknowledgement lost")
+
+    socket.call_hook = lose_client_message_ack
+    with pytest.raises(ThinkConnectionError, match="did not acknowledge"):
+        client.submit("Analyze", idempotency_key="customer-job-42")
+
+    socket.call_hook = None
+    recovered = client.submit("Analyze", idempotency_key="customer-job-42")
+
+    sent_messages: list[dict[str, object]] = []
+    for event, data, _timeout in socket.calls:
+        if event != "client_message":
+            continue
+        assert isinstance(data, dict)
+        message = data["message"]
+        assert isinstance(message, dict)
+        sent_messages.append(message)
+    assert len(sent_messages) == 4
+    assert len({message["id"] for message in sent_messages}) == 1
+    assert recovered.id == "thread-1"
+
+
+def test_blank_idempotency_key_fails_before_transport_or_client_activation(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+
+    with pytest.raises(ValueError, match="idempotency_key cannot be empty"):
+        client.submit("Analyze", idempotency_key="  ")
+
+    assert socket.connect_args is None
+    assert client.submit("Analyze").id == "thread-1"
+
+
 def test_threadless_task_end_cannot_complete_the_active_run(
     auth_state: CachedAuth,
     transport: tuple[FakeSession, FakeSocket],
@@ -2078,21 +2484,244 @@ def test_resume_hydrates_a_completed_run(
             "id": "thread-existing",
             "steps": [
                 {
+                    "id": "user-existing",
+                    "threadId": "thread-existing",
+                    "type": "user_message",
+                    "output": "Analyze",
+                    "metadata": {"mode": "phd"},
+                },
+                {
                     "id": "final-existing",
                     "threadId": "thread-existing",
                     "type": "assistant_message",
                     "output": "Persisted answer",
-                    "metadata": {"is_final_response": True},
+                    "metadata": {
+                        "is_final_response": True,
+                        "agent_execution_started_at": "2026-08-17T19:49:40.061902+00:00",
+                        "agent_execution_completed_at": "2026-08-17T19:49:50.948058+00:00",
+                        "agent_execution_duration_seconds": 10.886156558990479,
+                    },
                 }
             ],
             "elements": [],
         },
     )
 
-    assert run.wait(timeout=0.1) == RunResult(
+    outcome = run.wait(timeout=0.1)
+    assert outcome == RunResult(
         run_id="thread-existing",
         output="Persisted answer",
+        options=RunOptions(mode="phd"),
+        execution_started_at=datetime(
+            2026,
+            8,
+            17,
+            19,
+            49,
+            40,
+            61_902,
+            tzinfo=timezone.utc,
+        ),
+        execution_completed_at=datetime(
+            2026,
+            8,
+            17,
+            19,
+            49,
+            50,
+            948_058,
+            tzinfo=timezone.utc,
+        ),
+        execution_duration_seconds=10.886156558990479,
     )
+    assert isinstance(outcome, RunResult)
+    assert outcome.mode == "phd"
+
+
+@pytest.mark.parametrize(
+    ("metadata", "field_name"),
+    [
+        (
+            {"agent_execution_duration_seconds": 10**309},
+            "agent execution duration",
+        ),
+        (
+            {"agent_execution_started_at": "0001-01-01T00:00:00+14:00"},
+            "agent execution start time",
+        ),
+    ],
+)
+def test_invalid_result_timing_metadata_fails_with_a_protocol_error(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+    metadata: dict[str, object],
+    field_name: str,
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.submit("Analyze")
+    socket.trigger(
+        "new_message",
+        {
+            "id": "final-invalid-metadata",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "Valid answer with invalid optional metadata",
+            "metadata": {"is_final_response": True, **metadata},
+        },
+    )
+    socket.trigger("task_end", {"threadId": run.id})
+
+    with pytest.raises(RunProtocolError, match=f"invalid {field_name}"):
+        run.wait(timeout=0.1)
+    assert run.status is RunStatus.FAILED
+    assert all(event.kind is not EventKind.COMPLETED for event in run.history)
+
+
+def test_resume_hydrates_a_terminal_server_error_after_task_end(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport, finalization_timeout=0.001)
+    run = client.resume("thread-failed")
+
+    socket.trigger(
+        "resume_thread",
+        {
+            "id": "thread-failed",
+            "steps": [
+                {
+                    "id": "user-failed",
+                    "threadId": "thread-failed",
+                    "type": "user_message",
+                    "output": "Analyze",
+                    "metadata": {},
+                },
+                {
+                    "id": "server-error",
+                    "threadId": "thread-failed",
+                    "type": "assistant_message",
+                    "output": "AssertionError",
+                    "name": "Error",
+                    "isError": True,
+                    "metadata": {},
+                },
+            ],
+            "elements": [],
+        },
+    )
+    socket.trigger("task_end", {"threadId": "thread-failed"})
+
+    with pytest.raises(RunFailedError, match="AssertionError"):
+        run.wait(timeout=0.1)
+    assert run.status is RunStatus.FAILED
+
+
+def test_resume_does_not_treat_an_active_tool_error_as_terminal(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.resume("thread-active")
+
+    socket.trigger(
+        "resume_thread",
+        {
+            "id": "thread-active",
+            "steps": [
+                {
+                    "id": "user-active",
+                    "threadId": "thread-active",
+                    "type": "user_message",
+                    "output": "Analyze",
+                    "metadata": {},
+                },
+                {
+                    "id": "recoverable-tool-error",
+                    "threadId": "thread-active",
+                    "type": "assistant_message",
+                    "output": "A tool failed and the agent will retry",
+                    "isError": True,
+                    "metadata": {},
+                },
+            ],
+            "elements": [],
+        },
+    )
+    socket.trigger("task_start", {"threadId": "thread-active"})
+    socket.trigger(
+        "new_message",
+        {
+            "id": "final-recovered",
+            "threadId": "thread-active",
+            "type": "assistant_message",
+            "output": "Recovered answer",
+            "metadata": {"is_final_response": True},
+        },
+    )
+    socket.trigger("task_end", {"threadId": "thread-active"})
+
+    outcome = run.wait(timeout=0.1)
+    assert isinstance(outcome, RunResult)
+    assert outcome.output == "Recovered answer"
+    assert run.status is RunStatus.SUCCEEDED
+    assert all(event.kind is not EventKind.FAILED for event in run.history)
+
+
+def test_resume_ignores_an_error_from_an_older_turn(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.resume("thread-recovered")
+
+    socket.trigger(
+        "resume_thread",
+        {
+            "id": "thread-recovered",
+            "steps": [
+                {
+                    "id": "user-failed",
+                    "threadId": "thread-recovered",
+                    "type": "user_message",
+                    "output": "First attempt",
+                    "metadata": {},
+                },
+                {
+                    "id": "old-error",
+                    "threadId": "thread-recovered",
+                    "type": "assistant_message",
+                    "output": "TransientError",
+                    "name": "Error",
+                    "isError": True,
+                    "metadata": {},
+                },
+                {
+                    "id": "user-retry",
+                    "threadId": "thread-recovered",
+                    "type": "user_message",
+                    "output": "Try again",
+                    "metadata": {},
+                },
+                {
+                    "id": "final-recovered",
+                    "threadId": "thread-recovered",
+                    "type": "assistant_message",
+                    "output": "Recovered answer",
+                    "metadata": {"is_final_response": True},
+                },
+            ],
+            "elements": [],
+        },
+    )
+
+    outcome = run.wait(timeout=0.1)
+    assert isinstance(outcome, RunResult)
+    assert outcome.output == "Recovered answer"
+    assert run.status is RunStatus.SUCCEEDED
 
 
 def test_resume_restores_run_options_for_follow_up_turns(
@@ -2299,6 +2928,44 @@ def test_resume_does_not_complete_new_turn_from_an_older_final_response(
     assert all(event.kind is not EventKind.COMPLETED for event in run.history)
 
 
+def test_resume_hydrates_a_durably_cancelled_latest_turn(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.resume("thread-cancelled")
+
+    socket.trigger(
+        "resume_thread",
+        {
+            "id": "thread-cancelled",
+            "steps": [
+                {
+                    "id": "user-current",
+                    "threadId": "thread-cancelled",
+                    "type": "user_message",
+                    "output": "Run a long analysis",
+                    "metadata": {},
+                },
+                {
+                    "id": "stopped-current",
+                    "threadId": "thread-cancelled",
+                    "type": "run",
+                    "output": "",
+                    "metadata": {"manual_stop_status": True},
+                },
+            ],
+            "elements": [],
+        },
+    )
+
+    assert run.status is RunStatus.CANCELLED
+    assert [event.kind for event in run.history].count(EventKind.CANCELLED) == 1
+    with pytest.raises(RunCancelledError):
+        run.wait(timeout=0.1)
+
+
 def test_late_final_message_emits_completion_after_task_end(
     auth_state: CachedAuth,
     transport: tuple[FakeSession, FakeSocket],
@@ -2324,6 +2991,112 @@ def test_late_final_message_emits_completion_after_task_end(
     assert isinstance(result, RunResult)
     assert result.output == "Late durable answer"
     assert [event.kind for event in run.history].count(EventKind.COMPLETED) == 1
+
+
+def test_error_message_only_fails_the_run_after_task_end(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport, finalization_timeout=0.001)
+    run = client.submit("Analyze")
+    socket.trigger("task_start", {"threadId": run.id})
+
+    socket.trigger(
+        "new_message",
+        {
+            "id": "server-error",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "AssertionError",
+            "name": "Error",
+            "isError": True,
+            "metadata": {},
+        },
+    )
+
+    with pytest.raises(RunTimeoutError):
+        run.wait(timeout=0.001)
+
+    assert run.status is RunStatus.RUNNING
+    assert all(event.kind is not EventKind.FAILED for event in run.history)
+
+    socket.trigger("task_end", {"threadId": run.id})
+
+    with pytest.raises(RunFailedError, match="AssertionError"):
+        run.wait(timeout=0.1)
+    assert run.status is RunStatus.FAILED
+    assert [event.kind for event in run.history].count(EventKind.FAILED) == 1
+
+
+def test_recoverable_error_can_be_followed_by_a_final_response(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport)
+    run = client.submit("Analyze")
+    socket.trigger("task_start", {"threadId": run.id})
+    socket.trigger(
+        "new_message",
+        {
+            "id": "server-error",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "AssertionError",
+            "name": "Error",
+            "isError": True,
+            "metadata": {},
+        },
+    )
+    socket.trigger(
+        "new_message",
+        {
+            "id": "late-final",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "Late answer",
+            "metadata": {"is_final_response": True},
+        },
+    )
+    socket.trigger("task_end", {"threadId": run.id})
+
+    result = run.wait(timeout=0.1)
+    assert isinstance(result, RunResult)
+    assert result.output == "Late answer"
+    assert run.status is RunStatus.SUCCEEDED
+    assert all(event.kind is not EventKind.FAILED for event in run.history)
+    assert [event.kind for event in run.history].count(EventKind.COMPLETED) == 1
+
+
+def test_terminal_server_error_strips_control_sequences(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    client = make_client(auth_state, transport, finalization_timeout=0.001)
+    run = client.submit("Analyze")
+    socket.trigger(
+        "new_message",
+        {
+            "id": "server-error",
+            "threadId": run.id,
+            "type": "assistant_message",
+            "output": "Failure\n\x1b]0;forged title\x07",
+            "name": "Error",
+            "isError": True,
+            "metadata": {},
+        },
+    )
+    socket.trigger("task_end", {"threadId": run.id})
+
+    with pytest.raises(RunFailedError) as raised:
+        run.wait(timeout=0.1)
+
+    rendered = str(raised.value)
+    assert "\n" not in rendered
+    assert "\x1b" not in rendered
+    assert "\x07" not in rendered
 
 
 def test_events_fail_closed_after_task_end_without_a_final_response(
@@ -2497,6 +3270,140 @@ def test_rejected_follow_up_restores_completed_turn(
     restored_result = run.wait(timeout=0.1)
     assert isinstance(restored_result, RunResult)
     assert restored_result.output == "First answer"
+
+
+def billing_denial_ack() -> dict[str, object]:
+    return {
+        "success": False,
+        "error": "INSUFFICIENT_BILLING_CREDITS",
+        "retryable": False,
+        "billing": {
+            "status": "billing_required",
+            "reservationStatus": "denied",
+            "requiredCostCents": 2_500,
+            "additionalCostCents": 1_500,
+            "spendCapMonthlyLimitCents": 4_000,
+            "accessMessage": "Approve a top-up to continue.",
+        },
+    }
+
+
+def test_billing_denial_exposes_an_explicit_top_up_request(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    _session, socket = transport
+    socket.next_message_ack = billing_denial_ack()
+    client = make_client(auth_state, transport)
+
+    with pytest.raises(ThinkBillingRequiredError) as exc_info:
+        client.submit("Expensive analysis")
+
+    assert exc_info.value.request is not None
+    assert exc_info.value.request.minimum_top_up_cents == 1_500
+    assert exc_info.value.request.required_cost_cents == 2_500
+    assert exc_info.value.request.current_monthly_limit_cents == 4_000
+
+
+def test_explicit_top_up_uses_atomic_endpoint_and_retries_same_message(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    session, socket = transport
+    socket.message_acks = [
+        billing_denial_ack(),
+        {"success": True, "threadId": "thread-funded", "created": True},
+    ]
+    session.spend_cap_responses.append(
+        FakeResponse(200, {"ok": True, "spendCapSaved": True})
+    )
+    requests_seen: list[BillingTopUpRequest] = []
+
+    def approve(request: BillingTopUpRequest) -> BillingTopUpApproval:
+        requests_seen.append(request)
+        return request.approve(amount_cents=2_000)
+
+    client = make_client(
+        auth_state,
+        transport,
+        on_billing_required=approve,
+    )
+    run = client.submit("Expensive analysis")
+
+    assert run.id == "thread-funded"
+    assert requests_seen[0].minimum_top_up_cents == 1_500
+    assert session.puts == [
+        (
+            "https://ai.bystro.cloud/user/billing/spend-cap",
+            {
+                "json": {
+                    "mode": "fixed",
+                    "monthlyLimitUsd": "20.00",
+                    "topUp": True,
+                },
+                "timeout": (15.0, 300.0),
+                "allow_redirects": False,
+            },
+        )
+    ]
+    message_calls = [call for call in socket.calls if call[0] == "client_message"]
+    assert len(message_calls) == 2
+    first_payload = cast(dict[str, object], message_calls[0][1])
+    second_payload = cast(dict[str, object], message_calls[1][1])
+    first_message = cast(dict[str, object], first_payload["message"])
+    second_message = cast(dict[str, object], second_payload["message"])
+    assert second_message["id"] == first_message["id"]
+    first_metadata = cast(dict[str, object], first_message["metadata"])
+    second_metadata = cast(dict[str, object], second_message["metadata"])
+    assert "billingRetrySalt" not in first_metadata
+    assert isinstance(second_metadata["billingRetrySalt"], str)
+
+
+def test_top_up_that_needs_payment_setup_exposes_action_without_retry(
+    auth_state: CachedAuth,
+    transport: tuple[FakeSession, FakeSocket],
+) -> None:
+    session, socket = transport
+    socket.next_message_ack = billing_denial_ack()
+    session.spend_cap_responses.append(
+        FakeResponse(
+            200,
+            {
+                "ok": True,
+                "spendCapSaved": False,
+                "paymentMethodSetupRequired": True,
+                "checkoutUrl": "https://checkout.stripe.com/setup/test",
+            },
+        )
+    )
+    client = make_client(
+        auth_state,
+        transport,
+        on_billing_required=lambda request: request.approve(),
+    )
+
+    with pytest.raises(ThinkBillingRequiredError) as exc_info:
+        client.submit("Expensive analysis")
+
+    assert exc_info.value.code == "payment_method_setup_required"
+    assert exc_info.value.action_url == "https://checkout.stripe.com/setup/test"
+    assert len([call for call in socket.calls if call[0] == "client_message"]) == 1
+
+
+@given(
+    minimum=st.integers(min_value=1, max_value=1_000_000),
+    amount=st.integers(min_value=1, max_value=1_000_000),
+)
+def test_top_up_approval_never_authorizes_less_than_the_server_minimum(
+    minimum: int,
+    amount: int,
+) -> None:
+    request = BillingTopUpRequest(minimum, minimum, None)
+    if amount < minimum:
+        with pytest.raises(ValueError, match="smaller"):
+            request.approve(amount)
+    else:
+        assert request.approve(amount).amount_cents == amount
 
 
 def test_run_result_lazily_exposes_structured_files_and_notebook_markdown(
@@ -2829,7 +3736,7 @@ def test_async_event_iterator_and_wait_return_the_terminal_result(
 @settings(max_examples=50, deadline=None, database=None)
 @given(
     message_kinds=st.lists(
-        st.sampled_from(["user", "assistant", "final"]),
+        st.sampled_from(["user", "assistant", "final", "stopped"]),
         min_size=1,
         max_size=20,
     )
@@ -2848,17 +3755,28 @@ def test_resume_transcript_fuzz_only_completes_the_latest_turn(
     run = client.resume("thread-fuzz")
     steps: list[dict[str, object]] = []
     expected_output: str | None = None
+    expected_cancelled = False
     for index, message_kind in enumerate(message_kinds):
         output = f"output-{index}"
         if message_kind == "user":
             expected_output = None
+            expected_cancelled = False
             message_type = "user_message"
             metadata: dict[str, object] = {}
         else:
             message_type = "assistant_message"
-            metadata = {"is_final_response": True} if message_kind == "final" else {}
+            metadata = (
+                {"is_final_response": True}
+                if message_kind == "final"
+                else {"manual_stop_status": True}
+                if message_kind == "stopped"
+                else {}
+            )
             if message_kind == "final":
                 expected_output = output
+                expected_cancelled = False
+            elif message_kind == "stopped":
+                expected_cancelled = True
         steps.append(
             {
                 "id": f"message-{index}",
@@ -2875,7 +3793,11 @@ def test_resume_transcript_fuzz_only_completes_the_latest_turn(
     )
 
     completed_events = [event for event in run.history if event.kind is EventKind.COMPLETED]
-    if expected_output is None:
+    if expected_cancelled:
+        assert run.status is RunStatus.CANCELLED
+        with pytest.raises(RunCancelledError):
+            run.wait(timeout=0.1)
+    elif expected_output is None:
         assert run.status is RunStatus.QUEUED
         assert completed_events == []
     else:
