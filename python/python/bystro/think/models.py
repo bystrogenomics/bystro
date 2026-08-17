@@ -92,6 +92,43 @@ class Dataset:
 
 
 @dataclass(frozen=True, slots=True)
+class BillingTopUpApproval:
+    """An explicit authorization to raise the fixed monthly spend cap."""
+
+    amount_cents: int
+
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.amount_cents, bool)
+            or not isinstance(self.amount_cents, int)
+            or self.amount_cents <= 0
+        ):
+            raise ValueError("top-up amount must be a positive integer number of cents")
+
+
+@dataclass(frozen=True, slots=True)
+class BillingTopUpRequest:
+    """The server-priced funding shortfall for one blocked message."""
+
+    minimum_top_up_cents: int
+    required_cost_cents: int
+    current_monthly_limit_cents: int | None
+    message: str | None = None
+    details: Mapping[str, object] = field(default_factory=dict)
+
+    def approve(self, amount_cents: int | None = None) -> BillingTopUpApproval:
+        """Explicitly approve the minimum top-up, or a larger cent amount."""
+
+        resolved_amount = self.minimum_top_up_cents if amount_cents is None else amount_cents
+        approval = BillingTopUpApproval(resolved_amount)
+        if approval.amount_cents < self.minimum_top_up_cents:
+            raise ValueError(
+                "approved top-up amount cannot be smaller than the required amount"
+            )
+        return approval
+
+
+@dataclass(frozen=True, slots=True)
 class UploadedFile:
     """A durable personal input artifact returned by Think."""
 
@@ -153,6 +190,7 @@ class ThinkMessage:
     output: str
     name: str | None = None
     metadata: Mapping[str, object] = field(default_factory=dict)
+    is_error: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -167,6 +205,7 @@ class StreamUpdate:
     name: str | None = None
     stream_type: str | None = None
     is_reasoning: bool = False
+    section: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -241,6 +280,10 @@ class RunResult:
 
     run_id: str
     output: str
+    options: RunOptions = field(default_factory=RunOptions)
+    execution_started_at: datetime | None = None
+    execution_completed_at: datetime | None = None
+    execution_duration_seconds: float | None = None
     _file_loader: OutputFileLoader | None = field(
         default=None,
         repr=False,
@@ -278,6 +321,12 @@ class RunResult:
 
         return self.files
 
+    @property
+    def mode(self) -> ConversationMode:
+        """Return the model/research mode used for the completed turn."""
+
+        return self.options.mode
+
     def _repr_markdown_(self) -> str:
         """Render the final Markdown response naturally in notebooks."""
 
@@ -288,6 +337,8 @@ RunOutcome: TypeAlias = NeedsInput | RunResult
 
 
 __all__ = [
+    "BillingTopUpApproval",
+    "BillingTopUpRequest",
     "ConversationMode",
     "Dataset",
     "EventKind",

@@ -105,11 +105,38 @@ jobs:
           name: wheels-sdist
           path: dist
 
+  think:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install pinned build tools
+        run: >-
+          python -m pip install
+          --only-binary=:all:
+          --require-hashes
+          --requirement python/think-client/build-requirements.txt
+
+      - name: Build lightweight Think wheel
+        run: python -m build --no-isolation --wheel --outdir dist python/think-client
+
+      - name: Check lightweight Think wheel
+        run: python python/think-client/check_wheel.py dist/bystro_think-*.whl
+
+      - name: Upload lightweight Think wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-think
+          path: dist
+
   release:
     name: Release
     runs-on: ubuntu-latest
     if: "startsWith(github.ref, 'refs/tags/')"
-    needs: [linux, macos, sdist]
+    needs: [linux, macos, sdist, think]
     steps:
       - uses: actions/download-artifact@v4
       - name: Publish to PyPI

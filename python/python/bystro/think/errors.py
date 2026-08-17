@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Mapping
+from typing import TYPE_CHECKING, Mapping
+
+if TYPE_CHECKING:
+    from bystro.think.models import BillingTopUpRequest
 
 
 class ThinkError(RuntimeError):
@@ -32,6 +35,25 @@ class ThinkAuthenticationError(ThinkHTTPError):
 
 class ThinkBillingRequiredError(ThinkHTTPError):
     """The account needs an active Think plan or additional credits."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int,
+        code: str | None = None,
+        retryable: bool = False,
+        request: BillingTopUpRequest | None = None,
+        action_url: str | None = None,
+    ) -> None:
+        super().__init__(
+            message,
+            status_code=status_code,
+            code=code,
+            retryable=retryable,
+        )
+        self.request = request
+        self.action_url = action_url
 
 
 class ThinkConnectionError(ThinkError):
@@ -63,6 +85,32 @@ class RunCancelledError(ThinkError):
     """The run was durably cancelled rather than merely detached."""
 
 
+class RunFailedError(ThinkError):
+    """The server accepted a run, but its execution failed."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        run_id: str,
+        message_id: str,
+    ) -> None:
+        terminal_safe_message = " ".join(
+            "".join(
+                (
+                    character
+                    if ord(character) >= 32
+                    and not 127 <= ord(character) <= 159
+                    else " "
+                )
+                for character in message
+            ).split()
+        )
+        super().__init__(terminal_safe_message or "Think run failed")
+        self.run_id = run_id
+        self.message_id = message_id
+
+
 class RunProtocolError(ThinkError):
     """The live server sent an incomplete or contradictory run state."""
 
@@ -74,6 +122,7 @@ class InputResponseError(ThinkError):
 __all__ = [
     "InputResponseError",
     "RunCancelledError",
+    "RunFailedError",
     "RunProtocolError",
     "RunRejectedError",
     "RunTimeoutError",

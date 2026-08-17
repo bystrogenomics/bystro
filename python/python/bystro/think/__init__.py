@@ -14,6 +14,7 @@ Typical usage::
 """
 
 from bystro.think.client import (
+    BillingApprovalCallback,
     DEFAULT_THINK_URL,
     Run,
     ThinkClient,
@@ -37,6 +38,7 @@ from bystro.think.context import (
 from bystro.think.errors import (
     InputResponseError,
     RunCancelledError,
+    RunFailedError,
     RunProtocolError,
     RunRejectedError,
     RunTimeoutError,
@@ -47,6 +49,8 @@ from bystro.think.errors import (
     ThinkHTTPError,
 )
 from bystro.think.models import (
+    BillingTopUpApproval,
+    BillingTopUpRequest,
     ConversationMode,
     Dataset,
     EventKind,
@@ -72,6 +76,9 @@ from bystro.think.progress import ProgressCallback, ProgressRenderer, show_progr
 
 __all__ = [
     "ArtifactReference",
+    "BillingApprovalCallback",
+    "BillingTopUpApproval",
+    "BillingTopUpRequest",
     "ConversationMode",
     "ContextArtifact",
     "ContextTransform",
@@ -92,6 +99,7 @@ __all__ = [
     "ProgressRenderer",
     "Run",
     "RunCancelledError",
+    "RunFailedError",
     "RunOptions",
     "RunOutcome",
     "RunProtocolError",

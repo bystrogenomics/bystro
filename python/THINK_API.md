@@ -7,12 +7,25 @@ results.
 
 ## Install
 
-Bystro 2.1.2 supports CPython 3.11 and 3.12:
+For agent workloads only, install the lightweight client. It supports CPython
+3.11 and newer, including 3.13, and does not install the genomics/scientific
+stack:
 
 ```sh
 python --version
-python -m pip install "bystro>=2.1.2,<2.2"
+python -m pip install "bystro-think==2.1.3"
 ```
+
+For both Think and Bystro's local genomics tools, install the full distribution
+on CPython 3.11 or 3.12:
+
+```sh
+python --version
+python -m pip install "bystro==2.1.3"
+```
+
+Choose one distribution per environment. Both intentionally provide the same
+`bystro.think` and `bystro.api.auth` imports, so they should not be co-installed.
 
 Production uses publicly trusted HTTPS certificates. Customers do not need a
 custom CA bundle or TLS override; those are only for local development servers
@@ -57,15 +70,34 @@ dashboard before running the login snippet above.
 ## Canonical interactive workflow
 
 This is the recommended customer experience. It prints lifecycle changes,
-backend-owned phases such as web search and source verification, visible answer
-chunks, and an elapsed heartbeat if no server frame arrives for 30 seconds.
-`interact()` prompts for any number of clarification or plan-review pauses.
+backend-owned phases when the service emits them, visible answer chunks, and an
+elapsed heartbeat if no server frame arrives for 30 seconds. `interact()`
+prompts for any number of clarification or plan-review pauses.
 
 ```python
-from bystro.think import NeedsInput, RunResult, ThinkClient, show_progress
+from bystro.think import (
+    BillingTopUpApproval,
+    BillingTopUpRequest,
+    NeedsInput,
+    RunResult,
+    ThinkClient,
+    show_progress,
+)
 
 
-with ThinkClient.from_cached_login(on_event=show_progress) as client:
+def approve_top_up(
+    request: BillingTopUpRequest,
+) -> BillingTopUpApproval | None:
+    amount = request.minimum_top_up_cents
+    dollars = f"{amount // 100}.{amount % 100:02d}"
+    answer = input(f"This message needs a ${dollars} top-up. Approve? [y/N] ")
+    return request.approve(amount) if answer.strip().lower() == "y" else None
+
+
+with ThinkClient.from_cached_login(
+    on_event=show_progress,
+    on_billing_required=approve_top_up,
+) as client:
     run = client.submit_with_progress(
         "Research the latest CAR-T therapies and cite primary sources."
     )
@@ -73,9 +105,9 @@ with ThinkClient.from_cached_login(on_event=show_progress) as client:
 
     if isinstance(outcome, NeedsInput):
         # interact() handles clarification and plan-review pauses itself.
-        # A returned NeedsInput is a billing pause that must be resolved in
-        # the dashboard, followed by run.refresh(). Unlimited accounts should
-        # not enter this branch.
+        # Admission top-ups are handled above. A returned NeedsInput is a
+        # mid-run billing pause; resolve its durable operation in the dashboard
+        # and call run.refresh().
         print(outcome)
     else:
         assert isinstance(outcome, RunResult)
@@ -85,6 +117,16 @@ with ThinkClient.from_cached_login(on_event=show_progress) as client:
 `submit_with_progress()` installs a progress renderer automatically. Supplying
 `show_progress` on the client also includes connection and reconnect events.
 Do not pass the same callback again to `run.wait(on_event=...)`.
+
+The billing callback is invoked only after the server prices and rejects the
+specific message. It must return `request.approve(...)` or `None`; the SDK never
+infers consent, never accepts less than `minimum_top_up_cents`, and makes at most
+one top-up attempt for that submission. The approved amount raises the fixed
+monthly extra-usage cap; the actual usage charge remains part of the retried
+conversation reservation. If Stripe needs a payment method or billing-address
+update, `ThinkBillingRequiredError.action_url` contains the hosted URL and the
+blocked message is not retried. Returning `None` declines the proposal and
+raises that same typed error without changing the cap.
 
 Think uses authenticated Socket.IO transport. It normally upgrades to WebSocket
 and retains HTTP polling as a compatibility fallback. Output frames are
@@ -312,9 +354,11 @@ def on_event(event: ThinkEvent) -> None:
 
 `ProgressRenderer(heartbeat_interval=30)` provides the canonical terminal
 presentation. Generic `Thinking...` and `Processing...` states print at most
-once per turn; meaningful phase/count changes print immediately; and the renderer emits
-`Still working... (… elapsed)` during complete transport silence. Heartbeat
-workers stop on input, completion, failure, cancellation, or local detach.
+once per turn; meaningful phase/count changes print immediately; and, during
+transport silence, the renderer repeats a structured phase only while the
+backend reports it active or pending. Otherwise it emits
+`Still working... (… elapsed)`. Heartbeat workers stop on input, completion,
+failure, cancellation, or local detach.
 
 ## Results, conversations, and downloads
 
@@ -334,6 +378,11 @@ with ThinkClient.from_cached_login() as client:
     if not isinstance(result, RunResult):
         raise RuntimeError("The run paused for billing")
 
+    print("Mode:", result.mode)
+    print("Started:", result.execution_started_at)
+    print("Completed:", result.execution_completed_at)
+    print("Execution seconds:", result.execution_duration_seconds)
+
     for output_file in result.files:  # result.artifacts is the same tuple
         print(output_file.path, output_file.size)
 
@@ -352,6 +401,13 @@ with ThinkClient.from_cached_login() as client:
 the destination only after the authenticated download completes. Existing
 targets are never replaced unless `overwrite=True` is explicit.
 
+`result.options` contains the complete typed `RunOptions` used for the turn;
+`result.mode` is its convenient mode alias. Execution timing comes from the
+durable final-message metadata and is `None` only when an older transcript does
+not contain that field. `result.files` is the authenticated output-file
+manifest and remains lazily loaded so text-only callers do not pay for another
+request.
+
 List and resume past conversations:
 
 ```python
@@ -360,13 +416,17 @@ for conversation in conversations:
     print(conversation.id, conversation.name, conversation.created_at)
 
 previous = client.resume(conversations[0].id)
+previous_outcome = previous.wait(timeout=60)
 print(previous.messages)
 print(previous.output_files())
 ```
 
 Omit `limit` to traverse all cursor pages. `run.messages` excludes internal
 reasoning and progress-card messages; `run.history` is bounded SDK event
-history. A resumed run restores its submitted mode and other `RunOptions`, so
+history. `resume()` starts transcript replay asynchronously; call `wait()` before
+reading a completed or paused conversation. For work that is still active,
+iterate `previous.events()` to observe it through its next pause or completion.
+A resumed run restores its submitted mode and other `RunOptions`, so
 `run.follow_up(...)` continues with the original settings.
 
 In Jupyter, `RunResult` and `NeedsInput` implement `_repr_markdown_()`, so
@@ -405,6 +465,29 @@ with ThinkClient.from_cached_login() as client:
 
 A `ThinkClient` owns one foreground conversation at a time. Use separate
 clients for concurrently controlled conversations.
+
+## Caller-controlled idempotency
+
+The SDK automatically reuses one message ID for its own transport retries. For
+recovery after a caller process exits before receiving the server's
+acknowledgement, persist an idempotency key before submission and reuse it:
+
+```python
+from uuid import uuid4
+
+
+request_id = str(uuid4())  # persist beside the customer job before submitting
+run = client.submit_with_progress(
+    "Research recent CAR-T approvals.",
+    idempotency_key=request_id,
+)
+```
+
+If the caller cannot tell whether that message was accepted, submitting it
+again with the same key resolves to the original durable admission instead of
+starting a second expensive job. `respond()` and `follow_up()` accept the same
+argument. A key identifies one logical message: never reuse it with different
+content and expect the new content to run.
 
 ## Async applications
 
@@ -457,9 +540,13 @@ For `ai.bystro.cloud`, the complete SDK transport surface is:
 /set-session-cookie
 /ws/socket.io
 /project/threads
+/user/billing/spend-cap
 /user/files/*
 /api/user-output/*
 ```
+
+The approval callback specifically requires a matching `PUT` rule for the
+exact `/user/billing/spend-cap` path.
 
 For `bystro.cloud`, one-time programmatic login uses:
 
@@ -492,10 +579,13 @@ Transport, HTTP, authentication, billing, admission, cancellation, timeout, and
 protocol failures have typed exceptions under `bystro.think`. In particular:
 
 - `ThinkAuthenticationError`: cached dashboard login is missing or expired.
-- `ThinkBillingRequiredError`: initial admission requires plan/credit action.
+- `ThinkBillingRequiredError`: admission requires billing action. Its `request`
+  holds a typed top-up proposal when one can be approved programmatically, and
+  `action_url` identifies any required Stripe-hosted setup.
 - `RunRejectedError`: submission was rejected before dispatch.
 - `RunTimeoutError`: a local wait deadline elapsed; the durable run may continue.
 - `RunCancelledError`: server-side cancellation completed.
+- `RunFailedError`: the accepted workload failed during server execution.
 - `RunProtocolError`: the server returned contradictory or incomplete state.
 
 Closing a client never implies cancellation.
