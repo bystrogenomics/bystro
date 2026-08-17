@@ -50,7 +50,8 @@ jobs:
         run: |
           source ~/.venv/ci-venv/bin/activate
           mypy --version
-          mypy --config-file python/mypy.ini $(git ls-files '*.py')
+          mypy --config-file python/mypy.ini $(git ls-files '*.py' ':!python/think-client/setup.py')
+          mypy --config-file python/mypy.ini python/think-client/setup.py
 
       - name: Tests
         run: |
