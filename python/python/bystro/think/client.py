@@ -198,12 +198,13 @@ def _message_id(idempotency_key: str | None, *, run_id: str | None) -> str:
     if not idempotency_key.strip():
         raise ValueError("idempotency_key cannot be empty")
     scope = run_id or "new"
-    return str(
-        uuid.uuid5(
-            uuid.NAMESPACE_URL,
-            f"https://api.bystro.com/think/messages/{scope}/{idempotency_key}",
-        )
+    seed = (
+        f"https://api.bystro.com/think/messages/{scope}/{idempotency_key}".encode()
     )
+    digest = hashlib.sha256(seed).digest()
+    # Chainlit accepts only UUIDv4 client-message IDs. Passing version=4 sets
+    # the RFC version and variant bits while retaining 122 deterministic bits.
+    return str(uuid.UUID(bytes=digest[:16], version=4))
 
 
 def _optional_nonnegative_float(value: object, *, field_name: str) -> float | None:
@@ -2076,6 +2077,7 @@ class ThinkClient:
             run_id = _text(ack.get("threadId"))
             if run_id is None:
                 raise RunProtocolError("Think accepted the workload without returning a run id")
+            replayed = ack.get("dispatched") is False
             with tracker.condition:
                 if tracker.run_id is not None and tracker.run_id != run_id:
                     raise RunProtocolError(
@@ -2090,6 +2092,7 @@ class ThinkClient:
             raise
         with tracker.condition:
             tracker.run_id = run_id
+            tracker.awaiting_transcript = replayed
             if tracker.status is RunStatus.SUBMITTING:
                 tracker.status = RunStatus.QUEUED
             tracker.condition.notify_all()
@@ -2105,7 +2108,10 @@ class ThinkClient:
             message=normalized_prompt,
             data={"message_id": message_id},
         )
-        self._emit_status_ready(run_id)
+        if replayed:
+            self._refresh(tracker)
+        else:
+            self._emit_status_ready(run_id)
         return Run(self, tracker)
 
     def resume(self, run_id: str) -> "Run":
