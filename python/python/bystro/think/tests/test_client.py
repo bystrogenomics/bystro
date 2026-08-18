@@ -7,6 +7,7 @@ from io import StringIO
 from pathlib import Path
 import time
 from typing import cast
+import uuid
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -2379,7 +2380,45 @@ def test_caller_idempotency_key_recovers_a_new_run_after_all_acks_are_lost(
         client.submit("Analyze", idempotency_key="customer-job-42")
 
     socket.call_hook = None
+    socket.next_message_ack = {
+        "success": True,
+        "threadId": "thread-1",
+        "created": True,
+        "dispatched": False,
+        "replayed": "client_message_admission",
+    }
+
+    def hydrate_replayed_submission(event: str, data: object) -> None:
+        del data
+        if event != "connection_successful":
+            return
+        socket.trigger(
+            "resume_thread",
+            {
+                "id": "thread-1",
+                "steps": [
+                    {
+                        "id": "user-1",
+                        "threadId": "thread-1",
+                        "type": "user_message",
+                        "output": "Analyze",
+                        "metadata": {},
+                    },
+                    {
+                        "id": "final-1",
+                        "threadId": "thread-1",
+                        "type": "assistant_message",
+                        "output": "Persisted answer",
+                        "metadata": {"is_final_response": True},
+                    },
+                ],
+                "elements": [],
+            },
+        )
+
+    socket.emit_hook = hydrate_replayed_submission
     recovered = client.submit("Analyze", idempotency_key="customer-job-42")
+    outcome = recovered.wait(timeout=0.01)
 
     sent_messages: list[dict[str, object]] = []
     for event, data, _timeout in socket.calls:
@@ -2391,7 +2430,40 @@ def test_caller_idempotency_key_recovers_a_new_run_after_all_acks_are_lost(
         sent_messages.append(message)
     assert len(sent_messages) == 4
     assert len({message["id"] for message in sent_messages}) == 1
+    assert {uuid.UUID(cast(str, message["id"])).version for message in sent_messages} == {
+        4
+    }
     assert recovered.id == "thread-1"
+    assert isinstance(outcome, RunResult)
+    assert outcome.output == "Persisted answer"
+
+
+@settings(max_examples=100, deadline=None, database=None)
+@given(
+    idempotency_key=st.text(min_size=1).filter(lambda value: bool(value.strip())),
+    run_id=st.one_of(st.none(), st.uuids(version=4).map(str)),
+)
+def test_idempotency_message_ids_are_stable_uuid4(
+    idempotency_key: str,
+    run_id: str | None,
+) -> None:
+    message_id_factory = think_client_module._message_id  # noqa: SLF001
+    first = message_id_factory(idempotency_key, run_id=run_id)
+    second = message_id_factory(idempotency_key, run_id=run_id)
+
+    assert first == second
+    assert uuid.UUID(first).version == 4
+
+
+def test_idempotency_message_ids_are_scoped_to_their_run() -> None:
+    message_id_factory = think_client_module._message_id  # noqa: SLF001
+    message_ids = {
+        message_id_factory("customer-job-42", run_id=None),
+        message_id_factory("customer-job-42", run_id="thread-1"),
+        message_id_factory("customer-job-42", run_id="thread-2"),
+    }
+
+    assert len(message_ids) == 3
 
 
 def test_blank_idempotency_key_fails_before_transport_or_client_activation(
